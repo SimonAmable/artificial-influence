@@ -97,7 +97,7 @@ export default function InfluencerGeneratorPage() {
       // Don't clear existing images on error - keep them in the grid
     } finally {
       setIsGenerating(false)
-    }
+    } 
   }
 
   // Render generated image or showcase card
