@@ -14,7 +14,7 @@ import { X } from "lucide-react"
 const VIDEO_FILES = [
   "/hero_showcase_images/lipsync_final.mp4",
   "/hero_showcase_images/motion_copy_dance_1.mp4",
-  "/hero_showcase_images/motion_copy_dance_2.mp4",
+  // "/hero_showcase_images/motion_copy_dance_2.mp4",
   "/hero_showcase_images/motion_copy.mp4",
 ]
 

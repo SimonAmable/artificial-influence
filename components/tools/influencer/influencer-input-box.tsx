@@ -14,6 +14,7 @@ import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { CircleNotch } from "@phosphor-icons/react"
 import {
   Select,
@@ -45,6 +46,9 @@ interface InfluencerInputBoxProps {
   selectedAspectRatio?: string
   onAspectRatioChange?: (aspectRatio: string) => void
   showAspectRatioSelector?: boolean
+  aspectRatio1to1?: boolean
+  onAspectRatio1to1Change?: (checked: boolean) => void
+  showAspectRatio1to1Checkbox?: boolean
 }
 
 export function InfluencerInputBox({
@@ -65,6 +69,9 @@ export function InfluencerInputBox({
   selectedAspectRatio,
   onAspectRatioChange,
   showAspectRatioSelector = false,
+  aspectRatio1to1 = false,
+  onAspectRatio1to1Change,
+  showAspectRatio1to1Checkbox = false,
 }: InfluencerInputBoxProps) {
   const [localPrompt, setLocalPrompt] = React.useState(promptValue)
   const [localReferenceImage, setLocalReferenceImage] = React.useState<ImageUpload | null>(referenceImage || null)
@@ -357,6 +364,23 @@ export function InfluencerInputBox({
               onValueChange={onAspectRatioChange}
               disabled={isGenerating || loadingModels}
             />
+          )}
+
+          {/* Aspect Ratio 1:1 Checkbox (if enabled) */}
+          {showAspectRatio1to1Checkbox && (
+            <div className="h-7 flex items-center gap-1.5 px-2 rounded-[28px] border border-border bg-muted/30">
+              <Checkbox
+                id="aspect-ratio-1to1"
+                checked={aspectRatio1to1}
+                onCheckedChange={onAspectRatio1to1Change}
+              />
+              <Label
+                htmlFor="aspect-ratio-1to1"
+                className="text-xs cursor-pointer"
+              >
+                1:1
+              </Label>
+            </div>
           )}
           
           {/* Enhance Prompt section wrapped in container */}
