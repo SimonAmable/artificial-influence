@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   },
   // Configure body size limit for API routes (Route Handlers)
   // This is separate from serverActions.bodySizeLimit
-  middlewareClientMaxBodySize: '50mb',
+  // Note: middlewareClientMaxBodySize is not a valid Next.js config option
   images: {
     remotePatterns: [
       {

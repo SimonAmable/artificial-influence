@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     const referenceImageFile = formData.get('referenceImage') as File | null;
     const enhancePromptValue = formData.get('enhancePrompt');
     const shouldEnhance = enhancePromptValue === 'true';
+    const modelIdentifier = (formData.get('model') as string) || 'google/nano-banana'; // Default to nano-banana if not provided
     
     // Get optional parameters from form data
     const aspectRatio = formData.get('aspectRatio') as string | null;
@@ -49,6 +50,25 @@ export async function POST(request: NextRequest) {
     const aspect_ratio = formData.get('aspect_ratio') as string | null;
     const resolution = formData.get('resolution') as string | null;
     const output_format = formData.get('output_format') as string | null;
+
+    // Fetch model details from database
+    console.log('[generate-image] Fetching model details for:', modelIdentifier);
+    const { data: modelData, error: modelError } = await supabase
+      .from('models')
+      .select('*')
+      .eq('identifier', modelIdentifier)
+      .eq('type', 'image')
+      .eq('is_active', true)
+      .single();
+
+    if (modelError || !modelData) {
+      console.error('[generate-image] Model not found or error:', modelError?.message || 'Model not found');
+      return NextResponse.json(
+        { error: `Model "${modelIdentifier}" not found or is inactive` },
+        { status: 400 }
+      );
+    }
+    console.log('[generate-image] ✓ Model found:', modelData.name);
 
     console.log('[generate-image] FormData parsed:', {
       promptLength: prompt?.length || 0,
@@ -128,7 +148,7 @@ export async function POST(request: NextRequest) {
         // Upload to Supabase storage (for persistence/logging)
         console.log('[generate-image] Uploading reference image to Supabase storage...');
         const uploadStartTime = Date.now();
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('public-bucket')
           .upload(storagePath, buffer, {
             contentType: referenceImageFile.type,
@@ -189,12 +209,13 @@ export async function POST(request: NextRequest) {
     // Prepare generateImage options
     console.log('[generate-image] Preparing generation options...');
     
-    // According to Replicate's nano-banana API documentation:
+    // Use the selected model identifier
+    // According to Replicate's API documentation:
     // - The model expects image_input as an array of URLs in the input
     // - We pass this via providerOptions.replicate.image_input
     // - The prompt remains a simple string
     const generateOptions: Parameters<typeof generateImage>[0] = {
-      model: replicate.image('google/nano-banana'),
+      model: replicate.image(modelIdentifier as string),
       prompt: finalPrompt, // Keep prompt as simple string
     };
 
@@ -235,7 +256,8 @@ export async function POST(request: NextRequest) {
     };
 
     console.log('[generate-image] Generation options:', {
-      model: 'google/nano-banana',
+      model: modelIdentifier,
+      modelName: modelData.name,
       promptType: 'string',
       promptText: finalPrompt.substring(0, 100) + (finalPrompt.length > 100 ? '...' : ''),
       promptLength: finalPrompt.length,
@@ -330,7 +352,7 @@ export async function POST(request: NextRequest) {
           supabase_storage_path: storagePath,
           reference_images_supabase_storage_path: referenceStoragePaths,
           aspect_ratio: aspectRatio || aspect_ratio || null,
-          model: 'google/nano-banana',
+          model: modelIdentifier,
           type: 'image', // You can customize this based on your needs
           is_public: true, // Default from schema, but explicitly set
         };
@@ -441,12 +463,13 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     message: 'Image Generation API',
-    model: 'google/nano-banana',
+    defaultModel: 'google/nano-banana',
     usage: {
       method: 'POST',
       contentType: 'multipart/form-data',
       body: {
         prompt: 'string (required) - Text description of the image to generate',
+        model: 'string (optional) - Model identifier from database (defaults to "google/nano-banana")',
         enhancePrompt: 'boolean (optional) - If true, enhances the prompt using AI before generation',
         referenceImage: 'File (optional) - Reference image file to upload',
         aspectRatio: 'string (optional) - Aspect ratio (e.g., "16:9", "1:1")',

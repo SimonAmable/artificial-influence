@@ -113,10 +113,11 @@ export async function POST(request: NextRequest) {
       generatedVideoUrl = output;
     } else if (output && typeof output === 'object') {
       // Check if output has a url method (function)
-      if ('url' in output && typeof (output as any).url === 'function') {
-        generatedVideoUrl = (output as any).url();
-      } else if ('url' in output) {
-        generatedVideoUrl = String((output as any).url);
+      const outputObj = output as { url?: string | (() => string) };
+      if ('url' in outputObj && typeof outputObj.url === 'function') {
+        generatedVideoUrl = outputObj.url();
+      } else if ('url' in outputObj && typeof outputObj.url === 'string') {
+        generatedVideoUrl = outputObj.url;
       } else {
         // Try to get the first value if it's an array
         if (Array.isArray(output) && output.length > 0) {

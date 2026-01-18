@@ -1,15 +1,13 @@
 "use client"
 
 import * as React from "react"
-import { GeneratorLayout } from "@/components/generator-layout"
-import { InputPromptBox } from "@/components/input-prompt-box"
-import { ToolShowcaseCard } from "@/components/tool-showcase-card"
-import { ImageGrid } from "@/components/image-grid"
-import { useLayoutMode } from "@/components/layout-mode-context"
-import { ImageUpload } from "@/components/photo-upload"
+import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
+import { InfluencerInputBox, InfluencerShowcaseCard } from "@/components/tools/influencer"
+import { ImageGrid } from "@/components/shared/display/image-grid"
+import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
+import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CircleNotch, Plus } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 
 export default function InfluencerGeneratorPage() {
@@ -127,16 +125,16 @@ export default function InfluencerGeneratorPage() {
       )
     }
 
-    // Show empty state (ToolShowcaseCard) when no images and not generating
+    // Show empty state (InfluencerShowcaseCard) when no images and not generating
     return (
-      <ToolShowcaseCard
+      <InfluencerShowcaseCard
         tool_title=""
         title="CREATE YOUR OWN"
         highlightedTitle="INFLUENCER"
         description="Generate engaging social media content and captions that resonate with your audience."
         steps={[
           {
-            mediaPath: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=400&h=300&fit=crop",
+            mediaPath: "/influencers_images/image.png",
             title: "CHOOSE REFERENCE IMAGE (OPTIONAL)",
             description: "Use a reference image to guide the generation process.",
           },
@@ -151,7 +149,6 @@ export default function InfluencerGeneratorPage() {
   }
 
   const isRowLayout = layoutMode === "row"
-  const referenceImageValue = referenceImage ?? undefined
 
   return (
     <div className={cn(
@@ -167,22 +164,22 @@ export default function InfluencerGeneratorPage() {
             // Row layout: Full-screen grid fills entire screen excluding header
             <>
               {/* Main Content - Full-screen grid fills entire screen excluding header */}
-              <div className="flex-1 w-full h-full overflow-auto pb-[200px] sm:pb-[220px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <div className="flex-1 w-full h-full overflow-auto pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {renderShowcase()}
               </div>
 
               {/* Fixed Bottom Panel - Prompt Box (always visible) */}
               <div className="fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6">
                 <div className="max-w-7xl mx-auto flex justify-center">
-                  <InputPromptBox
+                  <InfluencerInputBox
                     forceRowLayout={true}
-                    showTextInput={true}
-                    textInputValue={prompt}
-                    onTextInputChange={setPrompt}
-                    defaultReferenceImage={referenceImageValue}
+                    promptValue={prompt}
+                    onPromptChange={setPrompt}
+                    referenceImage={referenceImage}
                     onReferenceImageChange={setReferenceImage}
                     enhancePrompt={enhancePrompt}
                     onEnhancePromptChange={setEnhancePrompt}
+                    isGenerating={isGenerating}
                     onGenerate={handleGenerate}
                   />
                 </div>
@@ -197,15 +194,15 @@ export default function InfluencerGeneratorPage() {
                   {/* Left Panel - Prompt Box (hidden on mobile, shown on desktop) */}
                   <div className="hidden lg:block lg:sticky lg:top-0 h-fit">
                     <div className="flex justify-center">
-                      <InputPromptBox
+                      <InfluencerInputBox
                         forceRowLayout={false}
-                        showTextInput={true}
-                        textInputValue={prompt}
-                        onTextInputChange={setPrompt}
-                        defaultReferenceImage={referenceImageValue}
+                        promptValue={prompt}
+                        onPromptChange={setPrompt}
+                        referenceImage={referenceImage}
                         onReferenceImageChange={setReferenceImage}
                         enhancePrompt={enhancePrompt}
                         onEnhancePromptChange={setEnhancePrompt}
+                        isGenerating={isGenerating}
                         onGenerate={handleGenerate}
                       />
                     </div>
@@ -221,15 +218,15 @@ export default function InfluencerGeneratorPage() {
               {/* Fixed Bottom Panel - Prompt Box (mobile only) */}
               <div className="fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6 lg:hidden">
                 <div className="max-w-7xl mx-auto flex justify-center">
-                  <InputPromptBox
+                  <InfluencerInputBox
                     forceRowLayout={false}
-                    showTextInput={true}
-                    textInputValue={prompt}
-                    onTextInputChange={setPrompt}
-                    defaultReferenceImage={referenceImageValue}
+                    promptValue={prompt}
+                    onPromptChange={setPrompt}
+                    referenceImage={referenceImage}
                     onReferenceImageChange={setReferenceImage}
                     enhancePrompt={enhancePrompt}
                     onEnhancePromptChange={setEnhancePrompt}
+                    isGenerating={isGenerating}
                     onGenerate={handleGenerate}
                   />
                 </div>

@@ -1,16 +1,15 @@
 "use client"
 
 import * as React from "react"
-import { GeneratorLayout } from "@/components/generator-layout"
-import { LipsyncInputBox } from "@/components/lipsync-input-box"
-import { LipsyncShowcaseCard } from "@/components/lipsync-showcase-card"
-import { VideoDisplay } from "@/components/video-display"
-import { useLayoutMode } from "@/components/layout-mode-context"
-import { ImageUpload } from "@/components/photo-upload"
-import { AudioUploadValue } from "@/components/audio-upload"
+import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
+import { LipsyncInputBox } from "@/components/tools/lipsync/lipsync-input-box"
+import { LipsyncShowcaseCard } from "@/components/tools/lipsync/lipsync-showcase-card"
+import { VideoDisplay } from "@/components/shared/display/video-display"
+import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
+import { ImageUpload } from "@/components/shared/upload/photo-upload"
+import { AudioUploadValue } from "@/components/shared/upload/audio-upload"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CircleNotch } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 
@@ -134,40 +133,36 @@ export default function LipsyncPage() {
       const audioPublicUrl = audioUrlData.publicUrl
       console.log('✓ Audio uploaded:', audioPublicUrl)
 
-      // TODO: Send URLs to API route for lipsync generation
-      // For now, we'll just show a placeholder message
+      // Send URLs to API route for lipsync generation
       console.log('Sending lipsync request with image and audio URLs')
       
-      // Placeholder: In a real implementation, you would call your API here
-      // const response = await fetch('/api/generate-lipsync', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({
-      //     imageUrl: imagePublicUrl,
-      //     audioUrl: audioPublicUrl,
-      //     imageStoragePath,
-      //     audioStoragePath,
-      //   }),
-      // })
+      const response = await fetch('/api/generate-lipsync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageUrl: imagePublicUrl,
+          audioUrl: audioPublicUrl,
+          imageStoragePath,
+          audioStoragePath,
+          resolution: '720p', // Default to 720p, can be made configurable later
+        }),
+      })
       
-      // if (!response.ok) {
-      //   const errorData = await response.json()
-      //   throw new Error(errorData.error || errorData.message || 'Failed to generate lipsync')
-      // }
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || errorData.message || 'Failed to generate lipsync')
+      }
       
-      // const data = await response.json()
+      const data = await response.json()
       
-      // // Handle response - extract video URL and PREPEND to existing videos
-      // if (data.video?.url) {
-      //   setGeneratedVideos(prev => [data.video.url, ...prev])
-      // } else {
-      //   throw new Error('No video URL received from API')
-      // }
-
-      // Temporary: Show error message that API is not implemented
-      throw new Error('Lipsync API endpoint not yet implemented. Please check back later.')
+      // Handle response - extract video URL and PREPEND to existing videos
+      if (data.video?.url) {
+        setGeneratedVideos(prev => [data.video.url, ...prev])
+      } else {
+        throw new Error('No video URL received from API')
+      }
     } catch (err) {
       console.error('Error generating lipsync:', err)
       setError(err instanceof Error ? err.message : 'Failed to generate lipsync')
@@ -209,19 +204,19 @@ export default function LipsyncPage() {
         description="Generate realistic lipsync videos by combining your image with audio."
         steps={[
           {
-            mediaPath: "/lipsync/step1_image.png",
+            mediaPath: "/lip_sync/step1_ref-Image.png",
             mediaType: "image",
             title: "UPLOAD IMAGE",
             description: "Upload an image of the person you want to lipsync.",
           },
           {
-            mediaPath: "/lipsync/step2_audio.mp3",
+            mediaPath: "/lip_sync/step-2-best-speak.mp3",
             mediaType: "audio",
             title: "UPLOAD AUDIO",
             description: "Upload the audio file you want to sync with the image.",
           },
           {
-            mediaPath: "/lipsync/step3_video.mp4",
+            mediaPath: "/lip_sync/final.mp4",
             mediaType: "video",
             title: "GENERATE",
             description: "Generate your lipsync video with AI-powered processing.",
@@ -249,7 +244,7 @@ export default function LipsyncPage() {
             // Row layout: Full-screen grid fills entire screen excluding header
             <>
               {/* Main Content - Full-screen grid fills entire screen excluding header */}
-              <div className="flex-1 w-full h-full overflow-auto pb-[200px] sm:pb-[220px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <div className="flex-1 w-full h-full overflow-auto pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {renderShowcase()}
               </div>
 

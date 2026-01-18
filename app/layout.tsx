@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Noto_Sans } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
-import { Header } from "@/components/header";
-import { LayoutModeProviderWrapper } from "@/components/layout-mode-provider-wrapper";
+import { ThemeProvider } from "@/components/app/theme-provider";
+import { Header } from "@/components/app/header";
+import { LayoutModeProviderWrapper } from "@/components/shared/layout/layout-mode-provider-wrapper";
 
 const notoSans = Noto_Sans({variable:'--font-sans'});
 
@@ -34,7 +34,7 @@ export default function RootLayout({
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="light"
           enableSystem
           disableTransitionOnChange
         >

@@ -1,12 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { GeneratorLayout } from "@/components/generator-layout"
-import { MotionCopyInputBox } from "@/components/motion-copy-input-box"
-import { MotionCopyShowcaseCard } from "@/components/motion-copy-showcase-card"
-import { VideoDisplay } from "@/components/video-display"
-import { useLayoutMode } from "@/components/layout-mode-context"
-import { ImageUpload } from "@/components/photo-upload"
+import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
+import { MotionCopyInputBox } from "@/components/tools/motion-copy/motion-copy-input-box"
+import { MotionCopyShowcaseCard } from "@/components/tools/motion-copy/motion-copy-showcase-card"
+import { VideoDisplay } from "@/components/shared/display/video-display"
+import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
+import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -246,7 +246,7 @@ export default function MotionCopyPage() {
             // Row layout: Full-screen grid fills entire screen excluding header
             <>
               {/* Main Content - Full-screen grid fills entire screen excluding header */}
-              <div className="flex-1 w-full h-full overflow-auto pb-[200px] sm:pb-[220px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <div className="flex-1 w-full h-full overflow-auto pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {renderShowcase()}
               </div>
 
