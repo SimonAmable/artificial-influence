@@ -40,14 +40,14 @@ export function HeroSection() {
   // 1. Typing: 0ms to totalTypingTime (1950ms)
   // 2. Subtitle: starts at totalTypingTime (1950ms), duration 1500ms, ends at 3450ms
   // 3. Buttons: starts at 3450ms, duration 1500ms, ends at 4950ms
-  // 4. Header and media: starts at 4950ms (together)
-  // 5. Lights: starts at 6950ms (2 seconds after header/media)
+  // 4. Header and media: starts at 3000ms (together, reduced from 4950ms)
+  // 5. Lights: starts at 5000ms (2 seconds after header/media, reduced from 6950ms)
   const subtitleDelay = totalTypingTime // 1950ms
   const subtitleDuration = 1500 // ms
   const buttonsDelay = subtitleDelay + subtitleDuration // 3450ms
   const buttonsDuration = 1500 // ms
-  const headerMediaDelay = buttonsDelay + buttonsDuration // 4950ms
-  const lightsDelay = headerMediaDelay + 2000 // 6950ms (2 seconds after header/media)
+  const headerMediaDelay = 3000 // Reduced from 4950ms for faster load-in
+  const lightsDelay = headerMediaDelay + 2000 // 5000ms (2 seconds after header/media)
 
   React.useEffect(() => {
     // Mark typing as complete after animation finishes

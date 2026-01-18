@@ -46,7 +46,7 @@ export function Iphone({
     >
       {hasVideo && (
         <div
-          className="pointer-events-none absolute z-0 overflow-hidden"
+          className="pointer-events-none absolute z-10 overflow-hidden"
           style={{
             left: `${LEFT_PCT}%`,
             top: `${TOP_PCT}%`,
@@ -91,7 +91,7 @@ export function Iphone({
         viewBox={`0 0 ${PHONE_WIDTH} ${PHONE_HEIGHT}`}
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="absolute inset-0 size-full"
+        className="absolute inset-0 size-full z-0"
         style={{ transform: "translateZ(0)" }}
       >
         <g mask={hasMedia ? "url(#screenPunch)" : undefined}>

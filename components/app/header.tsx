@@ -115,7 +115,7 @@ export function Header() {
           : "top-0 left-0 right-0",
       // Transition classes
       isHomePage 
-        ? "transition-all duration-[1500ms] ease-out" 
+        ? "transition-all duration-[800ms] ease-out" 
         : "transition-all duration-300 ease-in-out",
       // Home page animation: fade in from top
       isHomePage && !shouldAnimate && "opacity-0 -translate-y-4",
