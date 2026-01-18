@@ -184,10 +184,11 @@ export function HeroSection() {
       ref={containerRef}
       className={cn(
         "relative min-h-screen w-full",
-        "flex flex-col items-center justify-center",
+        "flex flex-col items-center",
         "bg-background",
         "overflow-x-hidden",
-        "py-8 md:py-12"
+        "py-8 md:py-12",
+        "md:justify-center"
       )}
     >
       {/* Light Rays Background - appears last, 2 seconds after header and media */}
@@ -199,7 +200,7 @@ export function HeroSection() {
           blur="20px"
           direction="down"
           offset={0}
-          className="fixed inset-0 z-0 w-full h-full pointer-events-none"
+          className="fixed inset-0 z-0 w-full h-full pointer-events-none touch-none"
         >
           <LightRays
             key="light-rays-effect" // Stable key to prevent remounting
@@ -221,7 +222,7 @@ export function HeroSection() {
       )}
 
       {/* Main content wrapper */}
-      <div className="relative z-20 w-full flex flex-col items-center pointer-events-none">
+      <div className="relative z-20 w-full flex flex-col items-center touch-pan-y">
         {/* Main text content with typing animation */}
         <h1
           className={cn(
@@ -230,7 +231,6 @@ export function HeroSection() {
             "font-bold",
             "text-center",
             "relative",
-            "pointer-events-none",
             "pt-4 md:pt-6"
           )}
         >
@@ -243,7 +243,7 @@ export function HeroSection() {
             blinkCursor={true}
             cursorStyle="line"
             loop={false}
-            className="uppercase pointer-events-none"
+            className="uppercase"
           />
         </h1>
 
@@ -255,9 +255,9 @@ export function HeroSection() {
           blur="10px"
           direction="up"
           offset={20}
-          className="mt-4 md:mt-6 pointer-events-none"
+          className="mt-4 md:mt-6"
         >
-          <p className="text-muted-foreground text-xl md:text-2xl lg:text-3xl text-center px-4 pointer-events-none max-w-3xl mx-auto leading-relaxed">
+          <p className="text-muted-foreground text-xl md:text-2xl lg:text-3xl text-center px-4 max-w-3xl mx-auto leading-relaxed">
             Create AI-powered influencers for UGC content, brand sponsorships, and ad testing. Transform your marketing with realistic virtual personalities.
           </p>
         </BlurFade>
@@ -408,7 +408,7 @@ export function HeroSection() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-[51] pointer-events-none"
+              className="fixed inset-0 z-[51]"
             >
               {/* Close button */}
               <Button

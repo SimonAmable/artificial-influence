@@ -55,7 +55,8 @@ export function FAQSection() {
         "relative min-h-screen w-full",
         "flex items-center justify-center",
         "bg-background",
-        "py-8 md:py-12"
+        "py-8 md:py-12",
+        "touch-pan-y"
       )}
     >
       <div className="relative z-10 w-full max-w-4xl mx-auto px-4">
