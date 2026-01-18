@@ -45,8 +45,26 @@ export function Header() {
   const isAuthPage = pathname === "/login" || pathname === "/signup"
   const [user, setUser] = React.useState<any>(null)
   const [loading, setLoading] = React.useState(true)
+  const [isScrolled, setIsScrolled] = React.useState(false)
 
   const currentPage = navigationItems.find(item => item.path === pathname)?.path || pathname
+  const isPageInDropdown = navigationItems.some(item => item.path === pathname)
+
+  // Scroll detection
+  React.useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY >= 50)
+    }
+
+    // Check initial scroll position
+    handleScroll()
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
 
   React.useEffect(() => {
     const supabase = createClient()
@@ -76,8 +94,15 @@ export function Header() {
 
   return (
     <header className={cn(
-      "fixed z-50 rounded-xl shadow-lg border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
-      isAuthPage ? "top-0 left-0 right-0 rounded-none" : "top-4 left-4 right-4"
+      "fixed z-50 rounded-xl border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-300 ease-in-out",
+      // Shadow: only when scrolled
+      isScrolled ? "shadow-lg" : "",
+      // Padding/Positioning
+      isAuthPage 
+        ? "top-0 left-0 right-0 rounded-none" 
+        : isScrolled 
+          ? "top-4 left-4 right-4" 
+          : "top-0 left-0 right-0"
     )}>
       <div className="flex h-14 items-center justify-between px-4 w-full max-w-full">
         <div className="flex items-center gap-6">
@@ -150,13 +175,13 @@ export function Header() {
           {/* Mobile/Tablet Dropdown - visible on tablet and smaller */}
           <div className="lg:hidden">
             <Select
-              value={currentPage}
+              value={isPageInDropdown ? currentPage : undefined}
               onValueChange={(value) => {
                 router.push(value)
               }}
             >
               <SelectTrigger className="min-w-full">
-                <SelectValue placeholder="Select a page" />
+                <SelectValue placeholder={isPageInDropdown ? "Select a page" : "Tools"} />
               </SelectTrigger>
               <SelectContent>
                 {navigationItems.map((item) => (
@@ -170,20 +195,25 @@ export function Header() {
         </div>
         <div className="flex items-center gap-3">
           {loading ? null : user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <User className="h-[1.2rem] w-[1.2rem]" />
-                  <span className="sr-only">User menu</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleLogout} variant="destructive">
-                  <SignOut className="mr-2 h-4 w-4" />
-                  <span>Logout</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <>
+              <Button variant="secondary" asChild>
+                <Link href="/assets">Assets</Link>
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <User className="h-[1.2rem] w-[1.2rem]" />
+                    <span className="sr-only">User menu</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleLogout} variant="destructive">
+                    <SignOut className="mr-2 h-4 w-4" />
+                    <span>Logout</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
           ) : (
             <>
               <Link 

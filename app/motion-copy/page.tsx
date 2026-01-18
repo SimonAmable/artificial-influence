@@ -2,14 +2,13 @@
 
 import * as React from "react"
 import { GeneratorLayout } from "@/components/generator-layout"
-import { InputPromptBox } from "@/components/input-prompt-box"
+import { MotionCopyInputBox } from "@/components/motion-copy-input-box"
 import { MotionCopyShowcaseCard } from "@/components/motion-copy-showcase-card"
 import { VideoDisplay } from "@/components/video-display"
 import { useLayoutMode } from "@/components/layout-mode-context"
 import { ImageUpload } from "@/components/photo-upload"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CircleNotch } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 
@@ -28,7 +27,6 @@ export default function MotionCopyPage() {
   const [generatedVideos, setGeneratedVideos] = React.useState<string[]>([])
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  const [enhancePrompt, setEnhancePrompt] = React.useState(false)
 
   // Handle generation
   const handleGenerate = async () => {
@@ -237,11 +235,11 @@ export default function MotionCopyPage() {
   return (
     <div className={cn(
       "min-h-screen bg-background flex flex-col",
-      isRowLayout ? "p-0" : "p-4 sm:p-6 md:p-12"
+      isRowLayout ? "p-0" : "px-4 pt-4 pb-0 sm:px-6 sm:pt-6 md:px-12 md:pt-[60px]"
     )}>
       <div className={cn(
         "mx-auto flex-1 flex flex-col",
-        isRowLayout ? "w-full pt-20" : "max-w-7xl pt-12"
+        isRowLayout ? "w-full pt-20" : "max-w-7xl"
       )}>
         <GeneratorLayout layoutMode={layoutMode} className="h-full flex-1 min-h-0">
           {isRowLayout ? (
@@ -252,20 +250,11 @@ export default function MotionCopyPage() {
                 {renderShowcase()}
               </div>
 
-              {/* Fixed Bottom Panel - Prompt Box (always visible) */}
+              {/* Fixed Bottom Panel - Input Box (always visible) */}
               <div className="fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6">
                 <div className="max-w-7xl mx-auto flex justify-center">
-                  <InputPromptBox
+                  <MotionCopyInputBox
                     forceRowLayout={true}
-                    showTextInput={false}
-                    showPlusButton={false}
-                    showPhotoUpload={true}
-                    showVideoUpload={true}
-                    showEnhancePrompt={false}
-                    showModelSelect={false}
-                    showAspectRatioSelect={false}
-                    showResolutionSelect={false}
-                    showQualitySelect={false}
                     defaultImage={inputImageValue}
                     defaultVideo={inputVideoValue}
                     onImageChange={setInputImage}
@@ -278,8 +267,7 @@ export default function MotionCopyPage() {
                       title: "Upload Video",
                       description: "Click to upload video"
                     }}
-                    enhancePrompt={enhancePrompt}
-                    onEnhancePromptChange={setEnhancePrompt}
+                    isGenerating={isGenerating}
                     onGenerate={handleGenerate}
                   />
                 </div>
@@ -291,20 +279,11 @@ export default function MotionCopyPage() {
               {/* Main Content */}
               <div className="w-full flex-1 min-h-0 lg:pb-0">
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 sm:gap-6 lg:gap-12 h-full">
-                  {/* Left Panel - Prompt Box (hidden on mobile, shown on desktop) */}
+                  {/* Left Panel - Input Box (hidden on mobile, shown on desktop) */}
                   <div className="hidden lg:block lg:sticky lg:top-0 h-fit">
                     <div className="flex justify-center">
-                      <InputPromptBox
+                      <MotionCopyInputBox
                         forceRowLayout={false}
-                        showTextInput={false}
-                        showPlusButton={false}
-                        showPhotoUpload={true}
-                        showVideoUpload={true}
-                        showEnhancePrompt={false}
-                        showModelSelect={false}
-                        showAspectRatioSelect={false}
-                        showResolutionSelect={false}
-                        showQualitySelect={false}
                         defaultImage={inputImageValue}
                         defaultVideo={inputVideoValue}
                         onImageChange={setInputImage}
@@ -317,8 +296,7 @@ export default function MotionCopyPage() {
                           title: "Upload Video",
                           description: "Click to upload video"
                         }}
-                        enhancePrompt={enhancePrompt}
-                        onEnhancePromptChange={setEnhancePrompt}
+                        isGenerating={isGenerating}
                         onGenerate={handleGenerate}
                       />
                     </div>
@@ -331,20 +309,11 @@ export default function MotionCopyPage() {
                 </div>
               </div>
 
-              {/* Fixed Bottom Panel - Prompt Box (mobile only) */}
+              {/* Fixed Bottom Panel - Input Box (mobile only) */}
               <div className="fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6 lg:hidden">
                 <div className="max-w-7xl mx-auto flex justify-center">
-                  <InputPromptBox
+                  <MotionCopyInputBox
                     forceRowLayout={false}
-                    showTextInput={false}
-                    showPlusButton={false}
-                    showPhotoUpload={true}
-                    showVideoUpload={true}
-                    showEnhancePrompt={false}
-                    showModelSelect={false}
-                    showAspectRatioSelect={false}
-                    showResolutionSelect={false}
-                    showQualitySelect={false}
                     defaultImage={inputImageValue}
                     defaultVideo={inputVideoValue}
                     onImageChange={setInputImage}
@@ -357,8 +326,7 @@ export default function MotionCopyPage() {
                       title: "Upload Video",
                       description: "Click to upload video"
                     }}
-                    enhancePrompt={enhancePrompt}
-                    onEnhancePromptChange={setEnhancePrompt}
+                    isGenerating={isGenerating}
                     onGenerate={handleGenerate}
                   />
                 </div>

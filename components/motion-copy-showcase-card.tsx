@@ -99,11 +99,11 @@ export function MotionCopyShowcaseCard({
                 GENERATE IN{" "}
                 <span className="text-primary motion-copy-showcase-steps-heading-highlight">{steps.length} EASY STEPS</span>
               </h3>
-            )}
+            )} 
             <div className={cn(
               "grid gap-4 md:gap-4 w-full motion-copy-showcase-steps-grid",
               steps.length === 1 ? "grid-cols-1 max-w-5xl mx-auto" : 
-              "grid-cols-1 lg:grid-cols-3"
+              "grid-cols-3"
             )}>
               {steps.map((step, index) => {
                 const stepNumber = index + 1
