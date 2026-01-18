@@ -227,7 +227,7 @@ export function LipsyncShowcaseCard({
                               <VideoStepContent isSingle={true} />
                             </div>
                           ) : mediaType === 'audio' ? (
-                            <div className="w-full h-32 lipsync-showcase-step-audio-wrapper">
+                            <div className="w-full h-[180px] md:h-32 lipsync-showcase-step-audio-wrapper">
                               <AudioStepContent />
                             </div>
                           ) : (
@@ -243,12 +243,12 @@ export function LipsyncShowcaseCard({
                         {(step.title || step.description) && (
                           <div className="pt-3 md:pt-4 space-y-1 text-center shrink-0 lipsync-showcase-step-text">
                             {step.title && (
-                              <h4 className="font-bold text-lg md:text-xl lg:text-2xl uppercase tracking-wider lipsync-showcase-step-title">
+                              <h4 className="hidden md:block font-bold text-lg md:text-xl lg:text-2xl uppercase tracking-wider lipsync-showcase-step-title">
                                 {step.title}
                               </h4>
                             )}
                             {step.description && (
-                              <p className="text-sm md:text-base text-muted-foreground max-w-xl mx-auto lipsync-showcase-step-description">
+                              <p className="hidden md:block text-sm md:text-base text-muted-foreground max-w-xl mx-auto lipsync-showcase-step-description">
                                 {step.description}
                               </p>
                             )}
@@ -264,7 +264,7 @@ export function LipsyncShowcaseCard({
                           </div>
                         </div>
                         <CardContent className="p-0 flex flex-col min-h-full lipsync-showcase-step-card-content overflow-visible">
-                          <div className="shrink-0 lipsync-showcase-step-media-wrapper overflow-hidden bg-black/5 dark:bg-white/5 aspect-video flex items-center justify-center rounded-t-2xl">
+                          <div className="shrink-0 lipsync-showcase-step-media-wrapper overflow-hidden bg-black/5 dark:bg-white/5 h-[180px] md:aspect-video flex items-center justify-center rounded-t-2xl">
                             {mediaType === 'video' ? (
                               <VideoStepContent isSingle={false} />
                             ) : mediaType === 'audio' ? (
@@ -278,10 +278,10 @@ export function LipsyncShowcaseCard({
                             )}
                           </div>
                           <div className="p-2.5 md:p-3 pb-4 md:pb-5 space-y-1 text-center flex-1 flex flex-col justify-start lipsync-showcase-step-text">
-                            <h4 className="font-bold text-sm md:text-base lg:text-lg uppercase tracking-widest lipsync-showcase-step-title">
+                            <h4 className="hidden md:block font-bold text-sm md:text-base lg:text-lg uppercase tracking-widest lipsync-showcase-step-title">
                               {step.title}
                             </h4>
-                            <p className="text-xs md:text-sm text-muted-foreground leading-relaxed lipsync-showcase-step-description">
+                            <p className="hidden md:block text-xs md:text-sm text-muted-foreground leading-relaxed lipsync-showcase-step-description">
                               {step.description}
                             </p>
                           </div>

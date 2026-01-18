@@ -199,7 +199,7 @@ export function HeroSection() {
           blur="20px"
           direction="down"
           offset={0}
-          className="fixed inset-0 z-0 w-full h-full"
+          className="fixed inset-0 z-0 w-full h-full pointer-events-none"
         >
           <LightRays
             key="light-rays-effect" // Stable key to prevent remounting
