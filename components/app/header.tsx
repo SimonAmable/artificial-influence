@@ -4,20 +4,13 @@ import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { User, SignOut } from "@phosphor-icons/react"
+import { User, SignOut, CaretDownIcon } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { SettingsDropdown } from "@/components/app/settings-dropdown"
 import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
 import { createClient } from "@/lib/supabase/client"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -111,7 +104,7 @@ export function Header() {
 
   return (
     <header className={cn(
-      "fixed z-50 rounded-xl border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+      "fixed z-50 rounded-xl border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pointer-events-auto",
       // Shadow: only when scrolled
       isScrolled ? "shadow-lg" : "",
       // Padding/Positioning
@@ -180,23 +173,31 @@ export function Header() {
           </nav>
           {/* Mobile/Tablet Dropdown - visible on tablet and smaller */}
           <div className="lg:hidden">
-            <Select
-              value={isPageInDropdown ? currentPage : undefined}
-              onValueChange={(value) => {
-                router.push(value)
-              }}
-            >
-              <SelectTrigger className="min-w-full">
-                <SelectValue placeholder={isPageInDropdown ? "Select a page" : "Tools"} />
-              </SelectTrigger>
-              <SelectContent position="popper" side="bottom">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="min-w-full justify-between gap-2">
+                  <span>
+                    {isPageInDropdown 
+                      ? navigationItems.find(item => item.path === currentPage)?.label || "Select a page"
+                      : "Tools"}
+                  </span>
+                  <CaretDownIcon className="h-4 w-4 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
                 {navigationItems.map((item) => (
-                  <SelectItem key={item.path} value={item.path}>
+                  <DropdownMenuItem 
+                    key={item.path} 
+                    onClick={() => router.push(item.path)}
+                    className={cn(
+                      pathname === item.path && "bg-accent"
+                    )}
+                  >
                     {item.label}
-                  </SelectItem>
+                  </DropdownMenuItem>
                 ))}
-              </SelectContent>
-            </Select>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         <div className="flex items-center gap-3">
