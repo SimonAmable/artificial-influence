@@ -134,12 +134,12 @@ export default function InfluencerGeneratorPage() {
         description="Generate engaging social media content and captions that resonate with your audience."
         steps={[
           {
-            mediaPath: "/influencers_images/image.png",
+            mediaPath: "/hero_showcase_images/image_generation.png",
             title: "CHOOSE REFERENCE IMAGE (OPTIONAL)",
             description: "Use a reference image to guide the generation process.",
           },
           {
-            mediaPath: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=300&fit=crop",
+            mediaPath: "/hero_showcase_images/image_generation.png",
             title: "GENERATE PERSONALIZED INFLUENCER",
             description: "Get your personalized influencer content and captions",
           },

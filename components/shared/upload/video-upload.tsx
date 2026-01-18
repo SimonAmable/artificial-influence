@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { X, Play, Plus } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { ImageUpload } from "./photo-upload"
+import { toast } from "sonner"
 
 export interface VideoUploadProps {
   value?: ImageUpload | null
@@ -31,13 +32,59 @@ export function VideoUpload({
     onChange?.(null)
   }
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      const url = URL.createObjectURL(file)
-      const newVideo = { file, url }
-      onChange?.(newVideo)
+      // Validate video duration (max 10 seconds)
+      try {
+        const duration = await getVideoDuration(file)
+        const maxDuration = 10 // 10 seconds
+        
+        if (duration > maxDuration) {
+          toast.error(
+            "Video duration too long",
+            {
+              description: `Video duration must be 10 seconds or less. Your video is ${duration.toFixed(1)} seconds.`,
+            }
+          )
+          e.target.value = '' // Clear the input
+          return
+        }
+        
+        const url = URL.createObjectURL(file)
+        const newVideo = { file, url }
+        onChange?.(newVideo)
+      } catch (error) {
+        console.error('Error validating video duration:', error)
+        toast.error(
+          "Validation failed",
+          {
+            description: "Failed to validate video. Please try again.",
+          }
+        )
+        e.target.value = '' // Clear the input
+      }
     }
+  }
+
+  // Helper function to get video duration
+  const getVideoDuration = (file: File): Promise<number> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video')
+      video.preload = 'metadata'
+      
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src)
+        resolve(video.duration)
+      }
+      
+      video.onerror = () => {
+        window.URL.revokeObjectURL(video.src)
+        reject(new Error('Failed to load video metadata'))
+      }
+      
+      video.src = URL.createObjectURL(file)
+    })
   }
 
   return (

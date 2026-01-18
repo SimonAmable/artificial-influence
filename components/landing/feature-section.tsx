@@ -14,6 +14,7 @@ import Image from "next/image"
 export function FeatureSection() {
   return (
     <section
+      id="features"
       className={cn(
         "relative min-h-screen w-full",
         "flex items-center justify-center",

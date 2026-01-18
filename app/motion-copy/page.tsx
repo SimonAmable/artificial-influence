@@ -28,6 +28,26 @@ export default function MotionCopyPage() {
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
+  // Helper function to get video duration
+  const getVideoDuration = (file: File): Promise<number> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video')
+      video.preload = 'metadata'
+      
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src)
+        resolve(video.duration)
+      }
+      
+      video.onerror = () => {
+        window.URL.revokeObjectURL(video.src)
+        reject(new Error('Failed to load video metadata'))
+      }
+      
+      video.src = URL.createObjectURL(file)
+    })
+  }
+
   // Handle generation
   const handleGenerate = async () => {
     if (!inputImage?.file) {
@@ -70,6 +90,23 @@ export default function MotionCopyPage() {
       
       if (inputVideo.file.size > maxVideoSize) {
         setError('Video is too large. Maximum size is 50MB.')
+        setIsGenerating(false)
+        return
+      }
+
+      // Validate video duration (max 10 seconds)
+      try {
+        const videoDuration = await getVideoDuration(inputVideo.file)
+        const maxDuration = 10 // 10 seconds
+        
+        if (videoDuration > maxDuration) {
+          setError(`Video duration must be 10 seconds or less. Your video is ${videoDuration.toFixed(1)} seconds.`)
+          setIsGenerating(false)
+          return
+        }
+      } catch (err) {
+        console.error('Error validating video duration:', err)
+        setError('Failed to validate video duration. Please try again.')
         setIsGenerating(false)
         return
       }

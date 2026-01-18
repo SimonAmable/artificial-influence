@@ -95,8 +95,43 @@ export function MotionCopyShowcaseCard({
       {/* Steps Section */}
       {steps.length > 0 && (
         <div className="flex flex-col shrink-0 space-y-3 md:space-y-4 mt-0 motion-copy-showcase-steps-container"> 
+          {/* Mobile: Only show 3rd step (index 2) as media only */}
+          {steps.length >= 3 && (
+            <div className="md:hidden w-full motion-copy-showcase-steps-mobile">
+              {(() => {
+                const thirdStep = steps[2]
+                const mediaType = detectMediaType(thirdStep.mediaPath, thirdStep.mediaType)
+                return (
+                  <div className="w-full max-h-[200px] motion-copy-showcase-step-media-container overflow-hidden flex items-center justify-center">
+                    {mediaType === 'video' ? (
+                      <div className="w-full h-full max-h-[200px] motion-copy-showcase-step-video-wrapper flex items-center justify-center">
+                        <video
+                          src={thirdStep.mediaPath}
+                          className="w-full h-full max-h-[200px] object-contain block motion-copy-showcase-step-video"
+                          loop
+                          muted
+                          autoPlay
+                          playsInline
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full h-full max-h-[200px] motion-copy-showcase-step-image-wrapper flex items-center justify-center">
+                        <img
+                          src={thirdStep.mediaPath}
+                          alt={thirdStep.title}
+                          className="w-full h-full max-h-[200px] object-contain block motion-copy-showcase-step-image"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+
+          {/* Desktop: Show all steps */}
           <div className={cn(
-            "grid gap-4 md:gap-4 w-full motion-copy-showcase-steps-grid",
+            "hidden md:grid gap-4 md:gap-4 w-full motion-copy-showcase-steps-grid",
             steps.length === 1 ? "grid-cols-1 max-w-5xl mx-auto" : 
             "grid-cols-3"
           )}>

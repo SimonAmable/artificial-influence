@@ -27,8 +27,6 @@ import {
 
 const navigationItems = [
   { path: "/", label: "Home" },
-  { path: "/shadcn-component-example", label: "Component Example" },
-  { path: "/custom-components", label: "Custom Components" },
   { path: "/influencer-generator", label: "Influencer Generator" },
   { path: "/image", label: "Image" },
   { path: "/motion-copy", label: "Motion Copy" },
@@ -54,15 +52,14 @@ export function Header() {
   const currentPage = navigationItems.find(item => item.path === pathname)?.path || pathname
   const isPageInDropdown = navigationItems.some(item => item.path === pathname)
 
-  // Home page animation - sync with dither fade-in timing
-  // Typing: 19 chars × 50ms + 1000ms pause = 1950ms
-  // Wait after typing: 1000ms
-  // Total delay: 2950ms (matches when dither starts fading in)
+  // Home page animation - sync with media timing
+  // Sequence: Typing (0-1950ms) → Subtitle (1950-3450ms) → Buttons (3450-4950ms) → Header/Media (4950ms) → Lights (6950ms)
+  // Header appears at the same time as media (after buttons complete), lights appear 2 seconds later
   React.useEffect(() => {
     if (isHomePage) {
       const timer = setTimeout(() => {
         setShouldAnimate(true)
-      }, 2950) // Matches dither animation start timing
+      }, 4950) // Matches when media appears (after buttons complete)
       return () => clearTimeout(timer)
     } else {
       setShouldAnimate(false)
@@ -143,25 +140,6 @@ export function Header() {
           </Link>
           {/* Desktop Navigation - hidden on tablet and smaller */}
           <nav className="hidden lg:flex items-center gap-6">
-         
-            <Link 
-              href="/shadcn-component-example" 
-              className={cn(
-                "text-white font-bold hover:underline",
-                pathname === "/shadcn-component-example" && "underline"
-              )}
-            >
-              Component Example
-            </Link>
-            <Link 
-              href="/custom-components" 
-              className={cn(
-                "text-white font-bold hover:underline",
-                pathname === "/custom-components" && "underline"
-              )}
-            >
-              Custom Components
-            </Link>
             <Link 
               href="/influencer-generator" 
               className={cn(

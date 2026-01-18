@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/app/theme-provider";
 import { Header } from "@/components/app/header";
 import { LayoutModeProviderWrapper } from "@/components/shared/layout/layout-mode-provider-wrapper";
+import { Toaster } from "@/components/ui/sonner";
 
 const notoSans = Noto_Sans({variable:'--font-sans'});
 
@@ -18,8 +19,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Shadcn Depth Demo",
-  description: "Shadcn components with depth system",
+  title: "Artificial Influence",
+  description: "Create and manage AI-powered influencer content with uncanny AI generation tools",
 };
 
 export default function RootLayout({
@@ -42,6 +43,7 @@ export default function RootLayout({
             <Header />
             {children}
           </LayoutModeProviderWrapper>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

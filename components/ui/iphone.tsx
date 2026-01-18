@@ -19,6 +19,8 @@ const RADIUS_V = (SCREEN_RADIUS / SCREEN_HEIGHT) * 100
 export interface IphoneProps extends HTMLAttributes<HTMLDivElement> {
   src?: string
   videoSrc?: string
+  loop?: boolean
+  onEnded?: () => void
 }
 
 export function Iphone({
@@ -26,6 +28,8 @@ export function Iphone({
   videoSrc,
   className,
   style,
+  loop = true,
+  onEnded,
   ...props
 }: IphoneProps) {
   const hasVideo = !!videoSrc
@@ -55,10 +59,11 @@ export function Iphone({
             className="block size-full object-cover"
             src={videoSrc}
             autoPlay
-            loop
+            loop={loop}
             muted
             playsInline
             preload="metadata"
+            onEnded={onEnded}
           />
         </div>
       )}
