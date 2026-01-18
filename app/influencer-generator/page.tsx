@@ -9,6 +9,7 @@ import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 export default function InfluencerGeneratorPage() {
   const layoutModeContext = useLayoutMode()
@@ -31,6 +32,14 @@ export default function InfluencerGeneratorPage() {
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       setError("Please enter a prompt")
+      return
+    }
+
+    // Validate that reference image is required
+    if (!referenceImage?.file) {
+      toast.error("Image required", {
+        description: "Please upload an image to edit before generating.",
+      })
       return
     }
 
@@ -129,19 +138,19 @@ export default function InfluencerGeneratorPage() {
     return (
       <InfluencerShowcaseCard
         tool_title=""
-        title="CREATE YOUR OWN"
-        highlightedTitle="INFLUENCER"
-        description="Generate engaging social media content and captions that resonate with your audience."
+        title="AI IMAGE"
+        highlightedTitle="EDITING"
+        description="Enhance, retouch, and transform your images with AI-powered editing tools."
         steps={[
           {
             mediaPath: "/hero_showcase_images/influencer_generation_showcase.png",
-            title: "CHOOSE REFERENCE IMAGE (OPTIONAL)",
-            description: "Use a reference image to guide the generation process.",
+            title: "CHOOSE REFERENCE IMAGE (REQUIRED)",
+            description: "Upload an image to edit and enhance with AI-powered tools.",
           },
           {
             mediaPath: "/hero_showcase_images/influencer_generation_showcase.png",
-            title: "GENERATE PERSONALIZED INFLUENCER",
-            description: "Get your personalized influencer content and captions",
+            title: "GENERATE EDITED IMAGE",
+            description: "Get your enhanced and transformed image",
           },
         ]}
       />

@@ -24,7 +24,7 @@ export function FeatureSection() {
     >
       <div className="relative z-10 w-full max-w-7xl mx-auto px-4">
         <h2 className="text-4xl md:text-5xl font-bold text-center text-foreground mb-12">
-          Features
+          FEATURES
         </h2>
         <BentoGrid>
           <BentoCard

@@ -27,8 +27,9 @@ import {
 
 const navigationItems = [
   { path: "/", label: "Home" },
-  { path: "/influencer-generator", label: "Influencer Generator" },
-  { path: "/image", label: "Image" },
+  { path: "/image", label: "Generate Images" },
+
+  { path: "/influencer-generator", label: "Image Editing" },
   { path: "/motion-copy", label: "Motion Copy" },
   { path: "/lipsync", label: "Lipsync" },
 ]
@@ -147,7 +148,7 @@ export function Header() {
                 pathname === "/influencer-generator" && "underline"
               )}
             >
-              Influencer Generator
+              Image Editing
             </Link>
             <Link 
               href="/image" 
