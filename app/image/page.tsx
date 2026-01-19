@@ -143,8 +143,8 @@ export default function ImagePage() {
       <InfluencerShowcaseCard
         tool_title=""
         title=""
-        highlightedTitle="IMAGE"
-        description="Generate engaging social media content and captions that resonate with your audience."
+        highlightedTitle="Image Generation"
+        description="Create stunning images using state-of-the-art AI models."
         steps={[
           {
             mediaPath: "/hero_showcase_images/image_generation.png",
