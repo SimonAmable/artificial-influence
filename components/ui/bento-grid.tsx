@@ -13,7 +13,7 @@ interface BentoCardProps extends ComponentPropsWithoutRef<"div"> {
   name: string
   className: string
   background: ReactNode
-  Icon: React.ComponentType<{ className?: string }>
+  Icon?: React.ComponentType<{ className?: string }>
   description: string
   href: string
   cta: string
@@ -23,7 +23,7 @@ const BentoGrid = ({ children, className, ...props }: BentoGridProps) => {
   return (
     <div
       className={cn(
-        "grid w-full auto-rows-[22rem] grid-cols-1 md:grid-cols-2 gap-4",
+        "grid w-full grid-cols-1 md:grid-cols-2 gap-4",
         className
       )}
       {...props}
@@ -47,6 +47,7 @@ const BentoCard = ({
     key={name}
     className={cn(
       "group relative flex flex-col justify-between overflow-hidden rounded-xl",
+      "aspect-[9/16] md:aspect-[9/16]",
       // light styles
       "bg-background [box-shadow:0_0_0_1px_rgba(0,0,0,.03),0_2px_4px_rgba(0,0,0,.05),0_12px_24px_rgba(0,0,0,.05)]",
       // dark styles
@@ -57,8 +58,7 @@ const BentoCard = ({
   >
     <div>{background}</div>
     <div className="p-4">
-      <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 transition-all duration-300 lg:group-hover:-translate-y-10">
-        <Icon className="h-12 w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />
+      <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 opacity-100 md:opacity-0 transition-all duration-300 md:group-hover:opacity-100 lg:group-hover:-translate-y-10">
         <h3 className="text-xl font-semibold text-neutral-700 dark:text-neutral-300">
           {name}
         </h3>
@@ -74,7 +74,7 @@ const BentoCard = ({
           variant="link"
           asChild
           size="sm"
-          className="pointer-events-auto p-0"
+          className="pointer-events-auto px-4 py-0"
         >
           <a href={href}>
             {cta}
@@ -93,7 +93,7 @@ const BentoCard = ({
         variant="link"
         asChild
         size="sm"
-        className="pointer-events-auto p-0"
+        className="pointer-events-auto px-4 py-0"
       >
         <a href={href}>
           {cta}

@@ -29,7 +29,7 @@ export function FeatureSection() {
         <BentoGrid>
           <BentoCard
             name="Image Generation"
-            className="col-span-1 md:col-span-2"
+            className="col-span-1 md:row-span-2"
             description="Create stunning, high-quality images from text descriptions."
             href="/image"
             cta="Try Image Generation"
@@ -37,7 +37,7 @@ export function FeatureSection() {
             background={
               <div className="absolute inset-0">
                 <Image
-                  src="/hero_showcase_images/image_generation_wide.png"
+                  src="/hero_showcase_images/image_generation.png"
                   alt="Image Generation"
                   fill
                   className="object-cover"
@@ -91,7 +91,7 @@ export function FeatureSection() {
           />
           <BentoCard
             name="Image Editing"
-            className="col-span-1 md:col-span-2"
+            className="col-span-1 md:row-span-2"
             description="Enhance, retouch, and transform your images with AI-powered editing tools."
             href="/image"
             cta="Try Image Editing"
@@ -99,7 +99,7 @@ export function FeatureSection() {
             background={
               <div className="absolute inset-0">
                 <Image
-                  src="/hero_showcase_images/image_editing_wide.png"
+                  src="/hero_showcase_images/image_editing.png"
                   alt="Image Editing"
                   fill
                   className="object-cover"

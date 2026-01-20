@@ -395,7 +395,7 @@ export function InfluencerInputBox({
               htmlFor="enhance-prompt"
               className="text-xs cursor-pointer"
             >
-              Enhance Prompt
+              <span className="hidden md:inline">Enhance Prompt</span>
             </Label>
           </div>
         </div>
