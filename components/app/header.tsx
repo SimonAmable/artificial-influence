@@ -25,6 +25,8 @@ const navigationItems = [
   { path: "/influencer-generator", label: "Image Editing" },
   { path: "/motion-copy", label: "Motion Copy" },
   { path: "/lipsync", label: "Lipsync" },
+  { path: "/pricing", label: "Pricing" },
+  ...(process.env.NODE_ENV === 'development' ? [{ path: "/pricing-test", label: "Pricing (Test)" }] : []),
 ]
 
 export function Header() {
@@ -170,6 +172,26 @@ export function Header() {
             >
               Lipsync
             </Link>
+            <Link 
+              href="/pricing" 
+              className={cn(
+                "text-white font-bold hover:underline",
+                pathname === "/pricing" && "underline"
+              )}
+            >
+              Pricing
+            </Link>
+            {process.env.NODE_ENV === 'development' && (
+              <Link 
+                href="/pricing-test" 
+                className={cn(
+                  "text-white font-bold hover:underline text-yellow-400",
+                  pathname === "/pricing-test" && "underline"
+                )}
+              >
+                Pricing (Test)
+              </Link>
+            )}
           </nav>
           {/* Mobile/Tablet Dropdown - visible on tablet and smaller */}
           <div className="lg:hidden">
