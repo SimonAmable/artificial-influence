@@ -13,16 +13,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get type query parameter (optional - if not provided, return all)
+    // Get query parameters
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get('type') as 'image' | 'video' | 'audio' | null;
+    const limit = parseInt(searchParams.get('limit') || '100', 10);
+    const offset = parseInt(searchParams.get('offset') || '0', 10);
 
     // Build query
     let query = supabase
       .from('generations')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     // Filter by type if provided
     if (type) {

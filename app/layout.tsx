@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/app/theme-provider";
 import { Header } from "@/components/app/header";
 import { LayoutModeProviderWrapper } from "@/components/shared/layout/layout-mode-provider-wrapper";
 import { Toaster } from "@/components/ui/sonner";
+import { AIChat } from "@/components/ai-chat";
 
 const notoSans = Noto_Sans({variable:'--font-sans'});
 
@@ -44,6 +45,7 @@ export default function RootLayout({
             {children}
           </LayoutModeProviderWrapper>
           <Toaster />
+          <AIChat />
         </ThemeProvider>
       </body>
     </html>

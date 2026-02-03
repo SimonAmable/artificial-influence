@@ -32,22 +32,22 @@ export function HeroSection() {
 
   // Calculate typing duration based on text length
   const text = "Artificial Influence"
-  const typingDuration = 50 // ms per character
-  const pauseDelay = 1000 // pause after typing completes (matches TypingAnimation default)
+  const typingDuration = 15 // ms per character (reduced from 50)
+  const pauseDelay = 150 // pause after typing completes (reduced from 1000)
   const totalTypingTime = text.length * typingDuration + pauseDelay
   
-  // Animation timing sequence:
-  // 1. Typing: 0ms to totalTypingTime (1950ms)
-  // 2. Subtitle: starts at totalTypingTime (1950ms), duration 1500ms, ends at 3450ms
-  // 3. Buttons: starts at 3450ms, duration 1500ms, ends at 4950ms
-  // 4. Header and media: starts at 3000ms (together, reduced from 4950ms)
-  // 5. Lights: starts at 5000ms (2 seconds after header/media, reduced from 6950ms)
-  const subtitleDelay = totalTypingTime // 1950ms
-  const subtitleDuration = 1500 // ms
-  const buttonsDelay = subtitleDelay + subtitleDuration // 3450ms
-  const buttonsDuration = 1500 // ms
-  const headerMediaDelay = 3000 // Reduced from 4950ms for faster load-in
-  const lightsDelay = headerMediaDelay + 2000 // 5000ms (2 seconds after header/media)
+  // Animation timing sequence - all animations complete within 2 seconds:
+  // 1. Typing: 0ms to totalTypingTime (450ms)
+  // 2. Subtitle: starts at totalTypingTime (450ms), duration 300ms, ends at 750ms
+  // 3. Buttons: starts at 750ms, duration 300ms, ends at 1050ms
+  // 4. Header and media: starts at 600ms (overlaps with subtitle)
+  // 5. Lights: starts at 1000ms, duration 400ms, ends at 1400ms
+  const subtitleDelay = totalTypingTime // 450ms
+  const subtitleDuration = 300 // ms (reduced from 1500)
+  const buttonsDelay = subtitleDelay + subtitleDuration // 750ms
+  const buttonsDuration = 300 // ms (reduced from 1500)
+  const headerMediaDelay = 600 // ms (reduced from 3000)
+  const lightsDelay = 1000 // ms (reduced from 5000)
 
   React.useEffect(() => {
     // Mark typing as complete after animation finishes
@@ -191,11 +191,11 @@ export function HeroSection() {
         "md:justify-center"
       )}
     >
-      {/* Light Rays Background - appears last, 2 seconds after header and media */}
+      {/* Light Rays Background - appears last */}
       {showLights && (
         <BlurFade
           inView={true}
-          duration={1.5}
+          duration={0.4}
           delay={0}
           blur="20px"
           direction="down"
@@ -238,6 +238,7 @@ export function HeroSection() {
             // eslint-disable-next-line react/no-children-prop
             children={text}
             typeSpeed={typingDuration}
+            pauseDelay={pauseDelay}
             startOnView={false}
             showCursor={true}
             blinkCursor={true}
@@ -310,8 +311,8 @@ export function HeroSection() {
               <BlurFade
                 key={`desktop-${videoSrc}-${index}`}
                 inView={true}
-                duration={1.5}
-                delay={index * 0.6} // Stagger delay: 0s, 0.3s, 0.6s, 0.9s (relative to showDither)
+                duration={0.3}
+                delay={index * 0.08} // Stagger delay: 0s, 0.08s, 0.16s, 0.24s (relative to showDither)
                 blur="10px"
                 direction="up"
                 offset={20}
@@ -352,7 +353,7 @@ export function HeroSection() {
                     initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
                     animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                     exit={{ opacity: 0, y: -20, filter: "blur(10px)" }}
-                    transition={{ duration: 1.5, ease: "easeOut" }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
                     className="w-full pointer-events-auto"
                   >
                     <div

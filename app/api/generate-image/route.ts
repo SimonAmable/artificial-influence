@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     console.log('[generate-image] Parsing FormData...');
     const formData = await request.formData();
     const prompt = formData.get('prompt') as string;
-    const referenceImageFile = formData.get('referenceImage') as File | null;
+    const referenceImageFiles = formData.getAll('referenceImages') as File[];
     const enhancePromptValue = formData.get('enhancePrompt');
     const shouldEnhance = enhancePromptValue === 'true';
     const modelIdentifier = (formData.get('model') as string) || 'google/nano-banana'; // Default to nano-banana if not provided
@@ -72,9 +72,9 @@ export async function POST(request: NextRequest) {
 
     console.log('[generate-image] FormData parsed:', {
       promptLength: prompt?.length || 0,
-      hasReferenceImage: !!referenceImageFile,
-      referenceImageSize: referenceImageFile?.size || 0,
-      referenceImageType: referenceImageFile?.type || 'none',
+      referenceImageCount: referenceImageFiles.length,
+      referenceImageSizes: referenceImageFiles.map(f => f.size),
+      referenceImageTypes: referenceImageFiles.map(f => f.type),
       shouldEnhance,
       aspectRatio,
       size,
@@ -95,14 +95,23 @@ export async function POST(request: NextRequest) {
     }
     console.log('[generate-image] ✓ Prompt validated:', prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''));
 
-    // Upload reference image to storage if provided
-    // Store both the buffer (for AI SDK) and URL (for logging/persistence)
-    let referenceImageBuffer: Buffer | undefined;
-    let referenceImageUrl: string | undefined;
-    let referenceImageStoragePath: string | undefined;
+    // Upload reference images to storage if provided
+    // Store both the buffers (for AI SDK) and URLs (for logging/persistence)
+    const referenceImageUrls: string[] = [];
+    const referenceImageStoragePaths: string[] = [];
     
-    if (referenceImageFile && referenceImageFile.size > 0) {
-      console.log('[generate-image] Processing reference image...');
+    if (referenceImageFiles.length > 0) {
+      console.log(`[generate-image] Processing ${referenceImageFiles.length} reference image(s)...`);
+      
+      for (let i = 0; i < referenceImageFiles.length; i++) {
+        const referenceImageFile = referenceImageFiles[i];
+        
+        if (!referenceImageFile || referenceImageFile.size === 0) {
+          console.log(`[generate-image] Skipping empty reference image ${i + 1}`);
+          continue;
+        }
+        
+        console.log(`[generate-image] Processing reference image ${i + 1}/${referenceImageFiles.length}...`);
       try {
         // Validate file type
         if (!referenceImageFile.type.startsWith('image/')) {
@@ -130,61 +139,62 @@ export async function POST(request: NextRequest) {
         const filename = `${timestamp}-${randomStr}.${fileExtension}`;
         const storagePath = `${user.id}/reference-images/${filename}`;
 
-        console.log('[generate-image] Reference image details:', {
-          originalName: referenceImageFile.name,
-          type: referenceImageFile.type,
-          size: referenceImageFile.size,
-          storagePath,
-        });
-
-        // Convert File to ArrayBuffer then to Buffer
-        // Keep the buffer for AI SDK (DataContent must be Buffer/ArrayBuffer/Uint8Array/base64)
-        console.log('[generate-image] Converting reference image to buffer...');
-        const arrayBuffer = await referenceImageFile.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        referenceImageBuffer = buffer; // Store buffer for AI SDK
-        console.log('[generate-image] ✓ Buffer created, size:', buffer.length, 'bytes');
-
-        // Upload to Supabase storage (for persistence/logging)
-        console.log('[generate-image] Uploading reference image to Supabase storage...');
-        const uploadStartTime = Date.now();
-        const { error: uploadError } = await supabase.storage
-          .from('public-bucket')
-          .upload(storagePath, buffer, {
-            contentType: referenceImageFile.type,
-            upsert: false,
+          console.log(`[generate-image] Reference image ${i + 1} details:`, {
+            originalName: referenceImageFile.name,
+            type: referenceImageFile.type,
+            size: referenceImageFile.size,
+            storagePath,
           });
 
-        if (uploadError) {
-          console.error('[generate-image] Error uploading reference image:', uploadError);
+          // Convert File to ArrayBuffer then to Buffer
+          console.log(`[generate-image] Converting reference image ${i + 1} to buffer...`);
+          const arrayBuffer = await referenceImageFile.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          console.log(`[generate-image] ✓ Buffer ${i + 1} created, size:`, buffer.length, 'bytes');
+
+          // Upload to Supabase storage (for persistence/logging)
+          console.log(`[generate-image] Uploading reference image ${i + 1} to Supabase storage...`);
+          const uploadStartTime = Date.now();
+          const { error: uploadError } = await supabase.storage
+            .from('public-bucket')
+            .upload(storagePath, buffer, {
+              contentType: referenceImageFile.type,
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error(`[generate-image] Error uploading reference image ${i + 1}:`, uploadError);
+            return NextResponse.json(
+              { error: `Failed to upload reference image ${i + 1}`, message: uploadError.message },
+              { status: 500 }
+            );
+          }
+
+          const uploadTime = Date.now() - uploadStartTime;
+          console.log(`[generate-image] ✓ Reference image ${i + 1} uploaded in`, uploadTime, 'ms');
+
+          // Store the storage path for database
+          referenceImageStoragePaths.push(storagePath);
+
+          // Get public URL (for logging/reference)
+          const { data: urlData } = supabase.storage
+            .from('public-bucket')
+            .getPublicUrl(storagePath);
+
+          referenceImageUrls.push(urlData.publicUrl);
+          console.log(`[generate-image] ✓ Reference image ${i + 1} URL:`, urlData.publicUrl);
+        } catch (error) {
+          console.error(`[generate-image] Error processing reference image ${i + 1}:`, error);
           return NextResponse.json(
-            { error: 'Failed to upload reference image', message: uploadError.message },
+            { error: `Failed to process reference image ${i + 1}`, message: error instanceof Error ? error.message : 'Unknown error' },
             { status: 500 }
           );
         }
-
-        const uploadTime = Date.now() - uploadStartTime;
-        console.log('[generate-image] ✓ Reference image uploaded in', uploadTime, 'ms');
-
-        // Store the storage path for database
-        referenceImageStoragePath = storagePath;
-
-        // Get public URL (for logging/reference)
-        const { data: urlData } = supabase.storage
-          .from('public-bucket')
-          .getPublicUrl(storagePath);
-
-        referenceImageUrl = urlData.publicUrl;
-        console.log('[generate-image] ✓ Reference image URL:', referenceImageUrl);
-      } catch (error) {
-        console.error('[generate-image] Error processing reference image:', error);
-        return NextResponse.json(
-          { error: 'Failed to process reference image', message: error instanceof Error ? error.message : 'Unknown error' },
-          { status: 500 }
-        );
       }
+      
+      console.log(`[generate-image] ✓ Processed ${referenceImageUrls.length} reference image(s)`);
     } else {
-      console.log('[generate-image] No reference image provided');
+      console.log('[generate-image] No reference images provided');
     }
 
     // Enhance prompt if requested
@@ -249,8 +259,8 @@ export async function POST(request: NextRequest) {
         ...(resolution && { resolution }),
         ...(output_format && { output_format }),
         // Pass reference image URL(s) via image_input (as per Replicate API docs)
-        ...(referenceImageUrl && { 
-          image_input: [referenceImageUrl] // Array of URLs as expected by nano-banana
+        ...(referenceImageUrls.length > 0 && { 
+          image_input: referenceImageUrls // Array of URLs as expected by nano-banana
         }),
       },
     };
@@ -261,11 +271,10 @@ export async function POST(request: NextRequest) {
       promptType: 'string',
       promptText: finalPrompt.substring(0, 100) + (finalPrompt.length > 100 ? '...' : ''),
       promptLength: finalPrompt.length,
-      hasReferenceImage: !!referenceImageUrl,
-      referenceImageUrl: referenceImageUrl || 'none',
-      referenceImageBufferSize: referenceImageBuffer?.length || 0,
-      imageInputInProviderOptions: referenceImageUrl 
-        ? `[${referenceImageUrl.substring(0, 50)}...]` 
+      referenceImageCount: referenceImageUrls.length,
+      referenceImageUrls: referenceImageUrls.length > 0 ? referenceImageUrls : 'none',
+      imageInputInProviderOptions: referenceImageUrls.length > 0
+        ? `[${referenceImageUrls.map(url => url.substring(0, 50)).join(', ')}...]` 
         : 'none',
       aspectRatio: generateOptions.aspectRatio || 'default',
       size: generateOptions.size || 'default',
@@ -277,7 +286,36 @@ export async function POST(request: NextRequest) {
     // Generate the image(s)
     console.log('[generate-image] Starting image generation...');
     const generationStartTime = Date.now();
-    const result = await generateImage(generateOptions);
+    let result;
+    try {
+      result = await generateImage(generateOptions);
+    } catch (genError: unknown) {
+      const generationTime = Date.now() - generationStartTime;
+      console.error('[generate-image] Generation failed after', generationTime, 'ms');
+      
+      // Extract Replicate error if available
+      if (genError && typeof genError === 'object' && 'responseBody' in genError && typeof genError.responseBody === 'string') {
+        try {
+          const replicateResponse = JSON.parse(genError.responseBody);
+          if (replicateResponse.error) {
+            console.error('[generate-image] Replicate error:', replicateResponse.error);
+            return NextResponse.json(
+              { 
+                error: 'Content moderation',
+                message: replicateResponse.error,
+                details: 'The AI model flagged this request. Try different inputs or reference images.'
+              },
+              { status: 400 }
+            );
+          }
+        } catch {
+          // Fall through to generic error
+        }
+      }
+      
+      // Re-throw for generic error handler
+      throw genError;
+    }
     const generationTime = Date.now() - generationStartTime;
     console.log('[generate-image] ✓ Image generation completed in', generationTime, 'ms');
     
@@ -337,20 +375,17 @@ export async function POST(request: NextRequest) {
     };
 
     // Helper function to save generation data to database
-    const saveGenerationToDatabase = async (storagePath: string, referenceStoragePath?: string) => {
+    const saveGenerationToDatabase = async (storagePath: string, referenceStoragePaths?: string[]) => {
       try {
         console.log('[generate-image] Saving generation to database...');
-        
-        // Use reference image storage path if available
-        const referenceStoragePaths: string[] | null = referenceStoragePath 
-          ? [referenceStoragePath] 
-          : null;
         
         const generationData = {
           user_id: user.id,
           prompt: finalPrompt, // Use the final prompt (enhanced if applicable)
           supabase_storage_path: storagePath,
-          reference_images_supabase_storage_path: referenceStoragePaths,
+          reference_images_supabase_storage_path: referenceStoragePaths && referenceStoragePaths.length > 0 
+            ? referenceStoragePaths 
+            : null,
           aspect_ratio: aspectRatio || aspect_ratio || null,
           model: modelIdentifier,
           type: 'image', // You can customize this based on your needs
@@ -391,7 +426,7 @@ export async function POST(request: NextRequest) {
 
       // Save each generation to database
       await Promise.all(
-        imageStoragePaths.map((storagePath) => saveGenerationToDatabase(storagePath, referenceImageStoragePath))
+        imageStoragePaths.map((storagePath) => saveGenerationToDatabase(storagePath, referenceImageStoragePaths))
       );
 
       const totalUploadTime = Date.now() - uploadStartTime;
@@ -411,7 +446,7 @@ export async function POST(request: NextRequest) {
       const { url: imageUrl, storagePath: imageStoragePath } = await uploadImageToStorage(result.image.base64);
 
       // Save generation to database
-      await saveGenerationToDatabase(imageStoragePath, referenceImageStoragePath);
+      await saveGenerationToDatabase(imageStoragePath, referenceImageStoragePaths);
 
       const totalUploadTime = Date.now() - uploadStartTime;
       const totalTime = Date.now() - requestStartTime;

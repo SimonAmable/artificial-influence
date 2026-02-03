@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
     }
     console.log('[generate-video] ✓ User authenticated:', { userId: user.id, email: user.email });
 
-    // Parse JSON body (files are already uploaded to Supabase by client)
-    console.log('[generate-video] Parsing request body...');
+    // Parse JSON body (both canvas and motion copy upload client-side now)
+    console.log('[generate-video] Parsing JSON body...');
     const body = await request.json();
     const imagePublicUrl = body.imageUrl as string;
     const videoPublicUrl = body.videoUrl as string;
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const keepOriginalSound = body.keep_original_sound !== false;
     const characterOrientation = (body.character_orientation as string) || 'image';
 
-    console.log('[generate-video] Request body parsed:', {
+    console.log('[generate-video] JSON body parsed:', {
       hasImageUrl: !!imagePublicUrl,
       hasVideoUrl: !!videoPublicUrl,
       imageStoragePath: imageStoragePath || 'none',
@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[generate-video] ✓ URLs validated');
+    console.log('[generate-video] ✓ Request processed successfully');
 
     // Initialize Replicate client
     console.log('[generate-video] Initializing Replicate client...');

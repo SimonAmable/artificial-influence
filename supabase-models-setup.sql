@@ -211,6 +211,173 @@ VALUES (
 )
 ON CONFLICT (identifier) DO NOTHING;
 
+-- Video model: minimax/hailuo-2.3-fast
+INSERT INTO public.models (identifier, name, description, type, provider, is_active, model_cost, parameters)
+VALUES (
+  'minimax/hailuo-2.3-fast',
+  'Hailuo 2.3 Fast',
+  'A lower-latency image-to-video version of Hailuo 2.3 that preserves core motion quality, visual consistency, and stylization performance while enabling faster iteration cycles.',
+  'video',
+  'replicate',
+  true,
+  0.008,
+  '{
+    "parameters": [
+      {
+        "name": "duration",
+        "type": "number",
+        "label": "Duration",
+        "description": "Duration of the video in seconds. 10 seconds is only available for 768p resolution.",
+        "required": false,
+        "default": 6,
+        "min": 5,
+        "max": 10,
+        "ui_type": "number"
+      },
+      {
+        "name": "resolution",
+        "type": "string",
+        "label": "Resolution",
+        "description": "Pick between 768p or 1080p resolution. 1080p supports only 6-second duration.",
+        "required": false,
+        "default": "768p",
+        "enum": ["768p", "1080p"],
+        "ui_type": "select"
+      },
+      {
+        "name": "prompt_optimizer",
+        "type": "boolean",
+        "label": "Prompt Optimizer",
+        "description": "Use prompt optimizer",
+        "required": false,
+        "default": true,
+        "ui_type": "switch"
+      },
+      {
+        "name": "first_frame_image",
+        "type": "string",
+        "label": "First Frame Image",
+        "description": "First frame image for video generation. The output video will have the same aspect ratio as this image.",
+        "required": false,
+        "default": null,
+        "ui_type": "text"
+      }
+    ]
+  }'::jsonb
+)
+ON CONFLICT (identifier) DO NOTHING;
+
+-- Video model: google/veo-3.1-fast
+INSERT INTO public.models (identifier, name, description, type, provider, is_active, model_cost, parameters)
+VALUES (
+  'google/veo-3.1-fast',
+  'Veo 3.1 Fast',
+  'New and improved version of Veo 3 Fast, with higher-fidelity video, context-aware audio and last frame support',
+  'video',
+  'replicate',
+  true,
+  0.012,
+  '{
+    "parameters": [
+      {
+        "name": "seed",
+        "type": "number",
+        "label": "Seed",
+        "description": "Random seed. Omit for random generations",
+        "required": false,
+        "default": null,
+        "min": 0,
+        "max": 2147483647,
+        "ui_type": "number"
+      },
+      {
+        "name": "image",
+        "type": "string",
+        "label": "Input Image",
+        "description": "Input image to start generating from. Ideal images are 16:9 or 9:16 and 1280x720 or 720x1280, depending on the aspect ratio you choose.",
+        "required": false,
+        "default": null,
+        "ui_type": "text"
+      },
+      {
+        "name": "duration",
+        "type": "number",
+        "label": "Duration",
+        "description": "Video duration in seconds",
+        "required": false,
+        "default": 8,
+        "min": 2,
+        "max": 10,
+        "ui_type": "number"
+      },
+      {
+        "name": "last_frame",
+        "type": "string",
+        "label": "Last Frame",
+        "description": "Ending image for interpolation. When provided with an input image, creates a transition between the two images.",
+        "required": false,
+        "default": null,
+        "ui_type": "text"
+      },
+      {
+        "name": "resolution",
+        "type": "string",
+        "label": "Resolution",
+        "description": "Resolution of the generated video",
+        "required": false,
+        "default": "1080p",
+        "enum": ["720p", "1080p"],
+        "ui_type": "select"
+      },
+      {
+        "name": "aspect_ratio",
+        "type": "string",
+        "label": "Aspect Ratio",
+        "description": "Video aspect ratio",
+        "required": false,
+        "default": "16:9",
+        "enum": ["16:9", "9:16", "1:1"],
+        "ui_type": "select"
+      },
+      {
+        "name": "generate_audio",
+        "type": "boolean",
+        "label": "Generate Audio",
+        "description": "Generate audio with the video",
+        "required": false,
+        "default": true,
+        "ui_type": "switch"
+      },
+      {
+        "name": "negative_prompt",
+        "type": "string",
+        "label": "Negative Prompt",
+        "description": "Description of what to exclude from the generated video",
+        "required": false,
+        "default": null,
+        "ui_type": "textarea"
+      }
+    ]
+  }'::jsonb
+)
+ON CONFLICT (identifier) DO NOTHING;
+
+-- Video model: kwaivgi/kling-v2.6
+INSERT INTO public.models (identifier, name, description, type, provider, is_active, model_cost, parameters)
+VALUES (
+  'kwaivgi/kling-v2.6',
+  'Kling V2.6 Pro',
+  'Kling 2.6 Pro: Top-tier image-to-video with cinematic visuals, fluid motion, and native audio generation',
+  'video',
+  'replicate',
+  true,
+  0.015,
+  '{
+    "parameters": []
+  }'::jsonb
+)
+ON CONFLICT (identifier) DO NOTHING;
+
 -- Image model: prunaai/flux-kontext-fast
 INSERT INTO public.models (identifier, name, description, type, provider, is_active, model_cost, parameters)
 VALUES (
