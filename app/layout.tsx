@@ -6,6 +6,7 @@ import { Header } from "@/components/app/header";
 import { LayoutModeProviderWrapper } from "@/components/shared/layout/layout-mode-provider-wrapper";
 import { Toaster } from "@/components/ui/sonner";
 import { AIChat } from "@/components/ai-chat";
+import { Analytics } from "@vercel/analytics/next"
 
 const notoSans = Noto_Sans({variable:'--font-sans'});
 
@@ -47,6 +48,7 @@ export default function RootLayout({
           <Toaster />
           <AIChat />
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );

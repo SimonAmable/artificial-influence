@@ -123,7 +123,7 @@ export function CanvasHeader({
           size="sm"
           onClick={onSave}
           disabled={isSaving}
-          className="border-white/10 text-zinc-300 hover:text-white bg-transparent hover:bg-white/5 h-8 text-xs"
+          className="border-white/10 text-zinc-300 hover:text-white bg-zinc-900/95 backdrop-blur-md hover:bg-zinc-800/95 shadow-xl h-8 text-xs"
         >
           {isSaving ? (
             <CircleNotch size={14} className="animate-spin mr-1.5" />
@@ -137,7 +137,7 @@ export function CanvasHeader({
           onClick={handleExecuteClick}
           disabled={isExecuting}
           className={cn(
-            "h-8 text-xs",
+            "h-8 text-xs shadow-xl backdrop-blur-md",
             isExecuting && "opacity-80"
           )}
         >

@@ -115,8 +115,8 @@ export function Header() {
                 key={item.path}
                 href={item.path}
                 className={cn(
-                  "text-white font-bold hover:underline",
-                  pathname === item.path && "underline",
+                  "text-white font-bold transition-colors hover:text-primary",
+                  pathname === item.path && "text-primary",
                   item.className
                 )}
               >
