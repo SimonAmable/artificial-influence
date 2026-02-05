@@ -80,6 +80,23 @@ export async function uploadFileToSupabase(
 }
 
 /**
+ * Upload a Blob to Supabase Storage and return the public URL
+ * @param blob - Blob to upload
+ * @param filename - Filename to use for storage
+ * @param folder - Folder path within user's directory
+ * @returns Promise with upload result or null if failed
+ */
+export async function uploadBlobToSupabase(
+  blob: Blob,
+  filename: string,
+  folder: string = 'uploads'
+): Promise<UploadResult | null> {
+  const safeName = filename && filename.trim().length > 0 ? filename : `upload-${Date.now()}`
+  const file = new File([blob], safeName, { type: blob.type || 'application/octet-stream' })
+  return uploadFileToSupabase(file, folder)
+}
+
+/**
  * Upload multiple files to Supabase Storage
  * @param files - Array of files to upload
  * @param folder - Folder path within user's directory

@@ -51,6 +51,7 @@ import { instantiateWorkflow } from "@/lib/workflows/utils"
 import type { Workflow } from "@/lib/workflows/database-server"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 
 // Register custom node types - MUST be outside component for stable reference
 const nodeTypes = {
@@ -93,6 +94,29 @@ function CanvasContent() {
   const reactFlowInstance = useReactFlow()
   const [isDraggingFile, setIsDraggingFile] = React.useState(false)
   const dragCounter = React.useRef(0)
+  const pendingUploadsRef = React.useRef(0)
+  const uploadWaitersRef = React.useRef<Array<() => void>>([])
+  const uploadErrorsRef = React.useRef(0)
+
+  const incrementPendingUploads = React.useCallback(() => {
+    pendingUploadsRef.current += 1
+  }, [])
+
+  const decrementPendingUploads = React.useCallback(() => {
+    pendingUploadsRef.current = Math.max(0, pendingUploadsRef.current - 1)
+    if (pendingUploadsRef.current === 0) {
+      const waiters = uploadWaitersRef.current
+      uploadWaitersRef.current = []
+      waiters.forEach(resolve => resolve())
+    }
+  }, [])
+
+  const waitForUploads = React.useCallback(() => {
+    if (pendingUploadsRef.current === 0) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      uploadWaitersRef.current.push(resolve)
+    })
+  }, [])
 
   // Track selection changes
   useOnSelectionChange({
@@ -308,13 +332,16 @@ function CanvasContent() {
 
       if (files.length === 0) return
 
-      // Filter for images and videos
+      // Filter for images, videos, and audio
       const validFiles = files.filter(
-        (file) => file.type.startsWith('image/') || file.type.startsWith('video/')
+        (file) =>
+          file.type.startsWith('image/') ||
+          file.type.startsWith('video/') ||
+          file.type.startsWith('audio/')
       )
 
       if (validFiles.length === 0) {
-        toast.error('Please drop image or video files')
+        toast.error('Please drop image, video, or audio files')
         return
       }
 
@@ -357,6 +384,38 @@ function CanvasContent() {
         }
 
         newNodes.push(newNode)
+
+        incrementPendingUploads()
+        uploadFileToSupabase(file, 'uploads')
+          .then((uploadResult) => {
+            if (!uploadResult) {
+              uploadErrorsRef.current += 1
+              return
+            }
+
+            setNodes((nds) =>
+              nds.map((n) =>
+                n.id === id
+                  ? {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        fileUrl: uploadResult.url,
+                        fileType: uploadResult.fileType,
+                        fileName: uploadResult.fileName,
+                      },
+                    }
+                  : n
+              )
+            )
+            URL.revokeObjectURL(fileUrl)
+          })
+          .catch(() => {
+            uploadErrorsRef.current += 1
+          })
+          .finally(() => {
+            decrementPendingUploads()
+          })
       }
 
       setNodes((nds) => [...nds, ...newNodes])
@@ -369,29 +428,33 @@ function CanvasContent() {
 
   // Add a new node
   const handleAddNode = React.useCallback(
-    (type: CanvasNodeType, initialData?: Partial<CanvasNodeData>) => {
+    (type: CanvasNodeType, initialData?: Partial<CanvasNodeData>, screenPosition?: { x: number; y: number }) => {
       nodeCounter.current += 1
       const id = `${type}-${nodeCounter.current}`
 
       let flowPosition: { x: number; y: number }
 
-      const selectedNode = nodes.find((node) => node.selected)
-
-      if (selectedNode) {
-        const nodeWidth = selectedNode.width || 300
-        const gap = 30
-
-        flowPosition = {
-          x: selectedNode.position.x + nodeWidth + gap,
-          y: selectedNode.position.y,
-        }
+      if (screenPosition) {
+        flowPosition = screenToFlowPosition(screenPosition)
       } else {
+        const selectedNode = nodes.find((node) => node.selected)
+
+        if (selectedNode) {
+          const nodeWidth = selectedNode.width || 300
+          const gap = 30
+
+          flowPosition = {
+            x: selectedNode.position.x + nodeWidth + gap,
+            y: selectedNode.position.y,
+          }
+        } else {
         const centerX = window.innerWidth / 2
         const centerY = window.innerHeight / 2
         flowPosition = screenToFlowPosition({
           x: centerX,
           y: centerY,
         })
+        }
       }
 
       let data: CanvasNodeData
@@ -844,6 +907,8 @@ function CanvasContent() {
   const handleSave = React.useCallback(async () => {
     setIsSaving(true)
     try {
+      uploadErrorsRef.current = 0
+
       // Generate and upload thumbnail
       let thumbnailUrl: string | null = null
       if (canvasRef.current) {
@@ -853,8 +918,27 @@ function CanvasContent() {
         }
       }
 
+      // Ensure uploads are completed before saving
+      await waitForUploads()
+      if (uploadErrorsRef.current > 0) {
+        toast.error("Some uploads failed. Please retry before saving.")
+        return
+      }
+
       // Use React Flow's toObject to get properly serialized flow state
       const flow = reactFlowInstance.toObject()
+      
+      // Ensure we don't save transient blob/data URLs
+      const hasTransientMedia = flow.nodes.some((node) => {
+        if (node.type !== 'upload') return false
+        const nodeData = node.data as Partial<CanvasNodeData> | null
+        const url = typeof nodeData?.fileUrl === 'string' ? nodeData.fileUrl : null
+        return !!url && (url.startsWith('blob:') || url.startsWith('data:'))
+      })
+      if (hasTransientMedia) {
+        toast.error("Media is still uploading. Please wait and try saving again.")
+        return
+      }
       
       console.log('[handleSave] Flow from toObject:', {
         nodesCount: flow.nodes.length,
@@ -877,7 +961,7 @@ function CanvasContent() {
     } finally {
       setIsSaving(false)
     }
-  }, [canvasId, workflowName, userId, reactFlowInstance])
+  }, [canvasId, workflowName, userId, reactFlowInstance, waitForUploads, setNodes])
 
   // Execute workflow
   const handleExecute = React.useCallback(async () => {
@@ -1066,6 +1150,7 @@ function CanvasContent() {
           onDelete={handleDelete}
           onGroup={handleGroup}
           onUngroup={() => selectedGroupNode && handleUngroup(selectedGroupNode.id)}
+          onAddNode={handleAddNode}
           onClose={() => setContextMenuPosition(null)}
         />
       </div>

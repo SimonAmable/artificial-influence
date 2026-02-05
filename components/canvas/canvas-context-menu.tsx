@@ -2,8 +2,10 @@
 
 import * as React from "react"
 import { Node } from "@xyflow/react"
-import { Copy, Clipboard, CopyPlus, Trash2, Group, Ungroup } from "lucide-react"
+import { Copy, Clipboard, CopyPlus, Trash2, Group, Ungroup, Plus, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { CanvasNodeType, CanvasNodeData } from "@/lib/canvas/types"
+import { AddNodesMenu } from "@/components/canvas/add-nodes-menu"
 
 interface CanvasContextMenuProps {
   position: { x: number; y: number } | null
@@ -16,6 +18,7 @@ interface CanvasContextMenuProps {
   onDelete: () => void
   onGroup: () => void
   onUngroup: () => void
+  onAddNode: (type: CanvasNodeType, initialData?: Partial<CanvasNodeData>, screenPosition?: { x: number; y: number }) => void
   onClose: () => void
 }
 
@@ -30,9 +33,11 @@ export function CanvasContextMenu({
   onDelete,
   onGroup,
   onUngroup,
+  onAddNode,
   onClose,
 }: CanvasContextMenuProps) {
   const menuRef = React.useRef<HTMLDivElement>(null)
+  const [isCreateMenuOpen, setIsCreateMenuOpen] = React.useState(false)
 
   const isGroupNode = clickedNode?.type === "group"
   const hasMultipleSelected = selectedNodes.length > 1
@@ -64,6 +69,12 @@ export function CanvasContextMenu({
     }
   }, [position, onClose])
 
+  React.useEffect(() => {
+    if (!position) {
+      setIsCreateMenuOpen(false)
+    }
+  }, [position])
+
   if (!position) return null
 
   const handleAction = (action: () => void) => {
@@ -76,17 +87,33 @@ export function CanvasContextMenu({
     onClose()
   }
 
+  const handleCreateNode = (type: CanvasNodeType, initialData?: Partial<CanvasNodeData>) => {
+    onAddNode(type, initialData, position)
+    onClose()
+  }
+
   return (
     <div
       ref={menuRef}
       className={cn(
-        "fixed z-50 min-w-[12rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-80"
+        "fixed z-50 min-w-[12rem] text-popover-foreground animate-in fade-in-80"
       )}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
       }}
     >
+      <div className="relative">
+        <div className="overflow-hidden rounded-md border bg-popover p-1 shadow-md">
+          <button
+            onClick={() => setIsCreateMenuOpen((current) => !current)}
+            className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create Node
+            <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
+          </button>
+          <div className="my-1 h-px bg-border" />
       {/* Node selection actions */}
       {hasSelection && (
         <>
@@ -157,12 +184,15 @@ export function CanvasContextMenu({
         </button>
       )}
 
-      {/* Show message when no actions available */}
-      {!hasSelection && !hasClipboard && (
-        <div className="relative flex w-full select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none text-muted-foreground cursor-default">
-          No actions available
+      {/* No empty-state needed since Create Node is always available */}
         </div>
-      )}
+
+        {isCreateMenuOpen && (
+          <div className="absolute left-full top-0 ml-2 w-64 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl">
+            <AddNodesMenu onAddNode={handleCreateNode} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

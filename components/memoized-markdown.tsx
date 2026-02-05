@@ -1,7 +1,9 @@
 "use client"
 
-import { memo } from "react"
+import { memo, type ComponentPropsWithoutRef } from "react"
 import ReactMarkdown from "react-markdown"
+
+type MarkdownCodeProps = ComponentPropsWithoutRef<"code"> & { inline?: boolean }
 
 export const MemoizedMarkdown = memo(
   ({ content, id }: { content: string; id: string }) => {
@@ -13,7 +15,7 @@ export const MemoizedMarkdown = memo(
             ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
             ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
             li: ({ children }) => <li className="mb-1">{children}</li>,
-            code: ({ inline, children, ...props }: any) =>
+            code: ({ inline, children, ...props }: MarkdownCodeProps) =>
               inline ? (
                 <code className="bg-muted px-1 py-0.5 rounded text-sm" {...props}>
                   {children}

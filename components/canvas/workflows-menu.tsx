@@ -92,7 +92,7 @@ export function WorkflowsMenu({ onInstantiate, onEdit, isOpen }: WorkflowsMenuPr
             <Stack size={40} weight="thin" />
             <p className="text-xs text-center px-4">
               No saved workflows yet.<br/>
-              Select a group and click "Save Workflow" to get started.
+              Select a group and click &quot;Save Workflow&quot; to get started.
             </p>
           </div>
         ) : (

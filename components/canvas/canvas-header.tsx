@@ -66,7 +66,7 @@ export function CanvasHeader({
     <>
       {/* Logo with Navigation Dropdown */}
       <div className="absolute top-4 left-4 z-30 bg-zinc-900/80 backdrop-blur-md border border-white/10 shadow-lg rounded-xl px-3 py-2">
-        <DropdownMenu>
+        <DropdownMenu >
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-1 hover:opacity-80 transition-opacity group">
               <Image 
@@ -164,18 +164,18 @@ export function CanvasHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={onSave} disabled={isSaving}>
-              {isSaving ? (
-                <CircleNotch size={16} className="animate-spin mr-2" />
-              ) : (
-                <FloppyDisk size={16} className="mr-2" />
-              )}
-              Save
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExecuteClick} disabled={isExecuting}>
-              {isExecuting ? (
-                <CircleNotch size={16} className="animate-spin mr-2" />
-              ) : (
+          <DropdownMenuItem onClick={onSave} disabled={isSaving}>
+            {isSaving ? (
+              <CircleNotch size={16} className="animate-spin mr-2" />
+            ) : (
+              <FloppyDisk size={16} className="mr-2" />
+            )}
+            Save
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleExecuteClick} disabled={isExecuting}>
+            {isExecuting ? (
+              <CircleNotch size={16} className="animate-spin mr-2" />
+            ) : (
                 <Play size={16} weight="fill" className="mr-2" />
               )}
               {isExecuting ? "Running..." : "Execute"}

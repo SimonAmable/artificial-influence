@@ -25,6 +25,7 @@ export interface MotionCopyInputBoxProps {
     title?: string
     description?: string
   }
+  extraControls?: React.ReactNode
 }
 
 export function MotionCopyInputBox({
@@ -38,6 +39,7 @@ export function MotionCopyInputBox({
   forceRowLayout = false,
   photoUploadProps,
   videoUploadProps,
+  extraControls,
 }: MotionCopyInputBoxProps) {
   const [inputImage, setInputImage] = React.useState<ImageUpload | null>(defaultImage || null)
   const [inputVideo, setInputVideo] = React.useState<ImageUpload | null>(defaultVideo || null)
@@ -80,7 +82,8 @@ export function MotionCopyInputBox({
     <Card className={cn("w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative", className)}>
       <CardContent className={cn(
         "pt-1.5 pb-1.5 flex gap-1.5 sm:gap-2 px-4 sm:px-6",
-        forceRowLayout ? "flex-row items-stretch" : "flex-col"
+        forceRowLayout ? "flex-row items-stretch" : "flex-col",
+        extraControls && "flex-wrap"
       )}>
         {/* Image Upload */}
         <div className={cn(
@@ -105,6 +108,14 @@ export function MotionCopyInputBox({
             description={videoUploadProps?.description || "Click to upload video"}
           />
         </div>
+
+        {extraControls && (
+          <div className={cn(
+            forceRowLayout ? "w-full" : "w-full"
+          )}>
+            {extraControls}
+          </div>
+        )}
 
         {/* Generate Button - Same size as inputs */}
         <div className={cn(

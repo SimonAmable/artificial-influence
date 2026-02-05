@@ -108,7 +108,11 @@ export async function POST(request: NextRequest) {
         break;
 
       case 'kwaivgi/kling-v2.6':
-        // Simple prompt-only model
+        if (otherParams.start_image) replicateInput.start_image = otherParams.start_image;
+        if (otherParams.aspect_ratio) replicateInput.aspect_ratio = otherParams.aspect_ratio;
+        if (otherParams.duration) replicateInput.duration = otherParams.duration;
+        if (otherParams.generate_audio !== undefined) replicateInput.generate_audio = otherParams.generate_audio;
+        if (otherParams.negative_prompt) replicateInput.negative_prompt = otherParams.negative_prompt;
         break;
 
       case 'kwaivgi/kling-v2.6-motion-control':

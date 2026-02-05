@@ -24,9 +24,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Model } from "@/lib/types/models"
-import { createClient } from "@/lib/supabase/client"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { AspectRatioSelector } from "@/components/shared/selectors/aspect-ratio-selector"
+import { getActiveModelMetadata, type ModelMetadata } from "@/lib/constants/model-metadata"
 
 interface InfluencerInputBoxProps {
   className?: string
@@ -77,8 +77,9 @@ export function InfluencerInputBox({
   const [localReferenceImage, setLocalReferenceImage] = React.useState<ImageUpload | null>(referenceImage || null)
   const [isFullScreenPreviewOpen, setIsFullScreenPreviewOpen] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
-  const [models, setModels] = React.useState<Model[]>([])
-  const [loadingModels, setLoadingModels] = React.useState(false)
+  
+  // Get active image models from constants
+  const models = React.useMemo(() => getActiveModelMetadata('image'), [])
 
   // Sync with external changes
   React.useEffect(() => {
@@ -172,49 +173,51 @@ export function InfluencerInputBox({
       .join(' ')
   }
 
-  // Fetch models if model selector is enabled
+  // Set default model if none selected
   React.useEffect(() => {
-    if (showModelSelector) {
-      setLoadingModels(true)
-      const supabase = createClient()
-      
-      const fetchModels = async () => {
-        try {
-          const { data: modelsData, error } = await supabase
-            .from('models')
-            .select('*')
-            .eq('type', 'image')
-            .eq('is_active', true)
-            .order('name', { ascending: true })
-          
-          if (error) {
-            console.error('Error fetching models:', error)
-            return
-          }
-          
-          if (modelsData) {
-            setModels(modelsData as Model[])
-            // Set default model if none selected
-            if (!selectedModel && modelsData.length > 0 && onModelChange) {
-              onModelChange(modelsData[0].identifier)
-            }
-          }
-        } catch (err) {
-          console.error('Error fetching models:', err)
-        } finally {
-          setLoadingModels(false)
-        }
-      }
-      
-      fetchModels()
+    if (showModelSelector && !selectedModel && models.length > 0 && onModelChange) {
+      onModelChange(models[0].identifier)
     }
-  }, [showModelSelector, selectedModel, onModelChange])
+  }, [showModelSelector, selectedModel, models, onModelChange])
 
   // Find the selected model object
   const selectedModelObject = React.useMemo(() => {
     if (!selectedModel) return null
     return models.find(m => m.identifier === selectedModel) || null
   }, [selectedModel, models])
+  
+  // Convert ModelMetadata to Model format for AspectRatioSelector compatibility
+  const selectedModelForSelector = React.useMemo<Model | null>(() => {
+    if (!selectedModelObject) return null
+    
+    // Create a minimal Model object with the parameters structure expected by AspectRatioSelector
+    return {
+      id: selectedModelObject.id,
+      identifier: selectedModelObject.identifier,
+      name: selectedModelObject.name,
+      description: selectedModelObject.description,
+      type: selectedModelObject.type,
+      provider: selectedModelObject.provider,
+      is_active: selectedModelObject.is_active,
+      model_cost: selectedModelObject.model_cost,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      parameters: {
+        parameters: selectedModelObject.aspect_ratios.length > 0 ? [
+          {
+            name: 'aspect_ratio',
+            type: 'string' as const,
+            label: 'Aspect Ratio',
+            description: 'Image aspect ratio',
+            required: false,
+            default: selectedModelObject.aspect_ratios[0] || '1:1',
+            enum: selectedModelObject.aspect_ratios,
+            ui_type: 'select' as const,
+          }
+        ] : []
+      }
+    } as Model
+  }, [selectedModelObject])
 
   // Determine if button is ready (prompt must not be empty)
   const isReady = React.useMemo(() => {
@@ -315,10 +318,10 @@ export function InfluencerInputBox({
             <Select
               value={selectedModel || ""}
               onValueChange={(value) => onModelChange?.(value)}
-              disabled={loadingModels || isGenerating}
+              disabled={isGenerating}
             >
               <SelectTrigger id="model-select" className="h-7 text-xs w-fit min-w-[120px]">
-                <SelectValue placeholder={loadingModels ? "Loading..." : "Select model"}>
+                <SelectValue placeholder="Select model">
                   {selectedModel && (() => {
                     const model = models.find(m => m.identifier === selectedModel)
                     return (
@@ -359,10 +362,10 @@ export function InfluencerInputBox({
           {/* Aspect Ratio Selector (if enabled) */}
           {showAspectRatioSelector && (
             <AspectRatioSelector
-              model={selectedModelObject}
+              model={selectedModelForSelector}
               value={selectedAspectRatio}
               onValueChange={onAspectRatioChange}
-              disabled={isGenerating || loadingModels}
+              disabled={isGenerating}
             />
           )}
 

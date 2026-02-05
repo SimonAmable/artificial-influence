@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Handle, Position, NodeToolbar, type NodeProps, useReactFlow, type Node } from "@xyflow/react"
+import { Handle, Position, NodeToolbar, type NodeProps, useReactFlow, useUpdateNodeInternals, type Node } from "@xyflow/react"
 import {
   Upload,
   X,
@@ -23,12 +23,13 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { extractFirstFrame, extractLastFrame } from "@/lib/canvas/frame-extraction"
 import { createUploadNodeData } from "@/lib/canvas/types"
-import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { uploadBlobToSupabase, uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { toast } from "sonner"
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog"
+import { getConstrainedSize, loadImageSize, loadVideoSize } from "@/lib/canvas/media-sizing"
 
 const hintSuggestions = [
   { icon: ImageIcon, label: "Image" },
@@ -40,6 +41,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
   const nodeData = data as UploadNodeData
   const inputRef = React.useRef<HTMLInputElement>(null)
   const reactFlow = useReactFlow()
+  const updateNodeInternals = useUpdateNodeInternals()
   const nodeCounterRef = React.useRef(Date.now())
   const [isHovered, setIsHovered] = React.useState(false)
   const [isEditingTitle, setIsEditingTitle] = React.useState(false)
@@ -54,6 +56,18 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
   const nodeWidth = currentNode?.style?.width || currentNode?.width || 280
   const nodeHeight = currentNode?.style?.height || currentNode?.height || 280
 
+  const applyNodeSize = React.useCallback((width: number, height: number) => {
+    const existing = reactFlow.getNode(id)
+    const existingWidth = existing?.style?.width ?? existing?.width
+    const existingHeight = existing?.style?.height ?? existing?.height
+    if (existingWidth === width && existingHeight === height) return
+
+    reactFlow.updateNode(id, {
+      style: { width, height },
+    })
+    updateNodeInternals(id)
+  }, [id, reactFlow, updateNodeInternals])
+
   React.useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
       titleInputRef.current.focus()
@@ -66,87 +80,25 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
     if (!nodeData.fileUrl) return
     
     if (nodeData.fileType === 'image') {
-      const img = new Image()
-      img.onload = () => {
-        const aspectRatio = img.naturalWidth / img.naturalHeight
-        const maxWidth = 500
-        const maxHeight = 500
-        const minWidth = 200
-        const minHeight = 200
-        
-        let nodeWidth: number
-        let nodeHeight: number
-        
-        if (aspectRatio > 1) {
-          nodeWidth = Math.min(maxWidth, Math.max(minWidth, 350))
-          nodeHeight = nodeWidth / aspectRatio
-          if (nodeHeight < minHeight) {
-            nodeHeight = minHeight
-            nodeWidth = nodeHeight * aspectRatio
-          }
-        } else {
-          nodeHeight = Math.min(maxHeight, Math.max(minHeight, 350))
-          nodeWidth = nodeHeight * aspectRatio
-          if (nodeWidth < minWidth) {
-            nodeWidth = minWidth
-            nodeHeight = nodeWidth / aspectRatio
-          }
-        }
-        
-        reactFlow.setNodes((nodes) =>
-          nodes.map((node) =>
-            node.id === id
-              ? {
-                  ...node,
-                  style: { ...node.style, width: nodeWidth, height: nodeHeight },
-                }
-              : node
-          )
-        )
-      }
-      img.src = nodeData.fileUrl
+      loadImageSize(nodeData.fileUrl)
+        .then((size) => {
+          const constrained = getConstrainedSize(size)
+          applyNodeSize(constrained.width, constrained.height)
+        })
+        .catch(() => {
+          // Ignore load errors; keep existing size
+        })
     } else if (nodeData.fileType === 'video') {
-      const video = document.createElement('video')
-      video.onloadedmetadata = () => {
-        const aspectRatio = video.videoWidth / video.videoHeight
-        const maxWidth = 500
-        const maxHeight = 500
-        const minWidth = 200
-        const minHeight = 200
-        
-        let nodeWidth: number
-        let nodeHeight: number
-        
-        if (aspectRatio > 1) {
-          nodeWidth = Math.min(maxWidth, Math.max(minWidth, 350))
-          nodeHeight = nodeWidth / aspectRatio
-          if (nodeHeight < minHeight) {
-            nodeHeight = minHeight
-            nodeWidth = nodeHeight * aspectRatio
-          }
-        } else {
-          nodeHeight = Math.min(maxHeight, Math.max(minHeight, 350))
-          nodeWidth = nodeHeight * aspectRatio
-          if (nodeWidth < minWidth) {
-            nodeWidth = minWidth
-            nodeHeight = nodeWidth / aspectRatio
-          }
-        }
-        
-        reactFlow.setNodes((nodes) =>
-          nodes.map((node) =>
-            node.id === id
-              ? {
-                  ...node,
-                  style: { ...node.style, width: nodeWidth, height: nodeHeight },
-                }
-              : node
-          )
-        )
-      }
-      video.src = nodeData.fileUrl
+      loadVideoSize(nodeData.fileUrl)
+        .then((size) => {
+          const constrained = getConstrainedSize(size)
+          applyNodeSize(constrained.width, constrained.height)
+        })
+        .catch(() => {
+          // Ignore load errors; keep existing size
+        })
     }
-  }, [nodeData.fileUrl, nodeData.fileType, id, reactFlow])
+  }, [nodeData.fileUrl, nodeData.fileType, applyNodeSize])
 
   const handleTitleClick = () => {
     if (selected) {
@@ -252,6 +204,26 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
       }
 
       reactFlow.addNodes(newNode)
+      
+      const uploadResult = await uploadBlobToSupabase(frame.blob, frame.filename, 'uploads')
+      if (uploadResult) {
+        reactFlow.setNodes((nodes) =>
+          nodes.map((n) =>
+            n.id === newNodeId
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    fileUrl: uploadResult.url,
+                    fileType: uploadResult.fileType,
+                    fileName: uploadResult.fileName,
+                  },
+                }
+              : n
+          )
+        )
+        URL.revokeObjectURL(frame.url)
+      }
     } catch (error) {
       console.error('Error extracting first frame:', error)
     } finally {
@@ -295,6 +267,26 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
       }
 
       reactFlow.addNodes(newNode)
+      
+      const uploadResult = await uploadBlobToSupabase(frame.blob, frame.filename, 'uploads')
+      if (uploadResult) {
+        reactFlow.setNodes((nodes) =>
+          nodes.map((n) =>
+            n.id === newNodeId
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    fileUrl: uploadResult.url,
+                    fileType: uploadResult.fileType,
+                    fileName: uploadResult.fileName,
+                  },
+                }
+              : n
+          )
+        )
+        URL.revokeObjectURL(frame.url)
+      }
     } catch (error) {
       console.error('Error extracting last frame:', error)
     } finally {
@@ -320,30 +312,10 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
     if (fileType === "image") {
       const img = new Image()
       img.onload = async () => {
-        const aspectRatio = img.naturalWidth / img.naturalHeight
-        const maxWidth = 500
-        const maxHeight = 500
-        const minWidth = 200
-        const minHeight = 200
-        
-        let nodeWidth: number
-        let nodeHeight: number
-        
-        if (aspectRatio > 1) {
-          nodeWidth = Math.min(maxWidth, Math.max(minWidth, 350))
-          nodeHeight = nodeWidth / aspectRatio
-          if (nodeHeight < minHeight) {
-            nodeHeight = minHeight
-            nodeWidth = nodeHeight * aspectRatio
-          }
-        } else {
-          nodeHeight = Math.min(maxHeight, Math.max(minHeight, 350))
-          nodeWidth = nodeHeight * aspectRatio
-          if (nodeWidth < minWidth) {
-            nodeWidth = minWidth
-            nodeHeight = nodeWidth / aspectRatio
-          }
-        }
+        const constrained = getConstrainedSize({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        })
         
         // Show blob URL immediately for instant preview
         const updatedNodePreview: Node = {
@@ -356,12 +328,13 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
           },
           style: {
             ...currentNode.style,
-            width: nodeWidth,
-            height: nodeHeight,
+            width: constrained.width,
+            height: constrained.height,
           },
         }
         
         reactFlow.setNodes((nodes) => nodes.map((n) => (n.id === id ? updatedNodePreview : n)))
+        updateNodeInternals(id)
         
         // Upload to Supabase in background
         setIsUploading(true)
@@ -391,30 +364,10 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
     } else if (fileType === "video") {
       const video = document.createElement('video')
       video.onloadedmetadata = async () => {
-        const aspectRatio = video.videoWidth / video.videoHeight
-        const maxWidth = 500
-        const maxHeight = 500
-        const minWidth = 200
-        const minHeight = 200
-        
-        let nodeWidth: number
-        let nodeHeight: number
-        
-        if (aspectRatio > 1) {
-          nodeWidth = Math.min(maxWidth, Math.max(minWidth, 350))
-          nodeHeight = nodeWidth / aspectRatio
-          if (nodeHeight < minHeight) {
-            nodeHeight = minHeight
-            nodeWidth = nodeHeight * aspectRatio
-          }
-        } else {
-          nodeHeight = Math.min(maxHeight, Math.max(minHeight, 350))
-          nodeWidth = nodeHeight * aspectRatio
-          if (nodeWidth < minWidth) {
-            nodeWidth = minWidth
-            nodeHeight = nodeWidth / aspectRatio
-          }
-        }
+        const constrained = getConstrainedSize({
+          width: video.videoWidth,
+          height: video.videoHeight,
+        })
         
         // Show blob URL immediately for instant preview
         const updatedNodePreview: Node = {
@@ -427,12 +380,13 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
           },
           style: {
             ...currentNode.style,
-            width: nodeWidth,
-            height: nodeHeight,
+            width: constrained.width,
+            height: constrained.height,
           },
         }
         
         reactFlow.setNodes((nodes) => nodes.map((n) => (n.id === id ? updatedNodePreview : n)))
+        updateNodeInternals(id)
         
         // Upload to Supabase in background
         setIsUploading(true)
@@ -484,16 +438,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
     })
     
     // Reset to default size
-    reactFlow.setNodes((nodes) =>
-      nodes.map((node) =>
-        node.id === id
-          ? {
-              ...node,
-              style: { ...node.style, width: 280, height: 280 },
-            }
-          : node
-      )
-    )
+    applyNodeSize(280, 280)
     
     if (inputRef.current) inputRef.current.value = ""
   }
@@ -581,6 +526,13 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
+        <Handle
+          id="input"
+          type="target"
+          position={Position.Left}
+          isConnectableStart={false}
+          className="easy-connect-target"
+        />
         <div
           className={cn(
             "relative transition-all duration-200",

@@ -44,9 +44,9 @@ export function AIChat({ className }: AIChatProps) {
       setIsOpen(true)
     }
 
-    window.addEventListener('chat-open' as any, handleOpenChat)
+    window.addEventListener('chat-open', handleOpenChat as EventListener)
     return () => {
-      window.removeEventListener('chat-open' as any, handleOpenChat)
+      window.removeEventListener('chat-open', handleOpenChat as EventListener)
     }
   }, [])
 
@@ -343,14 +343,14 @@ const MessageInput = () => {
       setInput(prev => prev ? `${prev}\n\n${e.detail.text}` : e.detail.text)
     }
 
-    window.addEventListener('chat-add-asset' as any, handleAddAsset)
-    window.addEventListener('chat-add-files' as any, handleAddFiles)
-    window.addEventListener('chat-add-text' as any, handleAddText)
+    window.addEventListener('chat-add-asset', handleAddAsset as EventListener)
+    window.addEventListener('chat-add-files', handleAddFiles as EventListener)
+    window.addEventListener('chat-add-text', handleAddText as EventListener)
 
     return () => {
-      window.removeEventListener('chat-add-asset' as any, handleAddAsset)
-      window.removeEventListener('chat-add-files' as any, handleAddFiles)
-      window.removeEventListener('chat-add-text' as any, handleAddText)
+      window.removeEventListener('chat-add-asset', handleAddAsset as EventListener)
+      window.removeEventListener('chat-add-files', handleAddFiles as EventListener)
+      window.removeEventListener('chat-add-text', handleAddText as EventListener)
     }
   }, [])
 

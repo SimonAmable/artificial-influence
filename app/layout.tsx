@@ -1,24 +1,11 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono, Noto_Sans } from "next/font/google";
-import "./globals.css";
-import { ThemeProvider } from "@/components/app/theme-provider";
-import { Header } from "@/components/app/header";
-import { LayoutModeProviderWrapper } from "@/components/shared/layout/layout-mode-provider-wrapper";
-import { Toaster } from "@/components/ui/sonner";
-import { AIChat } from "@/components/ai-chat";
+import type { Metadata } from "next"
+import "./globals.css"
+import { ThemeProvider } from "@/components/app/theme-provider"
+import { Header } from "@/components/app/header"
+import { LayoutModeProviderWrapper } from "@/components/shared/layout/layout-mode-provider-wrapper"
+import { Toaster } from "@/components/ui/sonner"
+import { AIChat } from "@/components/ai-chat"
 import { Analytics } from "@vercel/analytics/next"
-
-const notoSans = Noto_Sans({variable:'--font-sans'});
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Artificial Influence",
@@ -28,12 +15,12 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={notoSans.variable} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className="antialiased"
       >
         <ThemeProvider
           attribute="class"
@@ -51,5 +38,5 @@ export default function RootLayout({
         <Analytics />
       </body>
     </html>
-  );
+  )
 }

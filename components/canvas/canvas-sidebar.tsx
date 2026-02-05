@@ -7,11 +7,7 @@ import {
   Shapes,
   ClockCounterClockwise,
   Stack,
-  TextT,
-  Image as ImageIcon,
-  VideoCamera,
   SpeakerHigh,
-  UploadSimple,
   type IconProps,
 } from "@phosphor-icons/react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -20,6 +16,7 @@ import type { CanvasNodeType, CanvasNodeData } from "@/lib/canvas/types"
 import type { Workflow } from "@/lib/workflows/database-server"
 import { createClient } from "@/lib/supabase/client"
 import { WorkflowsMenu } from "@/components/canvas/workflows-menu"
+import { AddNodesMenu } from "@/components/canvas/add-nodes-menu"
 import Image from "next/image"
 
 interface Generation {
@@ -34,7 +31,7 @@ interface Generation {
 }
 
 interface CanvasSidebarProps {
-  onAddNode: (type: CanvasNodeType, initialData?: Partial<CanvasNodeData>) => void
+  onAddNode: (type: CanvasNodeType, initialData?: Partial<CanvasNodeData>, screenPosition?: { x: number; y: number }) => void
   onInstantiateWorkflow?: (workflow: Workflow) => void
   onEditWorkflow?: (workflow: Workflow) => void
 }
@@ -304,47 +301,10 @@ export function CanvasSidebar({ onAddNode, onInstantiateWorkflow, onEditWorkflow
             onMouseLeave={scheduleCloseAddMenu}
             className="absolute left-[72px] top-0 w-64 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl"
           >
-            <div className="px-2 py-1.5 mb-2">
-              <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Add Nodes</span>
-            </div>
-            
-            <div className="flex flex-col gap-1">
-              <AddNodeItem 
-                icon={TextT} 
-                title="Text" 
-                badge="Gemini 3" 
-                description="Script, Ad copy, Brand text"
-                onClick={() => { onAddNode("text"); setActiveMenu(null); }}
-              />
-              <AddNodeItem 
-                icon={ImageIcon} 
-                title="Image" 
-                badge="Banana Pro" 
-                onClick={() => { onAddNode("image-gen"); setActiveMenu(null); }}
-              />
-              <AddNodeItem 
-                icon={VideoCamera} 
-                title="Video" 
-                onClick={() => { onAddNode("video-gen"); setActiveMenu(null); }}
-              />
-              <AddNodeItem 
-                icon={SpeakerHigh} 
-                title="Audio" 
-                badge="Beta"
-                onClick={() => { onAddNode("audio"); setActiveMenu(null); }}
-              />
-              
-              <div className="h-px bg-white/5 my-2" />
-              <div className="px-2 py-1.5 mb-1">
-                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Add Source</span>
-              </div>
-              
-              <AddNodeItem 
-                icon={UploadSimple} 
-                title="Upload" 
-                onClick={() => { onAddNode("upload"); setActiveMenu(null); }}
-              />
-            </div>
+            <AddNodesMenu
+              onAddNode={(type, initialData) => onAddNode(type, initialData)}
+              onClose={() => setActiveMenu(null)}
+            />
           </motion.div>
         )}
 
@@ -475,58 +435,5 @@ export function CanvasSidebar({ onAddNode, onInstantiateWorkflow, onEditWorkflow
         )}
       </AnimatePresence>
     </div>
-  )
-}
-
-function AddNodeItem({ 
-  icon: Icon, 
-  title, 
-  badge, 
-  description, 
-  onClick 
-}: { 
-  icon: IconComponent, 
-  title: string, 
-  badge?: string, 
-  description?: string,
-  onClick: () => void
-}) {
-  const [isHovered, setIsHovered] = React.useState(false)
-
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className="flex items-start gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors text-left group w-full"
-    >
-      <div className="w-10 h-10 shrink-0 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-white group-hover:bg-zinc-700 transition-colors">
-        <Icon size={20} weight="bold" />
-      </div>
-      <div className="flex flex-col gap-0.5">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-zinc-200">{title}</span>
-          {badge && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-zinc-400 font-bold border border-white/5">
-              {badge}
-            </span>
-          )}
-        </div>
-        {description && (
-          <motion.span
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ 
-              opacity: isHovered ? 1 : 0, 
-              y: isHovered ? 0 : -4 
-            }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="text-xs text-zinc-500 leading-tight overflow-hidden"
-            style={{ height: isHovered ? 'auto' : 0 }}
-          >
-            {description}
-          </motion.span>
-        )}
-      </div>
-    </button>
   )
 }

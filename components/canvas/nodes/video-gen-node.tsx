@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Handle, Position, NodeToolbar, type NodeProps, useNodes, useEdges, getIncomers, useReactFlow, type Node } from "@xyflow/react"
+import { Handle, Position, NodeToolbar, type NodeProps, useNodes, useEdges, getIncomers, useReactFlow, useUpdateNodeInternals, type Node, useStore } from "@xyflow/react"
 import { createClient } from "@/lib/supabase/client"
 import {
   VideoCamera,
@@ -18,12 +18,19 @@ import {
   PaperPlaneTilt,
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
-import type { VideoGenNodeData } from "@/lib/canvas/types"
+import type { VideoGenNodeData, UploadNodeData, ImageGenNodeData } from "@/lib/canvas/types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { extractFirstFrame, extractLastFrame } from "@/lib/canvas/frame-extraction"
 import { createUploadNodeData } from "@/lib/canvas/types"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { getActiveModelMetadata, getModelMetadataByIdentifier } from "@/lib/constants/model-metadata"
+import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
+import type { Model, ParameterDefinition } from "@/lib/types/models"
+import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
+import { VideoModelParameterControls } from "@/components/tools/video/video-model-parameter-controls"
+import { PhotoUpload, type ImageUpload } from "@/components/shared/upload/photo-upload"
+import { VideoUpload } from "@/components/shared/upload/video-upload"
+import { AudioUpload, type AudioUploadValue } from "@/components/shared/upload/audio-upload"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +41,8 @@ import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog"
+import { getConstrainedSize, loadVideoSize } from "@/lib/canvas/media-sizing"
+import { uploadBlobToSupabase } from "@/lib/canvas/upload-helpers"
 
 const hintSuggestions = [
   { label: "Connect an image source" },
@@ -45,6 +54,11 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const nodes = useNodes()
   const edges = useEdges()
   const reactFlow = useReactFlow()
+  const { isConnecting, connectingFromId } = useStore((state) => ({
+    isConnecting: state.connection.inProgress,
+    connectingFromId: state.connection.fromHandle?.nodeId,
+  }))
+  const updateNodeInternals = useUpdateNodeInternals()
   const nodeCounterRef = React.useRef(Date.now())
   const [isHovered, setIsHovered] = React.useState(false)
   const [isEditingTitle, setIsEditingTitle] = React.useState(false)
@@ -53,7 +67,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
   const [isAddMediaOpen, setIsAddMediaOpen] = React.useState(false)
   const imageUploadRef = React.useRef<HTMLInputElement>(null)
+  const lastFrameUploadRef = React.useRef<HTMLInputElement>(null)
   const videoUploadRef = React.useRef<HTMLInputElement>(null)
+  const audioUploadRef = React.useRef<HTMLInputElement>(null)
   const [videoDuration, setVideoDuration] = React.useState<number | null>(null)
   const [isExtractingFrame, setIsExtractingFrame] = React.useState(false)
 
@@ -86,13 +102,13 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     let imageUrl: string | null = null
     for (const node of incomingNodes) {
       if (node.type === 'upload') {
-        const uploadData = node.data as any
+        const uploadData = node.data as UploadNodeData
         if (uploadData.fileUrl && uploadData.fileType === 'image') {
           imageUrl = uploadData.fileUrl
           break
         }
       } else if (node.type === 'image-gen') {
-        const imageGenData = node.data as any
+        const imageGenData = node.data as ImageGenNodeData
         if (imageGenData.generatedImageUrl) {
           imageUrl = imageGenData.generatedImageUrl
           break
@@ -104,9 +120,21 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     let videoUrl: string | null = null
     for (const node of incomingNodes) {
       if (node.type === 'upload') {
-        const uploadData = node.data as any
+        const uploadData = node.data as UploadNodeData
         if (uploadData.fileUrl && uploadData.fileType === 'video') {
           videoUrl = uploadData.fileUrl
+          break
+        }
+      }
+    }
+
+    // Get audio from upload nodes (use first one found)
+    let audioUrl: string | null = null
+    for (const node of incomingNodes) {
+      if (node.type === 'upload') {
+        const uploadData = node.data as UploadNodeData
+        if (uploadData.fileUrl && uploadData.fileType === 'audio') {
+          audioUrl = uploadData.fileUrl
           break
         }
       }
@@ -118,6 +146,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     }
     if (videoUrl !== nodeData.connectedVideoUrl) {
       nodeData.onDataChange?.(id, { connectedVideoUrl: videoUrl })
+    }
+    if (audioUrl !== nodeData.connectedAudioUrl) {
+      nodeData.onDataChange?.(id, { connectedAudioUrl: audioUrl })
     }
   }, [nodes, edges, id, nodeData])
 
@@ -140,70 +171,77 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     }
   }, [isEditingTitle])
 
+  const getModelFromMetadata = React.useCallback((identifier: string): Model | null => {
+    const metadata = getModelMetadataByIdentifier(identifier) || getActiveModelMetadata("video")[0]
+    if (!metadata) return null
+    return {
+      id: metadata.id,
+      identifier: metadata.identifier,
+      name: metadata.name,
+      description: metadata.description,
+      type: metadata.type,
+      provider: metadata.provider,
+      is_active: metadata.is_active,
+      model_cost: metadata.model_cost,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      parameters: {
+        parameters: buildVideoModelParameters(metadata),
+      },
+    }
+  }, [])
+
+  const selectedModel = React.useMemo(() => {
+    return getModelFromMetadata(nodeData.model || "kwaivgi/kling-v2.6-motion-control")
+  }, [getModelFromMetadata, nodeData.model])
+
+  React.useEffect(() => {
+    if (!selectedModel) return
+    if (nodeData.model !== selectedModel.identifier) {
+      nodeData.onDataChange?.(id, { model: selectedModel.identifier })
+    }
+    if (!nodeData.parameters || Object.keys(nodeData.parameters).length === 0) {
+      const defaults: Record<string, unknown> = {}
+      selectedModel.parameters.parameters.forEach((param: ParameterDefinition) => {
+        defaults[param.name] = param.default
+      })
+      nodeData.onDataChange?.(id, { parameters: defaults })
+    }
+  }, [id, nodeData, selectedModel])
+
+  const applyNodeSize = React.useCallback((width: number, height: number) => {
+    const existing = reactFlow.getNode(id)
+    const existingWidth = existing?.style?.width ?? existing?.width
+    const existingHeight = existing?.style?.height ?? existing?.height
+    if (existingWidth === width && existingHeight === height) return
+
+    reactFlow.updateNode(id, {
+      width,
+      height,
+      style: { width, height },
+    })
+    updateNodeInternals(id)
+  }, [id, reactFlow, updateNodeInternals])
+
   // Adjust node size based on video aspect ratio when video is generated
   React.useEffect(() => {
     const videoUrl = nodeData.generatedVideoUrl
     if (videoUrl) {
-      // Extract first frame to get dimensions
-      extractFirstFrame(videoUrl, 'temp')
-        .then((frame) => {
-          const aspectRatio = frame.width / frame.height
-          const maxWidth = 500
-          const maxHeight = 500
-          const minWidth = 200
-          const minHeight = 200
-          
-          let nodeWidth: number
-          let nodeHeight: number
-          
-          if (aspectRatio > 1) {
-            // Landscape
-            nodeWidth = Math.min(maxWidth, Math.max(minWidth, 350))
-            nodeHeight = nodeWidth / aspectRatio
-            if (nodeHeight < minHeight) {
-              nodeHeight = minHeight
-              nodeWidth = nodeHeight * aspectRatio
-            }
-          } else {
-            // Portrait or square
-            nodeHeight = Math.min(maxHeight, Math.max(minHeight, 350))
-            nodeWidth = nodeHeight * aspectRatio
-            if (nodeWidth < minWidth) {
-              nodeWidth = minWidth
-              nodeHeight = nodeWidth / aspectRatio
-            }
-          }
-          
-          reactFlow.updateNode(id, {
-            style: {
-              width: nodeWidth,
-              height: nodeHeight,
-            },
-          })
-          
-          // Clean up the temporary blob URL
-          URL.revokeObjectURL(frame.url)
+      loadVideoSize(videoUrl)
+        .then((size) => {
+          const constrained = getConstrainedSize(size)
+          applyNodeSize(constrained.width, constrained.height)
         })
         .catch((error) => {
-          console.error('Error extracting frame for dimensions:', error)
+          console.error('Error loading video metadata for dimensions:', error)
           // Reset to default size on error
-          reactFlow.updateNode(id, {
-            style: {
-              width: 280,
-              height: 280,
-            },
-          })
+          applyNodeSize(280, 280)
         })
     } else {
       // Reset to default size when no video
-      reactFlow.updateNode(id, {
-        style: {
-          width: 280,
-          height: 280,
-        },
-      })
+      applyNodeSize(280, 280)
     }
-  }, [nodeData.generatedVideoUrl, id, reactFlow])
+  }, [nodeData.generatedVideoUrl, applyNodeSize])
 
   const handleTitleClick = () => {
     if (selected) {
@@ -303,6 +341,26 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       }
 
       reactFlow.addNodes(newNode)
+      
+      const uploadResult = await uploadBlobToSupabase(frame.blob, frame.filename, 'uploads')
+      if (uploadResult) {
+        reactFlow.setNodes((nodes) =>
+          nodes.map((n) =>
+            n.id === newNodeId
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    fileUrl: uploadResult.url,
+                    fileType: uploadResult.fileType,
+                    fileName: uploadResult.fileName,
+                  },
+                }
+              : n
+          )
+        )
+        URL.revokeObjectURL(frame.url)
+      }
     } catch (error) {
       console.error('Error extracting first frame:', error)
     } finally {
@@ -344,6 +402,26 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       }
 
       reactFlow.addNodes(newNode)
+      
+      const uploadResult = await uploadBlobToSupabase(frame.blob, frame.filename, 'uploads')
+      if (uploadResult) {
+        reactFlow.setNodes((nodes) =>
+          nodes.map((n) =>
+            n.id === newNodeId
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    fileUrl: uploadResult.url,
+                    fileType: uploadResult.fileType,
+                    fileName: uploadResult.fileName,
+                  },
+                }
+              : n
+          )
+        )
+        URL.revokeObjectURL(frame.url)
+      }
     } catch (error) {
       console.error('Error extracting last frame:', error)
     } finally {
@@ -402,6 +480,36 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     }
   }
 
+  const handleLastFrameUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !file.type.startsWith("image/")) return
+
+    const url = URL.createObjectURL(file)
+    nodeData.onDataChange?.(id, {
+      manualLastFrameUrl: url,
+      manualLastFrameFile: file,
+      error: null,
+    })
+
+    if (lastFrameUploadRef.current) lastFrameUploadRef.current.value = ""
+    setIsAddMediaOpen(false)
+  }
+
+  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !file.type.startsWith("audio/")) return
+
+    const url = URL.createObjectURL(file)
+    nodeData.onDataChange?.(id, {
+      manualAudioUrl: url,
+      manualAudioFile: file,
+      error: null,
+    })
+
+    if (audioUploadRef.current) audioUploadRef.current.value = ""
+    setIsAddMediaOpen(false)
+  }
+
   const handleRemoveImage = () => {
     nodeData.onDataChange?.(id, { manualImageUrl: null, manualImageFile: null })
   }
@@ -410,15 +518,78 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     nodeData.onDataChange?.(id, { manualVideoUrl: null, manualVideoFile: null })
   }
 
+  const handleRemoveLastFrame = () => {
+    nodeData.onDataChange?.(id, { manualLastFrameUrl: null, manualLastFrameFile: null })
+  }
+
+  const handleRemoveAudio = () => {
+    nodeData.onDataChange?.(id, { manualAudioUrl: null, manualAudioFile: null })
+  }
+
+  const handleCustomImageChange = (image: ImageUpload | null) => {
+    nodeData.onDataChange?.(id, {
+      manualImageUrl: image?.url ?? null,
+      manualImageFile: image?.file ?? null,
+      error: null,
+    })
+  }
+
+  const handleCustomVideoChange = (video: ImageUpload | null) => {
+    nodeData.onDataChange?.(id, {
+      manualVideoUrl: video?.url ?? null,
+      manualVideoFile: video?.file ?? null,
+      error: null,
+    })
+  }
+
+  const handleCustomAudioChange = (audio: AudioUploadValue | null) => {
+    nodeData.onDataChange?.(id, {
+      manualAudioUrl: audio?.url ?? null,
+      manualAudioFile: audio?.file ?? null,
+      error: null,
+    })
+  }
+
   const handleGenerate = async () => {
-    // Get final image and video URLs (prefer manual, fallback to connected)
+    if (!selectedModel) {
+      nodeData.onDataChange?.(id, { error: "Select a model first" })
+      return
+    }
+
+    const modelIdentifier = selectedModel.identifier
+    const isMotionCopy = modelIdentifier === "kwaivgi/kling-v2.6-motion-control"
+    const isLipsync = modelIdentifier === "veed/fabric-1.0"
+
     const finalImageUrl = nodeData.manualImageUrl || nodeData.connectedImageUrl
     const finalVideoUrl = nodeData.manualVideoUrl || nodeData.connectedVideoUrl
+    const finalAudioUrl = nodeData.manualAudioUrl || nodeData.connectedAudioUrl
+    const finalLastFrameUrl = nodeData.manualLastFrameUrl || null
 
-    if (!finalImageUrl || !finalVideoUrl) {
-      nodeData.onDataChange?.(id, {
-        error: "Both image and video inputs are required",
-      })
+    const modelSupportsImage = selectedModel.parameters.parameters?.some(
+      (param) =>
+        param.name === "image" ||
+        param.name === "first_frame_image" ||
+        param.name === "start_image"
+    )
+
+    if (isMotionCopy && (!finalImageUrl || !finalVideoUrl)) {
+      nodeData.onDataChange?.(id, { error: "Image and video are required" })
+      return
+    }
+    if (isLipsync && (!finalImageUrl || !finalAudioUrl)) {
+      nodeData.onDataChange?.(id, { error: "Image and audio are required" })
+      return
+    }
+    if (!isMotionCopy && !isLipsync && modelSupportsImage && !finalImageUrl) {
+      nodeData.onDataChange?.(id, { error: "Image input is required" })
+      return
+    }
+    if (!isMotionCopy && !isLipsync && modelSupportsLastFrame && !finalLastFrameUrl) {
+      nodeData.onDataChange?.(id, { error: "Last frame image is required" })
+      return
+    }
+    if (!isMotionCopy && !isLipsync && !nodeData.prompt?.trim()) {
+      nodeData.onDataChange?.(id, { error: "Prompt is required" })
       return
     }
 
@@ -429,133 +600,150 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       
       if (authError || !user) {
-        throw new Error('Please log in to generate videos')
+        throw new Error("Please log in to generate videos")
       }
 
-      let imagePublicUrl: string
-      let imageStoragePath: string
-      let videoPublicUrl: string
-      let videoStoragePath: string
+      const uploadFileToSupabase = async (file: File, prefix: string) => {
+        const fileExtension = file.name.split(".").pop() || "bin"
+        const timestamp = Date.now()
+        const randomStr = Math.random().toString(36).substring(7)
+        const filename = `${timestamp}-${randomStr}.${fileExtension}`
+        const storagePath = `${user.id}/${prefix}/${filename}`
 
-      // Upload image to Supabase
-      if (nodeData.manualImageFile) {
-        // Manual upload - use the stored File
-        const imageExtension = nodeData.manualImageFile.name.split('.').pop() || 'png'
-        const imageTimestamp = Date.now()
-        const imageRandomStr = Math.random().toString(36).substring(7)
-        const imageFilename = `${imageTimestamp}-${imageRandomStr}.${imageExtension}`
-        imageStoragePath = `${user.id}/video-gen-images/${imageFilename}`
-
-        const { error: imageUploadError } = await supabase.storage
-          .from('public-bucket')
-          .upload(imageStoragePath, nodeData.manualImageFile, {
-            contentType: nodeData.manualImageFile.type,
+        const { error: uploadError } = await supabase.storage
+          .from("public-bucket")
+          .upload(storagePath, file, {
+            contentType: file.type,
             upsert: false,
           })
 
-        if (imageUploadError) {
-          throw new Error(`Failed to upload image: ${imageUploadError.message}`)
+        if (uploadError) {
+          throw new Error(`Failed to upload file: ${uploadError.message}`)
         }
 
-        const { data: imageUrlData } = supabase.storage
-          .from('public-bucket')
-          .getPublicUrl(imageStoragePath)
-        imagePublicUrl = imageUrlData.publicUrl
+        const { data: urlData } = supabase.storage
+          .from("public-bucket")
+          .getPublicUrl(storagePath)
+
+        return { url: urlData.publicUrl, storagePath }
+      }
+
+      const uploadUrlToSupabase = async (url: string, prefix: string) => {
+        const response = await fetch(url)
+        const blob = await response.blob()
+        const extension = blob.type.split("/")[1] || "bin"
+        const timestamp = Date.now()
+        const randomStr = Math.random().toString(36).substring(7)
+        const filename = `${timestamp}-${randomStr}.${extension}`
+        const storagePath = `${user.id}/${prefix}/${filename}`
+
+        const { error: uploadError } = await supabase.storage
+          .from("public-bucket")
+          .upload(storagePath, blob, {
+            contentType: blob.type,
+            upsert: false,
+          })
+
+        if (uploadError) {
+          throw new Error(`Failed to upload file: ${uploadError.message}`)
+        }
+
+        const { data: urlData } = supabase.storage
+          .from("public-bucket")
+          .getPublicUrl(storagePath)
+
+        return { url: urlData.publicUrl, storagePath }
+      }
+
+      let imageUpload: { url: string; storagePath: string } | null = null
+      let videoUpload: { url: string; storagePath: string } | null = null
+      let audioUpload: { url: string; storagePath: string } | null = null
+
+      if (finalImageUrl) {
+        imageUpload = nodeData.manualImageFile
+          ? await uploadFileToSupabase(nodeData.manualImageFile, "video-gen-images")
+          : await uploadUrlToSupabase(finalImageUrl, "video-gen-images")
+      }
+
+      let lastFrameUpload: { url: string; storagePath: string } | null = null
+      if (finalLastFrameUrl) {
+        lastFrameUpload = nodeData.manualLastFrameFile
+          ? await uploadFileToSupabase(nodeData.manualLastFrameFile, "video-gen-last-frames")
+          : await uploadUrlToSupabase(finalLastFrameUrl, "video-gen-last-frames")
+      }
+
+      if (finalVideoUrl) {
+        videoUpload = nodeData.manualVideoFile
+          ? await uploadFileToSupabase(nodeData.manualVideoFile, "video-gen-videos")
+          : await uploadUrlToSupabase(finalVideoUrl, "video-gen-videos")
+      }
+
+      if (finalAudioUrl) {
+        audioUpload = nodeData.manualAudioFile
+          ? await uploadFileToSupabase(nodeData.manualAudioFile, "video-gen-audio")
+          : await uploadUrlToSupabase(finalAudioUrl, "video-gen-audio")
+      }
+
+      let response: Response
+
+      if (isMotionCopy) {
+        response = await fetch("/api/generate-video", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrl: imageUpload?.url,
+            videoUrl: videoUpload?.url,
+            imageStoragePath: imageUpload?.storagePath,
+            videoStoragePath: videoUpload?.storagePath,
+            prompt: nodeData.prompt || "",
+            mode: (nodeData.parameters?.mode as string) || nodeData.mode || "pro",
+            keep_original_sound: nodeData.parameters?.keep_original_sound ?? true,
+            character_orientation: nodeData.parameters?.character_orientation || "image",
+          }),
+        })
+      } else if (isLipsync) {
+        response = await fetch("/api/generate-lipsync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrl: imageUpload?.url,
+            audioUrl: audioUpload?.url,
+            imageStoragePath: imageUpload?.storagePath,
+            audioStoragePath: audioUpload?.storagePath,
+            resolution: nodeData.parameters?.resolution || "720p",
+          }),
+        })
       } else {
-        // Connected node - fetch and upload
-        const imageResponse = await fetch(finalImageUrl)
-        const imageBlob = await imageResponse.blob()
-        const imageExtension = imageBlob.type.split('/')[1] || 'png'
-        const imageTimestamp = Date.now()
-        const imageRandomStr = Math.random().toString(36).substring(7)
-        const imageFilename = `${imageTimestamp}-${imageRandomStr}.${imageExtension}`
-        imageStoragePath = `${user.id}/video-gen-images/${imageFilename}`
-
-        const { error: imageUploadError } = await supabase.storage
-          .from('public-bucket')
-          .upload(imageStoragePath, imageBlob, {
-            contentType: imageBlob.type,
-            upsert: false,
-          })
-
-        if (imageUploadError) {
-          throw new Error(`Failed to upload image: ${imageUploadError.message}`)
-        }
-
-        const { data: imageUrlData } = supabase.storage
-          .from('public-bucket')
-          .getPublicUrl(imageStoragePath)
-        imagePublicUrl = imageUrlData.publicUrl
-      }
-
-      // Upload video to Supabase
-      if (nodeData.manualVideoFile) {
-        // Manual upload - use the stored File
-        const videoExtension = nodeData.manualVideoFile.name.split('.').pop() || 'mp4'
-        const videoTimestamp = Date.now()
-        const videoRandomStr = Math.random().toString(36).substring(7)
-        const videoFilename = `${videoTimestamp}-${videoRandomStr}.${videoExtension}`
-        videoStoragePath = `${user.id}/video-gen-videos/${videoFilename}`
-
-        const { error: videoUploadError } = await supabase.storage
-          .from('public-bucket')
-          .upload(videoStoragePath, nodeData.manualVideoFile, {
-            contentType: nodeData.manualVideoFile.type,
-            upsert: false,
-          })
-
-        if (videoUploadError) {
-          throw new Error(`Failed to upload video: ${videoUploadError.message}`)
-        }
-
-        const { data: videoUrlData } = supabase.storage
-          .from('public-bucket')
-          .getPublicUrl(videoStoragePath)
-        videoPublicUrl = videoUrlData.publicUrl
-      } else {
-        // Connected node - fetch and upload
-        const videoResponse = await fetch(finalVideoUrl)
-        const videoBlob = await videoResponse.blob()
-        const videoExtension = videoBlob.type.split('/')[1] || 'mp4'
-        const videoTimestamp = Date.now()
-        const videoRandomStr = Math.random().toString(36).substring(7)
-        const videoFilename = `${videoTimestamp}-${videoRandomStr}.${videoExtension}`
-        videoStoragePath = `${user.id}/video-gen-videos/${videoFilename}`
-
-        const { error: videoUploadError } = await supabase.storage
-          .from('public-bucket')
-          .upload(videoStoragePath, videoBlob, {
-            contentType: videoBlob.type,
-            upsert: false,
-          })
-
-        if (videoUploadError) {
-          throw new Error(`Failed to upload video: ${videoUploadError.message}`)
-        }
-
-        const { data: videoUrlData } = supabase.storage
-          .from('public-bucket')
-          .getPublicUrl(videoStoragePath)
-        videoPublicUrl = videoUrlData.publicUrl
-      }
-
-      // Send URLs to API (like motion copy page)
-      const response = await fetch("/api/generate-video", {
-        method: "POST",
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl: imagePublicUrl,
-          videoUrl: videoPublicUrl,
-          imageStoragePath,
-          videoStoragePath,
+        const requestBody: Record<string, unknown> = {
+          model: modelIdentifier,
           prompt: nodeData.prompt || "",
-          mode: nodeData.mode,
-          keep_original_sound: true,
-          character_orientation: 'image',
-        }),
-      })
+          ...(nodeData.parameters || {}),
+        }
+
+        if (nodeData.negativePrompt && !requestBody.negative_prompt) {
+          requestBody.negative_prompt = nodeData.negativePrompt
+        }
+
+        if (imageUpload?.url) {
+          if (modelIdentifier === "kwaivgi/kling-v2.6") {
+            requestBody.start_image = imageUpload.url
+          } else {
+            requestBody.image = imageUpload.url
+          }
+          if (modelIdentifier === "minimax/hailuo-2.3-fast") {
+            requestBody.first_frame_image = imageUpload.url
+          }
+        }
+        if (lastFrameUpload?.url) {
+          requestBody.last_frame = lastFrameUpload.url
+        }
+
+        response = await fetch("/api/generate-video-any-model", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        })
+      }
 
       if (!response.ok) {
         const err = await response.json()
@@ -563,10 +751,11 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       }
 
       const result = await response.json()
-      if (!result.video?.url) throw new Error("No video URL received")
+      const videoUrl = result.video?.url || result.videoUrl
+      if (!videoUrl) throw new Error("No video URL received")
 
       nodeData.onDataChange?.(id, {
-        generatedVideoUrl: result.video.url,
+        generatedVideoUrl: videoUrl,
         isGenerating: false,
         error: null,
       })
@@ -579,6 +768,33 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   }
 
   const hasContent = !!nodeData.generatedVideoUrl
+  const isMotionCopyModel = selectedModel?.identifier === "kwaivgi/kling-v2.6-motion-control"
+  const isLipsyncModel = selectedModel?.identifier === "veed/fabric-1.0"
+  const needsPrompt = !isMotionCopyModel && !isLipsyncModel
+  const modelSupportsNegativePrompt = selectedModel?.parameters.parameters?.some(
+    (param) => param.name === "negative_prompt"
+  )
+  const modelSupportsImage = selectedModel?.parameters.parameters?.some(
+    (param) =>
+      param.name === "image" ||
+      param.name === "first_frame_image" ||
+      param.name === "start_image"
+  )
+  const modelSupportsLastFrame = selectedModel?.parameters.parameters?.some(
+    (param) => param.name === "last_frame"
+  )
+
+  const showImageUpload = !!(modelSupportsImage || isMotionCopyModel || isLipsyncModel)
+  const showVideoUpload = !!isMotionCopyModel
+  const showAudioUpload = !!isLipsyncModel
+  const showLastFrameUpload = !!modelSupportsLastFrame
+  const hasUploadOptions = showImageUpload || showVideoUpload || showAudioUpload || showLastFrameUpload
+
+  const getImageUploadLabel = () => {
+    if (selectedModel?.identifier === "kwaivgi/kling-v2.6") return "Upload Start Image"
+    if (selectedModel?.identifier === "minimax/hailuo-2.3-fast") return "Upload First Frame"
+    return "Upload Input Image"
+  }
 
   return (
     <>
@@ -654,10 +870,25 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
 
       {/* Wrapper to allow handles to overflow */}
       <div 
-        className="relative w-full h-full"
+        className={cn(
+          "relative w-full h-full",
+          isConnecting && connectingFromId !== id && "easy-connect-glow"
+        )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
+        <Handle
+          id="input"
+          type="target"
+          position={Position.Left}
+          isConnectableStart={false}
+          className="easy-connect-target"
+        />
+        {isConnecting && connectingFromId !== id && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/20 text-[10px] font-semibold uppercase tracking-wider text-white/80">
+            Drop here
+          </div>
+        )}
         <div
           className={cn(
             "relative transition-all duration-200 w-full h-full",
@@ -671,8 +902,32 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           )}
         >
 
-          {/* Content area: hints OR generated preview */}
-          {hasContent ? (
+          {/* Content area: loading state, hints, OR generated preview */}
+          {nodeData.isGenerating ? (
+            <div className="relative w-full h-full overflow-hidden bg-zinc-900 rounded-lg">
+              {/* Progress fill */}
+              <div 
+                className="absolute inset-y-0 left-0 bg-gradient-to-r from-zinc-800 to-zinc-700 rounded-lg"
+                style={{
+                  width: '0%',
+                  animation: 'fillProgress 120s linear infinite',
+                  boxShadow: '2px 0 8px 0 rgba(255, 255, 255, 0.4)'
+                }}
+              />
+              {/* Overlay gradient for depth */}
+              <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30 pointer-events-none" />
+              <style jsx>{`
+                @keyframes fillProgress {
+                  0% {
+                    width: 0%;
+                  }
+                  100% {
+                    width: 100%;
+                  }
+                }
+              `}</style>
+            </div>
+          ) : hasContent ? (
             <div className="relative w-full h-full">
               <video
                 src={nodeData.generatedVideoUrl!}
@@ -707,7 +962,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           <div className="w-6 h-6 rounded-full border-2 border-blue-500 bg-zinc-900 flex items-center justify-center cursor-crosshair hover:bg-blue-500/10 transition-colors">
             <Plus size={14} weight="bold" className="text-blue-500 pointer-events-none" />
             <Handle
-              id="input"
+              id="input-ui"
               type="target"
               position={Position.Left}
               className="!absolute !inset-0 !w-full !h-full !bg-transparent !border-0 !rounded-full !transform-none"
@@ -747,7 +1002,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           {(() => {
             const finalImageUrl = nodeData.manualImageUrl || nodeData.connectedImageUrl
             const finalVideoUrl = nodeData.manualVideoUrl || nodeData.connectedVideoUrl
-            const hasMedia = finalImageUrl || finalVideoUrl
+            const finalAudioUrl = nodeData.manualAudioUrl || nodeData.connectedAudioUrl
+            const finalLastFrameUrl = nodeData.manualLastFrameUrl || null
+            const hasMedia = finalImageUrl || finalVideoUrl || finalAudioUrl || finalLastFrameUrl
             
             if (hasMedia) {
               return (
@@ -768,6 +1025,29 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                           onClick={handleRemoveImage}
                           className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500/80 hover:bg-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                           aria-label="Remove image"
+                        >
+                          <X size={12} className="text-white" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Last frame preview */}
+                  {finalLastFrameUrl && (
+                    <div className="relative rounded-lg overflow-hidden border border-white/10 group" style={{ width: '120px', height: '80px' }}>
+                      <img
+                        src={finalLastFrameUrl}
+                        alt="Last frame input"
+                        className="w-full h-full object-cover bg-black/20"
+                      />
+                      <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-zinc-900/80 text-[9px] text-zinc-400">
+                        Last Frame
+                      </div>
+                      {nodeData.manualLastFrameUrl && (
+                        <button
+                          onClick={handleRemoveLastFrame}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500/80 hover:bg-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Remove last frame"
                         >
                           <X size={12} className="text-white" />
                         </button>
@@ -801,21 +1081,84 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                       )}
                     </div>
                   )}
+
+                  {/* Audio preview */}
+                  {finalAudioUrl && (
+                    <div className="relative rounded-lg overflow-hidden border border-white/10 group flex items-center justify-center bg-zinc-900/60" style={{ width: '120px', height: '80px' }}>
+                      <div className="text-[10px] text-zinc-300">Audio</div>
+                      {nodeData.manualAudioUrl && (
+                        <button
+                          onClick={handleRemoveAudio}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500/80 hover:bg-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Remove audio"
+                        >
+                          <X size={12} className="text-white" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             }
             return null
           })()}
 
-          <textarea
-            value={nodeData.prompt || ""}
-            onChange={(e) => nodeData.onDataChange?.(id, { prompt: e.target.value })}
-            placeholder="Describe the motion..."
-            rows={2}
-            className={cn(
-              "w-full bg-transparent border-0 text-sm text-zinc-200 placeholder:text-zinc-600 resize-none outline-none",
-            )}
-          />
+          {(isMotionCopyModel || isLipsyncModel) && (
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <PhotoUpload
+                  value={
+                    nodeData.manualImageUrl
+                      ? ({ file: nodeData.manualImageFile || undefined, url: nodeData.manualImageUrl } as ImageUpload)
+                      : null
+                  }
+                  onChange={handleCustomImageChange}
+                  title="Upload Image"
+                  description="Click to upload"
+                />
+              </div>
+              {isMotionCopyModel && (
+                <div className="flex-1">
+                  <VideoUpload
+                    value={
+                      nodeData.manualVideoUrl
+                        ? ({ file: nodeData.manualVideoFile || undefined, url: nodeData.manualVideoUrl } as ImageUpload)
+                        : null
+                    }
+                    onChange={handleCustomVideoChange}
+                    title="Upload Video"
+                    description="Click to upload"
+                  />
+                </div>
+              )}
+              {isLipsyncModel && (
+                <div className="flex-1">
+                  <AudioUpload
+                    value={
+                      nodeData.manualAudioUrl
+                        ? ({ file: nodeData.manualAudioFile || undefined, url: nodeData.manualAudioUrl } as AudioUploadValue)
+                        : null
+                    }
+                    onChange={handleCustomAudioChange}
+                    title="Upload Audio"
+                    description="Click to upload"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {needsPrompt && (
+            <VideoPromptFields
+              promptValue={nodeData.prompt || ""}
+              onPromptChange={(value) => nodeData.onDataChange?.(id, { prompt: value })}
+              negativePromptValue={nodeData.negativePrompt || ""}
+              onNegativePromptChange={(value) => nodeData.onDataChange?.(id, { negativePrompt: value })}
+              showNegativePrompt={!!modelSupportsNegativePrompt}
+              placeholder="Describe the video you want to generate..."
+              variant="toolbar"
+            />
+          )}
 
           {nodeData.error && (
             <div className="flex items-center justify-between bg-red-500/10 border border-red-500/20 rounded-lg px-2.5 py-2">
@@ -832,44 +1175,75 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           )}
         </div>
 
-        {/* Bottom bar: mode toggle + generate */}
+        {/* Bottom bar: model controls + generate */}
         <div className="border-t border-white/5 px-3 py-2.5 flex flex-nowrap items-center gap-2 overflow-x-auto">
           {/* Add Media Button with Dropdown */}
-          <DropdownMenu open={isAddMediaOpen} onOpenChange={setIsAddMediaOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 w-7 p-0"
-                title="Add image or video"
-              >
-                <Plus size={16} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="nopan nodrag">
-              <DropdownMenuItem 
-                onClick={() => imageUploadRef.current?.click()}
-                disabled={!!(nodeData.manualImageUrl || nodeData.connectedImageUrl)}
-              >
-                <ImageIcon size={14} className="mr-2" />
-                Upload Image {(nodeData.manualImageUrl || nodeData.connectedImageUrl) && '✓'}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => videoUploadRef.current?.click()}
-                disabled={!!(nodeData.manualVideoUrl || nodeData.connectedVideoUrl)}
-              >
-                <VideoCamera size={14} className="mr-2" />
-                Upload Video {(nodeData.manualVideoUrl || nodeData.connectedVideoUrl) && '✓'}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          {/* Hidden file inputs */}
+{hasUploadOptions && (
+  <DropdownMenu open={isAddMediaOpen} onOpenChange={setIsAddMediaOpen}>
+    <DropdownMenuTrigger asChild>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 w-7 p-0"
+        title="Add media"
+      >
+        <Plus size={16} />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent side="top" align="start" className="nopan nodrag">
+      {showImageUpload && (
+        <DropdownMenuItem 
+          onClick={() => imageUploadRef.current?.click()}
+          disabled={!!(nodeData.manualImageUrl || nodeData.connectedImageUrl)}
+        >
+          <ImageIcon size={14} className="mr-2" />
+          {getImageUploadLabel()} {(nodeData.manualImageUrl || nodeData.connectedImageUrl) && 'OK'}
+        </DropdownMenuItem>
+      )}
+                {showLastFrameUpload && (
+                  <DropdownMenuItem
+                    onClick={() => lastFrameUploadRef.current?.click()}
+                    disabled={!!nodeData.manualLastFrameUrl}
+                  >
+                    <ImageIcon size={14} className="mr-2" />
+                    Upload Last Frame {nodeData.manualLastFrameUrl && 'OK'}
+                  </DropdownMenuItem>
+                )}
+      {showVideoUpload && (
+        <DropdownMenuItem
+          onClick={() => videoUploadRef.current?.click()}
+          disabled={!!(nodeData.manualVideoUrl || nodeData.connectedVideoUrl)}
+        >
+          <VideoCamera size={14} className="mr-2" />
+          Upload Video {(nodeData.manualVideoUrl || nodeData.connectedVideoUrl) && 'OK'}
+        </DropdownMenuItem>
+      )}
+      {showAudioUpload && (
+        <DropdownMenuItem
+          onClick={() => audioUploadRef.current?.click()}
+          disabled={!!(nodeData.manualAudioUrl || nodeData.connectedAudioUrl)}
+        >
+          <VideoCamera size={14} className="mr-2" />
+          Upload Audio {(nodeData.manualAudioUrl || nodeData.connectedAudioUrl) && 'OK'}
+        </DropdownMenuItem>
+      )}
+    </DropdownMenuContent>
+  </DropdownMenu>
+)}
+
+{/* Hidden file inputs */}
           <input
             ref={imageUploadRef}
             type="file"
             accept="image/*"
             onChange={handleImageUpload}
+            className="hidden"
+          />
+          <input
+            ref={lastFrameUploadRef}
+            type="file"
+            accept="image/*"
+            onChange={handleLastFrameUpload}
             className="hidden"
           />
           <input
@@ -879,26 +1253,33 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             onChange={handleVideoUpload}
             className="hidden"
           />
+          <input
+            ref={audioUploadRef}
+            type="file"
+            accept="audio/*"
+            onChange={handleAudioUpload}
+            className="hidden"
+          />
 
-          <ToggleGroup
-            type="single"
-            value={nodeData.mode || "std"}
-            onValueChange={(value) => {
-              if (value) nodeData.onDataChange?.(id, { mode: value as "pro" | "std" })
-            }}
-            className="gap-1"
-          >
-            <ToggleGroupItem value="pro" className="h-7 px-2 text-[11px] data-[state=on]:bg-blue-500 data-[state=on]:text-white">
-              Pro
-            </ToggleGroupItem>
-            <ToggleGroupItem value="std" className="h-7 px-2 text-[11px] data-[state=on]:bg-blue-500 data-[state=on]:text-white">
-              Standard
-            </ToggleGroupItem>
-          </ToggleGroup>
-
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
-            Kling v2.6
-          </span>
+          {selectedModel && (
+            <VideoModelParameterControls
+              selectedModel={selectedModel}
+              onModelChange={(model) => {
+                const defaults: Record<string, unknown> = {}
+                model.parameters.parameters.forEach((param) => {
+                  defaults[param.name] = param.default
+                })
+                nodeData.onDataChange?.(id, {
+                  model: model.identifier,
+                  parameters: defaults,
+                })
+              }}
+              parameters={nodeData.parameters || {}}
+              onParametersChange={(params) => nodeData.onDataChange?.(id, { parameters: params })}
+              disabled={nodeData.isGenerating}
+              variant="toolbar"
+            />
+          )}
 
           <div className="flex-1" />
 

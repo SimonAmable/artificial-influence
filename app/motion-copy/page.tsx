@@ -9,6 +9,8 @@ import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
 import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 
@@ -24,6 +26,7 @@ export default function MotionCopyPage() {
   // State management
   const [inputImage, setInputImage] = React.useState<ImageUpload | null>(null)
   const [inputVideo, setInputVideo] = React.useState<ImageUpload | null>(null)
+  const [characterOrientation, setCharacterOrientation] = React.useState<string>("image")
   const [generatedVideos, setGeneratedVideos] = React.useState<string[]>([])
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -185,7 +188,7 @@ export default function MotionCopyPage() {
           prompt: '',
           mode: 'pro',
           keep_original_sound: true,
-          character_orientation: 'image',
+          character_orientation: characterOrientation,
         }),
       })
 
@@ -268,6 +271,25 @@ export default function MotionCopyPage() {
   const isRowLayout = layoutMode === "row"
   const inputImageValue = inputImage ?? undefined
   const inputVideoValue = inputVideo ?? undefined
+  const characterOrientationControl = (
+    <div className="flex items-center gap-2 px-1">
+      <Label htmlFor="character-orientation" className="text-xs text-muted-foreground">
+        Character Orientation
+      </Label>
+      <Select
+        value={characterOrientation}
+        onValueChange={setCharacterOrientation}
+      >
+        <SelectTrigger id="character-orientation" className="h-7 text-xs w-fit min-w-[120px]">
+          <SelectValue placeholder="Select" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="image" className="text-xs">image</SelectItem>
+          <SelectItem value="video" className="text-xs">video</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  )
 
   return (
     <div className={cn(
@@ -306,6 +328,7 @@ export default function MotionCopyPage() {
                     }}
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
+                    extraControls={characterOrientationControl}
                   />
                 </div>
               </div>
@@ -335,6 +358,7 @@ export default function MotionCopyPage() {
                         }}
                         isGenerating={isGenerating}
                         onGenerate={handleGenerate}
+                        extraControls={characterOrientationControl}
                       />
                     </div>
                   </div>
@@ -365,6 +389,7 @@ export default function MotionCopyPage() {
                     }}
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
+                    extraControls={characterOrientationControl}
                   />
                 </div>
               </div>

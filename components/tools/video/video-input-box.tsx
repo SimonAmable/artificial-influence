@@ -3,16 +3,9 @@
 import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { Slider } from "@/components/ui/slider"
 import { CircleNotch, Plus, FilePlus, X } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
-import { VIDEO_MODELS_ALL } from "@/lib/constants/models"
-import type { Model, ParameterDefinition } from "@/lib/types/models"
-import { ModelIcon } from "@/components/shared/icons/model-icon"
+import type { Model } from "@/lib/types/models"
 import { PhotoUpload, ImageUpload } from "@/components/shared/upload/photo-upload"
 import { VideoUpload } from "@/components/shared/upload/video-upload"
 import { AudioUpload, AudioUploadValue } from "@/components/shared/upload/audio-upload"
@@ -23,6 +16,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
+import { VideoModelParameterControls } from "@/components/tools/video/video-model-parameter-controls"
 
 interface VideoInputBoxProps {
   forceRowLayout?: boolean
@@ -71,14 +66,22 @@ export function VideoInputBox({
   const inputRef = React.useRef<HTMLInputElement>(null)
   const lastFrameRef = React.useRef<HTMLInputElement>(null)
 
+
+
   // Detect model type
   const isMotionCopyModel = selectedModel.identifier === 'kwaivgi/kling-v2.6-motion-control'
-  const isLipsyncModel = selectedModel.identifier.includes('lipsync') || selectedModel.identifier.includes('wav2lip')
+  const isLipsyncModel =
+    selectedModel.identifier.includes('lipsync') ||
+    selectedModel.identifier.includes('wav2lip') ||
+    selectedModel.identifier === 'veed/fabric-1.0'
   
   // Check if model supports image/last frame based on parameters
   const modelSupportsImage = React.useMemo(() => {
     return selectedModel.parameters.parameters?.some(
-      param => param.name === 'image' || param.name === 'first_frame_image'
+      param =>
+        param.name === 'image' ||
+        param.name === 'first_frame_image' ||
+        param.name === 'start_image'
     ) ?? false
   }, [selectedModel])
 
@@ -96,19 +99,6 @@ export function VideoInputBox({
 
   // Determine if we need prompt
   const needsPrompt = !isMotionCopyModel && !isLipsyncModel
-
-  // Format model name for display
-  const formatModelName = (identifier: string, name: string): string => {
-    if (name && !name.includes('/')) {
-      return name
-    }
-    const parts = identifier.split('/')
-    const shortIdentifier = parts[parts.length - 1]
-    return shortIdentifier
-      .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
-  }
 
   const handleTextInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -134,87 +124,7 @@ export function VideoInputBox({
     }
   }
 
-  const renderParameterInput = (param: ParameterDefinition) => {
-    const value = parameters[param.name]
-
-    if (param.ui_type === 'select' && 'enum' in param && param.enum) {
-      return (
-        <Select
-          key={param.name}
-          value={String(value)}
-          onValueChange={(val) => onParametersChange({ ...parameters, [param.name]: val })}
-        >
-          <SelectTrigger id={param.name} className="h-7 text-xs w-fit min-w-[80px] px-2">
-            <SelectValue placeholder={param.label} />
-          </SelectTrigger>
-          <SelectContent side="top">
-            {param.enum.map((option: string) => (
-              <SelectItem key={option} value={option} className="text-xs">
-                {option}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )
-    }
-
-    if (param.ui_type === 'switch' && param.type === 'boolean') {
-      return (
-        <div key={param.name} className="h-7 flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20">
-          <Switch
-            id={param.name}
-            checked={Boolean(value)}
-            onCheckedChange={(checked) => onParametersChange({ ...parameters, [param.name]: checked })}
-            className="scale-75"
-          />
-          <Label htmlFor={param.name} className="text-xs cursor-pointer whitespace-nowrap leading-none">
-            {param.label}
-          </Label>
-        </div>
-      )
-    }
-
-    if (param.ui_type === 'slider' && param.type === 'number') {
-      const unit = param.name.includes('duration') ? 's' : ''
-      return (
-        <div key={param.name} className="h-7 flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20 min-w-[100px]">
-          <Slider
-            id={param.name}
-            min={param.min}
-            max={param.max}
-            step={param.step || 1}
-            value={[Number(value)]}
-            onValueChange={(vals) => onParametersChange({ ...parameters, [param.name]: vals[0] })}
-            className="flex-1"
-          />
-          <span className="text-xs font-medium text-foreground tabular-nums">{String(value)}{unit}</span>
-        </div>
-      )
-    }
-
-    if (param.ui_type === 'number' && param.type === 'number') {
-      const unit = param.name.includes('duration') ? 's' : ''
-      return (
-        <div key={param.name} className="h-7 flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20">
-          <Input
-            id={param.name}
-            type="number"
-            min={param.min}
-            max={param.max}
-            step={param.step || 1}
-            value={Number(value)}
-            onChange={(e) => onParametersChange({ ...parameters, [param.name]: Number(e.target.value) })}
-            className="h-5 text-xs w-12 px-1 border-0 bg-transparent"
-          />
-          {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
-        </div>
-      )
-    }
-
-    return null
-  }
-
-  const isReady = React.useMemo(() => {
+  const isReady = (() => {
     // Motion copy model needs image + video
     if (isMotionCopyModel) {
       return !!(inputImage && inputVideo)
@@ -231,7 +141,7 @@ export function VideoInputBox({
     }
     // For text-only models, check prompt
     return promptValue.trim().length > 0
-  }, [promptValue, isMotionCopyModel, isLipsyncModel, modelSupportsImage, modelSupportsLastFrame, inputImage, lastFrameImage, inputVideo, inputAudio])
+  })()
 
   // Unified interface structure
   return (
@@ -288,27 +198,15 @@ export function VideoInputBox({
         {/* 1. PROMPT AT TOP (when needed) */}
         {needsPrompt && (
           <div className="flex items-start gap-2 pt-1 px-2">
-            <div className="flex-1">
-              <textarea
-                ref={textareaRef}
-                value={promptValue}
-                onChange={(e) => onPromptChange(e.target.value)}
-                onKeyDown={handleTextInputKeyDown}
-                placeholder="Describe the video you want to generate..."
-                className="w-full border-none outline-none resize-none bg-transparent text-sm min-h-[60px] max-h-[120px] overflow-y-auto"
-                rows={3}
-              />
-              {/* Negative Prompt */}
-              {modelSupportsNegativePrompt && (
-                <textarea
-                  value={negativePromptValue}
-                  onChange={(e) => onNegativePromptChange(e.target.value)}
-                  placeholder="What to exclude from the video..."
-                  className="w-full border-none outline-none resize-none bg-transparent text-xs text-muted-foreground min-h-[40px] max-h-[80px] overflow-y-auto mt-1"
-                  rows={2}
-                />
-              )}
-            </div>
+            <VideoPromptFields
+              promptValue={promptValue}
+              onPromptChange={onPromptChange}
+              negativePromptValue={negativePromptValue}
+              onNegativePromptChange={onNegativePromptChange}
+              showNegativePrompt={modelSupportsNegativePrompt}
+              variant="page"
+              onPromptKeyDown={handleTextInputKeyDown}
+            />
 
             {/* Generate Button */}
             <div className="shrink-0">
@@ -433,50 +331,14 @@ export function VideoInputBox({
             </>
           )}
 
-          {/* Model Selector */}
-          <Select
-            value={selectedModel.identifier}
-            onValueChange={(val) => {
-              const model = VIDEO_MODELS_ALL.find(m => m.identifier === val)
-              if (model) onModelChange(model)
-            }}
+          <VideoModelParameterControls
+            selectedModel={selectedModel}
+            onModelChange={onModelChange}
+            parameters={parameters}
+            onParametersChange={onParametersChange}
             disabled={isGenerating}
-          >
-            <SelectTrigger className="h-7 text-xs w-fit min-w-[140px]">
-              <SelectValue placeholder="Select model">
-                {selectedModel && (
-                  <div className="flex items-center gap-2">
-                    <ModelIcon identifier={selectedModel.identifier} size={16} />
-                    <span>{formatModelName(selectedModel.identifier, selectedModel.name)}</span>
-                  </div>
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent position="popper" side="top" sideOffset={4}>
-              {VIDEO_MODELS_ALL.map((model) => (
-                <SelectItem key={model.identifier} value={model.identifier}>
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-md border border-border bg-muted/30 p-1.5 shrink-0">
-                      <ModelIcon identifier={model.identifier} size={20} />
-                    </div>
-                    <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                      <span className="font-semibold text-sm">
-                        {formatModelName(model.identifier, model.name)}
-                      </span>
-                      {model.description && (
-                        <span className="text-xs text-muted-foreground line-clamp-2">
-                          {model.description}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Parameters */}
-          {selectedModel.parameters.parameters && selectedModel.parameters.parameters.map((param) => renderParameterInput(param))}
+            variant="page"
+          />
 
           {/* Generate Button for motion/lipsync models */}
           {(isMotionCopyModel || isLipsyncModel) && (

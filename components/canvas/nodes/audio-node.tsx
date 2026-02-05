@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Handle, Position, NodeToolbar, type NodeProps } from "@xyflow/react"
+import { Handle, Position, NodeToolbar, type NodeProps, useStore } from "@xyflow/react"
 import {
   SpeakerHigh,
   CircleNotch,
@@ -36,6 +36,10 @@ const hintSuggestions = [
 
 export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as AudioNodeData
+  const { isConnecting, connectingFromId } = useStore((state) => ({
+    isConnecting: state.connection.inProgress,
+    connectingFromId: state.connection.fromHandle?.nodeId,
+  }))
   const [isHovered, setIsHovered] = React.useState(false)
   const [isEditingTitle, setIsEditingTitle] = React.useState(false)
   const [title, setTitle] = React.useState(nodeData.label || "Audio")
@@ -224,10 +228,25 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
 
       {/* Wrapper to allow handles to overflow */}
       <div 
-        className="relative w-[280px] h-[280px]"
+        className={cn(
+          "relative w-[280px] h-[280px]",
+          isConnecting && connectingFromId !== id && "easy-connect-glow"
+        )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
+        <Handle
+          id="input"
+          type="target"
+          position={Position.Left}
+          isConnectableStart={false}
+          className="easy-connect-target"
+        />
+        {isConnecting && connectingFromId !== id && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/20 text-[10px] font-semibold uppercase tracking-wider text-white/80">
+            Drop here
+          </div>
+        )}
         <div
           className={cn(
             "relative transition-all duration-200 w-full h-full",
@@ -277,7 +296,7 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
           <div className="w-6 h-6 rounded-full border-2 border-orange-500 bg-zinc-900 flex items-center justify-center cursor-crosshair hover:bg-orange-500/10 transition-colors">
             <Plus size={14} weight="bold" className="text-orange-500 pointer-events-none" />
             <Handle
-              id="input"
+              id="input-ui"
               type="target"
               position={Position.Left}
               className="!absolute !inset-0 !w-full !h-full !bg-transparent !border-0 !rounded-full !transform-none"

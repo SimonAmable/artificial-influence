@@ -133,7 +133,7 @@ export function EditWorkflowDialog({
         <DialogHeader>
           <DialogTitle>Edit Workflow</DialogTitle>
           <DialogDescription>
-            Update your workflow's name, description, visibility, and thumbnail.
+            Update your workflow&apos;s name, description, visibility, and thumbnail.
           </DialogDescription>
         </DialogHeader>
 

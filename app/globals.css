@@ -64,6 +64,9 @@
 }
 
 :root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  --font-geist-sans: var(--font-sans);
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -333,4 +336,29 @@
     opacity: 1;
     transform: translate(-50%, -40%) scale(1);
   }
+}
+
+/* Easy connect: make the whole node an easy drop target */
+.react-flow__handle.easy-connect-target {
+  width: 100% !important;
+  height: 100% !important;
+  left: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  transform: none !important;
+  border: 0 !important;
+  background: transparent !important;
+  border-radius: 0.75rem;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.react-flow__handle.easy-connect-target.connectionindicator {
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+.easy-connect-glow {
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.35), 0 0 18px rgba(255, 255, 255, 0.25);
 }

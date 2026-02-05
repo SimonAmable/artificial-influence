@@ -58,7 +58,7 @@ export function FeatureShowcaseCarousel() {
 
                     <div className="absolute inset-0 flex flex-col items-end justify-end p-3">
                       <div className="text-right">
-                        <p className="text-xs font-semibold text-white leading-tight">
+                        <p className="text-xl font-semibold text-white leading-tight">
                           {feature.title}
                         </p>
                         <p className="mt-0.5 text-[10px] text-white/70 line-clamp-2">

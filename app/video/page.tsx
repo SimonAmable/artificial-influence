@@ -10,7 +10,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
-import { VIDEO_MODELS_ALL } from "@/lib/constants/models"
+import { getActiveModelMetadata, getModelMetadataByIdentifier, type ModelMetadata } from "@/lib/constants/model-metadata"
+import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition } from "@/lib/types/models"
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
 import type { AudioUploadValue } from "@/components/shared/upload/audio-upload"
@@ -31,8 +32,35 @@ export default function VideoPage() {
   
   const { layoutMode } = layoutModeContext
 
+  // Get active video models
+  const videoModels = React.useMemo(() => getActiveModelMetadata('video'), [])
+
+  // Convert metadata to Model format
+  const convertMetadataToModel = (metadata: ModelMetadata): Model => {
+    return {
+      id: metadata.id,
+      identifier: metadata.identifier,
+      name: metadata.name,
+      description: metadata.description,
+      type: metadata.type,
+      provider: metadata.provider,
+      is_active: metadata.is_active,
+      model_cost: metadata.model_cost,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      parameters: {
+        parameters: buildVideoModelParameters(metadata),
+      }
+    }
+  }
+
   // State management
-  const [selectedModel, setSelectedModel] = React.useState<Model>(VIDEO_MODELS_ALL[0])
+  const [selectedModel, setSelectedModel] = React.useState<Model>(() => {
+    if (videoModels.length > 0) {
+      return convertMetadataToModel(videoModels[0])
+    }
+    throw new Error("No video models available")
+  })
   const [prompt, setPrompt] = React.useState("")
   const [negativePrompt, setNegativePrompt] = React.useState("")
   const [inputImage, setInputImage] = React.useState<ImageUpload | null>(null)
@@ -44,6 +72,14 @@ export default function VideoPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [generatedVideos, setGeneratedVideos] = React.useState<GeneratedVideo[]>([])
 
+  // Handle model change - convert identifier to Model
+  const handleModelChange = React.useCallback((modelIdentifier: string) => {
+    const metadata = getModelMetadataByIdentifier(modelIdentifier)
+    if (metadata) {
+      setSelectedModel(convertMetadataToModel(metadata))
+    }
+  }, [])
+
   // Initialize parameters when model changes
   React.useEffect(() => {
     const defaultParams: Record<string, unknown> = {}
@@ -54,7 +90,11 @@ export default function VideoPage() {
   }, [selectedModel])
 
   // Upload image to Supabase
-  const uploadImageToSupabase = async (file: File, userId: string, prefix: string): Promise<string> => {
+  const uploadImageToSupabase = async (
+    file: File,
+    userId: string,
+    prefix: string
+  ): Promise<{ url: string; storagePath: string }> => {
     const supabase = createClient()
     const fileExtension = file.name.split('.').pop() || 'jpg'
     const timestamp = Date.now()
@@ -77,13 +117,16 @@ export default function VideoPage() {
       .from('public-bucket')
       .getPublicUrl(storagePath)
 
-    return urlData.publicUrl
+    return { url: urlData.publicUrl, storagePath }
   }
 
   // Handle generation
   const handleGenerate = async () => {
     const isMotionCopy = selectedModel.identifier === 'kwaivgi/kling-v2.6-motion-control'
-    const isLipsync = selectedModel.identifier.includes('lipsync') || selectedModel.identifier.includes('wav2lip')
+    const isLipsync =
+      selectedModel.identifier.includes('lipsync') ||
+      selectedModel.identifier.includes('wav2lip') ||
+      selectedModel.identifier === 'veed/fabric-1.0'
     
     // Validation based on model type
     if (isMotionCopy) {
@@ -129,33 +172,39 @@ export default function VideoPage() {
 
       // Handle motion copy uploads
       if (isMotionCopy && inputImage?.file && inputVideo?.file) {
-        const imageUrl = await uploadImageToSupabase(inputImage.file, user.id, 'motion-copy-images')
-        const videoUrl = await uploadImageToSupabase(inputVideo.file, user.id, 'motion-copy-videos')
-        requestBody.imagePublicUrl = imageUrl
-        requestBody.videoPublicUrl = videoUrl
+        const imageUpload = await uploadImageToSupabase(inputImage.file, user.id, 'motion-copy-images')
+        const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'motion-copy-videos')
+        requestBody.imagePublicUrl = imageUpload.url
+        requestBody.videoPublicUrl = videoUpload.url
       }
       
       // Handle lipsync uploads
       else if (isLipsync && inputImage?.file && inputAudio?.file) {
-        const imageUrl = await uploadImageToSupabase(inputImage.file, user.id, 'lipsync-images')
-        const audioUrl = await uploadImageToSupabase(inputAudio.file, user.id, 'lipsync-audio')
-        requestBody.imagePublicUrl = imageUrl
-        requestBody.audioPublicUrl = audioUrl
+        const imageUpload = await uploadImageToSupabase(inputImage.file, user.id, 'lipsync-images')
+        const audioUpload = await uploadImageToSupabase(inputAudio.file, user.id, 'lipsync-audio')
+        requestBody.imageUrl = imageUpload.url
+        requestBody.audioUrl = audioUpload.url
+        requestBody.imageStoragePath = imageUpload.storagePath
+        requestBody.audioStoragePath = audioUpload.storagePath
       }
       
       // Handle other models with image uploads
       else if (inputImage?.file) {
-        const imageUrl = await uploadImageToSupabase(inputImage.file, user.id, 'video-gen-input-images')
-        requestBody.image = imageUrl
+        const imageUpload = await uploadImageToSupabase(inputImage.file, user.id, 'video-gen-input-images')
+        if (selectedModel.identifier === 'kwaivgi/kling-v2.6') {
+          requestBody.start_image = imageUpload.url
+        } else {
+          requestBody.image = imageUpload.url
+        }
         // For first_frame_image parameter (Hailuo)
         if (selectedModel.identifier === 'minimax/hailuo-2.3-fast') {
-          requestBody.first_frame_image = imageUrl
+          requestBody.first_frame_image = imageUpload.url
         }
       }
 
       if (lastFrameImage?.file && selectedModel.identifier === 'google/veo-3.1-fast') {
-        const lastFrameUrl = await uploadImageToSupabase(lastFrameImage.file, user.id, 'video-gen-last-frames')
-        requestBody.last_frame = lastFrameUrl
+        const lastFrameUpload = await uploadImageToSupabase(lastFrameImage.file, user.id, 'video-gen-last-frames')
+        requestBody.last_frame = lastFrameUpload.url
       }
 
       if (negativePrompt && selectedModel.identifier === 'google/veo-3.1-fast') {
@@ -164,7 +213,9 @@ export default function VideoPage() {
 
       console.log('Sending video generation request:', requestBody)
 
-      const response = await fetch('/api/generate-video-any-model', {
+      const endpoint = isLipsync ? '/api/generate-lipsync' : '/api/generate-video-any-model'
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -278,7 +329,10 @@ export default function VideoPage() {
                     negativePromptValue={negativePrompt}
                     onNegativePromptChange={setNegativePrompt}
                     selectedModel={selectedModel}
-                    onModelChange={setSelectedModel}
+                  onModelChange={(model: Model) => {
+                    setSelectedModel(model)
+                    handleModelChange(model.identifier)
+                  }}
                     inputImage={inputImage}
                     onInputImageChange={setInputImage}
                     lastFrameImage={lastFrameImage}
@@ -311,7 +365,10 @@ export default function VideoPage() {
                         negativePromptValue={negativePrompt}
                         onNegativePromptChange={setNegativePrompt}
                         selectedModel={selectedModel}
-                        onModelChange={setSelectedModel}
+                        onModelChange={(model: Model) => {
+                          setSelectedModel(model)
+                          handleModelChange(model.identifier)
+                        }}
                         inputImage={inputImage}
                         onInputImageChange={setInputImage}
                         lastFrameImage={lastFrameImage}
@@ -345,7 +402,10 @@ export default function VideoPage() {
                     negativePromptValue={negativePrompt}
                     onNegativePromptChange={setNegativePrompt}
                     selectedModel={selectedModel}
-                    onModelChange={setSelectedModel}
+                    onModelChange={(model: Model) => {
+                      setSelectedModel(model)
+                      handleModelChange(model.identifier)
+                    }}
                     inputImage={inputImage}
                     onInputImageChange={setInputImage}
                     lastFrameImage={lastFrameImage}

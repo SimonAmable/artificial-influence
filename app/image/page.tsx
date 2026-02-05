@@ -9,6 +9,7 @@ import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { getActiveModelMetadata } from "@/lib/constants/model-metadata"
 
 export default function ImagePage() {
   const layoutModeContext = useLayoutMode()
@@ -26,8 +27,15 @@ export default function ImagePage() {
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [enhancePrompt, setEnhancePrompt] = React.useState(false)
-  const [selectedModel, setSelectedModel] = React.useState<string>("")
-  const [selectedAspectRatio, setSelectedAspectRatio] = React.useState<string>("")
+  
+  // Initialize with first active model
+  const defaultModel = React.useMemo(() => {
+    const activeModels = getActiveModelMetadata('image')
+    return activeModels.length > 0 ? activeModels[0].identifier : ""
+  }, [])
+  
+  const [selectedModel, setSelectedModel] = React.useState<string>(defaultModel)
+  const [selectedAspectRatio, setSelectedAspectRatio] = React.useState<string>("match_input_image")
 
   // Handle image generation
   const handleGenerate = async () => {
@@ -226,6 +234,9 @@ export default function ImagePage() {
                         selectedModel={selectedModel}
                         onModelChange={setSelectedModel}
                         showModelSelector={true}
+                        selectedAspectRatio={selectedAspectRatio}
+                        onAspectRatioChange={setSelectedAspectRatio}
+                        showAspectRatioSelector={true}
                       />
                     </div>
                   </div>

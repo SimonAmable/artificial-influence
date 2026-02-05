@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Handle, Position, NodeToolbar, type NodeProps, useReactFlow, useNodes, useEdges, getIncomers } from "@xyflow/react"
+import { Handle, Position, NodeToolbar, type NodeProps, useReactFlow, useNodes, useEdges, getIncomers, useUpdateNodeInternals, useStore } from "@xyflow/react"
 import {
   Image as ImageIcon,
   CircleNotch,
@@ -20,8 +20,8 @@ import {
   PaperPlaneTilt,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "framer-motion"
-import Cropper from "react-easy-crop"
-import type { ImageGenNodeData } from "@/lib/canvas/types"
+import Cropper, { type Area } from "react-easy-crop"
+import type { ImageGenNodeData, TextNodeData, UploadNodeData } from "@/lib/canvas/types"
 import { cn } from "@/lib/utils"
 import {
   Select,
@@ -47,6 +47,7 @@ import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog"
+import { getConstrainedSize, loadImageSize } from "@/lib/canvas/media-sizing"
 
 const hintSuggestions = [
   { icon: ImageIcon, label: "Image to Image" },
@@ -85,10 +86,15 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const [crop, setCrop] = React.useState({ x: 0, y: 0 })
   const [zoom, setZoom] = React.useState(1)
   const [cropAspect, setCropAspect] = React.useState<number>(1)
-  const [croppedAreaPixels, setCroppedAreaPixels] = React.useState<any>(null)
+  const [croppedAreaPixels, setCroppedAreaPixels] = React.useState<Area | null>(null)
   const [mediaSize, setMediaSize] = React.useState<{ width: number; height: number } | null>(null)
   const [previousViewport, setPreviousViewport] = React.useState<{ x: number; y: number; zoom: number } | null>(null)
   const reactFlow = useReactFlow()
+  const { isConnecting, connectingFromId } = useStore((state) => ({
+    isConnecting: state.connection.inProgress,
+    connectingFromId: state.connection.fromHandle?.nodeId,
+  }))
+  const updateNodeInternals = useUpdateNodeInternals()
   const nodes = useNodes()
   const edges = useEdges()
 
@@ -104,7 +110,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     // Get text from text nodes
     const textNodes = incomingNodes.filter(node => node.type === 'text')
     const combinedText = textNodes
-      .map(node => (node.data as any).text || '')
+      .map(node => (node.data as TextNodeData).text || '')
       .filter(text => text.trim())
       .join(' ')
     
@@ -114,12 +120,12 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     
     for (const node of imageNodes) {
       if (node.type === 'upload') {
-        const uploadData = node.data as any
+        const uploadData = node.data as UploadNodeData
         if (uploadData.fileUrl && uploadData.fileType === 'image') {
           imageUrls.push(uploadData.fileUrl)
         }
       } else if (node.type === 'image-gen') {
-        const imageGenData = node.data as any
+        const imageGenData = node.data as ImageGenNodeData
         if (imageGenData.generatedImageUrl) {
           imageUrls.push(imageGenData.generatedImageUrl)
         }
@@ -150,6 +156,37 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     }
   }, [isEditingTitle])
 
+  const applyNodeSize = React.useCallback((width: number, height: number) => {
+    const existing = reactFlow.getNode(id)
+    const existingWidth = existing?.style?.width ?? existing?.width
+    const existingHeight = existing?.style?.height ?? existing?.height
+    if (existingWidth === width && existingHeight === height) return
+
+    reactFlow.updateNode(id, {
+      width,
+      height,
+      style: { width, height },
+    })
+    updateNodeInternals(id)
+  }, [id, reactFlow, updateNodeInternals])
+
+  React.useEffect(() => {
+    if (nodeData.generatedImageUrl) {
+      loadImageSize(nodeData.generatedImageUrl)
+        .then((size) => {
+          const constrained = getConstrainedSize(size)
+          applyNodeSize(constrained.width, constrained.height)
+        })
+        .catch(() => {
+          // Ignore load errors; keep existing size
+        })
+      return
+    }
+
+    // Reset to aspect-ratio defaults when no media
+    applyNodeSize(width, height)
+  }, [nodeData.generatedImageUrl, applyNodeSize, width, height])
+
   const handleTitleClick = () => {
     if (selected) {
       setIsEditingTitle(true)
@@ -175,6 +212,15 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     }
   }
 
+  const currentNode = reactFlow.getNode(id)
+  const toNumber = (value: number | string | undefined) => {
+    if (typeof value === 'number') return value
+    if (typeof value === 'string') return Number.parseFloat(value)
+    return undefined
+  }
+  const nodeWidth = toNumber(currentNode?.style?.width) ?? toNumber(currentNode?.width) ?? width
+  const nodeHeight = toNumber(currentNode?.style?.height) ?? toNumber(currentNode?.height) ?? height
+
   const handleCrop = () => {
     if (nodeData.generatedImageUrl) {
       // Store current viewport
@@ -189,8 +235,8 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           {
             x: node.position.x - padding,
             y: node.position.y - padding,
-            width: width + padding * 2,
-            height: height + padding * 2,
+            width: nodeWidth + padding * 2,
+            height: nodeHeight + padding * 2,
           },
           { duration: 600 }
         )
@@ -227,7 +273,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     }
   }
 
-  const onCropComplete = React.useCallback((_croppedArea: any, croppedAreaPixels: any) => {
+  const onCropComplete = React.useCallback((_croppedArea: Area, croppedAreaPixels: Area) => {
     setCroppedAreaPixels(croppedAreaPixels)
   }, [])
 
@@ -585,12 +631,28 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
 
       {/* Wrapper to allow handles to overflow */}
       <div 
-        className={cn("relative", isCropping && "nodrag nopan")}
-        style={{ width: `${width}px`, height: `${height}px` }}
+        className={cn(
+          "relative",
+          isCropping && "nodrag nopan",
+          isConnecting && connectingFromId !== id && "easy-connect-glow"
+        )}
+        style={{ width: `${nodeWidth}px`, height: `${nodeHeight}px` }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onWheel={handleWheel}
       >
+        <Handle
+          id="input"
+          type="target"
+          position={Position.Left}
+          isConnectableStart={false}
+          className="easy-connect-target"
+        />
+        {isConnecting && connectingFromId !== id && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/20 text-[10px] font-semibold uppercase tracking-wider text-white/80">
+            Drop here
+          </div>
+        )}
         <div
           className={cn(
             "relative transition-all duration-200 w-full h-full",
@@ -703,7 +765,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           <div className="w-6 h-6 rounded-full border-2 border-purple-500 bg-zinc-900 flex items-center justify-center cursor-crosshair hover:bg-purple-500/10 transition-colors">
             <Plus size={14} weight="bold" className="text-purple-500 pointer-events-none" />
             <Handle
-              id="input"
+              id="input-ui"
               type="target"
               position={Position.Left}
               className="!absolute !inset-0 !w-full !h-full !bg-transparent !border-0 !rounded-full !transform-none"

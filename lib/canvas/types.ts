@@ -24,13 +24,22 @@ export interface VideoGenNodeData extends Record<string, unknown> {
   label: string
   imageUrl: string
   videoUrl: string
+  audioUrl?: string
   connectedImageUrl: string | null // Image from connected upload/image nodes (single)
   connectedVideoUrl: string | null // Video from connected upload nodes (single)
+  connectedAudioUrl?: string | null // Audio from connected upload nodes (single)
   manualImageUrl: string | null // Manually uploaded image (single)
   manualVideoUrl: string | null // Manually uploaded video (single)
+  manualAudioUrl?: string | null // Manually uploaded audio (single)
+  manualLastFrameUrl?: string | null // Manually uploaded last frame image
   manualImageFile: File | null // Store file for client-side upload
   manualVideoFile: File | null // Store file for client-side upload
+  manualAudioFile?: File | null // Store file for client-side upload
+  manualLastFrameFile?: File | null // Store file for client-side upload
   prompt: string
+  negativePrompt?: string
+  model: string
+  parameters: Record<string, unknown>
   mode: "pro" | "std"
   generatedVideoUrl: string | null
   isGenerating: boolean
@@ -113,13 +122,22 @@ export function createVideoGenNodeData(): VideoGenNodeData {
     label: "Video Generation",
     imageUrl: "",
     videoUrl: "",
+    audioUrl: "",
     connectedImageUrl: null,
     connectedVideoUrl: null,
+    connectedAudioUrl: null,
     manualImageUrl: null,
     manualVideoUrl: null,
+    manualAudioUrl: null,
+    manualLastFrameUrl: null,
     manualImageFile: null,
     manualVideoFile: null,
+    manualAudioFile: null,
+    manualLastFrameFile: null,
     prompt: "",
+    negativePrompt: "",
+    model: "kwaivgi/kling-v2.6-motion-control",
+    parameters: {},
     mode: "pro",
     generatedVideoUrl: null,
     isGenerating: false,

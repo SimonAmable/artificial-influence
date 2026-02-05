@@ -29,6 +29,9 @@ function AspectRatioIcon({ ratio }: { ratio: string }) {
         return "w-3 h-2" // Landscape
       case "2:3":
         return "w-2 h-3" // Portrait
+      case "match_input_image":
+      case "auto":
+        return "w-3 h-3 border-dashed" // Square with dashed border for special values
       default:
         return "w-3 h-3"
     }
@@ -37,11 +40,22 @@ function AspectRatioIcon({ ratio }: { ratio: string }) {
   return (
     <div
       className={cn(
-        "border-2 border-foreground/60 rounded-[2px] shrink-0",
+        "border-3 border-foreground/60 rounded-[2px] shrink-0",
         getIconStyle()
       )}
     />
   )
+}
+
+// Format aspect ratio for display
+function formatAspectRatioLabel(ratio: string): string {
+  switch (ratio) {
+    case "match_input_image":
+    case "auto":
+      return "Auto"
+    default:
+      return ratio
+  }
 }
 
 interface AspectRatioSelectorProps {
@@ -80,12 +94,9 @@ export function AspectRatioSelector({
       return []
     }
 
-    // Filter out non-ratio values like "auto", "match_input_image", etc.
-    // Only include values that match the pattern "width:height" (e.g., "16:9", "1:1")
-    const ratioPattern = /^\d+:\d+$/
-    return (
-      aspectRatioParam.enum?.filter((ratio) => ratioPattern.test(ratio)) || []
-    )
+    // Return all aspect ratio values including special ones like "auto", "match_input_image"
+    // Pattern matches: numeric ratios (16:9, 1:1) OR special keywords (auto, match_input_image)
+    return aspectRatioParam.enum || []
   }, [model])
 
   // Filter current value if it's not in supported ratios
@@ -143,7 +154,7 @@ export function AspectRatioSelector({
           {currentValue && (
             <div className="flex items-center gap-2">
               <AspectRatioIcon ratio={currentValue} />
-              <span>{currentValue}</span>
+              <span>{formatAspectRatioLabel(currentValue)}</span>
             </div>
           )}
         </SelectValue>
@@ -153,7 +164,7 @@ export function AspectRatioSelector({
           <SelectItem key={ratio} value={ratio}>
             <div className="flex items-center gap-2">
               <AspectRatioIcon ratio={ratio} />
-              <span>{ratio}</span>
+              <span>{formatAspectRatioLabel(ratio)}</span>
             </div>
           </SelectItem>
         ))}

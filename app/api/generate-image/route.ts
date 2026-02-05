@@ -1,5 +1,6 @@
 import { generateImage } from 'ai';
 import { replicate } from '@ai-sdk/replicate';
+import { xai } from '@ai-sdk/xai';
 import { NextRequest, NextResponse } from 'next/server';
 import { enhancePrompt } from '@/lib/prompt-enhancement';
 import { createClient } from '@/lib/supabase/server';
@@ -219,13 +220,24 @@ export async function POST(request: NextRequest) {
     // Prepare generateImage options
     console.log('[generate-image] Preparing generation options...');
     
+    // Initialize model based on provider
+    let imageModel;
+    const provider = modelData.provider?.toLowerCase();
+    
+    if (provider === 'xai') {
+      // xAI Grok model
+      const modelIdentifierOnly = modelIdentifier.replace('xai/', '');
+      imageModel = xai.image(modelIdentifierOnly);
+      console.log('[generate-image] Using xAI provider with model:', modelIdentifierOnly);
+    } else {
+      // Default to Replicate
+      imageModel = replicate.image(modelIdentifier as string);
+      console.log('[generate-image] Using Replicate provider');
+    }
+    
     // Use the selected model identifier
-    // According to Replicate's API documentation:
-    // - The model expects image_input as an array of URLs in the input
-    // - We pass this via providerOptions.replicate.image_input
-    // - The prompt remains a simple string
     const generateOptions: Parameters<typeof generateImage>[0] = {
-      model: replicate.image(modelIdentifier as string),
+      model: imageModel,
       prompt: finalPrompt, // Keep prompt as simple string
     };
 
@@ -250,10 +262,20 @@ export async function POST(request: NextRequest) {
       console.log('[generate-image] Seed set:', seed);
     }
 
-    // Add provider-specific options for nano-banana
-    // Replicate's nano-banana expects image_input as array of URLs
-    generateOptions.providerOptions = {
-      replicate: {
+    // Add provider-specific options
+    generateOptions.providerOptions = {};
+    
+    if (provider === 'xai') {
+      // xAI/Grok provider options
+      console.log('[generate-image] Setting up xAI provider options');
+      generateOptions.providerOptions.xai = {
+        // Add xAI-specific parameters
+        ...(seed && { seed }),
+      };
+    } else {
+      // Replicate provider options
+      console.log('[generate-image] Setting up Replicate provider options');
+      generateOptions.providerOptions.replicate = {
         // Optional: aspect_ratio, resolution, output_format, etc.
         ...(aspect_ratio && { aspect_ratio }),
         ...(resolution && { resolution }),
@@ -262,8 +284,8 @@ export async function POST(request: NextRequest) {
         ...(referenceImageUrls.length > 0 && { 
           image_input: referenceImageUrls // Array of URLs as expected by nano-banana
         }),
-      },
-    };
+      };
+    }
 
     console.log('[generate-image] Generation options:', {
       model: modelIdentifier,

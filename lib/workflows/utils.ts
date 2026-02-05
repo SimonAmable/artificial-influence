@@ -1,5 +1,9 @@
 import type { Node, Edge } from "@xyflow/react"
 
+type ReactFlowInstanceLike = {
+  getNode: (id: string) => Node | null | undefined
+}
+
 /**
  * Extract group node and all its children from the canvas
  */
@@ -102,7 +106,7 @@ export function instantiateWorkflow(
  */
 export async function captureWorkflowScreenshot(
   groupId: string,
-  reactFlowInstance: any
+  reactFlowInstance: ReactFlowInstanceLike
 ): Promise<string> {
   try {
     // Get the group node to find its bounds

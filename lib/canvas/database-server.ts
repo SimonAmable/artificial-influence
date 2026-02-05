@@ -326,7 +326,7 @@ function denormalizeNodesFromStorage(nodes: Node[]): Node[] {
  */
 function normalizeEdgesForStorage(edges: Edge[]): Edge[] {
   return edges.map((edge) => {
-    const normalized: any = {
+    const normalized: Edge = {
       id: edge.id,
       source: edge.source,
       target: edge.target,
@@ -334,7 +334,7 @@ function normalizeEdgesForStorage(edges: Edge[]): Edge[] {
     }
     
     // Only include handle properties if they have actual string values (not null, undefined, or "null")
-    const isValidHandle = (handle: any): handle is string => {
+    const isValidHandle = (handle: unknown): handle is string => {
       return (
         handle != null && // not null or undefined
         handle !== 'null' && // not the string "null"
@@ -377,7 +377,7 @@ function denormalizeEdgesFromStorage(edges: Edge[]): Edge[] {
       targetHandleType: typeof edge.targetHandle,
     })
     
-    const denormalized: any = {
+    const denormalized: Edge = {
       id: edge.id,
       source: edge.source,
       target: edge.target,
@@ -385,7 +385,7 @@ function denormalizeEdgesFromStorage(edges: Edge[]): Edge[] {
     }
     
     // Only include handle properties if they have actual string values (not null, undefined, or "null")
-    const isValidHandle = (handle: any): handle is string => {
+    const isValidHandle = (handle: unknown): handle is string => {
       return (
         handle != null && // not null or undefined
         handle !== 'null' && // not the string "null"

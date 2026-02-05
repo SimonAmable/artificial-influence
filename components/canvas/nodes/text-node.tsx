@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Handle, Position, NodeToolbar, type NodeProps, useReactFlow, useNodes, useEdges, getIncomers } from "@xyflow/react"
+import { Handle, Position, NodeToolbar, type NodeProps, useReactFlow, useNodes, useEdges, getIncomers, useStore } from "@xyflow/react"
 import {
   TextT,
   ArrowsOut,
@@ -12,7 +12,7 @@ import {
   PaperPlaneTilt
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
-import type { TextNodeData } from "@/lib/canvas/types"
+import type { TextNodeData, UploadNodeData, ImageGenNodeData } from "@/lib/canvas/types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -68,7 +68,12 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
   const [isFocused, setIsFocused] = React.useState(false)
   const [previousViewport, setPreviousViewport] = React.useState<{ x: number; y: number; zoom: number } | null>(null)
   const reactFlow = useReactFlow()
+  const { isConnecting, connectingFromId } = useStore((state) => ({
+    isConnecting: state.connection.inProgress,
+    connectingFromId: state.connection.fromHandle?.nodeId,
+  }))
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+  const nodeRef = React.useRef<HTMLDivElement>(null)
   const nodes = useNodes()
   const edges = useEdges()
   
@@ -85,7 +90,7 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
     // Get text from text nodes
     const textNodes = incomingNodes.filter(node => node.type === 'text')
     const combinedText = textNodes
-      .map(node => (node.data as any).text || '')
+      .map(node => (node.data as TextNodeData).text || '')
       .filter(text => text.trim())
       .join('\n\n')
     
@@ -95,13 +100,13 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
     
     for (const node of imageNodes) {
       if (node.type === 'upload') {
-        const uploadData = node.data as any
+        const uploadData = node.data as UploadNodeData
         if (uploadData.fileUrl && uploadData.fileType === 'image') {
           imageUrl = uploadData.fileUrl
           break
         }
       } else if (node.type === 'image-gen') {
-        const imageGenData = node.data as any
+        const imageGenData = node.data as ImageGenNodeData
         if (imageGenData.generatedImageUrl) {
           imageUrl = imageGenData.generatedImageUrl
           break
@@ -231,7 +236,7 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
     }
   }
 
-  const handleExitFocus = () => {
+  const handleExitFocus = React.useCallback(() => {
     setIsFocused(false)
     
     // Restore previous viewport
@@ -239,7 +244,21 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
       reactFlow.setViewport(previousViewport, { duration: 600 })
       setPreviousViewport(null)
     }
-  }
+  }, [previousViewport, reactFlow])
+  
+  // Handle click outside to exit focus mode
+  React.useEffect(() => {
+    if (!isFocused) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (nodeRef.current && !nodeRef.current.contains(event.target as Node)) {
+        handleExitFocus()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isFocused, handleExitFocus])
 
   const hasContent = !!nodeData.text?.trim()
 
@@ -247,37 +266,20 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
     <>
       {/* Floating toolbar using NodeToolbar */}
       <NodeToolbar
-        isVisible={selected && (hasContent || isFocused)}
+        isVisible={selected && hasContent}
         position={Position.Top}
         offset={35}
       >
         <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl px-2 py-2 flex flex-nowrap items-center gap-2 overflow-x-auto nopan nodrag">
-          {isFocused ? (
-            <>
-              <span className="text-[10px] text-zinc-500 px-1">Editing text</span>
-              <div className="w-px h-5 bg-white/10" />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-3 text-xs text-zinc-400 hover:text-zinc-200"
-                onClick={handleExitFocus}
-              >
-                Done
-              </Button>
-            </>
-          ) : (
-            <>
-              <ToolbarIconButton icon={PaperPlaneTilt} onClick={handleSendToChat} label="Send to AI Chat" />
-              <div className="w-px h-5 bg-white/10" />
-              
-              <span className="text-[10px] text-zinc-500 px-1">Prompt, ad copy, context</span>
+          <ToolbarIconButton icon={PaperPlaneTilt} onClick={handleSendToChat} label="Send to AI Chat" />
+          <div className="w-px h-5 bg-white/10" />
+          
+          <span className="text-[10px] text-zinc-500 px-1">Prompt, ad copy, context</span>
 
-              <div className="w-px h-5 bg-white/10" />
+          <div className="w-px h-5 bg-white/10" />
 
-              <ToolbarIconButton icon={DownloadSimple} onClick={handleDownload} label="Download" />
-              <ToolbarIconButton icon={ArrowsOut} onClick={handleFullscreen} label="Fullscreen" />
-            </>
-          )}
+          <ToolbarIconButton icon={DownloadSimple} onClick={handleDownload} label="Download" />
+          <ToolbarIconButton icon={ArrowsOut} onClick={handleFullscreen} label="Fullscreen" />
         </div>
       </NodeToolbar>
 
@@ -310,12 +312,28 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
 
       {/* Wrapper to allow handles to overflow */}
       <div 
-        className="relative transition-all duration-300"
+        ref={nodeRef}
+        className={cn(
+          "relative transition-all duration-300",
+          isConnecting && connectingFromId !== id && "easy-connect-glow"
+        )}
         style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onDoubleClick={handleDoubleClick}
       >
+        <Handle
+          id="input"
+          type="target"
+          position={Position.Left}
+          isConnectableStart={false}
+          className="easy-connect-target"
+        />
+        {isConnecting && connectingFromId !== id && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/20 text-[10px] font-semibold uppercase tracking-wider text-white/80">
+            Drop here
+          </div>
+        )}
         <div
           className={cn(
             "relative transition-all duration-200 w-full h-full",
@@ -328,7 +346,7 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
 
           {/* Content area: loading state, hints OR text preview OR editable text */}
           {nodeData.isGenerating ? (
-            <div className="relative w-full h-full overflow-hidden bg-zinc-900">
+            <div className="relative w-full h-full overflow-hidden bg-zinc-900 rounded-xl">
               {/* Progress fill */}
               <div 
                 className="absolute inset-y-0 left-0 bg-gradient-to-r from-zinc-800 to-zinc-700"

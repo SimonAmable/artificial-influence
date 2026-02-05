@@ -20,6 +20,7 @@ export const MODEL_IDENTIFIERS = {
   OPENAI_GPT_IMAGE_1_5: 'openai/gpt-image-1.5',
   BYTEDANCE_SEEDREAM_4_5: 'bytedance/seedream-4.5',
   PRUNAAI_FLUX_KONTEXT_FAST: 'prunaai/flux-kontext-fast',
+  XAI_GROK_IMAGINE: 'xai/grok-imagine-image',
   
   // Video Models
   KWAIVGI_KLING_V2_6: 'kwaivgi/kling-v2.6-motion-control',
@@ -127,7 +128,7 @@ const KLING_V2_6_PARAMS: ParameterDefinition[] = [
     description: 'Character orientation setting',
     required: false,
     default: 'image',
-    enum: ['image'],
+    enum: ['image', 'video'],
     ui_type: 'select',
   },
 ];
@@ -271,8 +272,102 @@ const VEO_3_1_FAST_PARAMS: ParameterDefinition[] = [
   },
 ];
 
-// Kling V2.6 Pro parameters (simpler version for kwaivgi/kling-v2.6)
-const KLING_V2_6_PRO_PARAMS: ParameterDefinition[] = [];
+// Kling V2.6 Pro parameters (kwaivgi/kling-v2.6)
+const KLING_V2_6_PRO_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'start_image',
+    type: 'string',
+    label: 'Start Image',
+    description: 'First frame of the video',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
+    name: 'aspect_ratio',
+    type: 'string',
+    label: 'Aspect Ratio',
+    description: 'Aspect ratio of the video (ignored if start image is provided)',
+    required: false,
+    default: '16:9',
+    enum: ['16:9', '9:16', '1:1'],
+    ui_type: 'select',
+  },
+  {
+    name: 'duration',
+    type: 'number',
+    label: 'Duration',
+    description: 'Duration of the video in seconds',
+    required: false,
+    default: 5,
+    min: 5,
+    max: 10,
+    ui_type: 'number',
+  },
+  {
+    name: 'generate_audio',
+    type: 'boolean',
+    label: 'Generate Audio',
+    description: 'Generate audio for the video',
+    required: false,
+    default: true,
+    ui_type: 'switch',
+  },
+  {
+    name: 'negative_prompt',
+    type: 'string',
+    label: 'Negative Prompt',
+    description: 'Description of what to exclude from the generated video',
+    required: false,
+    default: null,
+    ui_type: 'textarea',
+  },
+];
+
+// Grok Imagine Image parameters
+const GROK_IMAGINE_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'aspectRatio',
+    type: 'string',
+    label: 'Aspect Ratio',
+    description: 'Aspect ratio of the generated image',
+    required: false,
+    default: '1:1',
+    enum: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '2:1', '1:2', '19.5:9', '9:19.5', '20:9', '9:20'],
+    ui_type: 'select',
+  },
+  {
+    name: 'n',
+    type: 'number',
+    label: 'Number of Images',
+    description: 'Number of images to generate (max 10)',
+    required: false,
+    default: 1,
+    min: 1,
+    max: 10,
+    ui_type: 'number',
+  },
+  {
+    name: 'seed',
+    type: 'number',
+    label: 'Seed',
+    description: 'Seed for reproducibility',
+    required: false,
+    default: null,
+    min: 0,
+    max: 2147483647,
+    ui_type: 'number',
+  },
+  {
+    name: 'image_url',
+    type: 'string',
+    label: 'Input Image URL',
+    description: 'Source image for editing or style transfer (public URL or base64 data URI)',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+];
 
 // Flux Kontext Fast parameters
 const FLUX_KONTEXT_FAST_PARAMS: ParameterDefinition[] = [
@@ -749,6 +844,25 @@ export const FLUX_KONTEXT_FAST_MODEL: Model = {
 };
 
 /**
+ * Grok Imagine - xAI's image generation model
+ */
+export const GROK_IMAGINE_MODEL: Model = {
+  id: 'model-grok-imagine',
+  identifier: MODEL_IDENTIFIERS.XAI_GROK_IMAGINE,
+  name: 'Grok Imagine',
+  description: 'xAI Grok Imagine image generation model with support for creating images from text prompts',
+  type: 'image',
+  provider: 'xai',
+  is_active: true,
+  model_cost: 0.004,
+  parameters: {
+    parameters: GROK_IMAGINE_PARAMS,
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+/**
  * Nano Banana Pro - State of the art image generation and editing
  */
 export const NANO_BANANA_PRO_MODEL: Model = {
@@ -819,6 +933,7 @@ export const IMAGE_MODELS = [
   GPT_IMAGE_1_5_MODEL,
   SEEDREAM_4_5_MODEL,
   FLUX_KONTEXT_FAST_MODEL,
+  GROK_IMAGINE_MODEL,
 ] as const;
 
 export const VIDEO_MODELS = [
@@ -847,6 +962,7 @@ const IMAGE_MODELS_FIXED = [
   GPT_IMAGE_1_5_MODEL,
   SEEDREAM_4_5_MODEL,
   FLUX_KONTEXT_FAST_MODEL,
+  GROK_IMAGINE_MODEL,
 ] as const;
 
 const VIDEO_MODELS_FIXED = [
