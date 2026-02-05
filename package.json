@@ -14,7 +14,7 @@
     "@ai-sdk/react": "^3.0.41",
     "@ai-sdk/replicate": "^2.0.8",
     "@base-ui/react": "^1.1.0",
-    "@lobehub/icons": "^1.59.1",
+    "@lobehub/icons": "^4.2.0",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-icons": "^1.3.2",
     "@react-three/fiber": "^9.5.0",
