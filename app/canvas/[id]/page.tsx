@@ -928,17 +928,25 @@ function CanvasContent() {
       // Use React Flow's toObject to get properly serialized flow state
       const flow = reactFlowInstance.toObject()
       
-      // Ensure we don't save transient blob/data URLs
-      const hasTransientMedia = flow.nodes.some((node) => {
-        if (node.type !== 'upload') return false
+      // Avoid persisting transient local URLs by clearing them during save.
+      // This keeps saving unblocked while uploads are still in progress.
+      let transientMediaCount = 0
+      const nodesForSave = flow.nodes.map((node) => {
+        if (node.type !== "upload") return node
         const nodeData = node.data as Partial<CanvasNodeData> | null
-        const url = typeof nodeData?.fileUrl === 'string' ? nodeData.fileUrl : null
-        return !!url && (url.startsWith('blob:') || url.startsWith('data:'))
+        const url = typeof nodeData?.fileUrl === "string" ? nodeData.fileUrl : null
+        const isTransientUrl = !!url && (url.startsWith("blob:") || url.startsWith("data:"))
+        if (!isTransientUrl) return node
+
+        transientMediaCount += 1
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            fileUrl: null,
+          },
+        }
       })
-      if (hasTransientMedia) {
-        toast.error("Media is still uploading. Please wait and try saving again.")
-        return
-      }
       
       console.log('[handleSave] Flow from toObject:', {
         nodesCount: flow.nodes.length,
@@ -949,11 +957,16 @@ function CanvasContent() {
       // Save canvas to database
       await saveCanvasClient(canvasId, {
         name: workflowName,
-        nodes: flow.nodes,
+        nodes: nodesForSave,
         edges: flow.edges,
         thumbnail_url: thumbnailUrl || undefined,
       })
       
+      if (transientMediaCount > 0) {
+        toast.warning(
+          `Saved while ${transientMediaCount} media upload${transientMediaCount > 1 ? "s were" : " was"} still in progress.`
+        )
+      }
       toast.success("Canvas saved")
     } catch (error) {
       console.error("Save error:", error)

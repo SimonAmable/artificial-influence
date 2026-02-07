@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     const size = formData.get('size') as string | null;
     const n = formData.get('n') ? parseInt(formData.get('n') as string) : null;
     const seed = formData.get('seed') ? parseInt(formData.get('seed') as string) : null;
-    const aspect_ratio = formData.get('aspect_ratio') as string | null;
+    let aspect_ratio = formData.get('aspect_ratio') as string | null;
     const resolution = formData.get('resolution') as string | null;
     const output_format = formData.get('output_format') as string | null;
 
@@ -219,6 +219,13 @@ export async function POST(request: NextRequest) {
 
     // Prepare generateImage options
     console.log('[generate-image] Preparing generation options...');
+    const isNanoBanana = modelIdentifier === 'google/nano-banana';
+
+    // For image-editor-style edits with references, default nano-banana to input image ratio
+    if (isNanoBanana && referenceImageUrls.length > 0 && !aspect_ratio && !aspectRatio) {
+      aspect_ratio = 'match_input_image';
+      console.log('[generate-image] Applied default aspect_ratio=match_input_image for nano-banana edit flow');
+    }
     
     // Initialize model based on provider
     let imageModel;

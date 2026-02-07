@@ -18,6 +18,7 @@ import {
   Upload,
   DotsSixVertical,
   PaperPlaneTilt,
+  PencilSimple,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "framer-motion"
 import Cropper, { type Area } from "react-easy-crop"
@@ -48,6 +49,7 @@ import {
   DialogContent,
 } from "@/components/ui/dialog"
 import { getConstrainedSize, loadImageSize } from "@/lib/canvas/media-sizing"
+import { ImageEditorDialog } from "@/components/image-editor"
 
 const hintSuggestions = [
   { icon: ImageIcon, label: "Image to Image" },
@@ -82,6 +84,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const [isCropping, setIsCropping] = React.useState(false)
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
   const [isAddImageOpen, setIsAddImageOpen] = React.useState(false)
+  const [isEditorOpen, setIsEditorOpen] = React.useState(false)
   const uploadInputRef = React.useRef<HTMLInputElement>(null)
   const [crop, setCrop] = React.useState({ x: 0, y: 0 })
   const [zoom, setZoom] = React.useState(1)
@@ -521,6 +524,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl px-2 py-2 flex flex-nowrap items-center gap-2 overflow-x-auto nopan nodrag">
           <ToolbarIconButton icon={PaperPlaneTilt} onClick={handleSendToChat} label="Send to AI Chat" />
           <div className="w-px h-5 bg-white/10" />
+          <ToolbarIconButton icon={PencilSimple} onClick={() => setIsEditorOpen(true)} label="Edit in Canvas" />
           <ToolbarIconButton icon={Crop} onClick={handleCrop} label="Crop" />
           <ToolbarIconButton icon={DownloadSimple} onClick={handleDownload} label="Download" />
           <ToolbarIconButton icon={ArrowsOut} onClick={handleFullscreen} label="Fullscreen" />
@@ -1080,7 +1084,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           >
             <X size={24} className="text-white" />
           </button>
-          <div 
+          <div
             className="w-full h-full flex items-center justify-center bg-zinc-950 p-4 cursor-pointer"
             onClick={() => setIsFullscreenOpen(false)}
           >
@@ -1093,6 +1097,17 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         </DialogContent>
       </Dialog>
     )}
+
+    {/* Image Editor Dialog */}
+    <ImageEditorDialog
+      open={isEditorOpen}
+      onOpenChange={setIsEditorOpen}
+      initialImage={nodeData.generatedImageUrl}
+      onSave={(editedImageUrl) => {
+        nodeData.onDataChange?.(id, { generatedImageUrl: editedImageUrl })
+        setIsEditorOpen(false)
+      }}
+    />
     </>
   )
 })

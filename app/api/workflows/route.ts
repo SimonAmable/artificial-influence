@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       thumbnail_url: body.thumbnail_url || null,
       nodes: body.nodes,
       edges: body.edges || [],
-      is_public: false, // Default to private when saving
+      is_public: body.is_public === true,
     })
 
     return NextResponse.json(workflow)

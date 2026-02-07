@@ -28,7 +28,7 @@ export function Header() {
   const isImagePage = pathname === "/image"
   const isMotionCopyPage = pathname === "/motion-copy"
   const isLipsyncPage = pathname === "/lipsync"
-  const isAuthPage = pathname === "/login" || pathname === "/signup"
+  const isAuthPage = pathname === "/login"
   const isHomePage = pathname === "/"
   const isCanvasPage = pathname === "/canvas"
   const isCanvasDetailPage = pathname?.startsWith("/canvas/")
@@ -184,7 +184,7 @@ export function Header() {
                 Login
               </Link>
               <Button variant="secondary" asChild>
-                <Link href="/signup">Signup</Link>
+                <Link href="/login?mode=signup">Signup</Link>
               </Button>
             </>
           )}

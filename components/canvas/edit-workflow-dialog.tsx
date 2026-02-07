@@ -95,7 +95,16 @@ export function EditWorkflowDialog({
           const { thumbnail_url } = await uploadResponse.json()
           setThumbnailUrl(thumbnail_url)
         } else {
-          toast.error("Failed to upload thumbnail")
+          let message = "Failed to upload thumbnail"
+          try {
+            const errorBody = await uploadResponse.json()
+            if (typeof errorBody?.error === "string" && errorBody.error.trim().length > 0) {
+              message = errorBody.error
+            }
+          } catch {
+            // Ignore JSON parse errors and keep fallback message
+          }
+          toast.error(message)
         }
         setIsUploading(false)
       }

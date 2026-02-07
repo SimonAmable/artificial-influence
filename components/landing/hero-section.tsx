@@ -274,7 +274,7 @@ export function HeroSection() {
           className="mt-6 md:mt-8 pointer-events-auto"
         >
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 px-4">
-            <Link href="/signup">
+            <Link href="/login?mode=signup">
               <Button
                 variant="secondary"
                 size="lg"

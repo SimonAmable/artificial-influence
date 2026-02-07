@@ -127,14 +127,15 @@ export async function updateWorkflow(
     throw new Error("Workflow not found or access denied")
   }
 
+  const updates: Record<string, unknown> = {}
+  if (input.name !== undefined) updates.name = input.name
+  if (input.description !== undefined) updates.description = input.description
+  if (input.thumbnail_url !== undefined) updates.thumbnail_url = input.thumbnail_url
+  if (input.is_public !== undefined) updates.is_public = input.is_public
+
   const { data, error } = await supabase
     .from("workflows")
-    .update({
-      name: input.name,
-      description: input.description,
-      thumbnail_url: input.thumbnail_url,
-      is_public: input.is_public,
-    })
+    .update(updates)
     .eq("id", workflowId)
     .select()
     .single()

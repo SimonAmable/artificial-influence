@@ -16,6 +16,7 @@ import {
   SquareHalfBottom,
   CircleNotch,
   PaperPlaneTilt,
+  PencilSimple,
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
 import type { UploadNodeData } from "@/lib/canvas/types"
@@ -30,6 +31,7 @@ import {
   DialogContent,
 } from "@/components/ui/dialog"
 import { getConstrainedSize, loadImageSize, loadVideoSize } from "@/lib/canvas/media-sizing"
+import { ImageEditorDialog } from "@/components/image-editor"
 
 const hintSuggestions = [
   { icon: ImageIcon, label: "Image" },
@@ -49,6 +51,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
   const titleInputRef = React.useRef<HTMLInputElement>(null)
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
   const [isExtractingFrame, setIsExtractingFrame] = React.useState(false)
+  const [isEditorOpen, setIsEditorOpen] = React.useState(false)
   const [isUploading, setIsUploading] = React.useState(false)
   
   // Get current node to read its dimensions
@@ -488,6 +491,13 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
             </>
           )}
 
+          {/* Edit button - only show for images */}
+          {nodeData.fileType === 'image' && (
+            <>
+              <ToolbarIconButton icon={PencilSimple} onClick={() => setIsEditorOpen(true)} label="Edit in Canvas" />
+              <div className="w-px h-5 bg-white/10" />
+            </>
+          )}
           <ToolbarIconButton icon={DownloadSimple} onClick={handleDownload} label="Download" />
           <ToolbarIconButton icon={ArrowsOut} onClick={handleFullscreen} label="Fullscreen" />
         </div>
@@ -738,6 +748,19 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
           </div>
         </DialogContent>
       </Dialog>
+    )}
+
+    {/* Image Editor Dialog - only for images */}
+    {nodeData.fileType === 'image' && (
+      <ImageEditorDialog
+        open={isEditorOpen}
+        onOpenChange={setIsEditorOpen}
+        initialImage={nodeData.fileUrl}
+        onSave={(editedImageUrl) => {
+          nodeData.onDataChange?.(id, { fileUrl: editedImageUrl })
+          setIsEditorOpen(false)
+        }}
+      />
     )}
     </>
   )
