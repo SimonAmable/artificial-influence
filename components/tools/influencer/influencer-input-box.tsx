@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Plus, X, FilePlus } from "@phosphor-icons/react"
+import { Plus, X, FilePlus, Sparkle, FolderOpen } from "@phosphor-icons/react"
 import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
@@ -27,6 +27,7 @@ import { Model } from "@/lib/types/models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { AspectRatioSelector } from "@/components/shared/selectors/aspect-ratio-selector"
 import { getActiveModelMetadata, type ModelMetadata } from "@/lib/constants/model-metadata"
+import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
 
 interface InfluencerInputBoxProps {
   className?: string
@@ -35,6 +36,9 @@ interface InfluencerInputBoxProps {
   onPromptChange?: (value: string) => void
   referenceImage?: ImageUpload | null
   onReferenceImageChange?: (image: ImageUpload | null) => void
+  /** Multiple reference images support */
+  referenceImages?: ImageUpload[]
+  onReferenceImagesChange?: (images: ImageUpload[]) => void
   enhancePrompt?: boolean
   onEnhancePromptChange?: (enabled: boolean) => void
   isGenerating?: boolean
@@ -43,12 +47,18 @@ interface InfluencerInputBoxProps {
   selectedModel?: string
   onModelChange?: (modelIdentifier: string) => void
   showModelSelector?: boolean
+  /** Pass DB models when using /api/models. When provided, overrides getActiveModelMetadata. */
+  imageModels?: Model[]
   selectedAspectRatio?: string
   onAspectRatioChange?: (aspectRatio: string) => void
   showAspectRatioSelector?: boolean
   aspectRatio1to1?: boolean
   onAspectRatio1to1Change?: (checked: boolean) => void
   showAspectRatio1to1Checkbox?: boolean
+  /** Number of images to generate (1–max_images). Shown when model has max_images > 1. */
+  selectedNumImages?: number
+  onNumImagesChange?: (n: number) => void
+  showNumImagesSelector?: boolean
 }
 
 export function InfluencerInputBox({
@@ -58,6 +68,8 @@ export function InfluencerInputBox({
   onPromptChange,
   referenceImage,
   onReferenceImageChange,
+  referenceImages,
+  onReferenceImagesChange,
   enhancePrompt = false,
   onEnhancePromptChange,
   isGenerating = false,
@@ -66,20 +78,42 @@ export function InfluencerInputBox({
   selectedModel,
   onModelChange,
   showModelSelector = false,
+  imageModels,
   selectedAspectRatio,
   onAspectRatioChange,
   showAspectRatioSelector = false,
   aspectRatio1to1 = false,
   onAspectRatio1to1Change,
   showAspectRatio1to1Checkbox = false,
+  selectedNumImages = 1,
+  onNumImagesChange,
+  showNumImagesSelector = false,
 }: InfluencerInputBoxProps) {
   const [localPrompt, setLocalPrompt] = React.useState(promptValue)
   const [localReferenceImage, setLocalReferenceImage] = React.useState<ImageUpload | null>(referenceImage || null)
+  const [localReferenceImages, setLocalReferenceImages] = React.useState<ImageUpload[]>(referenceImages || [])
   const [isFullScreenPreviewOpen, setIsFullScreenPreviewOpen] = React.useState(false)
+  const [fullScreenImageIndex, setFullScreenImageIndex] = React.useState(0)
+  const [assetModalOpen, setAssetModalOpen] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   
-  // Get active image models from constants
-  const models = React.useMemo(() => getActiveModelMetadata('image'), [])
+  // Use DB models when provided, else fallback to constants
+  const metadataModels = React.useMemo(() => getActiveModelMetadata('image'), [])
+  const models: Model[] = imageModels ?? metadataModels.map((m: ModelMetadata): Model => ({
+    id: m.id,
+    identifier: m.identifier,
+    name: m.name,
+    description: m.description,
+    type: m.type,
+    provider: m.provider,
+    is_active: m.is_active,
+    model_cost: m.model_cost,
+    parameters: { parameters: [] },
+    created_at: '',
+    updated_at: '',
+    aspect_ratios: m.aspect_ratios,
+    default_aspect_ratio: m.aspect_ratios[0],
+  }))
 
   // Sync with external changes
   React.useEffect(() => {
@@ -93,6 +127,12 @@ export function InfluencerInputBox({
       setLocalReferenceImage(referenceImage)
     }
   }, [referenceImage])
+
+  React.useEffect(() => {
+    if (referenceImages !== undefined) {
+      setLocalReferenceImages(referenceImages)
+    }
+  }, [referenceImages])
 
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
@@ -115,17 +155,37 @@ export function InfluencerInputBox({
     if (file) {
       const url = URL.createObjectURL(file)
       const newImage = { file, url }
-      setLocalReferenceImage(newImage)
-      onReferenceImageChange?.(newImage)
+      
+      // Support both single and multiple reference images
+      if (onReferenceImagesChange) {
+        const updatedImages = [...localReferenceImages, newImage]
+        setLocalReferenceImages(updatedImages)
+        onReferenceImagesChange(updatedImages)
+      } else {
+        setLocalReferenceImage(newImage)
+        onReferenceImageChange?.(newImage)
+      }
     }
   }
 
-  const handleReferenceImageRemove = () => {
-    if (localReferenceImage?.url) {
-      URL.revokeObjectURL(localReferenceImage.url)
+  const handleReferenceImageRemove = (index?: number) => {
+    // Support both single and multiple reference images
+    if (onReferenceImagesChange && index !== undefined) {
+      const imageToRemove = localReferenceImages[index]
+      if (imageToRemove?.url && imageToRemove.file) {
+        URL.revokeObjectURL(imageToRemove.url)
+      }
+      const updatedImages = localReferenceImages.filter((_, i) => i !== index)
+      setLocalReferenceImages(updatedImages)
+      onReferenceImagesChange(updatedImages)
+    } else {
+      if (localReferenceImage?.url) {
+        URL.revokeObjectURL(localReferenceImage.url)
+      }
+      setLocalReferenceImage(null)
+      onReferenceImageChange?.(null)
     }
-    setLocalReferenceImage(null)
-    onReferenceImageChange?.(null)
+    
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -135,8 +195,23 @@ export function InfluencerInputBox({
     fileInputRef.current?.click()
   }
 
-  const handleImagePreviewClick = () => {
+  const handleImagePreviewClick = (index: number = 0) => {
+    setFullScreenImageIndex(index)
     setIsFullScreenPreviewOpen(true)
+  }
+
+  const handleAssetSelect = (imageUrl: string) => {
+    const newImage = { url: imageUrl }
+    
+    // Support both single and multiple reference images
+    if (onReferenceImagesChange) {
+      const updatedImages = [...localReferenceImages, newImage]
+      setLocalReferenceImages(updatedImages)
+      onReferenceImagesChange(updatedImages)
+    } else {
+      setLocalReferenceImage(newImage)
+      onReferenceImageChange?.(newImage)
+    }
   }
 
   const handleCloseFullScreenPreview = React.useCallback(() => {
@@ -180,72 +255,50 @@ export function InfluencerInputBox({
     }
   }, [showModelSelector, selectedModel, models, onModelChange])
 
-  // Find the selected model object
+  // Find the selected model object (Model from DB or converted from metadata)
   const selectedModelObject = React.useMemo(() => {
     if (!selectedModel) return null
     return models.find(m => m.identifier === selectedModel) || null
   }, [selectedModel, models])
-  
-  // Convert ModelMetadata to Model format for AspectRatioSelector compatibility
-  const selectedModelForSelector = React.useMemo<Model | null>(() => {
-    if (!selectedModelObject) return null
-    
-    // Create a minimal Model object with the parameters structure expected by AspectRatioSelector
-    return {
-      id: selectedModelObject.id,
-      identifier: selectedModelObject.identifier,
-      name: selectedModelObject.name,
-      description: selectedModelObject.description,
-      type: selectedModelObject.type,
-      provider: selectedModelObject.provider,
-      is_active: selectedModelObject.is_active,
-      model_cost: selectedModelObject.model_cost,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      parameters: {
-        parameters: selectedModelObject.aspect_ratios.length > 0 ? [
-          {
-            name: 'aspect_ratio',
-            type: 'string' as const,
-            label: 'Aspect Ratio',
-            description: 'Image aspect ratio',
-            required: false,
-            default: selectedModelObject.aspect_ratios[0] || '1:1',
-            enum: selectedModelObject.aspect_ratios,
-            ui_type: 'select' as const,
-          }
-        ] : []
-      }
-    } as Model
-  }, [selectedModelObject])
 
   // Determine if button is ready (prompt must not be empty)
   const isReady = React.useMemo(() => {
     return localPrompt.trim().length > 0
   }, [localPrompt])
 
+  // Determine which images to display (multiple or single)
+  const displayImages = onReferenceImagesChange 
+    ? localReferenceImages 
+    : localReferenceImage 
+      ? [localReferenceImage] 
+      : []
+
   return (
     <Card className={cn("w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative", className)}>
       <CardContent className="p-2 flex flex-col gap-1.5">
         {/* Image Preview - Above Text Input */}
-        {localReferenceImage?.url && (
-          <div className="relative w-full">
-            <img
-              src={localReferenceImage.url}
-              alt="Reference image preview"
-              className="w-full max-h-48 rounded object-contain border border-border cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={handleImagePreviewClick}
-            />
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleReferenceImageRemove()
-              }}
-              className="absolute top-1.5 right-1.5 bg-background hover:bg-destructive text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10"
-              aria-label="Remove reference image"
-            >
-              <X className="size-3" weight="bold" />
-            </button>
+        {displayImages.length > 0 && (
+          <div className="relative w-full flex gap-2 flex-wrap">
+            {displayImages.map((image, index) => (
+              <div key={index} className="relative">
+                <img
+                  src={image.url}
+                  alt={`Reference image ${index + 1}`}
+                  className="h-[60px] w-auto max-w-full rounded object-contain border border-border cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => handleImagePreviewClick(index)}
+                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleReferenceImageRemove(onReferenceImagesChange ? index : undefined)
+                  }}
+                  className="absolute -top-1 -right-1 bg-background hover:bg-destructive text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10"
+                  aria-label={`Remove reference image ${index + 1}`}
+                >
+                  <X className="size-3" weight="bold" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
@@ -285,7 +338,17 @@ export function InfluencerInputBox({
                     Generating...
                   </>
                 ) : (
-                  "Generate"
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-sm font-semibold">Generate</span>
+                    <div className="flex items-center gap-0.5">
+                      <Sparkle size={8} weight="fill" />
+                      <span className="text-[10px]">
+                        {selectedModelObject?.model_cost != null
+                          ? selectedModelObject.model_cost * selectedNumImages
+                          : "—"}
+                      </span>
+                    </div>
+                  </div>
                 )}
               </Button>
             </div>
@@ -309,6 +372,10 @@ export function InfluencerInputBox({
               <DropdownMenuItem onClick={handleUploadReferenceImage}>
                 <FilePlus className="size-4 mr-2" />
                 Upload Reference Image
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setAssetModalOpen(true)}>
+                <FolderOpen className="size-4 mr-2" />
+                Select Asset
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -362,11 +429,33 @@ export function InfluencerInputBox({
           {/* Aspect Ratio Selector (if enabled) */}
           {showAspectRatioSelector && (
             <AspectRatioSelector
-              model={selectedModelForSelector}
+              model={selectedModelObject}
               value={selectedAspectRatio}
               onValueChange={onAspectRatioChange}
               disabled={isGenerating}
             />
+          )}
+
+          {/* Number of Images Selector (when model supports max_images > 1) */}
+          {showNumImagesSelector && selectedModelObject && (selectedModelObject.max_images ?? 1) > 1 && (
+            <Select
+              value={String(selectedNumImages)}
+              onValueChange={(v) => onNumImagesChange?.(parseInt(v, 10))}
+              disabled={isGenerating}
+            >
+              <SelectTrigger id="num-images-select" className="h-7 text-xs w-fit min-w-[80px]">
+                <SelectValue>
+                  {selectedNumImages} image{selectedNumImages !== 1 ? "s" : ""}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent position="popper" side="top" sideOffset={4}>
+                {Array.from({ length: selectedModelObject.max_images ?? 1 }, (_, i) => i + 1).map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n} image{n !== 1 ? "s" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
 
           {/* Aspect Ratio 1:1 Checkbox (if enabled) */}
@@ -414,14 +503,14 @@ export function InfluencerInputBox({
       </CardContent>
 
       {/* Full Screen Image Preview */}
-      {isFullScreenPreviewOpen && localReferenceImage?.url && (
+      {isFullScreenPreviewOpen && displayImages[fullScreenImageIndex]?.url && (
         <div
           className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={handleCloseFullScreenPreview}
         >
           <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
             <img
-              src={localReferenceImage.url}
+              src={displayImages[fullScreenImageIndex].url}
               alt="Reference image full screen"
               className="max-w-full max-h-[90vh] object-contain rounded-lg"
             />
@@ -435,6 +524,13 @@ export function InfluencerInputBox({
           </div>
         </div>
       )}
+
+      {/* Asset Selection Modal */}
+      <AssetSelectionModal
+        open={assetModalOpen}
+        onOpenChange={setAssetModalOpen}
+        onSelect={handleAssetSelect}
+      />
     </Card>
   )
 }

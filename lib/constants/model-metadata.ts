@@ -33,7 +33,10 @@ export interface ModelMetadata {
   provider: string;
   is_active: boolean;
   model_cost: number;
-  is_reference_supported: boolean;
+  /** Image models: reference images for style/character. */
+  supports_reference_image: boolean;
+  /** Video models only: reference video for editing or motion copy. */
+  supports_reference_video?: boolean;
   aspect_ratios: string[];
   supports_first_frame?: boolean; // Video models only
   supports_last_frame?: boolean; // Video models only
@@ -54,7 +57,8 @@ export const GOOGLE_NANO_BANANA_META: ModelMetadata = {
   provider: 'replicate',
   is_active: true,
   model_cost: 2.0,
-  is_reference_supported: true,
+  supports_reference_image: true,
+  supports_reference_video: false,
   aspect_ratios: ['match_input_image', '1:1', '16:9', '9:16', '3:2', '2:3', '4:3', '3:4'],
   customParameters: [
     {
@@ -76,7 +80,8 @@ export const NANO_BANANA_PRO_META: ModelMetadata = {
   provider: 'replicate',
   is_active: true,
   model_cost: 4.0,
-  is_reference_supported: true,
+  supports_reference_image: true,
+  supports_reference_video: false,
   aspect_ratios: ['match_input_image', '1:1', '16:9', '9:16', '3:2', '2:3', '4:3', '3:4'],
   customParameters: [
     {
@@ -111,7 +116,8 @@ export const SEEDREAM_4_5_META: ModelMetadata = {
   provider: 'replicate',
   is_active: true,
   model_cost: 2.0,
-  is_reference_supported: true,
+  supports_reference_image: true,
+  supports_reference_video: false,
   aspect_ratios: ['match_input_image', '1:1', '16:9', '9:16', '3:2', '2:3', '4:3', '3:4'],
   customParameters: [
     {
@@ -140,7 +146,8 @@ export const GROK_IMAGINE_META: ModelMetadata = {
   provider: 'xai',
   is_active: true,
   model_cost: 0.004,
-  is_reference_supported: true,
+  supports_reference_image: true,
+  supports_reference_video: false,
   aspect_ratios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '2:1', '1:2', '19.5:9', '9:19.5', '20:9', '9:20'],
   customParameters: [
     {
@@ -169,7 +176,8 @@ export const GPT_IMAGE_1_5_META: ModelMetadata = {
   provider: 'replicate',
   is_active: true,
   model_cost: 2.0,
-  is_reference_supported: true,
+  supports_reference_image: true,
+  supports_reference_video: false,
   aspect_ratios: ['1:1',"2:3","3:2"],
 };
 
@@ -182,7 +190,8 @@ export const FLUX_KONTEXT_FAST_META: ModelMetadata = {
   provider: 'replicate',
   is_active: false,
   model_cost: 2.0,
-  is_reference_supported: true,
+  supports_reference_image: true,
+  supports_reference_video: false,
   aspect_ratios: ['match_input_image', '1:1', '16:9', '9:16', '4:3', '3:4'],  customParameters: [
     {
       name: 'speed_mode',
@@ -210,7 +219,8 @@ export const KLING_V2_6_MOTION_META: ModelMetadata = {
   provider: 'replicate',
   is_active: true,
   model_cost: 10.0,
-  is_reference_supported: true,
+  supports_reference_image: true,
+  supports_reference_video: true,
   aspect_ratios: ['16:9', '9:16', '1:1'],
   supports_first_frame: true,
   customParameters: [
@@ -247,7 +257,8 @@ export const FABRIC_1_0_META: ModelMetadata = {
   provider: 'replicate',
   is_active: true,
   model_cost: 2.0,
-  is_reference_supported: true,
+  supports_reference_image: false,
+  supports_reference_video: false,
   aspect_ratios: ['16:9', '9:16', '1:1'],
   customParameters: [
     {
@@ -269,7 +280,8 @@ export const VEO_3_1_FAST_META: ModelMetadata = {
   provider: 'replicate',
   is_active: true,
   model_cost: 0.012,
-  is_reference_supported: true,
+  supports_reference_image: false,
+  supports_reference_video: false,
   aspect_ratios: ['16:9', '9:16', '1:1'],
   supports_first_frame: true,
   supports_last_frame: true,
@@ -307,7 +319,8 @@ export const KLING_V2_6_PRO_META: ModelMetadata = {
   provider: 'replicate',
   is_active: true,
   model_cost: 0.015,
-  is_reference_supported: true,
+  supports_reference_image: false,
+  supports_reference_video: false,
   aspect_ratios: ['16:9', '9:16', '1:1'],
   supports_first_frame: true,
   customParameters: [
@@ -344,7 +357,8 @@ export const HAILUO_2_3_FAST_META: ModelMetadata = {
   provider: 'replicate',
   is_active: true,
   model_cost: 0.008,
-  is_reference_supported: true,
+  supports_reference_image: false,
+  supports_reference_video: false,
   aspect_ratios: ['16:9', '9:16', '1:1'],
   supports_first_frame: true,
   customParameters: [
@@ -462,9 +476,9 @@ export function getModelMetadataByType(type: ModelType): ModelMetadata[] {
 /**
  * Get models that support reference images
  */
-export function getReferenceSupportedModels(type?: ModelType): ModelMetadata[] {
+export function getReferenceImageSupportedModels(type?: ModelType): ModelMetadata[] {
   let models = ALL_MODELS_METADATA.filter(
-    (model) => model.is_reference_supported
+    (model) => model.supports_reference_image
   );
   
   if (type) {
@@ -472,6 +486,26 @@ export function getReferenceSupportedModels(type?: ModelType): ModelMetadata[] {
   }
   
   return models;
+}
+
+/**
+ * Get models that support reference video
+ */
+export function getReferenceVideoSupportedModels(type?: ModelType): ModelMetadata[] {
+  let models = ALL_MODELS_METADATA.filter(
+    (model) => model.supports_reference_video
+  );
+  
+  if (type) {
+    models = models.filter((model) => model.type === type);
+  }
+  
+  return models;
+}
+
+/** @deprecated Use getReferenceImageSupportedModels or getReferenceVideoSupportedModels */
+export function getReferenceSupportedModels(type?: ModelType): ModelMetadata[] {
+  return getReferenceImageSupportedModels(type);
 }
 
 /**

@@ -16,6 +16,7 @@ import {
   FrameCorners,
   SquareHalfBottom,
   PaperPlaneTilt,
+  FloppyDisk,
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
 import type { VideoGenNodeData, UploadNodeData, ImageGenNodeData } from "@/lib/canvas/types"
@@ -23,7 +24,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { extractFirstFrame, extractLastFrame } from "@/lib/canvas/frame-extraction"
 import { createUploadNodeData } from "@/lib/canvas/types"
-import { getActiveModelMetadata, getModelMetadataByIdentifier } from "@/lib/constants/model-metadata"
+import { useModels } from "@/hooks/use-models"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition } from "@/lib/types/models"
 import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
@@ -43,6 +44,7 @@ import {
 } from "@/components/ui/dialog"
 import { getConstrainedSize, loadVideoSize } from "@/lib/canvas/media-sizing"
 import { uploadBlobToSupabase } from "@/lib/canvas/upload-helpers"
+import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 
 const hintSuggestions = [
   { label: "Connect an image source" },
@@ -66,6 +68,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const titleInputRef = React.useRef<HTMLInputElement>(null)
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
   const [isAddMediaOpen, setIsAddMediaOpen] = React.useState(false)
+  const [isCreateAssetOpen, setIsCreateAssetOpen] = React.useState(false)
   const imageUploadRef = React.useRef<HTMLInputElement>(null)
   const lastFrameUploadRef = React.useRef<HTMLInputElement>(null)
   const videoUploadRef = React.useRef<HTMLInputElement>(null)
@@ -171,29 +174,23 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     }
   }, [isEditingTitle])
 
-  const getModelFromMetadata = React.useCallback((identifier: string): Model | null => {
-    const metadata = getModelMetadataByIdentifier(identifier) || getActiveModelMetadata("video")[0]
-    if (!metadata) return null
-    return {
-      id: metadata.id,
-      identifier: metadata.identifier,
-      name: metadata.name,
-      description: metadata.description,
-      type: metadata.type,
-      provider: metadata.provider,
-      is_active: metadata.is_active,
-      model_cost: metadata.model_cost,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      parameters: {
-        parameters: buildVideoModelParameters(metadata),
-      },
-    }
-  }, [])
+  const { models: videoModels } = useModels("video")
+
+  const getModelFromIdentifier = React.useCallback(
+    (identifier: string): Model | null => {
+      const m = videoModels.find((x) => x.identifier === identifier) ?? videoModels[0]
+      if (!m) return null
+      return {
+        ...m,
+        parameters: { parameters: buildVideoModelParameters(m) },
+      }
+    },
+    [videoModels]
+  )
 
   const selectedModel = React.useMemo(() => {
-    return getModelFromMetadata(nodeData.model || "kwaivgi/kling-v2.6-motion-control")
-  }, [getModelFromMetadata, nodeData.model])
+    return getModelFromIdentifier(nodeData.model || "kwaivgi/kling-v2.6-motion-control")
+  }, [getModelFromIdentifier, nodeData.model])
 
   React.useEffect(() => {
     if (!selectedModel) return
@@ -837,6 +834,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           <div className="w-px h-5 bg-white/10" />
 
           <ToolbarIconButton icon={DownloadSimple} onClick={handleDownload} label="Download" />
+          <ToolbarIconButton icon={FloppyDisk} onClick={() => setIsCreateAssetOpen(true)} label="Create Asset" />
           <ToolbarIconButton icon={ArrowsOut} onClick={handleFullscreen} label="Fullscreen" />
         </div>
       </NodeToolbar>
@@ -1261,8 +1259,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             className="hidden"
           />
 
-          {selectedModel && (
+          {selectedModel && videoModels.length > 0 && (
             <VideoModelParameterControls
+              videoModels={videoModels}
               selectedModel={selectedModel}
               onModelChange={(model) => {
                 const defaults: Record<string, unknown> = {}
@@ -1324,6 +1323,19 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           </div>
         </DialogContent>
       </Dialog>
+    )}
+
+    {nodeData.generatedVideoUrl && (
+      <CreateAssetDialog
+        open={isCreateAssetOpen}
+        onOpenChange={setIsCreateAssetOpen}
+        initial={{
+          title,
+          url: nodeData.generatedVideoUrl,
+          assetType: "video",
+          sourceNodeType: "video-gen",
+        }}
+      />
     )}
     </>
   )

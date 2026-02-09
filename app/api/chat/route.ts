@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
     // Stream the response using Gemini via AI Gateway
     const result = streamText({
-      model: gateway('google/gemini-2.5-flash'),
+      model: gateway('xai/grok-4.1-fast-reasoning'),
       messages: messagesWithSystem,
       temperature: 0.7,
     });

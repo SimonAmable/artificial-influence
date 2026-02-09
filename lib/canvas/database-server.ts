@@ -270,6 +270,11 @@ function normalizeNodesForStorage(nodes: Node[]): Node[] {
     if (typeof data.generatedImageUrl === "string") {
       data.generatedImageUrl = normalizeUrl(data.generatedImageUrl)
     }
+    if (Array.isArray(data.generatedImageUrls)) {
+      data.generatedImageUrls = data.generatedImageUrls.map((url) =>
+        typeof url === "string" ? normalizeUrl(url) : url
+      )
+    }
     if (typeof data.generatedVideoUrl === "string") {
       data.generatedVideoUrl = normalizeUrl(data.generatedVideoUrl)
     }
@@ -300,6 +305,11 @@ function denormalizeNodesFromStorage(nodes: Node[]): Node[] {
     // Denormalize URLs in common fields
     if (typeof data.generatedImageUrl === "string") {
       data.generatedImageUrl = denormalizeUrl(data.generatedImageUrl)
+    }
+    if (Array.isArray(data.generatedImageUrls)) {
+      data.generatedImageUrls = data.generatedImageUrls.map((url) =>
+        typeof url === "string" ? denormalizeUrl(url) : url
+      )
     }
     if (typeof data.generatedVideoUrl === "string") {
       data.generatedVideoUrl = denormalizeUrl(data.generatedVideoUrl)

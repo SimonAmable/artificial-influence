@@ -8,6 +8,8 @@ import {
   ClockCounterClockwise,
   Stack,
   SpeakerHigh,
+  Image as ImageIcon,
+  VideoCamera,
   type IconProps,
 } from "@phosphor-icons/react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -18,6 +20,13 @@ import { createClient } from "@/lib/supabase/client"
 import { WorkflowsMenu } from "@/components/canvas/workflows-menu"
 import { AddNodesMenu } from "@/components/canvas/add-nodes-menu"
 import Image from "next/image"
+import { Input } from "@/components/ui/input"
+import type { AssetCategory, AssetRecord, AssetVisibility } from "@/lib/assets/types"
+import {
+  ASSET_CATEGORIES,
+  ASSET_CATEGORY_LABELS,
+  listAssets,
+} from "@/lib/assets/library"
 
 interface Generation {
   id: string
@@ -73,9 +82,13 @@ function SidebarButton({
 export function CanvasSidebar({ onAddNode, onInstantiateWorkflow, onEditWorkflow }: CanvasSidebarProps) {
   const [activeMenu, setActiveMenu] = React.useState<MenuType>(null)
   const [generations, setGenerations] = React.useState<Generation[]>([])
+  const [assets, setAssets] = React.useState<AssetRecord[]>([])
+  const [assetVisibility, setAssetVisibility] = React.useState<AssetVisibility | "all">("all")
+  const [assetCategory, setAssetCategory] = React.useState<AssetCategory | "all">("all")
+  const [assetSearch, setAssetSearch] = React.useState("")
+  const [loadingAssets, setLoadingAssets] = React.useState(false)
   const [loadingGenerations, setLoadingGenerations] = React.useState(false)
   const [hasMore, setHasMore] = React.useState(true)
-  const [page, setPage] = React.useState(1)
   const menuRef = React.useRef<HTMLDivElement>(null)
   const scrollContainerRef = React.useRef<HTMLDivElement>(null)
   const addMenuCloseTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -92,6 +105,15 @@ export function CanvasSidebar({ onAddNode, onInstantiateWorkflow, onEditWorkflow
       })
       setActiveMenu(null) // Close the history sidebar
     }
+  }, [onAddNode])
+
+  const handleAssetClick = React.useCallback((asset: AssetRecord) => {
+    onAddNode("upload", {
+      fileUrl: asset.url,
+      fileType: asset.assetType,
+      fileName: `${asset.title}.${asset.assetType === "image" ? "png" : asset.assetType === "video" ? "mp4" : "mp3"}`,
+    })
+    setActiveMenu(null)
   }, [onAddNode])
 
   const fetchGenerations = React.useCallback(async (pageNum: number) => {
@@ -134,13 +156,35 @@ export function CanvasSidebar({ onAddNode, onInstantiateWorkflow, onEditWorkflow
 
   // Fetch generations when history menu opens
   React.useEffect(() => {
-    if (activeMenu === 'history') {
+    if (activeMenu === "history") {
       setGenerations([])
-      setPage(1)
       setHasMore(true)
       fetchGenerations(1)
     }
   }, [activeMenu, fetchGenerations])
+
+  const fetchAssets = React.useCallback(async () => {
+    setLoadingAssets(true)
+    try {
+      const data = await listAssets({
+        visibility: assetVisibility === "all" ? undefined : assetVisibility,
+        category: assetCategory === "all" ? undefined : assetCategory,
+        search: assetSearch,
+        limit: 120,
+      })
+      setAssets(data)
+    } catch (error) {
+      console.error("Error fetching assets:", error)
+      setAssets([])
+    } finally {
+      setLoadingAssets(false)
+    }
+  }, [assetCategory, assetSearch, assetVisibility])
+
+  React.useEffect(() => {
+    if (activeMenu !== "assets") return
+    void fetchAssets()
+  }, [activeMenu, fetchAssets])
 
   const handleScroll = React.useCallback(() => {
     if (!scrollContainerRef.current || !hasMore) return
@@ -149,13 +193,10 @@ export function CanvasSidebar({ onAddNode, onInstantiateWorkflow, onEditWorkflow
     
     // Load more when scrolled to within 100px of bottom
     if (scrollTop + clientHeight >= scrollHeight - 100) {
-      setPage(prev => {
-        const nextPage = prev + 1
-        fetchGenerations(nextPage)
-        return nextPage
-      })
+      const nextPage = Math.floor(generations.length / 12) + 1
+      fetchGenerations(nextPage)
     }
-  }, [hasMore, fetchGenerations])
+  }, [fetchGenerations, generations.length, hasMore])
 
   // Group generations by date
   const groupedGenerations = React.useMemo(() => {
@@ -323,12 +364,116 @@ export function CanvasSidebar({ onAddNode, onInstantiateWorkflow, onEditWorkflow
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -10 }}
-            className="absolute left-[72px] top-0 w-80 h-[400px] bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl"
+            className="absolute left-[72px] top-0 w-[360px] bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col"
+            style={{ maxHeight: "500px" }}
           >
-            <h3 className="text-sm font-medium text-white mb-4">Assets</h3>
-            <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-2">
-              <Shapes size={40} weight="thin" />
-              <p className="text-xs">No assets available yet</p>
+            <div className="p-4 border-b border-white/10">
+              <div className="flex items-center gap-2 mb-3">
+                <h3 className="text-sm font-medium text-white">Assets</h3>
+                <Input
+                  value={assetSearch}
+                  onChange={(e) => setAssetSearch(e.target.value)}
+                  placeholder="Search name or tags"
+                  className="h-8 text-xs bg-zinc-800/80 border-white/10"
+                />
+              </div>
+              <div className="flex gap-2 mb-3">
+                {(["all", "private", "public"] as const).map((visibility) => (
+                  <button
+                    key={visibility}
+                    onClick={() => {
+                      setAssetVisibility(visibility)
+                    }}
+                    className={cn(
+                      "text-xs rounded-md px-2 py-1 border transition-colors",
+                      assetVisibility === visibility
+                        ? "border-white/20 bg-white/10 text-white"
+                        : "border-white/10 text-zinc-400 hover:text-zinc-200"
+                    )}
+                  >
+                    {visibility === "all" ? "All" : visibility === "private" ? "Private" : "Public"}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => {
+                    setAssetCategory("all")
+                  }}
+                  className={cn(
+                    "text-[11px] rounded-md px-2 py-1 border transition-colors",
+                    assetCategory === "all"
+                      ? "border-blue-400/40 bg-blue-500/10 text-blue-200"
+                      : "border-white/10 text-zinc-400 hover:text-zinc-200"
+                  )}
+                >
+                  All
+                </button>
+                {ASSET_CATEGORIES.map((item) => (
+                  <button
+                    key={item}
+                    onClick={() => {
+                      setAssetCategory(item)
+                    }}
+                    className={cn(
+                      "text-[11px] rounded-md px-2 py-1 border transition-colors",
+                      assetCategory === item
+                        ? "border-blue-400/40 bg-blue-500/10 text-blue-200"
+                        : "border-white/10 text-zinc-400 hover:text-zinc-200"
+                    )}
+                  >
+                    {ASSET_CATEGORY_LABELS[item]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {loadingAssets ? (
+                <div className="flex flex-col items-center justify-center h-40 text-zinc-500 gap-2">
+                  <p className="text-xs">Loading assets...</p>
+                </div>
+              ) : assets.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-zinc-500 gap-2">
+                  <Shapes size={40} weight="thin" />
+                  <p className="text-xs">No assets in this tab yet</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {assets.map((asset) => (
+                    <button
+                      key={asset.id}
+                      onClick={() => handleAssetClick(asset)}
+                      className="text-left rounded-lg border border-white/10 hover:border-white/30 transition-colors p-2 bg-zinc-900/70"
+                    >
+                      <div className="relative aspect-square rounded-md overflow-hidden bg-zinc-800 mb-2">
+                        {asset.assetType === "image" ? (
+                          <Image
+                            src={asset.thumbnailUrl || asset.url}
+                            alt={asset.title}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        ) : asset.assetType === "video" ? (
+                          <video src={asset.url} className="w-full h-full object-cover" preload="metadata" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-zinc-400">
+                            <SpeakerHigh size={24} weight="duotone" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] text-zinc-300 mb-1">
+                        {asset.assetType === "image" && <ImageIcon size={12} />}
+                        {asset.assetType === "video" && <VideoCamera size={12} />}
+                        {asset.assetType === "audio" && <SpeakerHigh size={12} />}
+                        <span className="capitalize">{asset.assetType}</span>
+                      </div>
+                      <p className="text-[11px] text-zinc-100 line-clamp-1">{asset.title}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
         )}

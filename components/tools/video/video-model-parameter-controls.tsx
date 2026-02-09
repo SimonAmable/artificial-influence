@@ -7,12 +7,12 @@ import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-import { getActiveModelMetadata, type ModelMetadata } from "@/lib/constants/model-metadata"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition } from "@/lib/types/models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 
 interface VideoModelParameterControlsProps {
+  videoModels: Model[]
   selectedModel: Model
   onModelChange: (model: Model) => void
   parameters: Record<string, unknown>
@@ -23,6 +23,7 @@ interface VideoModelParameterControlsProps {
 }
 
 export function VideoModelParameterControls({
+  videoModels,
   selectedModel,
   onModelChange,
   parameters,
@@ -31,28 +32,18 @@ export function VideoModelParameterControls({
   className,
   variant = "page",
 }: VideoModelParameterControlsProps) {
-  const videoModels = React.useMemo(() => getActiveModelMetadata("video"), [])
   const isToolbar = variant === "toolbar"
 
   const modelMap = React.useMemo(() => {
     const map = new Map<string, Model>()
-    videoModels.forEach((metadata: ModelMetadata) => {
+    videoModels.forEach((m) => {
       const model: Model = {
-        id: metadata.id,
-        identifier: metadata.identifier,
-        name: metadata.name,
-        description: metadata.description,
-        type: metadata.type,
-        provider: metadata.provider,
-        is_active: metadata.is_active,
-        model_cost: metadata.model_cost,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        ...m,
         parameters: {
-          parameters: buildVideoModelParameters(metadata),
+          parameters: buildVideoModelParameters(m),
         },
       }
-      map.set(metadata.identifier, model)
+      map.set(m.identifier, model)
     })
     return map
   }, [videoModels])
@@ -82,14 +73,15 @@ export function VideoModelParameterControls({
         >
           <SelectTrigger
             id={param.name}
-            className={cn("h-7 text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")}
+            size="sm"
+            className={cn("h-8 text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")}
           >
             <SelectValue placeholder={param.label} />
           </SelectTrigger>
           <SelectContent side="top">
-            {param.enum.map((option: string) => (
-              <SelectItem key={option} value={option} className="text-xs">
-                {option}
+            {param.enum.map((option) => (
+              <SelectItem key={String(option)} value={String(option)} className="text-xs">
+                {String(option)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -101,13 +93,13 @@ export function VideoModelParameterControls({
       return (
         <div
           key={param.name}
-          className="h-7 flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20"
+          className="h-8 flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20"
         >
           <Switch
             id={param.name}
             checked={Boolean(value)}
             onCheckedChange={(checked) => onParametersChange({ ...parameters, [param.name]: checked })}
-            className="scale-75"
+            className="scale-90"
             disabled={disabled}
           />
           <Label htmlFor={param.name} className="text-xs cursor-pointer whitespace-nowrap leading-none">
@@ -117,12 +109,50 @@ export function VideoModelParameterControls({
       )
     }
 
+    // Number param with enum (e.g. duration_options from DB) → render as select
+    if (
+      param.type === "number" &&
+      "enum" in param &&
+      Array.isArray(param.enum) &&
+      param.enum.length > 0
+    ) {
+      const unit = param.name.includes("duration") ? "s" : ""
+      return (
+        <Select
+          key={param.name}
+          value={String(value ?? param.default)}
+          onValueChange={(val) =>
+            onParametersChange({ ...parameters, [param.name]: Number(val) })
+          }
+          disabled={disabled}
+        >
+          <SelectTrigger
+            id={param.name}
+            size="sm"
+            className={cn("h-8 text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")}
+          >
+            <SelectValue placeholder={param.label}>
+              {value != null ? `${value}${unit}` : param.label}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent side="top">
+            {param.enum.map((option) => (
+              <SelectItem key={option} value={String(option)} className="text-xs">
+                {option}
+                {unit}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )
+    }
+
     if (param.ui_type === "slider" && param.type === "number") {
       const unit = param.name.includes("duration") ? "s" : ""
       return (
         <div
           key={param.name}
-          className="h-7 flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20 min-w-[100px]"
+          className="h-8 flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20 min-w-[100px]"
         >
           <Slider
             id={param.name}
@@ -147,7 +177,7 @@ export function VideoModelParameterControls({
       return (
         <div
           key={param.name}
-          className="h-7 flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20"
+          className="h-8 flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20"
         >
           <Input
             id={param.name}
@@ -178,7 +208,7 @@ export function VideoModelParameterControls({
         }}
         disabled={disabled}
       >
-        <SelectTrigger className={cn("h-7 text-xs w-fit min-w-[140px]", isToolbar && "min-w-[120px]")}>
+        <SelectTrigger size="sm" className={cn("h-8 text-xs w-fit min-w-[140px]", isToolbar && "min-w-[120px]")}>
           <SelectValue placeholder="Select model">
             {selectedModel && (
               <div className="flex items-center gap-2">

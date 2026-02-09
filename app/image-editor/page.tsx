@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { ImageEditor } from "@/components/image-editor"
 import { toast } from "sonner"
 
-export default function ImageEditorPage() {
+function ImageEditorPageContent() {
   const searchParams = useSearchParams()
   const initialImage = searchParams.get("image") || undefined
 
@@ -36,5 +36,13 @@ export default function ImageEditorPage() {
         onSave={handleSave}
       />
     </main>
+  )
+}
+
+export default function ImageEditorPage() {
+  return (
+    <React.Suspense fallback={<main className="h-screen bg-zinc-950 p-4 pt-20" />}>
+      <ImageEditorPageContent />
+    </React.Suspense>
   )
 }

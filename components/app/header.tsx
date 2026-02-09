@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { User, SignOut, CaretDownIcon } from "@phosphor-icons/react"
+import { User, SignOut, CaretDownIcon, ChatCircleDots } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -15,9 +15,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { navigationItems } from "@/lib/constants/navigation"
+import { PromotionalBanner } from "@/components/app/promotional-banner"
+import { FeedbackDialog } from "@/components/app/feedback-dialog"
 
 export function Header() {
   const pathname = usePathname()
@@ -35,6 +39,8 @@ export function Header() {
   const [user, setUser] = React.useState<{ id: string; email?: string } | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [isScrolled, setIsScrolled] = React.useState(false)
+  const [credits, setCredits] = React.useState<number | null>(null)
+  const [feedbackOpen, setFeedbackOpen] = React.useState(false)
 
   const currentPage = navigationItems.find(item => item.path === pathname)?.path || pathname
   const isPageInDropdown = navigationItems.some(item => item.path === pathname)
@@ -74,6 +80,29 @@ export function Header() {
     return () => subscription.unsubscribe()
   }, [])
 
+  React.useEffect(() => {
+    if (!user?.id) {
+      setCredits(null)
+      return
+    }
+    const supabase = createClient()
+
+    const fetchCredits = async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("credits")
+          .eq("id", user.id)
+          .single()
+        setCredits(data?.credits ?? 0)
+      } catch {
+        setCredits(0)
+      }
+    }
+
+    void fetchCredits()
+  }, [user?.id])
+
   const handleLogout = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -85,20 +114,14 @@ export function Header() {
 
   return (
     <header className={cn(
-      "fixed z-50 rounded-xl border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pointer-events-auto",
-      // Shadow: only when scrolled
+      "fixed z-50 flex flex-col rounded-xl border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pointer-events-auto",
+      "transition-all duration-300 ease-in-out",
       isScrolled ? "shadow-lg" : "",
-      // Padding/Positioning
-      isAuthPage 
-        ? "top-0 left-0 right-0 rounded-none" 
-        : isScrolled 
-          ? "top-4 left-4 right-4" 
-          : "top-0 left-0 right-0",
-      // Transition classes
-      "transition-all duration-300 ease-in-out"
+      isAuthPage ? "top-0 left-0 right-0 rounded-none" : isScrolled ? "top-4 left-4 right-4" : "top-0 left-0 right-0"
     )}>
-      <div className="flex h-14 items-center justify-between px-4 w-full max-w-full">
-        <div className="flex items-center gap-6">
+      <PromotionalBanner />
+      <div className="flex h-14 min-w-0 items-center justify-between gap-2 px-4">
+        <div className="flex min-w-0 shrink items-center gap-4 lg:gap-6">
           <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
             <Image 
               src="/logo.svg" 
@@ -115,7 +138,7 @@ export function Header() {
                 key={item.path}
                 href={item.path}
                 className={cn(
-                  "text-white font-bold transition-colors hover:text-primary",
+                  "text-foreground font-bold transition-colors hover:text-primary",
                   pathname === item.path && "text-primary",
                   item.className
                 )}
@@ -128,7 +151,7 @@ export function Header() {
           <div className="lg:hidden">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="min-w-full justify-between gap-2">
+                <Button variant="outline" className="justify-between gap-2">
                   <span>
                     {isPageInDropdown 
                       ? navigationItems.find(item => item.path === currentPage)?.label || "Select a page"
@@ -154,7 +177,7 @@ export function Header() {
             </DropdownMenu>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {loading ? null : user ? (
             <>
               <Button variant="secondary" asChild>
@@ -167,7 +190,16 @@ export function Header() {
                     <span className="sr-only">User menu</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="font-normal">
+                    {credits !== null ? `${credits} credits available` : "— credits"}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setFeedbackOpen(true)}>
+                    <ChatCircleDots className="mr-2 h-4 w-4" />
+                    <span>Send Feedback</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} variant="destructive">
                     <SignOut className="mr-2 h-4 w-4" />
                     <span>Logout</span>
@@ -194,6 +226,7 @@ export function Header() {
           />
         </div>
       </div>
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </header>
   )
 }

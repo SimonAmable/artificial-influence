@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { AuthForm } from "@/components/app/auth-form"
 
 type LoginPageProps = {
@@ -9,5 +10,9 @@ type LoginPageProps = {
 export default function LoginPage({ searchParams }: LoginPageProps) {
   const mode = searchParams?.mode === "signup" ? "signup" : "login"
 
-  return <AuthForm defaultMode={mode} />
+  return (
+    <Suspense fallback={null}>
+      <AuthForm defaultMode={mode} />
+    </Suspense>
+  )
 }

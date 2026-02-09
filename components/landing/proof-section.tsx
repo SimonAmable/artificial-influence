@@ -1,7 +1,3 @@
-"use client"
-
-import * as React from "react"
-import { cn } from "@/lib/utils"
 import { Iphone } from "@/components/ui/iphone"
 
 const PROOF_IMAGES = [
@@ -12,32 +8,24 @@ const PROOF_IMAGES = [
 
 export function ProofSection() {
   return (
-    <section
-      id="proof"
-      className={cn(
-        "relative min-h-screen w-full",
-        "flex items-center justify-center",
-        "bg-background",
-        "py-8 md:py-12"
-      )}
-    >
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-            PROOF
+    <section id="proof" className="w-full bg-background py-16 sm:py-24">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            Social Proof
+          </p>
+          <h2 className="mt-3 text-3xl font-semibold text-foreground sm:text-4xl">
+            Outputs that look ready for real campaigns
           </h2>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            See examples of real AI influencers who have had success in the market.
+          <p className="mt-4 text-muted-foreground">
+            Samples from creator-style content and influencer-focused production experiments.
           </p>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 items-center justify-items-center">
+
+        <div className="mt-10 grid grid-cols-1 items-center justify-items-center gap-8 md:grid-cols-3 md:gap-12">
           {PROOF_IMAGES.map((imageSrc, index) => (
-            <div
-              key={index}
-              className="w-full max-w-[300px] md:max-w-[350px]"
-            >
-              <Iphone src={imageSrc} />
+            <div key={imageSrc} className="w-full max-w-[300px] md:max-w-[350px]">
+              <Iphone src={imageSrc} aria-label={`Proof sample ${index + 1}`} />
             </div>
           ))}
         </div>

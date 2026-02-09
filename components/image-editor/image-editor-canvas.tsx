@@ -29,7 +29,7 @@ interface ImageEditorCanvasProps {
 }
 
 type FabricMouseEvent = {
-  e: MouseEvent
+  e: MouseEvent | TouchEvent | PointerEvent
 }
 
 type FabricPathCreatedEvent = {

@@ -23,6 +23,8 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/motion-copy", label: "Motion Copy" },
   { path: "/lipsync", label: "Lipsync" },
   { path: "/canvases", label: "Canvas" },
+  { path: "/assets", label: "Assets" },
+  { path: "/history", label: "History" },
   { path: "/pricing", label: "Pricing" },
   { path: "/pricing-test", label: "Pricing (Test)", devOnly: true },
 ]
@@ -43,7 +45,7 @@ export function getNavigationItems(): NavigationItem[] {
 
       return {
         ...item,
-        className: isTestPage ? "text-yellow-400 hover:text-yellow-300" : undefined,
+        className: isTestPage ? "text-amber-600 dark:text-amber-400 hover:text-amber-500 dark:hover:text-amber-300" : undefined,
       }
     })
 

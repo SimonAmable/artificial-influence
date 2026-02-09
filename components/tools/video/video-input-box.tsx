@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CircleNotch, Plus, FilePlus, X } from "@phosphor-icons/react"
+import { CircleNotch, Plus, FilePlus, X, Sparkle } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import type { Model } from "@/lib/types/models"
 import { PhotoUpload, ImageUpload } from "@/components/shared/upload/photo-upload"
@@ -20,6 +20,7 @@ import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
 import { VideoModelParameterControls } from "@/components/tools/video/video-model-parameter-controls"
 
 interface VideoInputBoxProps {
+  videoModels: Model[]
   forceRowLayout?: boolean
   promptValue: string
   onPromptChange: (value: string) => void
@@ -42,6 +43,7 @@ interface VideoInputBoxProps {
 }
 
 export function VideoInputBox({
+  videoModels,
   forceRowLayout = false,
   promptValue,
   onPromptChange,
@@ -65,6 +67,7 @@ export function VideoInputBox({
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const lastFrameRef = React.useRef<HTMLInputElement>(null)
+  const videoRef = React.useRef<HTMLInputElement>(null)
 
 
 
@@ -74,7 +77,10 @@ export function VideoInputBox({
     selectedModel.identifier.includes('lipsync') ||
     selectedModel.identifier.includes('wav2lip') ||
     selectedModel.identifier === 'veed/fabric-1.0'
-  
+  const isReferenceVideoSupported =
+    selectedModel.supports_reference_video === true ||
+    selectedModel.identifier === 'xai/grok-imagine-video'
+
   // Check if model supports image/last frame based on parameters
   const modelSupportsImage = React.useMemo(() => {
     return selectedModel.parameters.parameters?.some(
@@ -124,6 +130,18 @@ export function VideoInputBox({
     }
   }
 
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && file.type.startsWith('video/')) {
+      const videoUpload: ImageUpload = {
+        file,
+        url: URL.createObjectURL(file)
+      }
+      onInputVideoChange(videoUpload)
+    }
+    e.target.value = ''
+  }
+
   const isReady = (() => {
     // Motion copy model needs image + video
     if (isMotionCopyModel) {
@@ -147,8 +165,8 @@ export function VideoInputBox({
   return (
     <Card className={cn("w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative", forceRowLayout && "backdrop-blur-xl bg-background/95 shadow-2xl border-2")}>
       <CardContent className="p-2 flex flex-col gap-1.5">
-        {/* Image Previews - Show uploaded images from plus button (only when not using custom upload components) */}
-        {!isMotionCopyModel && !isLipsyncModel && (inputImage || lastFrameImage) && (
+        {/* Image/Video Previews - Show uploaded assets from plus button (only when not using custom upload components) */}
+        {!isMotionCopyModel && !isLipsyncModel && (inputImage || lastFrameImage || (isReferenceVideoSupported && inputVideo)) && (
           <div className="flex gap-2 px-2 pt-1">
             {inputImage && inputImage.url && (
               <div className="relative flex-1 max-w-[200px]">
@@ -192,6 +210,27 @@ export function VideoInputBox({
                 </div>
               </div>
             )}
+            {isReferenceVideoSupported && inputVideo?.url && (
+              <div className="relative flex-1 max-w-[200px]">
+                <video
+                  src={inputVideo.url}
+                  className="w-full h-auto max-h-32 rounded-md object-cover border border-border"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+                <button
+                  onClick={() => onInputVideoChange(null)}
+                  className="absolute top-1 right-1 bg-background/80 hover:bg-destructive/80 text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10 backdrop-blur-sm"
+                  aria-label="Remove reference video"
+                >
+                  <X className="size-3" weight="bold" />
+                </button>
+                <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-medium border border-border">
+                  Reference Video
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -207,34 +246,6 @@ export function VideoInputBox({
               variant="page"
               onPromptKeyDown={handleTextInputKeyDown}
             />
-
-            {/* Generate Button */}
-            <div className="shrink-0">
-              <div
-                className={cn(
-                  "relative inline-block transition-all duration-300",
-                  isReady && "before:content-[''] before:absolute before:inset-[-12px] before:bg-primary before:rounded-full before:blur-[15px] before:opacity-50 before:-z-10"
-                )}
-              >
-                <Button
-                  onClick={onGenerate}
-                  disabled={!isReady || isGenerating}
-                  className={cn(
-                    "bg-primary hover:bg-primary/80 text-primary-foreground font-semibold h-10 min-w-[100px] text-sm px-4 py-6 transition-all duration-300 relative z-0",
-                    !isReady && "opacity-50 cursor-not-allowed"
-                  )}
-                >
-                  {isGenerating ? (
-                    <>
-                      <CircleNotch className="size-3 mr-1.5 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    "Generate"
-                  )}
-                </Button>
-              </div>
-            </div>
           </div>
         )}
 
@@ -283,16 +294,16 @@ export function VideoInputBox({
 
         {/* 3. BOTTOM ROW: Plus button + Model Selector + Parameters + Generate (for upload models) */}
         <div className="flex flex-wrap items-center gap-1.5 px-2">
-          {/* Plus button for first frame/last frame (only for models that need it, not motion/lipsync) */}
-          {(modelSupportsImage || modelSupportsLastFrame) && !isMotionCopyModel && !isLipsyncModel && (
+          {/* Plus button for first frame / last frame / reference video (only for models that need it, not motion/lipsync) */}
+          {(modelSupportsImage || modelSupportsLastFrame || isReferenceVideoSupported) && !isMotionCopyModel && !isLipsyncModel && (
             <>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 rounded-md bg-muted/20 hover:bg-muted/40 border border-border"
-                    aria-label="Add image"
+                    className="h-8 w-8 rounded-md bg-muted/20 hover:bg-muted/40 border border-border"
+                    aria-label="Add image or video"
                   >
                     <Plus className="size-3.5" weight="bold" />
                   </Button>
@@ -308,6 +319,12 @@ export function VideoInputBox({
                     <DropdownMenuItem onClick={() => lastFrameRef.current?.click()}>
                       <FilePlus className="size-4 mr-2" />
                       Upload Last Frame
+                    </DropdownMenuItem>
+                  )}
+                  {isReferenceVideoSupported && (
+                    <DropdownMenuItem onClick={() => videoRef.current?.click()}>
+                      <FilePlus className="size-4 mr-2" />
+                      Upload Reference Video
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -328,10 +345,18 @@ export function VideoInputBox({
                 onChange={(e) => handleImageUpload(e, 'lastFrame')}
                 className="hidden"
               />
+              <input
+                ref={videoRef}
+                type="file"
+                accept="video/*"
+                onChange={handleVideoUpload}
+                className="hidden"
+              />
             </>
           )}
 
           <VideoModelParameterControls
+            videoModels={videoModels}
             selectedModel={selectedModel}
             onModelChange={onModelChange}
             parameters={parameters}
@@ -340,26 +365,37 @@ export function VideoInputBox({
             variant="page"
           />
 
-          {/* Generate Button for motion/lipsync models */}
-          {(isMotionCopyModel || isLipsyncModel) && (
-            <Button
-              onClick={onGenerate}
-              disabled={!isReady || isGenerating}
-              className={cn(
-                "ml-auto px-8 py-2 text-sm font-semibold h-7",
-                !isReady && "opacity-50 cursor-not-allowed"
-              )}
-            >
-              {isGenerating ? (
-                <>
-                  <CircleNotch className="size-3 mr-1.5 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                "Generate"
-              )}
-            </Button>
-          )}
+          <div className="flex-1" />
+
+          {/* Generate Button - always on right */}
+          <Button
+            onClick={onGenerate}
+            disabled={!isReady || isGenerating}
+            size="sm"
+            className={cn(
+              "shrink-0 px-4 text-sm font-semibold h-8",
+              !isReady && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            {isGenerating ? (
+              <>
+                <CircleNotch className="size-3 mr-1.5 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-sm font-semibold">Generate</span>
+                <div className="flex items-center gap-0.5">
+                  <Sparkle size={8} weight="fill" />
+                  <span className="text-[10px]">
+                    {selectedModel.model_cost != null
+                      ? selectedModel.model_cost
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+            )}
+          </Button>
         </div>
       </CardContent>
     </Card>

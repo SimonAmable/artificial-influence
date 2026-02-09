@@ -167,9 +167,10 @@ export async function deleteWorkflow(workflowId: string, userId: string): Promis
 
   // Delete thumbnail from storage if it exists
   if (existing.thumbnail_url) {
-    const thumbnailPath = existing.thumbnail_url.split("/public/")[1]
+    const match = existing.thumbnail_url.match(/\/public-bucket\/(.+)/)
+    const thumbnailPath = match ? match[1] : null
     if (thumbnailPath) {
-      await supabase.storage.from("public").remove([thumbnailPath])
+      await supabase.storage.from("public-bucket").remove([thumbnailPath])
     }
   }
 
@@ -199,7 +200,7 @@ export async function uploadWorkflowThumbnail(
   const fileName = `${userId}/workflow-thumbnails/${workflowId}.${fileExt}`
 
   const { error: uploadError } = await supabase.storage
-    .from("public")
+    .from("public-bucket")
     .upload(fileName, file, { upsert: true })
 
   if (uploadError) {
@@ -208,7 +209,7 @@ export async function uploadWorkflowThumbnail(
   }
 
   const { data } = supabase.storage
-    .from("public")
+    .from("public-bucket")
     .getPublicUrl(fileName)
 
   return data.publicUrl

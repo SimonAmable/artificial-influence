@@ -12,6 +12,7 @@ import {
   Plus,
   X,
   PaperPlaneTilt,
+  FloppyDisk,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "framer-motion"
 import type { AudioNodeData } from "@/lib/canvas/types"
@@ -28,6 +29,7 @@ import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog"
+import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 
 const hintSuggestions = [
   { label: "Text to Speech" },
@@ -45,6 +47,7 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
   const [title, setTitle] = React.useState(nodeData.label || "Audio")
   const titleInputRef = React.useRef<HTMLInputElement>(null)
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
+  const [isCreateAssetOpen, setIsCreateAssetOpen] = React.useState(false)
 
   React.useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -195,6 +198,7 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
           <div className="w-px h-5 bg-white/10" />
 
           <ToolbarIconButton icon={DownloadSimple} onClick={handleDownload} label="Download" />
+          <ToolbarIconButton icon={FloppyDisk} onClick={() => setIsCreateAssetOpen(true)} label="Create Asset" />
           <ToolbarIconButton icon={ArrowsOut} onClick={handleFullscreen} label="Fullscreen" />
         </div>
       </NodeToolbar>
@@ -409,6 +413,19 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
           </div>
         </DialogContent>
       </Dialog>
+    )}
+
+    {nodeData.generatedAudioUrl && (
+      <CreateAssetDialog
+        open={isCreateAssetOpen}
+        onOpenChange={setIsCreateAssetOpen}
+        initial={{
+          title,
+          url: nodeData.generatedAudioUrl,
+          assetType: "audio",
+          sourceNodeType: "audio",
+        }}
+      />
     )}
     </>
   )

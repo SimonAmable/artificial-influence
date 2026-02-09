@@ -1003,7 +1003,23 @@ function CanvasContent() {
                 isGenerating: false,
                 error: null,
               }
-              if (output.imageUrl) updates.generatedImageUrl = output.imageUrl
+              if (output.imageUrl) {
+                const existingImageUrls = Array.isArray((n.data as { generatedImageUrls?: unknown }).generatedImageUrls)
+                  ? ((n.data as { generatedImageUrls?: unknown }).generatedImageUrls as unknown[])
+                      .filter((url): url is string => typeof url === "string" && url.length > 0)
+                  : []
+                const fallbackSingle = typeof (n.data as { generatedImageUrl?: unknown }).generatedImageUrl === "string"
+                  ? [(n.data as { generatedImageUrl: string }).generatedImageUrl]
+                  : []
+                const currentImageUrls = existingImageUrls.length > 0 ? existingImageUrls : fallbackSingle
+                const maxGeneratedImages = 20
+                const nextImageUrls = [...currentImageUrls, output.imageUrl].slice(-maxGeneratedImages)
+                const nextActiveIndex = nextImageUrls.length - 1
+
+                updates.generatedImageUrls = nextImageUrls
+                updates.activeImageIndex = nextActiveIndex
+                updates.generatedImageUrl = nextImageUrls[nextActiveIndex] ?? null
+              }
               if (output.videoUrl) updates.generatedVideoUrl = output.videoUrl
               if (output.audioUrl) updates.generatedAudioUrl = output.audioUrl
               return { ...n, data: { ...n.data, ...updates } }

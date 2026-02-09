@@ -17,6 +17,7 @@ import {
   CircleNotch,
   PaperPlaneTilt,
   PencilSimple,
+  FloppyDisk,
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
 import type { UploadNodeData } from "@/lib/canvas/types"
@@ -32,6 +33,8 @@ import {
 } from "@/components/ui/dialog"
 import { getConstrainedSize, loadImageSize, loadVideoSize } from "@/lib/canvas/media-sizing"
 import { ImageEditorDialog } from "@/components/image-editor"
+import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import type { AssetType } from "@/lib/assets/types"
 
 const hintSuggestions = [
   { icon: ImageIcon, label: "Image" },
@@ -53,6 +56,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
   const [isExtractingFrame, setIsExtractingFrame] = React.useState(false)
   const [isEditorOpen, setIsEditorOpen] = React.useState(false)
   const [isUploading, setIsUploading] = React.useState(false)
+  const [isCreateAssetOpen, setIsCreateAssetOpen] = React.useState(false)
   
   // Get current node to read its dimensions
   const currentNode = reactFlow.getNode(id)
@@ -499,6 +503,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
             </>
           )}
           <ToolbarIconButton icon={DownloadSimple} onClick={handleDownload} label="Download" />
+          <ToolbarIconButton icon={FloppyDisk} onClick={() => setIsCreateAssetOpen(true)} label="Create Asset" />
           <ToolbarIconButton icon={ArrowsOut} onClick={handleFullscreen} label="Fullscreen" />
         </div>
       </NodeToolbar>
@@ -755,10 +760,23 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
       <ImageEditorDialog
         open={isEditorOpen}
         onOpenChange={setIsEditorOpen}
-        initialImage={nodeData.fileUrl}
+        initialImage={nodeData.fileUrl ?? undefined}
         onSave={(editedImageUrl) => {
           nodeData.onDataChange?.(id, { fileUrl: editedImageUrl })
           setIsEditorOpen(false)
+        }}
+      />
+    )}
+
+    {nodeData.fileUrl && nodeData.fileType && (
+      <CreateAssetDialog
+        open={isCreateAssetOpen}
+        onOpenChange={setIsCreateAssetOpen}
+        initial={{
+          title,
+          url: nodeData.fileUrl,
+          assetType: nodeData.fileType as AssetType,
+          sourceNodeType: "upload",
         }}
       />
     )}

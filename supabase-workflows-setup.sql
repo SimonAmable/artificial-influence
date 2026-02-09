@@ -69,14 +69,14 @@ CREATE TRIGGER update_workflows_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Storage RLS policies for workflow thumbnails in public bucket
--- Uses existing 'public' bucket with folder structure: {user_id}/workflow-thumbnails/...
+-- Storage RLS policies for workflow thumbnails in public-bucket
+-- Uses existing 'public-bucket' with folder structure: {user_id}/workflow-thumbnails/...
 CREATE POLICY "Users can upload workflow thumbnails to public bucket"
     ON storage.objects
     FOR INSERT
     TO authenticated
     WITH CHECK (
-        bucket_id = 'public' 
+        bucket_id = 'public-bucket' 
         AND (storage.foldername(name))[1] = auth.uid()::text
         AND name LIKE auth.uid()::text || '/workflow-thumbnails/%'
     );
@@ -86,7 +86,7 @@ CREATE POLICY "Users can update their workflow thumbnails in public bucket"
     FOR UPDATE
     TO authenticated
     USING (
-        bucket_id = 'public' 
+        bucket_id = 'public-bucket' 
         AND (storage.foldername(name))[1] = auth.uid()::text
         AND name LIKE auth.uid()::text || '/workflow-thumbnails/%'
     );
@@ -96,7 +96,7 @@ CREATE POLICY "Users can delete their workflow thumbnails in public bucket"
     FOR DELETE
     TO authenticated
     USING (
-        bucket_id = 'public' 
+        bucket_id = 'public-bucket' 
         AND (storage.foldername(name))[1] = auth.uid()::text
         AND name LIKE auth.uid()::text || '/workflow-thumbnails/%'
     );
@@ -106,7 +106,7 @@ CREATE POLICY "Anyone can view workflow thumbnails in public bucket"
     FOR SELECT
     TO public
     USING (
-        bucket_id = 'public' 
+        bucket_id = 'public-bucket' 
         AND name LIKE '%/workflow-thumbnails/%'
     );
 

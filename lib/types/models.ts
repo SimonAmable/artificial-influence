@@ -46,13 +46,15 @@ export interface StringParameterDefinition extends BaseParameterDefinition {
 }
 
 /**
- * Number parameter with min/max constraints
+ * Number parameter with min/max constraints or discrete enum options
  */
 export interface NumberParameterDefinition extends BaseParameterDefinition {
   type: 'number';
   min?: number;
   max?: number;
   step?: number; // For slider inputs
+  /** When set, renders as select with these options instead of slider/number input */
+  enum?: number[];
 }
 
 /**
@@ -92,6 +94,17 @@ export interface Model {
   parameters: ModelParameters;
   created_at: string;
   updated_at: string;
+  /** Display columns - main UI info */
+  aspect_ratios?: string[];
+  default_aspect_ratio?: string;
+  /** Image models: reference images for style/character. Video models: first frame / input image. */
+  supports_reference_image?: boolean;
+  /** Video models only: reference video for editing or motion copy (e.g. Grok Imagine Video, Kling motion). */
+  supports_reference_video?: boolean;
+  supports_first_frame?: boolean;
+  supports_last_frame?: boolean;
+  duration_options?: number[];
+  max_images?: number;
 }
 
 /**

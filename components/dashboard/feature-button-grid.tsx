@@ -53,51 +53,41 @@ export function FeatureButtonGrid() {
   }
 
   return (
-    <div className="w-full">
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold">Features</h2>
+    <div className="w-full space-y-6">
+      {/* Header: Title + Create New Project */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-2xl font-semibold">Tools</h2>
+        <Button
+          onClick={handleCreateProject}
+          disabled={isLoading}
+          size="lg"
+          variant="ghost"
+        >
+          <PencilSimpleIcon size={18} weight="bold" className="mr-2" />
+          Create New Project
+        </Button>
       </div>
-      <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-6">
-        {/* Create New Project Button */}
-        <div className="lg:col-span-1">
-          <Button
-            onClick={handleCreateProject}
-            disabled={isLoading}
-            className="h-full min-h-48 w-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg p-6 transition-all hover:shadow-lg disabled:opacity-50"
-          >
-            <div className="w-16 h-16 flex items-center justify-center bg-white/20 rounded-full">
-              <PencilSimpleIcon size={32} weight="duotone" className="text-white" />
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-bold">Create New</div>
-              <div className="text-sm font-medium opacity-90">Project</div>
-            </div>
-          </Button>
-        </div>
 
-        {/* Tool Buttons */}
-        <div className="lg:col-span-5">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {toolButtons.map((tool) => (
-              <Button
-                key={tool.href}
-                asChild
-                variant="ghost"
-                className="h-auto justify-start gap-4 p-3 transition-shadow hover:shadow-md"
-              >
-                <Link href={tool.href} className="flex items-center gap-4">
-                  <div className="w-14 h-14 flex items-center justify-center flex-shrink-0">
-                    <tool.icon size={48} weight="duotone" className="text-primary" style={{ width: '48px', height: '48px', minWidth: '48px', minHeight: '48px' }} />
-                  </div>
-                  <div className="flex flex-col items-start gap-1">
-                    <span className="text-lg font-bold text-left">{tool.label}</span>
-                    <span className="text-xs text-muted-foreground text-left">{tool.description}</span>
-                  </div>
-                </Link>
-              </Button>
-            ))}
-          </div>
-        </div>
+      {/* Tool cards - stacked layout per tool */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
+        {toolButtons.map((tool) => {
+          const Icon = tool.icon
+          return (
+            <Link
+              key={tool.href}
+              href={tool.href}
+              className="group flex flex-col items-center text-center p-5 rounded-xl transition-all duration-200 hover:shadow-md"
+            >
+              <div className="mb-3 flex h-12 w-12 items-center justify-center text-primary">
+                <Icon size={24} weight="duotone" className="shrink-0" />
+              </div>
+              <h3 className="font-semibold text-sm mb-1">{tool.label}</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                {tool.description}
+              </p>
+            </Link>
+          )
+        })}
       </div>
     </div>
   )

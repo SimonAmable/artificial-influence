@@ -215,7 +215,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
               </div>
 
               {!showEmailForm && (
-                <div className="hidden space-y-3 lg:block">
+                <div className="space-y-3">
                   <Button
                     type="button"
                     variant="outline"
@@ -257,7 +257,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className={cn("space-y-3", !showEmailForm && "lg:hidden")}>
+              <form onSubmit={handleSubmit} className={cn("space-y-3", !showEmailForm && "hidden")}>
                 <Input
                   id="email"
                   type="email"

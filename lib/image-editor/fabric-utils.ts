@@ -3,6 +3,7 @@ import { CANVAS_SETTINGS, SHAPE_DEFAULTS, TEXT_DEFAULTS } from "./constants"
 import type { EditorTool } from "./types"
 
 type BaseAwareObject = {
+  id?: string
   name?: string
   layerId?: string
   selectable?: boolean
@@ -101,9 +102,10 @@ export async function loadImageOntoCanvas(
   })
 
   // Add custom properties for layer management
-  ;(img as any).id = `image-${Date.now()}`
-  ;(img as any).name = "Background Image"
-  ;(img as any).layerId = "base"
+  const metaImage = img as FabricImage & BaseAwareObject
+  metaImage.id = `image-${Date.now()}`
+  metaImage.name = "Background Image"
+  metaImage.layerId = "base"
 
   canvas.add(img)
   canvas.sendObjectToBack(img)
@@ -140,8 +142,9 @@ export function addRectangle(
     top: y,
     ...SHAPE_DEFAULTS.rectangle,
   })
-  ;(rect as any).id = `rect-${Date.now()}`
-  ;(rect as any).name = "Rectangle"
+  const metaRect = rect as Rect & BaseAwareObject
+  metaRect.id = `rect-${Date.now()}`
+  metaRect.name = "Rectangle"
 
   canvas.add(rect)
   canvas.setActiveObject(rect)
@@ -197,8 +200,9 @@ export function addArrow(
     left: Math.min(startX, endX),
     top: Math.min(startY, endY),
   })
-  ;(arrow as any).id = `arrow-${Date.now()}`
-  ;(arrow as any).name = "Arrow"
+  const metaArrow = arrow as Group & BaseAwareObject
+  metaArrow.id = `arrow-${Date.now()}`
+  metaArrow.name = "Arrow"
 
   canvas.add(arrow)
   canvas.setActiveObject(arrow)
@@ -221,8 +225,9 @@ export function addText(
     top: y,
     ...TEXT_DEFAULTS,
   })
-  ;(textObj as any).id = `text-${Date.now()}`
-  ;(textObj as any).name = "Text"
+  const metaText = textObj as IText & BaseAwareObject
+  metaText.id = `text-${Date.now()}`
+  metaText.name = "Text"
 
   canvas.add(textObj)
   canvas.setActiveObject(textObj)

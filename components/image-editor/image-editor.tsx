@@ -128,20 +128,20 @@ function ImageEditorInner({
         className
       )}
     >
-      {/* Top-left: Color + canvas ratio controls */}
-      <div className="absolute left-4 top-0 z-20">
+      {/* Top-left: Color + aspect ratio controls */}
+      <div className="absolute left-4 top-4 z-20">
         <ImageEditorColorPicker />
       </div>
 
       {/* Right side: Layers/object panel */}
       {showLayers && (
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20">
+        <div className="absolute right-4 top-4  z-20">
           <ImageEditorLayers />
         </div>
       )}
 
       {/* Main canvas area - always render canvas so it can receive images */}
-      <div className="flex-1 min-h-0 relative px-16 py-8 pt-12 pb-40">
+      <div className="flex-1 min-h-0 relative px-16 py-8 pt-20 pb-60">
         <div className="relative h-full w-full rounded-xl  overflow-hidden">
           <ImageEditorCanvas
             className="absolute inset-0"
@@ -178,7 +178,7 @@ function ImageEditorInner({
       </div>
 
       {/* Bottom controls */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3 w-full max-w-4xl px-4">
         {/* Toolbar */}
         <ImageEditorToolbar
           onToggleFullscreen={toggleFullscreen}

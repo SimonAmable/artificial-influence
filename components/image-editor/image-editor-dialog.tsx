@@ -25,7 +25,7 @@ export function ImageEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] p-0 gap-0 overflow-hidden bg-zinc-950 border-white/10">
+      <DialogContent className="!max-w-none w-screen h-[90vh] p-0 gap-0 overflow-hidden bg-zinc-950 border-white/10">
         <ImageEditor
           initialImage={initialImage}
           mode="modal"

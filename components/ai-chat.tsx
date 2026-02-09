@@ -133,7 +133,7 @@ export function AIChat({ className }: AIChatProps) {
             whileTap={{ scale: 0.9 }}
             onClick={() => setIsOpen(true)}
             className={cn(
-              "fixed bottom-6 right-6 z-40",
+              "fixed bottom-6 right-6 z-[60]",
               "w-14 h-14 rounded-full",
               "bg-foreground",
               "shadow-lg",
@@ -205,8 +205,7 @@ export function AIChat({ className }: AIChatProps) {
                     <Image src="/logo.svg" alt="AI" width={16} height={16} className="invert dark:invert-0" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold">AI Chat</h2>
-                    <p className="text-xs text-muted-foreground">Powered by Gemini 2.5</p>
+                    <h2 className="text-lg font-semibold">AI assistant</h2>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -237,7 +236,7 @@ export function AIChat({ className }: AIChatProps) {
                     <Image src="/logo.svg" alt="AI" width={64} height={64} />
                     <div>
                       <p className="font-medium text-foreground">Start a conversation</p>
-                      <p className="text-sm">Ask me anything</p>
+                      <p className="text-sm">I&apos;m your guide to this platform - ask about workflows, features, or how to get started</p>
                     </div>
                   </div>
                 )}
@@ -379,6 +378,30 @@ const MessageInput = () => {
     )
   }
 
+  const handlePaste = React.useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+
+    const imageFiles: File[] = []
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile()
+        if (file) imageFiles.push(file)
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      e.preventDefault()
+      const dt = new DataTransfer()
+      imageFiles.forEach((f) => dt.items.add(f))
+      if (files) {
+        Array.from(files).forEach((f) => dt.items.add(f))
+      }
+      setFiles(dt.files)
+    }
+  }, [files])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() && !files && droppedAssets.length === 0) return
@@ -486,19 +509,11 @@ const MessageInput = () => {
           multiple
           className="hidden"
         />
-        <div className="flex items-end gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => fileInputRef.current?.click()}
-            className="shrink-0 h-10 w-10 opacity-50 hover:opacity-100"
-          >
-            <Plus className="h-5 w-5" />
-          </Button>
+        <div className="flex flex-col gap-2">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onPaste={handlePaste}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
@@ -507,18 +522,30 @@ const MessageInput = () => {
             }}
             placeholder="Say something..."
             rows={3}
-            className="flex-1 px-0 py-2 bg-transparent resize-none text-base focus:outline-none"
+            className="w-full min-h-[4.5rem] px-0 py-2 bg-transparent resize-y text-base focus:outline-none border-0"
           />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!input.trim() && !files && droppedAssets.length === 0}
-            className="shrink-0 h-10 w-10 bg-foreground hover:bg-foreground/90 text-background"
-          >
-            <ArrowUp className="h-5 w-5 text-background" weight="bold" />
-          </Button>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              className="h-9 w-9 shrink-0 opacity-60 hover:opacity-100"
+            >
+              <Plus className="h-5 w-5" />
+            </Button>
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!input.trim() && !files && droppedAssets.length === 0}
+              className="h-9 w-9 shrink-0 bg-foreground hover:bg-foreground/90 text-background"
+            >
+              <ArrowUp className="h-5 w-5 text-background" weight="bold" />
+            </Button>
+          </div>
         </div>
       </form>
     </div>
   )
 }
+

@@ -4,6 +4,8 @@ import { xai } from '@ai-sdk/xai';
 import { NextRequest, NextResponse } from 'next/server';
 import { enhancePrompt } from '@/lib/prompt-enhancement';
 import { createClient } from '@/lib/supabase/server';
+import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
+import { modelUsesDimensions, aspectRatioToDimensions } from '@/lib/utils/model-parameters';
 
 export async function POST(request: NextRequest) {
   const requestStartTime = Date.now();
@@ -51,6 +53,10 @@ export async function POST(request: NextRequest) {
     let aspect_ratio = formData.get('aspect_ratio') as string | null;
     const resolution = formData.get('resolution') as string | null;
     const output_format = formData.get('output_format') as string | null;
+    const widthForm = formData.get('width');
+    const heightForm = formData.get('height');
+    const width = widthForm ? parseInt(widthForm as string) : null;
+    const height = heightForm ? parseInt(heightForm as string) : null;
 
     // Fetch model details from database
     console.log('[generate-image] Fetching model details for:', modelIdentifier);
@@ -70,6 +76,35 @@ export async function POST(request: NextRequest) {
       );
     }
     console.log('[generate-image] ✓ Model found:', modelData.name);
+
+    // Validate and clamp n against model's max_images
+    const maxImages = modelData.max_images != null ? Number(modelData.max_images) : 1;
+    const effectiveN = (() => {
+      if (!n || n < 1) return 1;
+      if (maxImages <= 1) return 1;
+      return Math.min(n, maxImages);
+    })();
+    if (n != null && n > 0 && effectiveN !== n) {
+      console.log(`[generate-image] Clamped n from ${n} to ${effectiveN} (model max_images=${maxImages})`);
+    }
+
+    // Compute required credits from model cost and image count
+    const imageCount = effectiveN;
+    const costPerImage = Number(modelData.model_cost) ?? 0;
+    const requiredCredits = costPerImage > 0
+      ? costPerImage * imageCount
+      : Math.max(1, imageCount);
+
+    const hasCredits = await checkUserHasCredits(user.id, requiredCredits);
+    if (!hasCredits) {
+      return NextResponse.json(
+        {
+          error: 'Insufficient credits.',
+          message: `This generation requires ${requiredCredits} credits (${modelData.name}${imageCount > 1 ? ` × ${imageCount} images` : ''}).`,
+        },
+        { status: 402 }
+      );
+    }
 
     console.log('[generate-image] FormData parsed:', {
       promptLength: prompt?.length || 0,
@@ -259,9 +294,9 @@ export async function POST(request: NextRequest) {
       console.log('[generate-image] Size set:', size);
     }
 
-    if (n && typeof n === 'number' && n > 0) {
-      generateOptions.n = n;
-      console.log('[generate-image] Number of images set:', n);
+    if (effectiveN > 1) {
+      generateOptions.n = effectiveN;
+      console.log('[generate-image] Number of images set:', effectiveN);
     }
 
     if (seed && typeof seed === 'number') {
@@ -282,16 +317,32 @@ export async function POST(request: NextRequest) {
     } else {
       // Replicate provider options
       console.log('[generate-image] Setting up Replicate provider options');
-      generateOptions.providerOptions.replicate = {
-        // Optional: aspect_ratio, resolution, output_format, etc.
-        ...(aspect_ratio && { aspect_ratio }),
-        ...(resolution && { resolution }),
-        ...(output_format && { output_format }),
-        // Pass reference image URL(s) via image_input (as per Replicate API docs)
-        ...(referenceImageUrls.length > 0 && { 
-          image_input: referenceImageUrls // Array of URLs as expected by nano-banana
-        }),
-      };
+      const usesDimensions = modelUsesDimensions(modelData.parameters);
+
+      if (usesDimensions) {
+        // Model expects width/height (e.g. prunaai/z-image-turbo)
+        const aspectValue = aspect_ratio || aspectRatio;
+        const dims =
+          width != null && height != null && width > 0 && height > 0
+            ? { width, height }
+            : aspectRatioToDimensions(aspectValue || '1:1');
+        console.log('[generate-image] Model uses dimensions, mapped:', dims);
+        generateOptions.providerOptions.replicate = {
+          width: dims.width,
+          height: dims.height,
+          ...(resolution && { resolution }),
+          ...(output_format && { output_format }),
+          ...(referenceImageUrls.length > 0 && { image_input: referenceImageUrls }),
+        };
+      } else {
+        // Model expects aspect_ratio (e.g. nano-banana)
+        generateOptions.providerOptions.replicate = {
+          ...(aspect_ratio && { aspect_ratio }),
+          ...(resolution && { resolution }),
+          ...(output_format && { output_format }),
+          ...(referenceImageUrls.length > 0 && { image_input: referenceImageUrls }),
+        };
+      }
     }
 
     console.log('[generate-image] Generation options:', {
@@ -461,6 +512,9 @@ export async function POST(request: NextRequest) {
       const totalUploadTime = Date.now() - uploadStartTime;
       const totalTime = Date.now() - requestStartTime;
       console.log('[generate-image] ✓ All images uploaded in', totalUploadTime, 'ms');
+
+      await deductUserCredits(user.id, requiredCredits);
+      console.log('[generate-image] ✓ Credits deducted:', requiredCredits);
       console.log('[generate-image] ===== Request completed successfully in', totalTime, 'ms =====');
 
       return NextResponse.json({
@@ -469,6 +523,7 @@ export async function POST(request: NextRequest) {
           mimeType: 'image/png',
         })),
         warnings: result.warnings,
+        creditsUsed: requiredCredits,
       });
     } else if (result.image) {
       // Single image
@@ -480,6 +535,9 @@ export async function POST(request: NextRequest) {
       const totalUploadTime = Date.now() - uploadStartTime;
       const totalTime = Date.now() - requestStartTime;
       console.log('[generate-image] ✓ Image uploaded in', totalUploadTime, 'ms');
+
+      await deductUserCredits(user.id, requiredCredits);
+      console.log('[generate-image] ✓ Credits deducted:', requiredCredits);
       console.log('[generate-image] ===== Request completed successfully in', totalTime, 'ms =====');
 
       return NextResponse.json({
@@ -489,6 +547,7 @@ export async function POST(request: NextRequest) {
         },
         warnings: result.warnings,
         providerMetadata: result.providerMetadata,
+        creditsUsed: requiredCredits,
       });
     } else {
       console.error('[generate-image] No image in result object');

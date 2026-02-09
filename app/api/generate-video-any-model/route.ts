@@ -126,6 +126,14 @@ export async function POST(request: NextRequest) {
         if (otherParams.resolution) replicateInput.resolution = otherParams.resolution;
         break;
 
+      case 'xai/grok-imagine-video':
+        if (image) replicateInput.image = image;
+        if (otherParams.video) replicateInput.video = otherParams.video;
+        if (otherParams.duration) replicateInput.duration = otherParams.duration;
+        if (otherParams.aspect_ratio) replicateInput.aspect_ratio = otherParams.aspect_ratio;
+        if (otherParams.resolution) replicateInput.resolution = otherParams.resolution;
+        break;
+
       default:
         return NextResponse.json(
           { error: `Unsupported model: ${model}` },

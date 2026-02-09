@@ -79,7 +79,7 @@ export function FeatureShowcaseCarousel() {
           className="absolute left-0 top-0 h-full w-12 z-10 flex items-center justify-center transition hover:bg-white/5"
           aria-label="Previous"
         >
-          <div className="rounded-full p-2 transition hover:bg-white/10 backdrop-blur-sm">
+          <div className="rounded-full p-2 transition hover:bg-white/10">
             <ChevronLeft size={24} className="text-white" />
           </div>
         </button>
@@ -90,7 +90,7 @@ export function FeatureShowcaseCarousel() {
           className="absolute right-0 top-0 h-full w-12 z-10 flex items-center justify-center transition hover:bg-white/5"
           aria-label="Next"
         >
-          <div className="rounded-full p-2 transition hover:bg-white/10 backdrop-blur-sm">
+          <div className="rounded-full p-2 transition hover:bg-white/10">
             <ChevronRight size={24} className="text-white" />
           </div>
         </button>

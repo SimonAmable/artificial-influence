@@ -52,6 +52,7 @@ export interface TextNodeData extends Record<string, unknown> {
   text: string
   connectedPrompt?: string
   connectedImageUrl?: string
+  connectedImageUrls?: string[]
   isGenerating?: boolean
   onDataChange?: (id: string, data: Partial<TextNodeData>) => void
 }
@@ -149,6 +150,7 @@ export function createTextNodeData(): TextNodeData {
   return {
     label: "Text",
     text: "",
+    connectedImageUrls: [],
     isGenerating: false,
   }
 }

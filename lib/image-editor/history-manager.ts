@@ -4,7 +4,10 @@ import type { Canvas as FabricCanvas } from "fabric"
  * Serializes the current canvas state to JSON string
  */
 export function serializeCanvas(canvas: FabricCanvas): string {
-  return JSON.stringify(canvas.toJSON(["id", "name", "layerId"]))
+  const canvasWithCustomSerializer = canvas as FabricCanvas & {
+    toJSON: (propertiesToInclude?: string[]) => unknown
+  }
+  return JSON.stringify(canvasWithCustomSerializer.toJSON(["id", "name", "layerId"]))
 }
 
 /**

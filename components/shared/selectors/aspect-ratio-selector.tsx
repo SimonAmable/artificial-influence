@@ -80,22 +80,27 @@ export function AspectRatioSelector({
   placeholder = "Select aspect ratio",
 }: AspectRatioSelectorProps) {
   // Extract supported aspect ratios from the model
+  // Prefer DB column aspect_ratios when available, else fall back to parameters
   const supportedRatios = React.useMemo(() => {
     if (!model) {
       return []
     }
 
+    // Use DB column if available (single source of truth)
+    if (model.aspect_ratios && model.aspect_ratios.length > 0) {
+      return model.aspect_ratios
+    }
+
+    // Fallback: parse from parameters JSON
     const parameters = parseModelParameters(model.parameters)
     const aspectRatioParam = parameters.find(
-      (param) => param.name === "aspect_ratio" && isStringParameter(param)
+      (param) => (param.name === "aspect_ratio" || param.name === "aspectRatio") && isStringParameter(param)
     )
 
     if (!aspectRatioParam || !isStringParameter(aspectRatioParam)) {
       return []
     }
 
-    // Return all aspect ratio values including special ones like "auto", "match_input_image"
-    // Pattern matches: numeric ratios (16:9, 1:1) OR special keywords (auto, match_input_image)
     return aspectRatioParam.enum || []
   }, [model])
 

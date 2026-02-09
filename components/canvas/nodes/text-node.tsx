@@ -81,9 +81,9 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
   const dimensions = React.useMemo(() => calculateNodeDimensions(nodeData.text || ''), [nodeData.text])
 
   // Track connected nodes for text and image inputs
-  const { connectedPrompt, connectedImageUrl } = React.useMemo(() => {
+  const { connectedPrompt, connectedImageUrls } = React.useMemo(() => {
     const currentNode = nodes.find(n => n.id === id)
-    if (!currentNode) return { connectedPrompt: '', connectedImageUrl: '' }
+    if (!currentNode) return { connectedPrompt: '', connectedImageUrls: [] as string[] }
 
     const incomingNodes = getIncomers(currentNode, nodes, edges)
     
@@ -94,27 +94,27 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
       .filter(text => text.trim())
       .join('\n\n')
     
-    // Get first image from upload or image-gen nodes
+    // Get image references from upload or image-gen nodes
     const imageNodes = incomingNodes.filter(node => node.type === 'upload' || node.type === 'image-gen')
-    let imageUrl = ''
+    const imageUrls: string[] = []
     
     for (const node of imageNodes) {
       if (node.type === 'upload') {
         const uploadData = node.data as UploadNodeData
         if (uploadData.fileUrl && uploadData.fileType === 'image') {
-          imageUrl = uploadData.fileUrl
-          break
+          imageUrls.push(uploadData.fileUrl)
         }
       } else if (node.type === 'image-gen') {
         const imageGenData = node.data as ImageGenNodeData
         if (imageGenData.generatedImageUrl) {
-          imageUrl = imageGenData.generatedImageUrl
-          break
+          imageUrls.push(imageGenData.generatedImageUrl)
         }
       }
     }
+
+    const uniqueImageUrls = Array.from(new Set(imageUrls))
     
-    return { connectedPrompt: combinedText, connectedImageUrl: imageUrl }
+    return { connectedPrompt: combinedText, connectedImageUrls: uniqueImageUrls }
   }, [edges, id, nodes])
   
   // Update node data when connected values change
@@ -125,10 +125,20 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
   }, [connectedPrompt, nodeData, id])
   
   React.useEffect(() => {
-    if (connectedImageUrl !== (nodeData.connectedImageUrl || '')) {
-      nodeData.onDataChange?.(id, { connectedImageUrl })
+    const existingUrls = Array.isArray(nodeData.connectedImageUrls) ? nodeData.connectedImageUrls : []
+    const urlsChanged =
+      existingUrls.length !== connectedImageUrls.length ||
+      existingUrls.some((url, index) => url !== connectedImageUrls[index])
+    const firstConnectedUrl = connectedImageUrls[0] || ''
+    const firstUrlChanged = firstConnectedUrl !== (nodeData.connectedImageUrl || '')
+
+    if (urlsChanged || firstUrlChanged) {
+      nodeData.onDataChange?.(id, {
+        connectedImageUrls,
+        connectedImageUrl: firstConnectedUrl,
+      })
     }
-  }, [connectedImageUrl, nodeData, id])
+  }, [connectedImageUrls, nodeData, id])
 
   React.useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -372,16 +382,20 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
           ) : (
           <div className="px-3 py-3 flex-1 overflow-hidden flex flex-col gap-2">
             {/* Connected image reference for AI */}
-            {connectedImageUrl && (
+            {connectedImageUrls.length > 0 && (
               <div className="relative w-full h-20 rounded border border-emerald-500/20 overflow-hidden flex-shrink-0">
                 <Image
-                  src={connectedImageUrl}
+                  src={connectedImageUrls[0]}
                   alt="Reference image"
                   fill
                   className="object-cover opacity-60"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-900/80 to-transparent flex items-end p-1.5">
-                  <span className="text-[9px] text-emerald-400/80 uppercase tracking-wider">Reference Image</span>
+                  <span className="text-[9px] text-emerald-400/80 uppercase tracking-wider">
+                    {connectedImageUrls.length > 1
+                      ? `Reference Images (${connectedImageUrls.length})`
+                      : "Reference Image"}
+                  </span>
                 </div>
               </div>
             )}
@@ -518,12 +532,27 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
   const [files, setFiles] = React.useState<FileList | undefined>(undefined)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [isGenerating, setIsGenerating] = React.useState(false)
-  
+  const [uploadedPreviewUrls, setUploadedPreviewUrls] = React.useState<string[]>([])
+
   React.useEffect(() => {
     console.log('[AITextInput] Component mounted for node:', nodeId)
     console.log('[AITextInput] onDataChange available:', !!nodeData.onDataChange)
   }, [nodeId, nodeData.onDataChange])
-  
+
+  React.useEffect(() => {
+    if (!files || files.length === 0) {
+      setUploadedPreviewUrls([])
+      return
+    }
+
+    const urls = Array.from(files).map((file) => URL.createObjectURL(file))
+    setUploadedPreviewUrls(urls)
+
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [files])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() && !files) return
@@ -537,9 +566,27 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
       console.log('[AITextInput] Files attached:', files?.length || 0)
 
       // Convert files to data URLs for images/videos
-      let imageData: Array<{ url: string; mediaType: string }> = []
+      const imageData: Array<{ url: string; mediaType: string }> = []
+
+      // Include images connected via node input handles as prompt references
+      if (Array.isArray(nodeData.connectedImageUrls) && nodeData.connectedImageUrls.length > 0) {
+        nodeData.connectedImageUrls.forEach((url) => {
+          if (url && typeof url === 'string') {
+            imageData.push({
+              url,
+              mediaType: 'image/*',
+            })
+          }
+        })
+      } else if (typeof nodeData.connectedImageUrl === 'string' && nodeData.connectedImageUrl) {
+        imageData.push({
+          url: nodeData.connectedImageUrl,
+          mediaType: 'image/*',
+        })
+      }
+
       if (files && files.length > 0) {
-        imageData = await Promise.all(
+        const uploadedImageData = await Promise.all(
           Array.from(files)
             .filter(file => file.type.startsWith('image/') || file.type.startsWith('video/'))
             .map(
@@ -557,6 +604,7 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
                 }),
             ),
         )
+        imageData.push(...uploadedImageData)
       }
 
       // Call simple generate-text API
@@ -589,6 +637,7 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
       // Clear input
       setInput('')
       setFiles(undefined)
+      setUploadedPreviewUrls([])
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -602,48 +651,8 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl overflow-hidden nopan nodrag">
+    <div className="w-[460px] max-w-[92vw] rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl overflow-hidden nopan nodrag">
       <div className="p-3">
-        {/* File Preview */}
-        {files && files.length > 0 && (
-          <div className="mb-2 flex gap-2 flex-wrap">
-            {Array.from(files).map((file, index) => (
-              <div key={index} className="relative">
-                {file.type.startsWith('image/') ? (
-                  <Image
-                    src={URL.createObjectURL(file)}
-                    alt={file.name}
-                    width={48}
-                    height={48}
-                    className="h-12 w-12 rounded object-cover"
-                  />
-                ) : file.type.startsWith('video/') ? (
-                  <video
-                    src={URL.createObjectURL(file)}
-                    className="h-12 w-12 rounded object-cover"
-                  />
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const dt = new DataTransfer()
-                    Array.from(files)
-                      .filter((_, i) => i !== index)
-                      .forEach(f => dt.items.add(f))
-                    setFiles(dt.files.length > 0 ? dt.files : undefined)
-                    if (fileInputRef.current) {
-                      fileInputRef.current.files = dt.files
-                    }
-                  }}
-                  className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-emerald-500 text-zinc-900 flex items-center justify-center text-xs"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
         <form onSubmit={handleSubmit}>
           <input
             type="file"
@@ -657,17 +666,73 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
             multiple
             className="hidden"
           />
-          <div className="flex items-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              className="shrink-0 h-8 w-8 text-zinc-400 hover:text-zinc-200"
-              disabled={isGenerating}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+
+          <div className="space-y-3">
+            {Array.isArray(nodeData.connectedImageUrls) && nodeData.connectedImageUrls.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] uppercase tracking-wider text-emerald-400/80">
+                  Connected References ({nodeData.connectedImageUrls.length})
+                </p>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {nodeData.connectedImageUrls.map((url, index) => (
+                    <div key={`${url}-${index}`} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-emerald-500/25 bg-zinc-950">
+                      <Image
+                        src={url}
+                        alt={`Connected reference ${index + 1}`}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {files && files.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+                  Uploaded References ({files.length})
+                </p>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {Array.from(files).map((file, index) => (
+                    <div key={`${file.name}-${index}`} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-white/15 bg-zinc-950">
+                      {file.type.startsWith('image/') && uploadedPreviewUrls[index] ? (
+                        <Image
+                          src={uploadedPreviewUrls[index]}
+                          alt={file.name}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : file.type.startsWith('video/') && uploadedPreviewUrls[index] ? (
+                        <video
+                          src={uploadedPreviewUrls[index]}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const dt = new DataTransfer()
+                          Array.from(files)
+                            .filter((_, i) => i !== index)
+                            .forEach(f => dt.items.add(f))
+                          setFiles(dt.files.length > 0 ? dt.files : undefined)
+                          if (fileInputRef.current) {
+                            fileInputRef.current.files = dt.files
+                          }
+                        }}
+                        className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/75 text-[10px] leading-none text-white hover:bg-black"
+                        aria-label={`Remove ${file.name}`}
+                        title="Remove"
+                      >
+                        x
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -678,18 +743,34 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
                 }
               }}
               placeholder="Ask AI to write, edit, or improve this text..."
-              rows={2}
+              rows={4}
               disabled={isGenerating}
-              className="flex-1 px-0 py-1 bg-transparent resize-none text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none disabled:opacity-50"
+              className="w-full min-h-28 max-h-80 rounded-md bg-transparent px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none resize-y disabled:opacity-50"
             />
-            <Button
-              type="submit"
-              size="icon"
-              disabled={(!input.trim() && !files) || isGenerating}
-              className="shrink-0 h-8 w-8 bg-emerald-500 hover:bg-emerald-600 text-zinc-900"
-            >
-              <ArrowUp className="h-4 w-4" weight="bold" />
-            </Button>
+
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                className="shrink-0 h-8 w-8 text-zinc-400 hover:text-zinc-200"
+                disabled={isGenerating}
+                title="Add reference image or video"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+
+              <Button
+                type="submit"
+                size="icon"
+                disabled={(!input.trim() && !files) || isGenerating}
+                className="shrink-0 h-8 w-8 bg-emerald-500 hover:bg-emerald-600 text-zinc-900"
+                title="Generate text"
+              >
+                <ArrowUp className="h-4 w-4" weight="bold" />
+              </Button>
+            </div>
           </div>
         </form>
       </div>

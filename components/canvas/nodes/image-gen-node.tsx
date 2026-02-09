@@ -19,6 +19,9 @@ import {
   DotsSixVertical,
   PaperPlaneTilt,
   PencilSimple,
+  CaretLeft,
+  CaretRight,
+  FloppyDisk,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "framer-motion"
 import Cropper, { type Area } from "react-easy-crop"
@@ -39,7 +42,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
-import { AVAILABLE_IMAGE_MODELS, getImageModel } from "@/lib/canvas/image-models"
+import { useModels } from "@/hooks/use-models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { uploadFilesToSupabase } from "@/lib/canvas/upload-helpers"
 import { toast } from "sonner"
@@ -50,6 +53,7 @@ import {
 } from "@/components/ui/dialog"
 import { getConstrainedSize, loadImageSize } from "@/lib/canvas/media-sizing"
 import { ImageEditorDialog } from "@/components/image-editor"
+import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 
 const hintSuggestions = [
   { icon: ImageIcon, label: "Image to Image" },
@@ -74,8 +78,40 @@ const getImageDimensions = (aspectRatio: string) => {
   return ratios[aspectRatio] || [baseSize, baseSize]
 }
 
+const MAX_GENERATED_IMAGES = 20
+
+function getNormalizedGeneratedImages(data: ImageGenNodeData): {
+  urls: string[]
+  activeIndex: number
+  activeUrl: string | null
+} {
+  const rawUrls = Array.isArray(data.generatedImageUrls)
+    ? data.generatedImageUrls.filter((url): url is string => typeof url === "string" && url.length > 0)
+    : []
+  const legacyFallback =
+    typeof data.generatedImageUrl === "string" && data.generatedImageUrl.length > 0
+      ? [data.generatedImageUrl]
+      : []
+  const urls = (rawUrls.length > 0 ? rawUrls : legacyFallback).slice(-MAX_GENERATED_IMAGES)
+  const rawActiveIndex = data.activeImageIndex
+  const requestedIndex =
+    typeof rawActiveIndex === "number" && Number.isFinite(rawActiveIndex)
+      ? Math.floor(rawActiveIndex)
+      : 0
+  const activeIndex = urls.length === 0 ? 0 : Math.min(Math.max(requestedIndex, 0), urls.length - 1)
+  const activeUrl = urls[activeIndex] ?? null
+
+  return { urls, activeIndex, activeUrl }
+}
+
+function getFirstAvailableImageUrl(data: ImageGenNodeData): string | null {
+  const normalized = getNormalizedGeneratedImages(data)
+  return normalized.activeUrl
+}
+
 export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as ImageGenNodeData
+  const { models: imageModels } = useModels("image")
   const [width, height] = getImageDimensions(nodeData.aspectRatio || "match_input_image")
   const [isHovered, setIsHovered] = React.useState(false)
   const [isEditingTitle, setIsEditingTitle] = React.useState(false)
@@ -85,6 +121,8 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
   const [isAddImageOpen, setIsAddImageOpen] = React.useState(false)
   const [isEditorOpen, setIsEditorOpen] = React.useState(false)
+  const [isCreateAssetOpen, setIsCreateAssetOpen] = React.useState(false)
+  const [isPromptExpanded, setIsPromptExpanded] = React.useState(false)
   const uploadInputRef = React.useRef<HTMLInputElement>(null)
   const [crop, setCrop] = React.useState({ x: 0, y: 0 })
   const [zoom, setZoom] = React.useState(1)
@@ -129,8 +167,9 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         }
       } else if (node.type === 'image-gen') {
         const imageGenData = node.data as ImageGenNodeData
-        if (imageGenData.generatedImageUrl) {
-          imageUrls.push(imageGenData.generatedImageUrl)
+        const imageUrl = getFirstAvailableImageUrl(imageGenData)
+        if (imageUrl) {
+          imageUrls.push(imageUrl)
         }
       }
     }
@@ -151,6 +190,30 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       nodeData.onDataChange?.(id, { connectedImageUrls })
     }
   }, [connectedImageUrls, nodeData, id])
+
+  const generatedImages = getNormalizedGeneratedImages(nodeData)
+  const generatedImageUrls = generatedImages.urls
+  const activeImageIndex = generatedImages.activeIndex
+  const activeImageUrl = generatedImages.activeUrl
+
+  React.useEffect(() => {
+    const updates: Partial<ImageGenNodeData> = {}
+    const currentUrls = Array.isArray(nodeData.generatedImageUrls)
+      ? nodeData.generatedImageUrls.filter((url): url is string => typeof url === "string" && url.length > 0)
+      : []
+    if (JSON.stringify(currentUrls) !== JSON.stringify(generatedImageUrls)) {
+      updates.generatedImageUrls = generatedImageUrls
+    }
+    if ((nodeData.activeImageIndex ?? 0) !== activeImageIndex) {
+      updates.activeImageIndex = activeImageIndex
+    }
+    if ((nodeData.generatedImageUrl ?? null) !== activeImageUrl) {
+      updates.generatedImageUrl = activeImageUrl
+    }
+    if (Object.keys(updates).length > 0) {
+      nodeData.onDataChange?.(id, updates)
+    }
+  }, [activeImageIndex, activeImageUrl, generatedImageUrls, id, nodeData])
 
   React.useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -174,8 +237,8 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   }, [id, reactFlow, updateNodeInternals])
 
   React.useEffect(() => {
-    if (nodeData.generatedImageUrl) {
-      loadImageSize(nodeData.generatedImageUrl)
+    if (activeImageUrl) {
+      loadImageSize(activeImageUrl)
         .then((size) => {
           const constrained = getConstrainedSize(size)
           applyNodeSize(constrained.width, constrained.height)
@@ -188,7 +251,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
 
     // Reset to aspect-ratio defaults when no media
     applyNodeSize(width, height)
-  }, [nodeData.generatedImageUrl, applyNodeSize, width, height])
+  }, [activeImageUrl, applyNodeSize, width, height])
 
   const handleTitleClick = () => {
     if (selected) {
@@ -225,7 +288,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const nodeHeight = toNumber(currentNode?.style?.height) ?? toNumber(currentNode?.height) ?? height
 
   const handleCrop = () => {
-    if (nodeData.generatedImageUrl) {
+    if (activeImageUrl) {
       // Store current viewport
       const viewport = reactFlow.getViewport()
       setPreviousViewport(viewport)
@@ -285,13 +348,23 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   }, [])
 
   const handleCropConfirm = async () => {
-    if (!croppedAreaPixels || !nodeData.generatedImageUrl) return
+    if (!croppedAreaPixels || !activeImageUrl) return
 
     try {
       const { getCroppedImg } = await import('@/lib/utils/crop-image')
-      const croppedBlob = await getCroppedImg(nodeData.generatedImageUrl, croppedAreaPixels)
+      const croppedBlob = await getCroppedImg(activeImageUrl, croppedAreaPixels)
       const croppedUrl = URL.createObjectURL(croppedBlob)
-      nodeData.onDataChange?.(id, { generatedImageUrl: croppedUrl })
+      const updatedImageUrls = [...generatedImageUrls]
+      if (updatedImageUrls.length === 0) {
+        updatedImageUrls.push(croppedUrl)
+      } else {
+        updatedImageUrls[activeImageIndex] = croppedUrl
+      }
+      nodeData.onDataChange?.(id, {
+        generatedImageUrls: updatedImageUrls,
+        activeImageIndex,
+        generatedImageUrl: updatedImageUrls[activeImageIndex] ?? null,
+      })
       setIsCropping(false)
       setCrop({ x: 0, y: 0 })
       setZoom(1)
@@ -308,11 +381,11 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   }
 
   const handleDownload = async () => {
-    if (!nodeData.generatedImageUrl) return
+    if (!activeImageUrl) return
 
     try {
       // Fetch the image as a blob to handle remote URLs
-      const response = await fetch(nodeData.generatedImageUrl)
+      const response = await fetch(activeImageUrl)
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
       
@@ -364,17 +437,17 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   }
 
   const handleFullscreen = () => {
-    if (nodeData.generatedImageUrl && !isCropping) {
+    if (activeImageUrl && !isCropping) {
       setIsFullscreenOpen(true)
     }
   }
 
   const handleSendToChat = () => {
-    if (!nodeData.generatedImageUrl) return
+    if (!activeImageUrl) return
     
     // Dispatch event to add image to chat
     const event = new CustomEvent('chat-add-asset', {
-      detail: { url: nodeData.generatedImageUrl, type: 'image' }
+      detail: { url: activeImageUrl, type: 'image' }
     })
     window.dispatchEvent(event)
     
@@ -427,6 +500,15 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       }
     }
   }, [isCropping, id, zoom])
+
+  const cycleImage = React.useCallback((direction: -1 | 1) => {
+    if (generatedImageUrls.length <= 1) return
+    const nextIndex = (activeImageIndex + direction + generatedImageUrls.length) % generatedImageUrls.length
+    nodeData.onDataChange?.(id, {
+      activeImageIndex: nextIndex,
+      generatedImageUrl: generatedImageUrls[nextIndex] ?? null,
+    })
+  }, [activeImageIndex, generatedImageUrls, id, nodeData])
 
   const handleGenerate = async () => {
     // Combine connected prompt and user prompt
@@ -484,22 +566,47 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
 
       if (!response.ok) {
         const err = await response.json()
+        
+        // Handle insufficient credits (402)
+        if (response.status === 402) {
+          toast.error(err.message || "Insufficient credits", {
+            description: "Upgrade your plan to continue generating images",
+            action: {
+              label: "View Plans",
+              onClick: () => window.open("/pricing", "_blank")
+            }
+          })
+          nodeData.onDataChange?.(id, {
+            isGenerating: false,
+            error: err.message || "Insufficient credits",
+          })
+          return
+        }
+        
         throw new Error(err.error || err.message || "Failed to generate image")
       }
 
       const result = await response.json()
-      let imageUrl: string | null = null
+      const newImageUrls: string[] = []
 
       if (result.images?.length > 0) {
-        imageUrl = result.images[0].url
-      } else if (result.image?.url) {
-        imageUrl = result.image.url
+        for (const image of result.images) {
+          if (typeof image?.url === "string" && image.url.length > 0) {
+            newImageUrls.push(image.url)
+          }
+        }
+      } else if (typeof result.image?.url === "string" && result.image.url.length > 0) {
+        newImageUrls.push(result.image.url)
       }
 
-      if (!imageUrl) throw new Error("No image URL received")
+      if (newImageUrls.length === 0) throw new Error("No image URL received")
 
+      const nextImageUrls = [...generatedImageUrls, ...newImageUrls].slice(-MAX_GENERATED_IMAGES)
+      const nextActiveIndex = Math.max(0, nextImageUrls.length - newImageUrls.length)
       nodeData.onDataChange?.(id, {
-        generatedImageUrl: imageUrl,
+        generatedImageUrls: nextImageUrls,
+        activeImageIndex: nextActiveIndex,
+        generatedImageUrl: nextImageUrls[nextActiveIndex] ?? null,
         isGenerating: false,
         error: null,
       })
@@ -511,7 +618,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     }
   }
 
-  const hasContent = !!nodeData.generatedImageUrl
+  const hasContent = !!activeImageUrl
 
   return (
     <>
@@ -527,6 +634,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           <ToolbarIconButton icon={PencilSimple} onClick={() => setIsEditorOpen(true)} label="Edit in Canvas" />
           <ToolbarIconButton icon={Crop} onClick={handleCrop} label="Crop" />
           <ToolbarIconButton icon={DownloadSimple} onClick={handleDownload} label="Download" />
+          <ToolbarIconButton icon={FloppyDisk} onClick={() => setIsCreateAssetOpen(true)} label="Create Asset" />
           <ToolbarIconButton icon={ArrowsOut} onClick={handleFullscreen} label="Fullscreen" />
         </div>
       </NodeToolbar>
@@ -712,7 +820,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                   onPointerUp={(e) => e.stopPropagation()}
                 >
                   <Cropper
-                    image={nodeData.generatedImageUrl!}
+                    image={activeImageUrl!}
                     crop={crop}
                     zoom={zoom}
                     aspect={cropAspect === 0 ? undefined : cropAspect}
@@ -736,10 +844,46 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                 </div>
               ) : (
                 <img
-                  src={nodeData.generatedImageUrl!}
+                  src={activeImageUrl!}
                   alt="Generated"
                   className="w-full h-full object-cover"
                 />
+              )}
+              {!isCropping && generatedImageUrls.length > 1 && (
+                <div
+                  className={cn(
+                    "absolute inset-0 flex items-center justify-between px-2 transition-opacity",
+                    isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
+                  )}
+                >
+                  <button
+                    type="button"
+                    className="h-7 w-7 rounded-full border border-white/20 bg-zinc-900/80 text-white flex items-center justify-center hover:bg-zinc-800/80 nopan nodrag"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      cycleImage(-1)
+                    }}
+                    aria-label="Previous image"
+                    title="Previous image"
+                  >
+                    <CaretLeft size={14} weight="bold" />
+                  </button>
+                  <button
+                    type="button"
+                    className="h-7 w-7 rounded-full border border-white/20 bg-zinc-900/80 text-white flex items-center justify-center hover:bg-zinc-800/80 nopan nodrag"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      cycleImage(1)
+                    }}
+                    aria-label="Next image"
+                    title="Next image"
+                  >
+                    <CaretRight size={14} weight="bold" />
+                  </button>
+                  <div className="absolute top-2 right-2 rounded-full border border-white/20 bg-zinc-900/75 px-2 py-0.5 text-[10px] text-white">
+                    {activeImageIndex + 1} / {generatedImageUrls.length}
+                  </div>
+                </div>
               )}
             </div>
           ) : (
@@ -821,13 +965,13 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                       return (
                         <div 
                           key={`${imageUrl}-${index}`} 
-                          className="relative rounded-lg overflow-hidden border border-white/10 group"
-                          style={{ width: '120px', height: '80px' }}
+                          className="relative rounded-lg overflow-hidden border border-white/10 group bg-black/20"
+                          style={{ maxWidth: '120px', maxHeight: '120px' }}
                         >
                           <img 
                             src={imageUrl} 
                             alt={`Reference ${index + 1}`}
-                            className="w-full h-full object-cover bg-black/20"
+                            className="w-full h-full object-contain"
                           />
                           {isManual && (
                             <button
@@ -848,19 +992,38 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             })()}
             
             {nodeData.connectedPrompt && (
-              <div className="text-sm text-zinc-500 italic pointer-events-none">
-                {nodeData.connectedPrompt}
+              <div className="mb-2">
+                <div 
+                  className={cn(
+                    "relative overflow-hidden transition-all duration-200 cursor-pointer hover:bg-zinc-800/30 rounded-lg p-2",
+                    !isPromptExpanded && "max-h-[60px]"
+                  )}
+                  onClick={() => setIsPromptExpanded(!isPromptExpanded)}
+                >
+                  <div className={cn(
+                    "text-sm text-zinc-500 italic",
+                    !isPromptExpanded && "line-clamp-2"
+                  )}>
+                    {nodeData.connectedPrompt}
+                  </div>
+                  {!isPromptExpanded && (
+                    <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-zinc-900/95 to-transparent pointer-events-none" />
+                  )}
+                </div>
+                {isPromptExpanded && (
+                  <div className="text-xs text-zinc-600 mt-1 px-2">
+                    Click to collapse
+                  </div>
+                )}
               </div>
             )}
+            
             <textarea
               value={nodeData.prompt || ""}
               onChange={(e) => nodeData.onDataChange?.(id, { prompt: e.target.value })}
               placeholder={nodeData.connectedPrompt ? "Add more to the prompt..." : "Type a prompt or press '/' for commands..."}
               rows={2}
-              className={cn(
-                "w-full bg-transparent min-h-20 border-0 text-sm text-zinc-200 placeholder:text-zinc-600 resize-auto outline-none",
-                nodeData.connectedPrompt && "mt-1"
-              )}
+              className="w-full bg-transparent min-h-20 border-0 text-sm text-zinc-200 placeholder:text-zinc-600 resize-auto outline-none"
             />
           </div>
 
@@ -920,7 +1083,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           />
 
           <Select
-            value={nodeData.model || "google/nano-banana"}
+            value={nodeData.model || imageModels[0]?.identifier || "google/nano-banana"}
             onValueChange={(value) =>
               nodeData.onDataChange?.(id, { model: value })
             }
@@ -928,7 +1091,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             <SelectTrigger id="canvas-model-select" className="h-7 text-xs w-fit min-w-[100px]">
               <SelectValue placeholder="Select model">
                 {nodeData.model && (() => {
-                  const model = getImageModel(nodeData.model)
+                  const model = imageModels.find((m) => m.identifier === nodeData.model)
                   return (
                     <div className="flex items-center gap-1.5">
                       <ModelIcon identifier={nodeData.model} size={14} />
@@ -939,7 +1102,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
               </SelectValue>
             </SelectTrigger>
             <SelectContent position="popper" side="top" sideOffset={4}>
-              {AVAILABLE_IMAGE_MODELS.map((model) => (
+              {imageModels.map((model) => (
                 <SelectItem key={model.identifier} value={model.identifier}>
                   <div className="flex items-center gap-2">
                     <div className="rounded-md border border-white/10 bg-white/5 p-1 shrink-0">
@@ -1074,7 +1237,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     </NodeToolbar>
 
     {/* Fullscreen Dialog - Just for viewing */}
-    {nodeData.generatedImageUrl && (
+    {activeImageUrl && (
       <Dialog open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
         <DialogContent className="!w-screen !h-screen !max-w-none !m-0 !p-0 gap-0 overflow-hidden border-0 !rounded-none !translate-x-0 !translate-y-0 !left-0 !top-0 !fixed !inset-0">
           <button
@@ -1089,7 +1252,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             onClick={() => setIsFullscreenOpen(false)}
           >
             <img
-              src={nodeData.generatedImageUrl}
+              src={activeImageUrl}
               alt={title}
               className="w-auto h-auto max-w-[96vw] max-h-[96vh] min-w-[60vw] min-h-[60vh] object-contain pointer-events-none"
             />
@@ -1102,12 +1265,35 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     <ImageEditorDialog
       open={isEditorOpen}
       onOpenChange={setIsEditorOpen}
-      initialImage={nodeData.generatedImageUrl}
+      initialImage={activeImageUrl ?? undefined}
       onSave={(editedImageUrl) => {
-        nodeData.onDataChange?.(id, { generatedImageUrl: editedImageUrl })
+        const updatedImageUrls = [...generatedImageUrls]
+        if (updatedImageUrls.length === 0) {
+          updatedImageUrls.push(editedImageUrl)
+        } else {
+          updatedImageUrls[activeImageIndex] = editedImageUrl
+        }
+        nodeData.onDataChange?.(id, {
+          generatedImageUrls: updatedImageUrls,
+          activeImageIndex,
+          generatedImageUrl: updatedImageUrls[activeImageIndex] ?? null,
+        })
         setIsEditorOpen(false)
       }}
     />
+
+    {activeImageUrl && (
+      <CreateAssetDialog
+        open={isCreateAssetOpen}
+        onOpenChange={setIsCreateAssetOpen}
+        initial={{
+          title,
+          url: activeImageUrl,
+          assetType: "image",
+          sourceNodeType: "image-gen",
+        }}
+      />
+    )}
     </>
   )
 })

@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
-import { getActiveModelMetadata, getModelMetadataByIdentifier, type ModelMetadata } from "@/lib/constants/model-metadata"
+import { useModels } from "@/hooks/use-models"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition } from "@/lib/types/models"
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
@@ -32,35 +32,21 @@ export default function VideoPage() {
   
   const { layoutMode } = layoutModeContext
 
-  // Get active video models
-  const videoModels = React.useMemo(() => getActiveModelMetadata('video'), [])
-
-  // Convert metadata to Model format
-  const convertMetadataToModel = (metadata: ModelMetadata): Model => {
-    return {
-      id: metadata.id,
-      identifier: metadata.identifier,
-      name: metadata.name,
-      description: metadata.description,
-      type: metadata.type,
-      provider: metadata.provider,
-      is_active: metadata.is_active,
-      model_cost: metadata.model_cost,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      parameters: {
-        parameters: buildVideoModelParameters(metadata),
-      }
-    }
-  }
+  const { models: videoModels, isLoading: modelsLoading } = useModels("video")
 
   // State management
-  const [selectedModel, setSelectedModel] = React.useState<Model>(() => {
-    if (videoModels.length > 0) {
-      return convertMetadataToModel(videoModels[0])
+  const [selectedModel, setSelectedModel] = React.useState<Model | null>(null)
+
+  // Set default model when models load
+  React.useEffect(() => {
+    if (videoModels.length > 0 && !selectedModel) {
+      const first = videoModels[0]
+      setSelectedModel({
+        ...first,
+        parameters: { parameters: buildVideoModelParameters(first) },
+      })
     }
-    throw new Error("No video models available")
-  })
+  }, [videoModels, selectedModel])
   const [prompt, setPrompt] = React.useState("")
   const [negativePrompt, setNegativePrompt] = React.useState("")
   const [inputImage, setInputImage] = React.useState<ImageUpload | null>(null)
@@ -72,16 +58,9 @@ export default function VideoPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [generatedVideos, setGeneratedVideos] = React.useState<GeneratedVideo[]>([])
 
-  // Handle model change - convert identifier to Model
-  const handleModelChange = React.useCallback((modelIdentifier: string) => {
-    const metadata = getModelMetadataByIdentifier(modelIdentifier)
-    if (metadata) {
-      setSelectedModel(convertMetadataToModel(metadata))
-    }
-  }, [])
-
   // Initialize parameters when model changes
   React.useEffect(() => {
+    if (!selectedModel) return
     const defaultParams: Record<string, unknown> = {}
     selectedModel.parameters.parameters.forEach((param: ParameterDefinition) => {
       defaultParams[param.name] = param.default
@@ -122,6 +101,11 @@ export default function VideoPage() {
 
   // Handle generation
   const handleGenerate = async () => {
+    if (!selectedModel) {
+      setError("Please select a model")
+      return
+    }
+
     const isMotionCopy = selectedModel.identifier === 'kwaivgi/kling-v2.6-motion-control'
     const isLipsync =
       selectedModel.identifier.includes('lipsync') ||
@@ -209,6 +193,12 @@ export default function VideoPage() {
 
       if (negativePrompt && selectedModel.identifier === 'google/veo-3.1-fast') {
         requestBody.negative_prompt = negativePrompt
+      }
+
+      // Grok Imagine Video: reference video for video editing mode
+      if (inputVideo?.file && selectedModel.identifier === 'xai/grok-imagine-video') {
+        const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'video-gen-reference-videos')
+        requestBody.video = videoUpload.url
       }
 
       console.log('Sending video generation request:', requestBody)
@@ -301,6 +291,24 @@ export default function VideoPage() {
 
   const isRowLayout = layoutMode === "row"
 
+  if (modelsLoading || !selectedModel) {
+    if (!modelsLoading && videoModels.length === 0) {
+      return (
+        <div className="flex h-screen items-center justify-center bg-background">
+          <p className="text-sm text-muted-foreground">No video models available.</p>
+        </div>
+      )
+    }
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading models...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={cn(
       "h-screen bg-background overflow-hidden flex flex-col",
@@ -323,16 +331,14 @@ export default function VideoPage() {
               <div className="fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6">
                 <div className="max-w-7xl mx-auto flex justify-center">
                   <VideoInputBox
+                    videoModels={videoModels}
                     forceRowLayout={true}
                     promptValue={prompt}
                     onPromptChange={setPrompt}
                     negativePromptValue={negativePrompt}
                     onNegativePromptChange={setNegativePrompt}
-                    selectedModel={selectedModel}
-                  onModelChange={(model: Model) => {
-                    setSelectedModel(model)
-                    handleModelChange(model.identifier)
-                  }}
+                    selectedModel={selectedModel!}
+                    onModelChange={setSelectedModel}
                     inputImage={inputImage}
                     onInputImageChange={setInputImage}
                     lastFrameImage={lastFrameImage}
@@ -359,16 +365,14 @@ export default function VideoPage() {
                   <div className="hidden lg:block lg:sticky lg:top-0 h-fit">
                     <div className="flex justify-center">
                       <VideoInputBox
+                        videoModels={videoModels}
                         forceRowLayout={false}
                         promptValue={prompt}
                         onPromptChange={setPrompt}
                         negativePromptValue={negativePrompt}
                         onNegativePromptChange={setNegativePrompt}
-                        selectedModel={selectedModel}
-                        onModelChange={(model: Model) => {
-                          setSelectedModel(model)
-                          handleModelChange(model.identifier)
-                        }}
+                        selectedModel={selectedModel!}
+                        onModelChange={setSelectedModel}
                         inputImage={inputImage}
                         onInputImageChange={setInputImage}
                         lastFrameImage={lastFrameImage}
@@ -396,16 +400,14 @@ export default function VideoPage() {
               <div className="fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6 lg:hidden">
                 <div className="max-w-7xl mx-auto flex justify-center">
                   <VideoInputBox
+                    videoModels={videoModels}
                     forceRowLayout={false}
                     promptValue={prompt}
                     onPromptChange={setPrompt}
                     negativePromptValue={negativePrompt}
                     onNegativePromptChange={setNegativePrompt}
-                    selectedModel={selectedModel}
-                    onModelChange={(model: Model) => {
-                      setSelectedModel(model)
-                      handleModelChange(model.identifier)
-                    }}
+                    selectedModel={selectedModel!}
+                    onModelChange={setSelectedModel}
                     inputImage={inputImage}
                     onInputImageChange={setInputImage}
                     lastFrameImage={lastFrameImage}
