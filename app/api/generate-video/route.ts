@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     const mode = (body.mode as string) || 'pro';
     const keepOriginalSound = body.keep_original_sound !== false;
     const characterOrientation = (body.character_orientation as string) || 'image';
+    const tool = body.tool as string | null;
 
     console.log('[generate-video] JSON body parsed:', {
       hasImageUrl: !!imagePublicUrl,
@@ -206,6 +207,7 @@ export async function POST(request: NextRequest) {
           model: 'kwaivgi/kling-v2.6-motion-control',
           type: 'video',
           is_public: true,
+          tool: tool || null,
         };
 
         const { data: savedData, error: saveError } = await supabase

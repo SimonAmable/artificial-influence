@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import { Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
 import { VideoInputBox } from "@/components/tools/video/video-input-box"
 import { VideoShowcaseCard } from "@/components/tools/video/video-showcase-card"
@@ -23,8 +25,9 @@ interface GeneratedVideo {
   parameters: Record<string, unknown>
 }
 
-export default function VideoPage() {
+function VideoPageContent() {
   const layoutModeContext = useLayoutMode()
+  const searchParams = useSearchParams()
   
   if (!layoutModeContext) {
     throw new Error("VideoPage must be used within LayoutModeProvider")
@@ -57,6 +60,23 @@ export default function VideoPage() {
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [generatedVideos, setGeneratedVideos] = React.useState<GeneratedVideo[]>([])
+
+  // Handle pre-loaded start frame from URL parameter (only load once)
+  const hasLoadedFromUrl = React.useRef(false)
+  React.useEffect(() => {
+    if (hasLoadedFromUrl.current) return
+    
+    const startFrameUrl = searchParams.get('startFrame')
+    if (startFrameUrl) {
+      try {
+        const decodedUrl = decodeURIComponent(startFrameUrl)
+        setInputImage({ url: decodedUrl })
+        hasLoadedFromUrl.current = true
+      } catch (err) {
+        console.error('Failed to load start frame from URL:', err)
+      }
+    }
+  }, [searchParams])
 
   // Initialize parameters when model changes
   React.useEffect(() => {
@@ -148,10 +168,12 @@ export default function VideoPage() {
       }
 
       // Build request body based on model
+      // Exclude prompt, image, video from parameters since they're managed separately
+      const { prompt: _prompt, image: _image, video: _video, ...otherParameters } = parameters
       const requestBody: Record<string, unknown> = {
         model: selectedModel.identifier,
         prompt,
-        ...parameters,
+        ...otherParameters,
       }
 
       // Handle motion copy uploads
@@ -185,6 +207,18 @@ export default function VideoPage() {
           requestBody.first_frame_image = imageUpload.url
         }
       }
+      // Handle pre-loaded images from URL (no file to upload)
+      else if (inputImage?.url) {
+        if (selectedModel.identifier === 'kwaivgi/kling-v2.6') {
+          requestBody.start_image = inputImage.url
+        } else {
+          requestBody.image = inputImage.url
+        }
+        // For first_frame_image parameter (Hailuo)
+        if (selectedModel.identifier === 'minimax/hailuo-2.3-fast') {
+          requestBody.first_frame_image = inputImage.url
+        }
+      }
 
       if (lastFrameImage?.file && selectedModel.identifier === 'google/veo-3.1-fast') {
         const lastFrameUpload = await uploadImageToSupabase(lastFrameImage.file, user.id, 'video-gen-last-frames')
@@ -200,6 +234,8 @@ export default function VideoPage() {
         const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'video-gen-reference-videos')
         requestBody.video = videoUpload.url
       }
+
+      requestBody.tool = isLipsync ? 'lipsync' : 'video'
 
       console.log('Sending video generation request:', requestBody)
 
@@ -428,5 +464,20 @@ export default function VideoPage() {
         </GeneratorLayout>
       </div>
     </div>
+  )
+}
+
+export default function VideoPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    }>
+      <VideoPageContent />
+    </Suspense>
   )
 }

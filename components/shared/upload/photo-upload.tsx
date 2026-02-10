@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
 import { X, User, Plus } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 
@@ -31,6 +32,8 @@ export function PhotoUpload({
   maxHeight = "max-h-[45px]",
   minHeight = "min-h-[50px] sm:min-h-[55px]",
 }: PhotoUploadProps) {
+  const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
+
   const handleRemove = () => {
     onChange?.(null)
   }
@@ -44,6 +47,12 @@ export function PhotoUpload({
     }
   }
 
+  const handleImageClick = () => {
+    if (value?.url) {
+      setIsFullscreenOpen(true)
+    }
+  }
+
   return (
     <Card className={cn("relative bg-muted border-dashed border-2 border-muted-foreground/40 rounded-lg h-full py-0", className)}>
       <CardContent className={cn("p-1.5 sm:p-2 h-full flex items-center justify-center", minHeight)}>
@@ -52,11 +61,12 @@ export function PhotoUpload({
             <img
               src={value.url}
               alt="Uploaded photo"
-              className={cn("max-w-full w-auto h-auto object-contain rounded-xl", maxHeight)}
+              className={cn("max-w-full w-auto h-auto object-contain rounded-xl cursor-pointer", maxHeight)}
+              onClick={handleImageClick}
             />
             <button
               onClick={handleRemove}
-              className="absolute top-2 right-2 bg-background/80 hover:bg-background rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute top-2 right-2 bg-background/80 hover:bg-background rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
               aria-label="Remove image"
             >
               <X className="size-4" />
@@ -81,6 +91,21 @@ export function PhotoUpload({
           </label>
         )}
       </CardContent>
+
+      <Dialog open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0">
+          <div className="relative w-full h-full flex items-center justify-center bg-black/95">
+            <img
+              src={value?.url}
+              alt="Full screen view"
+              className="max-w-full max-h-full object-contain"
+            />
+            <DialogClose className="absolute top-4 right-4 bg-background/80 hover:bg-background rounded-full p-2">
+              <X className="size-6" />
+            </DialogClose>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

@@ -25,7 +25,7 @@ export default function InfluencerGeneratorPage() {
       <div
         className={cn(
           "mx-auto overflow-hidden flex-1 min-h-0 flex flex-col",
-          isRowLayout ? "w-full pt-20" : "max-w-7xl pt-12"
+          isRowLayout ? "w-full pt-[50px]" : "max-w-7xl pt-12"
         )}
       >
         <div className="h-full flex-1 min-h-0">

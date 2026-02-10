@@ -28,9 +28,9 @@ export function ModelsSection() {
             <Link
               key={card.name}
               href={card.href}
-              className="group relative overflow-hidden rounded-3xl border border-white/15 bg-card/40 p-6 transition-transform duration-300 hover:-translate-y-1"
+              className="group flex flex-col transition-transform duration-300 hover:-translate-y-1"
             >
-              <div className="absolute inset-0">
+              <div className="relative aspect-square overflow-hidden rounded-3xl">
                 {card.mediaType === "video" ? (
                   <video
                     src={card.mediaSrc}
@@ -44,12 +44,11 @@ export function ModelsSection() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={card.mediaSrc} alt={card.name} className="h-full w-full object-cover" />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
               </div>
 
-              <div className="relative z-10 flex min-h-[260px] flex-col justify-end">
-                <h3 className="text-2xl font-semibold text-zinc-50">{card.name}</h3>
-                <p className="mt-2 max-w-md text-sm text-zinc-200/90">{card.tagline}</p>
+              <div className="mt-4">
+                <h3 className="text-2xl font-semibold text-foreground">{card.name}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{card.tagline}</p>
               </div>
             </Link>
           ))}

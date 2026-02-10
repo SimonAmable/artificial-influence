@@ -165,7 +165,7 @@ export function VideoShowcaseCard({
   if (isRowLayout) {
     return (
       <div className={cn(
-        "flex flex-col items-center justify-center gap-6 md:gap-8 lg:gap-10 w-full h-full p-6 md:p-12 lg:p-16 overflow-y-auto",
+        "flex flex-col items-center justify-start gap-6 md:gap-8 lg:gap-10 w-full h-full p-6 md:p-12 lg:p-16 overflow-y-auto",
         className
       )}>
         {content}

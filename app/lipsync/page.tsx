@@ -198,7 +198,6 @@ export default function LipsyncPage() {
     // Show empty state (LipsyncShowcaseCard) when no videos and not generating
     return (
       <LipsyncShowcaseCard
-        tool_title="LIPSYNC"
         title="CREATE YOUR"
         highlightedTitle="LIPSYNC VIDEO"
         description="Generate realistic lipsync videos by combining your image with audio."

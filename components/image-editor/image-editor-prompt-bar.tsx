@@ -271,6 +271,8 @@ export function ImageEditorPromptBar({
           formData.append("referenceImages", file)
         })
 
+        formData.append("tool", "image_editing")
+
         const response = await fetch("/api/generate-image", {
           method: "POST",
           body: formData,

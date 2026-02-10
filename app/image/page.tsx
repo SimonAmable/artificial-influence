@@ -4,6 +4,7 @@ import * as React from "react"
 import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
 import { InfluencerInputBox, InfluencerShowcaseCard } from "@/components/tools/influencer"
 import { ImageGrid } from "@/components/shared/display/image-grid"
+// import { GenerationHistoryColumn } from "@/components/shared/display/generation-history-column" // Temporarily disabled
 import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
 import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { Card, CardContent } from "@/components/ui/card"
@@ -205,7 +206,9 @@ export default function ImagePage() {
       if (selectedNumImages > 1) {
         formData.append('n', String(selectedNumImages))
       }
-      
+
+      formData.append('tool', 'image')
+
       const totalRefImages = imagesToUpload.length
       console.log('Sending request with reference images:', totalRefImages, 'numImages:', selectedNumImages)
       
@@ -356,11 +359,27 @@ export default function ImagePage() {
       )}>
         <GeneratorLayout layoutMode={layoutMode} className="h-full flex-1 min-h-0">
           {isRowLayout ? (
-            // Row layout: Full-screen grid fills entire screen excluding header
+            // Row layout: Full-screen grid fills entire screen excluding header with left history column
             <>
-              {/* Main Content - Full-screen grid fills entire screen excluding header */}
-              <div className="flex-1 w-full h-full overflow-auto pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                {renderShowcase()}
+              <div className="flex h-full w-full">
+                {/* Left History Column - Centered vertically */}
+                {/* Temporarily disabled
+                <div className="w-32 h-full flex items-center justify-center p-4">
+                  <GenerationHistoryColumn
+                    images={historyImages}
+                    isGenerating={isGenerating}
+                    generatingCount={selectedNumImages}
+                    isLoadingSkeleton={isHistoryLoading && historyImages.length === 0}
+                    maxItems={20}
+                    className="w-full"
+                  />
+                </div>
+                */}
+
+                {/* Main Content - Full-screen grid fills entire screen excluding header and history column */}
+                <div className="flex-1 w-full h-full overflow-auto pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {renderShowcase()}
+                </div>
               </div>
 
               {/* Fixed Bottom Panel - Prompt Box (always visible) */}
@@ -393,43 +412,59 @@ export default function ImagePage() {
               </div>
             </>
           ) : (
-            // Column layout: Side by side on desktop, stacked on mobile
+            // Column layout: Side by side on desktop, stacked on mobile with left history column
             <>
-              {/* Main Content */}
-              <div className="w-full flex-1 min-h-0 lg:pb-0">
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 sm:gap-6 lg:gap-12 h-full">
-                  {/* Left Panel - Prompt Box (hidden on mobile, shown on desktop) */}
-                  <div className="hidden lg:block lg:sticky lg:top-0 h-fit">
-                    <div className="flex justify-center">
-                      <InfluencerInputBox
-                        forceRowLayout={false}
-                        promptValue={prompt}
-                        onPromptChange={setPrompt}
-                        referenceImage={referenceImage}
-                        onReferenceImageChange={setReferenceImage}
-                        referenceImages={referenceImages}
-                        onReferenceImagesChange={setReferenceImages}
-                        enhancePrompt={enhancePrompt}
-                        onEnhancePromptChange={setEnhancePrompt}
-                        isGenerating={isGenerating}
-                        onGenerate={handleGenerate}
-                        selectedModel={selectedModel}
-                        onModelChange={setSelectedModel}
-                        showModelSelector={true}
-                        imageModels={imageModels}
-                        selectedAspectRatio={selectedAspectRatio}
-                        onAspectRatioChange={setSelectedAspectRatio}
-                        showAspectRatioSelector={true}
-                        selectedNumImages={selectedNumImages}
-                        onNumImagesChange={setSelectedNumImages}
-                        showNumImagesSelector={true}
-                      />
-                    </div>
-                  </div>
+              <div className="flex h-full w-full gap-4">
+                {/* Left History Column - Hidden on mobile, Centered vertically */}
+                {/* Temporarily disabled
+                <div className="hidden lg:flex w-32 h-full items-center">
+                  <GenerationHistoryColumn
+                    images={historyImages}
+                    isGenerating={isGenerating}
+                    generatingCount={selectedNumImages}
+                    isLoadingSkeleton={isHistoryLoading && historyImages.length === 0}
+                    maxItems={20}
+                    className="w-full"
+                  />
+                </div>
+                */}
 
-                  {/* Right Panel - Showcase (full-screen grid) */}
-                  <div className="w-full h-full overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                    {renderShowcase()}
+                {/* Main Content */}
+                <div className="w-full flex-1 min-h-0 lg:pb-0">
+                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 sm:gap-6 lg:gap-12 h-full">
+                    {/* Left Panel - Prompt Box (hidden on mobile, shown on desktop) */}
+                    <div className="hidden lg:block lg:sticky lg:top-0 h-fit">
+                      <div className="flex justify-center">
+                        <InfluencerInputBox
+                          forceRowLayout={false}
+                          promptValue={prompt}
+                          onPromptChange={setPrompt}
+                          referenceImage={referenceImage}
+                          onReferenceImageChange={setReferenceImage}
+                          referenceImages={referenceImages}
+                          onReferenceImagesChange={setReferenceImages}
+                          enhancePrompt={enhancePrompt}
+                          onEnhancePromptChange={setEnhancePrompt}
+                          isGenerating={isGenerating}
+                          onGenerate={handleGenerate}
+                          selectedModel={selectedModel}
+                          onModelChange={setSelectedModel}
+                          showModelSelector={true}
+                          imageModels={imageModels}
+                          selectedAspectRatio={selectedAspectRatio}
+                          onAspectRatioChange={setSelectedAspectRatio}
+                          showAspectRatioSelector={true}
+                          selectedNumImages={selectedNumImages}
+                          onNumImagesChange={setSelectedNumImages}
+                          showNumImagesSelector={true}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right Panel - Showcase (full-screen grid) */}
+                    <div className="w-full h-full overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                      {renderShowcase()}
+                    </div>
                   </div>
                 </div>
               </div>

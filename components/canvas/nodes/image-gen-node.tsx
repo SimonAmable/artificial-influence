@@ -559,6 +559,8 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         }
       }
 
+      formData.append("tool", "node")
+
       const response = await fetch("/api/generate-image", {
         method: "POST",
         body: formData,

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { LayoutMode } from "@/components/shared/layout/layout-toggle"
+import type { LayoutMode } from "@/components/shared/layout/layout-toggle"
 import { cn } from "@/lib/utils"
 
 interface GeneratorLayoutProps {

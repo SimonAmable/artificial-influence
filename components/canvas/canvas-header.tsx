@@ -132,7 +132,8 @@ export function CanvasHeader({
           )}
           Save
         </Button>
-        <Button
+        {/* Execute button temporarily hidden */}
+        {/* <Button
           size="sm"
           onClick={handleExecuteClick}
           disabled={isExecuting}
@@ -147,7 +148,7 @@ export function CanvasHeader({
             <Play size={14} weight="fill" className="mr-1.5" />
           )}
           {isExecuting ? "Running..." : "Execute"}
-        </Button>
+        </Button> */}
       </div>
 
       {/* Right floating group: Mobile dropdown (Settings) */}
@@ -172,14 +173,15 @@ export function CanvasHeader({
             )}
             Save
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleExecuteClick} disabled={isExecuting}>
+          {/* Execute button temporarily hidden */}
+          {/* <DropdownMenuItem onClick={handleExecuteClick} disabled={isExecuting}>
             {isExecuting ? (
               <CircleNotch size={16} className="animate-spin mr-2" />
             ) : (
                 <Play size={16} weight="fill" className="mr-2" />
               )}
               {isExecuting ? "Running..." : "Execute"}
-            </DropdownMenuItem>
+            </DropdownMenuItem> */}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

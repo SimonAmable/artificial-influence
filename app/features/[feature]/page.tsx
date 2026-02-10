@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button"
 import { dashboardFeatures } from "@/lib/constants/dashboard-features"
 
 interface FeaturePageProps {
-  params: {
+  params: Promise<{
     feature: string
-  }
+  }>
 }
 
-export default function FeaturePage({ params }: FeaturePageProps) {
-  const feature = dashboardFeatures.find((item) => item.slug === params.feature)
+export default async function FeaturePage({ params }: FeaturePageProps) {
+  const resolvedParams = await params
+  const feature = dashboardFeatures.find((item) => item.slug === resolvedParams.feature)
 
   if (!feature) {
     notFound()

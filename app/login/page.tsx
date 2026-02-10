@@ -2,13 +2,14 @@ import { Suspense } from "react"
 import { AuthForm } from "@/components/app/auth-form"
 
 type LoginPageProps = {
-  searchParams?: {
+  searchParams: Promise<{
     mode?: string
-  }
+  }>
 }
 
-export default function LoginPage({ searchParams }: LoginPageProps) {
-  const mode = searchParams?.mode === "signup" ? "signup" : "login"
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams
+  const mode = params?.mode === "signup" ? "signup" : "login"
 
   return (
     <Suspense fallback={null}>

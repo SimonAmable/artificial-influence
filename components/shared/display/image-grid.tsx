@@ -1,10 +1,11 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
-import { ArrowsOutSimple, Copy, DownloadSimple, Check, X, DotsThree, Plus } from "@phosphor-icons/react"
+import { ArrowsOutSimple, Copy, DownloadSimple, Check, X, DotsThree, Plus, Trash, Play } from "@phosphor-icons/react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,9 +13,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { FullscreenImageViewer } from "./fullscreen-image-viewer"
+import { toast } from "sonner"
+
+interface ImageData {
+  id?: string
+  url: string
+  model?: string | null
+  prompt?: string | null
+  tool?: string | null
+  aspectRatio?: string | null
+  type?: string | null
+  createdAt?: string | null
+}
 
 interface ImageGridProps {
-  images: Array<string | { url: string; model?: string | null; prompt?: string | null }>
+  images: Array<string | ImageData>
   isGenerating?: boolean  // Show generating card in grid
   generatingCount?: number  // Number of images being generated (shows multiple generating cards)
   isLoadingSkeleton?: boolean  // Show skeleton grid while loading history
@@ -22,6 +36,7 @@ interface ImageGridProps {
   onImageClick?: (imageUrl: string, index: number) => void
   onUseAsReference?: (imageUrl: string, index: number) => void
   onCreateAsset?: (imageUrl: string, index: number) => void
+  onDelete?: (id: string, imageUrl: string, index: number) => void
 }
 
 // Normalize model names by removing prefix before slash, replacing dashes with spaces, and capitalizing
@@ -46,18 +61,30 @@ export function ImageGrid({
   onImageClick,
   onUseAsReference,
   onCreateAsset,
+  onDelete,
 }: ImageGridProps) {
-  const [columnCount, setColumnCount] = React.useState(4) // Default 4 columns
-  const [fullscreenImage, setFullscreenImage] = React.useState<string | null>(null)
+  const router = useRouter()
+  const [columnCount, setColumnCount] = React.useState(2) // Default 2 columns
+  const [fullscreenImage, setFullscreenImage] = React.useState<ImageData | null>(null)
   const [copiedImageUrl, setCopiedImageUrl] = React.useState<string | null>(null)
   const [copiedPromptKey, setCopiedPromptKey] = React.useState<string | null>(null)
+  const [deletingImageId, setDeletingImageId] = React.useState<string | null>(null)
 
   const normalizedImages = React.useMemo(
     () =>
       images.map((item) =>
         typeof item === "string"
-          ? { url: item, model: null, prompt: null }
-          : { url: item.url, model: item.model ?? null, prompt: item.prompt ?? null }
+          ? { id: undefined, url: item, model: null, prompt: null, tool: null, aspectRatio: null, type: null, createdAt: null }
+          : { 
+              id: item.id, 
+              url: item.url, 
+              model: item.model ?? null, 
+              prompt: item.prompt ?? null,
+              tool: item.tool ?? null,
+              aspectRatio: item.aspectRatio ?? null,
+              type: item.type ?? null,
+              createdAt: item.createdAt ?? null
+            }
       ),
     [images]
   )
@@ -105,8 +132,10 @@ export function ImageGrid({
 
       if (canWriteImage) {
         await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
+        toast.success("Image copied to clipboard")
       } else {
         await navigator.clipboard.writeText(imageUrl)
+        toast.success("Image URL copied to clipboard")
       }
 
       setCopiedImageUrl(imageUrl)
@@ -115,11 +144,14 @@ export function ImageGrid({
       if (navigator?.clipboard) {
         try {
           await navigator.clipboard.writeText(imageUrl)
+          toast.success("Image URL copied to clipboard")
           setCopiedImageUrl(imageUrl)
           window.setTimeout(() => setCopiedImageUrl(null), 1500)
         } catch {
-          // Ignore clipboard errors to keep the UI non-blocking.
+          toast.error("Failed to copy image")
         }
+      } else {
+        toast.error("Clipboard not available")
       }
     }
   }, [])
@@ -138,6 +170,26 @@ export function ImageGrid({
     }
   }, [])
 
+  const handleDelete = React.useCallback(async (id: string, imageUrl: string, index: number) => {
+    if (!id) {
+      console.error('Cannot delete image without ID')
+      return
+    }
+
+    // Confirm deletion
+    if (!window.confirm('Are you sure you want to delete this image? This action cannot be undone.')) {
+      return
+    }
+
+    setDeletingImageId(id)
+    
+    try {
+      onDelete?.(id, imageUrl, index)
+    } finally {
+      setDeletingImageId(null)
+    }
+  }, [onDelete])
+
   React.useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -150,16 +202,18 @@ export function ImageGrid({
   }, [])
 
   // Grid column class mapping
+  const isOneColumn = columnCount === 1
   const gridColsClass = {
+    1: 'grid-cols-1',
     2: 'grid-cols-2',
     3: 'grid-cols-3',
     4: 'grid-cols-4',
     5: 'grid-cols-5',
     6: 'grid-cols-6',
-  }[columnCount] || 'grid-cols-4'
+  }[columnCount] || 'grid-cols-2'
 
-  // Gap class mapping - reduce gap for more columns to prevent excessive vertical spacing
-  const gapClass = 'gap-0'
+  // Gap class mapping - use larger gap for single column, no gap for multi-column
+  const gapClass = isOneColumn ? 'gap-4' : 'gap-0'
 
   return (
     <div className={cn("w-full h-full flex flex-col py-0", className)}>
@@ -172,7 +226,7 @@ export function ImageGrid({
           <Slider
             value={[columnCount]}
             onValueChange={(value) => setColumnCount(value[0])}
-            min={2}
+            min={1}
             max={6}
             step={1}
             className="w-24 sm:w-32"
@@ -187,6 +241,8 @@ export function ImageGrid({
             "grid p-2 overflow-auto h-full",
             gridColsClass,
             gapClass,
+            // Center items in one-column mode
+            isOneColumn && "justify-items-center",
             // Hide scrollbar while maintaining scrollability
             "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
           )}
@@ -199,13 +255,22 @@ export function ImageGrid({
           {isLoadingSkeleton && Array.from({ length: 12 }).map((_, index) => (
             <div
               key={`skeleton-${index}`}
-              className="aspect-square w-full bg-muted/30 border border-border animate-pulse"
+              className={cn(
+                "w-full bg-muted/30 animate-pulse",
+                isOneColumn ? "aspect-auto min-h-[50vh]" : "aspect-square"
+              )}
             />
           ))}
 
           {/* Generating cards - show one card for each image being generated */}
           {isGenerating && !isLoadingSkeleton && Array.from({ length: generatingCount }).map((_, index) => (
-            <div key={`generating-${index}`} className="relative aspect-square w-full overflow-hidden bg-zinc-900 rounded-lg">
+            <div 
+              key={`generating-${index}`} 
+              className={cn(
+                "relative w-full overflow-hidden bg-zinc-900 rounded-lg",
+                isOneColumn ? "aspect-auto min-h-[50vh]" : "aspect-square"
+              )}
+            >
               {/* White fading line animation - 20 second infinite duration */}
               <div 
                 className="absolute inset-y-0 left-0 bg-gradient-to-r from-zinc-800 to-zinc-700"
@@ -234,8 +299,11 @@ export function ImageGrid({
           {!isLoadingSkeleton && normalizedImages.map((image, index) => (
             <div
               key={`image-${index}-${image.url}`}
-              className="group relative aspect-square bg-background border border-border flex items-center justify-center w-full cursor-pointer"
-              onClick={() => onImageClick?.(image.url, index)}
+              className={cn(
+                "group relative bg-background flex items-center justify-center w-full cursor-pointer",
+                isOneColumn ? "aspect-auto" : "aspect-square"
+              )}
+              onClick={() => setFullscreenImage(image)}
               draggable
               onDragStart={(e) => {
                 // Set data in the format AI chat expects (same as canvas image-gen nodes)
@@ -258,7 +326,10 @@ export function ImageGrid({
               <img
                 src={image.url}
                 alt={`Generated image ${index + 1}`}
-                className="max-w-full max-h-full w-auto h-auto object-contain pointer-events-none"
+                className={cn(
+                  "w-auto h-auto object-contain pointer-events-none",
+                  isOneColumn ? "max-h-[50vh] max-w-full" : "max-w-full max-h-full"
+                )}
                 loading="lazy"
                 draggable={false}
               />
@@ -276,7 +347,7 @@ export function ImageGrid({
                   className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
                   onClick={(event) => {
                     event.stopPropagation()
-                    setFullscreenImage(image.url)
+                    setFullscreenImage(image)
                   }}
                   aria-label="View full screen"
                 >
@@ -348,7 +419,7 @@ export function ImageGrid({
                     <DropdownMenuItem
                       onClick={(event) => {
                         event.stopPropagation()
-                        setFullscreenImage(image.url)
+                        setFullscreenImage(image)
                       }}
                       className="cursor-pointer"
                     >
@@ -384,13 +455,29 @@ export function ImageGrid({
                         </>
                       )}
                     </DropdownMenuItem>
+                    {image.id && onDelete && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            void handleDelete(image.id!, image.url, index)
+                          }}
+                          className="cursor-pointer text-destructive focus:text-destructive"
+                          disabled={deletingImageId === image.id}
+                        >
+                          <Trash className="mr-2 size-4" />
+                          {deletingImageId === image.id ? 'Deleting...' : 'Delete'}
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
 
               {/* Bottom bar: prompt (left) + buttons (right) - no overlap */}
-              <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-2 px-2 pb-2 pt-6 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                <div className="min-w-0 flex-1 overflow-hidden pr-2">
+              <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-1 sm:gap-2 px-2 pb-2 pt-6 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                <div className="min-w-0 flex-1 overflow-hidden pr-1 sm:pr-2">
                   {image.model && (
                     <p className="truncate text-[10px] font-semibold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                       {normalizeModelName(image.model)}
@@ -410,32 +497,96 @@ export function ImageGrid({
                     </button>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={!image.prompt?.trim()}
-                  className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    void handleCopyPrompt(image.prompt ?? "", `${image.url}-button`)
-                  }}
-                >
-                  {copiedPromptKey && copiedPromptKey.startsWith(image.url) ? "Copied" : "Copy Prompt"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onUseAsReference?.(image.url, index)
-                  }}
-                >
-                  Reference
-                </Button>
+                
+                {/* Desktop buttons (sm and up) */}
+                <div className="hidden sm:flex shrink-0 items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={!image.prompt?.trim()}
+                    className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void handleCopyPrompt(image.prompt ?? "", `${image.url}-button`)
+                    }}
+                  >
+                    {copiedPromptKey && copiedPromptKey.startsWith(image.url) ? "Copied" : "Copy Prompt"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onUseAsReference?.(image.url, index)
+                    }}
+                  >
+                    Reference
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      const encodedUrl = encodeURIComponent(image.url)
+                      router.push(`/video?startFrame=${encodedUrl}`)
+                    }}
+                  >
+                    <Play className="mr-1 size-3" weight="fill" />
+                    Animate
+                  </Button>
+                </div>
+                
+                {/* Mobile button - Animate dropdown only (below sm) */}
+                <div className="flex sm:hidden shrink-0 items-center gap-1">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                        }}
+                      >
+                        <Play className="mr-1 size-3" weight="fill" />
+                        Animate
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent 
+                      align="end" 
+                      className="w-48"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <DropdownMenuItem
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          const encodedUrl = encodeURIComponent(image.url)
+                          router.push(`/video?startFrame=${encodedUrl}`)
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <Play className="mr-2 size-4" weight="fill" />
+                        Animate
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onUseAsReference?.(image.url, index)
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <ArrowsOutSimple className="mr-2 size-4" />
+                        Use as Reference
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </div>
@@ -444,28 +595,36 @@ export function ImageGrid({
       </div>
 
       {fullscreenImage && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
-          onClick={() => setFullscreenImage(null)}
-        >
-          <div className="relative max-h-full max-w-full" onClick={(event) => event.stopPropagation()}>
-            <img
-              src={fullscreenImage}
-              alt="Full screen preview"
-              className="max-h-[90vh] max-w-[95vw] rounded-md object-contain"
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              className="absolute right-2 top-2 h-8 w-8 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
-              onClick={() => setFullscreenImage(null)}
-              aria-label="Close full screen preview"
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
-        </div>
+        <FullscreenImageViewer
+          imageUrl={fullscreenImage.url}
+          metadata={{
+            id: fullscreenImage.id,
+            model: fullscreenImage.model,
+            prompt: fullscreenImage.prompt,
+            tool: fullscreenImage.tool,
+            aspectRatio: fullscreenImage.aspectRatio,
+            type: fullscreenImage.type,
+            createdAt: fullscreenImage.createdAt,
+          }}
+          onClose={() => setFullscreenImage(null)}
+          onDownload={handleDownload}
+          onCopy={handleCopy}
+          onDelete={onDelete ? (id, url) => {
+            const imageIndex = normalizedImages.findIndex(img => img.id === id)
+            if (imageIndex !== -1) {
+              handleDelete(id, url, imageIndex)
+              setFullscreenImage(null)
+            }
+          } : undefined}
+          onSaveToAssets={onCreateAsset ? (url) => {
+            const imageIndex = normalizedImages.findIndex(img => img.url === url)
+            if (imageIndex !== -1) {
+              onCreateAsset(url, imageIndex)
+            }
+          } : undefined}
+          copiedImageUrl={copiedImageUrl}
+          deletingImageId={deletingImageId}
+        />
       )}
     </div>
   )

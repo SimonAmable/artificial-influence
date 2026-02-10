@@ -189,6 +189,7 @@ export default function MotionCopyPage() {
           mode: 'pro',
           keep_original_sound: true,
           character_orientation: characterOrientation,
+          tool: 'motion_copy',
         }),
       })
 
@@ -240,7 +241,6 @@ export default function MotionCopyPage() {
     // Show empty state (MotionCopyShowcaseCard) when no images and not generating
     return (
       <MotionCopyShowcaseCard
-        tool_title="MOTION COPY"
         title="CREATE YOUR"
         highlightedTitle="MOTION COPY"
         description="Generate dynamic motion copy by combining your image and video inputs."

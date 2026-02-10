@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get('type') as 'image' | 'video' | 'audio' | null;
+    const tool = searchParams.get('tool');
     const limit = parseInt(searchParams.get('limit') || '100', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
@@ -30,6 +31,11 @@ export async function GET(request: NextRequest) {
     // Filter by type if provided
     if (type) {
       query = query.eq('type', type);
+    }
+
+    // Filter by tool if provided
+    if (tool) {
+      query = query.eq('tool', tool);
     }
 
     const { data: generations, error } = await query;

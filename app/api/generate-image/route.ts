@@ -1,8 +1,9 @@
 import { generateImage } from 'ai';
 import { replicate } from '@ai-sdk/replicate';
 import { xai } from '@ai-sdk/xai';
+import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
-import { enhancePrompt } from '@/lib/prompt-enhancement';
+import { enhancePrompt, enhancePromptForJSONModels } from '@/lib/prompt-enhancement';
 import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 import { modelUsesDimensions, aspectRatioToDimensions } from '@/lib/utils/model-parameters';
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
     const heightForm = formData.get('height');
     const width = widthForm ? parseInt(widthForm as string) : null;
     const height = heightForm ? parseInt(heightForm as string) : null;
+    const tool = formData.get('tool') as string | null;
 
     // Fetch model details from database
     console.log('[generate-image] Fetching model details for:', modelIdentifier);
@@ -236,13 +238,29 @@ export async function POST(request: NextRequest) {
     // Enhance prompt if requested
     let finalPrompt = prompt;
     if (shouldEnhance === true) {
-      console.log('[generate-image] Enhancing prompt...');
+      console.log('[generate-image] Enhancing prompt for model:', modelIdentifier);
       try {
         const enhanceStartTime = Date.now();
-        finalPrompt = await enhancePrompt(prompt, 'generate');
+
+        // Use JSON enhancement for models that support structured prompts
+        const jsonSupportedModels = [
+          'google/nano-banana',
+          'google/nano-banana-pro',
+          'bytedance/seedream-4.5'
+        ];
+
+        if (jsonSupportedModels.includes(modelIdentifier)) {
+          console.log('[generate-image] Using JSON prompt enhancement for:', modelIdentifier);
+          finalPrompt = await enhancePromptForJSONModels(prompt, modelIdentifier);
+          console.log('[generate-image] ✓ JSON prompt enhanced - returned structured data');
+        } else {
+          console.log('[generate-image] Using standard prompt enhancement');
+          finalPrompt = await enhancePrompt(prompt, 'generate');
+          console.log('[generate-image] Enhanced prompt:', finalPrompt.substring(0, 100) + (finalPrompt.length > 100 ? '...' : ''));
+        }
+
         const enhanceTime = Date.now() - enhanceStartTime;
         console.log('[generate-image] ✓ Prompt enhanced in', enhanceTime, 'ms');
-        console.log('[generate-image] Enhanced prompt:', finalPrompt.substring(0, 100) + (finalPrompt.length > 100 ? '...' : ''));
       } catch (error) {
         console.error('[generate-image] Error enhancing prompt:', error);
         console.log('[generate-image] Continuing with original prompt');
@@ -277,10 +295,21 @@ export async function POST(request: NextRequest) {
       console.log('[generate-image] Using Replicate provider');
     }
     
+    // Check if we're using JSON prompt for supported models
+    const jsonSupportedModels = [
+      'google/nano-banana',
+      'google/nano-banana-pro',
+      'bytedance/seedream-4.5'
+    ];
+    const usingJSONPrompt = jsonSupportedModels.includes(modelIdentifier) && shouldEnhance;
+
+    console.log('[generate-image] Prompt type:', usingJSONPrompt ? 'JSON structured' : 'regular text');
+    console.log('[generate-image] Final prompt length:', finalPrompt.length, 'characters');
+
     // Use the selected model identifier
     const generateOptions: Parameters<typeof generateImage>[0] = {
       model: imageModel,
-      prompt: finalPrompt, // Keep prompt as simple string
+      prompt: finalPrompt, // JSON string for supported models, regular string for others
     };
 
     // Add optional parameters if provided
@@ -368,7 +397,74 @@ export async function POST(request: NextRequest) {
     const generationStartTime = Date.now();
     let result;
     try {
-      result = await generateImage(generateOptions);
+      if (provider === 'xai') {
+        result = await generateImage(generateOptions);
+      } else {
+        const replicateClient = new Replicate({
+          auth: process.env.REPLICATE_API_TOKEN,
+        });
+
+        const replicateProviderOptions = (generateOptions.providerOptions?.replicate ?? {}) as Record<string, unknown>;
+        const replicateInput: Record<string, unknown> = {
+          prompt: finalPrompt,
+          ...(generateOptions.n && { num_outputs: generateOptions.n }),
+          ...(generateOptions.seed && { seed: generateOptions.seed }),
+          ...(generateOptions.size && { size: generateOptions.size }),
+          ...replicateProviderOptions,
+        };
+
+        // Fallback mapping if only generic aspectRatio was set.
+        if (!('aspect_ratio' in replicateInput) && generateOptions.aspectRatio) {
+          replicateInput.aspect_ratio = generateOptions.aspectRatio;
+        }
+
+        console.log('[generate-image] Using Replicate polling mode:', {
+          model: modelIdentifier,
+          inputKeys: Object.keys(replicateInput),
+        });
+
+        const replicateOutput = await replicateClient.run(modelIdentifier as `${string}/${string}`, {
+          input: replicateInput,
+          wait: { mode: 'poll', interval: 2000 },
+        });
+
+        const extractUrl = (value: unknown): string | null => {
+          if (typeof value === 'string') return value;
+          if (value && typeof value === 'object') {
+            const candidate = value as { url?: string | (() => string) };
+            if (typeof candidate.url === 'function') return candidate.url();
+            if (typeof candidate.url === 'string') return candidate.url;
+          }
+          return null;
+        };
+
+        const outputUrls = Array.isArray(replicateOutput)
+          ? replicateOutput.map(extractUrl).filter((url): url is string => Boolean(url))
+          : (() => {
+              const single = extractUrl(replicateOutput);
+              return single ? [single] : [];
+            })();
+
+        if (outputUrls.length === 0) {
+          throw new Error('Replicate returned no output URLs');
+        }
+
+        console.log('[generate-image] Downloading Replicate output image(s):', outputUrls.length);
+        const outputBase64Images = await Promise.all(
+          outputUrls.map(async (url) => {
+            const response = await fetch(url);
+            if (!response.ok) {
+              throw new Error(`Failed to download Replicate output (${response.status})`);
+            }
+            const arrayBuffer = await response.arrayBuffer();
+            return Buffer.from(arrayBuffer).toString('base64');
+          })
+        );
+
+        result = outputBase64Images.length > 1
+          ? { images: outputBase64Images.map((base64) => ({ base64 })), warnings: [] }
+          : { image: { base64: outputBase64Images[0] }, warnings: [] };
+      }
     } catch (genError: unknown) {
       const generationTime = Date.now() - generationStartTime;
       console.error('[generate-image] Generation failed after', generationTime, 'ms');
@@ -470,6 +566,7 @@ export async function POST(request: NextRequest) {
           model: modelIdentifier,
           type: 'image', // You can customize this based on your needs
           is_public: true, // Default from schema, but explicitly set
+          tool: tool || null,
         };
 
         const { data: savedData, error: saveError } = await supabase

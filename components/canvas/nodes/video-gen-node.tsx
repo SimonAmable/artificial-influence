@@ -696,6 +696,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             mode: (nodeData.parameters?.mode as string) || nodeData.mode || "pro",
             keep_original_sound: nodeData.parameters?.keep_original_sound ?? true,
             character_orientation: nodeData.parameters?.character_orientation || "image",
+            tool: "node",
           }),
         })
       } else if (isLipsync) {
@@ -734,6 +735,8 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         if (lastFrameUpload?.url) {
           requestBody.last_frame = lastFrameUpload.url
         }
+
+        requestBody.tool = "node"
 
         response = await fetch("/api/generate-video-any-model", {
           method: "POST",

@@ -3,7 +3,6 @@
 import * as React from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -150,101 +149,96 @@ export default function AssetsPage() {
     const TypeIcon = getTypeIcon(generation.type)
     
     return (
-      <Card key={generation.id} className="overflow-hidden group hover:shadow-lg transition-shadow ">
-        <CardContent className="p-0 flex flex-col">
-          {/* Media Section */}
-          <div className="relative">
-            {generation.type === 'image' && (
-              <div className="relative aspect-square w-full px-4 pt-4">
-                <Image
-                  src={generation.url}
-                  alt={generation.prompt || 'Generated image'}
-                  fill
-                  className="object-cover rounded-lg"
-                  style={{ paddingLeft: '8px', paddingRight: '8px' }}
-                />
-              </div>
-            )}
-            {generation.type === 'video' && (
-              <div className="relative w-full px-[3px] pt-1 pb-1">
-                <video
-                  src={generation.url}
-                  controls
-                  className="w-full h-auto rounded-lg"
-                  style={{ paddingLeft: '8px', paddingRight: '8px' }}
-                  preload="metadata"
-                />
-              </div>
-            )}
-            {generation.type === 'audio' && (
-              <div className="px-4 pb-4 pt-0">
-                <audio
-                  src={generation.url}
-                  controls
-                  className="w-full"
-                />
-              </div>
-            )}
-            
-            {/* Action Menu Button - positioned absolutely */}
-            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className="h-8 w-8 bg-background/80 hover:bg-background backdrop-blur-sm"
-                  >
-                    <DotsThreeVertical className="h-4 w-4" />
-                    <span className="sr-only">Open menu</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleDownload(generation)}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleDelete(generation)}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash className="mr-2 h-4 w-4" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+      <div key={generation.id} className="group">
+        <div className="relative">
+          {generation.type === 'image' && (
+            <div className="relative aspect-square w-full">
+              <Image
+                src={generation.url}
+                alt={generation.prompt || 'Generated image'}
+                fill
+                className="object-cover rounded-lg"
+              />
             </div>
+          )}
+          {generation.type === 'video' && (
+            <div className="relative w-full">
+              <video
+                src={generation.url}
+                controls
+                className="w-full h-auto rounded-lg"
+                preload="metadata"
+              />
+            </div>
+          )}
+          {generation.type === 'audio' && (
+            <div>
+              <audio
+                src={generation.url}
+                controls
+                className="w-full"
+              />
+            </div>
+          )}
+          
+          {/* Action Menu Button - positioned absolutely */}
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="h-8 w-8 bg-background/80 hover:bg-background backdrop-blur-sm"
+                >
+                  <DotsThreeVertical className="h-4 w-4" />
+                  <span className="sr-only">Open menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleDownload(generation)}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleDelete(generation)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Metadata Section - consistent for all types */}
+        <div className="mt-3 space-y-2">
+          {/* Type Badge and Date */}
+          <div className="flex items-center justify-between">
+            <Badge variant="outline" className="gap-1">
+              <TypeIcon className="h-3 w-3" />
+              <span className="capitalize">{generation.type}</span>
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {formatDate(generation.created_at)}
+            </span>
           </div>
 
-          {/* Metadata Section - consistent for all types */}
-          <div className="p-3 space-y-2 border-t">
-            {/* Type Badge and Date */}
-            <div className="flex items-center justify-between">
-              <Badge variant="outline" className="gap-1">
-                <TypeIcon className="h-3 w-3" />
-                <span className="capitalize">{generation.type}</span>
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                {formatDate(generation.created_at)}
-              </span>
+          {/* Model (if available) */}
+          {generation.model && (
+            <div className="text-xs text-muted-foreground">
+              Model: <span className="font-medium">{generation.model}</span>
             </div>
+          )}
 
-            {/* Model (if available) */}
-            {generation.model && (
-              <div className="text-xs text-muted-foreground">
-                Model: <span className="font-medium">{generation.model}</span>
-              </div>
-            )}
-
-            {/* Prompt/Description */}
-            {generation.prompt && (
-              <p className="text-sm text-foreground line-clamp-2">
-                {generation.prompt}
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          {/* Prompt/Description */}
+          {generation.prompt && (
+            <p className="text-sm text-foreground line-clamp-2">
+              {generation.prompt}
+            </p>
+          )}
+        </div>
+      </div>
     )
   }
 

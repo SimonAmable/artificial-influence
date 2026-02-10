@@ -30,6 +30,7 @@ export function Header() {
   const isCustomComponentsPage = pathname === "/custom-components"
   const isInfluencerGeneratorPage = pathname === "/influencer-generator"
   const isImagePage = pathname === "/image"
+  const isCharacterSwapPage = pathname === "/character-swap"
   const isMotionCopyPage = pathname === "/motion-copy"
   const isLipsyncPage = pathname === "/lipsync"
   const isAuthPage = pathname === "/login"
@@ -121,8 +122,8 @@ export function Header() {
     )}>
       <PromotionalBanner />
       <div className="flex h-14 min-w-0 items-center justify-between gap-2 px-4">
-        <div className="flex min-w-0 shrink items-center gap-4 lg:gap-6">
-          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+        <div className="flex min-w-0 shrink items-center gap-4 lg:gap-6 overflow-hidden">
+          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity shrink-0">
             <Image 
               src="/logo.svg" 
               alt="Logo" 
@@ -132,13 +133,13 @@ export function Header() {
             />
           </Link>
           {/* Desktop Navigation - hidden on tablet and smaller */}
-          <nav className="hidden lg:flex items-center gap-6">
+          <nav className="hidden lg:flex items-center gap-6 whitespace-nowrap overflow-hidden">
             {navigationItems.map((item) => (
               <Link
                 key={item.path}
                 href={item.path}
                 className={cn(
-                  "text-foreground font-bold transition-colors hover:text-primary",
+                  "text-foreground font-bold transition-colors hover:text-primary whitespace-nowrap",
                   pathname === item.path && "text-primary",
                   item.className
                 )}
@@ -221,8 +222,8 @@ export function Header() {
             </>
           )}
           <SettingsDropdown
-            layoutMode={(isCustomComponentsPage || isInfluencerGeneratorPage || isImagePage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.layoutMode : undefined}
-            onLayoutModeChange={(isCustomComponentsPage || isInfluencerGeneratorPage || isImagePage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.setLayoutMode : undefined}
+            layoutMode={(isCustomComponentsPage || isInfluencerGeneratorPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.layoutMode : undefined}
+            onLayoutModeChange={(isCustomComponentsPage || isInfluencerGeneratorPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.setLayoutMode : undefined}
           />
         </div>
       </div>

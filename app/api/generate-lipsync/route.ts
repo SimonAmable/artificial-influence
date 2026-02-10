@@ -202,6 +202,7 @@ export async function POST(request: NextRequest) {
           model: 'veed/fabric-1.0',
           type: 'video',
           is_public: true,
+          tool: 'lipsync',
         };
 
         const { data: savedData, error: saveError } = await supabase

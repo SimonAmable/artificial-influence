@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -115,86 +114,82 @@ export default function AssetsPage() {
     const TypeIcon = asset.assetType === "image" ? ImageIcon : asset.assetType === "video" ? Video : MusicNote
 
     return (
-      <Card key={asset.id} className="overflow-hidden group hover:shadow-lg transition-shadow">
-        <CardContent className="p-0 flex flex-col">
-          <div className="relative">
-            {asset.assetType === "image" && (
-              <div className="relative aspect-square w-full px-4 pt-4">
-                <Image
-                  src={asset.thumbnailUrl || asset.url}
-                  alt={asset.title}
-                  fill
-                  className="object-cover rounded-lg"
-                  style={{ paddingLeft: "8px", paddingRight: "8px" }}
-                  unoptimized
-                />
-              </div>
-            )}
-            {asset.assetType === "video" && (
-              <div className="relative w-full px-[3px] pt-1 pb-1">
-                <video
-                  src={asset.url}
-                  controls
-                  className="w-full h-auto rounded-lg"
-                  style={{ paddingLeft: "8px", paddingRight: "8px" }}
-                  preload="metadata"
-                />
-              </div>
-            )}
-            {asset.assetType === "audio" && (
-              <div className="px-4 pb-4 pt-0">
-                <audio src={asset.url} controls className="w-full" />
-              </div>
-            )}
-
-            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/80 hover:bg-background backdrop-blur-sm">
-                    <DotsThreeVertical className="h-4 w-4" />
-                    <span className="sr-only">Open menu</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleDownload(asset)}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleDelete(asset)} className="text-destructive focus:text-destructive">
-                    <Trash className="mr-2 h-4 w-4" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+      <div key={asset.id} className="group">
+        <div className="relative">
+          {asset.assetType === "image" && (
+            <div className="relative aspect-square w-full">
+              <Image
+                src={asset.thumbnailUrl || asset.url}
+                alt={asset.title}
+                fill
+                className="object-cover rounded-lg"
+                unoptimized
+              />
             </div>
+          )}
+          {asset.assetType === "video" && (
+            <div className="relative w-full">
+              <video
+                src={asset.url}
+                controls
+                className="w-full h-auto rounded-lg"
+                preload="metadata"
+              />
+            </div>
+          )}
+          {asset.assetType === "audio" && (
+            <div>
+              <audio src={asset.url} controls className="w-full" />
+            </div>
+          )}
+
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/80 hover:bg-background backdrop-blur-sm">
+                  <DotsThreeVertical className="h-4 w-4" />
+                  <span className="sr-only">Open menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleDownload(asset)}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDelete(asset)} className="text-destructive focus:text-destructive">
+                  <Trash className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+        </div>
 
-          <div className="p-3 space-y-2 border-t">
-            <div className="flex items-center justify-between">
-              <Badge variant="outline" className="gap-1">
-                <TypeIcon className="h-3 w-3" />
-                <span className="capitalize">{asset.assetType}</span>
-              </Badge>
-              <span className="text-xs text-muted-foreground">{formatDate(asset.createdAt)}</span>
-            </div>
-
-            <div className="text-sm text-foreground line-clamp-1">{asset.title}</div>
-            <Badge variant="secondary" className="w-fit text-xs">
-              {ASSET_CATEGORY_LABELS[asset.category]}
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Badge variant="outline" className="gap-1">
+              <TypeIcon className="h-3 w-3" />
+              <span className="capitalize">{asset.assetType}</span>
             </Badge>
-
-            {asset.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {asset.tags.slice(0, 3).map((tag) => (
-                  <Badge key={tag} variant="outline" className="text-[10px]">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            )}
+            <span className="text-xs text-muted-foreground">{formatDate(asset.createdAt)}</span>
           </div>
-        </CardContent>
-      </Card>
+
+          <div className="text-sm text-foreground line-clamp-1">{asset.title}</div>
+          <Badge variant="secondary" className="w-fit text-xs">
+            {ASSET_CATEGORY_LABELS[asset.category]}
+          </Badge>
+
+          {asset.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {asset.tags.slice(0, 3).map((tag) => (
+                <Badge key={tag} variant="outline" className="text-[10px]">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     )
   }
 

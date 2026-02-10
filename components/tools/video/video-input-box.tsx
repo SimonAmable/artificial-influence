@@ -169,13 +169,13 @@ export function VideoInputBox({
         {!isMotionCopyModel && !isLipsyncModel && (inputImage || lastFrameImage || (isReferenceVideoSupported && inputVideo)) && (
           <div className="flex gap-2 px-2 pt-1">
             {inputImage && inputImage.url && (
-              <div className="relative flex-1 max-w-[200px]">
+              <div className="relative inline-block">
                 <Image
                   src={inputImage.url}
                   alt="Input preview"
                   width={200}
                   height={150}
-                  className="w-full h-auto max-h-32 rounded-md object-cover border border-border"
+                  className="w-auto h-auto max-h-32 rounded-md object-contain border border-border"
                 />
                 <button
                   onClick={() => onInputImageChange(null)}
@@ -190,13 +190,13 @@ export function VideoInputBox({
               </div>
             )}
             {lastFrameImage && lastFrameImage.url && (
-              <div className="relative flex-1 max-w-[200px]">
+              <div className="relative inline-block">
                 <Image
                   src={lastFrameImage.url}
                   alt="Last frame preview"
                   width={200}
                   height={150}
-                  className="w-full h-auto max-h-32 rounded-md object-cover border border-border"
+                  className="w-auto h-auto max-h-32 rounded-md object-contain border border-border"
                 />
                 <button
                   onClick={() => onLastFrameChange(null)}
@@ -211,10 +211,10 @@ export function VideoInputBox({
               </div>
             )}
             {isReferenceVideoSupported && inputVideo?.url && (
-              <div className="relative flex-1 max-w-[200px]">
+              <div className="relative inline-block">
                 <video
                   src={inputVideo.url}
-                  className="w-full h-auto max-h-32 rounded-md object-cover border border-border"
+                  className="w-auto h-auto max-h-32 rounded-md object-contain border border-border"
                   muted
                   playsInline
                   preload="metadata"
