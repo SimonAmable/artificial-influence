@@ -423,7 +423,7 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
         >
           <div className="text-left min-w-0">
             <div className="text-[10px] uppercase tracking-wider text-zinc-500">
-              Aspect Ratio
+              Size
             </div>
             <div className="text-xs font-medium text-zinc-100 truncate">
               {activeAspectRatioLabel}

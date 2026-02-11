@@ -9,6 +9,7 @@ import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { generateImageAndWait } from "@/lib/generate-image-client"
 
 const CHARACTER_SWAP_PROMPT =
   "Character swap task using two reference images. First image is the reference character. " +
@@ -170,22 +171,7 @@ export default function CharacterSwapPage() {
       formData.append("referenceImages", sceneImage.file)
       formData.append("tool", "character_swap")
 
-      const response = await fetch("/api/generate-image", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || errorData.message || "Failed to generate character swap image")
-      }
-
-      const data = await response.json()
-      
-      if (!data.images?.length && !data.image?.url) {
-        throw new Error("No image URL returned from API")
-      }
-
+      await generateImageAndWait(formData)
       // Use DB as source of truth for grid order/history
       await fetchImageHistory(20)
     } catch (err) {

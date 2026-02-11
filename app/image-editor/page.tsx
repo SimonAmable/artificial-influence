@@ -29,7 +29,7 @@ function ImageEditorPageContent() {
   }
 
   return (
-    <main className="h-screen bg-zinc-950 p-4 pt-20">
+    <main className="h-screen w-full min-w-0 bg-zinc-950 p-2 sm:p-4 pt-20 overflow-hidden flex flex-col">
       <ImageEditor
         initialImage={initialImage}
         mode="page"
@@ -41,7 +41,7 @@ function ImageEditorPageContent() {
 
 export default function ImageEditorPage() {
   return (
-    <React.Suspense fallback={<main className="h-screen bg-zinc-950 p-4 pt-20" />}>
+    <React.Suspense fallback={<main className="h-screen w-full bg-zinc-950 p-4 pt-20" />}>
       <ImageEditorPageContent />
     </React.Suspense>
   )

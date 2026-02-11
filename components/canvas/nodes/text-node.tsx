@@ -3,7 +3,6 @@
 import * as React from "react"
 import { Handle, Position, NodeToolbar, type NodeProps, useReactFlow, useNodes, useEdges, getIncomers, useStore } from "@xyflow/react"
 import {
-  TextT,
   ArrowsOut,
   DownloadSimple,
   Plus,
@@ -20,12 +19,6 @@ import {
   DialogContent,
 } from "@/components/ui/dialog"
 import Image from "next/image"
-
-const hintSuggestions = [
-  { label: "Write a script" },
-  { label: "Ad copy" },
-  { label: "Brand text" },
-]
 
 // Calculate node dimensions based on text content
 const calculateNodeDimensions = (text: string) => {
@@ -422,14 +415,10 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
                   {nodeData.text}
                 </p>
               ) : (
-                <div className="py-2 space-y-1.5">
-                  <p className="text-[10px] text-zinc-600 uppercase tracking-wider">Try to:</p>
-                  {hintSuggestions.map((hint) => (
-                    <div key={hint.label} className="flex items-center gap-2 text-zinc-500">
-                      <TextT size={13} weight="duotone" className="text-emerald-400/60" />
-                      <span className="text-xs">{hint.label}</span>
-                    </div>
-                  ))}
+                <div className="w-full h-full px-4 flex items-center justify-center">
+                  <p className="text-xs text-zinc-500 text-center leading-relaxed max-w-[220px]">
+                    Write your script, copy, or prompt here, then connect it to image, video, or audio nodes.
+                  </p>
                 </div>
               )}
             </div>

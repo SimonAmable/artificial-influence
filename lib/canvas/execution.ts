@@ -107,25 +107,9 @@ async function executeNode(
       formData.append("aspectRatio", aspectRatio)
       formData.append("aspect_ratio", aspectRatio)
 
-      const response = await fetch("/api/generate-image", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error || err.message || "Image generation failed")
-      }
-
-      const result = await response.json()
-      let imageUrl: string | undefined
-
-      if (result.images?.length > 0) {
-        imageUrl = result.images[0].url
-      } else if (result.image?.url) {
-        imageUrl = result.image.url
-      }
-
+      const { generateImageAndWait } = await import("@/lib/generate-image-client")
+      const result = await generateImageAndWait(formData)
+      const imageUrl = result.image?.url ?? result.images?.[0]?.url
       if (!imageUrl) throw new Error("No image URL in response")
       return { imageUrl }
     }

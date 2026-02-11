@@ -2,6 +2,10 @@
  * Maps model identifiers to their corresponding icon paths in public/ai_icons
  */
 export function getModelIconPath(identifier: string): string | null {
+  if (identifier === 'custom/character-swap') {
+    return '/logo.svg'
+  }
+
   // Extract the provider/prefix from identifier (e.g., "google/nano-banana" -> "google")
   const prefix = identifier.split('/')[0]?.toLowerCase()
   

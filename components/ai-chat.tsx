@@ -24,6 +24,7 @@ interface AIChatProps {
 export function AIChat({ className }: AIChatProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [isDraggingOver, setIsDraggingOver] = React.useState(false)
+  const dragCounter = React.useRef(0)
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const chatContainerRef = React.useRef<HTMLDivElement>(null)
 
@@ -54,14 +55,26 @@ export function AIChat({ className }: AIChatProps) {
   const handleDragOver = React.useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setIsDraggingOver(true)
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDraggingOver(true)
+    }
+  }, [])
+
+  const handleDragEnter = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer.types.includes('Files')) {
+      dragCounter.current += 1
+      setIsDraggingOver(true)
+    }
   }, [])
 
   const handleDragLeave = React.useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    // Only set to false if leaving the chat container entirely
-    if (chatContainerRef.current && !chatContainerRef.current.contains(e.relatedTarget as Node)) {
+    dragCounter.current -= 1
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0
       setIsDraggingOver(false)
     }
   }, [])
@@ -69,6 +82,7 @@ export function AIChat({ className }: AIChatProps) {
   const handleDrop = React.useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    dragCounter.current = 0
     setIsDraggingOver(false)
     
     // Extract node data if dragging from canvas
@@ -168,6 +182,7 @@ export function AIChat({ className }: AIChatProps) {
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               className={cn(
@@ -548,4 +563,3 @@ const MessageInput = () => {
     </div>
   )
 }
-

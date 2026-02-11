@@ -68,6 +68,9 @@ export function VideoInputBox({
   const inputRef = React.useRef<HTMLInputElement>(null)
   const lastFrameRef = React.useRef<HTMLInputElement>(null)
   const videoRef = React.useRef<HTMLInputElement>(null)
+  const promptDragCounter = React.useRef(0)
+  const [isPromptDragActive, setIsPromptDragActive] = React.useState(false)
+  const [draggedMediaKind, setDraggedMediaKind] = React.useState<"image" | "video" | "unknown" | null>(null)
 
 
 
@@ -161,9 +164,152 @@ export function VideoInputBox({
     return promptValue.trim().length > 0
   })()
 
+  const canDropReferenceVideo = React.useMemo(() => {
+    if (!isReferenceVideoSupported) return false
+    return !inputVideo || !isMotionCopyModel
+  }, [inputVideo, isMotionCopyModel, isReferenceVideoSupported])
+
+  const nextImageDropSlot = React.useMemo<"input" | "lastFrame" | null>(() => {
+    // Motion copy and lipsync always use an image slot
+    if (isMotionCopyModel || isLipsyncModel) {
+      return "input"
+    }
+
+    if (!modelSupportsImage && !modelSupportsLastFrame) return null
+
+    if (modelSupportsImage && !inputImage) return "input"
+    if (modelSupportsLastFrame && !lastFrameImage) return "lastFrame"
+
+    if (modelSupportsImage) return "input"
+    if (modelSupportsLastFrame) return "lastFrame"
+    return null
+  }, [
+    inputImage,
+    isLipsyncModel,
+    isMotionCopyModel,
+    lastFrameImage,
+    modelSupportsImage,
+    modelSupportsLastFrame,
+  ])
+
+  const nextImageDropLabel = React.useMemo(() => {
+    if (nextImageDropSlot === "lastFrame") return "Last Frame"
+    if (nextImageDropSlot === "input") {
+      if (selectedModel.identifier === "minimax/hailuo-2.3-fast") return "First Frame"
+      if (isMotionCopyModel || isLipsyncModel) return "Reference Image"
+      return "Input Image"
+    }
+    return "Reference Image"
+  }, [isLipsyncModel, isMotionCopyModel, nextImageDropSlot, selectedModel.identifier])
+
+  const canAcceptImageDrop = nextImageDropSlot !== null
+  const canAcceptPromptDrop = needsPrompt && (canAcceptImageDrop || canDropReferenceVideo)
+
+  const getDraggedMediaKind = React.useCallback((dataTransfer: DataTransfer): "image" | "video" | "unknown" => {
+    const items = Array.from(dataTransfer.items || [])
+    const fileItem = items.find((item) => item.kind === "file")
+    const mime = fileItem?.type || ""
+    if (mime.startsWith("image/")) return "image"
+    if (mime.startsWith("video/")) return "video"
+    return "unknown"
+  }, [])
+
+  const handlePromptDrop = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    promptDragCounter.current = 0
+    setIsPromptDragActive(false)
+    setDraggedMediaKind(null)
+
+    if (!canAcceptPromptDrop) return
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+
+    if (file.type.startsWith("video/") && canDropReferenceVideo) {
+      const videoUpload: ImageUpload = {
+        file,
+        url: URL.createObjectURL(file),
+      }
+      onInputVideoChange(videoUpload)
+      return
+    }
+
+    if (!file.type.startsWith("image/")) return
+
+    const imageUpload: ImageUpload = {
+      file,
+      url: URL.createObjectURL(file),
+    }
+
+    if (nextImageDropSlot === "lastFrame") {
+      onLastFrameChange(imageUpload)
+      return
+    }
+
+    onInputImageChange(imageUpload)
+  }, [canAcceptPromptDrop, canDropReferenceVideo, nextImageDropSlot, onInputImageChange, onInputVideoChange, onLastFrameChange])
+
+  const handlePromptDragOver = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!canAcceptPromptDrop || !e.dataTransfer.types.includes("Files")) return
+    const kind = getDraggedMediaKind(e.dataTransfer)
+    setDraggedMediaKind(kind)
+  }, [canAcceptPromptDrop, getDraggedMediaKind])
+
+  const handlePromptDragEnter = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!canAcceptPromptDrop || !e.dataTransfer.types.includes("Files")) return
+    const kind = getDraggedMediaKind(e.dataTransfer)
+    setDraggedMediaKind(kind)
+    promptDragCounter.current += 1
+    setIsPromptDragActive(true)
+  }, [canAcceptPromptDrop, getDraggedMediaKind])
+
+  const handlePromptDragLeave = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    promptDragCounter.current -= 1
+    if (promptDragCounter.current <= 0) {
+      promptDragCounter.current = 0
+      setIsPromptDragActive(false)
+      setDraggedMediaKind(null)
+    }
+  }, [])
+
+  const promptDropLabel = React.useMemo(() => {
+    if (draggedMediaKind === "video" && canDropReferenceVideo) {
+      return "Reference Video"
+    }
+    if (draggedMediaKind === "image" && canAcceptImageDrop) {
+      return nextImageDropLabel
+    }
+    if (canAcceptImageDrop) return nextImageDropLabel
+    if (canDropReferenceVideo) return "Reference Video"
+    return "Reference Media"
+  }, [canAcceptImageDrop, canDropReferenceVideo, draggedMediaKind, nextImageDropLabel])
+
+  const promptPlaceholderText = needsPrompt
+    ? (
+      isPromptDragActive && canAcceptPromptDrop
+        ? `Drop file to set ${promptDropLabel}...`
+        : `Describe the video you want to generate...${canAcceptPromptDrop ? ` (or drag file anywhere in this box to set ${promptDropLabel})` : ""}`
+    )
+    : "Describe the video you want to generate..."
+
   // Unified interface structure
   return (
-    <Card className={cn("w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative", forceRowLayout && "backdrop-blur-xl bg-background/95 shadow-2xl border-2")}>
+    <Card
+      className={cn("w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative", forceRowLayout && "backdrop-blur-xl bg-background/95 shadow-2xl border-2")}
+      onDropCapture={handlePromptDrop}
+      onDragOverCapture={handlePromptDragOver}
+      onDragEnterCapture={handlePromptDragEnter}
+      onDragLeaveCapture={handlePromptDragLeave}
+    >
+      {isPromptDragActive && canAcceptPromptDrop && (
+        <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] border-2 border-dashed border-primary bg-primary/20" />
+      )}
       <CardContent className="p-2 flex flex-col gap-1.5">
         {/* Image/Video Previews - Show uploaded assets from plus button (only when not using custom upload components) */}
         {!isMotionCopyModel && !isLipsyncModel && (inputImage || lastFrameImage || (isReferenceVideoSupported && inputVideo)) && (
@@ -243,6 +389,7 @@ export function VideoInputBox({
               negativePromptValue={negativePromptValue}
               onNegativePromptChange={onNegativePromptChange}
               showNegativePrompt={modelSupportsNegativePrompt}
+              placeholder={promptPlaceholderText}
               variant="page"
               onPromptKeyDown={handleTextInputKeyDown}
             />

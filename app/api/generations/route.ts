@@ -38,6 +38,9 @@ export async function GET(request: NextRequest) {
       query = query.eq('tool', tool);
     }
 
+    // Exclude pending (async Replicate) so list only shows completed/failed with results
+    query = query.neq('status', 'pending');
+
     const { data: generations, error } = await query;
 
     if (error) {
@@ -48,19 +51,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get public URLs for each generation
-    const generationsWithUrls = await Promise.all(
-      (generations || []).map(async (generation) => {
-        const { data: urlData } = supabase.storage
-          .from('public-bucket')
-          .getPublicUrl(generation.supabase_storage_path);
-        
-        return {
-          ...generation,
-          url: urlData.publicUrl,
-        };
-      })
-    );
+    // Get public URLs for each generation (skip pending or missing path)
+    const generationsWithUrls = (generations || []).map((generation) => {
+      const path = generation.supabase_storage_path;
+      const url =
+        path != null && path !== ''
+          ? supabase.storage.from('public-bucket').getPublicUrl(path).data.publicUrl
+          : null;
+      return {
+        ...generation,
+        url,
+      };
+    });
 
     return NextResponse.json({
       generations: generationsWithUrls,

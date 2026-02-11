@@ -48,8 +48,8 @@ export function ImageEditorToolbar({
   return (
     <div
       className={cn(
-        "flex items-center gap-1 px-2 py-1.5",
-        "bg-zinc-900/90 border border-white/10 rounded-xl backdrop-blur-md",
+        "flex items-center gap-0.5 sm:gap-1 px-1.5 py-1 sm:px-2 sm:py-1.5",
+        "bg-zinc-900/90 border border-white/10 rounded-lg sm:rounded-xl backdrop-blur-md",
         className
       )}
     >
@@ -64,7 +64,7 @@ export function ImageEditorToolbar({
             variant="ghost"
             size="icon"
             className={cn(
-              "h-9 w-9 rounded-lg transition-colors",
+              "h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg transition-colors",
               isActive
                 ? "bg-primary/20 text-primary ring-1 ring-primary/40"
                 : "text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
@@ -72,27 +72,27 @@ export function ImageEditorToolbar({
             onClick={() => setTool(isActive ? "select" : tool.id)}
             title={`${tool.label} (${tool.shortcut})`}
           >
-            <Icon size={20} weight={isActive ? "fill" : "regular"} />
+            <Icon size={18} weight={isActive ? "fill" : "regular"} />
           </Button>
         )
       })}
 
       {/* Separator */}
-      <div className="w-px h-6 bg-white/10 mx-1" />
+      <div className="w-px h-4 sm:h-6 bg-white/10 mx-0.5 sm:mx-1" />
 
       {/* Undo */}
       <Button
         variant="ghost"
         size="icon"
         className={cn(
-          "h-9 w-9 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5",
+          "h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5",
           !canUndo && "opacity-40 cursor-not-allowed"
         )}
         onClick={undo}
         disabled={!canUndo}
         title="Undo (Ctrl+Z)"
       >
-        <ArrowCounterClockwise size={20} />
+        <ArrowCounterClockwise size={18} />
       </Button>
 
       {/* Redo */}
@@ -100,41 +100,41 @@ export function ImageEditorToolbar({
         variant="ghost"
         size="icon"
         className={cn(
-          "h-9 w-9 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5",
+          "h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5",
           !canRedo && "opacity-40 cursor-not-allowed"
         )}
         onClick={redo}
         disabled={!canRedo}
         title="Redo (Ctrl+Shift+Z)"
       >
-        <ArrowClockwise size={20} />
+        <ArrowClockwise size={18} />
       </Button>
 
       {/* Separator */}
-      <div className="w-px h-6 bg-white/10 mx-1" />
+      <div className="w-px h-4 sm:h-6 bg-white/10 mx-0.5 sm:mx-1" />
 
       {/* Fullscreen */}
       {onToggleFullscreen && (
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
+          className="h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
           onClick={onToggleFullscreen}
           title={isFullscreen ? "Exit Fullscreen (F)" : "Fullscreen (F)"}
         >
-          {isFullscreen ? <ArrowsIn size={20} /> : <ArrowsOut size={20} />}
+          {isFullscreen ? <ArrowsIn size={18} /> : <ArrowsOut size={18} />}
         </Button>
       )}
 
       {/* Mask mode toggle */}
       {activeTool === "lasso" && (
         <>
-          <div className="w-px h-6 bg-white/10 mx-1" />
+          <div className="w-px h-4 sm:h-6 bg-white/10 mx-0.5 sm:mx-1" />
           <Button
             variant="ghost"
             size="sm"
             className={cn(
-              "h-8 px-3 rounded-lg text-xs",
+              "h-7 sm:h-8 px-2 sm:px-3 rounded-md sm:rounded-lg text-[10px] sm:text-xs",
               maskMode === "add"
                 ? "bg-primary/20 text-primary ring-1 ring-primary/40"
                 : "text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
@@ -148,7 +148,7 @@ export function ImageEditorToolbar({
             variant="ghost"
             size="sm"
             className={cn(
-              "h-8 px-3 rounded-lg text-xs",
+              "h-7 sm:h-8 px-2 sm:px-3 rounded-md sm:rounded-lg text-[10px] sm:text-xs",
               maskMode === "erase"
                 ? "bg-primary/20 text-primary ring-1 ring-primary/40"
                 : "text-zinc-400 hover:text-zinc-100 hover:bg-white/5"

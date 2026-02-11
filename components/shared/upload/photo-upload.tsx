@@ -33,18 +33,24 @@ export function PhotoUpload({
   minHeight = "min-h-[50px] sm:min-h-[55px]",
 }: PhotoUploadProps) {
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
+  const [isDragging, setIsDragging] = React.useState(false)
+  const dragCounter = React.useRef(0)
+
+  const handleFileUpload = (file?: File) => {
+    if (!file) return
+    if (!file.type.startsWith("image/")) return
+
+    const url = URL.createObjectURL(file)
+    const newImage = { file, url }
+    onChange?.(newImage)
+  }
 
   const handleRemove = () => {
     onChange?.(null)
   }
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const url = URL.createObjectURL(file)
-      const newImage = { file, url }
-      onChange?.(newImage)
-    }
+    handleFileUpload(e.target.files?.[0])
   }
 
   const handleImageClick = () => {
@@ -53,8 +59,50 @@ export function PhotoUpload({
     }
   }
 
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current = 0
+    setIsDragging(false)
+    handleFileUpload(e.dataTransfer.files?.[0])
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current += 1
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDragging(true)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current -= 1
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0
+      setIsDragging(false)
+    }
+  }
+
   return (
-    <Card className={cn("relative bg-muted border-dashed border-2 border-muted-foreground/40 rounded-lg h-full py-0", className)}>
+    <Card
+      className={cn(
+        "relative bg-muted border-dashed border-2 rounded-lg h-full py-0 transition-colors",
+        isDragging ? "border-primary bg-primary/10" : "border-muted-foreground/40",
+        className
+      )}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+    >
       <CardContent className={cn("p-1.5 sm:p-2 h-full flex items-center justify-center", minHeight)}>
         {value?.url ? (
           <div className="relative group flex items-center justify-center w-full h-full min-h-[45px] p-1">

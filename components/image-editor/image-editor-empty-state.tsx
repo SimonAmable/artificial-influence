@@ -14,6 +14,7 @@ export function ImageEditorEmptyState({ className }: ImageEditorEmptyStateProps)
   const { loadImage } = useImageEditor()
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = React.useState(false)
+  const dragCounter = React.useRef(0)
 
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -38,6 +39,7 @@ export function ImageEditorEmptyState({ className }: ImageEditorEmptyStateProps)
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    dragCounter.current = 0
     setIsDragging(false)
 
     const file = e.dataTransfer.files?.[0]
@@ -54,13 +56,20 @@ export function ImageEditorEmptyState({ className }: ImageEditorEmptyStateProps)
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setIsDragging(true)
+    dragCounter.current += 1
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDragging(true)
+    }
   }
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setIsDragging(false)
+    dragCounter.current -= 1
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0
+      setIsDragging(false)
+    }
   }
 
   return (

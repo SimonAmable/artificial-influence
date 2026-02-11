@@ -418,6 +418,53 @@ export async function POST(request: NextRequest) {
           replicateInput.aspect_ratio = generateOptions.aspectRatio;
         }
 
+        const webhookBase = process.env.REPLICATE_WEBHOOK_BASE_URL?.replace(/\/$/, '');
+
+        if (webhookBase) {
+          const webhookUrl = `${webhookBase}/api/webhooks/replicate`;
+          console.log('[generate-image] Using Replicate async + webhook:', { model: modelIdentifier, webhookUrl });
+
+          const prediction = await replicateClient.predictions.create({
+            model: modelIdentifier as `${string}/${string}`,
+            input: replicateInput,
+            webhook: webhookUrl,
+            webhook_events_filter: ['completed'],
+          });
+
+          const { data: pendingGeneration, error: insertError } = await supabase
+            .from('generations')
+            .insert({
+              user_id: user.id,
+              prompt: finalPrompt,
+              supabase_storage_path: null,
+              reference_images_supabase_storage_path: referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+              aspect_ratio: aspectRatio || aspect_ratio || null,
+              model: modelIdentifier,
+              type: 'image',
+              is_public: true,
+              tool: tool || null,
+              status: 'pending',
+              replicate_prediction_id: prediction.id,
+            })
+            .select('id')
+            .single();
+
+          if (insertError || !pendingGeneration) {
+            console.error('[generate-image] Failed to insert pending generation:', insertError);
+            throw new Error('Failed to create pending generation');
+          }
+
+          return NextResponse.json(
+            {
+              status: 'pending',
+              predictionId: prediction.id,
+              generationId: pendingGeneration.id,
+              message: 'Generation started. Poll GET /api/generate-image/status?predictionId=' + prediction.id,
+            },
+            { status: 202 }
+          );
+        }
+
         console.log('[generate-image] Using Replicate polling mode:', {
           model: modelIdentifier,
           inputKeys: Object.keys(replicateInput),
@@ -684,6 +731,10 @@ export async function GET() {
   return NextResponse.json({
     message: 'Image Generation API',
     defaultModel: 'google/nano-banana',
+    asyncWebhooks: !!process.env.REPLICATE_WEBHOOK_BASE_URL,
+    note: process.env.REPLICATE_WEBHOOK_BASE_URL
+      ? 'Async mode: POST returns 202 with predictionId; poll GET /api/generate-image/status?predictionId=...'
+      : undefined,
     usage: {
       method: 'POST',
       contentType: 'multipart/form-data',

@@ -10,7 +10,6 @@ import {
   ArrowsOut,
   DownloadSimple,
   Crop,
-  ArrowBendUpRight,
   Plus,
   MagicWand,
   X,
@@ -54,13 +53,6 @@ import {
 import { getConstrainedSize, loadImageSize } from "@/lib/canvas/media-sizing"
 import { ImageEditorDialog } from "@/components/image-editor"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
-
-const hintSuggestions = [
-  { icon: ImageIcon, label: "Image to Image" },
-  { icon: ArrowBendUpRight, label: "Image to Video" },
-  { icon: MagicWand, label: "Change Background" },
-  { icon: Play, label: "First-frame to Video" },
-]
 
 // Helper function to get dimensions for aspect ratio
 const getImageDimensions = (aspectRatio: string) => {
@@ -561,46 +553,16 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
 
       formData.append("tool", "node")
 
-      const response = await fetch("/api/generate-image", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const err = await response.json()
-        
-        // Handle insufficient credits (402)
-        if (response.status === 402) {
-          toast.error(err.message || "Insufficient credits", {
-            description: "Upgrade your plan to continue generating images",
-            action: {
-              label: "View Plans",
-              onClick: () => window.open("/pricing", "_blank")
-            }
-          })
-          nodeData.onDataChange?.(id, {
-            isGenerating: false,
-            error: err.message || "Insufficient credits",
-          })
-          return
-        }
-        
-        throw new Error(err.error || err.message || "Failed to generate image")
-      }
-
-      const result = await response.json()
+      const { generateImageAndWait } = await import("@/lib/generate-image-client")
+      const result = await generateImageAndWait(formData)
       const newImageUrls: string[] = []
-
-      if (result.images?.length > 0) {
+      if (result.images?.length) {
         for (const image of result.images) {
-          if (typeof image?.url === "string" && image.url.length > 0) {
-            newImageUrls.push(image.url)
-          }
+          if (typeof image?.url === "string" && image.url.length > 0) newImageUrls.push(image.url)
         }
       } else if (typeof result.image?.url === "string" && result.image.url.length > 0) {
         newImageUrls.push(result.image.url)
       }
-
       if (newImageUrls.length === 0) throw new Error("No image URL received")
 
       const nextImageUrls = [...generatedImageUrls, ...newImageUrls].slice(-MAX_GENERATED_IMAGES)
@@ -613,10 +575,14 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         error: null,
       })
     } catch (err) {
-      nodeData.onDataChange?.(id, {
-        isGenerating: false,
-        error: err instanceof Error ? err.message : "Generation failed",
-      })
+      const message = err instanceof Error ? err.message : "Generation failed"
+      if (message.includes("Insufficient credits")) {
+        toast.error(message, {
+          description: "Upgrade your plan to continue generating images",
+          action: { label: "View Plans", onClick: () => window.open("/pricing", "_blank") }
+        })
+      }
+      nodeData.onDataChange?.(id, { isGenerating: false, error: message })
     }
   }
 
@@ -889,16 +855,10 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
               )}
             </div>
           ) : (
-            <div className="px-3 py-3">
-              <div className="py-2 space-y-1.5">
-                <p className="text-[10px] text-zinc-600 uppercase tracking-wider">Try to:</p>
-                {hintSuggestions.map((hint) => (
-                  <div key={hint.label} className="flex items-center gap-2 text-zinc-500">
-                    <hint.icon size={13} weight="duotone" className="text-purple-400/60" />
-                    <span className="text-xs">{hint.label}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="w-full h-full px-4 flex items-center justify-center">
+              <p className="text-xs text-zinc-500 text-center leading-relaxed max-w-[220px]">
+                Describe the image you want, then click Generate. Optionally connect text or image references.
+              </p>
             </div>
           )}
         </div>

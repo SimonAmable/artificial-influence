@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Get user's current credit balance
  */
-export async function getUserCredits(userId: string): Promise<number> {
-  const supabase = await createClient();
+export async function getUserCredits(userId: string, supabaseClient?: SupabaseClient): Promise<number> {
+  const supabase = supabaseClient ?? (await createClient());
 
   const { data, error } = await supabase
     .from('profiles')
@@ -25,9 +26,10 @@ export async function getUserCredits(userId: string): Promise<number> {
  */
 export async function checkUserHasCredits(
   userId: string,
-  requiredCredits: number
+  requiredCredits: number,
+  supabaseClient?: SupabaseClient
 ): Promise<boolean> {
-  const currentCredits = await getUserCredits(userId);
+  const currentCredits = await getUserCredits(userId, supabaseClient);
   return currentCredits >= requiredCredits;
 }
 
@@ -37,9 +39,10 @@ export async function checkUserHasCredits(
  */
 export async function deductUserCredits(
   userId: string,
-  creditsToDeduct: number
+  creditsToDeduct: number,
+  supabaseClient?: SupabaseClient
 ): Promise<number> {
-  const supabase = await createClient();
+  const supabase = supabaseClient ?? (await createClient());
 
   const { data, error } = await supabase.rpc('deduct_credits', {
     user_id: userId,

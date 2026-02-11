@@ -12,7 +12,7 @@ const CanvasHeroFlow = dynamic(
 
 export function CanvasHeroSection() {
   const [isMobile, setIsMobile] = React.useState(false)
-  const mobileWorkflowPreview = canvasSeeds[0]?.mediaSrc ?? "/canvas_landing_page_assets/influencer_workflows.png"
+  const mobileWorkflowPreview = "/canvas_landing_page_assets/icon%20creation.png"
 
   React.useEffect(() => {
     const query = window.matchMedia("(max-width: 767px)")

@@ -3,7 +3,6 @@
 import * as React from "react"
 import { Handle, Position, NodeToolbar, type NodeProps, useStore } from "@xyflow/react"
 import {
-  SpeakerHigh,
   CircleNotch,
   Play,
   ArrowClockwise,
@@ -30,11 +29,6 @@ import {
   DialogContent,
 } from "@/components/ui/dialog"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
-
-const hintSuggestions = [
-  { label: "Text to Speech" },
-  { label: "Add voice narration" },
-]
 
 export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as AudioNodeData
@@ -274,16 +268,10 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
               />
             </div>
           ) : (
-            <div className="px-3 py-3">
-              <div className="py-2 space-y-1.5">
-                <p className="text-[10px] text-zinc-600 uppercase tracking-wider">Try to:</p>
-                {hintSuggestions.map((hint) => (
-                  <div key={hint.label} className="flex items-center gap-2 text-zinc-500">
-                    <SpeakerHigh size={13} weight="duotone" className="text-orange-400/60" />
-                    <span className="text-xs">{hint.label}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="w-full h-full px-4 flex items-center justify-center">
+              <p className="text-xs text-zinc-500 text-center leading-relaxed max-w-[220px]">
+                Enter the text you want spoken, choose a voice, then click Generate audio.
+              </p>
             </div>
           )}
         </div>

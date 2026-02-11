@@ -123,25 +123,25 @@ function ImageEditorInner({
     <div
       ref={containerRef}
       className={cn(
-        "relative flex flex-col bg-zinc-950",
+        "relative flex flex-col bg-zinc-950 w-full min-w-0 flex-1",
         mode === "page" ? "h-full min-h-0" : "h-full min-h-[600px]",
         className
       )}
     >
-      {/* Top-left: Color + aspect ratio controls */}
+      {/* Top-left: Color + size controls */}
       <div className="absolute left-4 top-4 z-20">
         <ImageEditorColorPicker />
       </div>
 
-      {/* Right side: Layers/object panel */}
+      {/* Right side: Layers/object panel - hidden on mobile */}
       {showLayers && (
-        <div className="absolute right-4 top-4  z-20">
+        <div className="absolute right-4 top-4 z-20 hidden md:block">
           <ImageEditorLayers />
         </div>
       )}
 
       {/* Main canvas area - always render canvas so it can receive images */}
-      <div className="flex-1 min-h-0 relative px-16 py-8 pt-20 pb-60">
+      <div className="flex-1 min-h-0 min-w-0 relative px-2 sm:px-4 md:px-6 py-4 sm:py-6 pt-16 sm:pt-20 pb-52 sm:pb-60">
         <div className="relative h-full w-full rounded-xl  overflow-hidden">
           <ImageEditorCanvas
             className="absolute inset-0"
@@ -178,7 +178,7 @@ function ImageEditorInner({
       </div>
 
       {/* Bottom controls */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3 w-full max-w-4xl px-4">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3 w-full max-w-5xl px-2 sm:px-4">
         {/* Toolbar */}
         <ImageEditorToolbar
           onToggleFullscreen={toggleFullscreen}

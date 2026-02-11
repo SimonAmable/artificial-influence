@@ -59,6 +59,14 @@ interface InfluencerInputBoxProps {
   selectedNumImages?: number
   onNumImagesChange?: (n: number) => void
   showNumImagesSelector?: boolean
+  customPromptContent?: React.ReactNode
+  customControlsStart?: React.ReactNode
+  hidePromptInput?: boolean
+  showReferenceControls?: boolean
+  showGenerateInBottomRow?: boolean
+  hideEnhancePrompt?: boolean
+  isReadyOverride?: boolean
+  uploadMenuItems?: React.ReactNode
 }
 
 export function InfluencerInputBox({
@@ -88,14 +96,24 @@ export function InfluencerInputBox({
   selectedNumImages = 1,
   onNumImagesChange,
   showNumImagesSelector = false,
+  customPromptContent,
+  customControlsStart,
+  hidePromptInput = false,
+  showReferenceControls = true,
+  showGenerateInBottomRow = false,
+  hideEnhancePrompt = false,
+  isReadyOverride,
+  uploadMenuItems,
 }: InfluencerInputBoxProps) {
   const [localPrompt, setLocalPrompt] = React.useState(promptValue)
   const [localReferenceImage, setLocalReferenceImage] = React.useState<ImageUpload | null>(referenceImage || null)
   const [localReferenceImages, setLocalReferenceImages] = React.useState<ImageUpload[]>(referenceImages || [])
+  const [isPromptDragActive, setIsPromptDragActive] = React.useState(false)
   const [isFullScreenPreviewOpen, setIsFullScreenPreviewOpen] = React.useState(false)
   const [fullScreenImageIndex, setFullScreenImageIndex] = React.useState(0)
   const [assetModalOpen, setAssetModalOpen] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const promptDragCounter = React.useRef(0)
   
   // Use DB models when provided, else fallback to constants
   const metadataModels = React.useMemo(() => getActiveModelMetadata('image'), [])
@@ -139,6 +157,57 @@ export function InfluencerInputBox({
     setLocalPrompt(value)
     onPromptChange?.(value)
   }
+
+  const canAcceptPromptDrop = showReferenceControls && Boolean(onReferenceImagesChange || onReferenceImageChange)
+
+  const handlePromptImageFile = React.useCallback((file?: File) => {
+    if (!file || !file.type.startsWith("image/")) return
+
+    const url = URL.createObjectURL(file)
+    const newImage: ImageUpload = { file, url }
+
+    if (onReferenceImagesChange) {
+      const updatedImages = [...localReferenceImages, newImage]
+      setLocalReferenceImages(updatedImages)
+      onReferenceImagesChange(updatedImages)
+      return
+    }
+
+    setLocalReferenceImage(newImage)
+    onReferenceImageChange?.(newImage)
+  }, [localReferenceImages, onReferenceImageChange, onReferenceImagesChange])
+
+  const handlePromptDrop = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    promptDragCounter.current = 0
+    setIsPromptDragActive(false)
+    if (!canAcceptPromptDrop) return
+    handlePromptImageFile(e.dataTransfer.files?.[0])
+  }, [canAcceptPromptDrop, handlePromptImageFile])
+
+  const handlePromptDragOver = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
+  const handlePromptDragEnter = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!canAcceptPromptDrop || !e.dataTransfer.types.includes("Files")) return
+    promptDragCounter.current += 1
+    setIsPromptDragActive(true)
+  }, [canAcceptPromptDrop])
+
+  const handlePromptDragLeave = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    promptDragCounter.current -= 1
+    if (promptDragCounter.current <= 0) {
+      promptDragCounter.current = 0
+      setIsPromptDragActive(false)
+    }
+  }, [])
 
   const handleTextInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // If Enter is pressed without Shift, trigger generate
@@ -263,8 +332,11 @@ export function InfluencerInputBox({
 
   // Determine if button is ready (prompt must not be empty)
   const isReady = React.useMemo(() => {
+    if (typeof isReadyOverride === "boolean") {
+      return isReadyOverride
+    }
     return localPrompt.trim().length > 0
-  }, [localPrompt])
+  }, [isReadyOverride, localPrompt])
 
   // Determine which images to display (multiple or single)
   const displayImages = onReferenceImagesChange 
@@ -273,11 +345,30 @@ export function InfluencerInputBox({
       ? [localReferenceImage] 
       : []
 
+  const promptPlaceholderText =
+    canAcceptPromptDrop && isPromptDragActive
+      ? "Drop image to set Reference Image..."
+      : canAcceptPromptDrop
+        ? `${placeholder} (or drag an image anywhere in this box to set Reference Image)`
+        : placeholder
+
   return (
-    <Card className={cn("w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative", className)}>
+    <Card
+      className={cn(
+        "w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative transition-colors",
+        className
+      )}
+      onDrop={handlePromptDrop}
+      onDragOver={handlePromptDragOver}
+      onDragEnter={handlePromptDragEnter}
+      onDragLeave={handlePromptDragLeave}
+    >
+      {isPromptDragActive && canAcceptPromptDrop && (
+        <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] border-2 border-dashed border-primary bg-primary/20" />
+      )}
       <CardContent className="p-2 flex flex-col gap-1.5">
         {/* Image Preview - Above Text Input */}
-        {displayImages.length > 0 && (
+        {showReferenceControls && displayImages.length > 0 && (
           <div className="relative w-full flex gap-2 flex-wrap">
             {displayImages.map((image, index) => (
               <div key={index} className="relative">
@@ -310,7 +401,7 @@ export function InfluencerInputBox({
               value={localPrompt}
               onChange={handlePromptChange}
               onKeyDown={handleTextInputKeyDown}
-              placeholder={placeholder}
+              placeholder={promptPlaceholderText}
               className="w-full border-none outline-none resize-none bg-transparent text-sm min-h-[60px] max-h-[120px] overflow-y-auto"
               rows={3}
             />

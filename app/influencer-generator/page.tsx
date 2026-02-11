@@ -18,18 +18,18 @@ export default function InfluencerGeneratorPage() {
   return (
     <div
       className={cn(
-        "h-screen bg-background overflow-hidden flex flex-col",
-        isRowLayout ? "p-0" : "p-4 sm:p-6 md:p-12"
+        "h-screen w-full min-w-0 bg-background overflow-hidden flex flex-col",
+        isRowLayout ? "p-0" : "p-2 sm:p-4 md:p-6"
       )}
     >
       <div
         className={cn(
-          "mx-auto overflow-hidden flex-1 min-h-0 flex flex-col",
-          isRowLayout ? "w-full pt-[50px]" : "max-w-7xl pt-12"
+          "w-full min-w-0 overflow-hidden flex-1 min-h-0 flex flex-col flex-1",
+          isRowLayout ? "pt-[50px]" : "pt-16 sm:pt-20"
         )}
       >
-        <div className="h-full flex-1 min-h-0">
-          <ImageEditor mode="page" className="h-full" />
+        <div className="h-full w-full min-w-0 flex-1 min-h-0">
+          <ImageEditor mode="page" className="h-full w-full min-w-0" />
         </div>
       </div>
     </div>

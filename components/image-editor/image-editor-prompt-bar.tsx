@@ -273,30 +273,8 @@ export function ImageEditorPromptBar({
 
         formData.append("tool", "image_editing")
 
-        const response = await fetch("/api/generate-image", {
-          method: "POST",
-          body: formData,
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          
-          // Handle insufficient credits (402)
-          if (response.status === 402) {
-            toast.error(errorData.message || "Insufficient credits", {
-              description: "Upgrade your plan to continue generating images",
-              action: {
-                label: "View Plans",
-                onClick: () => window.open("/pricing", "_blank")
-              }
-            })
-            return
-          }
-          
-          throw new Error("Generation failed")
-        }
-
-        const data = await response.json()
+        const { generateImageAndWait } = await import("@/lib/generate-image-client")
+        const data = await generateImageAndWait(formData)
 
         if (data.images?.[0]?.url) {
           await loadImage(data.images[0].url)
@@ -306,6 +284,13 @@ export function ImageEditorPromptBar({
       }
     } catch (error) {
       console.error("Generation failed:", error)
+      const message = error instanceof Error ? error.message : "Generation failed"
+      if (message.includes("Insufficient credits")) {
+        toast.error(message, {
+          description: "Upgrade your plan to continue generating images",
+          action: { label: "View Plans", onClick: () => window.open("/pricing", "_blank") }
+        })
+      }
     } finally {
       setIsGenerating(false)
       onGeneratingChange?.(false)
@@ -438,7 +423,7 @@ export function ImageEditorPromptBar({
           </div>
         </div>
 
-        {/* Controls: Add Reference Image, Model Selector, Aspect Ratio, Enhance Prompt */}
+        {/* Controls: Add Reference Image, Model Selector, Size, Enhance Prompt */}
         <div className="flex items-center gap-1.5">
           <input
             ref={referenceInputRef}

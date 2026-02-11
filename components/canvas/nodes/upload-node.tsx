@@ -36,12 +36,6 @@ import { ImageEditorDialog } from "@/components/image-editor"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import type { AssetType } from "@/lib/assets/types"
 
-const hintSuggestions = [
-  { icon: ImageIcon, label: "Image" },
-  { icon: VideoCamera, label: "Video" },
-  { icon: SpeakerHigh, label: "Audio" },
-]
-
 export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as UploadNodeData
   const inputRef = React.useRef<HTMLInputElement>(null)
@@ -623,16 +617,10 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
               </div>
             </div>
           ) : (
-            <div className="px-3 py-3">
-              <div className="py-2 space-y-1.5">
-                <p className="text-[10px] text-zinc-600 uppercase tracking-wider">Accepts:</p>
-                {hintSuggestions.map((hint) => (
-                  <div key={hint.label} className="flex items-center gap-2 text-zinc-500">
-                    <hint.icon size={13} weight="duotone" className="text-zinc-400/60" />
-                    <span className="text-xs">{hint.label}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="w-full h-full px-4 flex items-center justify-center">
+              <p className="text-xs text-zinc-500 text-center leading-relaxed max-w-[220px]">
+                Upload an image, video, or audio file to use it as input for the rest of your canvas.
+              </p>
             </div>
           )}
         </div>

@@ -3,6 +3,7 @@
 import * as React from "react"
 import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
 import { InfluencerInputBox, InfluencerShowcaseCard } from "@/components/tools/influencer"
+import { CharacterSwapInputBox } from "@/components/tools/character-swap"
 import { ImageGrid } from "@/components/shared/display/image-grid"
 // import { GenerationHistoryColumn } from "@/components/shared/display/generation-history-column" // Temporarily disabled
 import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
@@ -20,6 +21,15 @@ interface ImageHistoryItem {
   prompt: string | null
 }
 
+const CHARACTER_SWAP_UI_MODEL_IDENTIFIER = "custom/character-swap"
+const CHARACTER_SWAP_BASE_MODEL_IDENTIFIER = "google/nano-banana-pro"
+const CHARACTER_SWAP_PROMPT =
+  "Character swap task using two reference images. First image is the reference character. " +
+  "Second image is the reference scene. Place the character from the first image into the scene from the second image. " +
+  "Preserve the character's facial identity, hairstyle, body shape, and skin tone from the first image. " +
+  "Preserve scene composition, camera angle, environment layout, and lighting mood from the second image. " +
+  "Blend naturally with correct perspective, realistic scale, contact shadows, reflections, and occlusion."
+
 export default function ImagePage() {
   const layoutModeContext = useLayoutMode()
   
@@ -33,6 +43,8 @@ export default function ImagePage() {
   const [prompt, setPrompt] = React.useState("")
   const [referenceImage, setReferenceImage] = React.useState<ImageUpload | null>(null)
   const [referenceImages, setReferenceImages] = React.useState<ImageUpload[]>([])
+  const [characterSwapCharacterImage, setCharacterSwapCharacterImage] = React.useState<ImageUpload | null>(null)
+  const [characterSwapSceneImage, setCharacterSwapSceneImage] = React.useState<ImageUpload | null>(null)
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
@@ -43,10 +55,32 @@ export default function ImagePage() {
   const historyRequestIdRef = React.useRef(0)
 
   const { models: imageModels, isLoading: modelsLoading } = useModels('image')
+  const effectiveImageModels = React.useMemo(() => {
+    if (imageModels.length === 0) return imageModels
+
+    if (imageModels.some((model) => model.identifier === CHARACTER_SWAP_UI_MODEL_IDENTIFIER)) {
+      return imageModels
+    }
+
+    const baseModel = imageModels.find((model) => model.identifier === CHARACTER_SWAP_BASE_MODEL_IDENTIFIER)
+    if (!baseModel) return imageModels
+
+    return [
+      ...imageModels,
+      {
+        ...baseModel,
+        id: `ui-${CHARACTER_SWAP_UI_MODEL_IDENTIFIER}`,
+        identifier: CHARACTER_SWAP_UI_MODEL_IDENTIFIER,
+        name: "Character Swap",
+        description: "Swap a character into a scene using two references.",
+      },
+    ]
+  }, [imageModels])
   
   const [selectedModel, setSelectedModel] = React.useState<string>("")
   const [selectedAspectRatio, setSelectedAspectRatio] = React.useState<string>("match_input_image")
   const [selectedNumImages, setSelectedNumImages] = React.useState<number>(1)
+  const isCharacterSwapModel = selectedModel === CHARACTER_SWAP_UI_MODEL_IDENTIFIER
   
   // Create asset dialog state
   const [createAssetDialogOpen, setCreateAssetDialogOpen] = React.useState(false)
@@ -54,17 +88,17 @@ export default function ImagePage() {
 
   // Set default model when models load
   React.useEffect(() => {
-    if (imageModels.length > 0 && !selectedModel) {
-      const first = imageModels[0]
+    if (effectiveImageModels.length > 0 && !selectedModel) {
+      const first = effectiveImageModels[0]
       setSelectedModel(first.identifier)
       setSelectedAspectRatio(first.default_aspect_ratio ?? first.aspect_ratios?.[0] ?? "1:1")
     }
-  }, [imageModels, selectedModel])
+  }, [effectiveImageModels, selectedModel])
 
   // Update aspect ratio and clamp numImages when model changes
   React.useEffect(() => {
-    if (selectedModel && imageModels.length > 0) {
-      const model = imageModels.find(m => m.identifier === selectedModel)
+    if (selectedModel && effectiveImageModels.length > 0) {
+      const model = effectiveImageModels.find(m => m.identifier === selectedModel)
       const fallbackAspectRatio = model?.aspect_ratios?.[0]
       if (model?.default_aspect_ratio || fallbackAspectRatio) {
         setSelectedAspectRatio(model?.default_aspect_ratio ?? fallbackAspectRatio ?? "1:1")
@@ -72,7 +106,7 @@ export default function ImagePage() {
       const maxImages = model?.max_images ?? 1
       setSelectedNumImages((prev) => (maxImages >= 1 ? Math.min(prev, maxImages) : 1))
     }
-  }, [selectedModel, imageModels])
+  }, [selectedModel, effectiveImageModels])
 
   const fetchImageHistory = React.useCallback(async (limit = 20) => {
     historyAbortRef.current?.abort()
@@ -136,9 +170,21 @@ export default function ImagePage() {
 
   // Handle image generation
   const handleGenerate = async () => {
-    if (!prompt.trim()) {
+    if (!isCharacterSwapModel && !prompt.trim()) {
       setError("Please enter a prompt")
       return
+    }
+
+    if (isCharacterSwapModel) {
+      if (!characterSwapCharacterImage?.file) {
+        setError("Please upload a reference character image")
+        return
+      }
+
+      if (!characterSwapSceneImage?.file) {
+        setError("Please upload a reference scene image")
+        return
+      }
     }
 
     setIsGenerating(true)
@@ -169,22 +215,34 @@ export default function ImagePage() {
 
       // Create FormData for the request
       const formData = new FormData()
-      formData.append('prompt', prompt.trim())
+      formData.append('prompt', isCharacterSwapModel ? CHARACTER_SWAP_PROMPT : prompt.trim())
       formData.append('enhancePrompt', enhancePrompt.toString())
       
       // Add model identifier if selected
       if (selectedModel) {
-        formData.append('model', selectedModel)
+        const modelForRequest =
+          selectedModel === CHARACTER_SWAP_UI_MODEL_IDENTIFIER
+            ? CHARACTER_SWAP_BASE_MODEL_IDENTIFIER
+            : selectedModel
+        formData.append('model', modelForRequest)
       }
       
       // Add aspect ratio if selected
-      if (selectedAspectRatio) {
+      if (isCharacterSwapModel) {
+        formData.append('aspect_ratio', 'match_input_image')
+      } else if (selectedAspectRatio) {
         formData.append('aspectRatio', selectedAspectRatio)
         formData.append('aspect_ratio', selectedAspectRatio)
       }
       
       // Add reference image files if present (supports both single and multiple)
-      const imagesToUpload = referenceImages.length > 0 ? referenceImages : (referenceImage ? [referenceImage] : [])
+      const imagesToUpload = isCharacterSwapModel
+        ? [characterSwapCharacterImage, characterSwapSceneImage].filter(
+            (img): img is ImageUpload => Boolean(img)
+          )
+        : referenceImages.length > 0
+          ? referenceImages
+          : (referenceImage ? [referenceImage] : [])
       
       for (const refImage of imagesToUpload) {
         if (refImage.file) {
@@ -203,50 +261,30 @@ export default function ImagePage() {
       }
       
       // Add number of images when > 1
-      if (selectedNumImages > 1) {
+      if (!isCharacterSwapModel && selectedNumImages > 1) {
         formData.append('n', String(selectedNumImages))
       }
 
-      formData.append('tool', 'image')
+      const selectedTool = isCharacterSwapModel ? 'character_swap' : 'image'
+      formData.append('tool', selectedTool)
 
       const totalRefImages = imagesToUpload.length
       console.log('Sending request with reference images:', totalRefImages, 'numImages:', selectedNumImages)
       
-      const response = await fetch('/api/generate-image', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        
-        // Handle insufficient credits (402)
-        if (response.status === 402) {
-          toast.error(errorData.message || "Insufficient credits", {
-            description: "Upgrade your plan to continue generating images",
-            action: {
-              label: "View Plans",
-              onClick: () => window.open("/pricing", "_blank")
-            }
-          })
-          setError(errorData.message || "Insufficient credits")
-          return
-        }
-        
-        throw new Error(errorData.error || errorData.message || 'Failed to generate image')
-      }
-
-      const data = await response.json()
-      
-      if (!data.images?.length && !data.image?.url) {
-        throw new Error('No image URL received from API')
-      }
-
+      const { generateImageAndWait } = await import('@/lib/generate-image-client')
+      await generateImageAndWait(formData)
       // Use DB as source of truth for grid order/history
       await fetchImageHistory(20)
     } catch (err) {
       console.error('Error generating image:', err)
-      setError(err instanceof Error ? err.message : 'Failed to generate image')
+      const message = err instanceof Error ? err.message : 'Failed to generate image'
+      if (message.includes('Insufficient credits')) {
+        toast.error(message, {
+          description: "Upgrade your plan to continue generating images",
+          action: { label: "View Plans", onClick: () => window.open("/pricing", "_blank") }
+        })
+      }
+      setError(message)
     } finally {
       setIsGenerating(false)
     }
@@ -277,6 +315,65 @@ export default function ImagePage() {
     }
   }, [referenceImages])
 
+  const renderInputBox = React.useCallback((forceRowLayout: boolean) => {
+    if (!isCharacterSwapModel) {
+      return (
+        <InfluencerInputBox
+          forceRowLayout={forceRowLayout}
+          promptValue={prompt}
+          onPromptChange={setPrompt}
+          referenceImage={referenceImage}
+          onReferenceImageChange={setReferenceImage}
+          referenceImages={referenceImages}
+          onReferenceImagesChange={setReferenceImages}
+          enhancePrompt={enhancePrompt}
+          onEnhancePromptChange={setEnhancePrompt}
+          isGenerating={isGenerating}
+          onGenerate={handleGenerate}
+          selectedModel={selectedModel}
+          onModelChange={setSelectedModel}
+          showModelSelector={true}
+          imageModels={effectiveImageModels}
+          selectedAspectRatio={selectedAspectRatio}
+          onAspectRatioChange={setSelectedAspectRatio}
+          showAspectRatioSelector={true}
+          selectedNumImages={selectedNumImages}
+          onNumImagesChange={setSelectedNumImages}
+          showNumImagesSelector={true}
+        />
+      )
+    }
+
+    return (
+      <CharacterSwapInputBox
+        characterImage={characterSwapCharacterImage}
+        sceneImage={characterSwapSceneImage}
+        onCharacterImageChange={setCharacterSwapCharacterImage}
+        onSceneImageChange={setCharacterSwapSceneImage}
+        onGenerate={handleGenerate}
+        isGenerating={isGenerating}
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+        models={effectiveImageModels}
+        showModelSelector={true}
+      />
+    )
+  }, [
+    characterSwapCharacterImage,
+    characterSwapSceneImage,
+    effectiveImageModels,
+    enhancePrompt,
+    handleGenerate,
+    isCharacterSwapModel,
+    isGenerating,
+    prompt,
+    referenceImage,
+    referenceImages,
+    selectedAspectRatio,
+    selectedModel,
+    selectedNumImages,
+  ])
+
   const handleCreateAsset = React.useCallback((imageUrl: string, index: number) => {
     setSelectedImageForAsset({ url: imageUrl, index })
     setCreateAssetDialogOpen(true)
@@ -284,7 +381,6 @@ export default function ImagePage() {
 
   // Render generated image or showcase card
   const renderShowcase = () => {
-    const activeError = error || historyError
     const hasImages = historyImages.length > 0
 
     // Always show grid if we have images OR are generating OR are loading
@@ -304,19 +400,14 @@ export default function ImagePage() {
       )
     }
 
-    // Show error state if there's an error and no images
-    if (activeError) {
-      const isHistoryOnlyError = !!historyError && !error
-
+    // Show error state only for generation errors; history-only errors (e.g. not logged in) show showcase
+    if (error) {
       return (
         <Card className="w-full h-full flex flex-col">
           <CardContent className="flex flex-col items-center justify-center flex-1 p-8">
-            <p className="text-destructive mb-4">{activeError}</p>
-            <Button
-              onClick={isHistoryOnlyError ? () => void fetchImageHistory(20) : handleGenerate}
-              variant="default"
-            >
-              {isHistoryOnlyError ? "Reload History" : "Try Again"}
+            <p className="text-destructive mb-4">{error}</p>
+            <Button onClick={handleGenerate} variant="default">
+              Try Again
             </Button>
           </CardContent>
         </Card>
@@ -385,29 +476,7 @@ export default function ImagePage() {
               {/* Fixed Bottom Panel - Prompt Box (always visible) */}
               <div className="fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6">
                 <div className="max-w-7xl mx-auto flex justify-center">
-                  <InfluencerInputBox
-                    forceRowLayout={true}
-                    promptValue={prompt}
-                    onPromptChange={setPrompt}
-                    referenceImage={referenceImage}
-                    onReferenceImageChange={setReferenceImage}
-                    referenceImages={referenceImages}
-                    onReferenceImagesChange={setReferenceImages}
-                    enhancePrompt={enhancePrompt}
-                    onEnhancePromptChange={setEnhancePrompt}
-                    isGenerating={isGenerating}
-                    onGenerate={handleGenerate}
-                    selectedModel={selectedModel}
-                    onModelChange={setSelectedModel}
-                    showModelSelector={true}
-                    imageModels={imageModels}
-                    selectedAspectRatio={selectedAspectRatio}
-                    onAspectRatioChange={setSelectedAspectRatio}
-                    showAspectRatioSelector={true}
-                    selectedNumImages={selectedNumImages}
-                    onNumImagesChange={setSelectedNumImages}
-                    showNumImagesSelector={true}
-                  />
+                  {renderInputBox(true)}
                 </div>
               </div>
             </>
@@ -435,29 +504,7 @@ export default function ImagePage() {
                     {/* Left Panel - Prompt Box (hidden on mobile, shown on desktop) */}
                     <div className="hidden lg:block lg:sticky lg:top-0 h-fit">
                       <div className="flex justify-center">
-                        <InfluencerInputBox
-                          forceRowLayout={false}
-                          promptValue={prompt}
-                          onPromptChange={setPrompt}
-                          referenceImage={referenceImage}
-                          onReferenceImageChange={setReferenceImage}
-                          referenceImages={referenceImages}
-                          onReferenceImagesChange={setReferenceImages}
-                          enhancePrompt={enhancePrompt}
-                          onEnhancePromptChange={setEnhancePrompt}
-                          isGenerating={isGenerating}
-                          onGenerate={handleGenerate}
-                          selectedModel={selectedModel}
-                          onModelChange={setSelectedModel}
-                          showModelSelector={true}
-                          imageModels={imageModels}
-                          selectedAspectRatio={selectedAspectRatio}
-                          onAspectRatioChange={setSelectedAspectRatio}
-                          showAspectRatioSelector={true}
-                          selectedNumImages={selectedNumImages}
-                          onNumImagesChange={setSelectedNumImages}
-                          showNumImagesSelector={true}
-                        />
+                        {renderInputBox(false)}
                       </div>
                     </div>
 
@@ -472,29 +519,7 @@ export default function ImagePage() {
               {/* Fixed Bottom Panel - Prompt Box (mobile only) */}
               <div className="fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6 lg:hidden">
                 <div className="max-w-7xl mx-auto flex justify-center">
-                  <InfluencerInputBox
-                    forceRowLayout={false}
-                    promptValue={prompt}
-                    onPromptChange={setPrompt}
-                    referenceImage={referenceImage}
-                    onReferenceImageChange={setReferenceImage}
-                    referenceImages={referenceImages}
-                    onReferenceImagesChange={setReferenceImages}
-                    enhancePrompt={enhancePrompt}
-                    onEnhancePromptChange={setEnhancePrompt}
-                    isGenerating={isGenerating}
-                    onGenerate={handleGenerate}
-                    selectedModel={selectedModel}
-                    onModelChange={setSelectedModel}
-                    showModelSelector={true}
-                    imageModels={imageModels}
-                    selectedAspectRatio={selectedAspectRatio}
-                    onAspectRatioChange={setSelectedAspectRatio}
-                    showAspectRatioSelector={true}
-                    selectedNumImages={selectedNumImages}
-                    onNumImagesChange={setSelectedNumImages}
-                    showNumImagesSelector={true}
-                  />
+                  {renderInputBox(false)}
                 </div>
               </div>
             </>
