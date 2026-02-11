@@ -5,7 +5,7 @@
 /**
  * Model generation types
  */
-export type ModelType = 'image' | 'video' | 'audio';
+export type ModelType = 'image' | 'video' | 'audio' | 'upscale';
 
 /**
  * UI component types for parameter inputs

@@ -86,6 +86,9 @@ export default function ImagePage() {
   const [createAssetDialogOpen, setCreateAssetDialogOpen] = React.useState(false)
   const [selectedImageForAsset, setSelectedImageForAsset] = React.useState<{ url: string; index: number } | null>(null)
 
+  // Upscale: which image is currently upscaling (by URL)
+  const [upscalingImageUrl, setUpscalingImageUrl] = React.useState<string | null>(null)
+
   // Set default model when models load
   React.useEffect(() => {
     if (effectiveImageModels.length > 0 && !selectedModel) {
@@ -379,6 +382,46 @@ export default function ImagePage() {
     setCreateAssetDialogOpen(true)
   }, [])
 
+  const handleUpscale = React.useCallback(async (imageUrl: string, _index: number) => {
+    setUpscalingImageUrl(imageUrl)
+    try {
+      const res = await fetch('/api/upscale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ media: imageUrl }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const msg = data.error ?? data.message ?? 'Upscale failed'
+        toast.error(msg)
+        if (res.status === 402) {
+          toast.error(msg, {
+            description: 'Get more credits to continue',
+            action: { label: 'View Plans', onClick: () => window.open('/pricing', '_blank') },
+          })
+        }
+        return
+      }
+      const outputUrl = data.imageUrl
+      if (outputUrl) {
+        setHistoryImages((prev) => [
+          { url: outputUrl, model: 'Creative Upscale', prompt: null },
+          ...prev,
+        ])
+      }
+      toast.success('Upscale complete', {
+        action: outputUrl
+          ? { label: 'Open', onClick: () => window.open(outputUrl, '_blank') }
+          : undefined,
+      })
+    } catch (err) {
+      console.error('Upscale error:', err)
+      toast.error(err instanceof Error ? err.message : 'Upscale failed')
+    } finally {
+      setUpscalingImageUrl(null)
+    }
+  }, [fetchImageHistory])
+
   // Render generated image or showcase card
   const renderShowcase = () => {
     const hasImages = historyImages.length > 0
@@ -396,6 +439,8 @@ export default function ImagePage() {
             void handleUseAsReference(imageUrl)
           }}
           onCreateAsset={handleCreateAsset}
+          onUpscale={handleUpscale}
+          upscalingImageUrl={upscalingImageUrl}
         />
       )
     }

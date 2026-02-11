@@ -12,9 +12,10 @@ import {
 import { Plus, X, FilePlus, Sparkle, FolderOpen } from "@phosphor-icons/react"
 import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { cn } from "@/lib/utils"
-import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { ImagePromptFields } from "./image-prompt-fields"
+import { ImageEnhanceSwitch } from "./image-enhance-switch"
 import { CircleNotch } from "@phosphor-icons/react"
 import {
   Select,
@@ -395,15 +396,16 @@ export function InfluencerInputBox({
 
         {/* Textarea and Generate Button - Side by Side */}
         <div className="flex items-start gap-2 pt-1 px-2">
-          {/* Textarea */}
           <div className="flex-1">
-            <textarea
-              value={localPrompt}
-              onChange={handlePromptChange}
-              onKeyDown={handleTextInputKeyDown}
+            <ImagePromptFields
+              promptValue={localPrompt}
+              onPromptChange={(value) => {
+                setLocalPrompt(value)
+                onPromptChange?.(value)
+              }}
               placeholder={promptPlaceholderText}
-              className="w-full border-none outline-none resize-none bg-transparent text-sm min-h-[60px] max-h-[120px] overflow-y-auto"
-              rows={3}
+              variant="page"
+              onPromptKeyDown={handleTextInputKeyDown}
             />
           </div>
 
@@ -566,21 +568,15 @@ export function InfluencerInputBox({
             </div>
           )}
           
-          {/* Enhance Prompt section wrapped in container */}
-          <div className="h-7 flex items-center gap-1.5 px-2 py-[18px] rounded-[28px] border border-border bg-muted/30">
-            <Switch
-              id="enhance-prompt"
+          {/* Enhance Prompt */}
+          {!hideEnhancePrompt && onEnhancePromptChange && (
+            <ImageEnhanceSwitch
               checked={enhancePrompt}
               onCheckedChange={onEnhancePromptChange}
-              className="scale-90"
+              variant="page"
+              id="enhance-prompt"
             />
-            <Label
-              htmlFor="enhance-prompt"
-              className="text-xs cursor-pointer"
-            >
-              <span className="hidden md:inline">Enhance Prompt</span>
-            </Label>
-          </div>
+          )}
         </div>
 
         {/* Hidden file input for reference image */}

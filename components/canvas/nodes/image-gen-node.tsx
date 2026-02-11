@@ -39,7 +39,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { useModels } from "@/hooks/use-models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
@@ -53,6 +52,8 @@ import {
 import { getConstrainedSize, loadImageSize } from "@/lib/canvas/media-sizing"
 import { ImageEditorDialog } from "@/components/image-editor"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { ImagePromptFields } from "@/components/tools/influencer/image-prompt-fields"
+import { ImageEnhanceSwitch } from "@/components/tools/influencer/image-enhance-switch"
 
 // Helper function to get dimensions for aspect ratio
 const getImageDimensions = (aspectRatio: string) => {
@@ -114,7 +115,6 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const [isAddImageOpen, setIsAddImageOpen] = React.useState(false)
   const [isEditorOpen, setIsEditorOpen] = React.useState(false)
   const [isCreateAssetOpen, setIsCreateAssetOpen] = React.useState(false)
-  const [isPromptExpanded, setIsPromptExpanded] = React.useState(false)
   const uploadInputRef = React.useRef<HTMLInputElement>(null)
   const [crop, setCrop] = React.useState({ x: 0, y: 0 })
   const [zoom, setZoom] = React.useState(1)
@@ -953,39 +953,11 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
               return null
             })()}
             
-            {nodeData.connectedPrompt && (
-              <div className="mb-2">
-                <div 
-                  className={cn(
-                    "relative overflow-hidden transition-all duration-200 cursor-pointer hover:bg-zinc-800/30 rounded-lg p-2",
-                    !isPromptExpanded && "max-h-[60px]"
-                  )}
-                  onClick={() => setIsPromptExpanded(!isPromptExpanded)}
-                >
-                  <div className={cn(
-                    "text-sm text-zinc-500 italic",
-                    !isPromptExpanded && "line-clamp-2"
-                  )}>
-                    {nodeData.connectedPrompt}
-                  </div>
-                  {!isPromptExpanded && (
-                    <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-zinc-900/95 to-transparent pointer-events-none" />
-                  )}
-                </div>
-                {isPromptExpanded && (
-                  <div className="text-xs text-zinc-600 mt-1 px-2">
-                    Click to collapse
-                  </div>
-                )}
-              </div>
-            )}
-            
-            <textarea
-              value={nodeData.prompt || ""}
-              onChange={(e) => nodeData.onDataChange?.(id, { prompt: e.target.value })}
-              placeholder={nodeData.connectedPrompt ? "Add more to the prompt..." : "Type a prompt or press '/' for commands..."}
-              rows={2}
-              className="w-full bg-transparent min-h-20 border-0 text-sm text-zinc-200 placeholder:text-zinc-600 resize-auto outline-none"
+            <ImagePromptFields
+              promptValue={nodeData.prompt || ""}
+              onPromptChange={(value) => nodeData.onDataChange?.(id, { prompt: value })}
+              connectedPrompt={nodeData.connectedPrompt || undefined}
+              variant="toolbar"
             />
           </div>
 
@@ -1167,17 +1139,13 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-2 px-1">
-            <label className="text-xs text-zinc-400 cursor-pointer whitespace-nowrap">
-              Enhance
-            </label>
-            <Switch
-              checked={nodeData.enhancePrompt}
-              onCheckedChange={(checked) =>
-                nodeData.onDataChange?.(id, { enhancePrompt: checked })
-              }
-            />
-          </div>
+          <ImageEnhanceSwitch
+            checked={nodeData.enhancePrompt}
+            onCheckedChange={(checked) =>
+              nodeData.onDataChange?.(id, { enhancePrompt: checked })
+            }
+            variant="toolbar"
+          />
 
           <div className="flex-1" />
 

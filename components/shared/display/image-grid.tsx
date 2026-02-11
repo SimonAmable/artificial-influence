@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
-import { ArrowsOutSimple, Copy, DownloadSimple, Check, X, DotsThree, Plus, Trash, Play } from "@phosphor-icons/react"
+import { ArrowsOutSimple, Copy, DownloadSimple, Check, X, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus } from "@phosphor-icons/react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +36,8 @@ interface ImageGridProps {
   onImageClick?: (imageUrl: string, index: number) => void
   onUseAsReference?: (imageUrl: string, index: number) => void
   onCreateAsset?: (imageUrl: string, index: number) => void
+  onUpscale?: (imageUrl: string, index: number) => void
+  upscalingImageUrl?: string | null
   onDelete?: (id: string, imageUrl: string, index: number) => void
 }
 
@@ -61,6 +63,8 @@ export function ImageGrid({
   onImageClick,
   onUseAsReference,
   onCreateAsset,
+  onUpscale,
+  upscalingImageUrl = null,
   onDelete,
 }: ImageGridProps) {
   const router = useRouter()
@@ -217,6 +221,8 @@ export function ImageGrid({
 
   return (
     <div className={cn("w-full h-full flex flex-col py-0", className)}>
+      {/* Shared keyframe for generating and upscaling animations */}
+      <style dangerouslySetInnerHTML={{ __html: `@keyframes fillProgress { 0% { width: 0%; } 100% { width: 100%; } }` }} />
       {/* Column Count Slider - Integrated header, matches card styling */}
       <div className="  p-3 sm:p-4 pb-3 sm:pb-4 ">
         <div className="flex items-center justify-end gap-3 sm:gap-4 w-full">
@@ -333,6 +339,23 @@ export function ImageGrid({
                 loading="lazy"
                 draggable={false}
               />
+
+              {/* Upscaling overlay - generating animation over the image */}
+              {upscalingImageUrl === image.url && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg overflow-hidden bg-black/50 pointer-events-auto">
+                  {/* White line sweep (same as generating cards) */}
+                  <div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-zinc-700 to-zinc-500"
+                    style={{
+                      width: '0%',
+                      animation: 'fillProgress 20s linear infinite',
+                      boxShadow: '2px 0 8px 0 rgba(255, 255, 255, 0.4)',
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/40 via-transparent to-zinc-900/40 pointer-events-none" />
+                  <span className="relative z-10 text-xs font-medium text-white drop-shadow-md">Upscaling…</span>
+                </div>
+              )}
 
               {/* Bottom gradient overlay for prompt readability - no solid background */}
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/85 via-black/35 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
@@ -498,8 +521,8 @@ export function ImageGrid({
                   )}
                 </div>
                 
-                {/* Desktop buttons (sm and up) */}
-                <div className="hidden sm:flex shrink-0 items-center gap-1">
+                {/* Desktop buttons (sm and up) - column */}
+                <div className="hidden sm:flex shrink-0 flex-col items-end gap-1">
                   <Button
                     type="button"
                     variant="secondary"
@@ -539,10 +562,32 @@ export function ImageGrid({
                     <Play className="mr-1 size-3" weight="fill" />
                     Animate
                   </Button>
+                  {onUpscale && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={upscalingImageUrl === image.url}
+                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onUpscale(image.url, index)
+                      }}
+                    >
+                      {upscalingImageUrl === image.url ? (
+                        "Upscaling…"
+                      ) : (
+                        <>
+                          <MagnifyingGlassPlus className="mr-1 size-3" />
+                          Upscale
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
                 
-                {/* Mobile button - Animate dropdown only (below sm) */}
-                <div className="flex sm:hidden shrink-0 items-center gap-1">
+                {/* Mobile - column of actions (below sm) */}
+                <div className="flex sm:hidden shrink-0 flex-col items-end gap-1">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -585,6 +630,22 @@ export function ImageGrid({
                         <ArrowsOutSimple className="mr-2 size-4" />
                         Use as Reference
                       </DropdownMenuItem>
+                      {onUpscale && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              onUpscale(image.url, index)
+                            }}
+                            className="cursor-pointer"
+                            disabled={upscalingImageUrl === image.url}
+                          >
+                            <MagnifyingGlassPlus className="mr-2 size-4" />
+                            {upscalingImageUrl === image.url ? "Upscaling…" : "Upscale"}
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
