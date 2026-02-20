@@ -10,9 +10,11 @@ export interface ImagePromptFieldsProps {
   connectedPrompt?: string
   placeholder?: string
   className?: string
-  /** "page" = image page layout; "toolbar" = canvas node toolbar (compact, dark theme) */
-  variant?: "page" | "toolbar"
+  /** "page" = image page layout; "toolbar" = compact canvas; "node" = same sizing as page, dark theme + connected prompt */
+  variant?: "page" | "toolbar" | "node"
   onPromptKeyDown?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void
+  /** When pasting an image, called with the file; if handler returns true, default paste is prevented */
+  onPasteImage?: (file: File) => void
 }
 
 export function ImagePromptFields({
@@ -23,9 +25,31 @@ export function ImagePromptFields({
   className,
   variant = "page",
   onPromptKeyDown,
+  onPasteImage,
 }: ImagePromptFieldsProps) {
   const [isPromptExpanded, setIsPromptExpanded] = React.useState(false)
-  const isToolbar = variant === "toolbar"
+  const isToolbar = variant === "toolbar" || variant === "node"
+  const isNode = variant === "node"
+
+  const handlePaste = React.useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = e.clipboardData?.items
+      if (!items || !onPasteImage) return
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile()
+          if (file) {
+            e.preventDefault()
+            e.stopPropagation()
+            onPasteImage(file)
+            return
+          }
+        }
+      }
+    },
+    [onPasteImage]
+  )
 
   return (
     <div className={cn("flex flex-col", className)}>
@@ -61,6 +85,7 @@ export function ImagePromptFields({
         value={promptValue}
         onChange={(e) => onPromptChange(e.target.value)}
         onKeyDown={onPromptKeyDown}
+        onPaste={handlePaste}
         placeholder={
           isToolbar && connectedPrompt
             ? "Add more to the prompt..."
@@ -68,12 +93,12 @@ export function ImagePromptFields({
               ? "Type a prompt or press '/' for commands..."
               : placeholder
         }
-        rows={isToolbar ? 2 : 3}
+        rows={isToolbar && !isNode ? 2 : 3}
         className={cn(
           "w-full border-none outline-none resize-none bg-transparent text-sm overflow-y-auto",
-          isToolbar
-            ? "min-h-[50px] max-h-[120px] text-zinc-200 placeholder:text-zinc-600"
-            : "min-h-[60px] max-h-[120px]"
+          variant === "toolbar" && "min-h-[50px] max-h-[120px] text-zinc-200 placeholder:text-zinc-600",
+          variant === "page" && "min-h-[60px] max-h-[120px]",
+          isNode && "min-h-[60px] max-h-[120px] text-zinc-200 placeholder:text-zinc-500"
         )}
       />
     </div>

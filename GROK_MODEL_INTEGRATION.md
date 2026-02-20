@@ -1,7 +1,7 @@
 # Grok Image Model Integration Summary
 
 ## Overview
-Successfully added xAI Grok 2 image generation model to the Artificial Influence application. The Grok model is now fully integrated into the image generation pipeline with TypeScript support and database integration.
+Successfully added xAI Grok 2 image generation model to the UniCan application. The Grok model is now fully integrated into the image generation pipeline with TypeScript support and database integration.
 
 ## Changes Made
 

@@ -27,6 +27,7 @@ interface ImageHistoryItem {
   aspectRatio: string | null
   type: string | null
   createdAt: string | null
+  reference_image_urls?: string[]
 }
 
 export default function CharacterSwapPage() {
@@ -79,6 +80,7 @@ export default function CharacterSwapPage() {
               aspect_ratio?: string | null;
               type?: string | null;
               created_at?: string | null;
+              reference_image_urls?: string[];
             }) => ({
               id: generation.id ?? '',
               url: generation.url,
@@ -88,6 +90,7 @@ export default function CharacterSwapPage() {
               aspectRatio: generation.aspect_ratio ?? null,
               type: generation.type ?? null,
               createdAt: generation.created_at ?? null,
+              reference_image_urls: generation.reference_image_urls ?? [],
             }))
             .filter(
               (item: { 

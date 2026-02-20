@@ -20,7 +20,10 @@ import { CircleNotch } from "@phosphor-icons/react"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -133,6 +136,9 @@ export function InfluencerInputBox({
     aspect_ratios: m.aspect_ratios,
     default_aspect_ratio: m.aspect_ratios[0],
   }))
+  const toolModels = React.useMemo(() => models.filter((m) => m.identifier.startsWith("custom/")), [models])
+  const imageModelsOnly = React.useMemo(() => models.filter((m) => !m.identifier.startsWith("custom/")), [models])
+  const showModelGroups = toolModels.length > 0 && imageModelsOnly.length > 0
 
   // Sync with external changes
   React.useEffect(() => {
@@ -209,6 +215,27 @@ export function InfluencerInputBox({
       setIsPromptDragActive(false)
     }
   }, [])
+
+  const handleCardPaste = React.useCallback(
+    (e: React.ClipboardEvent) => {
+      if (!canAcceptPromptDrop) return
+      const items = e.clipboardData?.items
+      if (!items) return
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile()
+          if (file) {
+            e.preventDefault()
+            e.stopPropagation()
+            handlePromptImageFile(file)
+            return
+          }
+        }
+      }
+    },
+    [canAcceptPromptDrop, handlePromptImageFile]
+  )
 
   const handleTextInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // If Enter is pressed without Shift, trigger generate
@@ -363,6 +390,7 @@ export function InfluencerInputBox({
       onDragOver={handlePromptDragOver}
       onDragEnter={handlePromptDragEnter}
       onDragLeave={handlePromptDragLeave}
+      onPaste={handleCardPaste}
     >
       {isPromptDragActive && canAcceptPromptDrop && (
         <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] border-2 border-dashed border-primary bg-primary/20" />
@@ -406,6 +434,7 @@ export function InfluencerInputBox({
               placeholder={promptPlaceholderText}
               variant="page"
               onPromptKeyDown={handleTextInputKeyDown}
+              onPasteImage={canAcceptPromptDrop ? (file) => handlePromptImageFile(file) : undefined}
             />
           </div>
 
@@ -494,27 +523,73 @@ export function InfluencerInputBox({
                 </SelectValue>
               </SelectTrigger>
               <SelectContent position="popper" side="top" sideOffset={4}>
-                {models.map((model) => (
-                  <SelectItem key={model.identifier} value={model.identifier}>
-                    <div className="flex items-center gap-3">
-                      {/* Icon in small card */}
-                      <div className="rounded-md border border-border bg-muted/30 p-1.5 shrink-0">
-                        <ModelIcon identifier={model.identifier} size={20} />
-                      </div>
-                      {/* Text content */}
-                      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                        <span className="font-semibold text-sm">
-                          {formatModelName(model.identifier, model.name)}
-                        </span>
-                        {model.description && (
-                          <span className="text-xs text-muted-foreground">
-                            {model.description}
+                {showModelGroups ? (
+                  <>
+                    <SelectGroup>
+                      <SelectLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Tools
+                      </SelectLabel>
+                      {toolModels.map((model) => (
+                        <SelectItem key={model.identifier} value={model.identifier}>
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-md border border-border bg-muted/30 p-1.5 shrink-0">
+                              <ModelIcon identifier={model.identifier} size={20} />
+                            </div>
+                            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                              <span className="font-semibold text-sm">
+                                {formatModelName(model.identifier, model.name)}
+                              </span>
+                              {model.description && (
+                                <span className="text-xs text-muted-foreground">{model.description}</span>
+                              )}
+                            </div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                    <SelectSeparator />
+                    <SelectGroup>
+                      <SelectLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Models
+                      </SelectLabel>
+                      {imageModelsOnly.map((model) => (
+                        <SelectItem key={model.identifier} value={model.identifier}>
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-md border border-border bg-muted/30 p-1.5 shrink-0">
+                              <ModelIcon identifier={model.identifier} size={20} />
+                            </div>
+                            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                              <span className="font-semibold text-sm">
+                                {formatModelName(model.identifier, model.name)}
+                              </span>
+                              {model.description && (
+                                <span className="text-xs text-muted-foreground">{model.description}</span>
+                              )}
+                            </div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </>
+                ) : (
+                  models.map((model) => (
+                    <SelectItem key={model.identifier} value={model.identifier}>
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-md border border-border bg-muted/30 p-1.5 shrink-0">
+                          <ModelIcon identifier={model.identifier} size={20} />
+                        </div>
+                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                          <span className="font-semibold text-sm">
+                            {formatModelName(model.identifier, model.name)}
                           </span>
-                        )}
+                          {model.description && (
+                            <span className="text-xs text-muted-foreground">{model.description}</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </SelectItem>
-                ))}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           )}

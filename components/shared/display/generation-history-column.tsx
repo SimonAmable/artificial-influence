@@ -15,6 +15,7 @@ interface ImageData {
   aspectRatio?: string | null
   type?: string | null
   createdAt?: string | null
+  referenceImageUrls?: string[]
 }
 
 interface GenerationHistoryColumnProps {
@@ -43,7 +44,7 @@ export function GenerationHistoryColumn({
         .slice(0, maxItems)
         .map((item) =>
           typeof item === "string"
-            ? { id: undefined, url: item, model: null, prompt: null, tool: null, aspectRatio: null, type: null, createdAt: null }
+            ? { id: undefined, url: item, model: null, prompt: null, tool: null, aspectRatio: null, type: null, createdAt: null, referenceImageUrls: [] }
             : { 
                 id: item.id, 
                 url: item.url, 
@@ -52,7 +53,8 @@ export function GenerationHistoryColumn({
                 tool: item.tool ?? null,
                 aspectRatio: item.aspectRatio ?? null,
                 type: item.type ?? null,
-                createdAt: item.createdAt ?? null
+                createdAt: item.createdAt ?? null,
+                referenceImageUrls: (item as ImageData).referenceImageUrls ?? (item as { reference_image_urls?: string[] }).reference_image_urls ?? []
               }
         ),
     [images, maxItems]
@@ -197,6 +199,7 @@ export function GenerationHistoryColumn({
             type: fullscreenImage.type,
             createdAt: fullscreenImage.createdAt,
           }}
+          referenceImages={(fullscreenImage.referenceImageUrls ?? []).map((imageUrl) => ({ imageUrl }))}
           onClose={() => setFullscreenImage(null)}
         />
       )}

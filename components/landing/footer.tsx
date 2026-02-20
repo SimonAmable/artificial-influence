@@ -6,7 +6,7 @@ export function Footer() {
       <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-3 lg:px-8">
         <div className="lg:col-span-2">
           <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
-            Artificial Influence
+            UniCan
           </p>
           <p className="mt-4 max-w-md text-sm text-muted-foreground">
             A cinematic AI workflow for creators and teams producing modern brand content.
@@ -51,7 +51,7 @@ export function Footer() {
           </svg>
         </div>
         <div className="text-sm text-muted-foreground">
-          Copyright {new Date().getFullYear()} Artificial Influence. All rights reserved.
+          Copyright {new Date().getFullYear()} UniCan. All rights reserved.
         </div>
       </div>
     </footer>

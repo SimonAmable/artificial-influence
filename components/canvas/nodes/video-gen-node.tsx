@@ -1098,8 +1098,8 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
               <div className="flex-1">
                 <PhotoUpload
                   value={
-                    nodeData.manualImageUrl
-                      ? ({ file: nodeData.manualImageFile || undefined, url: nodeData.manualImageUrl } as ImageUpload)
+                    (nodeData.manualImageUrl || nodeData.connectedImageUrl)
+                      ? ({ file: nodeData.manualImageFile || undefined, url: nodeData.manualImageUrl || nodeData.connectedImageUrl || "" } as ImageUpload)
                       : null
                   }
                   onChange={handleCustomImageChange}
@@ -1111,8 +1111,8 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                 <div className="flex-1">
                   <VideoUpload
                     value={
-                      nodeData.manualVideoUrl
-                        ? ({ file: nodeData.manualVideoFile || undefined, url: nodeData.manualVideoUrl } as ImageUpload)
+                      (nodeData.manualVideoUrl || nodeData.connectedVideoUrl)
+                        ? ({ file: nodeData.manualVideoFile || undefined, url: nodeData.manualVideoUrl || nodeData.connectedVideoUrl || "" } as ImageUpload)
                         : null
                     }
                     onChange={handleCustomVideoChange}
@@ -1125,8 +1125,8 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                 <div className="flex-1">
                   <AudioUpload
                     value={
-                      nodeData.manualAudioUrl
-                        ? ({ file: nodeData.manualAudioFile || undefined, url: nodeData.manualAudioUrl } as AudioUploadValue)
+                      (nodeData.manualAudioUrl || nodeData.connectedAudioUrl)
+                        ? ({ file: nodeData.manualAudioFile || undefined, url: nodeData.manualAudioUrl || nodeData.connectedAudioUrl || "" } as AudioUploadValue)
                         : null
                     }
                     onChange={handleCustomAudioChange}

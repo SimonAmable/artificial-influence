@@ -6,10 +6,9 @@ import type {
 } from "@/lib/types/landing"
 
 export const landingHero = {
-  eyebrow: "Creative Engine",
-  title: "Build Campaign-Ready AI Content in One Flow",
+  title: "Create AI Content That Converts",
   description:
-    "Drag ideas into place, iterate visuals instantly, and ship polished creative faster.",
+    "Transform your marketing with realistic AI influencers, dynamic product shoots, and campaign-ready content. Build, iterate, and deploy creative assets in minutes, not days.",
   primaryCtaLabel: "Get Started Free",
   primaryCtaHref: "/login?mode=signup",
   secondaryCtaLabel: "See Workflows",
@@ -42,15 +41,26 @@ export const canvasSeeds: LandingCanvasNodeSeed[] = [
 
 export const workflowItems: LandingWorkflowItem[] = [
   {
-    category: "Influencer",
-    title: "Design complete influencer campaigns",
+    category: "Brand Assets",
+    title: "Create reusable brand visuals",
     description:
-      "Spin up personas, style references, and final content batches from one guided flow.",
+      "Move from idea to repeatable templates for social, paid ads, and launch assets.",
     mediaType: "image",
-    mediaSrc: "/canvas_landing_page_assets/influencer_workflows.png",
-    backgroundSrc: "/canvas_landing_page_assets/influencer_workflows.png",
+    mediaSrc: "/canvas_landing_page_assets/icon_workflow.png",
+    backgroundSrc: "/canvas_landing_page_assets/icon_workflow.png",
     backgroundType: "image",
-    href: "/influencer-generator",
+    href: "/canvas",
+  },
+  {
+    category: "Model Creation",
+    title: "Create personas from text to image",
+    description:
+      "Describe your vision in detail and generate striking, editorial-style portraits and model looks on the canvas.",
+    mediaType: "image",
+    mediaSrc: "/canvas_landing_page_assets/model_creation.png",
+    backgroundSrc: "/canvas_landing_page_assets/model_creation.png",
+    backgroundType: "image",
+    href: "/image",
   },
   {
     category: "Photoshoot",
@@ -64,15 +74,15 @@ export const workflowItems: LandingWorkflowItem[] = [
     href: "/image",
   },
   {
-    category: "Brand Assets",
-    title: "Create reusable brand visuals",
+    category: "Influencer",
+    title: "Design complete influencer campaigns",
     description:
-      "Move from idea to repeatable templates for social, paid ads, and launch assets.",
+      "Spin up personas, style references, and final content batches from one guided flow.",
     mediaType: "image",
-    mediaSrc: "/canvas_landing_page_assets/icon_workflow.png",
-    backgroundSrc: "/canvas_landing_page_assets/icon_workflow.png",
+    mediaSrc: "/canvas_landing_page_assets/influencer_workflows.png",
+    backgroundSrc: "/canvas_landing_page_assets/influencer_workflows.png",
     backgroundType: "image",
-    href: "/canvas",
+    href: "/influencer-generator",
   },
 ]
 

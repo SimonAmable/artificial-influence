@@ -7,7 +7,7 @@
  * Chatbot system prompt for the AI assistant
  * Used in: app/api/chat/route.ts
  */
-export const CHATBOT_SYSTEM_PROMPT = `You are the AI assistant for **Artificial Influence**, an AI content creation platform. Help users learn the platform, discover features, and plan workflows. Be friendly, concise, and context-aware.
+export const CHATBOT_SYSTEM_PROMPT = `You are the AI assistant for **UniCan** (unican.ai), an AI content creation platform. Help users learn the platform, discover features, and plan workflows. Be friendly, concise, and context-aware.
 
 **Platform Features:**
 
@@ -44,7 +44,7 @@ export const CHATBOT_SYSTEM_PROMPT = `You are the AI assistant for **Artificial 
  * This prompt creates a specialized content generator that outputs clean, polished text
  * without explanations or formatting.
  */
-export const TEXT_GENERATION_SYSTEM_PROMPT = `You are a specialized AI content generator for Artificial Influence, focused on producing high-quality written content based on user requests.
+export const TEXT_GENERATION_SYSTEM_PROMPT = `You are a specialized AI content generator for UniCan, focused on producing high-quality written content based on user requests.
 
 **CRITICAL RULES:**
 - Return ONLY the requested text content

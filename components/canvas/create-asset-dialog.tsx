@@ -19,23 +19,42 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { ASSET_CATEGORIES, ASSET_CATEGORY_LABELS, getDefaultCategoryByType, saveAsset } from "@/lib/assets/library"
+import {
+  ASSET_CATEGORIES,
+  ASSET_CATEGORY_LABELS,
+  getDefaultCategoryByType,
+  saveAsset,
+  updateAsset,
+} from "@/lib/assets/library"
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
+import Image from "next/image"
 import { toast } from "sonner"
 
 interface CreateAssetDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  mode?: "create" | "edit"
+  assetId?: string
   initial: {
     title?: string
     url: string
     assetType: AssetType
+    visibility?: AssetVisibility
+    category?: AssetCategory
+    tags?: string[]
     sourceNodeType?: string
   }
   onSaved?: () => void
 }
 
-export function CreateAssetDialog({ open, onOpenChange, initial, onSaved }: CreateAssetDialogProps) {
+export function CreateAssetDialog({
+  open,
+  onOpenChange,
+  mode = "create",
+  assetId,
+  initial,
+  onSaved,
+}: CreateAssetDialogProps) {
   const [title, setTitle] = React.useState("")
   const [visibility, setVisibility] = React.useState<AssetVisibility>("public")
   const [category, setCategory] = React.useState<AssetCategory>(getDefaultCategoryByType(initial.assetType))
@@ -44,10 +63,10 @@ export function CreateAssetDialog({ open, onOpenChange, initial, onSaved }: Crea
   React.useEffect(() => {
     if (!open) return
     setTitle(initial.title?.trim() || "Untitled Asset")
-    setVisibility("public")
-    setCategory(getDefaultCategoryByType(initial.assetType))
-    setTagsInput("")
-  }, [initial.assetType, initial.title, open])
+    setVisibility(initial.visibility || "public")
+    setCategory(initial.category || getDefaultCategoryByType(initial.assetType))
+    setTagsInput((initial.tags || []).join(", "))
+  }, [initial.assetType, initial.category, initial.tags, initial.title, initial.visibility, open])
 
   const handleSave = async () => {
     if (!initial.url) {
@@ -61,20 +80,37 @@ export function CreateAssetDialog({ open, onOpenChange, initial, onSaved }: Crea
       .filter(Boolean)
 
     try {
-      await saveAsset({
-        title,
-        assetType: initial.assetType,
-        category,
-        visibility,
-        tags,
-        url: initial.url,
-        sourceNodeType: initial.sourceNodeType,
-      })
-      toast.success("Asset saved")
+      if (mode === "edit") {
+        if (!assetId) {
+          toast.error("Missing asset ID")
+          return
+        }
+        await updateAsset(assetId, {
+          title,
+          assetType: initial.assetType,
+          category,
+          visibility,
+          tags,
+          url: initial.url,
+          sourceNodeType: initial.sourceNodeType,
+        })
+        toast.success("Asset updated")
+      } else {
+        await saveAsset({
+          title,
+          assetType: initial.assetType,
+          category,
+          visibility,
+          tags,
+          url: initial.url,
+          sourceNodeType: initial.sourceNodeType,
+        })
+        toast.success("Asset saved")
+      }
       onOpenChange(false)
       onSaved?.()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save asset")
+      toast.error(error instanceof Error ? error.message : `Failed to ${mode === "edit" ? "update" : "save"} asset`)
     }
   }
 
@@ -82,13 +118,43 @@ export function CreateAssetDialog({ open, onOpenChange, initial, onSaved }: Crea
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create Asset</DialogTitle>
+          <DialogTitle>{mode === "edit" ? "Edit Asset" : "Create Asset"}</DialogTitle>
           <DialogDescription>
-            Save this output as a reusable reference asset.
+            {mode === "edit"
+              ? "Update your asset details and preview before saving."
+              : "Save this output as a reusable reference asset."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Preview</Label>
+            <div className="overflow-hidden rounded-lg border border-border bg-muted/20 p-2">
+              {initial.assetType === "image" && (
+                <div className="relative aspect-video w-full overflow-hidden rounded-md bg-black/10">
+                  <Image
+                    src={initial.url}
+                    alt={title || "Asset preview"}
+                    fill
+                    className="object-contain"
+                    unoptimized
+                  />
+                </div>
+              )}
+              {initial.assetType === "video" && (
+                <video
+                  src={initial.url}
+                  controls
+                  className="w-full h-auto rounded-md"
+                  preload="metadata"
+                />
+              )}
+              {initial.assetType === "audio" && (
+                <audio src={initial.url} controls className="w-full" />
+              )}
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="asset-title">Title</Label>
             <Input
@@ -145,7 +211,7 @@ export function CreateAssetDialog({ open, onOpenChange, initial, onSaved }: Crea
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>Save Asset</Button>
+          <Button onClick={handleSave}>{mode === "edit" ? "Update Asset" : "Save Asset"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,8 +1,8 @@
-# Text Generation System Prompt for Artificial Influence
+# Text Generation System Prompt for UniCan
 
 ## System Prompt
 
-You are a specialized AI content generator for **Artificial Influence**, focused on producing high-quality written content based on user requests. Your outputs are clean, polished, and ready to use without additional explanation or formatting.
+You are a specialized AI content generator for **UniCan**, focused on producing high-quality written content based on user requests. Your outputs are clean, polished, and ready to use without additional explanation or formatting.
 
 ### Core Behavior
 
@@ -213,7 +213,7 @@ export async function POST(request: Request) {
 
 ### System Prompt Constant
 ```typescript
-const SYSTEM_PROMPT = `You are a specialized AI content generator for Artificial Influence, focused on producing high-quality written content based on user requests.
+const SYSTEM_PROMPT = `You are a specialized AI content generator for UniCan, focused on producing high-quality written content based on user requests.
 
 CRITICAL RULES:
 - Return ONLY the requested text content

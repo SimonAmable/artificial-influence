@@ -25,6 +25,7 @@ interface ImageData {
   aspectRatio?: string | null
   type?: string | null
   createdAt?: string | null
+  referenceImageUrls?: string[]
 }
 
 interface ImageGridProps {
@@ -78,7 +79,7 @@ export function ImageGrid({
     () =>
       images.map((item) =>
         typeof item === "string"
-          ? { id: undefined, url: item, model: null, prompt: null, tool: null, aspectRatio: null, type: null, createdAt: null }
+          ? { id: undefined, url: item, model: null, prompt: null, tool: null, aspectRatio: null, type: null, createdAt: null, referenceImageUrls: [] }
           : { 
               id: item.id, 
               url: item.url, 
@@ -87,7 +88,8 @@ export function ImageGrid({
               tool: item.tool ?? null,
               aspectRatio: item.aspectRatio ?? null,
               type: item.type ?? null,
-              createdAt: item.createdAt ?? null
+              createdAt: item.createdAt ?? null,
+              referenceImageUrls: (item as ImageData).referenceImageUrls ?? (item as { reference_image_urls?: string[] }).reference_image_urls ?? []
             }
       ),
     [images]
@@ -208,7 +210,7 @@ export function ImageGrid({
   // Grid column class mapping
   const isOneColumn = columnCount === 1
   const gridColsClass = {
-    1: 'grid-cols-1',
+    1: 'grid-cols-1 max-w-2xl mx-auto',
     2: 'grid-cols-2',
     3: 'grid-cols-3',
     4: 'grid-cols-4',
@@ -660,13 +662,14 @@ export function ImageGrid({
           imageUrl={fullscreenImage.url}
           metadata={{
             id: fullscreenImage.id,
-            model: fullscreenImage.model,
-            prompt: fullscreenImage.prompt,
-            tool: fullscreenImage.tool,
-            aspectRatio: fullscreenImage.aspectRatio,
-            type: fullscreenImage.type,
-            createdAt: fullscreenImage.createdAt,
+            model: fullscreenImage.model ?? null,
+            prompt: fullscreenImage.prompt ?? null,
+            tool: fullscreenImage.tool ?? null,
+            aspectRatio: fullscreenImage.aspectRatio ?? null,
+            type: fullscreenImage.type ?? null,
+            createdAt: fullscreenImage.createdAt ?? null,
           }}
+          referenceImages={(fullscreenImage.referenceImageUrls ?? []).map((imageUrl) => ({ imageUrl }))}
           onClose={() => setFullscreenImage(null)}
           onDownload={handleDownload}
           onCopy={handleCopy}

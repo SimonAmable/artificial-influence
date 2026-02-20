@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { KLING_V2_6_MOTION_META } from "@/lib/constants/model-metadata"
 
 export default function MotionCopyPage() {
   const layoutModeContext = useLayoutMode()
@@ -271,6 +272,11 @@ export default function MotionCopyPage() {
   const isRowLayout = layoutMode === "row"
   const inputImageValue = inputImage ?? undefined
   const inputVideoValue = inputVideo ?? undefined
+  const characterOrientationParam = KLING_V2_6_MOTION_META.customParameters?.find(
+    (p) => p.name === "character_orientation"
+  )
+  const characterOrientationOptions = characterOrientationParam?.options ?? ["image", "video"]
+
   const characterOrientationControl = (
     <div className="flex items-center gap-2 px-1">
       <Label htmlFor="character-orientation" className="text-xs text-muted-foreground">
@@ -284,8 +290,9 @@ export default function MotionCopyPage() {
           <SelectValue placeholder="Select" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="image" className="text-xs">image</SelectItem>
-          <SelectItem value="video" className="text-xs">video</SelectItem>
+          {characterOrientationOptions.map((opt) => (
+            <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>

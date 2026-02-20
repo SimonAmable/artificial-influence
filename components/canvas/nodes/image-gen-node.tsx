@@ -25,6 +25,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion"
 import Cropper, { type Area } from "react-easy-crop"
 import type { ImageGenNodeData, TextNodeData, UploadNodeData } from "@/lib/canvas/types"
+import type { Model } from "@/lib/types/models"
 import { cn } from "@/lib/utils"
 import {
   Select,
@@ -52,8 +53,8 @@ import {
 import { getConstrainedSize, loadImageSize } from "@/lib/canvas/media-sizing"
 import { ImageEditorDialog } from "@/components/image-editor"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
-import { ImagePromptFields } from "@/components/tools/influencer/image-prompt-fields"
-import { ImageEnhanceSwitch } from "@/components/tools/influencer/image-enhance-switch"
+import { InfluencerInputBox } from "@/components/tools/influencer"
+import type { ImageUpload } from "@/components/shared/upload/photo-upload"
 
 // Helper function to get dimensions for aspect ratio
 const getImageDimensions = (aspectRatio: string) => {
@@ -72,6 +73,8 @@ const getImageDimensions = (aspectRatio: string) => {
 }
 
 const MAX_GENERATED_IMAGES = 20
+const CHARACTER_SWAP_UI_MODEL_IDENTIFIER = "custom/character-swap"
+const CHARACTER_SWAP_BASE_MODEL_IDENTIFIER = "google/nano-banana-pro"
 
 function getNormalizedGeneratedImages(data: ImageGenNodeData): {
   urls: string[]
@@ -105,6 +108,22 @@ function getFirstAvailableImageUrl(data: ImageGenNodeData): string | null {
 export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as ImageGenNodeData
   const { models: imageModels } = useModels("image")
+  const effectiveImageModels = React.useMemo(() => {
+    if (imageModels.length === 0) return imageModels
+    if (imageModels.some((m) => m.identifier === CHARACTER_SWAP_UI_MODEL_IDENTIFIER)) return imageModels
+    const baseModel = imageModels.find((m) => m.identifier === CHARACTER_SWAP_BASE_MODEL_IDENTIFIER)
+    if (!baseModel) return imageModels
+    return [
+      ...imageModels,
+      {
+        ...baseModel,
+        id: `ui-${CHARACTER_SWAP_UI_MODEL_IDENTIFIER}`,
+        identifier: CHARACTER_SWAP_UI_MODEL_IDENTIFIER,
+        name: "Character Swap",
+        description: "Swap a character into a scene using two references.",
+      } as Model,
+    ]
+  }, [imageModels])
   const [width, height] = getImageDimensions(nodeData.aspectRatio || "match_input_image")
   const [isHovered, setIsHovered] = React.useState(false)
   const [isEditingTitle, setIsEditingTitle] = React.useState(false)
@@ -427,6 +446,26 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       manualImageUrls: currentManualImages.filter(url => url !== imageUrl)
     })
   }
+
+  const handleReferenceImagesChange = React.useCallback(
+    async (images: ImageUpload[]) => {
+      const manualUrls = nodeData.manualImageUrls || []
+      const resultUrls: string[] = []
+      for (const img of images) {
+        if (img.url && manualUrls.includes(img.url)) {
+          resultUrls.push(img.url)
+        } else if (img.file) {
+          const [result] = await uploadFilesToSupabase([img.file], "reference-images")
+          if (result?.url) {
+            resultUrls.push(result.url)
+            toast.success("Reference image added")
+          }
+        }
+      }
+      nodeData.onDataChange?.(id, { manualImageUrls: resultUrls })
+    },
+    [id, nodeData]
+  )
 
   const handleFullscreen = () => {
     if (activeImageUrl && !isCropping) {
@@ -901,268 +940,53 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         </motion.div>
       </div>
 
-    {/* Prompt input box using NodeToolbar positioned at bottom */}
+    {/* Same input component as /image page */}
     <NodeToolbar
       isVisible={selected && !isCropping}
       position={Position.Bottom}
       offset={12}
     >
-      <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl overflow-hidden nopan nodrag" style={{ width: '600px' }}>
-        {/* Prompt input area */}
-        <div className="p-2.5 space-y-2">
-
-          <div className="relative">
-            {/* Combined image previews - both connected and manual */}
-            {(() => {
-              const allImages = [
-                ...(nodeData.connectedImageUrls || []),
-                ...(nodeData.manualImageUrls || [])
-              ]
-              
-              if (allImages.length > 0) {
-                return (
-                  <div className="mb-2 flex flex-wrap gap-2">
-                    {allImages.map((imageUrl, index) => {
-                      const isManual = index >= (nodeData.connectedImageUrls || []).length
-                      return (
-                        <div 
-                          key={`${imageUrl}-${index}`} 
-                          className="relative rounded-lg overflow-hidden border border-white/10 group bg-black/20"
-                          style={{ maxWidth: '120px', maxHeight: '120px' }}
-                        >
-                          <img 
-                            src={imageUrl} 
-                            alt={`Reference ${index + 1}`}
-                            className="w-full h-full object-contain"
-                          />
-                          {isManual && (
-                            <button
-                              onClick={() => handleRemoveManualImage(imageUrl)}
-                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500/80 hover:bg-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                              aria-label="Remove image"
-                            >
-                              <X size={12} className="text-white" />
-                            </button>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              }
-              return null
-            })()}
-            
-            <ImagePromptFields
-              promptValue={nodeData.prompt || ""}
-              onPromptChange={(value) => nodeData.onDataChange?.(id, { prompt: value })}
-              connectedPrompt={nodeData.connectedPrompt || undefined}
-              variant="toolbar"
-            />
+      <div className="nopan nodrag w-full max-w-[600px]">
+        {nodeData.connectedPrompt && (
+          <div className="mb-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+            <span className="text-xs text-zinc-500">From connections: </span>
+            <span className="text-xs text-zinc-300 line-clamp-2">{nodeData.connectedPrompt}</span>
           </div>
-
-          {nodeData.error && (
-            <div className="flex items-center justify-between bg-red-500/10 border border-red-500/20 rounded-lg px-2.5 py-2">
-              <span className="text-[11px] text-red-400">{nodeData.error}</span>
-              <button
-                onClick={handleGenerate}
-                className="text-red-400 hover:text-red-300"
-                aria-label="Retry generation"
-                title="Retry generation"
-              >
-                <ArrowClockwise size={14} />
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Bottom bar: model selectors + generate */}
-        <div className=" px-3 py-2.5 flex flex-nowrap items-center gap-2 overflow-x-auto">
-          {/* Add Image Button with Dropdown */}
-          <DropdownMenu open={isAddImageOpen} onOpenChange={setIsAddImageOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 w-7 p-0"
-                title="Add reference image"
-              >
-                <Plus size={16} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="nopan nodrag">
-              <DropdownMenuItem onClick={() => uploadInputRef.current?.click()}>
-                <Upload size={14} className="mr-2" />
-                Upload Image
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  // TODO: Implement asset selection
-                  setIsAddImageOpen(false)
-                }}
-              >
-                <ImageIcon size={14} className="mr-2" />
-                Select Asset
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          {/* Hidden file input */}
-          <input
-            ref={uploadInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleManualImageUpload}
-            className="hidden"
-          />
-
-          <Select
-            value={nodeData.model || imageModels[0]?.identifier || "google/nano-banana"}
-            onValueChange={(value) =>
-              nodeData.onDataChange?.(id, { model: value })
-            }
-          >
-            <SelectTrigger id="canvas-model-select" className="h-7 text-xs w-fit min-w-[100px]">
-              <SelectValue placeholder="Select model">
-                {nodeData.model && (() => {
-                  const model = imageModels.find((m) => m.identifier === nodeData.model)
-                  return (
-                    <div className="flex items-center gap-1.5">
-                      <ModelIcon identifier={nodeData.model} size={14} />
-                      <span>{model?.name || nodeData.model}</span>
-                    </div>
-                  )
-                })()}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent position="popper" side="top" sideOffset={4}>
-              {imageModels.map((model) => (
-                <SelectItem key={model.identifier} value={model.identifier}>
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-md border border-white/10 bg-white/5 p-1 shrink-0">
-                      <ModelIcon identifier={model.identifier} size={16} />
-                    </div>
-                    <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                      <span className="font-medium text-xs">{model.name}</span>
-                      {model.description && (
-                        <span className="text-[10px] text-zinc-400">
-                          {model.description}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={nodeData.aspectRatio || "match_input_image"}
-            onValueChange={(value) =>
-              nodeData.onDataChange?.(id, { aspectRatio: value })
-            }
-          >
-            <SelectTrigger className="h-7 text-xs w-fit min-w-[120px]">
-              <SelectValue>
-                {(nodeData.aspectRatio || "match_input_image") && (
-                  <div className="flex items-center gap-2">
-                    {(nodeData.aspectRatio || "match_input_image") === "match_input_image" ? (
-                      <MagicWand weight="duotone" className="w-3 h-3" />
-                    ) : (
-                      <div
-                        className={cn(
-                          "border-2 border-foreground/60 rounded-[2px] shrink-0",
-                          (nodeData.aspectRatio || "match_input_image") === "1:1" && "w-3 h-3",
-                          (nodeData.aspectRatio || "match_input_image") === "16:9" && "w-3 h-2",
-                          (nodeData.aspectRatio || "match_input_image") === "9:16" && "w-2 h-3",
-                          (nodeData.aspectRatio || "match_input_image") === "4:3" && "w-3 h-2.5",
-                          (nodeData.aspectRatio || "match_input_image") === "3:4" && "w-2.5 h-3",
-                          (nodeData.aspectRatio || "match_input_image") === "3:2" && "w-3 h-2",
-                          (nodeData.aspectRatio || "match_input_image") === "2:3" && "w-2 h-3"
-                        )}
-                      />
-                    )}
-                    <span>{(nodeData.aspectRatio || "match_input_image") === "match_input_image" ? "Auto" : nodeData.aspectRatio}</span>
-                  </div>
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent position="popper" side="top" sideOffset={4}>
-              <SelectItem value="match_input_image">
-                <div className="flex items-center gap-2">
-                  <MagicWand weight="duotone" className="w-3 h-3" />
-                  <span>Auto</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="1:1">
-                <div className="flex items-center gap-2">
-                  <div className="border-2 border-foreground/60 rounded-[2px] shrink-0 w-3 h-3" />
-                  <span>1:1</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="16:9">
-                <div className="flex items-center gap-2">
-                  <div className="border-2 border-foreground/60 rounded-[2px] shrink-0 w-3 h-2" />
-                  <span>16:9</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="9:16">
-                <div className="flex items-center gap-2">
-                  <div className="border-2 border-foreground/60 rounded-[2px] shrink-0 w-2 h-3" />
-                  <span>9:16</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="4:3">
-                <div className="flex items-center gap-2">
-                  <div className="border-2 border-foreground/60 rounded-[2px] shrink-0 w-3 h-2.5" />
-                  <span>4:3</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="3:4">
-                <div className="flex items-center gap-2">
-                  <div className="border-2 border-foreground/60 rounded-[2px] shrink-0 w-2.5 h-3" />
-                  <span>3:4</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="3:2">
-                <div className="flex items-center gap-2">
-                  <div className="border-2 border-foreground/60 rounded-[2px] shrink-0 w-3 h-2" />
-                  <span>3:2</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="2:3">
-                <div className="flex items-center gap-2">
-                  <div className="border-2 border-foreground/60 rounded-[2px] shrink-0 w-2 h-3" />
-                  <span>2:3</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          <ImageEnhanceSwitch
-            checked={nodeData.enhancePrompt}
-            onCheckedChange={(checked) =>
-              nodeData.onDataChange?.(id, { enhancePrompt: checked })
-            }
-            variant="toolbar"
-          />
-
-          <div className="flex-1" />
-
-          <Button
-            onClick={handleGenerate}
-            disabled={nodeData.isGenerating}
-            size="sm"
-            className="text-xs"
-            variant={nodeData.isGenerating ? "secondary" : "default"}
-          >
-            {nodeData.isGenerating ? (
-              <CircleNotch size={12} className="animate-spin" />
-            ) : (
-              <Play size={10} weight="fill" />
-            )}
-          </Button>
-        </div>
+        )}
+        {nodeData.error && (
+          <div className="mb-2 flex items-center justify-between rounded-lg bg-red-500/10 border border-red-500/20 px-2.5 py-2">
+            <span className="text-[11px] text-red-400">{nodeData.error}</span>
+            <button
+              onClick={handleGenerate}
+              className="text-red-400 hover:text-red-300"
+              aria-label="Retry"
+            >
+              <ArrowClockwise size={14} />
+            </button>
+          </div>
+        )}
+        <InfluencerInputBox
+          className="border-white/10 bg-zinc-900/95 shadow-xl rounded-xl overflow-hidden"
+          promptValue={nodeData.prompt || ""}
+          onPromptChange={(value) => nodeData.onDataChange?.(id, { prompt: value })}
+          referenceImages={(nodeData.manualImageUrls || []).map((url) => ({ url }))}
+          onReferenceImagesChange={handleReferenceImagesChange}
+          enhancePrompt={nodeData.enhancePrompt ?? false}
+          onEnhancePromptChange={(checked) => nodeData.onDataChange?.(id, { enhancePrompt: checked })}
+          isGenerating={nodeData.isGenerating ?? false}
+          onGenerate={handleGenerate}
+          selectedModel={nodeData.model || effectiveImageModels[0]?.identifier || ""}
+          onModelChange={(value) => nodeData.onDataChange?.(id, { model: value })}
+          showModelSelector={true}
+          imageModels={effectiveImageModels}
+          selectedAspectRatio={nodeData.aspectRatio || "match_input_image"}
+          onAspectRatioChange={(value) => nodeData.onDataChange?.(id, { aspectRatio: value })}
+          showAspectRatioSelector={true}
+          selectedNumImages={1}
+          onNumImagesChange={() => {}}
+          showNumImagesSelector={false}
+          placeholder="Enter your prompt..."
+        />
       </div>
     </NodeToolbar>
 

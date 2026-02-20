@@ -4,6 +4,7 @@ import * as React from "react"
 import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
 import { InfluencerInputBox, InfluencerShowcaseCard } from "@/components/tools/influencer"
 import { CharacterSwapInputBox } from "@/components/tools/character-swap"
+import type { CharacterSwapMode } from "@/components/tools/character-swap/character-swap-input-box"
 import { ImageGrid } from "@/components/shared/display/image-grid"
 // import { GenerationHistoryColumn } from "@/components/shared/display/generation-history-column" // Temporarily disabled
 import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
@@ -16,19 +17,32 @@ import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { toast } from "sonner"
 
 interface ImageHistoryItem {
+  id?: string
   url: string
   model: string | null
   prompt: string | null
+  tool?: string | null
+  aspectRatio?: string | null
+  type?: string | null
+  createdAt?: string | null
+  reference_image_urls?: string[]
 }
 
 const CHARACTER_SWAP_UI_MODEL_IDENTIFIER = "custom/character-swap"
 const CHARACTER_SWAP_BASE_MODEL_IDENTIFIER = "google/nano-banana-pro"
-const CHARACTER_SWAP_PROMPT =
-  "Character swap task using two reference images. First image is the reference character. " +
-  "Second image is the reference scene. Place the character from the first image into the scene from the second image. " +
-  "Preserve the character's facial identity, hairstyle, body shape, and skin tone from the first image. " +
-  "Preserve scene composition, camera angle, environment layout, and lighting mood from the second image. " +
-  "Blend naturally with correct perspective, realistic scale, contact shadows, reflections, and occlusion."
+const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
+  full_character:
+    "Character swap task using two reference images. First image is the reference character. " +
+    "Second image is the reference scene. Place the character from the first image into the scene from the second image. " +
+    "Preserve the character's facial identity, hairstyle, body shape, and skin tone from the first image. " +
+    "Preserve scene composition, camera angle, environment layout, and lighting mood from the second image. " +
+    "Blend naturally with correct perspective, realistic scale, contact shadows, reflections, and occlusion.",
+  identity_only:
+    "Face and skin tone swap task using two reference images. First image is the face and skin-tone reference. " +
+    "Second image is the target character and scene. Keep the target person's body, pose, hairstyle silhouette, clothing, and environment from the second image. " +
+    "Replace facial identity and skin tone using the first image while preserving natural expression and head alignment. " +
+    "Keep realistic skin texture, lighting consistency, and seamless blending with the scene.",
+}
 
 export default function ImagePage() {
   const layoutModeContext = useLayoutMode()
@@ -45,6 +59,7 @@ export default function ImagePage() {
   const [referenceImages, setReferenceImages] = React.useState<ImageUpload[]>([])
   const [characterSwapCharacterImage, setCharacterSwapCharacterImage] = React.useState<ImageUpload | null>(null)
   const [characterSwapSceneImage, setCharacterSwapSceneImage] = React.useState<ImageUpload | null>(null)
+  const [characterSwapMode, setCharacterSwapMode] = React.useState<CharacterSwapMode>("full_character")
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
@@ -132,13 +147,24 @@ export default function ImagePage() {
       const data = await response.json()
       const imageRows = Array.isArray(data.generations)
         ? data.generations
-            .map((generation: { url?: string; model?: string | null; prompt?: string | null }) => ({
-              url: generation.url,
-              model: generation.model ?? null,
-              prompt: generation.prompt ?? null,
+            .map((g: {
+              url?: string; model?: string | null; prompt?: string | null;
+              id?: string; tool?: string | null; aspect_ratio?: string | null;
+              type?: string | null; created_at?: string | null;
+              reference_image_urls?: string[];
+            }) => ({
+              id: g.id,
+              url: g.url,
+              model: g.model ?? null,
+              prompt: g.prompt ?? null,
+              tool: g.tool ?? null,
+              aspectRatio: g.aspect_ratio ?? null,
+              type: g.type ?? null,
+              createdAt: g.created_at ?? null,
+              reference_image_urls: g.reference_image_urls ?? [],
             }))
             .filter(
-              (item: { url?: string; model: string | null; prompt: string | null }): item is ImageHistoryItem =>
+              (item: ImageHistoryItem): item is ImageHistoryItem =>
                 typeof item.url === "string" && item.url.length > 0
             )
         : []
@@ -218,7 +244,7 @@ export default function ImagePage() {
 
       // Create FormData for the request
       const formData = new FormData()
-      formData.append('prompt', isCharacterSwapModel ? CHARACTER_SWAP_PROMPT : prompt.trim())
+      formData.append('prompt', isCharacterSwapModel ? CHARACTER_SWAP_PROMPTS[characterSwapMode] : prompt.trim())
       formData.append('enhancePrompt', enhancePrompt.toString())
       
       // Add model identifier if selected
@@ -359,9 +385,12 @@ export default function ImagePage() {
         onModelChange={setSelectedModel}
         models={effectiveImageModels}
         showModelSelector={true}
+        selectedSwapMode={characterSwapMode}
+        onSwapModeChange={setCharacterSwapMode}
       />
     )
   }, [
+    characterSwapMode,
     characterSwapCharacterImage,
     characterSwapSceneImage,
     effectiveImageModels,

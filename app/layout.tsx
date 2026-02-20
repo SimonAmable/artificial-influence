@@ -8,8 +8,8 @@ import { AIChat } from "@/components/ai-chat"
 import { Analytics } from "@vercel/analytics/next"
 
 export const metadata: Metadata = {
-  title: "Artificial Influence",
-  description: "Create and manage AI-powered influencer content with uncanny AI generation tools",
+  title: "UniCan",
+  description: "Create and manage AI-powered content with uncanny AI generation tools",
 };
 
 export default function RootLayout({

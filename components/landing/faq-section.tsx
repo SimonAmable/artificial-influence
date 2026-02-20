@@ -7,7 +7,7 @@ import {
 
 const faqData = [
   {
-    question: "What can I build with Artificial Influence?",
+    question: "What can I build with UniCan?",
     answer:
       "You can generate image sets, motion assets, lip-synced videos, and influencer-style campaign creatives from one workspace.",
   },

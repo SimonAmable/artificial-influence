@@ -1,8 +1,8 @@
 'use client';
 
-// import { useState } from 'react';
-// import { useRouter } from 'next/navigation';
-// import { createClient } from '@/lib/supabase/client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { Sparkle, Info } from '@phosphor-icons/react';
 import {
   Tooltip,
@@ -117,10 +117,38 @@ const monthlyPlans = [
 ];
 
 export default function PricingTestPage() {
-  // TODO: Add subscribe functionality when needed
-  // const [loading, setLoading] = useState<string | null>(null);
-  // const router = useRouter();
-  // const supabase = createClient();
+  const [loading, setLoading] = useState<string | null>(null);
+  const router = useRouter();
+  const supabase = createClient();
+
+  const handleSubscribe = async (priceId: string, planId: string) => {
+    setLoading(planId);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push('/login?redirect=/pricing-test');
+        return;
+      }
+
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to create checkout session');
+      if (data.url) window.location.href = data.url;
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to start checkout. Please try again.');
+    } finally {
+      setLoading(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-linear-to-b from-background to-muted py-12 px-4 sm:px-6 lg:px-8">
@@ -223,6 +251,19 @@ export default function PricingTestPage() {
                   </TooltipContent>
                 </Tooltip>
               </div>
+
+              {/* Subscribe Button */}
+              <button
+                onClick={() => handleSubscribe(plan.priceId, plan.id)}
+                disabled={loading === plan.id}
+                className={`w-full py-3 px-6 rounded-lg font-semibold transition-colors mb-6 ${
+                  plan.popular
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {loading === plan.id ? 'Loading...' : 'Subscribe'}
+              </button>
 
               {/* Features List */}
                 <ul className="space-y-3 mb-8">

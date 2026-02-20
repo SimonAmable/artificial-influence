@@ -58,9 +58,17 @@ export async function GET(request: NextRequest) {
         path != null && path !== ''
           ? supabase.storage.from('public-bucket').getPublicUrl(path).data.publicUrl
           : null;
+
+      const referencePaths = (generation.reference_images_supabase_storage_path as string[] | null) ?? [];
+      const reference_image_urls = referencePaths
+        .filter((p): p is string => typeof p === 'string' && p.length > 0)
+        .map((p) => supabase.storage.from('public-bucket').getPublicUrl(p).data.publicUrl);
+
       return {
         ...generation,
+        tool: generation.tool ?? null,
         url,
+        reference_image_urls,
       };
     });
 

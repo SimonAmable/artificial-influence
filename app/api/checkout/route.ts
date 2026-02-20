@@ -43,33 +43,64 @@ export async function POST(request: NextRequest) {
 
     let customerId = existingCustomer?.stripe_customer_id;
 
-    // If no customer exists, create one in Stripe
-    if (!customerId) {
-      const customer = await createCustomer({
-        email: profile?.email || user.email || '',
+    const ensureCustomer = async (): Promise<string> => {
+      if (!customerId) {
+        const customer = await createCustomer({
+          email: profile?.email || user.email || '',
+          userId: user.id,
+          name: profile?.full_name || undefined,
+        });
+        customerId = customer.id;
+        await supabase.from('customers').insert({
+          user_id: user.id,
+          stripe_customer_id: customerId,
+          email: profile?.email || user.email || '',
+        });
+        return customerId;
+      }
+      return customerId;
+    };
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+    let session: Awaited<ReturnType<typeof createCheckoutSession>>;
+    try {
+      await ensureCustomer();
+      session = await createCheckoutSession({
+        priceId,
+        customerId: customerId!,
         userId: user.id,
-        name: profile?.full_name || undefined,
+        successUrl: `${appUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${appUrl}/pricing`,
       });
+    } catch (checkoutError: unknown) {
+      // Stored customer ID may be from test mode or deleted in Stripe — recreate and retry once
+      const isMissingCustomer =
+        checkoutError &&
+        typeof checkoutError === 'object' &&
+        'code' in checkoutError &&
+        (checkoutError as { code?: string }).code === 'resource_missing' &&
+        (checkoutError as { param?: string }).param === 'customer';
 
-      customerId = customer.id;
+      if (!isMissingCustomer || !existingCustomer?.stripe_customer_id) {
+        throw checkoutError;
+      }
 
-      // Store customer in our database
-      await supabase.from('customers').insert({
-        user_id: user.id,
-        stripe_customer_id: customerId,
-        email: profile?.email || user.email || '',
+      await supabase
+        .from('customers')
+        .delete()
+        .eq('user_id', user.id);
+
+      customerId = undefined;
+      await ensureCustomer();
+      session = await createCheckoutSession({
+        priceId,
+        customerId: customerId!,
+        userId: user.id,
+        successUrl: `${appUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${appUrl}/pricing`,
       });
     }
-
-    // Create Checkout Session
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const session = await createCheckoutSession({
-      priceId,
-      customerId,
-      userId: user.id,
-      successUrl: `${appUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${appUrl}/pricing`,
-    });
 
     return NextResponse.json({ sessionId: session.id, url: session.url });
   } catch (error) {

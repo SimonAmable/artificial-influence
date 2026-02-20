@@ -102,6 +102,22 @@ export async function deleteAsset(assetId: string): Promise<void> {
   }
 }
 
+export async function updateAsset(assetId: string, input: CreateAssetInput): Promise<AssetRecord> {
+  const response = await fetch(`/api/assets/${assetId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  })
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}))
+    throw new Error(payload.error || "Failed to update asset")
+  }
+
+  const data = await response.json()
+  return data.asset as AssetRecord
+}
+
 export function normalizeTags(tags: string[] | undefined) {
   return (tags || [])
     .map((tag) => tag.trim().toLowerCase())

@@ -41,7 +41,8 @@ export async function POST(request: NextRequest) {
     const prompt = (body.prompt as string) || '';
     const mode = (body.mode as string) || 'pro';
     const keepOriginalSound = body.keep_original_sound !== false;
-    const characterOrientation = (body.character_orientation as string) || 'image';
+    const rawCharacterOrientation = (body.character_orientation as string) || 'image';
+    const characterOrientation = (rawCharacterOrientation === 'video' ? 'video' : 'image') as 'image' | 'video';
     const tool = body.tool as string | null;
 
     console.log('[generate-video] JSON body parsed:', {
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
       video: videoPublicUrl,
       prompt: prompt,
       keep_original_sound: keepOriginalSound,
-      character_orientation: characterOrientation as 'image',
+      character_orientation: characterOrientation,
     };
 
     console.log('[generate-video] Replicate input:', {

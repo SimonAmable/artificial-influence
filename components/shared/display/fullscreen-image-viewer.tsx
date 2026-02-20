@@ -4,19 +4,27 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { X, DownloadSimple, Copy, Trash, Plus, Check, CalendarBlank } from "@phosphor-icons/react"
+import { X, DownloadSimple, Copy, Trash, Plus, Check, CalendarBlank, ImageSquare } from "@phosphor-icons/react"
+
+export type ImageViewerMetadata = {
+  id?: string
+  model: string | null
+  prompt: string | null
+  tool?: string | null
+  aspectRatio?: string | null
+  type?: string | null
+  createdAt?: string | null
+}
+
+export type ReferenceImageItem = {
+  imageUrl: string
+  metadata?: Partial<ImageViewerMetadata>
+}
 
 interface FullscreenImageViewerProps {
   imageUrl: string
-  metadata: {
-    id?: string
-    model: string | null
-    prompt: string | null
-    tool?: string | null
-    aspectRatio?: string | null
-    type?: string | null
-    createdAt?: string | null
-  }
+  metadata: ImageViewerMetadata
+  referenceImages?: ReferenceImageItem[]
   onClose: () => void
   onDownload: (imageUrl: string) => void
   onCopy: (imageUrl: string) => void
@@ -69,19 +77,28 @@ function formatDate(dateString: string | null): string {
   }
 }
 
-// Normalize tool names
-function normalizeToolName(tool: string | null | undefined): string {
-  if (!tool) return 'Unknown Tool'
-  
-  return tool
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
+// Normalize tool names; show type-based fallback when tool is missing (e.g. legacy rows)
+function normalizeToolName(
+  tool: string | null | undefined,
+  fallbackType?: string | null
+): string {
+  const value = (typeof tool === 'string' && tool.trim()) ? tool : null
+  if (value) {
+    return value
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }
+  if (fallbackType === 'image') return 'Image'
+  if (fallbackType === 'video') return 'Video'
+  if (fallbackType === 'audio') return 'Audio'
+  return 'Unknown Tool'
 }
 
 export function FullscreenImageViewer({
   imageUrl,
   metadata,
+  referenceImages = [],
   onClose,
   onDownload,
   onCopy,
@@ -90,7 +107,18 @@ export function FullscreenImageViewer({
   copiedImageUrl,
   deletingImageId,
 }: FullscreenImageViewerProps) {
-  const canDelete = Boolean(metadata.id && onDelete)
+  // activeRefIndex: null = main image, 0..n = reference image index
+  const [activeRefIndex, setActiveRefIndex] = React.useState<number | null>(null)
+
+  const hasRefs = referenceImages.length > 0
+  const currentImageUrl = activeRefIndex === null
+    ? imageUrl
+    : referenceImages[activeRefIndex]?.imageUrl ?? imageUrl
+  const currentMetadata: ImageViewerMetadata = activeRefIndex === null
+    ? metadata
+    : { ...metadata, ...referenceImages[activeRefIndex]?.metadata }
+
+  const canDelete = Boolean(currentMetadata.id && onDelete)
   const canSaveToAssets = Boolean(onSaveToAssets)
 
   return (
@@ -105,7 +133,7 @@ export function FullscreenImageViewer({
         {/* Image Container */}
         <div className="flex flex-1 items-center justify-center p-4 lg:p-8">
           <img
-            src={imageUrl}
+            src={currentImageUrl}
             alt="Full screen preview"
             className="max-h-[70vh] max-w-full rounded-lg object-contain lg:max-h-[90vh] lg:max-w-[70vw]"
           />
@@ -130,46 +158,107 @@ export function FullscreenImageViewer({
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto p-4">
+            {/* Reference images preview */}
+            {hasRefs && (
+              <div className="mb-4">
+                <p className="mb-2 text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <ImageSquare className="size-3.5" />
+                  Reference images
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setActiveRefIndex(null)
+                    }}
+                    className={cn(
+                      "relative h-14 w-14 shrink-0 overflow-hidden rounded-md border-2 bg-muted transition-colors hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring",
+                      activeRefIndex === null
+                        ? "border-primary ring-2 ring-primary/20"
+                        : "border-border"
+                    )}
+                    aria-label="View main image"
+                  >
+                    <img
+                      src={imageUrl}
+                      alt="Main"
+                      className="h-full w-full object-cover"
+                    />
+                    <span className="absolute bottom-0 left-0 right-0 bg-black/60 py-0.5 text-[10px] text-center text-white">
+                      Main
+                    </span>
+                  </button>
+                  {referenceImages.map((refImg, idx) => (
+                    <button
+                      key={refImg.imageUrl + idx}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveRefIndex(idx)
+                      }}
+                      className={cn(
+                        "relative h-14 w-14 shrink-0 overflow-hidden rounded-md border-2 bg-muted transition-colors hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring",
+                        activeRefIndex === idx
+                          ? "border-primary ring-2 ring-primary/20"
+                          : "border-border"
+                      )}
+                      aria-label={`View reference image ${idx + 1}`}
+                    >
+                      <img
+                        src={refImg.imageUrl}
+                        alt={`Reference ${idx + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                      <span className="absolute bottom-0 left-0 right-0 bg-black/60 py-0.5 text-[10px] text-center text-white">
+                        {idx + 1}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Information Section */}
             <div className="space-y-3">
               <div>
                 <p className="mb-2 text-xs font-medium text-muted-foreground">Tool</p>
                 <Badge variant="secondary" className="text-xs">
-                  {normalizeToolName(metadata.tool)}
+                  {normalizeToolName(currentMetadata.tool, currentMetadata.type)}
                 </Badge>
               </div>
 
-              {metadata.model && (
+              {currentMetadata.model && (
                 <div>
                   <p className="mb-2 text-xs font-medium text-muted-foreground">Model</p>
                   <Badge variant="outline" className="text-xs">
-                    {normalizeModelName(metadata.model)}
+                    {normalizeModelName(currentMetadata.model)}
                   </Badge>
                 </div>
               )}
 
-              {metadata.aspectRatio && (
+              {currentMetadata.aspectRatio && (
                 <div>
                   <p className="mb-2 text-xs font-medium text-muted-foreground">Size</p>
-                  <p className="text-sm text-foreground">{metadata.aspectRatio}</p>
+                  <p className="text-sm text-foreground">{currentMetadata.aspectRatio}</p>
                 </div>
               )}
 
-              {metadata.createdAt && (
+              {currentMetadata.createdAt && (
                 <div>
                   <p className="mb-2 text-xs font-medium text-muted-foreground">Created</p>
                   <div className="flex items-center gap-2 text-sm text-foreground">
                     <CalendarBlank className="size-4 text-muted-foreground" />
-                    {formatDate(metadata.createdAt)}
+                    {formatDate(currentMetadata.createdAt)}
                   </div>
                 </div>
               )}
 
-              {metadata.prompt && (
+              {currentMetadata.prompt && (
                 <div>
                   <p className="mb-2 text-xs font-medium text-muted-foreground">Prompt</p>
                   <p className="max-h-32 overflow-y-auto rounded-md border border-border bg-muted/30 p-3 text-xs leading-relaxed text-foreground">
-                    {metadata.prompt}
+                    {currentMetadata.prompt}
                   </p>
                 </div>
               )}
@@ -187,7 +276,7 @@ export function FullscreenImageViewer({
                 className="h-9 w-full justify-start gap-2"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onDownload(imageUrl)
+                  onDownload(currentImageUrl)
                 }}
               >
                 <DownloadSimple className="size-4" />
@@ -201,10 +290,10 @@ export function FullscreenImageViewer({
                 className="h-9 w-full justify-start gap-2"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onCopy(imageUrl)
+                  onCopy(currentImageUrl)
                 }}
               >
-                {copiedImageUrl === imageUrl ? (
+                {copiedImageUrl === currentImageUrl ? (
                   <>
                     <Check className="size-4" />
                     Copied
@@ -225,7 +314,7 @@ export function FullscreenImageViewer({
                   className="h-9 w-full justify-start gap-2"
                   onClick={(e) => {
                     e.stopPropagation()
-                    onSaveToAssets?.(imageUrl)
+                    onSaveToAssets?.(currentImageUrl)
                   }}
                 >
                   <Plus className="size-4" />
@@ -233,7 +322,7 @@ export function FullscreenImageViewer({
                 </Button>
               )}
 
-              {canDelete && (
+              {canDelete && currentMetadata.id && (
                 <Button
                   type="button"
                   variant="outline"
@@ -241,14 +330,12 @@ export function FullscreenImageViewer({
                   className="h-9 w-full justify-start gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={(e) => {
                     e.stopPropagation()
-                    if (metadata.id) {
-                      onDelete?.(metadata.id, imageUrl)
-                    }
+                    onDelete?.(currentMetadata.id!, currentImageUrl)
                   }}
-                  disabled={deletingImageId === metadata.id}
+                  disabled={deletingImageId === currentMetadata.id}
                 >
                   <Trash className="size-4" />
-                  {deletingImageId === metadata.id ? 'Deleting...' : 'Delete'}
+                  {deletingImageId === currentMetadata.id ? 'Deleting...' : 'Delete'}
                 </Button>
               )}
             </div>

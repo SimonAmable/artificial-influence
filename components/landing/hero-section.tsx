@@ -31,7 +31,7 @@ export function HeroSection() {
   const hasTriggeredThemeChange = React.useRef(false)
 
   // Calculate typing duration based on text length
-  const text = "Artificial Influence"
+  const text = "UniCan"
   const typingDuration = 15 // ms per character (reduced from 50)
   const pauseDelay = 150 // pause after typing completes (reduced from 1000)
   const totalTypingTime = text.length * typingDuration + pauseDelay
