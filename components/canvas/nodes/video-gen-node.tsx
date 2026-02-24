@@ -709,12 +709,13 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       } else {
         const requestBody: Record<string, unknown> = {
           model: modelIdentifier,
-          prompt: nodeData.prompt || "",
           ...(nodeData.parameters || {}),
+          // Apply node prompt after parameters spread so it is never overwritten by parameters.prompt (model default can be null)
+          prompt: nodeData.prompt?.trim() || "",
         }
 
-        if (nodeData.negativePrompt && !requestBody.negative_prompt) {
-          requestBody.negative_prompt = nodeData.negativePrompt
+        if (nodeData.negativePrompt?.trim()) {
+          requestBody.negative_prompt = nodeData.negativePrompt.trim()
         }
 
         if (imageUpload?.url) {

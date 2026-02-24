@@ -134,6 +134,53 @@ export async function POST(request: NextRequest) {
         if (otherParams.resolution) replicateInput.resolution = otherParams.resolution;
         break;
 
+      case 'kwaivgi/kling-v3-video': {
+        const startImage = otherParams.start_image ?? first_frame_image;
+        const endImage = otherParams.end_image ?? last_frame;
+        if (startImage) replicateInput.start_image = startImage;
+        if (endImage) replicateInput.end_image = endImage;
+        if (otherParams.mode) replicateInput.mode = otherParams.mode;
+        if (otherParams.duration != null && otherParams.duration !== undefined) replicateInput.duration = Number(otherParams.duration);
+        if (otherParams.aspect_ratio) replicateInput.aspect_ratio = otherParams.aspect_ratio;
+        if (otherParams.generate_audio !== undefined) replicateInput.generate_audio = otherParams.generate_audio;
+        if (negative_prompt) replicateInput.negative_prompt = negative_prompt;
+        if (otherParams.negative_prompt) replicateInput.negative_prompt = otherParams.negative_prompt;
+        if (otherParams.multi_prompt) {
+          const multiPrompt = typeof otherParams.multi_prompt === 'string'
+            ? otherParams.multi_prompt
+            : JSON.stringify(otherParams.multi_prompt);
+          replicateInput.multi_prompt = multiPrompt;
+        }
+        break;
+      }
+
+      case 'kwaivgi/kling-v3-omni-video': {
+        const startImage = otherParams.start_image ?? first_frame_image;
+        const endImage = otherParams.end_image ?? last_frame;
+        if (startImage) replicateInput.start_image = startImage;
+        if (endImage) replicateInput.end_image = endImage;
+        if (Array.isArray(body.reference_images) && body.reference_images.length > 0) {
+          replicateInput.reference_images = body.reference_images;
+        }
+        if (otherParams.reference_video) replicateInput.reference_video = otherParams.reference_video;
+        if (body.reference_video) replicateInput.reference_video = body.reference_video;
+        if (otherParams.video_reference_type) replicateInput.video_reference_type = otherParams.video_reference_type;
+        if (otherParams.mode) replicateInput.mode = otherParams.mode;
+        if (otherParams.duration != null && otherParams.duration !== undefined) replicateInput.duration = Number(otherParams.duration);
+        if (otherParams.aspect_ratio) replicateInput.aspect_ratio = otherParams.aspect_ratio;
+        if (otherParams.generate_audio !== undefined) replicateInput.generate_audio = otherParams.generate_audio;
+        if (otherParams.keep_original_sound !== undefined) replicateInput.keep_original_sound = otherParams.keep_original_sound;
+        if (negative_prompt) replicateInput.negative_prompt = negative_prompt;
+        if (otherParams.negative_prompt) replicateInput.negative_prompt = otherParams.negative_prompt;
+        if (otherParams.multi_prompt) {
+          const multiPrompt = typeof otherParams.multi_prompt === 'string'
+            ? otherParams.multi_prompt
+            : JSON.stringify(otherParams.multi_prompt);
+          replicateInput.multi_prompt = multiPrompt;
+        }
+        break;
+      }
+
       default:
         return NextResponse.json(
           { error: `Unsupported model: ${model}` },

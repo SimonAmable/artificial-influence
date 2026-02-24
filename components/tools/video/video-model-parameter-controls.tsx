@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition } from "@/lib/types/models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
+import { SpeakerHigh } from "@phosphor-icons/react"
 
 interface VideoModelParameterControlsProps {
   videoModels: Model[]
@@ -20,6 +21,8 @@ interface VideoModelParameterControlsProps {
   disabled?: boolean
   className?: string
   variant?: "page" | "toolbar"
+  /** When true, show "Keep original sound" (e.g. Omni with reference video) */
+  referenceVideoProvided?: boolean
 }
 
 export function VideoModelParameterControls({
@@ -31,6 +34,7 @@ export function VideoModelParameterControls({
   disabled = false,
   className,
   variant = "page",
+  referenceVideoProvided = false,
 }: VideoModelParameterControlsProps) {
   const isToolbar = variant === "toolbar"
 
@@ -64,6 +68,44 @@ export function VideoModelParameterControls({
     const value = parameters[param.name]
 
     if (param.ui_type === "select" && "enum" in param && param.enum) {
+      // Video reference type (Omni): title + descriptive options
+      if (param.name === "video_reference_type") {
+        return (
+          <Select
+            key={param.name}
+            value={String(value ?? param.default)}
+            onValueChange={(val) => onParametersChange({ ...parameters, [param.name]: val })}
+            disabled={disabled}
+          >
+            <SelectTrigger
+              id={param.name}
+              size="sm"
+              className={cn("h-8 text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")}
+            >
+              <SelectValue placeholder={param.label} />
+            </SelectTrigger>
+            <SelectContent side="top" className="w-[220px] p-1.5">
+              <SelectGroup>
+                <SelectLabel className="text-xs font-medium text-foreground px-2 py-1.5 leading-snug">
+                  Reference video use
+                  <span className="block font-normal text-muted-foreground mt-0.5">
+                    Feature = style/camera for new video
+                    <br />
+                    Base = edit this video
+                  </span>
+                </SelectLabel>
+                <SelectSeparator className="my-1" />
+                <SelectItem value="feature" className="text-sm py-2">
+                  Feature
+                </SelectItem>
+                <SelectItem value="base" className="text-sm py-2">
+                  Base
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        )
+      }
       return (
         <Select
           key={param.name}
@@ -90,6 +132,9 @@ export function VideoModelParameterControls({
     }
 
     if (param.ui_type === "switch" && param.type === "boolean") {
+      // Keep original sound: only show when reference video is provided (e.g. Omni)
+      if (param.name === "keep_original_sound" && !referenceVideoProvided) return null
+      const isAudioToggle = param.name === "generate_audio"
       return (
         <div
           key={param.name}
@@ -102,8 +147,11 @@ export function VideoModelParameterControls({
             className="scale-90"
             disabled={disabled}
           />
+          {isAudioToggle ? (
+            <SpeakerHigh className="size-3.5 shrink-0 text-muted-foreground" weight="duotone" />
+          ) : null}
           <Label htmlFor={param.name} className="text-xs cursor-pointer whitespace-nowrap leading-none">
-            {param.label}
+            {isAudioToggle ? "Audio" : param.label}
           </Label>
         </div>
       )
@@ -242,7 +290,14 @@ export function VideoModelParameterControls({
       </Select>
 
       {selectedModel.parameters.parameters &&
-        selectedModel.parameters.parameters.map((param) => renderParameterInput(param))}
+        selectedModel.parameters.parameters
+          .filter((param) => {
+            // Kling v3 / Omni: multi_prompt has its own MultiShotEditor in the input box
+            if ((selectedModel.identifier === 'kwaivgi/kling-v3-video' || selectedModel.identifier === 'kwaivgi/kling-v3-omni-video') && param.name === 'multi_prompt') return false
+            return true
+          })
+          .map((param) => renderParameterInput(param))
+          .filter(Boolean)}
     </div>
   )
 }

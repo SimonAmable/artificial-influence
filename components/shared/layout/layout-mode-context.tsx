@@ -14,7 +14,7 @@ const STORAGE_KEY = "layout-mode"
 
 export function LayoutModeProvider({
   children,
-  defaultMode = "column",
+  defaultMode = "row",
 }: {
   children: React.ReactNode
   defaultMode?: LayoutMode

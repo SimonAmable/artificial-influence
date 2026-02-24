@@ -91,8 +91,8 @@ export function VideoShowcaseCard({
         <div className="flex flex-col shrink-0 space-y-3 md:space-y-4 mt-0">
           {/* Mobile: Show last step as media only */}
           {steps.length >= 1 && (
-            <div className="md:hidden w-full">
-              <Card className="overflow-hidden bg-muted/50 border-none">
+            <div className="md:hidden w-full max-h-[400px]">
+              <Card className="overflow-hidden bg-muted/50 border-none h-full">
                 <CardContent className="p-0">
                   {detectMediaType(steps[steps.length - 1].mediaPath, steps[steps.length - 1].mediaType) === 'video' ? (
                     <video
@@ -101,13 +101,13 @@ export function VideoShowcaseCard({
                       loop
                       muted
                       playsInline
-                      className="w-full h-auto rounded-lg"
+                      className="w-full h-auto max-h-[400px] object-contain rounded-lg"
                     />
                   ) : (
                     <img
                       src={steps[steps.length - 1].mediaPath}
                       alt={steps[steps.length - 1].title}
-                      className="w-full h-auto object-cover rounded-lg"
+                      className="w-full h-auto max-h-[400px] object-contain rounded-lg"
                     />
                   )}
                 </CardContent>
@@ -115,47 +115,71 @@ export function VideoShowcaseCard({
             </div>
           )}
 
-          {/* Desktop: Show all steps */}
-          <div className="hidden md:grid md:grid-cols-3 gap-3 md:gap-4 lg:gap-6 w-full max-w-6xl mx-auto">
-            {steps.map((step, index) => {
-              const mediaType = detectMediaType(step.mediaPath, step.mediaType)
-              
-              return (
-                <Card
-                  key={index}
-                  className="overflow-hidden bg-muted/50 border-none"
-                >
-                  <CardContent className="p-3 md:p-4 space-y-2 md:space-y-3">
-                    <div className="aspect-video rounded-lg overflow-hidden bg-background/50">
-                      {mediaType === 'video' ? (
-                        <video
-                          src={step.mediaPath}
-                          autoPlay
-                          loop
-                          muted
-                          playsInline
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <img
-                          src={step.mediaPath}
-                          alt={step.title}
-                          className="w-full h-full object-cover"
-                        />
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="font-semibold text-xs md:text-sm tracking-tight">
-                        {step.title}
-                      </h3>
-                      <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
-                        {step.description}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+          {/* Desktop: single media only (no step text) or grid of steps */}
+          <div className="hidden md:block w-full max-w-6xl mx-auto">
+            {steps.length === 1 ? (
+              <Card className="overflow-hidden bg-muted/50 border-none max-h-[400px]">
+                <CardContent className="p-0">
+                  {detectMediaType(steps[0].mediaPath, steps[0].mediaType) === 'video' ? (
+                    <video
+                      src={steps[0].mediaPath}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-auto max-h-[400px] object-contain rounded-lg"
+                    />
+                  ) : (
+                    <img
+                      src={steps[0].mediaPath}
+                      alt={steps[0].title || "Showcase"}
+                      className="w-full h-auto max-h-[400px] object-contain rounded-lg"
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid md:grid-cols-3 gap-3 md:gap-4 lg:gap-6">
+                {steps.map((step, index) => {
+                  const mediaType = detectMediaType(step.mediaPath, step.mediaType)
+                  return (
+                    <Card
+                      key={index}
+                      className="overflow-hidden bg-muted/50 border-none"
+                    >
+                      <CardContent className="p-3 md:p-4 space-y-2 md:space-y-3">
+                        <div className="aspect-video rounded-lg overflow-hidden bg-background/50">
+                          {mediaType === 'video' ? (
+                            <video
+                              src={step.mediaPath}
+                              autoPlay
+                              loop
+                              muted
+                              playsInline
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <img
+                              src={step.mediaPath}
+                              alt={step.title}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="font-semibold text-xs md:text-sm tracking-tight">
+                            {step.title}
+                          </h3>
+                          <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
+                            {step.description}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -165,7 +189,7 @@ export function VideoShowcaseCard({
   if (isRowLayout) {
     return (
       <div className={cn(
-        "flex flex-col items-center justify-start gap-6 md:gap-8 lg:gap-10 w-full h-full p-6 md:p-12 lg:p-16 overflow-y-auto",
+        "flex flex-col items-center justify-start gap-6 md:gap-8 lg:gap-10 w-full h-full pt-0 pb-0 px-6 md:px-12 lg:px-16 overflow-y-auto",
         className
       )}>
         {content}
@@ -175,7 +199,7 @@ export function VideoShowcaseCard({
 
   return (
     <Card className={cn("w-full h-full flex flex-col", className)}>
-      <CardContent className="flex flex-col items-center justify-center flex-1 gap-6 md:gap-8 lg:gap-10 p-6 md:p-12 lg:p-16 overflow-y-auto">
+      <CardContent className="flex flex-col items-center justify-center flex-1 gap-6 md:gap-8 lg:gap-10 pt-0 pb-0 px-6 md:px-12 lg:px-16 overflow-y-auto">
         {content}
       </CardContent>
     </Card>

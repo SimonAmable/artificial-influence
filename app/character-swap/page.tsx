@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { generateImageAndWait } from "@/lib/generate-image-client"
+import { toast } from "sonner"
 
 const CHARACTER_SWAP_PROMPT =
   "Character swap task using two reference images. First image is the reference character. " +
@@ -178,7 +179,13 @@ export default function CharacterSwapPage() {
       // Use DB as source of truth for grid order/history
       await fetchImageHistory(20)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate character swap image")
+      const message = err instanceof Error ? err.message : "Failed to generate character swap image"
+      if (message.includes("Concurrency limit reached")) {
+        toast.error("Too many active generations", {
+          description: `${message} Wait for one to finish, then try again.`,
+        })
+      }
+      setError(message)
     } finally {
       setIsGenerating(false)
     }

@@ -168,6 +168,11 @@
     inset 0 -1px 1px rgba(255, 255, 255, 0.05);
 }
 
+/* Overlay scrollbars on .container when it's the scroll host */
+.container {
+  overflow-y: overlay;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -177,6 +182,7 @@
     padding: 0;
     overflow-x: hidden;
     overflow-y: auto;
+    overflow-y: overlay;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
     height: 100%;

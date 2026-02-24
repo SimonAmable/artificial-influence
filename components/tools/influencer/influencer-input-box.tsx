@@ -16,7 +16,6 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ImagePromptFields } from "./image-prompt-fields"
 import { ImageEnhanceSwitch } from "./image-enhance-switch"
-import { CircleNotch } from "@phosphor-icons/react"
 import {
   Select,
   SelectContent,
@@ -448,19 +447,13 @@ export function InfluencerInputBox({
             >
               <Button
                 onClick={onGenerate}
-                disabled={!isReady || isGenerating}
+                disabled={!isReady}
                 className={cn(
                   "bg-primary hover:bg-primary/80 text-primary-foreground font-semibold h-10 min-w-[100px] text-sm px-4 py-6 transition-all duration-300 relative z-0",
                   !isReady && "opacity-50 cursor-not-allowed"
                 )}
               >
-                {isGenerating ? (
-                  <>
-                    <CircleNotch className="size-3 mr-1.5 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center gap-0.5">
+                <div className="flex flex-col items-center gap-0.5">
                     <span className="text-sm font-semibold">Generate</span>
                     <div className="flex items-center gap-0.5">
                       <Sparkle size={8} weight="fill" />
@@ -471,8 +464,7 @@ export function InfluencerInputBox({
                       </span>
                     </div>
                   </div>
-                )}
-              </Button>
+                </Button>
             </div>
           </div>
         </div>

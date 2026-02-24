@@ -21,6 +21,19 @@ export async function generateImageAndWait(
     throw new Error(d.message || d.error || 'Insufficient credits');
   }
 
+  if (response.status === 429) {
+    const d = await response.json();
+    const active = typeof d.activeGenerations === 'number' ? d.activeGenerations : undefined;
+    const limit = typeof d.limit === 'number' ? d.limit : undefined;
+    const tier = typeof d.tier === 'string' ? d.tier : undefined;
+    const fallback =
+      active != null && limit != null
+        ? `Concurrency limit reached (${active}/${limit}${tier ? `, ${tier} tier` : ''}).`
+        : 'Concurrency limit reached. Please wait and try again.';
+    const detail = d.message || d.error || fallback;
+    throw new Error(`Concurrency limit reached: ${detail}`);
+  }
+
   if (!response.ok) {
     const d = await response.json();
     throw new Error(d.message || d.error || 'Failed to generate image');

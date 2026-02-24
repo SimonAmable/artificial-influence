@@ -36,7 +36,7 @@ import { ImageEditorDialog } from "@/components/image-editor"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import type { AssetType } from "@/lib/assets/types"
 
-export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
+export const UploadNodeComponent = React.memo(({ id, data, selected, width: propWidth, height: propHeight }: NodeProps) => {
   const nodeData = data as UploadNodeData
   const inputRef = React.useRef<HTMLInputElement>(null)
   const reactFlow = useReactFlow()
@@ -52,10 +52,19 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
   const [isUploading, setIsUploading] = React.useState(false)
   const [isCreateAssetOpen, setIsCreateAssetOpen] = React.useState(false)
   
+  // Defer internals refresh until after DOM/layout catches up with node style changes.
+  const scheduleUpdateNodeInternals = React.useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        updateNodeInternals(id)
+      })
+    })
+  }, [id, updateNodeInternals])
+
   // Get current node to read its dimensions
   const currentNode = reactFlow.getNode(id)
-  const nodeWidth = currentNode?.style?.width || currentNode?.width || 280
-  const nodeHeight = currentNode?.style?.height || currentNode?.height || 280
+  const nodeWidth = propWidth || currentNode?.style?.width || currentNode?.width || 280
+  const nodeHeight = propHeight || currentNode?.style?.height || currentNode?.height || 280
 
   const applyNodeSize = React.useCallback((width: number, height: number) => {
     const existing = reactFlow.getNode(id)
@@ -66,8 +75,8 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
     reactFlow.updateNode(id, {
       style: { width, height },
     })
-    updateNodeInternals(id)
-  }, [id, reactFlow, updateNodeInternals])
+    scheduleUpdateNodeInternals()
+  }, [id, reactFlow, scheduleUpdateNodeInternals])
 
   React.useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -306,10 +315,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
     else if (file.type.startsWith("video/")) fileType = "video"
     else if (file.type.startsWith("audio/")) fileType = "audio"
 
-    const currentNode = reactFlow.getNode(id)
-    if (!currentNode) return
-
-    // For images and videos, calculate dimensions and recreate node
+    // For images and videos, calculate dimensions and update node data/size
     if (fileType === "image") {
       const img = new Image()
       img.onload = async () => {
@@ -317,25 +323,14 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
           width: img.naturalWidth,
           height: img.naturalHeight,
         })
-        
+
         // Show blob URL immediately for instant preview
-        const updatedNodePreview: Node = {
-          ...currentNode,
-          data: {
-            ...currentNode.data,
-            fileUrl: blobUrl,
-            fileType,
-            fileName: file.name,
-          },
-          style: {
-            ...currentNode.style,
-            width: constrained.width,
-            height: constrained.height,
-          },
-        }
-        
-        reactFlow.setNodes((nodes) => nodes.map((n) => (n.id === id ? updatedNodePreview : n)))
-        updateNodeInternals(id)
+        reactFlow.updateNodeData(id, {
+          fileUrl: blobUrl,
+          fileType,
+          fileName: file.name,
+        })
+        applyNodeSize(constrained.width, constrained.height)
         
         // Upload to Supabase in background
         setIsUploading(true)
@@ -345,19 +340,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
         if (uploadResult) {
           // Replace blob URL with Supabase URL
           URL.revokeObjectURL(blobUrl)
-          reactFlow.setNodes((nodes) =>
-            nodes.map((n) =>
-              n.id === id
-                ? {
-                    ...n,
-                    data: {
-                      ...n.data,
-                      fileUrl: uploadResult.url,
-                    },
-                  }
-                : n
-            )
-          )
+          reactFlow.updateNodeData(id, { fileUrl: uploadResult.url })
           toast.success('File uploaded successfully')
         }
       }
@@ -369,25 +352,14 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
           width: video.videoWidth,
           height: video.videoHeight,
         })
-        
+
         // Show blob URL immediately for instant preview
-        const updatedNodePreview: Node = {
-          ...currentNode,
-          data: {
-            ...currentNode.data,
-            fileUrl: blobUrl,
-            fileType,
-            fileName: file.name,
-          },
-          style: {
-            ...currentNode.style,
-            width: constrained.width,
-            height: constrained.height,
-          },
-        }
-        
-        reactFlow.setNodes((nodes) => nodes.map((n) => (n.id === id ? updatedNodePreview : n)))
-        updateNodeInternals(id)
+        reactFlow.updateNodeData(id, {
+          fileUrl: blobUrl,
+          fileType,
+          fileName: file.name,
+        })
+        applyNodeSize(constrained.width, constrained.height)
         
         // Upload to Supabase in background
         setIsUploading(true)
@@ -397,19 +369,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected }: NodeProps
         if (uploadResult) {
           // Replace blob URL with Supabase URL
           URL.revokeObjectURL(blobUrl)
-          reactFlow.setNodes((nodes) =>
-            nodes.map((n) =>
-              n.id === id
-                ? {
-                    ...n,
-                    data: {
-                      ...n.data,
-                      fileUrl: uploadResult.url,
-                    },
-                  }
-                : n
-            )
-          )
+          reactFlow.updateNodeData(id, { fileUrl: uploadResult.url })
           toast.success('File uploaded successfully')
         }
       }

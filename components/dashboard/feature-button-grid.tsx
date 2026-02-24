@@ -10,14 +10,18 @@ import {
   MicrophoneIcon,
   PaintBrushIcon,
   PencilSimpleIcon,
+  ArrowsLeftRight,
+  FlowArrow,
 } from "@phosphor-icons/react"
 
 const toolButtons = [
-  { label: "Image Studio", href: "/image", icon: ImageIcon, description: "Generate AI images from text" },
-  { label: "Video Studio", href: "/video", icon: VideoIcon, description: "Create videos with AI effects" },
-  { label: "Motion Copy", href: "/motion-copy", icon: PencilSimpleIcon, description: "Copy motion from reference videos" },
-  { label: "Lip Sync", href: "/lipsync", icon: MicrophoneIcon, description: "Sync speech to video footage" },
-  { label: "Image Editing", href: "/influencer-generator", icon: PaintBrushIcon, description: "Edit and enhance images with AI" },
+  { label: "Image Studio", href: "/image", icon: ImageIcon },
+  { label: "Video Studio", href: "/video", icon: VideoIcon },
+  { label: "Motion Copy", href: "/motion-copy", icon: PencilSimpleIcon },
+  { label: "Lip Sync", href: "/lipsync", icon: MicrophoneIcon },
+  { label: "Image Editing", href: "/influencer-generator", icon: PaintBrushIcon },
+  { label: "Character Swap", href: "/character-swap", icon: ArrowsLeftRight },
+  { label: "Workflow", href: "/canvases", icon: FlowArrow },
 ]
 
 export function FeatureButtonGrid() {
@@ -53,7 +57,7 @@ export function FeatureButtonGrid() {
   }
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-6 rounded-[24px]">
       {/* Header: Title + Create New Project */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-semibold">Tools</h2>
@@ -68,23 +72,22 @@ export function FeatureButtonGrid() {
         </Button>
       </div>
 
-      {/* Tool cards - stacked layout per tool */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
+      {/* Tool buttons: icon left, label right; fill row width responsively */}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
         {toolButtons.map((tool) => {
           const Icon = tool.icon
           return (
             <Link
               key={tool.href}
               href={tool.href}
-              className="group flex flex-col items-center text-center p-5 rounded-xl transition-all duration-200 hover:shadow-md"
+              className="flex min-w-0 items-center gap-3 rounded-[24px] px-4 py-3 transition-shadow duration-200 hover:shadow-md"
             >
-              <div className="mb-3 flex h-12 w-12 items-center justify-center text-primary">
-                <Icon size={24} weight="duotone" className="shrink-0" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[24px] bg-muted text-foreground shadow-sm">
+                <Icon size={22} weight="duotone" className="shrink-0" />
               </div>
-              <h3 className="font-semibold text-sm mb-1">{tool.label}</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-                {tool.description}
-              </p>
+              <span className="font-semibold text-sm text-foreground text-center flex-1 min-w-0">
+                {tool.label}
+              </span>
             </Link>
           )
         })}

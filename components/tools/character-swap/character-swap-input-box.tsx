@@ -346,10 +346,10 @@ export function CharacterSwapInputBox({
           <div className="ml-auto">
             <Button
               onClick={onGenerate}
-              disabled={!isReady || isGenerating}
+              disabled={!isReady}
               className={cn("min-h-[50px] min-w-[110px] text-sm font-semibold", !isReady && "opacity-50 cursor-not-allowed")}
             >
-              {isGenerating ? (
+              {false ? (
                 <>
                   <CircleNotch className="size-4 mr-2 animate-spin" />
                   Generating...

@@ -8,6 +8,10 @@ import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 import { modelUsesDimensions, aspectRatioToDimensions } from '@/lib/utils/model-parameters';
 
+const STALE_PENDING_MINUTES = 30;
+const FREE_CONCURRENCY_LIMIT = 1;
+const PAID_CONCURRENCY_LIMIT = 3;
+
 export async function POST(request: NextRequest) {
   const requestStartTime = Date.now();
   console.log('[generate-image] ===== Request started =====');
@@ -36,6 +40,76 @@ export async function POST(request: NextRequest) {
       );
     }
     console.log('[generate-image] ✓ User authenticated:', { userId: user.id, email: user.email });
+
+    // Clean stale pending requests so users are not blocked forever by abandoned runs.
+    const staleCutoff = new Date(Date.now() - STALE_PENDING_MINUTES * 60 * 1000).toISOString();
+    const { error: staleCleanupError } = await supabase
+      .from('generations')
+      .update({
+        status: 'failed',
+        error_message: 'Timed out/stale pending cleanup',
+      })
+      .eq('user_id', user.id)
+      .eq('type', 'image')
+      .eq('status', 'pending')
+      .lt('created_at', staleCutoff);
+
+    if (staleCleanupError) {
+      console.error('[generate-image] Failed to clean stale pending generations:', staleCleanupError);
+      return NextResponse.json(
+        { error: 'Failed to validate active generations', message: staleCleanupError.message },
+        { status: 500 }
+      );
+    }
+
+    const { count: activeGenerationsCount, error: pendingCountError } = await supabase
+      .from('generations')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('type', 'image')
+      .eq('status', 'pending')
+      .gte('created_at', staleCutoff);
+
+    if (pendingCountError) {
+      console.error('[generate-image] Failed to count pending generations:', pendingCountError);
+      return NextResponse.json(
+        { error: 'Failed to validate active generations', message: pendingCountError.message },
+        { status: 500 }
+      );
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('is_pro')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('[generate-image] Failed to read profiles.is_pro, defaulting to free tier:', profileError);
+    }
+
+    const isPaidTier = Boolean(profile?.is_pro);
+    const tier = isPaidTier ? 'paid' : 'free';
+    const limit = isPaidTier ? PAID_CONCURRENCY_LIMIT : FREE_CONCURRENCY_LIMIT;
+    const activeGenerations = activeGenerationsCount ?? 0;
+
+    if (activeGenerations >= limit) {
+      return NextResponse.json(
+        {
+          error: 'Concurrency limit reached',
+          message: `You have ${activeGenerations} active image generation request${activeGenerations === 1 ? '' : 's'} (limit: ${limit} for ${tier} tier).`,
+          activeGenerations,
+          limit,
+          tier,
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': '30',
+          },
+        }
+      );
+    }
 
     // Parse FormData
     console.log('[generate-image] Parsing FormData...');

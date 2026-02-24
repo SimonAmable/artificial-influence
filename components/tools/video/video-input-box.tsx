@@ -18,6 +18,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
 import { VideoModelParameterControls } from "@/components/tools/video/video-model-parameter-controls"
+import { MultiShotEditor, type MultiShotItem } from "@/components/tools/video/multi-shot-editor"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 
 interface VideoInputBoxProps {
   videoModels: Model[]
@@ -40,6 +43,14 @@ interface VideoInputBoxProps {
   onParametersChange: (params: Record<string, unknown>) => void
   isGenerating: boolean
   onGenerate: () => void
+  /** Kling v3 multi-shot: when true, show multi-shot editor */
+  multiShotMode?: boolean
+  onMultiShotModeChange?: (enabled: boolean) => void
+  multiShotShots?: MultiShotItem[]
+  onMultiShotShotsChange?: (shots: MultiShotItem[]) => void
+  /** Kling v3 Omni: reference images for elements, scenes, or styles (max 7 without video, 4 with video) */
+  referenceImages?: ImageUpload[]
+  onReferenceImagesChange?: (images: ImageUpload[]) => void
 }
 
 export function VideoInputBox({
@@ -63,11 +74,18 @@ export function VideoInputBox({
   onParametersChange,
   isGenerating,
   onGenerate,
+  multiShotMode = false,
+  onMultiShotModeChange,
+  multiShotShots = [],
+  onMultiShotShotsChange,
+  referenceImages = [],
+  onReferenceImagesChange,
 }: VideoInputBoxProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const lastFrameRef = React.useRef<HTMLInputElement>(null)
   const videoRef = React.useRef<HTMLInputElement>(null)
+  const referenceImagesRef = React.useRef<HTMLInputElement>(null)
   const promptDragCounter = React.useRef(0)
   const [isPromptDragActive, setIsPromptDragActive] = React.useState(false)
   const [draggedMediaKind, setDraggedMediaKind] = React.useState<"image" | "video" | "unknown" | null>(null)
@@ -82,7 +100,8 @@ export function VideoInputBox({
     selectedModel.identifier === 'veed/fabric-1.0'
   const isReferenceVideoSupported =
     selectedModel.supports_reference_video === true ||
-    selectedModel.identifier === 'xai/grok-imagine-video'
+    selectedModel.identifier === 'xai/grok-imagine-video' ||
+    selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
 
   // Check if model supports image/last frame based on parameters
   const modelSupportsImage = React.useMemo(() => {
@@ -105,6 +124,13 @@ export function VideoInputBox({
       param => param.name === 'negative_prompt'
     ) ?? false
   }, [selectedModel])
+
+  const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
+  const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
+  const isKlingV3OrOmni = isKlingV3 || isKlingV3Omni
+  const totalDuration = Number(parameters.duration) || 5
+  const maxReferenceImages = inputVideo ? 4 : 7
+  const canAddReferenceImage = isKlingV3Omni && referenceImages.length < maxReferenceImages
 
   // Determine if we need prompt
   const needsPrompt = !isMotionCopyModel && !isLipsyncModel
@@ -145,6 +171,20 @@ export function VideoInputBox({
     e.target.value = ''
   }
 
+  const handleReferenceImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !file.type.match(/^image\/(jpeg|jpg|png)$/i)) return
+    if (!onReferenceImagesChange || referenceImages.length >= maxReferenceImages) return
+    const next: ImageUpload = { file, url: URL.createObjectURL(file) }
+    onReferenceImagesChange([...referenceImages, next])
+    e.target.value = ''
+  }
+
+  const removeReferenceImage = (index: number) => {
+    if (!onReferenceImagesChange) return
+    onReferenceImagesChange(referenceImages.filter((_, i) => i !== index))
+  }
+
   const isReady = (() => {
     // Motion copy model needs image + video
     if (isMotionCopyModel) {
@@ -153,6 +193,17 @@ export function VideoInputBox({
     // Lipsync model needs image + audio
     if (isLipsyncModel) {
       return !!(inputImage && inputAudio)
+    }
+    // Kling v3 / Omni multi-shot: ready if shots have prompts and total duration matches
+    if (isKlingV3OrOmni && multiShotMode && multiShotShots.length > 0) {
+      const sum = multiShotShots.reduce((acc, s) => acc + s.duration, 0)
+      const validSum = sum === totalDuration
+      const hasPrompts = multiShotShots.every((s) => s.prompt.trim().length > 0)
+      return validSum && hasPrompts
+    }
+    // Kling v3 / Omni single-shot: prompt or start image
+    if (isKlingV3OrOmni && !multiShotMode) {
+      return promptValue.trim().length > 0 || !!inputImage
     }
     // For models requiring images, check if images are uploaded
     if (modelSupportsImage || modelSupportsLastFrame) {
@@ -193,14 +244,15 @@ export function VideoInputBox({
   ])
 
   const nextImageDropLabel = React.useMemo(() => {
-    if (nextImageDropSlot === "lastFrame") return "Last Frame"
+    if (nextImageDropSlot === "lastFrame") return isKlingV3OrOmni ? "End Frame" : "Last Frame"
     if (nextImageDropSlot === "input") {
       if (selectedModel.identifier === "minimax/hailuo-2.3-fast") return "First Frame"
+      if (isKlingV3OrOmni) return "Start Frame"
       if (isMotionCopyModel || isLipsyncModel) return "Reference Image"
       return "Input Image"
     }
     return "Reference Image"
-  }, [isLipsyncModel, isMotionCopyModel, nextImageDropSlot, selectedModel.identifier])
+  }, [isKlingV3OrOmni, isLipsyncModel, isMotionCopyModel, nextImageDropSlot, selectedModel.identifier])
 
   const canAcceptImageDrop = nextImageDropSlot !== null
   const canAcceptPromptDrop = needsPrompt && (canAcceptImageDrop || canDropReferenceVideo)
@@ -312,8 +364,8 @@ export function VideoInputBox({
       )}
       <CardContent className="p-2 flex flex-col gap-1.5">
         {/* Image/Video Previews - Show uploaded assets from plus button (only when not using custom upload components) */}
-        {!isMotionCopyModel && !isLipsyncModel && (inputImage || lastFrameImage || (isReferenceVideoSupported && inputVideo)) && (
-          <div className="flex gap-2 px-2 pt-1">
+        {!isMotionCopyModel && !isLipsyncModel && (inputImage || lastFrameImage || (isReferenceVideoSupported && inputVideo) || (isKlingV3Omni && referenceImages.length > 0)) && (
+          <div className="flex flex-wrap gap-2 px-2 pt-1">
             {inputImage && inputImage.url && (
               <div className="relative inline-block">
                 <Image
@@ -331,7 +383,7 @@ export function VideoInputBox({
                   <X className="size-3" weight="bold" />
                 </button>
                 <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-medium border border-border">
-                  {selectedModel.identifier === 'minimax/hailuo-2.3-fast' ? 'First Frame' : 'Input'}
+                  {selectedModel.identifier === 'minimax/hailuo-2.3-fast' ? 'First Frame' : isKlingV3OrOmni ? 'Start Frame' : 'Input'}
                 </div>
               </div>
             )}
@@ -377,6 +429,28 @@ export function VideoInputBox({
                 </div>
               </div>
             )}
+            {isKlingV3Omni && referenceImages.map((ref, index) => ref.url && (
+              <div key={index} className="relative inline-block">
+                <Image
+                  src={ref.url}
+                  alt={`Reference ${index + 1}`}
+                  width={80}
+                  height={60}
+                  className="w-auto h-auto max-h-20 rounded-md object-cover border border-border"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeReferenceImage(index)}
+                  className="absolute top-0.5 right-0.5 bg-background/80 hover:bg-destructive/80 text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10 backdrop-blur-sm"
+                  aria-label={`Remove reference image ${index + 1}`}
+                >
+                  <X className="size-2.5" weight="bold" />
+                </button>
+                <div className="absolute bottom-0.5 left-0.5 bg-background/80 backdrop-blur-sm px-1 py-0.5 rounded text-[9px] font-medium border border-border">
+                  {index + 1}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -392,6 +466,88 @@ export function VideoInputBox({
               placeholder={promptPlaceholderText}
               variant="page"
               onPromptKeyDown={handleTextInputKeyDown}
+            />
+          </div>
+        )}
+
+        {/* Kling v3 / Omni: Multishot */}
+        {isKlingV3OrOmni && onMultiShotModeChange && onMultiShotShotsChange && (
+          <div className="px-2 space-y-2 border-t border-border/50 pt-2 mt-1">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="multi-shot-mode"
+                checked={multiShotMode}
+                onCheckedChange={onMultiShotModeChange}
+                disabled={isGenerating}
+              />
+              <Label htmlFor="multi-shot-mode" className="text-xs font-medium cursor-pointer">
+                Multishot
+              </Label>
+            </div>
+            {multiShotMode && (
+              <>
+                <p className="text-[11px] text-muted-foreground">
+                  (up to 6 scenes; shot durations must total {totalDuration}s)
+                </p>
+                <MultiShotEditor
+                  shots={multiShotShots}
+                  onShotsChange={onMultiShotShotsChange}
+                  totalDuration={totalDuration}
+                  maxShots={6}
+                  minDurationPerShot={1}
+                  disabled={isGenerating}
+                />
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Kling v3 Omni: Reference images */}
+        {isKlingV3Omni && onReferenceImagesChange && (
+          <div className="px-2 space-y-1.5 border-t border-border/50 pt-2 mt-1">
+            <p className="text-[11px] text-muted-foreground">
+              Reference images for elements, scenes, or styles. Supports .jpg/.jpeg/.png. Max {maxReferenceImages} without video, 4 with video.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {referenceImages.length > 0 && referenceImages.map((ref, index) => ref.url && (
+                <div key={index} className="relative">
+                  <Image
+                    src={ref.url}
+                    alt={`Ref ${index + 1}`}
+                    width={56}
+                    height={56}
+                    className="size-12 rounded-md object-cover border border-border"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeReferenceImage(index)}
+                    className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow border border-border"
+                    aria-label={`Remove reference ${index + 1}`}
+                  >
+                    <X className="size-2.5" weight="bold" />
+                  </button>
+                </div>
+              ))}
+              {canAddReferenceImage && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-12 w-12 rounded-md border-dashed p-0"
+                  onClick={() => referenceImagesRef.current?.click()}
+                  disabled={isGenerating}
+                  aria-label="Add reference image"
+                >
+                  <Plus className="size-5" weight="bold" />
+                </Button>
+              )}
+            </div>
+            <input
+              ref={referenceImagesRef}
+              type="file"
+              accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+              onChange={handleReferenceImageAdd}
+              className="hidden"
             />
           </div>
         )}
@@ -474,6 +630,12 @@ export function VideoInputBox({
                       Upload Reference Video
                     </DropdownMenuItem>
                   )}
+                  {canAddReferenceImage && (
+                    <DropdownMenuItem onClick={() => referenceImagesRef.current?.click()}>
+                      <FilePlus className="size-4 mr-2" />
+                      Add reference image
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -510,6 +672,7 @@ export function VideoInputBox({
             onParametersChange={onParametersChange}
             disabled={isGenerating}
             variant="page"
+            referenceVideoProvided={!!inputVideo}
           />
 
           <div className="flex-1" />

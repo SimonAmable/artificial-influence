@@ -27,7 +27,6 @@ import {
   updateAsset,
 } from "@/lib/assets/library"
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
-import Image from "next/image"
 import { toast } from "sonner"
 
 interface CreateAssetDialogProps {
@@ -116,7 +115,7 @@ export function CreateAssetDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="w-fit sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{mode === "edit" ? "Edit Asset" : "Create Asset"}</DialogTitle>
           <DialogDescription>
@@ -131,26 +130,22 @@ export function CreateAssetDialog({
             <Label>Preview</Label>
             <div className="overflow-hidden rounded-lg border border-border bg-muted/20 p-2">
               {initial.assetType === "image" && (
-                <div className="relative aspect-video w-full overflow-hidden rounded-md bg-black/10">
-                  <Image
-                    src={initial.url}
-                    alt={title || "Asset preview"}
-                    fill
-                    className="object-contain"
-                    unoptimized
-                  />
-                </div>
+                <img
+                  src={initial.url}
+                  alt={title || "Asset preview"}
+                  className="block max-h-[200px] w-full rounded-md bg-black/10 object-contain"
+                />
               )}
               {initial.assetType === "video" && (
                 <video
                   src={initial.url}
                   controls
-                  className="w-full h-auto rounded-md"
+                  className="block max-h-[200px] w-full rounded-md object-contain"
                   preload="metadata"
                 />
               )}
               {initial.assetType === "audio" && (
-                <audio src={initial.url} controls className="w-full" />
+                <audio src={initial.url} controls className="w-full max-w-full" />
               )}
             </div>
           </div>

@@ -125,11 +125,11 @@ export function CanvasesSection() {
                       src={canvas.thumbnail_url}
                       alt={canvas.name}
                       fill
-                      className="object-cover"
+                      className="object-cover rounded-[24px]"
                       unoptimized
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50 rounded-[24px]">
                       <svg
                         className="w-12 h-12 text-muted-foreground/30"
                         fill="none"

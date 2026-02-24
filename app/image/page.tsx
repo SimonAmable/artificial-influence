@@ -38,10 +38,11 @@ const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
     "Preserve scene composition, camera angle, environment layout, and lighting mood from the second image. " +
     "Blend naturally with correct perspective, realistic scale, contact shadows, reflections, and occlusion.",
   identity_only:
-    "Face and skin tone swap task using two reference images. First image is the face and skin-tone reference. " +
-    "Second image is the target character and scene. Keep the target person's body, pose, hairstyle silhouette, clothing, and environment from the second image. " +
-    "Replace facial identity and skin tone using the first image while preserving natural expression and head alignment. " +
-    "Keep realistic skin texture, lighting consistency, and seamless blending with the scene.",
+    "Full identity swap using two reference images. First image is the reference character (face, hair, body, and clothing to transfer). " +
+    "Second image is the reference scene. Place the character from the first image into the scene from the second image. " +
+    "From the first image preserve: the entire face (face shape, eyes, nose, mouth, bone structure, facial features), the reference character's hairstyle and hair, body shape, skin tone, and clothing/outfit—so the person in the result is recognizably the same individual as in the first image, wearing the same clothes. " +
+    "From the second image preserve only: scene composition, environment, camera angle, and lighting mood. " +
+    "Output must look like the full character from image one (same face, hair, body, and clothes) placed in the scene from image two, with realistic lighting and seamless blending.",
 }
 
 export default function ImagePage() {
@@ -61,13 +62,14 @@ export default function ImagePage() {
   const [characterSwapSceneImage, setCharacterSwapSceneImage] = React.useState<ImageUpload | null>(null)
   const [characterSwapMode, setCharacterSwapMode] = React.useState<CharacterSwapMode>("full_character")
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
-  const [isGenerating, setIsGenerating] = React.useState(false)
+  const [inFlightCount, setInFlightCount] = React.useState(0)
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [historyError, setHistoryError] = React.useState<string | null>(null)
   const [enhancePrompt, setEnhancePrompt] = React.useState(false)
   const historyAbortRef = React.useRef<AbortController | null>(null)
   const historyRequestIdRef = React.useRef(0)
+  const isGenerating = inFlightCount > 0
 
   const { models: imageModels, isLoading: modelsLoading } = useModels('image')
   const effectiveImageModels = React.useMemo(() => {
@@ -216,7 +218,7 @@ export default function ImagePage() {
       }
     }
 
-    setIsGenerating(true)
+    setInFlightCount((count) => count + 1)
     setError(null)
 
     try {
@@ -228,7 +230,6 @@ export default function ImagePage() {
           // Validate file type
           if (!refImage.file.type.startsWith('image/')) {
             setError('Reference images must be valid image files')
-            setIsGenerating(false)
             return
           }
           
@@ -236,7 +237,6 @@ export default function ImagePage() {
           const maxSize = 10 * 1024 * 1024 // 10MB
           if (refImage.file.size > maxSize) {
             setError('Reference images are too large. Maximum size is 10MB per image.')
-            setIsGenerating(false)
             return
           }
         }
@@ -312,10 +312,14 @@ export default function ImagePage() {
           description: "Upgrade your plan to continue generating images",
           action: { label: "View Plans", onClick: () => window.open("/pricing", "_blank") }
         })
+      } else if (message.includes('Concurrency limit reached')) {
+        toast.error('Too many active generations', {
+          description: `${message} Wait for one to finish, then try again.`,
+        })
       }
       setError(message)
     } finally {
-      setIsGenerating(false)
+      setInFlightCount((count) => Math.max(0, count - 1))
     }
   }
 
@@ -461,8 +465,8 @@ export default function ImagePage() {
       return (
         <ImageGrid
           images={historyImages}
-          isGenerating={isGenerating && hasImages}
-          generatingCount={selectedNumImages}
+          isGenerating={isGenerating}
+          generatingCount={inFlightCount}
           isLoadingSkeleton={isHistoryLoading && !hasImages}
           onUseAsReference={(imageUrl) => {
             void handleUseAsReference(imageUrl)
@@ -605,14 +609,18 @@ export default function ImagePage() {
       {selectedImageForAsset && (
         <CreateAssetDialog
           open={createAssetDialogOpen}
-          onOpenChange={setCreateAssetDialogOpen}
+          onOpenChange={(open) => {
+            setCreateAssetDialogOpen(open)
+            if (!open) {
+              setSelectedImageForAsset(null)
+            }
+          }}
           initial={{
             title: `Generated Image ${selectedImageForAsset.index + 1}`,
             url: selectedImageForAsset.url,
             assetType: "image",
           }}
           onSaved={() => {
-            // Optionally refresh or show success message
             setSelectedImageForAsset(null)
           }}
         />

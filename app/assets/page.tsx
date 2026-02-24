@@ -157,7 +157,7 @@ export default function AssetsPage() {
 
     const file = files[0]
     await handleFileUpload(file)
-  }, [])
+  }, [handleFileUpload])
 
   const handleDownload = async (asset: AssetRecord) => {
     try {
@@ -291,7 +291,7 @@ export default function AssetsPage() {
 
   return (
     <div
-      className="container mx-auto px-4 py-8 pt-24 min-h-screen relative"
+      className="relative min-h-screen w-full pt-24"
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -303,7 +303,7 @@ export default function AssetsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center gap-4 pointer-events-none"
+            className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center gap-4 pointer-events-none"
           >
             <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
               <UploadSimple className="w-12 h-12 text-primary" weight="bold" />
@@ -316,58 +316,60 @@ export default function AssetsPage() {
         )}
       </AnimatePresence>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Asset Library</h1>
-          <p className="text-muted-foreground mt-1">
-            Save references for characters, scenes, textures, motion clips, and audio.
-          </p>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Asset Library</h1>
+            <p className="text-muted-foreground mt-1">
+              Save references for characters, scenes, textures, motion clips, and audio.
+            </p>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*,audio/*"
+            className="hidden"
+            aria-hidden
+            onChange={handleFileSelect}
+          />
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            className="gap-2"
+          >
+            <UploadSimple className="h-4 w-4" />
+            Upload
+          </Button>
         </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*,audio/*"
-          className="hidden"
-          aria-hidden
-          onChange={handleFileSelect}
-        />
-        <Button
-          onClick={() => fileInputRef.current?.click()}
-          className="gap-2"
-        >
-          <UploadSimple className="h-4 w-4" />
-          Upload
-        </Button>
+
+        <Tabs value={visibility} onValueChange={(value) => setVisibility(value as AssetVisibility | "all")}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="private">Private</TabsTrigger>
+            <TabsTrigger value="public">Public</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <Tabs value={category} onValueChange={(value) => setCategory(value as AssetCategory | "all")}>
+          <TabsList className="mb-6 flex flex-wrap h-auto">
+            <TabsTrigger value="all">All</TabsTrigger>
+            {ASSET_CATEGORIES.map((item) => (
+              <TabsTrigger key={item} value={item}>
+                {ASSET_CATEGORY_LABELS[item]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        {loading ? (
+          <div className="text-center py-12 text-muted-foreground">Loading assets...</div>
+        ) : assets.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">No assets in this filter.</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {assets.map((asset) => renderAssetCard(asset))}
+          </div>
+        )}
       </div>
-
-      <Tabs value={visibility} onValueChange={(value) => setVisibility(value as AssetVisibility | "all")}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="private">Private</TabsTrigger>
-          <TabsTrigger value="public">Public</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <Tabs value={category} onValueChange={(value) => setCategory(value as AssetCategory | "all")}>
-        <TabsList className="mb-6 flex flex-wrap h-auto">
-          <TabsTrigger value="all">All</TabsTrigger>
-          {ASSET_CATEGORIES.map((item) => (
-            <TabsTrigger key={item} value={item}>
-              {ASSET_CATEGORY_LABELS[item]}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-
-      {loading ? (
-        <div className="text-center py-12 text-muted-foreground">Loading assets...</div>
-      ) : assets.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">No assets in this filter.</div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {assets.map((asset) => renderAssetCard(asset))}
-        </div>
-      )}
 
       {uploadedFileUrl && uploadedAssetType && (
         <CreateAssetDialog

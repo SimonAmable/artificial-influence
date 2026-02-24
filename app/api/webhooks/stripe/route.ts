@@ -152,11 +152,15 @@ async function handleCheckoutSessionCompleted(
 
   // Insert or update subscription record
   await upsertSubscription(subscription, userId);
+  await syncUserProFlag(userId);
 
   // Grant initial month's credits (for both monthly and yearly subscriptions)
+  // Allow grant even when status is still "incomplete" (e.g. 3DS) so credits appear immediately
   const priceId = subscription.items.data[0]?.price.id;
   if (priceId) {
-    await grantMonthlyCredits(userId, subscriptionId, priceId);
+    await grantMonthlyCredits(userId, subscriptionId, priceId, {
+      allowIncompleteForInitialGrant: true,
+    });
   }
 
   console.log('Checkout session completed for user:', userId);
@@ -187,19 +191,12 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
   // Update subscription status
   await upsertSubscription(subscription, userId);
+  await syncUserProFlag(userId);
 
-  // Grant monthly credits for monthly subscriptions only
-  // Yearly subscriptions are handled by cron job
+  // Grant monthly credits for both monthly and yearly (first invoice grants first month; cron handles later months for yearly)
   const priceId = subscription.items.data[0]?.price.id;
   if (priceId) {
-    const isMonthly = await isMonthlySubscription(priceId);
-    if (isMonthly) {
-      await grantMonthlyCredits(userId, subscriptionId, priceId);
-    } else {
-      console.log(
-        `Yearly subscription ${subscriptionId} - credits will be granted by cron job`
-      );
-    }
+    await grantMonthlyCredits(userId, subscriptionId, priceId);
   }
 
   console.log('Invoice paid for subscription:', subscriptionId);
@@ -234,6 +231,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
       updated_at: new Date().toISOString(),
     })
     .eq('stripe_subscription_id', subscriptionId);
+  await syncUserProFlag(userId);
 
   console.log('Payment failed for subscription:', subscriptionId);
   // Add logic to notify user about payment failure
@@ -248,6 +246,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 
   await upsertSubscription(subscription, userId);
+  await syncUserProFlag(userId);
 
   console.log('Subscription updated:', subscription.id);
 }
@@ -268,6 +267,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       updated_at: new Date().toISOString(),
     })
     .eq('stripe_subscription_id', subscription.id);
+  await syncUserProFlag(userId);
 
   console.log('Subscription deleted:', subscription.id);
 }
@@ -281,6 +281,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   }
 
   await upsertSubscription(subscription, userId);
+  await syncUserProFlag(userId);
 
   console.log('Subscription created:', subscription.id);
 }
@@ -292,7 +293,8 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
 async function grantMonthlyCredits(
   userId: string,
   subscriptionId: string,
-  priceId: string
+  priceId: string,
+  options?: { allowIncompleteForInitialGrant?: boolean }
 ) {
   try {
     // CRITICAL: Check if credits were already granted for this billing period
@@ -308,8 +310,13 @@ async function grantMonthlyCredits(
       return;
     }
 
-    // Only grant credits if subscription is active or trialing
-    if (subscription.status !== 'active' && subscription.status !== 'trialing') {
+    const allowIncomplete = options?.allowIncompleteForInitialGrant === true;
+    const statusOk =
+      subscription.status === 'active' ||
+      subscription.status === 'trialing' ||
+      (allowIncomplete && subscription.status === 'incomplete');
+
+    if (!statusOk) {
       console.log(
         `Skipping credit grant - subscription ${subscriptionId} is not active (status: ${subscription.status})`
       );
@@ -380,6 +387,11 @@ async function grantMonthlyCredits(
       `Granted ${monthlyCredits} credits to user ${userId} for subscription ${subscriptionId} ` +
       `(billing period: ${subscription.current_period_start})`
     );
+    if (allowIncomplete && subscription.status === 'incomplete') {
+      console.log(
+        `Initial checkout grant used for subscription ${subscriptionId} (status was incomplete; invoice.paid will skip via idempotency)`
+      );
+    }
   } catch (error) {
     console.error('Error in grantMonthlyCredits:', error);
   }
@@ -425,4 +437,32 @@ async function upsertSubscription(
   await supabaseAdmin.from('subscriptions').upsert(subscriptionData, {
     onConflict: 'stripe_subscription_id',
   });
+}
+
+async function syncUserProFlag(userId: string) {
+  const { count, error: countError } = await supabaseAdmin
+    .from('subscriptions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .in('status', ['active', 'trialing']);
+
+  if (countError) {
+    console.error('Failed to recompute pro status from subscriptions:', countError);
+    return;
+  }
+
+  const isPro = (count ?? 0) > 0;
+  const { error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .update({
+      is_pro: isPro,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (profileError) {
+    console.error(`Failed updating profiles.is_pro for user ${userId}:`, profileError);
+  } else {
+    console.log(`Synced profiles.is_pro for user ${userId} -> ${isPro}`);
+  }
 }

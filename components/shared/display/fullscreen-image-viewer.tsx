@@ -130,12 +130,16 @@ export function FullscreenImageViewer({
         className="relative flex h-full w-full flex-col lg:flex-row lg:justify-end"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Image Container */}
-        <div className="flex flex-1 items-center justify-center p-4 lg:p-8">
+        {/* Image Container - click outside image (on this div) closes viewer */}
+        <div
+          className="flex flex-1 items-center justify-center p-4 lg:p-8"
+          onClick={onClose}
+        >
           <img
             src={currentImageUrl}
             alt="Full screen preview"
             className="max-h-[70vh] max-w-full rounded-lg object-contain lg:max-h-[90vh] lg:max-w-[70vw]"
+            onClick={(e) => e.stopPropagation()}
           />
         </div>
 

@@ -21,6 +21,7 @@ import {
   CaretLeft,
   CaretRight,
   FloppyDisk,
+  Eraser,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "framer-motion"
 import Cropper, { type Area } from "react-easy-crop"
@@ -141,6 +142,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const [croppedAreaPixels, setCroppedAreaPixels] = React.useState<Area | null>(null)
   const [mediaSize, setMediaSize] = React.useState<{ width: number; height: number } | null>(null)
   const [previousViewport, setPreviousViewport] = React.useState<{ x: number; y: number; zoom: number } | null>(null)
+  const [isRemovingBg, setIsRemovingBg] = React.useState(false)
   const reactFlow = useReactFlow()
   const { isConnecting, connectingFromId } = useStore((state) => ({
     isConnecting: state.connection.inProgress,
@@ -414,6 +416,57 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     }
   }
 
+  const handleRemoveBackground = async () => {
+    if (!activeImageUrl || isRemovingBg) return
+    setIsRemovingBg(true)
+    try {
+      let res: Response
+      if (activeImageUrl.startsWith('blob:')) {
+        const response = await fetch(activeImageUrl)
+        const blob = await response.blob()
+        const file = new File([blob], 'image.png', { type: blob.type || 'image/png' })
+        const form = new FormData()
+        form.append('image', file)
+        res = await fetch('/api/remove-background', { method: 'POST', body: form })
+      } else {
+        res = await fetch('/api/remove-background', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: activeImageUrl }),
+        })
+      }
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const msg = data.error ?? data.message ?? 'Remove background failed'
+        toast.error(msg)
+        if (res.status === 402) {
+          toast.error('Insufficient credits', {
+            description: 'Remove background costs 1 credit.',
+            action: { label: 'View Plans', onClick: () => window.open('/pricing', '_blank') },
+          })
+        }
+        return
+      }
+      const outputUrl = data.imageUrl as string | undefined
+      if (outputUrl) {
+        const updatedImageUrls = [...generatedImageUrls]
+        if (updatedImageUrls.length === 0) updatedImageUrls.push(outputUrl)
+        else updatedImageUrls[activeImageIndex] = outputUrl
+        nodeData.onDataChange?.(id, {
+          generatedImageUrls: updatedImageUrls,
+          activeImageIndex,
+          generatedImageUrl: updatedImageUrls[activeImageIndex] ?? null,
+        })
+        toast.success('Background removed')
+      }
+    } catch (err) {
+      console.error('Remove background error:', err)
+      toast.error(err instanceof Error ? err.message : 'Remove background failed')
+    } finally {
+      setIsRemovingBg(false)
+    }
+  }
+
   const handleManualImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
@@ -620,6 +673,10 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           description: "Upgrade your plan to continue generating images",
           action: { label: "View Plans", onClick: () => window.open("/pricing", "_blank") }
         })
+      } else if (message.includes("Concurrency limit reached")) {
+        toast.error("Too many active generations", {
+          description: `${message} Wait for one to finish, then try again.`,
+        })
       }
       nodeData.onDataChange?.(id, { isGenerating: false, error: message })
     }
@@ -636,13 +693,27 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         offset={35}
       >
         <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl px-2 py-2 flex flex-nowrap items-center gap-2 overflow-x-auto nopan nodrag">
-          <ToolbarIconButton icon={PaperPlaneTilt} onClick={handleSendToChat} label="Send to AI Chat" />
-          <div className="w-px h-5 bg-white/10" />
-          <ToolbarIconButton icon={PencilSimple} onClick={() => setIsEditorOpen(true)} label="Edit in Canvas" />
-          <ToolbarIconButton icon={Crop} onClick={handleCrop} label="Crop" />
-          <ToolbarIconButton icon={DownloadSimple} onClick={handleDownload} label="Download" />
-          <ToolbarIconButton icon={FloppyDisk} onClick={() => setIsCreateAssetOpen(true)} label="Create Asset" />
-          <ToolbarIconButton icon={ArrowsOut} onClick={handleFullscreen} label="Fullscreen" />
+          <div className="flex items-center gap-2">
+            <ToolbarIconButton icon={PaperPlaneTilt} onClick={handleSendToChat} label="Send to AI Chat" />
+            <ToolbarIconButton icon={Crop} onClick={handleCrop} label="Crop" />
+            <ToolbarIconButton icon={DownloadSimple} onClick={handleDownload} label="Download" />
+            <ToolbarIconButton icon={FloppyDisk} onClick={() => setIsCreateAssetOpen(true)} label="Create Asset" />
+            <ToolbarIconButton icon={ArrowsOut} onClick={handleFullscreen} label="Fullscreen" />
+          </div>
+          <div className="w-px h-5 bg-white/20 shrink-0" aria-hidden />
+          <div className="flex items-center gap-1 shrink-0">
+            <ToolbarLabelButton
+              icon={PencilSimple}
+              label="Edit in Canvas"
+              onClick={() => setIsEditorOpen(true)}
+            />
+            <ToolbarLabelButton
+              icon={isRemovingBg ? CircleNotch : Eraser}
+              label="Remove background"
+              onClick={handleRemoveBackground}
+              disabled={isRemovingBg}
+            />
+          </div>
         </div>
       </NodeToolbar>
 
@@ -946,11 +1017,26 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       position={Position.Bottom}
       offset={12}
     >
-      <div className="nopan nodrag w-full max-w-[600px]">
+      <div className="nopan nodrag w-full max-w-sm sm:max-w-lg lg:max-w-4xl">
         {nodeData.connectedPrompt && (
           <div className="mb-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
             <span className="text-xs text-zinc-500">From connections: </span>
             <span className="text-xs text-zinc-300 line-clamp-2">{nodeData.connectedPrompt}</span>
+          </div>
+        )}
+        {connectedImageUrls.length > 0 && (
+          <div className="mb-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+            <span className="text-xs text-zinc-500">Reference images from connections: </span>
+            <div className="flex gap-1.5 mt-1.5 flex-wrap">
+              {connectedImageUrls.map((url) => (
+                <img
+                  key={url}
+                  src={url}
+                  alt=""
+                  className="w-12 h-12 rounded object-cover border border-white/10 shrink-0"
+                />
+              ))}
+            </div>
           </div>
         )}
         {nodeData.error && (
@@ -986,6 +1072,9 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           onNumImagesChange={() => {}}
           showNumImagesSelector={false}
           placeholder="Enter your prompt..."
+          isReadyOverride={
+            [nodeData.connectedPrompt, nodeData.prompt].filter((p) => p?.trim()).join(" ").trim().length > 0
+          }
         />
       </div>
     </NodeToolbar>
@@ -1057,11 +1146,13 @@ ImageGenNodeComponent.displayName = 'ImageGenNodeComponent'
 function ToolbarIconButton({ 
   icon: Icon, 
   onClick, 
-  label 
+  label,
+  disabled,
 }: { 
   icon: React.ElementType
   onClick?: () => void
   label?: string
+  disabled?: boolean
 }) {
   return (
     <Button
@@ -1071,8 +1162,36 @@ function ToolbarIconButton({
       aria-label={label || "Toolbar action"}
       title={label || "Toolbar action"}
       onClick={onClick}
+      disabled={disabled}
     >
-      <Icon size={16} />
+      <Icon size={16} className={disabled ? "animate-spin" : undefined} />
+    </Button>
+  )
+}
+
+function ToolbarLabelButton({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+}: {
+  icon: React.ElementType
+  label: string
+  onClick?: () => void
+  disabled?: boolean
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-7 gap-1.5 px-2 text-zinc-400 hover:text-zinc-200 text-xs font-normal"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <Icon size={16} className={disabled ? "animate-spin shrink-0" : "shrink-0"} />
+      <span className="whitespace-nowrap">{label}</span>
     </Button>
   )
 }

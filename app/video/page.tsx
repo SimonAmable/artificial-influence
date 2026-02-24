@@ -17,6 +17,7 @@ import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition } from "@/lib/types/models"
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
 import type { AudioUploadValue } from "@/components/shared/upload/audio-upload"
+import type { MultiShotItem } from "@/components/tools/video/multi-shot-editor"
 
 interface GeneratedVideo {
   url: string
@@ -57,6 +58,9 @@ function VideoPageContent() {
   const [inputVideo, setInputVideo] = React.useState<ImageUpload | null>(null)
   const [inputAudio, setInputAudio] = React.useState<AudioUploadValue | null>(null)
   const [parameters, setParameters] = React.useState<Record<string, unknown>>({})
+  const [multiShotMode, setMultiShotMode] = React.useState(false)
+  const [multiShotShots, setMultiShotShots] = React.useState<MultiShotItem[]>([])
+  const [referenceImages, setReferenceImages] = React.useState<ImageUpload[]>([])
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [generatedVideos, setGeneratedVideos] = React.useState<GeneratedVideo[]>([])
@@ -87,6 +91,25 @@ function VideoPageContent() {
     })
     setParameters(defaultParams)
   }, [selectedModel])
+
+  // Omni: when reference video is added, cap reference images at 4
+  React.useEffect(() => {
+    if (selectedModel?.identifier !== 'kwaivgi/kling-v3-omni-video') return
+    if (inputVideo && referenceImages.length > 4) {
+      setReferenceImages((prev) => prev.slice(0, 4))
+    }
+  }, [inputVideo, referenceImages.length, selectedModel?.identifier])
+
+  // When switching to Kling v3 or Omni multi-shot, init one shot if empty
+  React.useEffect(() => {
+    const isKlingV3OrOmni =
+      selectedModel?.identifier === 'kwaivgi/kling-v3-video' ||
+      selectedModel?.identifier === 'kwaivgi/kling-v3-omni-video'
+    if (isKlingV3OrOmni && multiShotMode && multiShotShots.length === 0) {
+      const d = Number(parameters.duration) || 5
+      setMultiShotShots([{ prompt: '', duration: d }])
+    }
+  }, [selectedModel?.identifier, multiShotMode, multiShotShots.length, parameters.duration])
 
   // Upload image to Supabase
   const uploadImageToSupabase = async (
@@ -127,10 +150,26 @@ function VideoPageContent() {
     }
 
     const isMotionCopy = selectedModel.identifier === 'kwaivgi/kling-v2.6-motion-control'
+    const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
+    const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
     const isLipsync =
       selectedModel.identifier.includes('lipsync') ||
       selectedModel.identifier.includes('wav2lip') ||
       selectedModel.identifier === 'veed/fabric-1.0'
+
+    if ((isKlingV3 || isKlingV3Omni) && multiShotMode && multiShotShots.length > 0) {
+      const totalDuration = Number(parameters.duration) || 5
+      const sum = multiShotShots.reduce((acc, s) => acc + s.duration, 0)
+      if (sum !== totalDuration) {
+        setError(`Multi-shot total (${sum}s) must equal duration (${totalDuration}s)`)
+        return
+      }
+      const hasEmptyPrompt = multiShotShots.some((s) => !s.prompt.trim())
+      if (hasEmptyPrompt) {
+        setError("Each multi-shot must have a prompt")
+        return
+      }
+    }
     
     // Validation based on model type
     if (isMotionCopy) {
@@ -152,8 +191,13 @@ function VideoPageContent() {
         return
       }
     } else if (!prompt.trim()) {
-      setError("Please enter a prompt")
-      return
+      const allowNoPrompt = (isKlingV3 || isKlingV3Omni) && (
+        (multiShotMode && multiShotShots.length > 0) || !!inputImage
+      )
+      if (!allowNoPrompt) {
+        setError("Please enter a prompt")
+        return
+      }
     }
 
     setIsGenerating(true)
@@ -199,6 +243,8 @@ function VideoPageContent() {
         const imageUpload = await uploadImageToSupabase(inputImage.file, user.id, 'video-gen-input-images')
         if (selectedModel.identifier === 'kwaivgi/kling-v2.6') {
           requestBody.start_image = imageUpload.url
+        } else if (isKlingV3 || isKlingV3Omni) {
+          requestBody.start_image = imageUpload.url
         } else {
           requestBody.image = imageUpload.url
         }
@@ -211,6 +257,8 @@ function VideoPageContent() {
       else if (inputImage?.url) {
         if (selectedModel.identifier === 'kwaivgi/kling-v2.6') {
           requestBody.start_image = inputImage.url
+        } else if (isKlingV3 || isKlingV3Omni) {
+          requestBody.start_image = inputImage.url
         } else {
           requestBody.image = inputImage.url
         }
@@ -220,13 +268,45 @@ function VideoPageContent() {
         }
       }
 
-      if (lastFrameImage?.file && selectedModel.identifier === 'google/veo-3.1-fast') {
+      if (lastFrameImage?.file && (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni)) {
         const lastFrameUpload = await uploadImageToSupabase(lastFrameImage.file, user.id, 'video-gen-last-frames')
         requestBody.last_frame = lastFrameUpload.url
+        if (isKlingV3 || isKlingV3Omni) requestBody.end_image = lastFrameUpload.url
+      }
+      if (lastFrameImage?.url && (isKlingV3 || isKlingV3Omni)) {
+        requestBody.end_image = lastFrameImage.url
       }
 
-      if (negativePrompt && selectedModel.identifier === 'google/veo-3.1-fast') {
+      if (negativePrompt && (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni)) {
         requestBody.negative_prompt = negativePrompt
+      }
+
+      if ((isKlingV3 || isKlingV3Omni) && multiShotMode && multiShotShots.length > 0) {
+        requestBody.multi_prompt = JSON.stringify(multiShotShots)
+        requestBody.prompt = multiShotShots[0]?.prompt ?? prompt
+      }
+
+      // Kling v3 Omni: reference video (editing or style reference)
+      if (isKlingV3Omni && inputVideo?.file) {
+        const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'video-gen-reference-videos')
+        requestBody.reference_video = videoUpload.url
+      }
+      if (isKlingV3Omni && inputVideo?.url) {
+        requestBody.reference_video = inputVideo.url
+      }
+
+      // Kling v3 Omni: reference images (elements, scenes, styles). Max 7 without video, 4 with video.
+      if (isKlingV3Omni && referenceImages.length > 0) {
+        const refUrls: string[] = []
+        for (const ref of referenceImages) {
+          if (ref.file) {
+            const up = await uploadImageToSupabase(ref.file, user.id, 'video-gen-reference-images')
+            refUrls.push(up.url)
+          } else if (ref.url) {
+            refUrls.push(ref.url)
+          }
+        }
+        if (refUrls.length > 0) requestBody.reference_images = refUrls
       }
 
       // Grok Imagine Video: reference video for video editing mode
@@ -303,21 +383,9 @@ function VideoPageContent() {
         description="Create stunning AI-generated videos with state-of-the-art models."
         steps={[
           {
-            mediaPath: "/motion_copy/step2_video.mp4",
-            title: "CHOOSE YOUR MODEL",
-            description: "Select from multiple video generation models with different capabilities.",
-            mediaType: "video",
-          },
-          {
-            mediaPath: "/motion_copy/step_3_copy.mp4",
-            title: "ENTER YOUR PROMPT",
-            description: "Describe the video you want to create with detailed prompts.",
-            mediaType: "video",
-          },
-          {
-            mediaPath: "/motion_copy/step_3_copy.mp4",
-            title: "GENERATE VIDEO",
-            description: "Get high-quality AI-generated videos in minutes.",
+            mediaPath: "/motion_copy/motion_copy_with_overlay.mp4",
+            title: "",
+            description: "",
             mediaType: "video",
           },
         ]}
@@ -387,6 +455,12 @@ function VideoPageContent() {
                     onParametersChange={setParameters}
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
+                    multiShotMode={multiShotMode}
+                    onMultiShotModeChange={setMultiShotMode}
+                    multiShotShots={multiShotShots}
+                    onMultiShotShotsChange={setMultiShotShots}
+                    referenceImages={referenceImages}
+                    onReferenceImagesChange={setReferenceImages}
                   />
                 </div>
               </div>
@@ -421,6 +495,12 @@ function VideoPageContent() {
                         onParametersChange={setParameters}
                         isGenerating={isGenerating}
                         onGenerate={handleGenerate}
+                        multiShotMode={multiShotMode}
+                        onMultiShotModeChange={setMultiShotMode}
+                        multiShotShots={multiShotShots}
+                        onMultiShotShotsChange={setMultiShotShots}
+                        referenceImages={referenceImages}
+                        onReferenceImagesChange={setReferenceImages}
                       />
                     </div>
                   </div>
@@ -456,6 +536,12 @@ function VideoPageContent() {
                     onParametersChange={setParameters}
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
+                    multiShotMode={multiShotMode}
+                    onMultiShotModeChange={setMultiShotMode}
+                    multiShotShots={multiShotShots}
+                    onMultiShotShotsChange={setMultiShotShots}
+                    referenceImages={referenceImages}
+                    onReferenceImagesChange={setReferenceImages}
                   />
                 </div>
               </div>

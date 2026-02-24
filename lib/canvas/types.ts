@@ -50,6 +50,8 @@ export interface VideoGenNodeData extends Record<string, unknown> {
 export interface TextNodeData extends Record<string, unknown> {
   label: string
   text: string
+  /** Persisted value for the AI prompt input box (toolbar) */
+  promptInput?: string
   connectedPrompt?: string
   connectedImageUrl?: string
   connectedImageUrls?: string[]
@@ -150,6 +152,7 @@ export function createTextNodeData(): TextNodeData {
   return {
     label: "Text",
     text: "",
+    promptInput: "",
     connectedImageUrls: [],
     isGenerating: false,
   }

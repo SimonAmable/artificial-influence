@@ -53,19 +53,14 @@ export function FeatureShowcaseCarousel() {
                         className="object-cover"
                       />
                     )}
-
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent transition group-hover:from-black/90" />
-
-                    <div className="absolute inset-0 flex flex-col items-end justify-end p-3">
-                      <div className="text-right">
-                        <p className="text-xl font-semibold text-white leading-tight">
-                          {feature.title}
-                        </p>
-                        <p className="mt-0.5 text-[10px] text-white/70 line-clamp-2">
-                          {feature.description}
-                        </p>
-                      </div>
-                    </div>
+                  </div>
+                  <div className="flex flex-col items-start justify-start p-3 text-left">
+                    <p className="text-xl font-semibold text-foreground leading-tight">
+                      {feature.title}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground line-clamp-2">
+                      {feature.description}
+                    </p>
                   </div>
                 </Link>
               </div>

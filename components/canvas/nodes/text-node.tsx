@@ -59,7 +59,6 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
   const titleInputRef = React.useRef<HTMLInputElement>(null)
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
   const [isFocused, setIsFocused] = React.useState(false)
-  const [previousViewport, setPreviousViewport] = React.useState<{ x: number; y: number; zoom: number } | null>(null)
   const reactFlow = useReactFlow()
   const { isConnecting, connectingFromId } = useStore((state) => ({
     isConnecting: state.connection.inProgress,
@@ -208,57 +207,39 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
   }
 
   const handleDoubleClick = () => {
-    if (!isFocused) {
-      // Store current viewport
-      const viewport = reactFlow.getViewport()
-      setPreviousViewport(viewport)
-      
-      // Get node position and zoom to it
-      const node = reactFlow.getNode(id)
-      if (node) {
-        const padding = 100
-        reactFlow.fitBounds(
-          {
-            x: node.position.x - padding,
-            y: node.position.y - padding,
-            width: dimensions.width + padding * 2,
-            height: dimensions.height + padding * 2,
-          },
-          { duration: 600 }
-        )
-      }
-      
-      // Enter focus mode
-      setTimeout(() => {
-        setIsFocused(true)
-        // Focus the textarea after a brief delay
-        setTimeout(() => {
-          textareaRef.current?.focus()
-        }, 100)
-      }, 300)
+    if (isFocused) return
+    const node = reactFlow.getNode(id)
+    if (node) {
+      const padding = 100
+      reactFlow.fitBounds(
+        {
+          x: node.position.x - padding,
+          y: node.position.y - padding,
+          width: dimensions.width + padding * 2,
+          height: dimensions.height + padding * 2,
+        },
+        { duration: 600 }
+      )
     }
+    setIsFocused(true)
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+    })
   }
 
   const handleExitFocus = React.useCallback(() => {
     setIsFocused(false)
-    
-    // Restore previous viewport
-    if (previousViewport) {
-      reactFlow.setViewport(previousViewport, { duration: 600 })
-      setPreviousViewport(null)
-    }
-  }, [previousViewport, reactFlow])
-  
+  }, [])
+
   // Handle click outside to exit focus mode
   React.useEffect(() => {
     if (!isFocused) return
-
     const handleClickOutside = (event: MouseEvent) => {
-      if (nodeRef.current && !nodeRef.current.contains(event.target as Node)) {
+      const target = event.target as HTMLElement
+      if (nodeRef.current && !nodeRef.current.contains(target)) {
         handleExitFocus()
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isFocused, handleExitFocus])
@@ -269,7 +250,7 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
     <>
       {/* Floating toolbar using NodeToolbar */}
       <NodeToolbar
-        isVisible={selected && hasContent}
+        isVisible={selected}
         position={Position.Top}
         offset={35}
       >
@@ -449,7 +430,7 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
 
     {/* AI Chat input using NodeToolbar positioned at bottom */}
     <NodeToolbar
-      isVisible={selected && !isFocused}
+      isVisible={selected}
       position={Position.Bottom}
       offset={12}
     >
@@ -517,7 +498,7 @@ interface AITextInputProps {
 }
 
 const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
-  const [input, setInput] = React.useState('')
+  const [input, setInput] = React.useState(nodeData.promptInput ?? '')
   const [files, setFiles] = React.useState<FileList | undefined>(undefined)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [isGenerating, setIsGenerating] = React.useState(false)
@@ -623,8 +604,7 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
         console.log('[AITextInput] Text updated successfully')
       }
 
-      // Clear input
-      setInput('')
+      // Keep prompt input persisted (do not clear); clear only attached files for next run
       setFiles(undefined)
       setUploadedPreviewUrls([])
       if (fileInputRef.current) {
@@ -724,7 +704,14 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
 
             <textarea
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value
+                setInput(value)
+                nodeData.onDataChange?.(nodeId, { promptInput: value })
+              }}
+              onBlur={() => {
+                nodeData.onDataChange?.(nodeId, { promptInput: input })
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()

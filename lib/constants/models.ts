@@ -25,6 +25,8 @@ export const MODEL_IDENTIFIERS = {
   // Video Models
   KWAIVGI_KLING_V2_6: 'kwaivgi/kling-v2.6-motion-control',
   KWAIVGI_KLING_V2_6_PRO: 'kwaivgi/kling-v2.6',
+  KWAIVGI_KLING_V3_VIDEO: 'kwaivgi/kling-v3-video',
+  KWAIVGI_KLING_V3_OMNI_VIDEO: 'kwaivgi/kling-v3-omni-video',
   VEED_FABRIC_1_0: 'veed/fabric-1.0',
   MINIMAX_HAILUO_2_3_FAST: 'minimax/hailuo-2.3-fast',
   GOOGLE_VEO_3_1_FAST: 'google/veo-3.1-fast',
@@ -266,6 +268,149 @@ const VEO_3_1_FAST_PARAMS: ParameterDefinition[] = [
     type: 'string',
     label: 'Negative Prompt',
     description: 'Description of what to exclude from the generated video',
+    required: false,
+    default: null,
+    ui_type: 'textarea',
+  },
+];
+
+// Kling V3 Video parameters (kwaivgi/kling-v3-video)
+const KLING_V3_VIDEO_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'mode',
+    type: 'string',
+    label: 'Mode',
+    description: 'standard = 720p, pro = 1080p',
+    required: false,
+    default: 'pro',
+    enum: ['standard', 'pro'],
+    ui_type: 'select',
+  },
+  {
+    name: 'duration',
+    type: 'number',
+    label: 'Duration',
+    description: 'Video duration in seconds (3–15)',
+    required: false,
+    default: 5,
+    min: 3,
+    max: 15,
+    ui_type: 'number',
+  },
+  {
+    name: 'aspect_ratio',
+    type: 'string',
+    label: 'Aspect Ratio',
+    description: 'Ignored when start image is provided',
+    required: false,
+    default: '16:9',
+    enum: ['16:9', '9:16', '1:1'],
+    ui_type: 'select',
+  },
+  {
+    name: 'generate_audio',
+    type: 'boolean',
+    label: 'Generate Audio',
+    description: 'Generate native audio including lip sync',
+    required: false,
+    default: true,
+    ui_type: 'switch',
+  },
+  {
+    name: 'negative_prompt',
+    type: 'string',
+    label: 'Negative Prompt',
+    description: 'What to exclude from the video',
+    required: false,
+    default: null,
+    ui_type: 'textarea',
+  },
+  {
+    name: 'multi_prompt',
+    type: 'string',
+    label: 'Multi-shot (JSON)',
+    description: 'JSON array of shots: [{"prompt": "...", "duration": N}]',
+    required: false,
+    default: null,
+    ui_type: 'textarea',
+  },
+];
+
+// Kling V3 Omni Video parameters (kwaivgi/kling-v3-omni-video)
+const KLING_V3_OMNI_VIDEO_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'mode',
+    type: 'string',
+    label: 'Mode',
+    description: 'standard = 720p, pro = 1080p',
+    required: false,
+    default: 'pro',
+    enum: ['standard', 'pro'],
+    ui_type: 'select',
+  },
+  {
+    name: 'duration',
+    type: 'number',
+    label: 'Duration',
+    description: 'Video duration in seconds (3–15). Ignored when editing with reference video.',
+    required: false,
+    default: 5,
+    min: 3,
+    max: 15,
+    ui_type: 'number',
+  },
+  {
+    name: 'aspect_ratio',
+    type: 'string',
+    label: 'Aspect Ratio',
+    description: '16:9, 9:16, or 1:1',
+    required: false,
+    default: '16:9',
+    enum: ['16:9', '9:16', '1:1'],
+    ui_type: 'select',
+  },
+  {
+    name: 'video_reference_type',
+    type: 'string',
+    label: 'Reference Video Type',
+    description: 'base = edit this video; feature = use style/camera for new content',
+    required: false,
+    default: 'feature',
+    enum: ['feature', 'base'],
+    ui_type: 'select',
+  },
+  {
+    name: 'generate_audio',
+    type: 'boolean',
+    label: 'Generate Audio',
+    description: 'Native audio (cannot use with reference video)',
+    required: false,
+    default: true,
+    ui_type: 'switch',
+  },
+  {
+    name: 'keep_original_sound',
+    type: 'boolean',
+    label: 'Keep Original Sound',
+    description: 'Keep audio from reference video when editing',
+    required: false,
+    default: false,
+    ui_type: 'switch',
+  },
+  {
+    name: 'negative_prompt',
+    type: 'string',
+    label: 'Negative Prompt',
+    description: 'What to exclude from the video',
+    required: false,
+    default: null,
+    ui_type: 'textarea',
+  },
+  {
+    name: 'multi_prompt',
+    type: 'string',
+    label: 'Multi-shot (JSON)',
+    description: 'JSON array of shots: [{"prompt": "...", "duration": N}]',
     required: false,
     default: null,
     ui_type: 'textarea',
@@ -825,6 +970,44 @@ export const KLING_V2_6_PRO_MODEL: Model = {
 };
 
 /**
+ * Kling Video 3.0 - Cinematic video up to 15s, native audio, multi-shot
+ */
+export const KLING_V3_VIDEO_MODEL: Model = {
+  id: 'model-kling-v3-video',
+  identifier: MODEL_IDENTIFIERS.KWAIVGI_KLING_V3_VIDEO,
+  name: 'Kling Video 3.0',
+  description: 'Generate cinematic videos up to 15 seconds from text or images. Native audio, lip sync, and multi-shot mode.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 0.02,
+  parameters: {
+    parameters: KLING_V3_VIDEO_PARAMS,
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+/**
+ * Kling Video 3.0 Omni - Unified text/image/video, reference images, editing, multi-shot
+ */
+export const KLING_V3_OMNI_VIDEO_MODEL: Model = {
+  id: 'model-kling-v3-omni-video',
+  identifier: MODEL_IDENTIFIERS.KWAIVGI_KLING_V3_OMNI_VIDEO,
+  name: 'Kling Video 3.0 Omni',
+  description: 'Unified video model: text/image/video input, reference images (<<<image_1>>>), video editing or style reference, multi-shot, native audio.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 0.025,
+  parameters: {
+    parameters: KLING_V3_OMNI_VIDEO_PARAMS,
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+/**
  * Flux Kontext Fast - Ultra fast image generation
  */
 export const FLUX_KONTEXT_FAST_MODEL: Model = {
@@ -939,6 +1122,8 @@ export const IMAGE_MODELS = [
 export const VIDEO_MODELS = [
   KLING_V2_6_MODEL,
   KLING_V2_6_PRO_MODEL,
+  KLING_V3_VIDEO_MODEL,
+  KLING_V3_OMNI_VIDEO_MODEL,
   FABRIC_1_0_MODEL,
   HAILUO_2_3_FAST_MODEL,
   VEO_3_1_FAST_MODEL,
@@ -968,6 +1153,8 @@ const IMAGE_MODELS_FIXED = [
 const VIDEO_MODELS_FIXED = [
   KLING_V2_6_MODEL,
   KLING_V2_6_PRO_MODEL,
+  KLING_V3_VIDEO_MODEL,
+  KLING_V3_OMNI_VIDEO_MODEL,
   FABRIC_1_0_MODEL,
   HAILUO_2_3_FAST_MODEL,
   VEO_3_1_FAST_MODEL,
