@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
-import { ArrowsOutSimple, Copy, DownloadSimple, Check, X, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus } from "@phosphor-icons/react"
+import { ArrowsOutSimple, Copy, DownloadSimple, Check, X, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise } from "@phosphor-icons/react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +36,7 @@ interface ImageGridProps {
   className?: string
   onImageClick?: (imageUrl: string, index: number) => void
   onUseAsReference?: (imageUrl: string, index: number) => void
+  onRecreate?: (image: ImageData) => void
   onCreateAsset?: (imageUrl: string, index: number) => void
   onUpscale?: (imageUrl: string, index: number) => void
   upscalingImageUrl?: string | null
@@ -63,6 +64,7 @@ export function ImageGrid({
   className,
   onImageClick,
   onUseAsReference,
+  onRecreate,
   onCreateAsset,
   onUpscale,
   upscalingImageUrl = null,
@@ -550,6 +552,21 @@ export function ImageGrid({
                   >
                     Reference
                   </Button>
+                  {onRecreate && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onRecreate?.(image)
+                      }}
+                    >
+                      <ArrowsClockwise className="mr-1 size-3" />
+                      Recreate
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="secondary"
@@ -632,6 +649,18 @@ export function ImageGrid({
                         <ArrowsOutSimple className="mr-2 size-4" />
                         Use as Reference
                       </DropdownMenuItem>
+                      {onRecreate && (
+                        <DropdownMenuItem
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            onRecreate?.(image)
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <ArrowsClockwise className="mr-2 size-4" />
+                          Recreate
+                        </DropdownMenuItem>
+                      )}
                       {onUpscale && (
                         <>
                           <DropdownMenuSeparator />

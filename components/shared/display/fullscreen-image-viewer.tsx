@@ -123,16 +123,16 @@ export function FullscreenImageViewer({
 
   return (
     <div
-      className="fixed inset-0 z-60 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      className="fixed inset-0 z-60 flex flex-col overflow-y-auto overscroll-contain bg-black/90 backdrop-blur-sm lg:flex-row lg:items-center lg:justify-center lg:overflow-hidden"
       onClick={onClose}
     >
       <div 
-        className="relative flex h-full w-full flex-col lg:flex-row lg:justify-end"
+        className="relative flex min-h-full min-w-full flex-col lg:flex-row lg:min-h-0 lg:h-full lg:w-full lg:flex-1 lg:justify-end"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Image Container - click outside image (on this div) closes viewer */}
         <div
-          className="flex flex-1 items-center justify-center p-4 lg:p-8"
+          className="flex min-h-0 flex-1 items-center justify-center p-4 lg:p-8"
           onClick={onClose}
         >
           <img

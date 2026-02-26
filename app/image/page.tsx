@@ -335,18 +335,16 @@ export default function ImagePage() {
       const extension = mimeType.split("/")[1] || "png"
       const file = new File([blob], `reference-${Date.now()}.${extension}`, { type: mimeType })
 
-      // Add to multiple reference images if supported, otherwise use single
-      if (referenceImages.length > 0) {
-        setReferenceImages([...referenceImages, { file, url: imageUrl }])
-      } else {
-        setReferenceImage({ file, url: imageUrl })
-      }
+      // Always add to referenceImages (InfluencerInputBox displays referenceImages when onReferenceImagesChange is passed)
+      setReferenceImages((prev) => [...prev, { file, url: imageUrl }])
       setError(null)
+      toast.success("Reference image added")
     } catch (err) {
       console.error("Error setting reference image:", err)
       setError("Could not set this image as reference. Please try another image.")
+      toast.error("Could not add reference image")
     }
-  }, [referenceImages])
+  }, [])
 
   const renderInputBox = React.useCallback((forceRowLayout: boolean) => {
     if (!isCharacterSwapModel) {
@@ -410,6 +408,18 @@ export default function ImagePage() {
     selectedNumImages,
   ])
 
+  const handleRecreate = React.useCallback((image: { prompt?: string | null; url: string; referenceImageUrls?: string[] }) => {
+    if (image.prompt?.trim()) {
+      setPrompt(image.prompt)
+    }
+    // Use referenceImageUrls from the generation; if none, use the main image as reference
+    const refUrls = image.referenceImageUrls && image.referenceImageUrls.length > 0
+      ? image.referenceImageUrls
+      : [image.url]
+    setReferenceImages(refUrls.map((url) => ({ url })))
+    toast.success("Prompt and references copied to input")
+  }, [])
+
   const handleCreateAsset = React.useCallback((imageUrl: string, index: number) => {
     setSelectedImageForAsset({ url: imageUrl, index })
     setCreateAssetDialogOpen(true)
@@ -471,6 +481,7 @@ export default function ImagePage() {
           onUseAsReference={(imageUrl) => {
             void handleUseAsReference(imageUrl)
           }}
+          onRecreate={handleRecreate}
           onCreateAsset={handleCreateAsset}
           onUpscale={handleUpscale}
           upscalingImageUrl={upscalingImageUrl}
