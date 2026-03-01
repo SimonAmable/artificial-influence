@@ -11,8 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
+import { ImageEnhanceSwitch } from "@/components/tools/influencer/image-enhance-switch"
 import {
   Select,
   SelectContent,
@@ -424,7 +423,7 @@ export function ImageEditorPromptBar({
         </div>
 
         {/* Controls: Add Reference Image, Model Selector, Size, Enhance Prompt */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 flex-wrap">
           <input
             ref={referenceInputRef}
             type="file"
@@ -464,7 +463,7 @@ export function ImageEditorPromptBar({
           >
             <SelectTrigger
               id="image-editor-model-select"
-              className="h-7 text-xs w-fit min-w-[120px]"
+              className="h-7 text-xs w-fit min-w-0 px-2"
             >
               <SelectValue placeholder="Select model">
                 {selectedModel && (
@@ -512,20 +511,12 @@ export function ImageEditorPromptBar({
             disabled={isGenerating}
           />
 
-          <div className="h-7 flex items-center gap-1.5 px-2 py-[18px] rounded-[28px] border border-border bg-muted/30">
-            <Switch
-              id="image-editor-enhance-prompt"
-              checked={enhancePrompt}
-              onCheckedChange={setEnhancePrompt}
-              className="scale-90"
-            />
-            <Label
-              htmlFor="image-editor-enhance-prompt"
-              className="text-xs cursor-pointer"
-            >
-              <span className="hidden md:inline">Enhance Prompt</span>
-            </Label>
-          </div>
+          <ImageEnhanceSwitch
+            checked={enhancePrompt}
+            onCheckedChange={setEnhancePrompt}
+            variant="page"
+            id="image-editor-enhance-prompt"
+          />
         </div>
       </CardContent>
     </Card>

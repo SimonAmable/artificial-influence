@@ -2,8 +2,8 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
+import { Toggle } from "@/components/ui/toggle"
+import { Sparkle } from "@phosphor-icons/react"
 
 export interface ImageEnhanceSwitchProps {
   checked: boolean
@@ -24,29 +24,19 @@ export function ImageEnhanceSwitch({
   const isToolbar = variant === "toolbar"
 
   return (
-    <div
+    <Toggle
+      id={id}
+      pressed={checked}
+      onPressedChange={onCheckedChange}
+      aria-label="Enhance prompt"
       className={cn(
-        "flex items-center gap-1.5",
-        isToolbar ? "gap-2 px-1" : "h-7 px-2 py-[18px] rounded-[28px] border border-border bg-muted/30",
+        "h-7 px-2 rounded-[28px] border border-border bg-muted/30 hover:bg-muted/50 data-[state=on]:bg-muted data-[state=on]:border-foreground/20",
+        isToolbar ? "gap-1.5" : "gap-1.5",
         className
       )}
     >
-      <Switch
-        id={id}
-        checked={checked}
-        onCheckedChange={onCheckedChange}
-        className={isToolbar ? undefined : "scale-90"}
-      />
-      <Label
-        htmlFor={id}
-        className={cn("text-xs cursor-pointer whitespace-nowrap", isToolbar && "text-zinc-400")}
-      >
-        {isToolbar ? (
-          "Enhance"
-        ) : (
-          <span className="hidden md:inline">Enhance Prompt</span>
-        )}
-      </Label>
-    </div>
+      <Sparkle className="size-3" weight={checked ? "fill" : "regular"} />
+      <span className="text-xs font-medium">{isToolbar ? "Enhance" : "Enhance"}</span>
+    </Toggle>
   )
 }

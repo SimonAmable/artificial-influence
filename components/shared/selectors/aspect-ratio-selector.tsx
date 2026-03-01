@@ -136,7 +136,7 @@ export function AspectRatioSelector({
   if (!model || supportedRatios.length === 0) {
     return (
       <Select value={value} onValueChange={onValueChange} disabled={true}>
-        <SelectTrigger className={cn("h-7 text-xs w-fit min-w-[120px]", className)}>
+        <SelectTrigger className={cn("h-7 text-xs w-fit min-w-0 px-2", className)}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -154,7 +154,7 @@ export function AspectRatioSelector({
       onValueChange={onValueChange}
       disabled={disabled}
     >
-      <SelectTrigger className={cn("h-7 text-xs w-fit min-w-[120px]", className)}>
+      <SelectTrigger className={cn("h-7 text-xs w-fit min-w-0 px-2", className)}>
         <SelectValue placeholder={placeholder}>
           {currentValue && (
             <div className="flex items-center gap-2">

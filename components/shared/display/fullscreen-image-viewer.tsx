@@ -123,28 +123,28 @@ export function FullscreenImageViewer({
 
   return (
     <div
-      className="fixed inset-0 z-60 flex flex-col overflow-y-auto overscroll-contain bg-black/90 backdrop-blur-sm lg:flex-row lg:items-center lg:justify-center lg:overflow-hidden"
+      className="fixed inset-0 z-60 overflow-y-auto overscroll-contain bg-black/90 backdrop-blur-sm lg:flex lg:items-center lg:justify-center lg:overflow-hidden"
       onClick={onClose}
     >
       <div 
-        className="relative flex min-h-full min-w-full flex-col lg:flex-row lg:min-h-0 lg:h-full lg:w-full lg:flex-1 lg:justify-end"
+        className="relative flex flex-col lg:flex-row lg:h-full lg:w-full lg:justify-end"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Image Container - click outside image (on this div) closes viewer */}
+        {/* Image Container - full size on mobile, scrollable; centered on desktop */}
         <div
-          className="flex min-h-0 flex-1 items-center justify-center p-4 lg:p-8"
+          className="flex shrink-0 items-center justify-center p-4 lg:flex-1 lg:p-8"
           onClick={onClose}
         >
           <img
             src={currentImageUrl}
             alt="Full screen preview"
-            className="max-h-[70vh] max-w-full rounded-lg object-contain lg:max-h-[90vh] lg:max-w-[70vw]"
+            className="max-h-[85vh] max-w-full rounded-lg object-contain lg:max-h-[90vh] lg:max-w-[70vw]"
             onClick={(e) => e.stopPropagation()}
           />
         </div>
 
         {/* Sidebar */}
-        <div className="flex h-auto w-full flex-col bg-background lg:h-full lg:w-[360px] lg:border-l lg:border-border">
+        <div className="flex shrink-0 w-full flex-col bg-background lg:h-full lg:w-[360px] lg:shrink-0 lg:border-l lg:border-border">
           {/* Close button - top right on desktop, top left on mobile */}
           <div className="flex items-center justify-between p-4">
             <h3 className="text-sm font-semibold text-foreground">Image Details</h3>

@@ -70,6 +70,8 @@ interface InfluencerInputBoxProps {
   hideEnhancePrompt?: boolean
   isReadyOverride?: boolean
   uploadMenuItems?: React.ReactNode
+  /** When true, Generate button stays enabled during generation so user can send concurrent requests */
+  allowConcurrent?: boolean
 }
 
 export function InfluencerInputBox({
@@ -107,6 +109,7 @@ export function InfluencerInputBox({
   hideEnhancePrompt = false,
   isReadyOverride,
   uploadMenuItems,
+  allowConcurrent = false,
 }: InfluencerInputBoxProps) {
   const [localPrompt, setLocalPrompt] = React.useState(promptValue)
   const [localReferenceImage, setLocalReferenceImage] = React.useState<ImageUpload | null>(referenceImage || null)
@@ -447,7 +450,7 @@ export function InfluencerInputBox({
             >
               <Button
                 onClick={onGenerate}
-                disabled={!isReady}
+                disabled={!isReady || (isGenerating && !allowConcurrent)}
                 className={cn(
                   "bg-primary hover:bg-primary/80 text-primary-foreground font-semibold h-10 min-w-[100px] text-sm px-4 py-6 transition-all duration-300 relative z-0",
                   !isReady && "opacity-50 cursor-not-allowed"
@@ -470,7 +473,7 @@ export function InfluencerInputBox({
         </div>
 
         {/* Controls: Add Reference Image, Model Selector, Enhance Prompt */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 flex-wrap">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -501,7 +504,7 @@ export function InfluencerInputBox({
               onValueChange={(value) => onModelChange?.(value)}
               disabled={isGenerating}
             >
-              <SelectTrigger id="model-select" className="h-7 text-xs w-fit min-w-[120px]">
+              <SelectTrigger id="model-select" className="h-7 text-xs w-fit min-w-0 px-2">
                 <SelectValue placeholder="Select model">
                   {selectedModel && (() => {
                     const model = models.find(m => m.identifier === selectedModel)
@@ -603,15 +606,13 @@ export function InfluencerInputBox({
               onValueChange={(v) => onNumImagesChange?.(parseInt(v, 10))}
               disabled={isGenerating}
             >
-              <SelectTrigger id="num-images-select" className="h-7 text-xs w-fit min-w-[80px]">
-                <SelectValue>
-                  {selectedNumImages} image{selectedNumImages !== 1 ? "s" : ""}
-                </SelectValue>
+              <SelectTrigger id="num-images-select" className="h-7 text-xs w-fit min-w-[2.25rem] px-2">
+                <SelectValue>{selectedNumImages}</SelectValue>
               </SelectTrigger>
               <SelectContent position="popper" side="top" sideOffset={4}>
                 {Array.from({ length: selectedModelObject.max_images ?? 1 }, (_, i) => i + 1).map((n) => (
                   <SelectItem key={n} value={String(n)}>
-                    {n} image{n !== 1 ? "s" : ""}
+                    {n}
                   </SelectItem>
                 ))}
               </SelectContent>

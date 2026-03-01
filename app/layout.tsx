@@ -20,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
+        <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

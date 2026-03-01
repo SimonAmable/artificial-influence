@@ -63,6 +63,8 @@ export interface CharacterSwapInputBoxProps {
   showModelSelector?: boolean
   selectedSwapMode?: CharacterSwapMode
   onSwapModeChange?: (mode: CharacterSwapMode) => void
+  /** When true, Generate button stays enabled during generation so user can send concurrent requests */
+  allowConcurrent?: boolean
 }
 
 export function CharacterSwapInputBox({
@@ -79,6 +81,7 @@ export function CharacterSwapInputBox({
   showModelSelector = false,
   selectedSwapMode = "full_character",
   onSwapModeChange,
+  allowConcurrent = false,
 }: CharacterSwapInputBoxProps) {
   const characterInputRef = React.useRef<HTMLInputElement>(null)
   const sceneInputRef = React.useRef<HTMLInputElement>(null)
@@ -346,7 +349,7 @@ export function CharacterSwapInputBox({
           <div className="ml-auto">
             <Button
               onClick={onGenerate}
-              disabled={!isReady}
+              disabled={!isReady || (isGenerating && !allowConcurrent)}
               className={cn("min-h-[50px] min-w-[110px] text-sm font-semibold", !isReady && "opacity-50 cursor-not-allowed")}
             >
               {false ? (

@@ -63,6 +63,7 @@ export default function ImagePage() {
   const [characterSwapMode, setCharacterSwapMode] = React.useState<CharacterSwapMode>("full_character")
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
   const [inFlightCount, setInFlightCount] = React.useState(0)
+  const inFlightCountRef = React.useRef(0)
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [historyError, setHistoryError] = React.useState<string | null>(null)
@@ -218,7 +219,8 @@ export default function ImagePage() {
       }
     }
 
-    setInFlightCount((count) => count + 1)
+    inFlightCountRef.current += 1
+    setInFlightCount(inFlightCountRef.current)
     setError(null)
 
     try {
@@ -229,6 +231,8 @@ export default function ImagePage() {
         if (refImage.file) {
           // Validate file type
           if (!refImage.file.type.startsWith('image/')) {
+            inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1)
+            setInFlightCount(inFlightCountRef.current)
             setError('Reference images must be valid image files')
             return
           }
@@ -236,6 +240,8 @@ export default function ImagePage() {
           // Validate file size (max 10MB)
           const maxSize = 10 * 1024 * 1024 // 10MB
           if (refImage.file.size > maxSize) {
+            inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1)
+            setInFlightCount(inFlightCountRef.current)
             setError('Reference images are too large. Maximum size is 10MB per image.')
             return
           }
@@ -319,7 +325,8 @@ export default function ImagePage() {
       }
       setError(message)
     } finally {
-      setInFlightCount((count) => Math.max(0, count - 1))
+      inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1)
+      setInFlightCount(inFlightCountRef.current)
     }
   }
 
@@ -361,6 +368,7 @@ export default function ImagePage() {
           onEnhancePromptChange={setEnhancePrompt}
           isGenerating={isGenerating}
           onGenerate={handleGenerate}
+          allowConcurrent={true}
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
           showModelSelector={true}
@@ -383,6 +391,7 @@ export default function ImagePage() {
         onSceneImageChange={setCharacterSwapSceneImage}
         onGenerate={handleGenerate}
         isGenerating={isGenerating}
+        allowConcurrent={true}
         selectedModel={selectedModel}
         onModelChange={setSelectedModel}
         models={effectiveImageModels}
@@ -476,7 +485,7 @@ export default function ImagePage() {
         <ImageGrid
           images={historyImages}
           isGenerating={isGenerating}
-          generatingCount={inFlightCount}
+          generatingCount={Math.max(1, inFlightCount * (isCharacterSwapModel ? 1 : selectedNumImages))}
           isLoadingSkeleton={isHistoryLoading && !hasImages}
           onUseAsReference={(imageUrl) => {
             void handleUseAsReference(imageUrl)
