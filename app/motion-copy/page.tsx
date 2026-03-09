@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
-import { KLING_V2_6_MOTION_META } from "@/lib/constants/model-metadata"
+
+const MOTION_COPY_MODEL = 'kwaivgi/kling-v3-motion-control' as const
 
 export default function MotionCopyPage() {
   const layoutModeContext = useLayoutMode()
@@ -98,13 +99,13 @@ export default function MotionCopyPage() {
         return
       }
 
-      // Validate video duration (max 10 seconds)
+      // Validate video duration: image orientation = max 10s, video orientation = max 30s
       try {
         const videoDuration = await getVideoDuration(inputVideo.file)
-        const maxDuration = 10 // 10 seconds
-        
+        const maxDuration = characterOrientation === 'video' ? 30 : 10
+
         if (videoDuration > maxDuration) {
-          setError(`Video duration must be 10 seconds or less. Your video is ${videoDuration.toFixed(1)} seconds.`)
+          setError(`Video duration must be ${maxDuration} seconds or less for ${characterOrientation} orientation. Your video is ${videoDuration.toFixed(1)} seconds.`)
           setIsGenerating(false)
           return
         }
@@ -190,6 +191,7 @@ export default function MotionCopyPage() {
           mode: 'pro',
           keep_original_sound: true,
           character_orientation: characterOrientation,
+          model: MOTION_COPY_MODEL,
           tool: 'motion_copy',
         }),
       })
@@ -272,29 +274,37 @@ export default function MotionCopyPage() {
   const isRowLayout = layoutMode === "row"
   const inputImageValue = inputImage ?? undefined
   const inputVideoValue = inputVideo ?? undefined
-  const characterOrientationParam = KLING_V2_6_MOTION_META.customParameters?.find(
-    (p) => p.name === "character_orientation"
-  )
-  const characterOrientationOptions = characterOrientationParam?.options ?? ["image", "video"]
 
-  const characterOrientationControl = (
-    <div className="flex items-center gap-2 px-1">
-      <Label htmlFor="character-orientation" className="text-xs text-muted-foreground">
-        Character Orientation
-      </Label>
-      <Select
-        value={characterOrientation}
-        onValueChange={setCharacterOrientation}
-      >
-        <SelectTrigger id="character-orientation" className="h-7 text-xs w-fit min-w-[120px]">
-          <SelectValue placeholder="Select" />
-        </SelectTrigger>
-        <SelectContent>
-          {characterOrientationOptions.map((opt) => (
-            <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+  const characterOrientationOptionsWithDescription: { value: string; label: string; description: string }[] = [
+    { value: 'image', label: 'Image', description: 'Same direction as picture (max 10s)' },
+    { value: 'video', label: 'Video', description: 'Match reference video (max 30s)' },
+  ]
+
+  const controlsRow = (
+    <div className="flex flex-row items-center gap-3 flex-wrap w-full">
+      <div className="flex items-center gap-2 px-1">
+        <Label htmlFor="character-orientation" className="text-xs text-muted-foreground shrink-0">
+          Character orientation
+        </Label>
+        <Select
+          value={characterOrientation}
+          onValueChange={setCharacterOrientation}
+        >
+          <SelectTrigger id="character-orientation" className="h-7 text-xs w-fit min-w-[140px]">
+            <SelectValue placeholder="Select" />
+          </SelectTrigger>
+          <SelectContent>
+            {characterOrientationOptionsWithDescription.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                <div className="flex flex-col gap-0.5">
+                  <span>{opt.label}</span>
+                  <span className="text-[10px] text-muted-foreground font-normal">{opt.description}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   )
 
@@ -330,12 +340,12 @@ export default function MotionCopyPage() {
                       description: "Click to upload image"
                     }}
                     videoUploadProps={{
-                      title: "Upload Video",
-                      description: "Click to upload video"
+                      title: "Background source",
+                      description: ""
                     }}
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
-                    extraControls={characterOrientationControl}
+                    extraControls={controlsRow}
                   />
                 </div>
               </div>
@@ -360,12 +370,12 @@ export default function MotionCopyPage() {
                           description: "Click to upload image"
                         }}
                         videoUploadProps={{
-                          title: "Upload Video",
-                          description: "Click to upload video"
+                          title: "Background source",
+                          description: ""
                         }}
                         isGenerating={isGenerating}
                         onGenerate={handleGenerate}
-                        extraControls={characterOrientationControl}
+                        extraControls={controlsRow}
                       />
                     </div>
                   </div>
@@ -391,12 +401,12 @@ export default function MotionCopyPage() {
                       description: "Click to upload image"
                     }}
                     videoUploadProps={{
-                      title: "Upload Video",
-                      description: "Click to upload video"
+                      title: "Background source",
+                      description: ""
                     }}
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
-                    extraControls={characterOrientationControl}
+                    extraControls={controlsRow}
                   />
                 </div>
               </div>

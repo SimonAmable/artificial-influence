@@ -38,11 +38,13 @@ const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
     "Preserve scene composition, camera angle, environment layout, and lighting mood from the second image. " +
     "Blend naturally with correct perspective, realistic scale, contact shadows, reflections, and occlusion.",
   identity_only:
-    "Full identity swap using two reference images. First image is the reference character (face, hair, body, and clothing to transfer). " +
-    "Second image is the reference scene. Place the character from the first image into the scene from the second image. " +
-    "From the first image preserve: the entire face (face shape, eyes, nose, mouth, bone structure, facial features), the reference character's hairstyle and hair, body shape, skin tone, and clothing/outfit—so the person in the result is recognizably the same individual as in the first image, wearing the same clothes. " +
-    "From the second image preserve only: scene composition, environment, camera angle, and lighting mood. " +
-    "Output must look like the full character from image one (same face, hair, body, and clothes) placed in the scene from image two, with realistic lighting and seamless blending.",
+    "Identity-only face transfer using two reference images. First image is the identity source (face to transfer). " +
+    "Second image is the reference person/scene (clothes, pose, body, and setting to keep). " +
+    "Transfer ONLY the facial identity from the first image onto the person in the second image. " +
+    "From the first image preserve ONLY: face shape, eyes, nose, mouth, bone structure, and facial features—nothing else. " +
+    "From the second image preserve: the exact clothing, outfit, and accessories; body proportions and pose; hairstyle and hair; skin tone; scene composition; camera angle; environment; and lighting. " +
+    "The result must show the person from image two wearing their own clothes in their own pose and setting, but with the face from image one. " +
+    "Adjust the transferred face to match the reference's lighting direction, color temperature, perspective, and scale. Blend seamlessly with no visible seams.",
 }
 
 export default function ImagePage() {
@@ -63,7 +65,6 @@ export default function ImagePage() {
   const [characterSwapMode, setCharacterSwapMode] = React.useState<CharacterSwapMode>("full_character")
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
   const [inFlightCount, setInFlightCount] = React.useState(0)
-  const inFlightCountRef = React.useRef(0)
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [historyError, setHistoryError] = React.useState<string | null>(null)
@@ -219,34 +220,31 @@ export default function ImagePage() {
       }
     }
 
-    inFlightCountRef.current += 1
-    setInFlightCount(inFlightCountRef.current)
     setError(null)
 
-    try {
-      // Validate reference images if present
-      const imagesToValidate = referenceImages.length > 0 ? referenceImages : (referenceImage ? [referenceImage] : [])
-      
-      for (const refImage of imagesToValidate) {
-        if (refImage.file) {
-          // Validate file type
-          if (!refImage.file.type.startsWith('image/')) {
-            inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1)
-            setInFlightCount(inFlightCountRef.current)
-            setError('Reference images must be valid image files')
-            return
-          }
-          
-          // Validate file size (max 10MB)
-          const maxSize = 10 * 1024 * 1024 // 10MB
-          if (refImage.file.size > maxSize) {
-            inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1)
-            setInFlightCount(inFlightCountRef.current)
-            setError('Reference images are too large. Maximum size is 10MB per image.')
-            return
-          }
+    // Validate reference images if present
+    const imagesToValidate = referenceImages.length > 0 ? referenceImages : (referenceImage ? [referenceImage] : [])
+    
+    for (const refImage of imagesToValidate) {
+      if (refImage.file) {
+        // Validate file type
+        if (!refImage.file.type.startsWith('image/')) {
+          setError('Reference images must be valid image files')
+          return
+        }
+        
+        // Validate file size (max 10MB)
+        const maxSize = 10 * 1024 * 1024 // 10MB
+        if (refImage.file.size > maxSize) {
+          setError('Reference images are too large. Maximum size is 10MB per image.')
+          return
         }
       }
+    }
+
+    setInFlightCount((n) => n + 1)
+
+    try {
 
       // Create FormData for the request
       const formData = new FormData()
@@ -325,8 +323,7 @@ export default function ImagePage() {
       }
       setError(message)
     } finally {
-      inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1)
-      setInFlightCount(inFlightCountRef.current)
+      setInFlightCount((n) => Math.max(0, n - 1))
     }
   }
 
@@ -369,6 +366,7 @@ export default function ImagePage() {
           isGenerating={isGenerating}
           onGenerate={handleGenerate}
           allowConcurrent={true}
+          allowOptionsDuringGeneration={true}
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
           showModelSelector={true}
@@ -392,6 +390,7 @@ export default function ImagePage() {
         onGenerate={handleGenerate}
         isGenerating={isGenerating}
         allowConcurrent={true}
+        allowOptionsDuringGeneration={true}
         selectedModel={selectedModel}
         onModelChange={setSelectedModel}
         models={effectiveImageModels}
@@ -485,8 +484,8 @@ export default function ImagePage() {
         <ImageGrid
           images={historyImages}
           isGenerating={isGenerating}
-          generatingCount={Math.max(1, inFlightCount * (isCharacterSwapModel ? 1 : selectedNumImages))}
-          isLoadingSkeleton={isHistoryLoading && !hasImages}
+          generatingCount={Math.max(1, inFlightCount)}
+          isLoadingSkeleton={isHistoryLoading && !hasImages && !isGenerating}
           onUseAsReference={(imageUrl) => {
             void handleUseAsReference(imageUrl)
           }}
@@ -544,7 +543,7 @@ export default function ImagePage() {
     )}>
       <div className={cn(
         "mx-auto overflow-hidden flex-1 min-h-0 flex flex-col",
-        isRowLayout ? "w-full pt-20" : "max-w-7xl pt-12"
+        isRowLayout ? "w-full pt-10" : "max-w-7xl pt-12"
       )}>
         <GeneratorLayout layoutMode={layoutMode} className="h-full flex-1 min-h-0">
           {isRowLayout ? (

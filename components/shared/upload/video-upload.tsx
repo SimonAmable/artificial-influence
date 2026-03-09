@@ -16,6 +16,8 @@ export interface VideoUploadProps {
   accept?: string
   maxHeight?: string
   minHeight?: string
+  /** Max allowed duration in seconds. Default 10. Use 30 for motion control with video orientation. */
+  maxDurationSeconds?: number
 }
 
 export function VideoUpload({
@@ -27,6 +29,7 @@ export function VideoUpload({
   accept = "video/*",
   maxHeight = "max-h-[45px]",
   minHeight = "min-h-[50px] sm:min-h-[55px]",
+  maxDurationSeconds = 10,
 }: VideoUploadProps) {
   const handleRemove = () => {
     onChange?.(null)
@@ -35,16 +38,14 @@ export function VideoUpload({
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      // Validate video duration (max 10 seconds)
+      // Validate video duration
       try {
         const duration = await getVideoDuration(file)
-        const maxDuration = 10 // 10 seconds
-        
-        if (duration > maxDuration) {
+        if (duration > maxDurationSeconds) {
           toast.error(
             "Video duration too long",
             {
-              description: `Video duration must be 10 seconds or less. Your video is ${duration.toFixed(1)} seconds.`,
+              description: `Video duration must be ${maxDurationSeconds} seconds or less. Your video is ${duration.toFixed(1)} seconds.`,
             }
           )
           e.target.value = '' // Clear the input

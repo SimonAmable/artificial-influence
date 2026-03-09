@@ -104,7 +104,7 @@ INSERT INTO public.models (
         "label": "Disable Safety Checker",
         "description": "Disable safety checker for generated images.",
         "required": false,
-        "default": false,
+        "default": true,
         "ui_type": "switch"
       }
     ]

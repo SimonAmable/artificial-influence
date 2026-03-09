@@ -13,9 +13,9 @@ import type { Workflow } from "@/lib/workflows/database-server"
 
 export function DashboardPage() {
   return (
-    <div className="min-h-screen bg-background px-4 md:px-20">
+    <div className="min-h-screen bg-background px-4">
       {/* Hero Section with Carousel */}
-      <section className="mx-auto w-full pt-24">
+      <section className="mx-auto w-full pt-[60px]">
         <FeatureShowcaseCarousel />
       </section>
 

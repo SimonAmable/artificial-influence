@@ -7,5 +7,5 @@ export function LayoutModeProviderWrapper({
 }: {
   children: React.ReactNode
 }) {
-  return <LayoutModeProvider defaultMode="column">{children}</LayoutModeProvider>
+  return <LayoutModeProvider defaultMode="row">{children}</LayoutModeProvider>
 }

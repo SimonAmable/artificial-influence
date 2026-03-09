@@ -65,6 +65,8 @@ export interface CharacterSwapInputBoxProps {
   onSwapModeChange?: (mode: CharacterSwapMode) => void
   /** When true, Generate button stays enabled during generation so user can send concurrent requests */
   allowConcurrent?: boolean
+  /** When true, model selector and other options stay enabled during generation */
+  allowOptionsDuringGeneration?: boolean
 }
 
 export function CharacterSwapInputBox({
@@ -82,6 +84,7 @@ export function CharacterSwapInputBox({
   selectedSwapMode = "full_character",
   onSwapModeChange,
   allowConcurrent = false,
+  allowOptionsDuringGeneration = false,
 }: CharacterSwapInputBoxProps) {
   const characterInputRef = React.useRef<HTMLInputElement>(null)
   const sceneInputRef = React.useRef<HTMLInputElement>(null)
@@ -259,7 +262,7 @@ export function CharacterSwapInputBox({
             <Select
               value={selectedModel || ""}
               onValueChange={(value) => onModelChange?.(value)}
-              disabled={isGenerating}
+              disabled={!allowOptionsDuringGeneration && isGenerating}
             >
               <SelectTrigger id="model-select-character-swap" className="h-7 text-xs w-[180px] shrink-0">
                 <SelectValue placeholder="Select model">

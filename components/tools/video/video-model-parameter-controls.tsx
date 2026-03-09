@@ -132,8 +132,11 @@ export function VideoModelParameterControls({
     }
 
     if (param.ui_type === "switch" && param.type === "boolean") {
-      // Keep original sound: only show when reference video is provided (e.g. Omni)
-      if (param.name === "keep_original_sound" && !referenceVideoProvided) return null
+      // Keep original sound: hide for motion control (we always keep). Show for Omni when reference video provided.
+      const isMotionControl =
+        selectedModel.identifier === "kwaivgi/kling-v2.6-motion-control" ||
+        selectedModel.identifier === "kwaivgi/kling-v3-motion-control"
+      if (param.name === "keep_original_sound" && (isMotionControl || !referenceVideoProvided)) return null
       const isAudioToggle = param.name === "generate_audio"
       return (
         <div

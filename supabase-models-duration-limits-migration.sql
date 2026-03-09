@@ -38,6 +38,7 @@ WHERE identifier = 'minimax/hailuo-2.3-fast';
 UPDATE public.models SET supports_first_frame = true
 WHERE identifier IN (
   'kwaivgi/kling-v2.6-motion-control',
+  'kwaivgi/kling-v3-motion-control',
   'kwaivgi/kling-v2.6',
   'google/veo-3.1-fast',
   'minimax/hailuo-2.3-fast'

@@ -59,7 +59,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!prompt || typeof prompt !== 'string') {
+    const isMotionCopy = model === 'kwaivgi/kling-v2.6-motion-control' || model === 'kwaivgi/kling-v3-motion-control';
+    const motionCopyImage = image || body.imagePublicUrl;
+    const motionCopyVideo = body.video || body.videoPublicUrl;
+    const hasMotionCopyInputs = isMotionCopy && motionCopyImage && motionCopyVideo;
+
+    if (isMotionCopy && !hasMotionCopyInputs) {
+      return NextResponse.json(
+        { error: 'Image and video are required for motion copy' },
+        { status: 400 }
+      );
+    }
+    if (!hasMotionCopyInputs && (!prompt || typeof prompt !== 'string')) {
       return NextResponse.json(
         { error: 'Prompt is required' },
         { status: 400 }
@@ -82,9 +93,10 @@ export async function POST(request: NextRequest) {
       auth: process.env.REPLICATE_API_TOKEN,
     });
 
-    // Build input based on model
+    // Build input based on model (motion copy allows empty prompt)
+    const effectivePrompt = hasMotionCopyInputs ? (prompt ?? '') : prompt;
     const replicateInput: Record<string, unknown> = {
-      prompt,
+      prompt: typeof effectivePrompt === 'string' ? effectivePrompt : '',
     };
 
     // Add model-specific parameters
@@ -116,7 +128,9 @@ export async function POST(request: NextRequest) {
         break;
 
       case 'kwaivgi/kling-v2.6-motion-control':
-        if (image) replicateInput.image = image;
+      case 'kwaivgi/kling-v3-motion-control':
+        if (motionCopyImage) replicateInput.image = motionCopyImage;
+        if (motionCopyVideo) replicateInput.video = motionCopyVideo;
         if (otherParams.mode) replicateInput.mode = otherParams.mode;
         if (otherParams.keep_original_sound !== undefined) replicateInput.keep_original_sound = otherParams.keep_original_sound;
         if (otherParams.character_orientation) replicateInput.character_orientation = otherParams.character_orientation;

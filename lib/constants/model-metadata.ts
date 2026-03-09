@@ -41,6 +41,8 @@ export interface ModelMetadata {
   supports_first_frame?: boolean; // Video models only
   supports_last_frame?: boolean; // Video models only
   customParameters?: CustomParameter[]; // Model-specific custom options
+  /** When true, model is deprecated and may be removed later; prefer non-deprecated alternatives. */
+  deprecated?: boolean;
 }
 
 // ============================================================================
@@ -66,6 +68,36 @@ export const GOOGLE_NANO_BANANA_META: ModelMetadata = {
       label: 'Output Format',
       options: ['jpg', 'png', 'webp'],
       default: 'png',
+      description: 'Image file format',
+    },
+  ],
+};
+
+export const NANO_BANANA_2_META: ModelMetadata = {
+  id: 'nano-banana-2-meta',
+  identifier: 'google/nano-banana-2',
+  name: 'Nano Banana 2',
+  description: "Google's latest image generation model (Gemini 3.1 Flash Image). Optimized for speed with Pro-level quality.",
+  type: 'image',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 2.0,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['match_input_image', '1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9', '1:4', '4:1', '1:8', '8:1'],
+  customParameters: [
+    {
+      name: 'resolution',
+      label: 'Resolution',
+      options: ['512', '1K', '2K', '4K'],
+      default: '1K',
+      description: 'Output resolution',
+    },
+    {
+      name: 'output_format',
+      label: 'Output Format',
+      options: ['jpg', 'png'],
+      default: 'jpg',
       description: 'Image file format',
     },
   ],
@@ -213,8 +245,8 @@ export const FLUX_KONTEXT_FAST_META: ModelMetadata = {
 export const KLING_V2_6_MOTION_META: ModelMetadata = {
   id: '42254e43-5838-4ab2-bc2f-507da3e3a95b',
   identifier: 'kwaivgi/kling-v2.6-motion-control',
-  name: 'Kling V2.6 Motion Control',
-  description: 'Advanced video generation with motion control',
+  name: 'Kling V2.6 Motion Control (deprecated)',
+  description: 'Advanced video generation with motion control. Prefer Kling 3.0 Motion Control.',
   type: 'video',
   provider: 'replicate',
   is_active: true,
@@ -223,6 +255,7 @@ export const KLING_V2_6_MOTION_META: ModelMetadata = {
   supports_reference_video: true,
   aspect_ratios: ['16:9', '9:16', '1:1'],
   supports_first_frame: true,
+  deprecated: true,
   customParameters: [
     {
       name: 'mode',
@@ -244,6 +277,44 @@ export const KLING_V2_6_MOTION_META: ModelMetadata = {
       options: ['image', 'video'],
       default: 'image',
       description: 'Character orientation setting',
+    },
+  ],
+};
+
+export const KLING_V3_MOTION_META: ModelMetadata = {
+  id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+  identifier: 'kwaivgi/kling-v3-motion-control',
+  name: 'Kling 3.0 Motion Control',
+  description: 'Transfer character motion from a reference video to any image. Improved consistency, 720p/1080p.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 10.0,
+  supports_reference_image: true,
+  supports_reference_video: true,
+  aspect_ratios: ['16:9', '9:16', '1:1'],
+  supports_first_frame: true,
+  customParameters: [
+    {
+      name: 'mode',
+      label: 'Model Mode',
+      options: ['pro', 'std'],
+      default: 'pro',
+      description: 'Pro = 1080p, Std = 720p',
+    },
+    {
+      name: 'keep_original_sound',
+      label: 'Keep Original Audio',
+      options: ['true', 'false'],
+      default: 'true',
+      description: 'Preserve audio from reference video',
+    },
+    {
+      name: 'character_orientation',
+      label: 'Character Orientation',
+      options: ['image', 'video'],
+      default: 'image',
+      description: 'image = same as picture (max 10s), video = match reference (max 30s)',
     },
   ],
 };
@@ -389,6 +460,7 @@ export const HAILUO_2_3_FAST_META: ModelMetadata = {
 export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
   GOOGLE_NANO_BANANA_META,
   NANO_BANANA_PRO_META,
+  NANO_BANANA_2_META,
   SEEDREAM_4_5_META,
   GROK_IMAGINE_META,
   GPT_IMAGE_1_5_META,
@@ -400,11 +472,26 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
  */
 export const VIDEO_MODELS_METADATA: ModelMetadata[] = [
   KLING_V2_6_MOTION_META,
+  KLING_V3_MOTION_META,
   FABRIC_1_0_META,
   VEO_3_1_FAST_META,
   KLING_V2_6_PRO_META,
   HAILUO_2_3_FAST_META,
 ];
+
+/**
+ * Motion control models (reference video + character image → motion transfer).
+ * Excludes other reference-video models (e.g. Grok). Use for motion-copy page and defaults.
+ */
+export const MOTION_CONTROL_MODELS_METADATA: ModelMetadata[] = VIDEO_MODELS_METADATA.filter(
+  (m) => m.supports_reference_video && m.identifier.includes('motion-control')
+);
+
+/** Default motion control model identifier (first non-deprecated, or first in list). */
+export const DEFAULT_MOTION_CONTROL_MODEL_IDENTIFIER: string =
+  MOTION_CONTROL_MODELS_METADATA.find((m) => !m.deprecated)?.identifier ??
+  MOTION_CONTROL_MODELS_METADATA[0]?.identifier ??
+  'kwaivgi/kling-v3-motion-control';
 
 /**
  * All models (image + video)
@@ -421,10 +508,12 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
   replicate: [
     GOOGLE_NANO_BANANA_META,
     NANO_BANANA_PRO_META,
+    NANO_BANANA_2_META,
     SEEDREAM_4_5_META,
     GPT_IMAGE_1_5_META,
     FLUX_KONTEXT_FAST_META,
     KLING_V2_6_MOTION_META,
+    KLING_V3_MOTION_META,
     FABRIC_1_0_META,
     VEO_3_1_FAST_META,
     KLING_V2_6_PRO_META,

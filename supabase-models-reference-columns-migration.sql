@@ -19,6 +19,7 @@ UPDATE public.models SET supports_reference_image = true
 WHERE type = 'image' AND identifier IN (
   'google/nano-banana',
   'google/nano-banana-pro',
+  'google/nano-banana-2',
   'bytedance/seedream-4.5',
   'xai/grok-imagine-image',
   'openai/gpt-image-1.5',
@@ -39,9 +40,9 @@ BEGIN
   END IF;
 END $$;
 
--- Video models: only Kling motion control and Grok Imagine Video support reference video
+-- Video models: Kling motion control and Grok Imagine Video support reference video
 UPDATE public.models SET supports_reference_video = true
-WHERE identifier IN ('kwaivgi/kling-v2.6-motion-control', 'xai/grok-imagine-video');
+WHERE identifier IN ('kwaivgi/kling-v2.6-motion-control', 'kwaivgi/kling-v3-motion-control', 'xai/grok-imagine-video');
 
 -- Drop old column
 ALTER TABLE public.models DROP COLUMN IF EXISTS is_reference_supported;

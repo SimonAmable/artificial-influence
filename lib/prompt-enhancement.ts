@@ -44,6 +44,7 @@ export async function enhancePromptForJSONModels(
   const jsonSupportedModels = [
     'google/nano-banana',
     'google/nano-banana-pro',
+    'google/nano-banana-2',
     'bytedance/seedream-4.5'
   ];
 

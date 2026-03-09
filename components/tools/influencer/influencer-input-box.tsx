@@ -72,6 +72,8 @@ interface InfluencerInputBoxProps {
   uploadMenuItems?: React.ReactNode
   /** When true, Generate button stays enabled during generation so user can send concurrent requests */
   allowConcurrent?: boolean
+  /** When true, model selector, aspect ratio, and other options stay enabled during generation */
+  allowOptionsDuringGeneration?: boolean
 }
 
 export function InfluencerInputBox({
@@ -110,6 +112,7 @@ export function InfluencerInputBox({
   isReadyOverride,
   uploadMenuItems,
   allowConcurrent = false,
+  allowOptionsDuringGeneration = false,
 }: InfluencerInputBoxProps) {
   const [localPrompt, setLocalPrompt] = React.useState(promptValue)
   const [localReferenceImage, setLocalReferenceImage] = React.useState<ImageUpload | null>(referenceImage || null)
@@ -502,7 +505,7 @@ export function InfluencerInputBox({
             <Select
               value={selectedModel || ""}
               onValueChange={(value) => onModelChange?.(value)}
-              disabled={isGenerating}
+              disabled={!allowOptionsDuringGeneration && isGenerating}
             >
               <SelectTrigger id="model-select" className="h-7 text-xs w-fit min-w-0 px-2">
                 <SelectValue placeholder="Select model">
@@ -595,7 +598,7 @@ export function InfluencerInputBox({
               model={selectedModelObject}
               value={selectedAspectRatio}
               onValueChange={onAspectRatioChange}
-              disabled={isGenerating}
+              disabled={!allowOptionsDuringGeneration && isGenerating}
             />
           )}
 
@@ -604,7 +607,7 @@ export function InfluencerInputBox({
             <Select
               value={String(selectedNumImages)}
               onValueChange={(v) => onNumImagesChange?.(parseInt(v, 10))}
-              disabled={isGenerating}
+              disabled={!allowOptionsDuringGeneration && isGenerating}
             >
               <SelectTrigger id="num-images-select" className="h-7 text-xs w-fit min-w-[2.25rem] px-2">
                 <SelectValue>{selectedNumImages}</SelectValue>

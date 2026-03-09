@@ -111,6 +111,22 @@ function VideoPageContent() {
     }
   }, [selectedModel?.identifier, multiShotMode, multiShotShots.length, parameters.duration])
 
+  const getVideoDuration = (file: File): Promise<number> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video')
+      video.preload = 'metadata'
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src)
+        resolve(video.duration)
+      }
+      video.onerror = () => {
+        window.URL.revokeObjectURL(video.src)
+        reject(new Error('Failed to load video metadata'))
+      }
+      video.src = URL.createObjectURL(file)
+    })
+  }
+
   // Upload image to Supabase
   const uploadImageToSupabase = async (
     file: File,
@@ -149,7 +165,7 @@ function VideoPageContent() {
       return
     }
 
-    const isMotionCopy = selectedModel.identifier === 'kwaivgi/kling-v2.6-motion-control'
+    const isMotionCopy = selectedModel.identifier === 'kwaivgi/kling-v2.6-motion-control' || selectedModel.identifier === 'kwaivgi/kling-v3-motion-control'
     const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
     const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
     const isLipsync =
@@ -179,6 +195,20 @@ function VideoPageContent() {
       }
       if (!inputVideo?.file) {
         setError("Please upload a video")
+        return
+      }
+      // Video duration: image orientation = max 10s, video orientation = max 30s
+      try {
+        const videoDuration = await getVideoDuration(inputVideo.file)
+        const characterOrientation = (parameters.character_orientation as string) || 'image'
+        const maxDuration = characterOrientation === 'video' ? 30 : 10
+        if (videoDuration > maxDuration) {
+          setError(`Video must be ${maxDuration} seconds or less for ${characterOrientation} orientation. Your video is ${videoDuration.toFixed(1)} seconds.`)
+          return
+        }
+      } catch (err) {
+        console.error('Error validating video duration:', err)
+        setError('Failed to validate video duration. Please try again.')
         return
       }
     } else if (isLipsync) {

@@ -76,6 +76,9 @@ export async function POST(request: NextRequest) {
     console.log('[generate-video] ✓ URLs validated');
     console.log('[generate-video] ✓ Request processed successfully');
 
+    const model = (body.model as string) || 'kwaivgi/kling-v2.6-motion-control';
+    const isV3Motion = model === 'kwaivgi/kling-v3-motion-control';
+
     // Initialize Replicate client
     console.log('[generate-video] Initializing Replicate client...');
     const replicate = new Replicate({
@@ -103,7 +106,7 @@ export async function POST(request: NextRequest) {
     });
 
     const generationStartTime = Date.now();
-    const output = await replicate.run('kwaivgi/kling-v2.6-motion-control', {
+    const output = await replicate.run(isV3Motion ? 'kwaivgi/kling-v3-motion-control' : 'kwaivgi/kling-v2.6-motion-control', {
       input: replicateInput,
     });
     const generationTime = Date.now() - generationStartTime;
@@ -205,7 +208,7 @@ export async function POST(request: NextRequest) {
           supabase_storage_path: generatedVideoStoragePath,
           reference_images_supabase_storage_path: imageStoragePath ? [imageStoragePath] : null,
           reference_videos_supabase_storage_path: videoStoragePath ? [videoStoragePath] : null,
-          model: 'kwaivgi/kling-v2.6-motion-control',
+          model: model,
           type: 'video',
           is_public: true,
           tool: tool || null,
@@ -268,8 +271,8 @@ export async function POST(request: NextRequest) {
 // GET method for API documentation
 export async function GET() {
   return NextResponse.json({
-    message: 'Video Generation API - Kling Motion Control',
-    model: 'kwaivgi/kling-v2.6-motion-control',
+    message: 'Video Generation API - Kling Motion Control (V2.6 or V3)',
+    models: ['kwaivgi/kling-v2.6-motion-control', 'kwaivgi/kling-v3-motion-control'],
     usage: {
       method: 'POST',
       contentType: 'application/json',

@@ -93,7 +93,7 @@ export function VideoInputBox({
 
 
   // Detect model type
-  const isMotionCopyModel = selectedModel.identifier === 'kwaivgi/kling-v2.6-motion-control'
+  const isMotionCopyModel = selectedModel.identifier === 'kwaivgi/kling-v2.6-motion-control' || selectedModel.identifier === 'kwaivgi/kling-v3-motion-control'
   const isLipsyncModel =
     selectedModel.identifier.includes('lipsync') ||
     selectedModel.identifier.includes('wav2lip') ||
@@ -332,15 +332,15 @@ export function VideoInputBox({
 
   const promptDropLabel = React.useMemo(() => {
     if (draggedMediaKind === "video" && canDropReferenceVideo) {
-      return "Reference Video"
+      return isMotionCopyModel ? "Background source" : "Reference Video"
     }
     if (draggedMediaKind === "image" && canAcceptImageDrop) {
       return nextImageDropLabel
     }
     if (canAcceptImageDrop) return nextImageDropLabel
-    if (canDropReferenceVideo) return "Reference Video"
+    if (canDropReferenceVideo) return isMotionCopyModel ? "Background source" : "Reference Video"
     return "Reference Media"
-  }, [canAcceptImageDrop, canDropReferenceVideo, draggedMediaKind, nextImageDropLabel])
+  }, [canAcceptImageDrop, canDropReferenceVideo, draggedMediaKind, isMotionCopyModel, nextImageDropLabel])
 
   const promptPlaceholderText = needsPrompt
     ? (
@@ -364,7 +364,7 @@ export function VideoInputBox({
       )}
       <CardContent className="p-2 flex flex-col gap-1.5">
         {/* Image/Video Previews - Show uploaded assets from plus button (only when not using custom upload components) */}
-        {!isMotionCopyModel && !isLipsyncModel && (inputImage || lastFrameImage || (isReferenceVideoSupported && inputVideo) || (isKlingV3Omni && referenceImages.length > 0)) && (
+        {((!isMotionCopyModel && !isLipsyncModel && (inputImage || lastFrameImage || (isReferenceVideoSupported && inputVideo) || (isKlingV3Omni && referenceImages.length > 0))) || (isMotionCopyModel && (inputImage || inputVideo))) && (
           <div className="flex flex-wrap gap-2 px-2 pt-1">
             {inputImage && inputImage.url && (
               <div className="relative inline-block">
@@ -420,12 +420,12 @@ export function VideoInputBox({
                 <button
                   onClick={() => onInputVideoChange(null)}
                   className="absolute top-1 right-1 bg-background/80 hover:bg-destructive/80 text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10 backdrop-blur-sm"
-                  aria-label="Remove reference video"
+                  aria-label={isMotionCopyModel ? "Remove background source" : "Remove reference video"}
                 >
                   <X className="size-3" weight="bold" />
                 </button>
                 <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-medium border border-border">
-                  Reference Video
+                  {isMotionCopyModel ? "Background source" : "Reference Video"}
                 </div>
               </div>
             )}
@@ -567,8 +567,9 @@ export function VideoInputBox({
               <VideoUpload
                 value={inputVideo}
                 onChange={onInputVideoChange}
-                title="Upload Video"
+                title={isMotionCopyModel ? "Background source" : "Upload Video"}
                 description="Click to upload"
+                maxDurationSeconds={parameters?.character_orientation === 'video' ? 30 : 10}
               />
             </div>
           </div>

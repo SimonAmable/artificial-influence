@@ -441,13 +441,15 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     if (!file || !file.type.startsWith("video/")) return
 
     try {
-      // Check duration first
+      // Check duration first (motion copy: 30s for video orientation, 10s for image)
       const url = URL.createObjectURL(file)
       const duration = await getVideoDuration(url)
-      
-      if (duration > 10) {
+      const isMotionCopy = selectedModel?.identifier === "kwaivgi/kling-v2.6-motion-control" || selectedModel?.identifier === "kwaivgi/kling-v3-motion-control"
+      const maxDuration = (isMotionCopy && nodeData.parameters?.character_orientation === "video") ? 30 : 10
+
+      if (duration > maxDuration) {
         nodeData.onDataChange?.(id, {
-          error: `Video must be 10 seconds or less. Your video is ${duration.toFixed(1)}s.`
+          error: `Video must be ${maxDuration} seconds or less. Your video is ${duration.toFixed(1)}s.`
         })
         URL.revokeObjectURL(url)
         if (videoUploadRef.current) videoUploadRef.current.value = ""
@@ -549,7 +551,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     }
 
     const modelIdentifier = selectedModel.identifier
-    const isMotionCopy = modelIdentifier === "kwaivgi/kling-v2.6-motion-control"
+    const isMotionCopy = modelIdentifier === "kwaivgi/kling-v2.6-motion-control" || modelIdentifier === "kwaivgi/kling-v3-motion-control"
     const isLipsync = modelIdentifier === "veed/fabric-1.0"
 
     const finalImageUrl = nodeData.manualImageUrl || nodeData.connectedImageUrl
@@ -764,7 +766,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   }
 
   const hasContent = !!nodeData.generatedVideoUrl
-  const isMotionCopyModel = selectedModel?.identifier === "kwaivgi/kling-v2.6-motion-control"
+  const isMotionCopyModel = selectedModel?.identifier === "kwaivgi/kling-v2.6-motion-control" || selectedModel?.identifier === "kwaivgi/kling-v3-motion-control"
   const isLipsyncModel = selectedModel?.identifier === "veed/fabric-1.0"
   const needsPrompt = !isMotionCopyModel && !isLipsyncModel
   const modelSupportsNegativePrompt = selectedModel?.parameters.parameters?.some(

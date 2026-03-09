@@ -320,6 +320,7 @@ export async function POST(request: NextRequest) {
         const jsonSupportedModels = [
           'google/nano-banana',
           'google/nano-banana-pro',
+          'google/nano-banana-2',
           'bytedance/seedream-4.5'
         ];
 
@@ -346,12 +347,12 @@ export async function POST(request: NextRequest) {
 
     // Prepare generateImage options
     console.log('[generate-image] Preparing generation options...');
-    const isNanoBanana = modelIdentifier === 'google/nano-banana';
+    const isNanoBananaFamily = ['google/nano-banana', 'google/nano-banana-pro', 'google/nano-banana-2'].includes(modelIdentifier);
 
-    // For image-editor-style edits with references, default nano-banana to input image ratio
-    if (isNanoBanana && referenceImageUrls.length > 0 && !aspect_ratio && !aspectRatio) {
+    // For image-editor-style edits with references, default nano-banana family to input image ratio
+    if (isNanoBananaFamily && referenceImageUrls.length > 0 && !aspect_ratio && !aspectRatio) {
       aspect_ratio = 'match_input_image';
-      console.log('[generate-image] Applied default aspect_ratio=match_input_image for nano-banana edit flow');
+      console.log('[generate-image] Applied default aspect_ratio=match_input_image for nano-banana family edit flow');
     }
     
     // Initialize model based on provider
@@ -444,6 +445,8 @@ export async function POST(request: NextRequest) {
           ...(resolution && { resolution }),
           ...(output_format && { output_format }),
           ...(referenceImageUrls.length > 0 && { image_input: referenceImageUrls }),
+          // Flux 2 Dev: disable safety checker to avoid NSFW content detection blocking valid images
+          ...(modelIdentifier === 'black-forest-labs/flux-2-dev' && { disable_safety_checker: true }),
         };
       }
     }
@@ -479,11 +482,13 @@ export async function POST(request: NextRequest) {
         });
 
         const replicateProviderOptions = (generateOptions.providerOptions?.replicate ?? {}) as Record<string, unknown>;
+        const replicateInputDefaults = (modelData.parameters as Record<string, unknown> | null)?.replicate_input_defaults as Record<string, unknown> | undefined;
         const replicateInput: Record<string, unknown> = {
           prompt: finalPrompt,
           ...(generateOptions.n && { num_outputs: generateOptions.n }),
           ...(generateOptions.seed && { seed: generateOptions.seed }),
           ...(generateOptions.size && { size: generateOptions.size }),
+          ...(replicateInputDefaults && Object.keys(replicateInputDefaults).length > 0 ? replicateInputDefaults : {}),
           ...replicateProviderOptions,
         };
 
@@ -498,12 +503,14 @@ export async function POST(request: NextRequest) {
           const webhookUrl = `${webhookBase}/api/webhooks/replicate`;
           console.log('[generate-image] Using Replicate async + webhook:', { model: modelIdentifier, webhookUrl });
 
-          const prediction = await replicateClient.predictions.create({
-            model: modelIdentifier as `${string}/${string}`,
-            input: replicateInput,
-            webhook: webhookUrl,
-            webhook_events_filter: ['completed'],
-          });
+          // Replicate predictions.create: use "version" (POST /predictions) when identifier has version,
+          // otherwise use "model" (POST /models/owner/name/predictions). The model-in-URL path 404s for versioned refs.
+          const replicateModelMatch = (modelIdentifier as string).match(/^([^/]+\/[^:]+):(.+)$/);
+          const prediction = await replicateClient.predictions.create(
+            replicateModelMatch
+              ? { version: replicateModelMatch[2], input: replicateInput, webhook: webhookUrl, webhook_events_filter: ['completed'] }
+              : { model: modelIdentifier as `${string}/${string}`, input: replicateInput, webhook: webhookUrl, webhook_events_filter: ['completed'] }
+          );
 
           const { data: pendingGeneration, error: insertError } = await supabase
             .from('generations')

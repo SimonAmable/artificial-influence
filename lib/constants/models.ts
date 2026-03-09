@@ -17,6 +17,7 @@ export const MODEL_IDENTIFIERS = {
   // Image Models
   GOOGLE_NANO_BANANA: 'google/nano-banana',
   GOOGLE_NANO_BANANA_PRO: 'google/nano-banana-pro',
+  GOOGLE_NANO_BANANA_2: 'google/nano-banana-2',
   OPENAI_GPT_IMAGE_1_5: 'openai/gpt-image-1.5',
   BYTEDANCE_SEEDREAM_4_5: 'bytedance/seedream-4.5',
   PRUNAAI_FLUX_KONTEXT_FAST: 'prunaai/flux-kontext-fast',
@@ -24,6 +25,7 @@ export const MODEL_IDENTIFIERS = {
   
   // Video Models
   KWAIVGI_KLING_V2_6: 'kwaivgi/kling-v2.6-motion-control',
+  KWAIVGI_KLING_V3_MOTION: 'kwaivgi/kling-v3-motion-control',
   KWAIVGI_KLING_V2_6_PRO: 'kwaivgi/kling-v2.6',
   KWAIVGI_KLING_V3_VIDEO: 'kwaivgi/kling-v3-video',
   KWAIVGI_KLING_V3_OMNI_VIDEO: 'kwaivgi/kling-v3-omni-video',
@@ -128,6 +130,39 @@ const KLING_V2_6_PARAMS: ParameterDefinition[] = [
     type: 'string',
     label: 'Character Orientation',
     description: 'Character orientation setting',
+    required: false,
+    default: 'image',
+    enum: ['image', 'video'],
+    ui_type: 'select',
+  },
+];
+
+// Kling V3 Motion Control parameters (same shape as V2.6: mode, keep_original_sound, character_orientation)
+const KLING_V3_MOTION_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'mode',
+    type: 'string',
+    label: 'Mode',
+    description: 'std = 720p, pro = 1080p',
+    required: false,
+    default: 'pro',
+    enum: ['pro', 'std'],
+    ui_type: 'select',
+  },
+  {
+    name: 'keep_original_sound',
+    type: 'boolean',
+    label: 'Keep Original Sound',
+    description: 'Preserve original audio from reference video',
+    required: false,
+    default: true,
+    ui_type: 'switch',
+  },
+  {
+    name: 'character_orientation',
+    type: 'string',
+    label: 'Character Orientation',
+    description: 'image = same as picture (max 10s), video = match reference (max 30s)',
     required: false,
     default: 'image',
     enum: ['image', 'video'],
@@ -894,6 +929,25 @@ export const KLING_V2_6_MODEL: Model = {
 };
 
 /**
+ * Kling V3 Motion Control - Transfer motion from reference video to character image
+ */
+export const KLING_V3_MOTION_MODEL: Model = {
+  id: 'model-kling-v3-motion-control',
+  identifier: MODEL_IDENTIFIERS.KWAIVGI_KLING_V3_MOTION,
+  name: 'Kling 3.0 Motion Control',
+  description: 'Transfer character motion from a reference video to any image. Improved consistency, 720p/1080p.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 0.01,
+  parameters: {
+    parameters: KLING_V3_MOTION_PARAMS,
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+/**
  * Veed Fabric 1.0 - Lip sync video generation
  */
 export const FABRIC_1_0_MODEL: Model = {
@@ -1121,6 +1175,7 @@ export const IMAGE_MODELS = [
 
 export const VIDEO_MODELS = [
   KLING_V2_6_MODEL,
+  KLING_V3_MOTION_MODEL,
   KLING_V2_6_PRO_MODEL,
   KLING_V3_VIDEO_MODEL,
   KLING_V3_OMNI_VIDEO_MODEL,
@@ -1152,6 +1207,7 @@ const IMAGE_MODELS_FIXED = [
 
 const VIDEO_MODELS_FIXED = [
   KLING_V2_6_MODEL,
+  KLING_V3_MOTION_MODEL,
   KLING_V2_6_PRO_MODEL,
   KLING_V3_VIDEO_MODEL,
   KLING_V3_OMNI_VIDEO_MODEL,

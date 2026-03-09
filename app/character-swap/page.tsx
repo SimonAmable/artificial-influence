@@ -261,7 +261,7 @@ export default function CharacterSwapPage() {
 
   return (
     <div className={cn("min-h-screen bg-background flex flex-col", isRowLayout ? "p-0" : "p-4 sm:p-6 md:p-12")}>
-      <div className={cn("mx-auto flex-1 flex flex-col", isRowLayout ? "w-full pt-20" : "max-w-7xl pt-12")}>
+      <div className={cn("mx-auto flex-1 flex flex-col", isRowLayout ? "w-full pt-10" : "max-w-7xl pt-12")}>
         <GeneratorLayout layoutMode={layoutMode} className="h-full flex-1 min-h-0">
           {isRowLayout ? (
             <>
