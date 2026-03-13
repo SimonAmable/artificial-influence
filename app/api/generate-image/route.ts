@@ -492,6 +492,12 @@ export async function POST(request: NextRequest) {
           ...replicateProviderOptions,
         };
 
+        // Enable Google grounding features for nano-banana 2
+        if (modelIdentifier === 'google/nano-banana-2') {
+          replicateInput.google_search = true;
+          replicateInput.image_search = true;
+        }
+
         // Fallback mapping if only generic aspectRatio was set.
         if (!('aspect_ratio' in replicateInput) && generateOptions.aspectRatio) {
           replicateInput.aspect_ratio = generateOptions.aspectRatio;

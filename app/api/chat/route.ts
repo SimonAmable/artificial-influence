@@ -1,6 +1,6 @@
 import { streamText, createGateway, convertToModelMessages, UIMessage } from 'ai';
 import { createClient } from '@/lib/supabase/server';
-import { CHATBOT_SYSTEM_PROMPT } from '@/lib/constants/system-prompts';
+import { CHATBOT_SYSTEM_PROMPT, PROMPT_RECREATE_SYSTEM_PROMPT } from '@/lib/constants/system-prompts';
 
 export async function POST(req: Request) {
   try {
@@ -26,26 +26,35 @@ export async function POST(req: Request) {
     }
 
     // Parse request body
-    const { messages }: { messages: UIMessage[] } = await req.json();
+    const body = await req.json();
+    const {
+      messages,
+      mode = 'chat',
+      model = 'google/gemini-3-flash-preview',
+    }: { messages: UIMessage[]; mode?: 'chat' | 'prompt-recreate'; model?: string } = body;
 
     // Create AI Gateway instance
     const gateway = createGateway({
       apiKey: process.env.AI_GATEWAY_API_KEY,
     });
 
+    // Select system prompt based on mode
+    const systemPrompt =
+      mode === 'prompt-recreate' ? PROMPT_RECREATE_SYSTEM_PROMPT : CHATBOT_SYSTEM_PROMPT;
+
     // Add system prompt to messages
     const systemMessage = {
       role: 'system' as const,
-      content: CHATBOT_SYSTEM_PROMPT,
+      content: systemPrompt,
     };
 
     // Convert messages and prepend system prompt
     const convertedMessages = await convertToModelMessages(messages);
     const messagesWithSystem = [systemMessage, ...convertedMessages];
 
-    // Stream the response using Gemini via AI Gateway
+    // Stream the response using selected model via AI Gateway
     const result = streamText({
-      model: gateway('xai/grok-4.1-fast-reasoning'),
+      model: gateway(model),
       messages: messagesWithSystem,
       temperature: 0.7,
     });

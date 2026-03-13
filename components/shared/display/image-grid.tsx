@@ -28,10 +28,16 @@ interface ImageData {
   referenceImageUrls?: string[]
 }
 
+export type GridItem =
+  | { type: "image"; data: ImageData }
+  | { type: "generating"; id: string }
+
 interface ImageGridProps {
-  images: Array<string | ImageData>
-  isGenerating?: boolean  // Show generating card in grid
-  generatingCount?: number  // Number of images being generated (shows multiple generating cards)
+  /** Unified list of items (images + generating slots). When provided, takes precedence over images/isGenerating/generatingCount. */
+  items?: GridItem[]
+  images?: Array<string | ImageData>
+  isGenerating?: boolean  // Show generating card in grid (legacy, when items not provided)
+  generatingCount?: number  // Number of images being generated (legacy)
   isLoadingSkeleton?: boolean  // Show skeleton grid while loading history
   className?: string
   onImageClick?: (imageUrl: string, index: number) => void
@@ -57,7 +63,8 @@ function normalizeModelName(name: string): string {
 }
 
 export function ImageGrid({
-  images,
+  items: itemsProp,
+  images = [],
   isGenerating = false,
   generatingCount = 1,
   isLoadingSkeleton = false,
@@ -77,24 +84,40 @@ export function ImageGrid({
   const [copiedPromptKey, setCopiedPromptKey] = React.useState<string | null>(null)
   const [deletingImageId, setDeletingImageId] = React.useState<string | null>(null)
 
+  // Build unified items: either from items prop (slot-based) or from images + isGenerating + generatingCount (legacy)
+  const items = React.useMemo((): GridItem[] => {
+    if (itemsProp && itemsProp.length > 0) {
+      return itemsProp
+    }
+    const normalized = images.map((item) =>
+      typeof item === "string"
+        ? { id: undefined, url: item, model: null, prompt: null, tool: null, aspectRatio: null, type: null, createdAt: null, referenceImageUrls: [] }
+        : {
+            id: item.id,
+            url: item.url,
+            model: item.model ?? null,
+            prompt: item.prompt ?? null,
+            tool: item.tool ?? null,
+            aspectRatio: item.aspectRatio ?? null,
+            type: item.type ?? null,
+            createdAt: item.createdAt ?? null,
+            referenceImageUrls: (item as ImageData).referenceImageUrls ?? (item as { reference_image_urls?: string[] }).reference_image_urls ?? [],
+          }
+    )
+    const imageItems: GridItem[] = normalized.map((data) => ({ type: "image", data }))
+    if (isGenerating && generatingCount > 0) {
+      const generatingItems: GridItem[] = Array.from({ length: generatingCount }, (_, i) => ({
+        type: "generating",
+        id: `legacy-gen-${i}`,
+      }))
+      return [...generatingItems, ...imageItems]
+    }
+    return imageItems
+  }, [itemsProp, images, isGenerating, generatingCount])
+
   const normalizedImages = React.useMemo(
-    () =>
-      images.map((item) =>
-        typeof item === "string"
-          ? { id: undefined, url: item, model: null, prompt: null, tool: null, aspectRatio: null, type: null, createdAt: null, referenceImageUrls: [] }
-          : { 
-              id: item.id, 
-              url: item.url, 
-              model: item.model ?? null, 
-              prompt: item.prompt ?? null,
-              tool: item.tool ?? null,
-              aspectRatio: item.aspectRatio ?? null,
-              type: item.type ?? null,
-              createdAt: item.createdAt ?? null,
-              referenceImageUrls: (item as ImageData).referenceImageUrls ?? (item as { reference_image_urls?: string[] }).reference_image_urls ?? []
-            }
-      ),
-    [images]
+    () => items.filter((i): i is { type: "image"; data: ImageData } => i.type === "image").map((i) => i.data),
+    [items]
   )
 
   const handleDownload = React.useCallback(async (imageUrl: string) => {
@@ -272,55 +295,44 @@ export function ImageGrid({
             />
           ))}
 
-          {/* Generating cards - show one card for each image being generated */}
-          {isGenerating && !isLoadingSkeleton && Array.from({ length: generatingCount }).map((_, index) => (
-            <div 
-              key={`generating-${index}`} 
-              className={cn(
-                "relative w-full overflow-hidden bg-zinc-900 rounded-lg",
-                isOneColumn ? "aspect-auto min-h-[50vh]" : "aspect-square"
-              )}
-            >
-              {/* White fading line animation - 20 second infinite duration */}
-              <div 
-                className="absolute inset-y-0 left-0 bg-gradient-to-r from-zinc-800 to-zinc-700"
-                style={{
-                  width: '0%',
-                  animation: 'fillProgress 20s linear infinite',
-                  boxShadow: '2px 0 8px 0 rgba(255, 255, 255, 0.4)'
-                }}
-              />
-              {/* Overlay gradient for depth */}
-              <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30 pointer-events-none" />
-              <style jsx>{`
-                @keyframes fillProgress {
-                  0% {
-                    width: 0%;
-                  }
-                  100% {
-                    width: 100%;
-                  }
-                }
-              `}</style>
-            </div>
-          ))}
-          
-          {/* Render existing images - square cards with natural aspect ratio images */}
-          {!isLoadingSkeleton && normalizedImages.map((image, index) => (
+          {/* Unified items: generating slots and image cards in order */}
+          {!isLoadingSkeleton &&
+            items.map((item, index) =>
+              item.type === "generating" ? (
+                <div
+                  key={item.id}
+                  className={cn(
+                    "relative w-full overflow-hidden bg-zinc-900 rounded-lg",
+                    isOneColumn ? "aspect-auto min-h-[50vh]" : "aspect-square"
+                  )}
+                >
+                  {/* White fading line animation - 20 second infinite duration */}
+                  <div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-zinc-800 to-zinc-700"
+                    style={{
+                      width: "0%",
+                      animation: "fillProgress 20s linear infinite",
+                      boxShadow: "2px 0 8px 0 rgba(255, 255, 255, 0.4)",
+                    }}
+                  />
+                  {/* Overlay gradient for depth */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30 pointer-events-none" />
+                </div>
+              ) : (
             <div
-              key={`image-${index}-${image.url}`}
+              key={`image-${index}-${item.data.url}`}
               className={cn(
                 "group relative bg-background flex items-center justify-center w-full cursor-pointer",
                 isOneColumn ? "aspect-auto" : "aspect-square"
               )}
-              onClick={() => setFullscreenImage(image)}
+              onClick={() => setFullscreenImage(item.data)}
               draggable
               onDragStart={(e) => {
                 // Set data in the format AI chat expects (same as canvas image-gen nodes)
                 const nodeData = {
                   id: `image-grid-${index}`,
                   type: 'image-gen',
-                  data: { generatedImageUrl: image.url }
+                  data: { generatedImageUrl: item.data.url }
                 }
                 e.dataTransfer.setData('application/reactflow-node', JSON.stringify(nodeData))
                 e.dataTransfer.effectAllowed = 'copy'
@@ -334,7 +346,7 @@ export function ImageGrid({
               }}
             >
               <img
-                src={image.url}
+                src={item.data.url}
                 alt={`Generated image ${index + 1}`}
                 className={cn(
                   "w-auto h-auto object-contain pointer-events-none",
@@ -345,7 +357,7 @@ export function ImageGrid({
               />
 
               {/* Upscaling overlay - generating animation over the image */}
-              {upscalingImageUrl === image.url && (
+              {upscalingImageUrl === item.data.url && (
                 <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg overflow-hidden bg-black/50 pointer-events-auto">
                   {/* White line sweep (same as generating cards) */}
                   <div
@@ -374,7 +386,7 @@ export function ImageGrid({
                   className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
                   onClick={(event) => {
                     event.stopPropagation()
-                    setFullscreenImage(image)
+                    setFullscreenImage(item.data)
                   }}
                   aria-label="View full screen"
                 >
@@ -387,7 +399,7 @@ export function ImageGrid({
                   className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
                   onClick={(event) => {
                     event.stopPropagation()
-                    void handleDownload(image.url)
+                    void handleDownload(item.data.url)
                   }}
                   aria-label="Download image"
                 >
@@ -400,11 +412,11 @@ export function ImageGrid({
                   className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
                   onClick={(event) => {
                     event.stopPropagation()
-                    void handleCopy(image.url)
+                    void handleCopy(item.data.url)
                   }}
                   aria-label="Copy image"
                 >
-                  {copiedImageUrl === image.url ? (
+                  {copiedImageUrl === item.data.url ? (
                     <Check className="size-3.5" />
                   ) : (
                     <Copy className="size-3.5" />
@@ -435,7 +447,7 @@ export function ImageGrid({
                     <DropdownMenuItem
                       onClick={(event) => {
                         event.stopPropagation()
-                        onCreateAsset?.(image.url, index)
+                        onCreateAsset?.(item.data.url, index)
                       }}
                       className="cursor-pointer"
                     >
@@ -446,7 +458,7 @@ export function ImageGrid({
                     <DropdownMenuItem
                       onClick={(event) => {
                         event.stopPropagation()
-                        setFullscreenImage(image)
+                        setFullscreenImage(item.data)
                       }}
                       className="cursor-pointer"
                     >
@@ -456,7 +468,7 @@ export function ImageGrid({
                     <DropdownMenuItem
                       onClick={(event) => {
                         event.stopPropagation()
-                        void handleDownload(image.url)
+                        void handleDownload(item.data.url)
                       }}
                       className="cursor-pointer"
                     >
@@ -466,11 +478,11 @@ export function ImageGrid({
                     <DropdownMenuItem
                       onClick={(event) => {
                         event.stopPropagation()
-                        void handleCopy(image.url)
+                        void handleCopy(item.data.url)
                       }}
                       className="cursor-pointer"
                     >
-                      {copiedImageUrl === image.url ? (
+                      {copiedImageUrl === item.data.url ? (
                         <>
                           <Check className="mr-2 size-4" />
                           Copied
@@ -482,19 +494,19 @@ export function ImageGrid({
                         </>
                       )}
                     </DropdownMenuItem>
-                    {image.id && onDelete && (
+                    {item.data.id && onDelete && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={(event) => {
                             event.stopPropagation()
-                            void handleDelete(image.id!, image.url, index)
+                            void handleDelete(item.data.id!, item.data.url, index)
                           }}
                           className="cursor-pointer text-destructive focus:text-destructive"
-                          disabled={deletingImageId === image.id}
+                          disabled={deletingImageId === item.data.id}
                         >
                           <Trash className="mr-2 size-4" />
-                          {deletingImageId === image.id ? 'Deleting...' : 'Delete'}
+                          {deletingImageId === item.data.id ? 'Deleting...' : 'Delete'}
                         </DropdownMenuItem>
                       </>
                     )}
@@ -505,22 +517,22 @@ export function ImageGrid({
               {/* Bottom bar: prompt (left) + buttons (right) - no overlap */}
               <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-1 sm:gap-2 px-2 pb-2 pt-6 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                 <div className="min-w-0 flex-1 overflow-hidden pr-1 sm:pr-2">
-                  {image.model && (
+                  {item.data.model && (
                     <p className="truncate text-[10px] font-semibold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                      {normalizeModelName(image.model)}
+                      {normalizeModelName(item.data.model)}
                     </p>
                   )}
-                  {image.prompt && (
+                  {item.data.prompt && (
                     <button
                       type="button"
                       className="line-clamp-2 w-full text-left text-[10px] leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-white/95"
                       onClick={(event) => {
                         event.stopPropagation()
-                        void handleCopyPrompt(image.prompt ?? "", `${image.url}-text`)
+                        void handleCopyPrompt(item.data.prompt ?? "", `${item.data.url}-text`)
                       }}
                       title="Click to copy prompt"
                     >
-                      {image.prompt}
+                      {item.data.prompt}
                     </button>
                   )}
                 </div>
@@ -531,14 +543,14 @@ export function ImageGrid({
                     type="button"
                     variant="secondary"
                     size="sm"
-                    disabled={!image.prompt?.trim()}
+                    disabled={!item.data.prompt?.trim()}
                     className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={(event) => {
                       event.stopPropagation()
-                      void handleCopyPrompt(image.prompt ?? "", `${image.url}-button`)
+                      void handleCopyPrompt(item.data.prompt ?? "", `${item.data.url}-button`)
                     }}
                   >
-                    {copiedPromptKey && copiedPromptKey.startsWith(image.url) ? "Copied" : "Copy Prompt"}
+                    {copiedPromptKey && copiedPromptKey.startsWith(item.data.url) ? "Copied" : "Copy Prompt"}
                   </Button>
                   <Button
                     type="button"
@@ -547,7 +559,7 @@ export function ImageGrid({
                     className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
                     onClick={(event) => {
                       event.stopPropagation()
-                      onUseAsReference?.(image.url, index)
+                      onUseAsReference?.(item.data.url, index)
                     }}
                   >
                     Reference
@@ -560,7 +572,7 @@ export function ImageGrid({
                       className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
                       onClick={(event) => {
                         event.stopPropagation()
-                        onRecreate?.(image)
+                        onRecreate?.(item.data)
                       }}
                     >
                       <ArrowsClockwise className="mr-1 size-3" />
@@ -574,7 +586,7 @@ export function ImageGrid({
                     className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
                     onClick={(event) => {
                       event.stopPropagation()
-                      const encodedUrl = encodeURIComponent(image.url)
+                      const encodedUrl = encodeURIComponent(item.data.url)
                       router.push(`/video?startFrame=${encodedUrl}`)
                     }}
                   >
@@ -586,14 +598,14 @@ export function ImageGrid({
                       type="button"
                       variant="secondary"
                       size="sm"
-                      disabled={upscalingImageUrl === image.url}
+                      disabled={upscalingImageUrl === item.data.url}
                       className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={(event) => {
                         event.stopPropagation()
-                        onUpscale(image.url, index)
+                        onUpscale(item.data.url, index)
                       }}
                     >
-                      {upscalingImageUrl === image.url ? (
+                      {upscalingImageUrl === item.data.url ? (
                         "Upscaling…"
                       ) : (
                         <>
@@ -630,7 +642,7 @@ export function ImageGrid({
                       <DropdownMenuItem
                         onClick={(event) => {
                           event.stopPropagation()
-                          const encodedUrl = encodeURIComponent(image.url)
+                          const encodedUrl = encodeURIComponent(item.data.url)
                           router.push(`/video?startFrame=${encodedUrl}`)
                         }}
                         className="cursor-pointer"
@@ -642,7 +654,7 @@ export function ImageGrid({
                       <DropdownMenuItem
                         onClick={(event) => {
                           event.stopPropagation()
-                          onUseAsReference?.(image.url, index)
+                          onUseAsReference?.(item.data.url, index)
                         }}
                         className="cursor-pointer"
                       >
@@ -653,7 +665,7 @@ export function ImageGrid({
                         <DropdownMenuItem
                           onClick={(event) => {
                             event.stopPropagation()
-                            onRecreate?.(image)
+                            onRecreate?.(item.data)
                           }}
                           className="cursor-pointer"
                         >
@@ -667,13 +679,13 @@ export function ImageGrid({
                           <DropdownMenuItem
                             onClick={(event) => {
                               event.stopPropagation()
-                              onUpscale(image.url, index)
+                              onUpscale(item.data.url, index)
                             }}
                             className="cursor-pointer"
-                            disabled={upscalingImageUrl === image.url}
+                            disabled={upscalingImageUrl === item.data.url}
                           >
                             <MagnifyingGlassPlus className="mr-2 size-4" />
-                            {upscalingImageUrl === image.url ? "Upscaling…" : "Upscale"}
+                            {upscalingImageUrl === item.data.url ? "Upscaling…" : "Upscale"}
                           </DropdownMenuItem>
                         </>
                       )}

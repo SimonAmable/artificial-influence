@@ -65,6 +65,8 @@ export default function ImagePage() {
   const [characterSwapMode, setCharacterSwapMode] = React.useState<CharacterSwapMode>("full_character")
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
   const [inFlightCount, setInFlightCount] = React.useState(0)
+  const [generatingSlots, setGeneratingSlots] = React.useState<Array<{ id: string }>>([])
+  const [slotsFilled, setSlotsFilled] = React.useState(0)
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [historyError, setHistoryError] = React.useState<string | null>(null)
@@ -243,6 +245,16 @@ export default function ImagePage() {
     }
 
     setInFlightCount((n) => n + 1)
+    setGeneratingSlots((prev) => [...prev, { id: `gen-${Date.now()}-${Math.random().toString(36).slice(2)}` }])
+
+    // Capture form state for append (avoids stale closure when concurrent requests complete out of order)
+    const capturedPrompt = isCharacterSwapModel ? CHARACTER_SWAP_PROMPTS[characterSwapMode] : prompt.trim()
+    const capturedModel = selectedModel
+    const capturedTool = isCharacterSwapModel ? "character_swap" : "image"
+    const capturedAspectRatio = isCharacterSwapModel ? "match_input_image" : selectedAspectRatio
+    const capturedRefUrls = isCharacterSwapModel
+      ? [characterSwapCharacterImage?.url, characterSwapSceneImage?.url].filter(Boolean) as string[]
+      : referenceImages.map((r) => r.url).filter(Boolean) as string[]
 
     try {
 
@@ -305,9 +317,20 @@ export default function ImagePage() {
       console.log('Sending request with reference images:', totalRefImages, 'numImages:', selectedNumImages)
       
       const { generateImageAndWait } = await import('@/lib/generate-image-client')
-      await generateImageAndWait(formData)
-      // Use DB as source of truth for grid order/history
-      await fetchImageHistory(20)
+      const result = await generateImageAndWait(formData)
+      // Append new image(s) to state instead of refetching - only fetch on first load
+      const newItems: ImageHistoryItem[] = result.image
+        ? [{ url: result.image.url, model: capturedModel, prompt: capturedPrompt || null, tool: capturedTool, aspectRatio: capturedAspectRatio, reference_image_urls: capturedRefUrls }]
+        : (result.images ?? []).map((img) => ({
+            url: img.url,
+            model: capturedModel,
+            prompt: capturedPrompt || null,
+            tool: capturedTool,
+            aspectRatio: capturedAspectRatio,
+            reference_image_urls: capturedRefUrls,
+          }))
+      setHistoryImages((prev) => [...newItems, ...prev])
+      setSlotsFilled((n) => n + 1)
     } catch (err) {
       console.error('Error generating image:', err)
       const message = err instanceof Error ? err.message : 'Failed to generate image'
@@ -324,6 +347,7 @@ export default function ImagePage() {
       setError(message)
     } finally {
       setInFlightCount((n) => Math.max(0, n - 1))
+      setGeneratingSlots((prev) => (prev.length > 0 ? prev.slice(1) : prev))
     }
   }
 
@@ -473,18 +497,29 @@ export default function ImagePage() {
     }
   }, [fetchImageHistory])
 
+  // Build unified grid items: filled slots (newest images) + generating slots + older images
+  const gridItems = React.useMemo(() => {
+    const toImageData = (img: ImageHistoryItem) => ({
+      ...img,
+      referenceImageUrls: img.reference_image_urls ?? (img as { referenceImageUrls?: string[] }).referenceImageUrls ?? [],
+    })
+    const filled = historyImages.slice(0, slotsFilled).map((img) => ({ type: "image" as const, data: toImageData(img) }))
+    const generating = generatingSlots.map((s) => ({ type: "generating" as const, id: s.id }))
+    const older = historyImages.slice(slotsFilled).map((img) => ({ type: "image" as const, data: toImageData(img) }))
+    return [...filled, ...generating, ...older]
+  }, [historyImages, slotsFilled, generatingSlots])
+
   // Render generated image or showcase card
   const renderShowcase = () => {
     const hasImages = historyImages.length > 0
+    const hasItems = gridItems.length > 0
 
     // Always show grid if we have images OR are generating OR are loading
     // Grid will show skeleton when loading, generating card when generating
-    if (hasImages || isGenerating || isHistoryLoading) {
+    if (hasItems || isHistoryLoading) {
       return (
         <ImageGrid
-          images={historyImages}
-          isGenerating={isGenerating}
-          generatingCount={Math.max(1, inFlightCount)}
+          items={gridItems}
           isLoadingSkeleton={isHistoryLoading && !hasImages && !isGenerating}
           onUseAsReference={(imageUrl) => {
             void handleUseAsReference(imageUrl)

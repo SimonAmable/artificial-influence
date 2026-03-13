@@ -7,8 +7,28 @@ import { motion, AnimatePresence } from "framer-motion"
 import { X, ArrowUp, Plus, NotePencil, UploadSimple } from "@phosphor-icons/react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { MemoizedMarkdown } from "@/components/memoized-markdown"
+import { ModelIcon } from "@/components/shared/icons/model-icon"
+
+const CHAT_MODELS = [
+  { identifier: "google/gemini-3-flash-preview", name: "Gemini 3 Flash" },
+  { identifier: "xai/grok-4.1-fast-reasoning", name: "Grok 4.1 Fast" },
+] as const
+
+function formatChatModelName(identifier: string, name: string): string {
+  if (name && !name.includes("/")) return name
+  const parts = identifier.split("/")
+  const short = parts[parts.length - 1]
+  return short.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+}
 
 // Create shared chat instance
 const chat = new Chat({
@@ -21,8 +41,12 @@ interface AIChatProps {
   className?: string
 }
 
+export type ChatMode = "chat" | "prompt-recreate"
+
 export function AIChat({ className }: AIChatProps) {
   const [isOpen, setIsOpen] = React.useState(false)
+  const [mode, setMode] = React.useState<ChatMode>("chat")
+  const [model, setModel] = React.useState<string>(CHAT_MODELS[0].identifier)
   const [isDraggingOver, setIsDraggingOver] = React.useState(false)
   const dragCounter = React.useRef(0)
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
@@ -250,8 +274,17 @@ export function AIChat({ className }: AIChatProps) {
                   <div className="flex flex-col items-center justify-center h-full text-center space-y-3 text-muted-foreground">
                     <Image src="/logo.svg" alt="AI" width={64} height={64} />
                     <div>
-                      <p className="font-medium text-foreground">Start a conversation</p>
-                      <p className="text-sm">I&apos;m your guide to this platform - ask about workflows, features, or how to get started</p>
+                      {mode === "chat" ? (
+                        <>
+                          <p className="font-medium text-foreground">Start a conversation</p>
+                          <p className="text-sm">I&apos;m your guide to this platform - ask about workflows, features, or how to get started</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-medium text-foreground">Prompt Recreate</p>
+                          <p className="text-sm">Upload an image to decompose its visual elements and get a NanoBanana Pro JSON prompt to recreate it</p>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
@@ -326,7 +359,7 @@ export function AIChat({ className }: AIChatProps) {
               </div>
 
               {/* Input Form */}
-              <MessageInput />
+              <MessageInput mode={mode} setMode={setMode} model={model} setModel={setModel} />
             </motion.div>
           </>
         )}
@@ -336,7 +369,14 @@ export function AIChat({ className }: AIChatProps) {
 }
 
 // Separate MessageInput component
-const MessageInput = () => {
+interface MessageInputProps {
+  mode: ChatMode
+  setMode: (mode: ChatMode) => void
+  model: string
+  setModel: (model: string) => void
+}
+
+const MessageInput = ({ mode, setMode, model, setModel }: MessageInputProps) => {
   const [input, setInput] = React.useState('')
   const [files, setFiles] = React.useState<FileList | undefined>(undefined)
   const [droppedAssets, setDroppedAssets] = React.useState<Array<{ url: string; type: string }>>([])
@@ -430,10 +470,13 @@ const MessageInput = () => {
       url: asset.url,
     }))
 
-    sendMessage({
-      role: 'user',
-      parts: [{ type: 'text', text: input }, ...fileParts, ...assetParts],
-    })
+    sendMessage(
+      {
+        role: 'user',
+        parts: [{ type: 'text', text: input }, ...fileParts, ...assetParts],
+      },
+      { body: { mode, model } }
+    )
 
     setInput('')
     setFiles(undefined)
@@ -444,7 +487,7 @@ const MessageInput = () => {
   }
 
   return (
-    <div className="p-4 shadow-lg">
+    <div className="p-4 shadow-lg rounded-t-3xl">
       {/* File Preview */}
       {((files && files.length > 0) || droppedAssets.length > 0) && (
         <div className="mb-2 flex gap-2 flex-wrap">
@@ -535,28 +578,76 @@ const MessageInput = () => {
                 handleSubmit(e)
               }
             }}
-            placeholder="Say something..."
+            placeholder={
+              mode === "chat"
+                ? "Say something..."
+                : "Upload an image or add instructions (e.g. make it warmer, emphasize X)..."
+            }
             rows={3}
             className="w-full min-h-[4.5rem] px-0 py-2 bg-transparent resize-y text-base focus:outline-none border-0"
           />
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              className="h-9 w-9 shrink-0 opacity-60 hover:opacity-100"
-            >
-              <Plus className="h-5 w-5" />
-            </Button>
-            <Button
-              type="submit"
-              size="icon"
-              disabled={!input.trim() && !files && droppedAssets.length === 0}
-              className="h-9 w-9 shrink-0 bg-foreground hover:bg-foreground/90 text-background"
-            >
-              <ArrowUp className="h-5 w-5 text-background" weight="bold" />
-            </Button>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Select value={mode} onValueChange={(v) => setMode(v as ChatMode)}>
+                  <SelectTrigger size="sm" className="h-7 text-xs w-fit min-w-0 px-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper" side="top" sideOffset={4}>
+                    <SelectItem value="chat">Chat</SelectItem>
+                    <SelectItem value="prompt-recreate">Prompt Recreate</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={model} onValueChange={setModel}>
+                  <SelectTrigger size="sm" className="h-7 text-xs w-fit min-w-0 px-2">
+                    <SelectValue placeholder="Select model">
+                      {model && (
+                        <div className="flex items-center gap-2">
+                          <ModelIcon identifier={model} size={16} />
+                          <span>
+                            {(() => {
+                              const m = CHAT_MODELS.find((x) => x.identifier === model)
+                              return m ? formatChatModelName(m.identifier, m.name) : formatChatModelName(model, "")
+                            })()}
+                          </span>
+                        </div>
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent position="popper" side="top" sideOffset={4}>
+                    {CHAT_MODELS.map((m) => (
+                      <SelectItem key={m.identifier} value={m.identifier}>
+                        <div className="flex items-center gap-2">
+                          <ModelIcon identifier={m.identifier} size={16} />
+                          <span>{formatChatModelName(m.identifier, m.name)}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-9 w-9 shrink-0 opacity-60 hover:opacity-100"
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!input.trim() && !files && droppedAssets.length === 0}
+                className="h-9 w-9 shrink-0 bg-foreground hover:bg-foreground/90 text-background"
+              >
+                <ArrowUp className="h-5 w-5 text-background" weight="bold" />
+              </Button>
+            </div>
           </div>
         </div>
       </form>
