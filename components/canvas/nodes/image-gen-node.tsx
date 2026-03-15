@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { useModels } from "@/hooks/use-models"
+import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { uploadFilesToSupabase } from "@/lib/canvas/upload-helpers"
 import { toast } from "sonner"
@@ -611,7 +612,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     try {
       const formData = new FormData()
       formData.append("prompt", fullPrompt)
-      formData.append("model", nodeData.model || "google/nano-banana")
+      formData.append("model", nodeData.model || DEFAULT_IMAGE_MODEL_IDENTIFIER)
       formData.append("enhancePrompt", String(nodeData.enhancePrompt))
       if (nodeData.aspectRatio) {
         formData.append("aspectRatio", nodeData.aspectRatio)

@@ -34,6 +34,9 @@ export const MODEL_IDENTIFIERS = {
   GOOGLE_VEO_3_1_FAST: 'google/veo-3.1-fast',
 } as const;
 
+/** Default model for image generation (used when no model is specified). */
+export const DEFAULT_IMAGE_MODEL_IDENTIFIER = MODEL_IDENTIFIERS.GOOGLE_NANO_BANANA_2;
+
 // ============================================================================
 // PARAMETER DEFINITIONS
 // ============================================================================

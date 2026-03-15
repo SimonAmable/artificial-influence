@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useModels } from "@/hooks/use-models"
+import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { toast } from "sonner"
 
@@ -65,7 +66,6 @@ export default function ImagePage() {
   const [characterSwapMode, setCharacterSwapMode] = React.useState<CharacterSwapMode>("full_character")
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
   const [inFlightCount, setInFlightCount] = React.useState(0)
-  const [generatingSlots, setGeneratingSlots] = React.useState<Array<{ id: string }>>([])
   const [slotsFilled, setSlotsFilled] = React.useState(0)
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -110,12 +110,12 @@ export default function ImagePage() {
   // Upscale: which image is currently upscaling (by URL)
   const [upscalingImageUrl, setUpscalingImageUrl] = React.useState<string | null>(null)
 
-  // Set default model when models load
+  // Set default model when models load (prefer Nano Banana 2)
   React.useEffect(() => {
     if (effectiveImageModels.length > 0 && !selectedModel) {
-      const first = effectiveImageModels[0]
-      setSelectedModel(first.identifier)
-      setSelectedAspectRatio(first.default_aspect_ratio ?? first.aspect_ratios?.[0] ?? "1:1")
+      const defaultModel = effectiveImageModels.find((m) => m.identifier === DEFAULT_IMAGE_MODEL_IDENTIFIER) ?? effectiveImageModels[0]
+      setSelectedModel(defaultModel.identifier)
+      setSelectedAspectRatio(defaultModel.default_aspect_ratio ?? defaultModel.aspect_ratios?.[0] ?? "1:1")
     }
   }, [effectiveImageModels, selectedModel])
 
@@ -245,7 +245,6 @@ export default function ImagePage() {
     }
 
     setInFlightCount((n) => n + 1)
-    setGeneratingSlots((prev) => [...prev, { id: `gen-${Date.now()}-${Math.random().toString(36).slice(2)}` }])
 
     // Capture form state for append (avoids stale closure when concurrent requests complete out of order)
     const capturedPrompt = isCharacterSwapModel ? CHARACTER_SWAP_PROMPTS[characterSwapMode] : prompt.trim()
@@ -330,7 +329,7 @@ export default function ImagePage() {
             reference_image_urls: capturedRefUrls,
           }))
       setHistoryImages((prev) => [...newItems, ...prev])
-      setSlotsFilled((n) => n + 1)
+      setSlotsFilled((n) => n + newItems.length)
     } catch (err) {
       console.error('Error generating image:', err)
       const message = err instanceof Error ? err.message : 'Failed to generate image'
@@ -347,7 +346,6 @@ export default function ImagePage() {
       setError(message)
     } finally {
       setInFlightCount((n) => Math.max(0, n - 1))
-      setGeneratingSlots((prev) => (prev.length > 0 ? prev.slice(1) : prev))
     }
   }
 
@@ -497,17 +495,20 @@ export default function ImagePage() {
     }
   }, [fetchImageHistory])
 
-  // Build unified grid items: filled slots (newest images) + generating slots + older images
+  // Grid order: generating (at front) → filled (newest) → older
   const gridItems = React.useMemo(() => {
     const toImageData = (img: ImageHistoryItem) => ({
       ...img,
       referenceImageUrls: img.reference_image_urls ?? (img as { referenceImageUrls?: string[] }).referenceImageUrls ?? [],
     })
+    const generating = Array.from({ length: inFlightCount }, (_, i) => ({
+      type: "generating" as const,
+      id: `gen-${i}`,
+    }))
     const filled = historyImages.slice(0, slotsFilled).map((img) => ({ type: "image" as const, data: toImageData(img) }))
-    const generating = generatingSlots.map((s) => ({ type: "generating" as const, id: s.id }))
     const older = historyImages.slice(slotsFilled).map((img) => ({ type: "image" as const, data: toImageData(img) }))
-    return [...filled, ...generating, ...older]
-  }, [historyImages, slotsFilled, generatingSlots])
+    return [...generating, ...filled, ...older]
+  }, [historyImages, slotsFilled, inFlightCount])
 
   // Render generated image or showcase card
   const renderShowcase = () => {

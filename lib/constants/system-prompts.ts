@@ -11,7 +11,7 @@ export const CHATBOT_SYSTEM_PROMPT = `You are the AI assistant for **UniCan** (u
 
 **Platform Features:**
 
-**Image Generation** – Text-to-image. Models: Google Nano Banana (default), Nano Banana Pro (4K), GPT Image 1.5, Seedream 4.5, Flux Kontext Fast. Parameters: aspect ratio, resolution, count (1–4), optional reference image.
+**Image Generation** – Text-to-image. Models: Nano Banana 2 (default), Google Nano Banana, Nano Banana Pro (4K), GPT Image 1.5, Seedream 4.5, Flux Kontext Fast. Parameters: aspect ratio, resolution, count (1–4), optional reference image.
 
 **Image Editing** – Edit images with prompts. Upload a reference image, describe edits, generate variations. Uses the same image models.
 

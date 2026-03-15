@@ -7,6 +7,7 @@ import { enhancePrompt, enhancePromptForJSONModels } from '@/lib/prompt-enhancem
 import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 import { modelUsesDimensions, aspectRatioToDimensions } from '@/lib/utils/model-parameters';
+import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from '@/lib/constants/models';
 
 const STALE_PENDING_MINUTES = 30;
 const FREE_CONCURRENCY_LIMIT = 1;
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
   console.log('[generate-image] ===== Request started =====');
   
   try {
-    // Check for API token
+    // Check for API tokens (Replicate for most models, xAI for Grok Imagine)
     if (!process.env.REPLICATE_API_TOKEN) {
       console.error('[generate-image] REPLICATE_API_TOKEN not set');
       return NextResponse.json(
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
     const referenceImageFiles = formData.getAll('referenceImages') as File[];
     const enhancePromptValue = formData.get('enhancePrompt');
     const shouldEnhance = enhancePromptValue === 'true';
-    const modelIdentifier = (formData.get('model') as string) || 'google/nano-banana'; // Default to nano-banana if not provided
+    const modelIdentifier = (formData.get('model') as string) || DEFAULT_IMAGE_MODEL_IDENTIFIER;
     
     // Get optional parameters from form data
     const aspectRatio = formData.get('aspectRatio') as string | null;
@@ -384,7 +385,7 @@ export async function POST(request: NextRequest) {
     // Use the selected model identifier
     const generateOptions: Parameters<typeof generateImage>[0] = {
       model: imageModel,
-      prompt: finalPrompt, // JSON string for supported models, regular string for others
+      prompt: finalPrompt,
     };
 
     // Add optional parameters if provided
@@ -474,7 +475,69 @@ export async function POST(request: NextRequest) {
     const generationStartTime = Date.now();
     let result;
     try {
-      if (provider === 'xai') {
+      if (provider === 'xai' && referenceImageUrls.length > 0) {
+        // xAI edits API requires JSON (not multipart). Call directly since AI SDK uses multipart for edits.
+        const xaiApiKey = process.env.XAI_API_KEY;
+        if (!xaiApiKey) {
+          throw new Error('XAI_API_KEY environment variable is not set (required for Grok Imagine with reference images)');
+        }
+        const modelId = modelIdentifier.replace('xai/', '');
+        const imagePayload =
+          referenceImageUrls.length === 1
+            ? {
+                image: {
+                  url: referenceImageUrls[0],
+                  type: 'image_url' as const,
+                },
+              }
+            : {
+                images: referenceImageUrls.map((url) => ({
+                  url,
+                  type: 'image_url' as const,
+                })),
+              };
+        const editsBody = {
+          model: modelId,
+          prompt: finalPrompt,
+          ...imagePayload,
+          response_format: 'b64_json' as const,
+          n: effectiveN,
+          ...(aspectRatio && /^\d+:\d+$/.test(aspectRatio) && { aspect_ratio: aspectRatio }),
+          ...(seed && typeof seed === 'number' && { seed }),
+        };
+        console.log('[generate-image] Calling xAI edits API directly:', {
+          model: modelId,
+          imageCount: referenceImageUrls.length,
+          n: effectiveN,
+        });
+        const xaiRes = await fetch('https://api.x.ai/v1/images/edits', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${xaiApiKey}`,
+          },
+          body: JSON.stringify(editsBody),
+        });
+        if (!xaiRes.ok) {
+          const errText = await xaiRes.text();
+          console.error('[generate-image] xAI edits API error:', xaiRes.status, errText);
+          throw new Error(`xAI API error: ${xaiRes.status} - ${errText}`);
+        }
+        const xaiData = (await xaiRes.json()) as { data: Array<{ b64_json?: string; url?: string }> };
+        const outputData = xaiData?.data ?? [];
+        if (outputData.length === 0) {
+          throw new Error('xAI edits API returned no images');
+        }
+        const outputBase64Images = outputData.map((item) => {
+          if (item.b64_json) return item.b64_json;
+          if (item.url) throw new Error('xAI returned URL; expected b64_json. Set response_format to b64_json.');
+          throw new Error('xAI response missing b64_json');
+        });
+        result =
+          outputBase64Images.length > 1
+            ? { images: outputBase64Images.map((base64) => ({ base64 })), warnings: [] }
+            : { image: { base64: outputBase64Images[0] }, warnings: [] };
+      } else if (provider === 'xai') {
         result = await generateImage(generateOptions);
       } else {
         const replicateClient = new Replicate({
@@ -817,7 +880,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     message: 'Image Generation API',
-    defaultModel: 'google/nano-banana',
+    defaultModel: DEFAULT_IMAGE_MODEL_IDENTIFIER,
     asyncWebhooks: !!process.env.REPLICATE_WEBHOOK_BASE_URL,
     note: process.env.REPLICATE_WEBHOOK_BASE_URL
       ? 'Async mode: POST returns 202 with predictionId; poll GET /api/generate-image/status?predictionId=...'
@@ -827,7 +890,7 @@ export async function GET() {
       contentType: 'multipart/form-data',
       body: {
         prompt: 'string (required) - Text description of the image to generate',
-        model: 'string (optional) - Model identifier from database (defaults to "google/nano-banana")',
+        model: `string (optional) - Model identifier from database (defaults to "${DEFAULT_IMAGE_MODEL_IDENTIFIER}")`,
         enhancePrompt: 'boolean (optional) - If true, enhances the prompt using AI before generation',
         referenceImage: 'File (optional) - Reference image file to upload',
         aspectRatio: 'string (optional) - Aspect ratio (e.g., "16:9", "1:1")',
