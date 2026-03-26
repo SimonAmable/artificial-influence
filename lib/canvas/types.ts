@@ -27,6 +27,8 @@ export interface VideoGenNodeData extends Record<string, unknown> {
   videoUrl: string
   audioUrl?: string
   connectedImageUrl: string | null // Image from connected upload/image nodes (single)
+  /** Second image input when the model supports last/end frame (dedicated handle or second legacy edge). */
+  connectedLastFrameUrl: string | null
   connectedVideoUrl: string | null // Video from connected upload nodes (single)
   connectedAudioUrl?: string | null // Audio from connected upload nodes (single)
   manualImageUrl: string | null // Manually uploaded image (single)
@@ -132,6 +134,7 @@ export function createVideoGenNodeData(): VideoGenNodeData {
     videoUrl: "",
     audioUrl: "",
     connectedImageUrl: null,
+    connectedLastFrameUrl: null,
     connectedVideoUrl: null,
     connectedAudioUrl: null,
     manualImageUrl: null,

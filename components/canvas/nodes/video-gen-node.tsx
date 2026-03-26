@@ -17,6 +17,7 @@ import {
   SquareHalfBottom,
   PaperPlaneTilt,
   FloppyDisk,
+  ArrowsLeftRight,
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
 import type { VideoGenNodeData, UploadNodeData, ImageGenNodeData } from "@/lib/canvas/types"
@@ -89,66 +90,108 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     })
   }
 
-  // Track connected image and video nodes
+  const { models: videoModels } = useModels("video")
+
+  function getImageUrlFromSourceNode(node: Node): string | null {
+    if (node.type === "upload") {
+      const uploadData = node.data as UploadNodeData
+      if (uploadData.fileUrl && uploadData.fileType === "image") return uploadData.fileUrl
+    }
+    if (node.type === "image-gen") {
+      const imageGenData = node.data as ImageGenNodeData
+      if (imageGenData.generatedImageUrl) return imageGenData.generatedImageUrl
+    }
+    return null
+  }
+
+  // Track connected image / last frame / video / audio from edges and incomers
   React.useEffect(() => {
-    const currentNode = nodes.find(n => n.id === id)
+    const currentNode = nodes.find((n) => n.id === id)
     if (!currentNode) return
 
+    const modelRow = videoModels.find((m) => m.identifier === (nodeData.model || "")) ?? videoModels[0]
+    const params: ParameterDefinition[] = modelRow ? buildVideoModelParameters(modelRow) : []
+    const supportsLastFrame = params.some((p: ParameterDefinition) => p.name === "last_frame")
+
     const incomingNodes = getIncomers(currentNode, nodes, edges)
-    
-    // Get image from upload or image-gen nodes (use first one found)
-    let imageUrl: string | null = null
-    for (const node of incomingNodes) {
-      if (node.type === 'upload') {
-        const uploadData = node.data as UploadNodeData
-        if (uploadData.fileUrl && uploadData.fileType === 'image') {
-          imageUrl = uploadData.fileUrl
-          break
+
+    let connectedImageUrl: string | null = null
+    let connectedLastFrameUrl: string | null = null
+
+    if (supportsLastFrame) {
+      const incomingEdges = edges
+        .filter((e) => e.target === id)
+        .sort((a, b) => a.id.localeCompare(b.id))
+
+      const firstSlotUrls: string[] = []
+      let explicitLast: string | null = null
+
+      for (const edge of incomingEdges) {
+        const sourceNode = nodes.find((n) => n.id === edge.source)
+        if (!sourceNode) continue
+        const imgUrl = getImageUrlFromSourceNode(sourceNode)
+        if (!imgUrl) continue
+
+        const th = edge.targetHandle
+        if (th === "last-frame") {
+          if (!explicitLast) explicitLast = imgUrl
+        } else {
+          // first-frame, input, input-ui, or legacy undefined → start / first frame slot
+          firstSlotUrls.push(imgUrl)
         }
-      } else if (node.type === 'image-gen') {
-        const imageGenData = node.data as ImageGenNodeData
-        if (imageGenData.generatedImageUrl) {
-          imageUrl = imageGenData.generatedImageUrl
+      }
+
+      connectedImageUrl = firstSlotUrls[0] ?? null
+      connectedLastFrameUrl = explicitLast
+      if (!connectedLastFrameUrl && firstSlotUrls.length >= 2) {
+        connectedLastFrameUrl = firstSlotUrls[1] ?? null
+      }
+    } else {
+      for (const node of incomingNodes) {
+        const url = getImageUrlFromSourceNode(node)
+        if (url) {
+          connectedImageUrl = url
           break
         }
       }
+      connectedLastFrameUrl = null
     }
-    
-    // Get video from upload nodes (use first one found)
+
+    // Video / audio: any incoming upload edge (unchanged)
     let videoUrl: string | null = null
     for (const node of incomingNodes) {
-      if (node.type === 'upload') {
+      if (node.type === "upload") {
         const uploadData = node.data as UploadNodeData
-        if (uploadData.fileUrl && uploadData.fileType === 'video') {
+        if (uploadData.fileUrl && uploadData.fileType === "video") {
           videoUrl = uploadData.fileUrl
           break
         }
       }
     }
 
-    // Get audio from upload nodes (use first one found)
     let audioUrl: string | null = null
     for (const node of incomingNodes) {
-      if (node.type === 'upload') {
+      if (node.type === "upload") {
         const uploadData = node.data as UploadNodeData
-        if (uploadData.fileUrl && uploadData.fileType === 'audio') {
+        if (uploadData.fileUrl && uploadData.fileType === "audio") {
           audioUrl = uploadData.fileUrl
           break
         }
       }
     }
-    
-    // Update connected URLs if changed
-    if (imageUrl !== nodeData.connectedImageUrl) {
-      nodeData.onDataChange?.(id, { connectedImageUrl: imageUrl })
+
+    const patch: Partial<VideoGenNodeData> = {}
+    if (connectedImageUrl !== nodeData.connectedImageUrl) patch.connectedImageUrl = connectedImageUrl
+    if (connectedLastFrameUrl !== (nodeData.connectedLastFrameUrl ?? null)) {
+      patch.connectedLastFrameUrl = connectedLastFrameUrl
     }
-    if (videoUrl !== nodeData.connectedVideoUrl) {
-      nodeData.onDataChange?.(id, { connectedVideoUrl: videoUrl })
+    if (videoUrl !== nodeData.connectedVideoUrl) patch.connectedVideoUrl = videoUrl
+    if (audioUrl !== (nodeData.connectedAudioUrl ?? null)) patch.connectedAudioUrl = audioUrl
+
+    if (Object.keys(patch).length > 0) {
+      nodeData.onDataChange?.(id, patch)
     }
-    if (audioUrl !== nodeData.connectedAudioUrl) {
-      nodeData.onDataChange?.(id, { connectedAudioUrl: audioUrl })
-    }
-  }, [nodes, edges, id, nodeData])
+  }, [nodes, edges, id, nodeData, videoModels, nodeData.model])
 
   // Update video duration when video changes
   React.useEffect(() => {
@@ -168,8 +211,6 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       titleInputRef.current.select()
     }
   }, [isEditingTitle])
-
-  const { models: videoModels } = useModels("video")
 
   const getModelFromIdentifier = React.useCallback(
     (identifier: string): Model | null => {
@@ -516,6 +557,17 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     nodeData.onDataChange?.(id, { manualLastFrameUrl: null, manualLastFrameFile: null })
   }
 
+  const handleSwapFirstLastFrames = () => {
+    nodeData.onDataChange?.(id, {
+      manualImageUrl: nodeData.manualLastFrameUrl ?? null,
+      manualImageFile: nodeData.manualLastFrameFile ?? null,
+      manualLastFrameUrl: nodeData.manualImageUrl ?? null,
+      manualLastFrameFile: nodeData.manualImageFile ?? null,
+      connectedImageUrl: nodeData.connectedLastFrameUrl ?? null,
+      connectedLastFrameUrl: nodeData.connectedImageUrl ?? null,
+    })
+  }
+
   const handleRemoveAudio = () => {
     nodeData.onDataChange?.(id, { manualAudioUrl: null, manualAudioFile: null })
   }
@@ -557,7 +609,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     const finalImageUrl = nodeData.manualImageUrl || nodeData.connectedImageUrl
     const finalVideoUrl = nodeData.manualVideoUrl || nodeData.connectedVideoUrl
     const finalAudioUrl = nodeData.manualAudioUrl || nodeData.connectedAudioUrl
-    const finalLastFrameUrl = nodeData.manualLastFrameUrl || null
+    const finalLastFrameUrl = nodeData.manualLastFrameUrl || nodeData.connectedLastFrameUrl || null
 
     const modelSupportsImage = selectedModel.parameters.parameters?.some(
       (param) =>
@@ -787,6 +839,12 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const showAudioUpload = !!isLipsyncModel
   const showLastFrameUpload = !!modelSupportsLastFrame
   const hasUploadOptions = showImageUpload || showVideoUpload || showAudioUpload || showLastFrameUpload
+  const showDualFrameHandles =
+    !!modelSupportsLastFrame && !isMotionCopyModel && !isLipsyncModel
+
+  React.useEffect(() => {
+    updateNodeInternals(id)
+  }, [id, showDualFrameHandles, updateNodeInternals])
 
   const getImageUploadLabel = () => {
     if (selectedModel?.identifier === "kwaivgi/kling-v2.6") return "Upload Start Image"
@@ -949,18 +1007,39 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: selected || isHovered ? 1 : 0, scale: selected || isHovered ? 1 : 0.5 }}
           transition={{ duration: 0.2 }}
-          className="absolute left-0 top-1/2 transform -translate-y-1/2 z-10 nopan nodrag"
-          style={{ marginLeft: '-12px', pointerEvents: selected || isHovered ? 'auto' : 'none' }}
+          className={cn(
+            "absolute left-0 z-10 flex nopan nodrag",
+            showDualFrameHandles
+              ? "top-1/2 -translate-y-1/2 flex-col gap-2"
+              : "top-1/2 -translate-y-1/2"
+          )}
+          style={{ marginLeft: "-12px", pointerEvents: selected || isHovered ? "auto" : "none" }}
         >
-          <div className="w-6 h-6 rounded-full border-2 border-blue-500 bg-zinc-900 flex items-center justify-center cursor-crosshair hover:bg-blue-500/10 transition-colors">
+          <div className="relative w-6 h-6 shrink-0 rounded-full border-2 border-blue-500 bg-zinc-900 flex items-center justify-center cursor-crosshair hover:bg-blue-500/10 transition-colors">
             <Plus size={14} weight="bold" className="text-blue-500 pointer-events-none" />
             <Handle
               id="input-ui"
               type="target"
               position={Position.Left}
+              isConnectableStart={false}
               className="!absolute !inset-0 !w-full !h-full !bg-transparent !border-0 !rounded-full !transform-none"
             />
           </div>
+          {showDualFrameHandles && (
+            <div
+              className="relative w-6 h-6 shrink-0 rounded-full border-2 border-violet-500 bg-zinc-900 flex items-center justify-center cursor-crosshair hover:bg-violet-500/10 transition-colors"
+              title="Last / end frame"
+            >
+              <Plus size={14} weight="bold" className="text-violet-400 pointer-events-none" />
+              <Handle
+                id="last-frame"
+                type="target"
+                position={Position.Left}
+                isConnectableStart={false}
+                className="!absolute !inset-0 !w-full !h-full !bg-transparent !border-0 !rounded-full !transform-none"
+              />
+            </div>
+          )}
         </motion.div>
 
       <motion.div
@@ -996,7 +1075,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             const finalImageUrl = nodeData.manualImageUrl || nodeData.connectedImageUrl
             const finalVideoUrl = nodeData.manualVideoUrl || nodeData.connectedVideoUrl
             const finalAudioUrl = nodeData.manualAudioUrl || nodeData.connectedAudioUrl
-            const finalLastFrameUrl = nodeData.manualLastFrameUrl || null
+            const finalLastFrameUrl = nodeData.manualLastFrameUrl || nodeData.connectedLastFrameUrl || null
             const hasMedia = finalImageUrl || finalVideoUrl || finalAudioUrl || finalLastFrameUrl
             
             if (hasMedia) {
@@ -1011,7 +1090,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                         className="w-full h-full object-cover bg-black/20"
                       />
                       <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-zinc-900/80 text-[9px] text-zinc-400">
-                        Image
+                        {modelSupportsLastFrame ? "First Frame" : "Image"}
                       </div>
                       {nodeData.manualImageUrl && (
                         <button
@@ -1022,6 +1101,22 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                           <X size={12} className="text-white" />
                         </button>
                       )}
+                    </div>
+                  )}
+
+                  {modelSupportsLastFrame && finalImageUrl && finalLastFrameUrl && (
+                    <div className="flex items-center justify-center self-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-zinc-400 hover:text-zinc-100"
+                        onClick={handleSwapFirstLastFrames}
+                        title="Swap first and last frame"
+                        aria-label="Swap first and last frame"
+                      >
+                        <ArrowsLeftRight size={18} />
+                      </Button>
                     </div>
                   )}
 
@@ -1196,10 +1291,11 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                 {showLastFrameUpload && (
                   <DropdownMenuItem
                     onClick={() => lastFrameUploadRef.current?.click()}
-                    disabled={!!nodeData.manualLastFrameUrl}
+                    disabled={!!(nodeData.manualLastFrameUrl || nodeData.connectedLastFrameUrl)}
                   >
                     <ImageIcon size={14} className="mr-2" />
-                    Upload Last Frame {nodeData.manualLastFrameUrl && 'OK'}
+                    Upload Last Frame{" "}
+                    {(nodeData.manualLastFrameUrl || nodeData.connectedLastFrameUrl) && "OK"}
                   </DropdownMenuItem>
                 )}
       {showVideoUpload && (
