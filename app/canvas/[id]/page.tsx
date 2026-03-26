@@ -153,6 +153,29 @@ function CanvasContent() {
     []
   )
 
+  /** Ensures every node has onDataChange; upload nodes also get pending-upload hooks for save. */
+  const attachNodeCallbacks = React.useCallback(
+    (node: Node): Node => {
+      const withDataChange: Node = {
+        ...node,
+        data: {
+          ...node.data,
+          onDataChange: handleNodeDataChange,
+        },
+      }
+      if (node.type !== "upload") return withDataChange
+      return {
+        ...withDataChange,
+        data: {
+          ...withDataChange.data,
+          onBackgroundUploadStart: incrementPendingUploads,
+          onBackgroundUploadEnd: decrementPendingUploads,
+        },
+      }
+    },
+    [handleNodeDataChange, incrementPendingUploads, decrementPendingUploads]
+  )
+
   // Load canvas on mount
   React.useEffect(() => {
     async function loadCanvas() {
@@ -173,7 +196,6 @@ function CanvasContent() {
             position: node.position,
             data: {
               ...node.data,
-              onDataChange: handleNodeDataChange,
             },
           }
           
@@ -188,7 +210,7 @@ function CanvasContent() {
           if (node.style !== undefined) restoredNode.style = node.style
           if (node.className !== undefined) restoredNode.className = node.className
           
-          return restoredNode
+          return attachNodeCallbacks(restoredNode)
         })
         
         // Properly restore edges for React Flow with all connection details
@@ -270,8 +292,7 @@ function CanvasContent() {
     }
 
     loadCanvas()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasId, router])
+  }, [canvasId, router, attachNodeCallbacks, setNodes, setEdges, updateNodeInternals])
 
   // Add beforeunload event listener to warn users before closing
   React.useEffect(() => {
@@ -367,7 +388,7 @@ function CanvasContent() {
         else if (file.type.startsWith('video/')) fileType = 'video'
         else if (file.type.startsWith('audio/')) fileType = 'audio'
 
-        const newNode: Node = {
+        const newNode = attachNodeCallbacks({
           id,
           type: 'upload',
           position: {
@@ -379,9 +400,8 @@ function CanvasContent() {
             fileUrl,
             fileType,
             fileName: file.name,
-            onDataChange: handleNodeDataChange,
           },
-        }
+        })
 
         newNodes.push(newNode)
 
@@ -423,7 +443,7 @@ function CanvasContent() {
         `Added ${validFiles.length} file${validFiles.length > 1 ? 's' : ''} to canvas`
       )
     },
-    [screenToFlowPosition, handleNodeDataChange, setNodes]
+    [screenToFlowPosition, setNodes, attachNodeCallbacks, incrementPendingUploads, decrementPendingUploads]
   )
 
   // Add a new node
@@ -484,8 +504,6 @@ function CanvasContent() {
         data = { ...data, ...initialData }
       }
 
-      data.onDataChange = handleNodeDataChange
-
       let nodeWidth = 280
       let nodeHeight = 280
       
@@ -494,7 +512,7 @@ function CanvasContent() {
         nodeHeight = 280
       }
 
-      const newNode: Node<CanvasNodeData> = {
+      const newNode = attachNodeCallbacks({
         id,
         type,
         position: flowPosition,
@@ -502,14 +520,14 @@ function CanvasContent() {
         selected: true,
         width: nodeWidth,
         height: nodeHeight,
-      }
+      })
 
       setNodes((nds) => [
         ...nds.map((node) => ({ ...node, selected: false })),
         newNode,
       ])
     },
-    [screenToFlowPosition, handleNodeDataChange, setNodes, nodes]
+    [screenToFlowPosition, setNodes, nodes, attachNodeCallbacks]
   )
 
   // Handle edge connection
@@ -693,14 +711,7 @@ function CanvasContent() {
         }))
       }
 
-      // Inject onDataChange callback to all new nodes (preserve existing data)
-      const nodesWithCallbacks = newNodes.map(node => ({
-        ...node,
-        data: {
-          ...node.data,
-          onDataChange: handleNodeDataChange,
-        },
-      }))
+      const nodesWithCallbacks = newNodes.map((node) => attachNodeCallbacks(node))
 
       setNodes((nds) => [
         ...nds.map(n => ({ ...n, selected: false })),
@@ -713,7 +724,7 @@ function CanvasContent() {
       console.error('Failed to paste:', error)
       toast.error('Failed to paste from clipboard')
     }
-  }, [screenToFlowPosition, handleNodeDataChange, setNodes, setEdges])
+  }, [screenToFlowPosition, attachNodeCallbacks, setNodes, setEdges])
 
   // Duplicate selected nodes with offset
   const handleDuplicate = React.useCallback(() => {
@@ -785,14 +796,7 @@ function CanvasContent() {
       }))
     }
 
-    // Inject onDataChange callback to all new nodes
-    const nodesWithCallbacks = newNodes.map(node => ({
-      ...node,
-      data: {
-        ...node.data,
-        onDataChange: handleNodeDataChange,
-      },
-    }))
+    const nodesWithCallbacks = newNodes.map((node) => attachNodeCallbacks(node))
 
     setNodes((nds) => [
       ...nds.map(n => ({ ...n, selected: false })),
@@ -801,7 +805,7 @@ function CanvasContent() {
     setEdges((eds) => [...eds, ...newEdges])
     
     toast.success(`Duplicated ${newNodes.length} node${newNodes.length > 1 ? 's' : ''}`)
-  }, [reactFlowInstance, handleNodeDataChange, setNodes, setEdges])
+  }, [reactFlowInstance, attachNodeCallbacks, setNodes, setEdges])
 
   // Delete selected nodes and edges
   const handleDelete = React.useCallback(() => {
@@ -877,14 +881,7 @@ function CanvasContent() {
         { x: centerX, y: centerY }
       )
 
-      // Inject onDataChange callback to all new nodes
-      const nodesWithCallbacks = newNodes.map(node => ({
-        ...node,
-        data: {
-          ...node.data,
-          onDataChange: handleNodeDataChange,
-        },
-      }))
+      const nodesWithCallbacks = newNodes.map((node) => attachNodeCallbacks(node))
 
       // Add to canvas
       setNodes((nds) => [...nds, ...nodesWithCallbacks])
@@ -895,7 +892,7 @@ function CanvasContent() {
       console.error("Error instantiating workflow:", error)
       toast.error(error instanceof Error ? error.message : "Failed to add workflow")
     }
-  }, [reactFlowInstance, handleNodeDataChange, setNodes, setEdges])
+  }, [reactFlowInstance, attachNodeCallbacks, setNodes, setEdges])
 
   // Open edit workflow dialog
   const handleEditWorkflow = React.useCallback((workflow: Workflow) => {

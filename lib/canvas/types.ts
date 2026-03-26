@@ -16,6 +16,7 @@ export interface ImageGenNodeData extends Record<string, unknown> {
   enhancePrompt: boolean
   generatedImageUrl: string | null
   isGenerating: boolean
+  pendingGenerationCount?: number
   error: string | null
   onDataChange?: (id: string, data: Partial<ImageGenNodeData>) => void
 }
@@ -75,6 +76,9 @@ export interface UploadNodeData extends Record<string, unknown> {
   fileType: "image" | "video" | "audio" | null
   fileName: string | null
   onDataChange?: (id: string, data: Partial<UploadNodeData>) => void
+  /** Registered by the canvas page so save can wait for Supabase (same as drag-and-drop uploads). */
+  onBackgroundUploadStart?: () => void
+  onBackgroundUploadEnd?: () => void
 }
 
 export interface GroupNodeData extends Record<string, unknown> {
@@ -116,6 +120,7 @@ export function createImageGenNodeData(): ImageGenNodeData {
     enhancePrompt: false,
     generatedImageUrl: null,
     isGenerating: false,
+    pendingGenerationCount: 0,
     error: null,
   }
 }

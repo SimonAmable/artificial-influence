@@ -19,6 +19,9 @@ export function getModelIconPath(identifier: string): string | null {
       return '/ai_icons/openai.svg'
     case 'bytedance':
       return '/ai_icons/bytedance-color.svg'
+    case 'xai':
+    case 'x-ai':
+      return '/ai_icons/grok.svg'
     default:
       return null
   }

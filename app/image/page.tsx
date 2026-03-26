@@ -29,6 +29,16 @@ interface ImageHistoryItem {
   reference_image_urls?: string[]
 }
 
+interface PendingImageRequest {
+  requestId: string
+  startedAt: string
+  prompt: string | null
+  model: string
+  tool: string
+  aspectRatio: string | null
+  referenceImageUrls: string[]
+}
+
 const CHARACTER_SWAP_UI_MODEL_IDENTIFIER = "custom/character-swap"
 const CHARACTER_SWAP_BASE_MODEL_IDENTIFIER = "google/nano-banana-pro"
 const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
@@ -496,6 +506,7 @@ export default function ImagePage() {
   }, [fetchImageHistory])
 
   // Grid order: generating (at front) → filled (newest) → older
+  // Grid order: pending requests (newest first) followed by completed history.
   const gridItems = React.useMemo(() => {
     const toImageData = (img: ImageHistoryItem) => ({
       ...img,

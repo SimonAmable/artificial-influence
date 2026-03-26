@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { extractFirstFrame, extractLastFrame } from "@/lib/canvas/frame-extraction"
 import { createUploadNodeData } from "@/lib/canvas/types"
-import { uploadBlobToSupabase, uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { uploadBlobToSupabase, uploadFileToSupabase, type UploadResult } from "@/lib/canvas/upload-helpers"
 import { toast } from "sonner"
 import {
   Dialog,
@@ -35,6 +35,14 @@ import { getConstrainedSize, loadImageSize, loadVideoSize } from "@/lib/canvas/m
 import { ImageEditorDialog } from "@/components/image-editor"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import type { AssetType } from "@/lib/assets/types"
+
+function toPersistedUploadFileType(
+  fromUpload: UploadResult["fileType"],
+  fallback: UploadNodeData["fileType"]
+): UploadNodeData["fileType"] {
+  if (fromUpload === "image" || fromUpload === "video" || fromUpload === "audio") return fromUpload
+  return fallback
+}
 
 export const UploadNodeComponent = React.memo(({ id, data, selected, width: propWidth, height: propHeight }: NodeProps) => {
   const nodeData = data as UploadNodeData
@@ -225,7 +233,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
                   data: {
                     ...n.data,
                     fileUrl: uploadResult.url,
-                    fileType: uploadResult.fileType,
+                    fileType: toPersistedUploadFileType(uploadResult.fileType, "image"),
                     fileName: uploadResult.fileName,
                   },
                 }
@@ -288,7 +296,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
                   data: {
                     ...n.data,
                     fileUrl: uploadResult.url,
-                    fileType: uploadResult.fileType,
+                    fileType: toPersistedUploadFileType(uploadResult.fileType, "image"),
                     fileName: uploadResult.fileName,
                   },
                 }
@@ -331,17 +339,23 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
           fileName: file.name,
         })
         applyNodeSize(constrained.width, constrained.height)
-        
-        // Upload to Supabase in background
-        setIsUploading(true)
-        const uploadResult = await uploadFileToSupabase(file, 'uploads')
-        setIsUploading(false)
-        
-        if (uploadResult) {
-          // Replace blob URL with Supabase URL
-          URL.revokeObjectURL(blobUrl)
-          reactFlow.updateNodeData(id, { fileUrl: uploadResult.url })
-          toast.success('File uploaded successfully')
+
+        nodeData.onBackgroundUploadStart?.()
+        try {
+          setIsUploading(true)
+          const uploadResult = await uploadFileToSupabase(file, 'uploads')
+          if (uploadResult) {
+            URL.revokeObjectURL(blobUrl)
+            reactFlow.updateNodeData(id, {
+              fileUrl: uploadResult.url,
+              fileType: toPersistedUploadFileType(uploadResult.fileType, fileType),
+              fileName: uploadResult.fileName ?? file.name,
+            })
+            toast.success('File uploaded successfully')
+          }
+        } finally {
+          setIsUploading(false)
+          nodeData.onBackgroundUploadEnd?.()
         }
       }
       img.src = blobUrl
@@ -360,33 +374,42 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
           fileName: file.name,
         })
         applyNodeSize(constrained.width, constrained.height)
-        
-        // Upload to Supabase in background
-        setIsUploading(true)
-        const uploadResult = await uploadFileToSupabase(file, 'uploads')
-        setIsUploading(false)
-        
-        if (uploadResult) {
-          // Replace blob URL with Supabase URL
-          URL.revokeObjectURL(blobUrl)
-          reactFlow.updateNodeData(id, { fileUrl: uploadResult.url })
-          toast.success('File uploaded successfully')
+
+        nodeData.onBackgroundUploadStart?.()
+        try {
+          setIsUploading(true)
+          const uploadResult = await uploadFileToSupabase(file, 'uploads')
+          if (uploadResult) {
+            URL.revokeObjectURL(blobUrl)
+            reactFlow.updateNodeData(id, {
+              fileUrl: uploadResult.url,
+              fileType: toPersistedUploadFileType(uploadResult.fileType, fileType),
+              fileName: uploadResult.fileName ?? file.name,
+            })
+            toast.success('File uploaded successfully')
+          }
+        } finally {
+          setIsUploading(false)
+          nodeData.onBackgroundUploadEnd?.()
         }
       }
       video.src = blobUrl
     } else {
-      // For audio, upload immediately (no preview needed)
-      setIsUploading(true)
-      const uploadResult = await uploadFileToSupabase(file, 'uploads')
-      setIsUploading(false)
-      
-      if (uploadResult) {
-        nodeData.onDataChange?.(id, {
-          fileUrl: uploadResult.url,
-          fileType,
-          fileName: file.name,
-        })
-        toast.success('File uploaded successfully')
+      nodeData.onBackgroundUploadStart?.()
+      try {
+        setIsUploading(true)
+        const uploadResult = await uploadFileToSupabase(file, 'uploads')
+        if (uploadResult) {
+          nodeData.onDataChange?.(id, {
+            fileUrl: uploadResult.url,
+            fileType: toPersistedUploadFileType(uploadResult.fileType, fileType),
+            fileName: uploadResult.fileName ?? file.name,
+          })
+          toast.success('File uploaded successfully')
+        }
+      } finally {
+        setIsUploading(false)
+        nodeData.onBackgroundUploadEnd?.()
       }
     }
   }

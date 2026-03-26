@@ -62,6 +62,12 @@ function normalizeModelName(name: string): string {
     .join(' ')                 // Join back together
 }
 
+function getImageItemKey(image: ImageData): string {
+  if (image.id) return `image-${image.id}`
+  if (image.createdAt) return `image-${image.createdAt}-${image.url}`
+  return `image-${image.url}`
+}
+
 export function ImageGrid({
   items: itemsProp,
   images = [],
@@ -303,7 +309,7 @@ export function ImageGrid({
                   key={item.id}
                   className={cn(
                     "relative w-full overflow-hidden bg-zinc-900 rounded-lg",
-                    isOneColumn ? "aspect-auto min-h-[50vh]" : "aspect-square"
+                    "aspect-square"
                   )}
                 >
                   {/* White fading line animation - 20 second infinite duration */}
@@ -320,7 +326,7 @@ export function ImageGrid({
                 </div>
               ) : (
             <div
-              key={`image-${index}-${item.data.url}`}
+              key={getImageItemKey(item.data)}
               className={cn(
                 "group relative bg-background flex items-center justify-center w-full cursor-pointer",
                 isOneColumn ? "aspect-auto" : "aspect-square"

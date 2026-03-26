@@ -79,6 +79,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { data: activeSubscription, error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .select('id, status')
+      .eq('user_id', user.id)
+      .in('status', ['active', 'trialing'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (subscriptionError) {
+      console.error('[generate-image] Failed to read active subscription, falling back to profiles.is_pro:', subscriptionError);
+    }
+
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('is_pro')
@@ -89,7 +102,7 @@ export async function POST(request: NextRequest) {
       console.error('[generate-image] Failed to read profiles.is_pro, defaulting to free tier:', profileError);
     }
 
-    const isPaidTier = Boolean(profile?.is_pro);
+    const isPaidTier = Boolean(activeSubscription) || Boolean(profile?.is_pro);
     const tier = isPaidTier ? 'paid' : 'free';
     const limit = isPaidTier ? PAID_CONCURRENCY_LIMIT : FREE_CONCURRENCY_LIMIT;
     const activeGenerations = activeGenerationsCount ?? 0;

@@ -209,6 +209,26 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const generatedImageUrls = generatedImages.urls
   const activeImageIndex = generatedImages.activeIndex
   const activeImageUrl = generatedImages.activeUrl
+  const pendingGenerationCount =
+    typeof nodeData.pendingGenerationCount === "number"
+      ? Math.max(0, nodeData.pendingGenerationCount)
+      : nodeData.isGenerating
+        ? 1
+        : 0
+  const isGenerating = pendingGenerationCount > 0
+
+  const getLatestImageNodeData = React.useCallback((): ImageGenNodeData => {
+    const latestNode = reactFlow.getNode(id)
+    return (latestNode?.data as ImageGenNodeData | undefined) ?? nodeData
+  }, [id, nodeData, reactFlow])
+
+  const getLatestPendingGenerationCount = React.useCallback(() => {
+    const latestData = getLatestImageNodeData()
+    if (typeof latestData.pendingGenerationCount === "number") {
+      return Math.max(0, latestData.pendingGenerationCount)
+    }
+    return latestData.isGenerating ? 1 : 0
+  }, [getLatestImageNodeData])
 
   React.useEffect(() => {
     const updates: Partial<ImageGenNodeData> = {}
@@ -607,7 +627,12 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       return
     }
 
-    nodeData.onDataChange?.(id, { isGenerating: true, error: null })
+    const nextPendingGenerationCount = getLatestPendingGenerationCount() + 1
+    nodeData.onDataChange?.(id, {
+      pendingGenerationCount: nextPendingGenerationCount,
+      isGenerating: true,
+      error: null,
+    })
 
     try {
       const formData = new FormData()
@@ -658,13 +683,17 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       }
       if (newImageUrls.length === 0) throw new Error("No image URL received")
 
-      const nextImageUrls = [...generatedImageUrls, ...newImageUrls].slice(-MAX_GENERATED_IMAGES)
+      const latestData = getLatestImageNodeData()
+      const latestGeneratedImages = getNormalizedGeneratedImages(latestData)
+      const nextImageUrls = [...latestGeneratedImages.urls, ...newImageUrls].slice(-MAX_GENERATED_IMAGES)
       const nextActiveIndex = Math.max(0, nextImageUrls.length - newImageUrls.length)
+      const remainingPendingGenerationCount = Math.max(0, getLatestPendingGenerationCount() - 1)
       nodeData.onDataChange?.(id, {
         generatedImageUrls: nextImageUrls,
         activeImageIndex: nextActiveIndex,
         generatedImageUrl: nextImageUrls[nextActiveIndex] ?? null,
-        isGenerating: false,
+        pendingGenerationCount: remainingPendingGenerationCount,
+        isGenerating: remainingPendingGenerationCount > 0,
         error: null,
       })
     } catch (err) {
@@ -679,7 +708,12 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           description: `${message} Wait for one to finish, then try again.`,
         })
       }
-      nodeData.onDataChange?.(id, { isGenerating: false, error: message })
+      const remainingPendingGenerationCount = Math.max(0, getLatestPendingGenerationCount() - 1)
+      nodeData.onDataChange?.(id, {
+        pendingGenerationCount: remainingPendingGenerationCount,
+        isGenerating: remainingPendingGenerationCount > 0,
+        error: message,
+      })
     }
   }
 
@@ -847,19 +881,19 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         <div
           className={cn(
             "relative transition-all duration-200 w-full h-full",
-            hasContent || nodeData.isGenerating
+            hasContent || isGenerating
               ? "rounded-lg overflow-hidden"
               : "rounded-xl border bg-zinc-900 shadow-lg flex flex-col",
-            !hasContent && !nodeData.isGenerating && selected
+            !hasContent && !isGenerating && selected
               ? "border-purple-500/40 ring-1 ring-purple-500/20"
-              : !hasContent && !nodeData.isGenerating && "border-white/10 hover:border-white/20",
-            (hasContent || nodeData.isGenerating) && selected && "ring-2 ring-purple-500/40",
+              : !hasContent && !isGenerating && "border-white/10 hover:border-white/20",
+            (hasContent || isGenerating) && selected && "ring-2 ring-purple-500/40",
             isCropping && "nopan"
           )}
         >
 
           {/* Content area: loading state, hints, OR generated preview */}
-          {nodeData.isGenerating ? (
+          {isGenerating ? (
             <div className="relative w-full h-full overflow-hidden bg-zinc-900">
               {/* Progress fill */}
               <div 
@@ -1060,8 +1094,10 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           onReferenceImagesChange={handleReferenceImagesChange}
           enhancePrompt={nodeData.enhancePrompt ?? false}
           onEnhancePromptChange={(checked) => nodeData.onDataChange?.(id, { enhancePrompt: checked })}
-          isGenerating={nodeData.isGenerating ?? false}
+          isGenerating={isGenerating}
           onGenerate={handleGenerate}
+          allowConcurrent={true}
+          allowOptionsDuringGeneration={true}
           selectedModel={nodeData.model || effectiveImageModels[0]?.identifier || ""}
           onModelChange={(value) => nodeData.onDataChange?.(id, { model: value })}
           showModelSelector={true}

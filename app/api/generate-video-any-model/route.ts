@@ -127,6 +127,23 @@ export async function POST(request: NextRequest) {
         if (otherParams.negative_prompt) replicateInput.negative_prompt = otherParams.negative_prompt;
         break;
 
+      case 'kwaivgi/kling-v2.5-turbo-pro': {
+        const startImage = otherParams.start_image ?? first_frame_image ?? image;
+        const endImage = otherParams.end_image ?? last_frame;
+        if (startImage) replicateInput.start_image = startImage;
+        if (endImage) replicateInput.end_image = endImage;
+        if (otherParams.aspect_ratio) replicateInput.aspect_ratio = otherParams.aspect_ratio;
+        if (otherParams.duration != null && otherParams.duration !== undefined) {
+          replicateInput.duration = Number(otherParams.duration);
+        }
+        if (negative_prompt) replicateInput.negative_prompt = negative_prompt;
+        if (otherParams.negative_prompt) replicateInput.negative_prompt = otherParams.negative_prompt;
+        if (otherParams.guidance_scale != null && otherParams.guidance_scale !== undefined) {
+          replicateInput.guidance_scale = Number(otherParams.guidance_scale);
+        }
+        break;
+      }
+
       case 'kwaivgi/kling-v2.6-motion-control':
       case 'kwaivgi/kling-v3-motion-control':
         if (motionCopyImage) replicateInput.image = motionCopyImage;
