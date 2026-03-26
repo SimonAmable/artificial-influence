@@ -82,5 +82,9 @@ export function buildVideoModelParameters(input: VideoParamsInput): ParameterDef
     params.push(FALLBACK_NEGATIVE_PROMPT);
   }
 
+  if (input.identifier === "kwaivgi/kling-v2.5-turbo-pro") {
+    return params.filter((p) => p.name !== "guidance_scale");
+  }
+
   return params;
 }
