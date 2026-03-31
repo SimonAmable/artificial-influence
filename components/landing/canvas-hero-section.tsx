@@ -3,8 +3,30 @@
 import * as React from "react"
 import Link from "next/link"
 import dynamic from "next/dynamic"
-import { landingHero, canvasSeeds } from "@/lib/constants/landing-content"
+import { motion } from "framer-motion"
+import { landingHero } from "@/lib/constants/landing-content"
 import { Button } from "@/components/ui/button"
+
+const heroEase = [0.22, 1, 0.36, 1] as const
+
+const heroList = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.06,
+    },
+  },
+}
+
+const heroFadeUp = {
+  hidden: { opacity: 0, y: 14 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.55, ease: heroEase },
+  },
+}
 const CanvasHeroFlow = dynamic(
   () => import("@/components/landing/canvas-hero-flow").then((mod) => mod.CanvasHeroFlow),
   { ssr: false }
@@ -25,50 +47,85 @@ export function CanvasHeroSection() {
   return (
     <section className="relative min-h-[100svh] w-full overflow-hidden bg-background">
       {isMobile ? (
-        <div className="relative z-20 flex min-h-[100svh] flex-col items-center justify-center px-4 pb-10 pt-28">
-          <div className="max-w-3xl text-center">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-300">
-              {landingHero.eyebrow}
-            </p>
-            <h1 className="text-balance text-4xl font-semibold leading-tight text-white sm:text-5xl md:text-6xl">
-              {landingHero.title}
-            </h1>
-            <p className="mx-auto mt-4 max-w-2xl text-pretty text-sm text-zinc-300 sm:text-base">
-              {landingHero.description}
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link href={landingHero.primaryCtaHref}>
-                <Button size="lg" className="w-full sm:w-auto">
-                  {landingHero.primaryCtaLabel}
-                </Button>
-              </Link>
-              <Link href={landingHero.secondaryCtaHref}>
-                <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                  {landingHero.secondaryCtaLabel}
-                </Button>
-              </Link>
-            </div>
-          </div>
+        <motion.div
+          className="relative z-20 flex min-h-[100svh] flex-col items-center justify-center px-4 pb-10 pt-28"
+          initial="hidden"
+          animate="visible"
+          variants={heroList}
+        >
+          <motion.p
+            variants={heroFadeUp}
+            className="mb-3 w-full max-w-3xl text-center text-xs font-semibold uppercase tracking-[0.2em] text-zinc-300"
+          >
+            {landingHero.eyebrow}
+          </motion.p>
+          <motion.h1
+            variants={heroFadeUp}
+            className="w-full max-w-3xl text-balance text-center text-4xl font-extrabold uppercase tracking-tighter leading-tight text-white sm:text-5xl md:text-6xl"
+          >
+            {landingHero.title}
+          </motion.h1>
+          <motion.p
+            variants={heroFadeUp}
+            className="mx-auto mt-4 w-full max-w-2xl text-pretty text-center text-sm text-zinc-300 sm:text-base"
+          >
+            {landingHero.description}
+          </motion.p>
+          <motion.div
+            variants={heroFadeUp}
+            className="mt-8 flex w-full max-w-3xl flex-col items-center justify-center gap-3 sm:flex-row"
+          >
+            <Link href={landingHero.primaryCtaHref}>
+              <Button size="lg" className="w-full sm:w-auto">
+                {landingHero.primaryCtaLabel}
+              </Button>
+            </Link>
+            <Link href={landingHero.secondaryCtaHref}>
+              <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                {landingHero.secondaryCtaLabel}
+              </Button>
+            </Link>
+          </motion.div>
 
-          <div className="mt-8 w-full max-w-sm overflow-hidden rounded-2xl border border-white/20 bg-zinc-950/70 shadow-2xl">
+          <motion.div
+            variants={heroFadeUp}
+            className="mt-8 w-full max-w-sm overflow-hidden rounded-2xl border border-white/20 bg-zinc-950/70 shadow-2xl"
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={mobileWorkflowPreview} alt="Workflow preview" className="h-auto w-full object-cover" />
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       ) : (
         <div className="relative h-[100svh] w-full">
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-4">
-            <div className="max-w-3xl text-center">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-300">
+            <motion.div
+              className="max-w-3xl text-center"
+              initial="hidden"
+              animate="visible"
+              variants={heroList}
+            >
+              <motion.p
+                variants={heroFadeUp}
+                className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-300"
+              >
                 {landingHero.eyebrow}
-              </p>
-              <h1 className="text-balance text-4xl font-semibold leading-tight text-white sm:text-5xl md:text-6xl">
+              </motion.p>
+              <motion.h1
+                variants={heroFadeUp}
+                className="text-balance text-4xl font-extrabold uppercase tracking-tighter leading-tight text-white sm:text-5xl md:text-6xl"
+              >
                 {landingHero.title}
-              </h1>
-              <p className="mx-auto mt-4 max-w-2xl text-pretty text-sm text-zinc-300 sm:text-base">
+              </motion.h1>
+              <motion.p
+                variants={heroFadeUp}
+                className="mx-auto mt-4 max-w-2xl text-pretty text-sm text-zinc-300 sm:text-base"
+              >
                 {landingHero.description}
-              </p>
-              <div className="pointer-events-auto mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              </motion.p>
+              <motion.div
+                variants={heroFadeUp}
+                className="pointer-events-auto mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
+              >
                 <Link href={landingHero.primaryCtaHref}>
                   <Button size="lg" className="w-full sm:w-auto">
                     {landingHero.primaryCtaLabel}
@@ -79,8 +136,8 @@ export function CanvasHeroSection() {
                     {landingHero.secondaryCtaLabel}
                   </Button>
                 </Link>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           </div>
           <CanvasHeroFlow />
         </div>

@@ -21,6 +21,7 @@ import {
   UploadSimple,
 } from "@phosphor-icons/react"
 import Image from "next/image"
+import Link from "next/link"
 import { AnimatePresence, motion } from "framer-motion"
 import type { AssetCategory, AssetRecord, AssetType, AssetVisibility } from "@/lib/assets/types"
 import {
@@ -291,7 +292,7 @@ export default function AssetsPage() {
 
   return (
     <div
-      className="relative min-h-screen w-full pt-24"
+      className="relative min-h-screen w-full pt-10"
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -323,6 +324,12 @@ export default function AssetsPage() {
             <p className="text-muted-foreground mt-1">
               Save references for characters, scenes, textures, motion clips, and audio.
             </p>
+            <Link
+              href="/history"
+              className="text-sm font-medium text-primary hover:underline mt-2 inline-block"
+            >
+              Generation history
+            </Link>
           </div>
           <input
             ref={fileInputRef}
@@ -332,10 +339,7 @@ export default function AssetsPage() {
             aria-hidden
             onChange={handleFileSelect}
           />
-          <Button
-            onClick={() => fileInputRef.current?.click()}
-            className="gap-2"
-          >
+          <Button onClick={() => fileInputRef.current?.click()} className="gap-2">
             <UploadSimple className="h-4 w-4" />
             Upload
           </Button>

@@ -6,6 +6,7 @@ import { ImageEditorProvider, useImageEditor } from "./image-editor-provider"
 import { ImageEditorCanvas } from "./image-editor-canvas"
 import { ImageEditorToolbar } from "./image-editor-toolbar"
 import { ImageEditorColorPicker } from "./image-editor-color-picker"
+import { ImageEditorInpaintBrushBar } from "./image-editor-inpaint-brush-bar"
 import { ImageEditorLayers } from "./image-editor-layers"
 import { ImageEditorPromptBar } from "./image-editor-prompt-bar"
 import { ImageEditorEmptyState } from "./image-editor-empty-state"
@@ -20,6 +21,7 @@ function ImageEditorInner({
   onSave,
   onClose,
   className,
+  variant = "full",
 }: ImageEditorProps) {
   const { state, setTool, undo, redo } = useImageEditor()
   const { currentImage, showLayers, canvas } = state
@@ -77,7 +79,17 @@ function ImageEditorInner({
 
       // Tool shortcuts (single letter keys)
       const shortcut = KEYBOARD_SHORTCUTS[e.key.toLowerCase()]
-      if (shortcut && !isCtrl && typeof shortcut === "string" && shortcut !== "undo" && shortcut !== "redo" && shortcut !== "delete") {
+      if (
+        shortcut &&
+        !isCtrl &&
+        typeof shortcut === "string" &&
+        shortcut !== "undo" &&
+        shortcut !== "redo" &&
+        shortcut !== "delete"
+      ) {
+        if (variant === "inpaint" && shortcut !== "lasso") {
+          return
+        }
         e.preventDefault()
         setTool(shortcut as EditorTool)
         return
@@ -95,7 +107,7 @@ function ImageEditorInner({
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [undo, redo, setTool, isFullscreen, mode, onClose, toggleFullscreen])
+  }, [undo, redo, setTool, isFullscreen, mode, onClose, toggleFullscreen, variant])
 
   // Handle fullscreen change
   React.useEffect(() => {
@@ -128,20 +140,27 @@ function ImageEditorInner({
         className
       )}
     >
-      {/* Top-left: Color + size controls */}
-      <div className="absolute left-4 top-4 z-20">
-        <ImageEditorColorPicker />
-      </div>
+      {/* Top-left: color UI (inpaint brush lives on the bottom toolbar row) */}
+      {variant === "full" && (
+        <div className="absolute left-4 top-4 z-20">
+          <ImageEditorColorPicker />
+        </div>
+      )}
 
       {/* Right side: Layers/object panel - hidden on mobile */}
-      {showLayers && (
+      {variant === "full" && showLayers && (
         <div className="absolute right-4 top-4 z-20 hidden md:block">
           <ImageEditorLayers />
         </div>
       )}
 
       {/* Main canvas area - always render canvas so it can receive images */}
-      <div className="flex-1 min-h-0 min-w-0 relative px-2 sm:px-4 md:px-6 py-4 sm:py-6 pt-16 sm:pt-20 pb-52 sm:pb-60">
+      <div
+        className={cn(
+          "flex-1 min-h-0 min-w-0 relative px-2 sm:px-4 md:px-6 py-4 sm:py-6 pb-52 sm:pb-60",
+          variant === "inpaint" ? "pt-4 sm:pt-6" : "pt-16 sm:pt-20"
+        )}
+      >
         <div className="relative h-full w-full rounded-xl  overflow-hidden">
           <ImageEditorCanvas
             className="absolute inset-0"
@@ -179,14 +198,22 @@ function ImageEditorInner({
 
       {/* Bottom controls */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3 w-full max-w-5xl px-2 sm:px-4">
-        {/* Toolbar */}
-        <ImageEditorToolbar
-          onToggleFullscreen={toggleFullscreen}
-          isFullscreen={isFullscreen}
-        />
+        <div className="flex flex-row flex-wrap items-center justify-center gap-2 sm:gap-3 w-full min-w-0">
+          {variant === "inpaint" && (
+            <ImageEditorInpaintBrushBar inline className="shrink min-w-[min(100%,12rem)]" />
+          )}
+          <ImageEditorToolbar
+            onToggleFullscreen={toggleFullscreen}
+            isFullscreen={isFullscreen}
+            className="shrink-0"
+          />
+        </div>
 
         {/* Prompt bar */}
-        <ImageEditorPromptBar onGeneratingChange={setIsGenerating} />
+        <ImageEditorPromptBar
+          onGeneratingChange={setIsGenerating}
+          variant={variant}
+        />
       </div>
 
       {/* Save button (modal mode) */}
@@ -216,15 +243,17 @@ export function ImageEditor({
   onSave,
   onClose,
   className,
+  variant = "full",
 }: ImageEditorProps) {
   return (
-    <ImageEditorProvider initialImage={initialImage}>
+    <ImageEditorProvider initialImage={initialImage} variant={variant}>
       <ImageEditorInner
         initialImage={initialImage}
         mode={mode}
         onSave={onSave}
         onClose={onClose}
         className={className}
+        variant={variant}
       />
     </ImageEditorProvider>
   )

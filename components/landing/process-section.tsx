@@ -19,10 +19,11 @@ export function ProcessSection() {
         <div className="mt-10 grid gap-8 md:grid-cols-3">
           {processSteps.map((step) => (
             <article key={step.step} className="relative">
-              <div className="absolute left-0 -top-3 z-10 rounded-full border border-white/30 bg-black/35 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-white">
-                STEP {step.step}
-              </div>
-              <div className="h-56 overflow-hidden rounded-lg">
+              <div className="relative">
+                <div className="pointer-events-none absolute left-0 top-0 z-20 -translate-y-1/2 rounded-full border border-white/30 bg-black/35 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-white">
+                  STEP {step.step}
+                </div>
+                <div className="relative z-0 h-56 overflow-hidden rounded-lg">
                 {step.mediaType === "video" ? (
                   <video
                     src={step.mediaSrc}
@@ -36,6 +37,7 @@ export function ProcessSection() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={step.mediaSrc} alt={step.title} className="h-full w-full object-cover" />
                 )}
+                </div>
               </div>
               <div className="mt-4">
                 <h3 className="text-xl font-semibold text-foreground">{step.title}</h3>

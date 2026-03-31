@@ -6,9 +6,9 @@ import type {
 } from "@/lib/types/landing"
 
 export const landingHero = {
-  title: "Create AI Content That Converts",
+  title: "Create winning ads with AI",
   description:
-    "Transform your marketing with realistic AI influencers, dynamic product shoots, and campaign-ready content. Build, iterate, and deploy creative assets in minutes, not days.",
+    "Choose top AI actors and video templates, then dial in the details with our creative tools.",
   primaryCtaLabel: "Get Started Free",
   primaryCtaHref: "/login?mode=signup",
   secondaryCtaLabel: "See Workflows",

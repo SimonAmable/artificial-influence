@@ -20,7 +20,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { navigationItems } from "@/lib/constants/navigation"
-import { PromotionalBanner } from "@/components/app/promotional-banner"
 import { FeedbackDialog } from "@/components/app/feedback-dialog"
 
 export function Header() {
@@ -115,12 +114,11 @@ export function Header() {
 
   return (
     <header className={cn(
-      "fixed z-50 flex flex-col rounded-none border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pointer-events-auto",
+      "fixed z-50 flex flex-col rounded-none bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pointer-events-auto",
       "transition-all duration-300 ease-in-out",
       isScrolled ? "shadow-lg" : "",
       isAuthPage ? "top-0 left-0 right-0 rounded-none" : isScrolled ? "top-4 left-4 right-4" : "top-0 left-0 right-0"
     )}>
-      <PromotionalBanner />
       <div className="flex h-[44px] min-w-0 items-center justify-between gap-2 px-4">
         <div className="flex min-w-0 shrink items-center gap-4 lg:gap-6 overflow-hidden">
           <Link href="/" className="flex items-center hover:opacity-80 transition-opacity shrink-0">
@@ -129,7 +127,7 @@ export function Header() {
               alt="Logo" 
               width={50} 
               height={50}
-              className="h-8 w-8"
+              className="h-8 w-8 dark:invert"
             />
           </Link>
           {/* Desktop Navigation - hidden on tablet and smaller */}

@@ -10,10 +10,36 @@ export type GenerateImageResult =
   | { image: { url: string; mimeType?: string }; images?: undefined }
   | { images: { url: string; mimeType?: string }[]; image?: undefined };
 
+export interface GenerateImageAcceptedPayload {
+  generationId?: string;
+  predictionId: string;
+}
+
+interface GenerateImageCallbacks {
+  onAccepted?: (payload: GenerateImageAcceptedPayload) => void;
+  onProgress?: (message: string) => void;
+}
+
+function normalizeCallbacks(
+  optionsOrProgress?: GenerateImageCallbacks | ((message: string) => void),
+  onAccepted?: (payload: GenerateImageAcceptedPayload) => void
+): GenerateImageCallbacks {
+  if (typeof optionsOrProgress === 'function') {
+    return { onAccepted, onProgress: optionsOrProgress };
+  }
+
+  return {
+    onAccepted: optionsOrProgress?.onAccepted ?? onAccepted,
+    onProgress: optionsOrProgress?.onProgress,
+  };
+}
+
 export async function generateImageAndWait(
   formData: FormData,
-  onProgress?: (message: string) => void
+  optionsOrProgress?: GenerateImageCallbacks | ((message: string) => void),
+  onAccepted?: (payload: GenerateImageAcceptedPayload) => void
 ): Promise<GenerateImageResult> {
+  const { onAccepted: acceptedCallback, onProgress } = normalizeCallbacks(optionsOrProgress, onAccepted);
   const response = await fetch('/api/generate-image', { method: 'POST', body: formData });
 
   if (response.status === 402) {
@@ -43,9 +69,14 @@ export async function generateImageAndWait(
 
   if (response.status === 202) {
     const predictionId = data.predictionId as string;
+    const generationId =
+      typeof data.generationId === 'string' && data.generationId.length > 0
+        ? data.generationId
+        : undefined;
     if (!predictionId) throw new Error('No predictionId in async response');
 
-    onProgress?.('Generation started, waiting for result…');
+    acceptedCallback?.({ generationId, predictionId });
+    onProgress?.('Generation started, waiting for result...');
     for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
       const statusRes = await fetch(`/api/generate-image/status?predictionId=${encodeURIComponent(predictionId)}`);
@@ -61,7 +92,7 @@ export async function generateImageAndWait(
       if (statusData.status === 'failed') {
         throw new Error(statusData.error || 'Generation failed');
       }
-      onProgress?.(`Waiting for result… (${i + 1})`);
+      onProgress?.(`Waiting for result... (${i + 1})`);
     }
     throw new Error('Generation timed out');
   }

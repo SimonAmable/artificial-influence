@@ -70,6 +70,8 @@ type CanvasWithMaskStore = FabricCanvas & {
 const MASK_OVERLAY_ID = "mask-overlay"
 const MASK_OVERLAY_NAME = "Mask"
 const MASK_OVERLAY_OPACITY = 0.24
+/** Free-draw stroke while painting the mask (final paths on the work canvas stay opaque for export). */
+const MASK_BRUSH_PREVIEW_OPACITY = 0.5
 const MASK_COLOR_FALLBACK = "#06b6d4"
 
 export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvasProps) {
@@ -459,7 +461,7 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
         canvas,
         isEraseMode ? "#ffffff" : primaryColor,
         Math.max(16, brushSettings.size),
-        MASK_OVERLAY_OPACITY
+        MASK_BRUSH_PREVIEW_OPACITY
       )
     }
   }, [brushSettings, activeTool, getPrimaryColor, maskMode])

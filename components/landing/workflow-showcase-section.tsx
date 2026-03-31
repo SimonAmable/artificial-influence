@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { BlurFade } from "@/components/ui/blur-fade"
 import { workflowItems } from "@/lib/constants/landing-content"
 
 export function WorkflowShowcaseSection() {
@@ -29,46 +30,65 @@ export function WorkflowShowcaseSection() {
                 className="group block"
               >
                 <div className="relative overflow-hidden rounded-3xl bg-black">
-                  {/* Background Layer */}
+                  {/* Background layer — blur-fades in after center media (delayed) */}
                   <div className="relative h-[500px] w-full sm:h-[600px]">
-                    {bgType === "video" ? (
-                      <video
-                        src={bgSrc}
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
-                        className="h-full w-full object-cover opacity-40 blur-sm"
-                      />
-                    ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={bgSrc}
-                        alt=""
-                        className="h-full w-full object-cover opacity-40 blur-sm"
-                      />
-                    )}
+                    <BlurFade
+                      inView
+                      className="h-full w-full"
+                      delay={2}
+                      duration={2}
+                      blur="12px"
+                      direction="up"
+                      offset={10}
+                    >
+                      {bgType === "video" ? (
+                        <video
+                          src={bgSrc}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          className="h-full w-full object-cover opacity-40 blur-sm"
+                        />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={bgSrc}
+                          alt=""
+                          className="h-full w-full object-cover opacity-40 blur-sm"
+                        />
+                      )}
+                    </BlurFade>
                   </div>
 
-                  {/* Center Image Layer */}
+                  {/* Center media: plain overlay; blur-fade only wraps the asset (avoids full-bleed filter layer) */}
                   <div className="absolute inset-0 flex items-center justify-center p-8">
-                    {item.mediaType === "video" ? (
-                      <video
-                        src={item.mediaSrc}
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
-                        className="max-h-[70%] max-w-[85%] rounded-2xl object-contain shadow-2xl transition-transform duration-500 group-hover:scale-105"
-                      />
-                    ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={item.mediaSrc}
-                        alt={item.title}
-                        className="max-h-[70%] max-w-[85%] rounded-2xl object-contain shadow-2xl transition-transform duration-500 group-hover:scale-105"
-                      />
-                    )}
+                    <BlurFade
+                      inView
+                      className="max-h-[70%] max-w-[85%]"
+                      duration={0.55}
+                      blur="14px"
+                      direction="up"
+                      offset={12}
+                    >
+                      {item.mediaType === "video" ? (
+                        <video
+                          src={item.mediaSrc}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          className="h-auto w-full rounded-2xl object-contain shadow-2xl transition-transform duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.mediaSrc}
+                          alt={item.title}
+                          className="h-auto w-full rounded-2xl object-contain shadow-2xl transition-transform duration-500 group-hover:scale-105"
+                        />
+                      )}
+                    </BlurFade>
                   </div>
                   
                   {/* Dark Gradient Overlay for text readability */}

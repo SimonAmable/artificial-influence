@@ -65,7 +65,7 @@ INSERT INTO public.models (
         "label": "Character Orientation",
         "description": "image = same direction as picture (max 10s), video = match reference video (max 30s)",
         "required": false,
-        "default": "image",
+        "default": "video",
         "enum": ["image", "video"],
         "ui_type": "select"
       }

@@ -744,7 +744,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             prompt: nodeData.prompt || "",
             mode: (nodeData.parameters?.mode as string) || nodeData.mode || "pro",
             keep_original_sound: nodeData.parameters?.keep_original_sound ?? true,
-            character_orientation: nodeData.parameters?.character_orientation || "image",
+            character_orientation: nodeData.parameters?.character_orientation || "video",
             tool: "node",
           }),
         })

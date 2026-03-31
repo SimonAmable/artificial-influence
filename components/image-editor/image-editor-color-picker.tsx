@@ -416,9 +416,9 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
         )}
       </div>
 
-      <div className="w-36 bg-zinc-900/90 border border-white/10 rounded-lg backdrop-blur-md p-2">
+      <div className="w-fit shrink-0 bg-zinc-900/90 border border-white/10 rounded-lg backdrop-blur-md p-2">
         <button
-          className="w-full h-8 px-1 flex items-center justify-between text-zinc-100"
+          className="flex h-8 items-center justify-between gap-2 px-1 text-zinc-100"
           onClick={() => setIsCanvasRatioOpen((prev) => !prev)}
         >
           <div className="text-left min-w-0">
@@ -433,14 +433,14 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
         </button>
 
         {isCanvasRatioOpen && (
-          <div className="space-y-1 mt-2">
+          <div className="mt-2 flex flex-col gap-1">
             {aspectRatioOptions.map((option) => {
               const isActive = option.ratio === canvasAspectRatio
               return (
                 <button
                   key={option.label}
                   className={cn(
-                    "w-full h-7 px-2 rounded-md text-xs text-left transition-colors",
+                    "h-7 whitespace-nowrap px-2 rounded-md text-xs text-left transition-colors",
                     isActive
                       ? "bg-primary/20 text-primary border border-primary/40"
                       : "bg-zinc-800 text-zinc-300 border border-white/5 hover:bg-zinc-700"

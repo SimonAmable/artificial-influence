@@ -15,6 +15,7 @@ export { ImageEditorEmptyState } from "./image-editor-empty-state"
 export type {
   ImageEditorProps,
   ImageEditorDialogProps,
+  ImageEditorVariant,
   EditorTool,
   EditorLayer,
   BrushSettings,

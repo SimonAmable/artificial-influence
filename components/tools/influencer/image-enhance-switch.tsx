@@ -30,12 +30,12 @@ export function ImageEnhanceSwitch({
       onPressedChange={onCheckedChange}
       aria-label="Enhance prompt"
       className={cn(
-        "h-7 px-2 rounded-[28px] border border-border bg-muted/30 hover:bg-muted/50 data-[state=on]:bg-muted data-[state=on]:border-foreground/20",
+        "h-9 px-2 rounded-[28px] border border-border bg-muted/30 hover:bg-muted/50 data-[state=on]:bg-muted data-[state=on]:border-foreground/20",
         isToolbar ? "gap-1.5" : "gap-1.5",
         className
       )}
     >
-      <Sparkle className="size-3" weight={checked ? "fill" : "regular"} />
+      <Sparkle className="size-3.5 shrink-0" weight={checked ? "fill" : "regular"} />
       <span className="text-xs font-medium">{isToolbar ? "Enhance" : "Enhance"}</span>
     </Toggle>
   )

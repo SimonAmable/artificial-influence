@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     const prompt = (body.prompt as string) || '';
     const mode = (body.mode as string) || 'pro';
     const keepOriginalSound = body.keep_original_sound !== false;
-    const rawCharacterOrientation = (body.character_orientation as string) || 'image';
+    const rawCharacterOrientation = (body.character_orientation as string) || 'video';
     const characterOrientation = (rawCharacterOrientation === 'video' ? 'video' : 'image') as 'image' | 'video';
     const tool = body.tool as string | null;
 
@@ -284,7 +284,7 @@ export async function GET() {
         prompt: 'string (optional) - Text prompt (can be empty)',
         mode: 'string (optional) - Model variant: "pro" or "std" (default: "pro")',
         keep_original_sound: 'boolean (optional) - Keep original audio (default: true)',
-        character_orientation: 'string (optional) - Character orientation (default: "image")',
+        character_orientation: 'string (optional) - Character orientation (default: "video")',
       },
       response: {
         video: {

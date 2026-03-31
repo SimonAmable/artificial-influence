@@ -200,7 +200,7 @@ function VideoPageContent() {
       // Video duration: image orientation = max 10s, video orientation = max 30s
       try {
         const videoDuration = await getVideoDuration(inputVideo.file)
-        const characterOrientation = (parameters.character_orientation as string) || 'image'
+        const characterOrientation = (parameters.character_orientation as string) || 'video'
         const maxDuration = characterOrientation === 'video' ? 30 : 10
         if (videoDuration > maxDuration) {
           setError(`Video must be ${maxDuration} seconds or less for ${characterOrientation} orientation. Your video is ${videoDuration.toFixed(1)} seconds.`)

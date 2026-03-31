@@ -28,7 +28,7 @@ export default function MotionCopyPage() {
   // State management
   const [inputImage, setInputImage] = React.useState<ImageUpload | null>(null)
   const [inputVideo, setInputVideo] = React.useState<ImageUpload | null>(null)
-  const [characterOrientation, setCharacterOrientation] = React.useState<string>("image")
+  const [characterOrientation, setCharacterOrientation] = React.useState<string>("video")
   const [generatedVideos, setGeneratedVideos] = React.useState<string[]>([])
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -246,7 +246,7 @@ export default function MotionCopyPage() {
       <MotionCopyShowcaseCard
         title="CREATE YOUR"
         highlightedTitle="MOTION COPY"
-        description="Generate dynamic motion copy by combining your image and video inputs."
+        description="Generate dynamic motion copy by combining your image and video inputs—powered by Kling 3.0 motion control."
         steps={[
           {
             mediaPath: "/motion_copy/step1_image.png",
@@ -280,6 +280,9 @@ export default function MotionCopyPage() {
     { value: 'video', label: 'Video', description: 'Match reference video (max 30s)' },
   ]
 
+  const characterOrientationTriggerLabel =
+    characterOrientationOptionsWithDescription.find((o) => o.value === characterOrientation)?.label ?? ""
+
   const controlsRow = (
     <div className="flex flex-row items-center gap-3 flex-wrap w-full">
       <div className="flex items-center gap-2 px-1">
@@ -290,8 +293,8 @@ export default function MotionCopyPage() {
           value={characterOrientation}
           onValueChange={setCharacterOrientation}
         >
-          <SelectTrigger id="character-orientation" className="h-7 text-xs w-fit min-w-[140px]">
-            <SelectValue placeholder="Select" />
+          <SelectTrigger id="character-orientation" className="h-7 text-xs w-fit min-w-[72px]">
+            <SelectValue placeholder="Select">{characterOrientationTriggerLabel}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {characterOrientationOptionsWithDescription.map((opt) => (

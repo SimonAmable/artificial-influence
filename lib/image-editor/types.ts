@@ -118,6 +118,9 @@ export interface ImageEditorContextType {
   exportImage: (format?: "png" | "jpeg") => Promise<Blob | null>
 }
 
+/** `inpaint`: mask tool only, fixed Nano Banana 2, simplified generate UI */
+export type ImageEditorVariant = "full" | "inpaint"
+
 // Props for main editor component
 export interface ImageEditorProps {
   /** Initial image URL to load */
@@ -130,6 +133,8 @@ export interface ImageEditorProps {
   onClose?: () => void
   /** Custom class name */
   className?: string
+  /** Defaults to full editor */
+  variant?: ImageEditorVariant
 }
 
 // Props for dialog wrapper

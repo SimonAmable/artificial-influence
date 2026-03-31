@@ -1,24 +1,10 @@
 "use client"
 
 import * as React from "react"
-import {
-  CursorClick,
-  Lasso,
-  Rectangle,
-  ArrowUpRight,
-  PencilSimple,
-  TextT,
-  Image,
-  ArrowCounterClockwise,
-  ArrowClockwise,
-  ArrowsOut,
-  ArrowsIn,
-} from "@phosphor-icons/react"
+import { Lasso, Eraser, ArrowsOut, ArrowsIn } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useImageEditor } from "./image-editor-provider"
-import { TOOLS } from "@/lib/image-editor/constants"
-import type { EditorTool } from "@/lib/image-editor/types"
 
 interface ImageEditorToolbarProps {
   className?: string
@@ -26,24 +12,26 @@ interface ImageEditorToolbarProps {
   isFullscreen?: boolean
 }
 
-// Map tool IDs to icons
-const TOOL_ICONS: Record<EditorTool, React.ElementType> = {
-  select: CursorClick,
-  lasso: Lasso,
-  rectangle: Rectangle,
-  arrow: ArrowUpRight,
-  brush: PencilSimple,
-  text: TextT,
-  image: Image,
-}
-
 export function ImageEditorToolbar({
   className,
   onToggleFullscreen,
   isFullscreen = false,
 }: ImageEditorToolbarProps) {
-  const { state, setTool, setMaskMode, undo, redo, canUndo, canRedo } = useImageEditor()
+  const { state, setTool, setMaskMode } = useImageEditor()
   const { activeTool, maskMode } = state
+
+  const maskActive = activeTool === "lasso" && maskMode === "add"
+  const eraseActive = activeTool === "lasso" && maskMode === "erase"
+
+  const activateMask = () => {
+    setTool("lasso")
+    setMaskMode("add")
+  }
+
+  const activateErase = () => {
+    setTool("lasso")
+    setMaskMode("erase")
+  }
 
   return (
     <div
@@ -53,110 +41,47 @@ export function ImageEditorToolbar({
         className
       )}
     >
-      {/* Tool buttons */}
-      {TOOLS.map((tool) => {
-        const Icon = TOOL_ICONS[tool.id]
-        const isActive = activeTool === tool.id
-
-        return (
-          <Button
-            key={tool.id}
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg transition-colors",
-              isActive
-                ? "bg-primary/20 text-primary ring-1 ring-primary/40"
-                : "text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
-            )}
-            onClick={() => setTool(isActive ? "select" : tool.id)}
-            title={`${tool.label} (${tool.shortcut})`}
-          >
-            <Icon size={18} weight={isActive ? "fill" : "regular"} />
-          </Button>
-        )
-      })}
-
-      {/* Separator */}
-      <div className="w-px h-4 sm:h-6 bg-white/10 mx-0.5 sm:mx-1" />
-
-      {/* Undo */}
       <Button
         variant="ghost"
         size="icon"
         className={cn(
-          "h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5",
-          !canUndo && "opacity-40 cursor-not-allowed"
+          "h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg transition-colors",
+          maskActive
+            ? "bg-primary/20 text-primary ring-1 ring-primary/40"
+            : "text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
         )}
-        onClick={undo}
-        disabled={!canUndo}
-        title="Undo (Ctrl+Z)"
+        onClick={activateMask}
+        title="Mask (L)"
       >
-        <ArrowCounterClockwise size={18} />
+        <Lasso size={18} weight={maskActive ? "fill" : "regular"} />
       </Button>
 
-      {/* Redo */}
       <Button
         variant="ghost"
         size="icon"
         className={cn(
-          "h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5",
-          !canRedo && "opacity-40 cursor-not-allowed"
+          "h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg transition-colors",
+          eraseActive
+            ? "bg-primary/20 text-primary ring-1 ring-primary/40"
+            : "text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
         )}
-        onClick={redo}
-        disabled={!canRedo}
-        title="Redo (Ctrl+Shift+Z)"
+        onClick={activateErase}
+        title="Erase mask"
       >
-        <ArrowClockwise size={18} />
+        <Eraser size={18} weight={eraseActive ? "fill" : "regular"} />
       </Button>
 
-      {/* Separator */}
-      <div className="w-px h-4 sm:h-6 bg-white/10 mx-0.5 sm:mx-1" />
-
-      {/* Fullscreen */}
       {onToggleFullscreen && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
-          onClick={onToggleFullscreen}
-          title={isFullscreen ? "Exit Fullscreen (F)" : "Fullscreen (F)"}
-        >
-          {isFullscreen ? <ArrowsIn size={18} /> : <ArrowsOut size={18} />}
-        </Button>
-      )}
-
-      {/* Mask mode toggle */}
-      {activeTool === "lasso" && (
         <>
           <div className="w-px h-4 sm:h-6 bg-white/10 mx-0.5 sm:mx-1" />
           <Button
             variant="ghost"
-            size="sm"
-            className={cn(
-              "h-7 sm:h-8 px-2 sm:px-3 rounded-md sm:rounded-lg text-[10px] sm:text-xs",
-              maskMode === "add"
-                ? "bg-primary/20 text-primary ring-1 ring-primary/40"
-                : "text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
-            )}
-            onClick={() => setMaskMode("add")}
-            title="Paint mask"
+            size="icon"
+            className="h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
+            onClick={onToggleFullscreen}
+            title={isFullscreen ? "Exit Fullscreen (F)" : "Fullscreen (F)"}
           >
-            Add Mask
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "h-7 sm:h-8 px-2 sm:px-3 rounded-md sm:rounded-lg text-[10px] sm:text-xs",
-              maskMode === "erase"
-                ? "bg-primary/20 text-primary ring-1 ring-primary/40"
-                : "text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
-            )}
-            onClick={() => setMaskMode("erase")}
-            title="Erase mask"
-          >
-            Erase
+            {isFullscreen ? <ArrowsIn size={18} /> : <ArrowsOut size={18} />}
           </Button>
         </>
       )}

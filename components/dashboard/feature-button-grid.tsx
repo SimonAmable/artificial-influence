@@ -66,6 +66,7 @@ export function FeatureButtonGrid() {
           disabled={isLoading}
           size="lg"
           variant="ghost"
+          className="shadow-md transition-shadow hover:shadow-lg"
         >
           <PencilSimpleIcon size={18} weight="bold" className="mr-2" />
           Create New Project

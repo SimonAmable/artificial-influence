@@ -175,8 +175,8 @@ VALUES (
         "label": "Character Orientation",
         "description": "Character orientation setting",
         "required": false,
-        "default": "image",
-        "enum": ["image"],
+        "default": "video",
+        "enum": ["image", "video"],
         "ui_type": "select"
       }
     ]

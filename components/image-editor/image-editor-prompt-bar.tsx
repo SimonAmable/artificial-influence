@@ -1,7 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { Sparkle, Plus, X, CircleNotch } from "@phosphor-icons/react"
+import {
+  Sparkle,
+  Plus,
+  X,
+  CircleNotch,
+  FolderOpen,
+  FilePlus,
+} from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -19,8 +26,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { FilePlus } from "@phosphor-icons/react"
+import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
 import { useImageEditor } from "./image-editor-provider"
+import { MODEL_IDENTIFIERS } from "@/lib/constants/models"
 import { useModels } from "@/hooks/use-models"
 import { AspectRatioSelector } from "@/components/shared/selectors/aspect-ratio-selector"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
@@ -28,6 +36,7 @@ import { getActiveModelMetadata, type ModelMetadata } from "@/lib/constants/mode
 import type { Model } from "@/lib/types/models"
 import type { Canvas as FabricCanvas } from "fabric"
 import { toast } from "sonner"
+import type { ImageEditorVariant } from "@/lib/image-editor/types"
 
 type CanvasWithMaskStore = FabricCanvas & {
   __maskWorkCanvas?: FabricCanvas
@@ -50,6 +59,7 @@ interface ImageEditorPromptBarProps {
   className?: string
   onGenerate?: (prompt: string, count: number) => Promise<void>
   onGeneratingChange?: (isGenerating: boolean) => void
+  variant?: ImageEditorVariant
 }
 
 function formatModelName(identifier: string, name: string): string {
@@ -64,11 +74,15 @@ function formatModelName(identifier: string, name: string): string {
     .join(" ")
 }
 
+const INPAINT_MODEL = MODEL_IDENTIFIERS.GOOGLE_NANO_BANANA_2
+
 export function ImageEditorPromptBar({
   className,
   onGenerate,
   onGeneratingChange,
+  variant = "full",
 }: ImageEditorPromptBarProps) {
+  const isInpaint = variant === "inpaint"
   const { state, loadImage } = useImageEditor()
   const { models: imageModels, isLoading: modelsLoading } = useModels("image")
   const metadataModels = React.useMemo(
@@ -99,14 +113,25 @@ export function ImageEditorPromptBar({
   const [prompt, setPrompt] = React.useState("")
   const [referenceFiles, setReferenceFiles] = React.useState<File[]>([])
   const [isGenerating, setIsGenerating] = React.useState(false)
-  const [selectedModel, setSelectedModel] = React.useState<string>("")
+  const [selectedModel, setSelectedModel] = React.useState<string>(() =>
+    isInpaint ? INPAINT_MODEL : ""
+  )
   const [selectedAspectRatio, setSelectedAspectRatio] =
     React.useState<string>("match_input_image")
   const [enhancePrompt, setEnhancePrompt] = React.useState(false)
+  const [assetModalOpen, setAssetModalOpen] = React.useState(false)
   const editorInstruction = "apply the edit instructions from the image."
   const referenceInputRef = React.useRef<HTMLInputElement>(null)
 
   React.useEffect(() => {
+    if (isInpaint) {
+      setSelectedModel(INPAINT_MODEL)
+      setSelectedAspectRatio("match_input_image")
+    }
+  }, [isInpaint])
+
+  React.useEffect(() => {
+    if (isInpaint) return
     if (models.length > 0 && !selectedModel) {
       const first = models[0]
       setSelectedModel(first.identifier)
@@ -114,9 +139,10 @@ export function ImageEditorPromptBar({
         first.default_aspect_ratio ?? first.aspect_ratios?.[0] ?? "match_input_image"
       )
     }
-  }, [models, selectedModel])
+  }, [models, selectedModel, isInpaint])
 
   React.useEffect(() => {
+    if (isInpaint) return
     if (selectedModel && models.length > 0) {
       const model = models.find((m) => m.identifier === selectedModel)
       const fallbackAspectRatio = model?.aspect_ratios?.[0]
@@ -124,12 +150,21 @@ export function ImageEditorPromptBar({
         setSelectedAspectRatio(model?.default_aspect_ratio ?? fallbackAspectRatio ?? "match_input_image")
       }
     }
-  }, [selectedModel, models])
+  }, [selectedModel, models, isInpaint])
 
   const selectedModelObject = React.useMemo(() => {
     if (!selectedModel) return null
     return models.find((m) => m.identifier === selectedModel) || null
   }, [selectedModel, models])
+
+  const displayModelObject = React.useMemo(() => {
+    if (isInpaint) {
+      return (
+        models.find((m) => m.identifier === INPAINT_MODEL) ?? selectedModelObject
+      )
+    }
+    return selectedModelObject
+  }, [isInpaint, models, selectedModelObject])
 
   const getMaskOverlay = (canvas: FabricCanvas): MaskOverlayObject | null => {
     const overlay = canvas.getObjects().find((obj) => {
@@ -214,61 +249,102 @@ export function ImageEditorPromptBar({
         const formData = new FormData()
         const exports = await exportGenerationInputs()
 
-        let finalPrompt = prompt.trim()
-        if (!finalPrompt.toLowerCase().includes(editorInstruction)) {
-          finalPrompt = `${finalPrompt}\n\n${editorInstruction}`
-        }
+        if (isInpaint) {
+          if (!exports?.hadMask || !exports.maskDataUrl) {
+            toast.error("Paint a mask first", {
+              description: "Brush over the region you want Nano Banana 2 to change.",
+            })
+            return
+          }
 
-        finalPrompt = `${finalPrompt}\n\nThe first reference image is the clean base. The second reference image is the edited composite with accessories/overlays. Apply the edit intent from the composite while preserving identity and realism.`
-
-        if (exports?.hadMask) {
-          finalPrompt = `${finalPrompt}\n\nEdit only the masked area from the provided mask image. Preserve everything outside the mask exactly unchanged.`
+          const finalPrompt = `${prompt.trim()}\n\nInpaint: edit only the region indicated by the mask image. Keep all pixels outside the mask identical. Follow the description above for what to put inside the masked region.`
           formData.append("hasMask", "true")
-        }
+          formData.append("prompt", finalPrompt)
+          formData.append("n", "1")
+          formData.append("aspect_ratio", "match_input_image")
+          formData.append("aspectRatio", "match_input_image")
+          formData.append("enhancePrompt", "false")
+          formData.append("model", INPAINT_MODEL)
 
-        formData.append("prompt", finalPrompt)
-        formData.append("n", "1")
-        formData.append("aspect_ratio", selectedAspectRatio)
-        formData.append("aspectRatio", selectedAspectRatio)
-        formData.append("enhancePrompt", enhancePrompt.toString())
-        if (selectedModel) {
-          formData.append("model", selectedModel)
-        }
+          if (exports.baseDataUrl) {
+            formData.append(
+              "referenceImages",
+              await dataUrlToFile(exports.baseDataUrl, "base-image.png")
+            )
+          } else if (state.currentImage) {
+            const response = await fetch(state.currentImage)
+            const blob = await response.blob()
+            formData.append(
+              "referenceImages",
+              new File([blob], "base-image.png", { type: "image/png" })
+            )
+          }
 
-        if (exports?.baseDataUrl) {
-          const baseFile = await dataUrlToFile(
-            exports.baseDataUrl,
-            "base-image.png"
+          formData.append(
+            "referenceImages",
+            await dataUrlToFile(exports.maskDataUrl, "mask-image.png")
           )
-          formData.append("referenceImages", baseFile)
-        } else if (state.currentImage) {
-          const response = await fetch(state.currentImage)
-          const blob = await response.blob()
-          const file = new File([blob], "base-image.png", {
-            type: "image/png",
+
+          referenceFiles.forEach((file) => {
+            formData.append("referenceImages", file)
           })
-          formData.append("referenceImages", file)
-        }
+        } else {
+          let finalPrompt = prompt.trim()
+          if (!finalPrompt.toLowerCase().includes(editorInstruction)) {
+            finalPrompt = `${finalPrompt}\n\n${editorInstruction}`
+          }
 
-        if (exports?.compositeDataUrl) {
-          const compositeFile = await dataUrlToFile(
-            exports.compositeDataUrl,
-            "composite-image.png"
-          )
-          formData.append("referenceImages", compositeFile)
-        }
+          finalPrompt = `${finalPrompt}\n\nThe first reference image is the clean base. The second reference image is the edited composite with accessories/overlays. Apply the edit intent from the composite while preserving identity and realism.`
 
-        if (exports?.maskDataUrl) {
-          const maskFile = await dataUrlToFile(
-            exports.maskDataUrl,
-            "mask-image.png"
-          )
-          formData.append("referenceImages", maskFile)
-        }
+          if (exports?.hadMask) {
+            finalPrompt = `${finalPrompt}\n\nEdit only the masked area from the provided mask image. Preserve everything outside the mask exactly unchanged.`
+            formData.append("hasMask", "true")
+          }
 
-        referenceFiles.forEach((file) => {
-          formData.append("referenceImages", file)
-        })
+          formData.append("prompt", finalPrompt)
+          formData.append("n", "1")
+          formData.append("aspect_ratio", selectedAspectRatio)
+          formData.append("aspectRatio", selectedAspectRatio)
+          formData.append("enhancePrompt", enhancePrompt.toString())
+          if (selectedModel) {
+            formData.append("model", selectedModel)
+          }
+
+          if (exports?.baseDataUrl) {
+            const baseFile = await dataUrlToFile(
+              exports.baseDataUrl,
+              "base-image.png"
+            )
+            formData.append("referenceImages", baseFile)
+          } else if (state.currentImage) {
+            const response = await fetch(state.currentImage)
+            const blob = await response.blob()
+            const file = new File([blob], "base-image.png", {
+              type: "image/png",
+            })
+            formData.append("referenceImages", file)
+          }
+
+          if (exports?.compositeDataUrl) {
+            const compositeFile = await dataUrlToFile(
+              exports.compositeDataUrl,
+              "composite-image.png"
+            )
+            formData.append("referenceImages", compositeFile)
+          }
+
+          if (exports?.maskDataUrl) {
+            const maskFile = await dataUrlToFile(
+              exports.maskDataUrl,
+              "mask-image.png"
+            )
+            formData.append("referenceImages", maskFile)
+          }
+
+          referenceFiles.forEach((file) => {
+            formData.append("referenceImages", file)
+          })
+        }
 
         formData.append("tool", "image_editing")
 
@@ -322,6 +398,24 @@ export function ImageEditorPromptBar({
     }
   }, [])
 
+  const handleAssetSelect = React.useCallback(async (imageUrl: string) => {
+    try {
+      const response = await fetch(imageUrl)
+      if (!response.ok) throw new Error("Failed to fetch")
+      const blob = await response.blob()
+      if (!blob.type.startsWith("image/")) {
+        toast.error("Selected item must be an image")
+        return
+      }
+      const ext = blob.type.split("/")[1] || "png"
+      const file = new File([blob], `reference-asset.${ext}`, { type: blob.type })
+      setReferenceFiles((prev) => [...prev, file])
+      setAssetModalOpen(false)
+    } catch {
+      toast.error("Could not load image from library")
+    }
+  }, [])
+
   const handleAddReferences = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []).filter((file) =>
       file.type.startsWith("image/")
@@ -346,7 +440,17 @@ export function ImageEditorPromptBar({
       )}
     >
       <CardContent className="p-2 flex flex-col gap-1.5">
-        {/* Reference images preview */}
+        <input
+          ref={referenceInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleAddReferences}
+          className="hidden"
+          aria-label="Add reference images"
+        />
+
+        {/* Reference images preview (extra refs — same as /image page) */}
         {referenceFiles.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {referenceFiles.map((file, index) => (
@@ -376,7 +480,11 @@ export function ImageEditorPromptBar({
               onChange={(e) => setPrompt(e.target.value)}
               onPaste={handlePaste}
               onKeyDown={handleKeyDown}
-              placeholder="Enter prompt for image editing..."
+              placeholder={
+                isInpaint
+                  ? "Describe the change inside the masked area…"
+                  : "Enter prompt for image editing..."
+              }
               className="w-full border-none outline-none resize-none bg-transparent text-sm min-h-[60px] max-h-[120px] overflow-y-auto"
               rows={3}
               disabled={isGenerating}
@@ -410,8 +518,8 @@ export function ImageEditorPromptBar({
                     <div className="flex items-center gap-0.5">
                       <Sparkle size={8} weight="fill" />
                       <span className="text-[10px]">
-                        {selectedModelObject?.model_cost != null
-                          ? selectedModelObject.model_cost
+                        {displayModelObject?.model_cost != null
+                          ? displayModelObject.model_cost
                           : "—"}
                       </span>
                     </div>
@@ -423,102 +531,138 @@ export function ImageEditorPromptBar({
         </div>
 
         {/* Controls: Add Reference Image, Model Selector, Size, Enhance Prompt */}
-        <div className="flex items-center gap-1 flex-wrap">
-          <input
-            ref={referenceInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleAddReferences}
-            className="hidden"
-            aria-label="Add reference images"
-          />
+        {isInpaint ? (
+          <div className="flex items-center gap-1 flex-wrap px-2 pb-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full bg-muted hover:bg-muted/80"
+                  aria-label="Add reference image or asset"
+                  disabled={isGenerating}
+                >
+                  <Plus className="size-3.5" weight="bold" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  onClick={() => referenceInputRef.current?.click()}
+                >
+                  <FilePlus className="size-4 mr-2" />
+                  Upload Reference Image
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setAssetModalOpen(true)}>
+                  <FolderOpen className="size-4 mr-2" />
+                  Select Asset
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full bg-muted hover:bg-muted/80"
-                aria-label="Add reference image"
-                disabled={isGenerating}
-              >
-                <Plus className="size-3.5" weight="bold" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem
-                onClick={() => referenceInputRef.current?.click()}
-              >
-                <FilePlus className="size-4 mr-2" />
-                Add Reference Image
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ModelIcon identifier={INPAINT_MODEL} size={16} />
+              <span className="font-medium text-foreground">Nano Banana 2</span>
+              <span className="hidden sm:inline">· mask inpaint</span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 flex-wrap">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full bg-muted hover:bg-muted/80"
+                  aria-label="Add reference image"
+                  disabled={isGenerating}
+                >
+                  <Plus className="size-3.5" weight="bold" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  onClick={() => referenceInputRef.current?.click()}
+                >
+                  <FilePlus className="size-4 mr-2" />
+                  Upload Reference Image
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setAssetModalOpen(true)}>
+                  <FolderOpen className="size-4 mr-2" />
+                  Select Asset
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <Select
-            value={selectedModel || ""}
-            onValueChange={(value) => setSelectedModel(value)}
-            disabled={isGenerating || modelsLoading}
-          >
-            <SelectTrigger
-              id="image-editor-model-select"
-              className="h-7 text-xs w-fit min-w-0 px-2"
+            <Select
+              value={selectedModel || ""}
+              onValueChange={(value) => setSelectedModel(value)}
+              disabled={isGenerating || modelsLoading}
             >
-              <SelectValue placeholder="Select model">
-                {selectedModel && (
-                  <div className="flex items-center gap-2">
-                    <ModelIcon identifier={selectedModel} size={16} />
-                    <span>
-                      {selectedModelObject
-                        ? formatModelName(
-                            selectedModelObject.identifier,
-                            selectedModelObject.name
-                          )
-                        : selectedModel}
-                    </span>
-                  </div>
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent position="popper" side="top" sideOffset={4}>
-              {models.map((model) => (
-                <SelectItem key={model.identifier} value={model.identifier}>
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-md border border-border bg-muted/30 p-1.5 shrink-0">
-                      <ModelIcon identifier={model.identifier} size={20} />
-                    </div>
-                    <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                      <span className="font-semibold text-sm">
-                        {formatModelName(model.identifier, model.name)}
+              <SelectTrigger
+                id="image-editor-model-select"
+                className="h-7 text-xs w-fit min-w-0 px-2"
+              >
+                <SelectValue placeholder="Select model">
+                  {selectedModel && (
+                    <div className="flex items-center gap-2">
+                      <ModelIcon identifier={selectedModel} size={16} />
+                      <span>
+                        {selectedModelObject
+                          ? formatModelName(
+                              selectedModelObject.identifier,
+                              selectedModelObject.name
+                            )
+                          : selectedModel}
                       </span>
-                      {model.description && (
-                        <span className="text-xs text-muted-foreground">
-                          {model.description}
-                        </span>
-                      )}
                     </div>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent position="popper" side="top" sideOffset={4}>
+                {models.map((model) => (
+                  <SelectItem key={model.identifier} value={model.identifier}>
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-md border border-border bg-muted/30 p-1.5 shrink-0">
+                        <ModelIcon identifier={model.identifier} size={20} />
+                      </div>
+                      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                        <span className="font-semibold text-sm">
+                          {formatModelName(model.identifier, model.name)}
+                        </span>
+                        {model.description && (
+                          <span className="text-xs text-muted-foreground">
+                            {model.description}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <AspectRatioSelector
-            model={selectedModelObject}
-            value={selectedAspectRatio}
-            onValueChange={setSelectedAspectRatio}
-            disabled={isGenerating}
-          />
+            <AspectRatioSelector
+              model={selectedModelObject}
+              value={selectedAspectRatio}
+              onValueChange={setSelectedAspectRatio}
+              disabled={isGenerating}
+            />
 
-          <ImageEnhanceSwitch
-            checked={enhancePrompt}
-            onCheckedChange={setEnhancePrompt}
-            variant="page"
-            id="image-editor-enhance-prompt"
-          />
-        </div>
+            <ImageEnhanceSwitch
+              checked={enhancePrompt}
+              onCheckedChange={setEnhancePrompt}
+              variant="page"
+              id="image-editor-enhance-prompt"
+            />
+          </div>
+        )}
       </CardContent>
+
+      <AssetSelectionModal
+        open={assetModalOpen}
+        onOpenChange={setAssetModalOpen}
+        onSelect={handleAssetSelect}
+      />
     </Card>
   )
 }

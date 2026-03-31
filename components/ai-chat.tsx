@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Chat, useChat } from "@ai-sdk/react"
+import { Chat, useChat, type UIMessage } from "@ai-sdk/react"
 import { DefaultChatTransport } from "ai"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, ArrowUp, Plus, NotePencil, UploadSimple } from "@phosphor-icons/react"
@@ -15,8 +15,21 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { UNICAN_ASSISTANT_NAME } from "@/lib/constants/system-prompts"
 import { MemoizedMarkdown } from "@/components/memoized-markdown"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
+import { useProjectAgentChat } from "@/hooks/use-project-agent-chat"
+import { EDITOR_RUNTIME_EVENT } from "@/lib/editor/runtime"
+import type { EditorRuntimeContext } from "@/lib/editor/types"
+import {
+  Conversation,
+  ConversationContent,
+} from "@/components/ai-elements/conversation"
+import {
+  Message,
+  MessageContent,
+} from "@/components/ai-elements/message"
+import { ToolExecutionList } from "@/components/ai-elements/tool-execution"
 
 const CHAT_MODELS = [
   { identifier: "google/gemini-3-flash-preview", name: "Gemini 3 Flash" },
@@ -27,11 +40,13 @@ function formatChatModelName(identifier: string, name: string): string {
   if (name && !name.includes("/")) return name
   const parts = identifier.split("/")
   const short = parts[parts.length - 1]
-  return short.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+  return short
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
 }
 
-// Create shared chat instance
-const chat = new Chat({
+const generalChat = new Chat({
   transport: new DefaultChatTransport({
     api: "/api/chat",
   }),
@@ -41,61 +56,135 @@ interface AIChatProps {
   className?: string
 }
 
-export type ChatMode = "chat" | "prompt-recreate"
+export type ChatMode = "chat" | "prompt-recreate" | "agent"
 
 export function AIChat({ className }: AIChatProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [mode, setMode] = React.useState<ChatMode>("chat")
   const [model, setModel] = React.useState<string>(CHAT_MODELS[0].identifier)
   const [isDraggingOver, setIsDraggingOver] = React.useState(false)
+  const [editorContext, setEditorContext] = React.useState<EditorRuntimeContext>({
+    projectId: null,
+    selectionItemIds: [],
+    playheadFrame: 0,
+    activeRoute: "other",
+  })
   const dragCounter = React.useRef(0)
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const chatContainerRef = React.useRef<HTMLDivElement>(null)
 
-  const { messages } = useChat({ chat, experimental_throttle: 50 })
+  const { messages, sendMessage, setMessages } = useChat({
+    chat: generalChat,
+    experimental_throttle: 50,
+  })
+  const {
+    messages: agentMessages,
+    sendAgentMessage,
+    clearAgentMessages,
+    commandHistory,
+    pendingAction,
+  } = useProjectAgentChat({
+    projectId: editorContext.projectId,
+    selectionItemIds: editorContext.selectionItemIds,
+    playheadFrame: editorContext.playheadFrame,
+  })
 
-  const clearMessages = () => {
-    chat.messages = []
-  }
+  const activeMessages = mode === "agent" ? agentMessages : messages
+  const agentAvailable = Boolean(editorContext.projectId)
 
-  // Auto-scroll to bottom when new messages arrive
+  const clearMessages = React.useCallback(() => {
+    if (mode === "agent") {
+      void clearAgentMessages()
+      return
+    }
+
+    setMessages([])
+  }, [clearAgentMessages, mode, setMessages])
+
+  const handleSendMessage = React.useCallback(
+    (
+      message: {
+        role: "user"
+        parts: UIMessage["parts"]
+      },
+      selectedModel: string,
+    ) => {
+      if (mode === "agent") {
+        sendAgentMessage(message, selectedModel)
+        return
+      }
+
+      sendMessage(message, {
+        body: {
+          mode,
+          model: selectedModel,
+        },
+      })
+    },
+    [mode, sendAgentMessage, sendMessage],
+  )
+
   React.useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [activeMessages])
 
-  // Listen for chat-open event
   React.useEffect(() => {
     const handleOpenChat = () => {
       setIsOpen(true)
     }
 
-    window.addEventListener('chat-open', handleOpenChat as EventListener)
+    window.addEventListener("chat-open", handleOpenChat as EventListener)
     return () => {
-      window.removeEventListener('chat-open', handleOpenChat as EventListener)
+      window.removeEventListener("chat-open", handleOpenChat as EventListener)
     }
   }, [])
 
-  // Handle drag and drop for files and canvas nodes
-  const handleDragOver = React.useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.dataTransfer.types.includes('Files')) {
+  React.useEffect(() => {
+    const handleRuntimeContext = (event: Event) => {
+      const customEvent = event as CustomEvent<EditorRuntimeContext>
+      setEditorContext(customEvent.detail)
+    }
+
+    window.addEventListener(EDITOR_RUNTIME_EVENT, handleRuntimeContext as EventListener)
+    return () => {
+      window.removeEventListener(EDITOR_RUNTIME_EVENT, handleRuntimeContext as EventListener)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (
+      editorContext.projectId &&
+      (editorContext.activeRoute === "editor" || editorContext.activeRoute === "agent-chat")
+    ) {
+      setMode("agent")
+      return
+    }
+
+    if (!editorContext.projectId && mode === "agent") {
+      setMode("chat")
+    }
+  }, [editorContext.activeRoute, editorContext.projectId, mode])
+
+  const handleDragOver = React.useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (event.dataTransfer.types.includes("Files")) {
       setIsDraggingOver(true)
     }
   }, [])
 
-  const handleDragEnter = React.useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.dataTransfer.types.includes('Files')) {
+  const handleDragEnter = React.useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (event.dataTransfer.types.includes("Files")) {
       dragCounter.current += 1
       setIsDraggingOver(true)
     }
   }, [])
 
-  const handleDragLeave = React.useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleDragLeave = React.useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
     dragCounter.current -= 1
     if (dragCounter.current <= 0) {
       dragCounter.current = 0
@@ -103,64 +192,59 @@ export function AIChat({ className }: AIChatProps) {
     }
   }, [])
 
-  const handleDrop = React.useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleDrop = React.useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
     dragCounter.current = 0
     setIsDraggingOver(false)
-    
-    // Extract node data if dragging from canvas
-    const nodeDataStr = e.dataTransfer.getData('application/reactflow-node')
-    
+
+    const nodeDataStr = event.dataTransfer.getData("application/reactflow-node")
+
     if (nodeDataStr) {
       try {
         const nodeData = JSON.parse(nodeDataStr)
-        
-        // Extract asset URL based on node type
-        let assetUrl: string | null = null
-        let assetType: 'image' | 'video' | 'audio' | null = null
 
-        if (nodeData.type === 'upload' && nodeData.data?.fileUrl) {
+        let assetUrl: string | null = null
+        let assetType: "image" | "video" | "audio" | null = null
+
+        if (nodeData.type === "upload" && nodeData.data?.fileUrl) {
           assetUrl = nodeData.data.fileUrl
-          assetType = nodeData.data.fileType || 'image'
-        } else if (nodeData.type === 'image-gen' && nodeData.data?.generatedImageUrl) {
+          assetType = nodeData.data.fileType || "image"
+        } else if (nodeData.type === "image-gen" && nodeData.data?.generatedImageUrl) {
           assetUrl = nodeData.data.generatedImageUrl
-          assetType = 'image'
-        } else if (nodeData.type === 'video-gen' && nodeData.data?.generatedVideoUrl) {
+          assetType = "image"
+        } else if (nodeData.type === "video-gen" && nodeData.data?.generatedVideoUrl) {
           assetUrl = nodeData.data.generatedVideoUrl
-          assetType = 'video'
-        } else if (nodeData.type === 'audio' && nodeData.data?.generatedAudioUrl) {
+          assetType = "video"
+        } else if (nodeData.type === "audio" && nodeData.data?.generatedAudioUrl) {
           assetUrl = nodeData.data.generatedAudioUrl
-          assetType = 'audio'
+          assetType = "audio"
         }
 
         if (assetUrl && assetType) {
-          // Dispatch custom event to add asset to message input
-          const event = new CustomEvent('chat-add-asset', {
-            detail: { url: assetUrl, type: assetType }
-          })
-          window.dispatchEvent(event)
+          window.dispatchEvent(
+            new CustomEvent("chat-add-asset", {
+              detail: { url: assetUrl, type: assetType },
+            }),
+          )
         }
       } catch (error) {
-        console.error('Failed to parse node data:', error)
+        console.error("Failed to parse node data:", error)
       }
     }
 
-    // Handle regular file drops
-    const files = e.dataTransfer.files
-    
+    const files = event.dataTransfer.files
     if (files && files.length > 0) {
-      // Dispatch custom event to add files to message input
-      const event = new CustomEvent('chat-add-files', {
-        detail: { files }
-      })
-      window.dispatchEvent(event)
+      window.dispatchEvent(
+        new CustomEvent("chat-add-files", {
+          detail: { files },
+        }),
+      )
     }
   }, [])
 
   return (
     <>
-      {/* Floating Trigger Button */}
       <AnimatePresence>
         {!isOpen && (
           <motion.button
@@ -170,88 +254,101 @@ export function AIChat({ className }: AIChatProps) {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => setIsOpen(true)}
+            aria-label={`Open ${UNICAN_ASSISTANT_NAME}`}
             className={cn(
               "fixed bottom-6 right-6 z-[60]",
-              "w-14 h-14 rounded-full",
-              "bg-foreground",
-              "shadow-lg",
-              "flex items-center justify-center",
-              "transition-shadow hover:shadow-xl",
-              className
+              "flex h-14 w-14 items-center justify-center rounded-full",
+              "bg-foreground shadow-lg transition-shadow hover:shadow-xl",
+              className,
             )}
           >
-            <Image src="/logo.svg" alt="AI" width={24} height={24} className="invert dark:invert-0" />
+            <Image
+              src="/logo.svg"
+              alt=""
+              width={24}
+              height={24}
+              className="invert dark:invert-0"
+            />
           </motion.button>
         )}
       </AnimatePresence>
 
-      {/* Chat Panel */}
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Mobile Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/50 z-40 md:hidden"
+              className="fixed inset-0 z-40 bg-black/50 md:hidden"
             />
 
-            {/* Chat Container */}
             <motion.div
               ref={chatContainerRef}
-              initial={{ x: '100%' }}
+              initial={{ x: "100%" }}
               animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
               onDragOver={handleDragOver}
               onDragEnter={handleDragEnter}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               className={cn(
                 "fixed right-0 top-0 bottom-0 z-50",
-                "bg-background border-l border-border",
-                "flex flex-col",
-                // Mobile: fullscreen
-                "w-full md:w-[480px]",
-                "shadow-2xl"
+                "flex w-full flex-col border-l border-border bg-background shadow-2xl md:w-[480px]",
               )}
             >
-              {/* Drop Overlay */}
               <AnimatePresence>
                 {isDraggingOver && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center gap-4 pointer-events-none"
+                    className="pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-background/95 backdrop-blur-sm"
                   >
-                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
-                      <UploadSimple className="w-12 h-12 text-primary" weight="bold" />
+                    <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10">
+                      <UploadSimple className="h-12 w-12 text-primary" weight="bold" />
                     </div>
                     <div className="text-center">
                       <p className="text-lg font-semibold text-foreground">Drop to add attachment</p>
-                      <p className="text-sm text-muted-foreground mt-1">Images, videos, or canvas nodes</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Images, videos, audio, or canvas nodes
+                      </p>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
-              {/* Header */}
+
               <div className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-foreground flex items-center justify-center">
-                    <Image src="/logo.svg" alt="AI" width={16} height={16} className="invert dark:invert-0" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground">
+                    <Image
+                      src="/logo.svg"
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="invert dark:invert-0"
+                    />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold">AI assistant</h2>
+                    <h2 className="text-lg font-semibold leading-tight">{UNICAN_ASSISTANT_NAME}</h2>
+                    <p className="text-xs font-normal text-muted-foreground">
+                      {mode === "agent"
+                        ? agentAvailable
+                          ? "Timeline agent"
+                          : "Agent needs a project"
+                        : mode === "prompt-recreate"
+                          ? "Prompt recreate"
+                          : "UniCan guide"}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => clearMessages()}
+                    onClick={clearMessages}
                     className="h-8 w-8"
                     title="Clear chat"
                   >
@@ -268,98 +365,132 @@ export function AIChat({ className }: AIChatProps) {
                 </div>
               </div>
 
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-full text-center space-y-3 text-muted-foreground">
-                    <Image src="/logo.svg" alt="AI" width={64} height={64} />
-                    <div>
-                      {mode === "chat" ? (
-                        <>
-                          <p className="font-medium text-foreground">Start a conversation</p>
-                          <p className="text-sm">I&apos;m your guide to this platform - ask about workflows, features, or how to get started</p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="font-medium text-foreground">Prompt Recreate</p>
-                          <p className="text-sm">Upload an image to decompose its visual elements and get a NanoBanana Pro JSON prompt to recreate it</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "flex gap-2",
-                      message.role === 'user' ? 'justify-end' : 'justify-start'
-                    )}
-                  >
-                    {/* AI Avatar */}
-                    {message.role === 'assistant' && (
-                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 mt-1">
-                        <Image src="/logo.svg" alt="AI" width={16} height={16} />
+              <Conversation className="p-4">
+                <ConversationContent className="space-y-4">
+                  {activeMessages.length === 0 && (
+                    <div className="flex h-full flex-col items-center justify-center space-y-3 text-center text-muted-foreground">
+                      <Image src="/logo.svg" alt="" width={64} height={64} className="dark:invert" />
+                      <div className="mx-auto max-w-[min(100%,20rem)] space-y-2">
+                        {mode === "chat" ? (
+                          <>
+                            <p className="font-medium text-foreground">Hi - I&apos;m {UNICAN_ASSISTANT_NAME}</p>
+                            <p className="text-sm leading-relaxed">
+                              Ask me about workflows, models, the canvas, or the fastest way to go
+                              from idea to finished content.
+                            </p>
+                          </>
+                        ) : mode === "prompt-recreate" ? (
+                          <>
+                            <p className="font-medium text-foreground">Prompt Recreate</p>
+                            <p className="text-sm">
+                              Upload an image to decompose its visual elements and get a
+                              NanoBanana Pro JSON prompt to recreate it.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-medium text-foreground">Editor Agent</p>
+                            <p className="text-sm">
+                              {agentAvailable
+                                ? "Ask me to add text, split clips, remove items, move clips, change speed, or chain several actions together."
+                                : "Open an editor project first to bind the agent to a timeline."}
+                            </p>
+                          </>
+                        )}
                       </div>
-                    )}
-                    
-                    <div
-                      className={cn(
-                        "max-w-[80%] px-4 py-2",
-                        message.role === 'user'
-                          ? 'rounded-2xl bg-foreground text-background'
-                          : 'text-foreground'
-                      )}
+                    </div>
+                  )}
+
+                  {mode === "agent" && pendingAction ? (
+                    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                      Pending confirmation: {pendingAction.label}
+                    </div>
+                  ) : null}
+
+                  {activeMessages.map((message) => (
+                    <Message
+                      key={message.id}
+                      from={message.role === "user" ? "user" : "assistant"}
                     >
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        {message.parts.map((part, i) => {
-                          if (part.type === 'text') {
-                            return (
-                              <MemoizedMarkdown
-                                key={`${message.id}-${i}`}
-                                id={message.id}
-                                content={part.text}
-                              />
-                            )
-                          }
-                          if (part.type === 'file') {
-                            if (part.mediaType?.startsWith('image/')) {
+                      {message.role === "assistant" && (
+                        <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white">
+                          <Image src="/logo.svg" alt="" width={16} height={16} />
+                        </div>
+                      )}
+
+                      <MessageContent from={message.role === "user" ? "user" : "assistant"}>
+                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                          {message.parts.map((part, index) => {
+                            if (part.type === "text") {
                               return (
-                                <Image
-                                  key={`${message.id}-${i}`}
-                                  src={part.url}
-                                  alt={part.filename || 'attachment'}
-                                  width={300}
-                                  height={300}
-                                  className="rounded-lg my-2"
+                                <MemoizedMarkdown
+                                  key={`${message.id}-${index}`}
+                                  id={message.id}
+                                  content={part.text}
                                 />
                               )
                             }
-                            if (part.mediaType?.startsWith('video/')) {
-                              return (
-                                <video
-                                  key={`${message.id}-${i}`}
-                                  src={part.url}
-                                  controls
-                                  className="rounded-lg my-2 max-w-full"
-                                />
-                              )
+
+                            if (part.type === "file") {
+                              if (part.mediaType?.startsWith("image/")) {
+                                return (
+                                  <Image
+                                    key={`${message.id}-${index}`}
+                                    src={part.url}
+                                    alt={part.filename || "attachment"}
+                                    width={300}
+                                    height={300}
+                                    className="my-2 rounded-lg"
+                                  />
+                                )
+                              }
+
+                              if (part.mediaType?.startsWith("video/")) {
+                                return (
+                                  <video
+                                    key={`${message.id}-${index}`}
+                                    src={part.url}
+                                    controls
+                                    className="my-2 max-w-full rounded-lg"
+                                  />
+                                )
+                              }
+
+                              if (part.mediaType?.startsWith("audio/")) {
+                                return (
+                                  <audio
+                                    key={`${message.id}-${index}`}
+                                    src={part.url}
+                                    controls
+                                    className="my-2 w-full"
+                                  />
+                                )
+                              }
                             }
-                          }
-                          return null
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ))}
 
-                <div ref={messagesEndRef} />
-              </div>
+                            return null
+                          })}
+                        </div>
+                      </MessageContent>
+                    </Message>
+                  ))}
 
-              {/* Input Form */}
-              <MessageInput mode={mode} setMode={setMode} model={model} setModel={setModel} />
+                  {mode === "agent" && commandHistory.length > 0 ? (
+                    <ToolExecutionList entries={commandHistory.slice(-3).reverse()} />
+                  ) : null}
+
+                  <div ref={messagesEndRef} />
+                </ConversationContent>
+              </Conversation>
+
+              <MessageInput
+                mode={mode}
+                setMode={setMode}
+                model={model}
+                setModel={setModel}
+                onSendMessage={handleSendMessage}
+                agentAvailable={agentAvailable}
+              />
             </motion.div>
           </>
         )}
@@ -368,60 +499,73 @@ export function AIChat({ className }: AIChatProps) {
   )
 }
 
-// Separate MessageInput component
 interface MessageInputProps {
   mode: ChatMode
   setMode: (mode: ChatMode) => void
   model: string
   setModel: (model: string) => void
+  onSendMessage: (
+    message: {
+      role: "user"
+      parts: UIMessage["parts"]
+    },
+    model: string,
+  ) => void | Promise<void>
+  agentAvailable: boolean
 }
 
-const MessageInput = ({ mode, setMode, model, setModel }: MessageInputProps) => {
-  const [input, setInput] = React.useState('')
+function MessageInput({
+  mode,
+  setMode,
+  model,
+  setModel,
+  onSendMessage,
+  agentAvailable,
+}: MessageInputProps) {
+  const [input, setInput] = React.useState("")
   const [files, setFiles] = React.useState<FileList | undefined>(undefined)
-  const [droppedAssets, setDroppedAssets] = React.useState<Array<{ url: string; type: string }>>([])
+  const [droppedAssets, setDroppedAssets] = React.useState<Array<{ url: string; type: string }>>(
+    [],
+  )
   const fileInputRef = React.useRef<HTMLInputElement>(null)
-  const { sendMessage } = useChat({ chat })
 
-  // Listen for custom events from drag-and-drop
   React.useEffect(() => {
-    const handleAddAsset = (e: CustomEvent<{ url: string; type: string }>) => {
-      setDroppedAssets(prev => [...prev, e.detail])
+    const handleAddAsset = (event: CustomEvent<{ url: string; type: string }>) => {
+      setDroppedAssets((current) => [...current, event.detail])
     }
 
-    const handleAddFiles = (e: CustomEvent<{ files: FileList }>) => {
-      setFiles(e.detail.files)
+    const handleAddFiles = (event: CustomEvent<{ files: FileList }>) => {
+      setFiles(event.detail.files)
     }
 
-    const handleAddText = (e: CustomEvent<{ text: string }>) => {
-      setInput(prev => prev ? `${prev}\n\n${e.detail.text}` : e.detail.text)
+    const handleAddText = (event: CustomEvent<{ text: string }>) => {
+      setInput((current) => (current ? `${current}\n\n${event.detail.text}` : event.detail.text))
     }
 
-    window.addEventListener('chat-add-asset', handleAddAsset as EventListener)
-    window.addEventListener('chat-add-files', handleAddFiles as EventListener)
-    window.addEventListener('chat-add-text', handleAddText as EventListener)
+    window.addEventListener("chat-add-asset", handleAddAsset as EventListener)
+    window.addEventListener("chat-add-files", handleAddFiles as EventListener)
+    window.addEventListener("chat-add-text", handleAddText as EventListener)
 
     return () => {
-      window.removeEventListener('chat-add-asset', handleAddAsset as EventListener)
-      window.removeEventListener('chat-add-files', handleAddFiles as EventListener)
-      window.removeEventListener('chat-add-text', handleAddText as EventListener)
+      window.removeEventListener("chat-add-asset", handleAddAsset as EventListener)
+      window.removeEventListener("chat-add-files", handleAddFiles as EventListener)
+      window.removeEventListener("chat-add-text", handleAddText as EventListener)
     }
   }, [])
 
-  // Convert files to data URLs for sending
   const convertFilesToDataURLs = async (fileList: FileList) => {
     return Promise.all(
       Array.from(fileList).map(
-        file =>
+        (file) =>
           new Promise<{
-            type: 'file'
+            type: "file"
             mediaType: string
             url: string
           }>((resolve, reject) => {
             const reader = new FileReader()
             reader.onload = () => {
               resolve({
-                type: 'file',
+                type: "file",
                 mediaType: file.type,
                 url: reader.result as string,
               })
@@ -433,124 +577,138 @@ const MessageInput = ({ mode, setMode, model, setModel }: MessageInputProps) => 
     )
   }
 
-  const handlePaste = React.useCallback((e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items
-    if (!items) return
+  const handlePaste = React.useCallback(
+    (event: React.ClipboardEvent) => {
+      const items = event.clipboardData?.items
+      if (!items) return
 
-    const imageFiles: File[] = []
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i]
-      if (item.type.startsWith('image/')) {
-        const file = item.getAsFile()
-        if (file) imageFiles.push(file)
+      const imageFiles: File[] = []
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index]
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile()
+          if (file) imageFiles.push(file)
+        }
       }
-    }
 
-    if (imageFiles.length > 0) {
-      e.preventDefault()
-      const dt = new DataTransfer()
-      imageFiles.forEach((f) => dt.items.add(f))
-      if (files) {
-        Array.from(files).forEach((f) => dt.items.add(f))
+      if (imageFiles.length > 0) {
+        event.preventDefault()
+        const dataTransfer = new DataTransfer()
+        imageFiles.forEach((file) => dataTransfer.items.add(file))
+        if (files) {
+          Array.from(files).forEach((file) => dataTransfer.items.add(file))
+        }
+        setFiles(dataTransfer.files)
       }
-      setFiles(dt.files)
-    }
-  }, [files])
+    },
+    [files],
+  )
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const submitCurrentMessage = React.useCallback(async () => {
     if (!input.trim() && !files && droppedAssets.length === 0) return
+    if (mode === "agent" && !agentAvailable) return
 
-    const fileParts = files && files.length > 0 ? await convertFilesToDataURLs(files) : []
-    
-    // Add dropped assets from canvas nodes
-    const assetParts = droppedAssets.map(asset => ({
-      type: 'file' as const,
-      mediaType: asset.type.includes('image') ? 'image/png' : asset.type.includes('video') ? 'video/mp4' : 'audio/mp3',
+    const fileParts =
+      files && files.length > 0 ? await convertFilesToDataURLs(files) : []
+    const assetParts = droppedAssets.map((asset) => ({
+      type: "file" as const,
+      mediaType: asset.type.includes("image")
+        ? "image/png"
+        : asset.type.includes("video")
+          ? "video/mp4"
+          : "audio/mp3",
       url: asset.url,
     }))
 
-    sendMessage(
+    await onSendMessage(
       {
-        role: 'user',
-        parts: [{ type: 'text', text: input }, ...fileParts, ...assetParts],
+        role: "user",
+        parts: [{ type: "text", text: input }, ...fileParts, ...assetParts],
       },
-      { body: { mode, model } }
+      model,
     )
 
-    setInput('')
+    setInput("")
     setFiles(undefined)
     setDroppedAssets([])
     if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+      fileInputRef.current.value = ""
     }
-  }
+  }, [agentAvailable, droppedAssets, files, input, mode, model, onSendMessage])
+
+  const handleSubmit = React.useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault()
+      await submitCurrentMessage()
+    },
+    [submitCurrentMessage],
+  )
 
   return (
-    <div className="p-4 shadow-lg rounded-t-3xl">
-      {/* File Preview */}
+    <div className="rounded-t-3xl p-4 shadow-lg">
       {((files && files.length > 0) || droppedAssets.length > 0) && (
-        <div className="mb-2 flex gap-2 flex-wrap">
-          {/* Dropped assets from canvas nodes */}
+        <div className="mb-2 flex flex-wrap gap-2">
           {droppedAssets.map((asset, index) => (
             <div key={`asset-${index}`} className="relative">
-              {asset.type.includes('image') ? (
+              {asset.type.includes("image") ? (
                 <img
                   src={asset.url}
                   alt={`Canvas asset ${index + 1}`}
                   className="h-16 w-16 rounded object-cover"
                 />
-              ) : asset.type.includes('video') ? (
-                <video
-                  src={asset.url}
-                  className="h-16 w-16 rounded object-cover"
-                />
-              ) : null}
+              ) : asset.type.includes("video") ? (
+                <video src={asset.url} className="h-16 w-16 rounded object-cover" />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
+                  Audio
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => {
-                  setDroppedAssets(prev => prev.filter((_, i) => i !== index))
+                  setDroppedAssets((current) => current.filter((_, itemIndex) => itemIndex !== index))
                 }}
-                className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-foreground text-background flex items-center justify-center text-xs"
+                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-xs text-background"
               >
-                ×
+                x
               </button>
             </div>
           ))}
-          
-          {/* Regular file uploads */}
-          {files && Array.from(files).map((file, index) => (
-            <div key={`file-${index}`} className="relative">
-              {file.type.startsWith('image/') ? (
-                <img
-                  src={URL.createObjectURL(file)}
-                  alt={file.name}
-                  className="h-16 w-16 rounded object-cover"
-                />
-              ) : file.type.startsWith('video/') ? (
-                <video
-                  src={URL.createObjectURL(file)}
-                  className="h-16 w-16 rounded object-cover"
-                />
-              ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  const dt = new DataTransfer()
-                  Array.from(files)
-                    .filter((_, i) => i !== index)
-                    .forEach(f => dt.items.add(f))
-                  setFiles(dt.files.length > 0 ? dt.files : undefined)
-                  if (fileInputRef.current) {
-                    fileInputRef.current.files = dt.files
-                  }
-                }}
-                className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-foreground text-background flex items-center justify-center text-xs"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+
+          {files &&
+            Array.from(files).map((file, index) => (
+              <div key={`file-${index}`} className="relative">
+                {file.type.startsWith("image/") ? (
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt={file.name}
+                    className="h-16 w-16 rounded object-cover"
+                  />
+                ) : file.type.startsWith("video/") ? (
+                  <video src={URL.createObjectURL(file)} className="h-16 w-16 rounded object-cover" />
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded bg-muted px-2 text-center text-xs text-muted-foreground">
+                    {file.name}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const dataTransfer = new DataTransfer()
+                    Array.from(files)
+                      .filter((_, fileIndex) => fileIndex !== index)
+                      .forEach((nextFile) => dataTransfer.items.add(nextFile))
+                    setFiles(dataTransfer.files.length > 0 ? dataTransfer.files : undefined)
+                    if (fileInputRef.current) {
+                      fileInputRef.current.files = dataTransfer.files
+                    }
+                  }}
+                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-xs text-background"
+                >
+                  x
+                </button>
+              </div>
+            ))}
         </div>
       )}
 
@@ -558,58 +716,65 @@ const MessageInput = ({ mode, setMode, model, setModel }: MessageInputProps) => 
         <input
           type="file"
           ref={fileInputRef}
-          onChange={(e) => {
-            if (e.target.files) {
-              setFiles(e.target.files)
+          onChange={(event) => {
+            if (event.target.files) {
+              setFiles(event.target.files)
             }
           }}
-          accept="image/*,video/*"
+          accept="image/*,video/*,audio/*"
           multiple
           className="hidden"
         />
         <div className="flex flex-col gap-2">
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(event) => setInput(event.target.value)}
             onPaste={handlePaste}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSubmit(e)
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault()
+                void submitCurrentMessage()
               }
             }}
             placeholder={
               mode === "chat"
                 ? "Say something..."
-                : "Upload an image or add instructions (e.g. make it warmer, emphasize X)..."
+                : mode === "prompt-recreate"
+                  ? "Upload an image or add instructions (e.g. make it warmer, emphasize X)..."
+                  : agentAvailable
+                    ? "Add text, split clips, move items, change speed, or remove the selected clip..."
+                    : "Open an editor project first to use agent mode..."
             }
             rows={3}
-            className="w-full min-h-[4.5rem] px-0 py-2 bg-transparent resize-y text-base focus:outline-none border-0"
+            className="min-h-[4.5rem] w-full resize-y border-0 bg-transparent px-0 py-2 text-base focus:outline-none"
           />
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               <div className="flex items-center gap-2">
-                <Select value={mode} onValueChange={(v) => setMode(v as ChatMode)}>
-                  <SelectTrigger size="sm" className="h-7 text-xs w-fit min-w-0 px-2">
+                <Select value={mode} onValueChange={(value) => setMode(value as ChatMode)}>
+                  <SelectTrigger size="sm" className="h-7 w-fit min-w-0 px-2 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper" side="top" sideOffset={4}>
                     <SelectItem value="chat">Chat</SelectItem>
                     <SelectItem value="prompt-recreate">Prompt Recreate</SelectItem>
+                    {agentAvailable ? <SelectItem value="agent">Agent</SelectItem> : null}
                   </SelectContent>
                 </Select>
               </div>
               <div className="flex items-center gap-2">
                 <Select value={model} onValueChange={setModel}>
-                  <SelectTrigger size="sm" className="h-7 text-xs w-fit min-w-0 px-2">
+                  <SelectTrigger size="sm" className="h-7 w-fit min-w-0 px-2 text-xs">
                     <SelectValue placeholder="Select model">
                       {model && (
                         <div className="flex items-center gap-2">
                           <ModelIcon identifier={model} size={16} />
                           <span>
                             {(() => {
-                              const m = CHAT_MODELS.find((x) => x.identifier === model)
-                              return m ? formatChatModelName(m.identifier, m.name) : formatChatModelName(model, "")
+                              const selectedModel = CHAT_MODELS.find((item) => item.identifier === model)
+                              return selectedModel
+                                ? formatChatModelName(selectedModel.identifier, selectedModel.name)
+                                : formatChatModelName(model, "")
                             })()}
                           </span>
                         </div>
@@ -617,11 +782,11 @@ const MessageInput = ({ mode, setMode, model, setModel }: MessageInputProps) => 
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent position="popper" side="top" sideOffset={4}>
-                    {CHAT_MODELS.map((m) => (
-                      <SelectItem key={m.identifier} value={m.identifier}>
+                    {CHAT_MODELS.map((chatModel) => (
+                      <SelectItem key={chatModel.identifier} value={chatModel.identifier}>
                         <div className="flex items-center gap-2">
-                          <ModelIcon identifier={m.identifier} size={16} />
-                          <span>{formatChatModelName(m.identifier, m.name)}</span>
+                          <ModelIcon identifier={chatModel.identifier} size={16} />
+                          <span>{formatChatModelName(chatModel.identifier, chatModel.name)}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -642,8 +807,8 @@ const MessageInput = ({ mode, setMode, model, setModel }: MessageInputProps) => 
               <Button
                 type="submit"
                 size="icon"
-                disabled={!input.trim() && !files && droppedAssets.length === 0}
-                className="h-9 w-9 shrink-0 bg-foreground hover:bg-foreground/90 text-background"
+                disabled={(!input.trim() && !files && droppedAssets.length === 0) || (mode === "agent" && !agentAvailable)}
+                className="h-9 w-9 shrink-0 bg-foreground text-background hover:bg-foreground/90"
               >
                 <ArrowUp className="h-5 w-5 text-background" weight="bold" />
               </Button>

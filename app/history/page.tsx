@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { DotsThreeVertical, Download, Trash, Image as ImageIcon, Video, MusicNote } from "@phosphor-icons/react"
 import Image from "next/image"
+import Link from "next/link"
 
 type GenerationType = 'image' | 'video' | 'audio' | 'all'
 
@@ -53,7 +54,7 @@ function getTypeIcon(type: 'image' | 'video' | 'audio') {
   }
 }
 
-export default function AssetsPage() {
+export default function HistoryPage() {
   const [generations, setGenerations] = React.useState<Generation[]>([])
   const [loading, setLoading] = React.useState(true)
   const [activeTab, setActiveTab] = React.useState<GenerationType>('all')
@@ -264,8 +265,19 @@ export default function AssetsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 pt-24 min-h-screen">
-      <h1 className="text-3xl font-bold mb-6">Generation History</h1>
-      
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Generation History</h1>
+        <p className="text-muted-foreground mt-1">
+          Everything generated in the app — images, video, and audio.
+        </p>
+        <Link
+          href="/assets"
+          className="text-sm font-medium text-primary hover:underline mt-2 inline-block"
+        >
+          Asset library
+        </Link>
+      </div>
+
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as GenerationType)}>
         <TabsList className="mb-6">
           <TabsTrigger value="all">All</TabsTrigger>

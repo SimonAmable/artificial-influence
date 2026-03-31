@@ -7,6 +7,7 @@ import type {
   ImageEditorContextType,
   EditorTool,
   MaskMode,
+  ImageEditorVariant,
 } from "@/lib/image-editor/types"
 import { INITIAL_EDITOR_STATE } from "@/lib/image-editor/constants"
 import { serializeCanvas, deserializeCanvas } from "@/lib/image-editor/history-manager"
@@ -168,20 +169,22 @@ const ImageEditorContext = React.createContext<ImageEditorContextType | null>(nu
 interface ImageEditorProviderProps {
   children: React.ReactNode
   initialImage?: string
+  variant?: ImageEditorVariant
 }
 
 // Provider Component
 export function ImageEditorProvider({
   children,
   initialImage,
+  variant = "full",
 }: ImageEditorProviderProps) {
-  const [state, dispatch] = React.useReducer(
-    imageEditorReducer,
-    {
-      ...INITIAL_EDITOR_STATE,
-      currentImage: initialImage || null,
-    }
-  )
+  const [state, dispatch] = React.useReducer(imageEditorReducer, {
+    ...INITIAL_EDITOR_STATE,
+    currentImage: initialImage || null,
+    ...(variant === "inpaint"
+      ? { activeTool: "lasso" as EditorTool, showLayers: false }
+      : {}),
+  })
 
   // Convenience methods
   const setTool = React.useCallback((tool: EditorTool) => {

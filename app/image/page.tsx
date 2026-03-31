@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils"
 import { useModels } from "@/hooks/use-models"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import type { GenerateImageAcceptedPayload } from "@/lib/generate-image-client"
 import { toast } from "sonner"
 
 interface ImageHistoryItem {
@@ -30,13 +31,97 @@ interface ImageHistoryItem {
 }
 
 interface PendingImageRequest {
-  requestId: string
+  clientRequestId: string
   startedAt: string
   prompt: string | null
   model: string
   tool: string
   aspectRatio: string | null
   referenceImageUrls: string[]
+  generationId?: string | null
+  predictionId?: string | null
+}
+
+function createClientRequestId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID()
+  }
+
+  return `pending-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function getPendingRequestKey(request: PendingImageRequest) {
+  if (request.generationId) return `generation-${request.generationId}`
+  if (request.predictionId) return `prediction-${request.predictionId}`
+  return `client-${request.clientRequestId}`
+}
+
+function isSamePendingRequest(a: PendingImageRequest, b: PendingImageRequest) {
+  return (
+    (Boolean(a.generationId) && a.generationId === b.generationId) ||
+    (Boolean(a.predictionId) && a.predictionId === b.predictionId) ||
+    a.clientRequestId === b.clientRequestId
+  )
+}
+
+function sortPendingRequests(requests: PendingImageRequest[]) {
+  return [...requests].sort((a, b) => {
+    const aTime = Date.parse(a.startedAt)
+    const bTime = Date.parse(b.startedAt)
+    return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime)
+  })
+}
+
+function mergePendingRequests(
+  existing: PendingImageRequest[],
+  incoming: PendingImageRequest[]
+) {
+  const mergedIncoming = incoming.map((incomingRequest) => {
+    const existingMatch = existing.find((request) => isSamePendingRequest(request, incomingRequest))
+
+    if (!existingMatch) {
+      return incomingRequest
+    }
+
+    return {
+      ...existingMatch,
+      ...incomingRequest,
+      clientRequestId: existingMatch.clientRequestId,
+    }
+  })
+
+  const unresolvedOptimistic = existing.filter((request) => {
+    if (request.generationId || request.predictionId) {
+      return false
+    }
+
+    return !mergedIncoming.some((mergedRequest) => mergedRequest.clientRequestId === request.clientRequestId)
+  })
+
+  return sortPendingRequests([...mergedIncoming, ...unresolvedOptimistic])
+}
+
+function removePendingRequest(
+  requests: PendingImageRequest[],
+  target: PendingImageRequest
+) {
+  return requests.filter((request) => !isSamePendingRequest(request, target))
+}
+
+function prependUniqueHistoryItems(
+  currentItems: ImageHistoryItem[],
+  newItems: ImageHistoryItem[]
+) {
+  const seenUrls = new Set<string>()
+
+  return [...newItems, ...currentItems].filter((item) => {
+    if (seenUrls.has(item.url)) {
+      return false
+    }
+
+    seenUrls.add(item.url)
+    return true
+  })
 }
 
 const CHARACTER_SWAP_UI_MODEL_IDENTIFIER = "custom/character-swap"
@@ -75,15 +160,14 @@ export default function ImagePage() {
   const [characterSwapSceneImage, setCharacterSwapSceneImage] = React.useState<ImageUpload | null>(null)
   const [characterSwapMode, setCharacterSwapMode] = React.useState<CharacterSwapMode>("full_character")
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
-  const [inFlightCount, setInFlightCount] = React.useState(0)
-  const [slotsFilled, setSlotsFilled] = React.useState(0)
+  const [pendingRequests, setPendingRequests] = React.useState<PendingImageRequest[]>([])
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [historyError, setHistoryError] = React.useState<string | null>(null)
   const [enhancePrompt, setEnhancePrompt] = React.useState(false)
   const historyAbortRef = React.useRef<AbortController | null>(null)
   const historyRequestIdRef = React.useRef(0)
-  const isGenerating = inFlightCount > 0
+  const isGenerating = pendingRequests.length > 0
 
   const { models: imageModels, isLoading: modelsLoading } = useModels('image')
   const effectiveImageModels = React.useMemo(() => {
@@ -152,7 +236,7 @@ export default function ImagePage() {
     setHistoryError(null)
 
     try {
-      const response = await fetch(`/api/generations?type=image&limit=${limit}`, {
+      const response = await fetch(`/api/generations?type=image&limit=${limit}&includePending=true`, {
         signal: controller.signal,
       })
 
@@ -161,32 +245,64 @@ export default function ImagePage() {
       }
 
       const data = await response.json()
-      const imageRows = Array.isArray(data.generations)
-        ? data.generations
-            .map((g: {
-              url?: string; model?: string | null; prompt?: string | null;
-              id?: string; tool?: string | null; aspect_ratio?: string | null;
-              type?: string | null; created_at?: string | null;
-              reference_image_urls?: string[];
-            }) => ({
-              id: g.id,
-              url: g.url,
-              model: g.model ?? null,
-              prompt: g.prompt ?? null,
-              tool: g.tool ?? null,
-              aspectRatio: g.aspect_ratio ?? null,
-              type: g.type ?? null,
-              createdAt: g.created_at ?? null,
-              reference_image_urls: g.reference_image_urls ?? [],
-            }))
-            .filter(
-              (item: ImageHistoryItem): item is ImageHistoryItem =>
-                typeof item.url === "string" && item.url.length > 0
-            )
+      const generations = Array.isArray(data.generations)
+        ? data.generations as Array<{
+            url?: string
+            model?: string | null
+            prompt?: string | null
+            id?: string
+            tool?: string | null
+            aspect_ratio?: string | null
+            type?: string | null
+            created_at?: string | null
+            reference_image_urls?: string[]
+            status?: string | null
+            replicate_prediction_id?: string | null
+          }>
         : []
+
+      const imageRows = generations.reduce<ImageHistoryItem[]>((items, generation) => {
+        if (typeof generation.url !== "string" || generation.url.length === 0) {
+          return items
+        }
+
+        items.push({
+          id: generation.id,
+          url: generation.url,
+          model: generation.model ?? null,
+          prompt: generation.prompt ?? null,
+          tool: generation.tool ?? null,
+          aspectRatio: generation.aspect_ratio ?? null,
+          type: generation.type ?? null,
+          createdAt: generation.created_at ?? null,
+          reference_image_urls: generation.reference_image_urls ?? [],
+        })
+
+        return items
+      }, [])
+
+      const serverPendingRequests = generations
+        .filter((generation) => generation.status === "pending")
+        .map((generation) => ({
+          clientRequestId:
+            generation.id
+              ? `server-${generation.id}`
+              : generation.replicate_prediction_id
+                ? `prediction-${generation.replicate_prediction_id}`
+                : `pending-${generation.created_at ?? generation.model ?? "unknown"}`,
+          startedAt: generation.created_at ?? new Date().toISOString(),
+          prompt: generation.prompt ?? null,
+          model: generation.model ?? "",
+          tool: generation.tool ?? "image",
+          aspectRatio: generation.aspect_ratio ?? null,
+          referenceImageUrls: generation.reference_image_urls ?? [],
+          generationId: generation.id ?? null,
+          predictionId: generation.replicate_prediction_id ?? null,
+        }))
 
       if (requestId === historyRequestIdRef.current) {
         setHistoryImages(imageRows)
+        setPendingRequests((currentRequests) => mergePendingRequests(currentRequests, serverPendingRequests))
       }
     } catch (err) {
       if (controller.signal.aborted) {
@@ -212,6 +328,20 @@ export default function ImagePage() {
       historyAbortRef.current?.abort()
     }
   }, [fetchImageHistory])
+
+  React.useEffect(() => {
+    if (pendingRequests.length === 0) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      void fetchImageHistory(20)
+    }, 2500)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [fetchImageHistory, pendingRequests.length])
 
   // Handle image generation
   const handleGenerate = async () => {
@@ -254,8 +384,6 @@ export default function ImagePage() {
       }
     }
 
-    setInFlightCount((n) => n + 1)
-
     // Capture form state for append (avoids stale closure when concurrent requests complete out of order)
     const capturedPrompt = isCharacterSwapModel ? CHARACTER_SWAP_PROMPTS[characterSwapMode] : prompt.trim()
     const capturedModel = selectedModel
@@ -263,7 +391,21 @@ export default function ImagePage() {
     const capturedAspectRatio = isCharacterSwapModel ? "match_input_image" : selectedAspectRatio
     const capturedRefUrls = isCharacterSwapModel
       ? [characterSwapCharacterImage?.url, characterSwapSceneImage?.url].filter(Boolean) as string[]
-      : referenceImages.map((r) => r.url).filter(Boolean) as string[]
+      : (referenceImages.length > 0 ? referenceImages : (referenceImage ? [referenceImage] : []))
+          .map((image) => image.url)
+          .filter(Boolean) as string[]
+    const clientRequestId = createClientRequestId()
+    const optimisticPendingRequest: PendingImageRequest = {
+      clientRequestId,
+      startedAt: new Date().toISOString(),
+      prompt: capturedPrompt || null,
+      model: capturedModel,
+      tool: capturedTool,
+      aspectRatio: capturedAspectRatio,
+      referenceImageUrls: capturedRefUrls,
+    }
+
+    setPendingRequests((currentRequests) => sortPendingRequests([optimisticPendingRequest, ...currentRequests]))
 
     try {
 
@@ -326,8 +468,28 @@ export default function ImagePage() {
       console.log('Sending request with reference images:', totalRefImages, 'numImages:', selectedNumImages)
       
       const { generateImageAndWait } = await import('@/lib/generate-image-client')
-      const result = await generateImageAndWait(formData)
-      // Append new image(s) to state instead of refetching - only fetch on first load
+      const result = await generateImageAndWait(
+        formData,
+        undefined,
+        ({ generationId, predictionId }: GenerateImageAcceptedPayload) => {
+          setPendingRequests((currentRequests) =>
+            sortPendingRequests(
+              currentRequests.map((request) =>
+                request.clientRequestId === clientRequestId
+                  ? {
+                      ...request,
+                      generationId: generationId ?? request.generationId ?? null,
+                      predictionId,
+                    }
+                  : request
+              )
+            )
+          )
+
+          void fetchImageHistory(20)
+        }
+      )
+
       const newItems: ImageHistoryItem[] = result.image
         ? [{ url: result.image.url, model: capturedModel, prompt: capturedPrompt || null, tool: capturedTool, aspectRatio: capturedAspectRatio, reference_image_urls: capturedRefUrls }]
         : (result.images ?? []).map((img) => ({
@@ -338,11 +500,13 @@ export default function ImagePage() {
             aspectRatio: capturedAspectRatio,
             reference_image_urls: capturedRefUrls,
           }))
-      setHistoryImages((prev) => [...newItems, ...prev])
-      setSlotsFilled((n) => n + newItems.length)
+      setPendingRequests((currentRequests) => removePendingRequest(currentRequests, optimisticPendingRequest))
+      setHistoryImages((currentImages) => prependUniqueHistoryItems(currentImages, newItems))
+      void fetchImageHistory(20)
     } catch (err) {
       console.error('Error generating image:', err)
       const message = err instanceof Error ? err.message : 'Failed to generate image'
+      setPendingRequests((currentRequests) => removePendingRequest(currentRequests, optimisticPendingRequest))
       if (message.includes('Insufficient credits')) {
         toast.error(message, {
           description: "Upgrade your plan to continue generating images",
@@ -354,8 +518,7 @@ export default function ImagePage() {
         })
       }
       setError(message)
-    } finally {
-      setInFlightCount((n) => Math.max(0, n - 1))
+      void fetchImageHistory(20)
     }
   }
 
@@ -512,14 +675,13 @@ export default function ImagePage() {
       ...img,
       referenceImageUrls: img.reference_image_urls ?? (img as { referenceImageUrls?: string[] }).referenceImageUrls ?? [],
     })
-    const generating = Array.from({ length: inFlightCount }, (_, i) => ({
+    const generating = pendingRequests.map((request) => ({
       type: "generating" as const,
-      id: `gen-${i}`,
+      id: getPendingRequestKey(request),
     }))
-    const filled = historyImages.slice(0, slotsFilled).map((img) => ({ type: "image" as const, data: toImageData(img) }))
-    const older = historyImages.slice(slotsFilled).map((img) => ({ type: "image" as const, data: toImageData(img) }))
-    return [...generating, ...filled, ...older]
-  }, [historyImages, slotsFilled, inFlightCount])
+    const completed = historyImages.map((img) => ({ type: "image" as const, data: toImageData(img) }))
+    return [...generating, ...completed]
+  }, [historyImages, pendingRequests])
 
   // Render generated image or showcase card
   const renderShowcase = () => {

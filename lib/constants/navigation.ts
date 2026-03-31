@@ -20,7 +20,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/canvases", label: "Canvas" },
   { path: "/image", label: "Image" },
   { path: "/video", label: "Video" },
-  { path: "/influencer-generator", label: "Image Editing" },
+  { path: "/inpaint", label: "Image Editing" },
   { path: "/character-swap", label: "Character Swap" },
   { path: "/motion-copy", label: "Motion Copy" },
   { path: "/lipsync", label: "Lipsync" },

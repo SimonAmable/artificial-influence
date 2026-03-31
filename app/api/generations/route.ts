@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const tool = searchParams.get('tool');
     const limit = parseInt(searchParams.get('limit') || '100', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const includePending = searchParams.get('includePending') === 'true';
 
     // Build query
     let query = supabase
@@ -38,8 +39,10 @@ export async function GET(request: NextRequest) {
       query = query.eq('tool', tool);
     }
 
-    // Exclude pending (async Replicate) so list only shows completed/failed with results
-    query = query.neq('status', 'pending');
+    // Default to completed/failed history, but allow callers to hydrate active pending rows.
+    if (!includePending) {
+      query = query.neq('status', 'pending');
+    }
 
     const { data: generations, error } = await query;
 
