@@ -126,6 +126,37 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       } as Model,
     ]
   }, [imageModels])
+
+  /** Align with app default (Nano Banana 2); fix Radix Select when stored id is missing from the list. */
+  const canvasSelectedImageModel = React.useMemo(() => {
+    if (effectiveImageModels.length === 0) {
+      return nodeData.model || DEFAULT_IMAGE_MODEL_IDENTIFIER
+    }
+    if (
+      nodeData.model &&
+      effectiveImageModels.some((m) => m.identifier === nodeData.model)
+    ) {
+      return nodeData.model
+    }
+    return (
+      effectiveImageModels.find(
+        (m) => m.identifier === DEFAULT_IMAGE_MODEL_IDENTIFIER
+      )?.identifier ?? effectiveImageModels[0]!.identifier
+    )
+  }, [effectiveImageModels, nodeData.model])
+
+  React.useEffect(() => {
+    if (effectiveImageModels.length === 0) return
+    if (nodeData.model === canvasSelectedImageModel) return
+    nodeData.onDataChange?.(id, { model: canvasSelectedImageModel })
+  }, [
+    canvasSelectedImageModel,
+    effectiveImageModels.length,
+    id,
+    nodeData.model,
+    nodeData.onDataChange,
+  ])
+
   const [width, height] = getImageDimensions(nodeData.aspectRatio || "match_input_image")
   const [isHovered, setIsHovered] = React.useState(false)
   const [isEditingTitle, setIsEditingTitle] = React.useState(false)
@@ -637,7 +668,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     try {
       const formData = new FormData()
       formData.append("prompt", fullPrompt)
-      formData.append("model", nodeData.model || DEFAULT_IMAGE_MODEL_IDENTIFIER)
+      formData.append("model", canvasSelectedImageModel)
       formData.append("enhancePrompt", String(nodeData.enhancePrompt))
       if (nodeData.aspectRatio) {
         formData.append("aspectRatio", nodeData.aspectRatio)
@@ -1098,7 +1129,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           onGenerate={handleGenerate}
           allowConcurrent={true}
           allowOptionsDuringGeneration={true}
-          selectedModel={nodeData.model || effectiveImageModels[0]?.identifier || ""}
+          selectedModel={canvasSelectedImageModel}
           onModelChange={(value) => nodeData.onDataChange?.(id, { model: value })}
           showModelSelector={true}
           imageModels={effectiveImageModels}

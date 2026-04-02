@@ -1,4 +1,5 @@
 import type { Node, Edge } from "@xyflow/react"
+import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import type { ExecutionCallbacks, NodeOutput } from "./types"
 
 /**
@@ -101,7 +102,10 @@ async function executeNode(
 
       const formData = new FormData()
       formData.append("prompt", prompt.trim())
-      formData.append("model", (data.model as string) || "google/nano-banana")
+      formData.append(
+        "model",
+        (data.model as string) || DEFAULT_IMAGE_MODEL_IDENTIFIER
+      )
       formData.append("enhancePrompt", String(data.enhancePrompt ?? false))
       const aspectRatio = (data.aspectRatio as string) || "1:1"
       formData.append("aspectRatio", aspectRatio)

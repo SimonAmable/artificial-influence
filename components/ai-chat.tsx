@@ -57,21 +57,61 @@ interface AIChatProps {
 
 export type ChatMode = "chat" | "prompt-recreate" | "agent"
 
-const SUGGESTIONS_BY_MODE: Record<ChatMode, string[]> = {
+interface ChatSuggestion {
+  label: string
+  prompt: string
+}
+
+const SUGGESTIONS_BY_MODE: Record<ChatMode, ChatSuggestion[]> = {
   chat: [
-    "How do I get started on the canvas?",
-    "Which models are best for images?",
-    "Fastest path from idea to export?",
+    {
+      label: "How do I get started on the canvas?",
+      prompt: "How do I get started on the canvas?",
+    },
+    {
+      label: "Which models are best for images?",
+      prompt: "Which models are best for images?",
+    },
+    {
+      label: "Fastest path from idea to export?",
+      prompt: "Fastest path from idea to export?",
+    },
   ],
   "prompt-recreate": [
-    "What should I upload for best results?",
-    "What does the JSON output include?",
-    "Tips for matching lighting and color",
+    {
+      label: "Copy pose into new scene",
+      prompt:
+        "Use the uploaded image as a pose and framing reference. Write a Nano Banana 2 prompt that keeps the same pose, camera angle, and facial expression, but places the subject in a new scene. Separate what must stay locked from what should change, and describe the new setting, lighting, wardrobe, and mood clearly.",
+    },
+    {
+      label: "Keep product, change campaign",
+      prompt:
+        "Use the uploaded image as the product reference. Write a Nano Banana 2 prompt that keeps the product design, color, proportions, and branding unchanged, but restages it in a premium ad scene with commercial lighting, realistic reflections, and clean copy space.",
+    },
+    {
+      label: "Make a consistency set",
+      prompt:
+        "Use the uploaded portrait as the character reference. Write a Nano Banana 2 prompt pack for three campaign variations that keep the same identity, hair, face, and body proportions while changing the scene, styling, and camera distance.",
+    },
+    {
+      label: "Rebuild poster with exact text",
+      prompt:
+        "Analyze the uploaded poster or ad and recreate it as a cleaner production prompt. Keep the layout logic, quote all visible text exactly, note the typography and placement, and recommend Nano Banana Pro if text fidelity is critical.",
+    },
   ],
   agent: [
-    "Add a text layer titled Hello",
-    "Split the selected clip at the playhead",
-    "Remove the selected items",
+    {
+      label: "Add a text layer titled Hello",
+      prompt: "Add a text layer titled Hello",
+    },
+    {
+      label: "Split the selected clip at the playhead",
+      prompt: "Split the selected clip at the playhead",
+    },
+    {
+      label: "Remove the selected items",
+      prompt: "Remove the selected items",
+    },
   ],
 }
 
@@ -143,11 +183,16 @@ export function AIChat({ className }: AIChatProps) {
     [mode, sendAgentMessage, sendMessage],
   )
 
-  const handleSuggestionSend = React.useCallback(
+  const handleSuggestionSelect = React.useCallback(
     (text: string) => {
+      if (mode === "prompt-recreate") {
+        window.dispatchEvent(new CustomEvent("chat-add-text", { detail: { text } }))
+        return
+      }
+
       void handleSendMessage({ role: "user", parts: [{ type: "text", text }] }, model)
     },
-    [handleSendMessage, model],
+    [handleSendMessage, mode, model],
   )
 
   React.useEffect(() => {
@@ -409,11 +454,11 @@ export function AIChat({ className }: AIChatProps) {
                               ? "Prompt Recreate"
                               : "Editor Agent"
                         }
-                        description={
-                          mode === "chat"
-                            ? "Ask me about workflows, models, the canvas, or the fastest way to go from idea to finished content."
-                            : mode === "prompt-recreate"
-                              ? "Upload an image to decompose its visual elements and get a NanoBanana Pro JSON prompt to recreate it."
+                         description={
+                           mode === "chat"
+                             ? "Ask me about workflows, models, the canvas, or the fastest way to go from idea to finished content."
+                             : mode === "prompt-recreate"
+                              ? "Attach one or more reference images, describe what should stay fixed or change, and get a Nano Banana-ready prompt package for recreate, pose transfer, product restaging, or poster rebuilds."
                               : agentAvailable
                                 ? "Ask me to add text, split clips, remove items, move clips, change speed, or chain several actions together."
                                 : "Open an editor project first to bind the agent to a timeline."
@@ -423,10 +468,12 @@ export function AIChat({ className }: AIChatProps) {
                         <div className="flex w-full max-w-md flex-wrap justify-center gap-2">
                           {SUGGESTIONS_BY_MODE[mode].map((suggestion) => (
                             <Suggestion
-                              key={suggestion}
-                              suggestion={suggestion}
-                              onClick={handleSuggestionSend}
-                            />
+                              key={suggestion.label}
+                              suggestion={suggestion.prompt}
+                              onClick={handleSuggestionSelect}
+                            >
+                              {suggestion.label}
+                            </Suggestion>
                           ))}
                         </div>
                       ) : null}
@@ -517,10 +564,12 @@ export function AIChat({ className }: AIChatProps) {
                   <Suggestions className="pb-1">
                     {SUGGESTIONS_BY_MODE[mode].map((suggestion) => (
                       <Suggestion
-                        key={suggestion}
-                        suggestion={suggestion}
-                        onClick={handleSuggestionSend}
-                      />
+                        key={suggestion.label}
+                        suggestion={suggestion.prompt}
+                        onClick={handleSuggestionSelect}
+                      >
+                        {suggestion.label}
+                      </Suggestion>
                     ))}
                   </Suggestions>
                 </div>
@@ -783,7 +832,7 @@ function MessageInput({
               mode === "chat"
                 ? "Say something..."
                 : mode === "prompt-recreate"
-                  ? "Upload an image or add instructions (e.g. make it warmer, emphasize X)..."
+                  ? "Attach references, then describe the workflow (e.g. keep the pose, move the subject to a rooftop editorial scene, preserve face and outfit)..."
                   : agentAvailable
                     ? "Add text, split clips, move items, change speed, or remove the selected clip..."
                     : "Open an editor project first to use agent mode..."

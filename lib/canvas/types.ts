@@ -1,4 +1,5 @@
 import type { Node, Edge } from "@xyflow/react"
+import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 
 // ===== Node Type Identifiers =====
 export type CanvasNodeType = "image-gen" | "video-gen" | "text" | "audio" | "upload" | "group"
@@ -117,7 +118,7 @@ export function createImageGenNodeData(): ImageGenNodeData {
     connectedPrompt: "",
     connectedImageUrls: [],
     manualImageUrls: [],
-    model: "google/nano-banana",
+    model: DEFAULT_IMAGE_MODEL_IDENTIFIER,
     aspectRatio: "1:1",
     enhancePrompt: false,
     generatedImageUrl: null,
