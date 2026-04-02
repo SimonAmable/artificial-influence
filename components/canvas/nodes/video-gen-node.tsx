@@ -486,7 +486,8 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       const url = URL.createObjectURL(file)
       const duration = await getVideoDuration(url)
       const isMotionCopy = selectedModel?.identifier === "kwaivgi/kling-v2.6-motion-control" || selectedModel?.identifier === "kwaivgi/kling-v3-motion-control"
-      const maxDuration = (isMotionCopy && nodeData.parameters?.character_orientation === "video") ? 30 : 10
+      const maxDuration =
+        isMotionCopy && (nodeData.parameters?.character_orientation ?? "video") === "video" ? 30 : 10
 
       if (duration > maxDuration) {
         nodeData.onDataChange?.(id, {
@@ -1216,6 +1217,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                     onChange={handleCustomVideoChange}
                     title="Upload Video"
                     description="Click to upload"
+                    maxDurationSeconds={
+                      (nodeData.parameters?.character_orientation ?? "video") === "video" ? 30 : 10
+                    }
                   />
                 </div>
               )}

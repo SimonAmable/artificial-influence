@@ -344,7 +344,8 @@ export default function MotionCopyPage() {
                     }}
                     videoUploadProps={{
                       title: "Background source",
-                      description: ""
+                      description: "",
+                      maxDurationSeconds: characterOrientation === "video" ? 30 : 10,
                     }}
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
@@ -374,7 +375,8 @@ export default function MotionCopyPage() {
                         }}
                         videoUploadProps={{
                           title: "Background source",
-                          description: ""
+                          description: "",
+                          maxDurationSeconds: characterOrientation === "video" ? 30 : 10,
                         }}
                         isGenerating={isGenerating}
                         onGenerate={handleGenerate}
@@ -405,7 +407,8 @@ export default function MotionCopyPage() {
                     }}
                     videoUploadProps={{
                       title: "Background source",
-                      description: ""
+                      description: "",
+                      maxDurationSeconds: characterOrientation === "video" ? 30 : 10,
                     }}
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}

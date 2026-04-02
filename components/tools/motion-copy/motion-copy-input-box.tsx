@@ -24,6 +24,8 @@ export interface MotionCopyInputBoxProps {
   videoUploadProps?: {
     title?: string
     description?: string
+    /** Motion copy: 10 for image orientation, 30 for video orientation */
+    maxDurationSeconds?: number
   }
   extraControls?: React.ReactNode
 }
@@ -106,6 +108,7 @@ export function MotionCopyInputBox({
             onChange={handleVideoChange}
             title={videoUploadProps?.title || "Upload Video"}
             description={videoUploadProps?.description || "Click to upload video"}
+            maxDurationSeconds={videoUploadProps?.maxDurationSeconds ?? 10}
           />
         </div>
 

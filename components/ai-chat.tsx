@@ -454,10 +454,10 @@ export function AIChat({ className }: AIChatProps) {
                               ? "Prompt Recreate"
                               : "Editor Agent"
                         }
-                         description={
-                           mode === "chat"
-                             ? "Ask me about workflows, models, the canvas, or the fastest way to go from idea to finished content."
-                             : mode === "prompt-recreate"
+                        description={
+                          mode === "chat"
+                            ? "Ask me about workflows, models, the canvas, or the fastest way to go from idea to finished content."
+                            : mode === "prompt-recreate"
                               ? "Attach one or more reference images, describe what should stay fixed or change, and get a Nano Banana-ready prompt package for recreate, pose transfer, product restaging, or poster rebuilds."
                               : agentAvailable
                                 ? "Ask me to add text, split clips, remove items, move clips, change speed, or chain several actions together."
