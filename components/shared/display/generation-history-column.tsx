@@ -192,15 +192,29 @@ export function GenerationHistoryColumn({
           imageUrl={fullscreenImage.url}
           metadata={{
             id: fullscreenImage.id,
-            model: fullscreenImage.model,
-            prompt: fullscreenImage.prompt,
-            tool: fullscreenImage.tool,
-            aspectRatio: fullscreenImage.aspectRatio,
-            type: fullscreenImage.type,
-            createdAt: fullscreenImage.createdAt,
+            model: fullscreenImage.model ?? null,
+            prompt: fullscreenImage.prompt ?? null,
+            tool: fullscreenImage.tool ?? null,
+            aspectRatio: fullscreenImage.aspectRatio ?? null,
+            type: fullscreenImage.type ?? null,
+            createdAt: fullscreenImage.createdAt ?? null,
           }}
           referenceImages={(fullscreenImage.referenceImageUrls ?? []).map((imageUrl) => ({ imageUrl }))}
           onClose={() => setFullscreenImage(null)}
+          onDownload={(url) => {
+            const a = document.createElement("a")
+            a.href = url
+            a.download = ""
+            a.rel = "noopener"
+            a.click()
+          }}
+          onCopy={async (url) => {
+            try {
+              await navigator.clipboard.writeText(url)
+            } catch {
+              /* ignore */
+            }
+          }}
         />
       )}
     </>

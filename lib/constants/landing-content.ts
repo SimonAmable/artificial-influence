@@ -6,6 +6,7 @@ import type {
 } from "@/lib/types/landing"
 
 export const landingHero = {
+  eyebrow: "Creative workflows",
   title: "Create winning ads with AI",
   description:
     "Choose top AI actors and video templates, then dial in the details with our creative tools.",

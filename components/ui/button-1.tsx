@@ -51,10 +51,10 @@ const createStopsArray = (
   svgOrder: readonly SvgKey[],
   maxStops: number
 ): Stop[][] => {
-  let stopsArray: Stop[][] = [];
+  const stopsArray: Stop[][] = [];
   for (let i = 0; i < maxStops; i++) {
-    let stopConfigurations = svgOrder.map((svgKey) => {
-      let svg = svgStates[svgKey];
+    const stopConfigurations = svgOrder.map((svgKey) => {
+      const svg = svgStates[svgKey];
       return svg.stops[i] || svg.stops[svg.stops.length - 1];
     });
     stopsArray.push(stopConfigurations);
@@ -165,11 +165,11 @@ const GradientSvg: React.FC<GradientSvgProps> = ({
   const variants = {
     hovered: {
       gradientTransform: gradientTransform,
-      transition: { duration: 60, repeat: Infinity, ease: 'linear' },
+      transition: { duration: 60, repeat: Infinity, ease: 'linear' as const },
     },
     notHovered: {
       gradientTransform: gradientTransform,
-      transition: { duration: 20, repeat: Infinity, ease: 'linear' },
+      transition: { duration: 20, repeat: Infinity, ease: 'linear' as const },
     },
   };
 
@@ -210,7 +210,7 @@ const GradientSvg: React.FC<GradientSvgProps> = ({
                 }}
                 transition={{
                   duration: 0,
-                  ease: 'linear',
+                  ease: 'linear' as const,
                   repeat: Infinity,
                 }}
               />
