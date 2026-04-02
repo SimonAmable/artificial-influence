@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { UNICAN_ASSISTANT_NAME } from "@/lib/constants/system-prompts"
-import { MemoizedMarkdown } from "@/components/memoized-markdown"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { useProjectAgentChat } from "@/hooks/use-project-agent-chat"
 import { EDITOR_RUNTIME_EVENT } from "@/lib/editor/runtime"
@@ -24,11 +23,11 @@ import type { EditorRuntimeContext } from "@/lib/editor/types"
 import {
   Conversation,
   ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
 } from "@/components/ai-elements/conversation"
-import {
-  Message,
-  MessageContent,
-} from "@/components/ai-elements/message"
+import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message"
+import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion"
 import { ToolExecutionList } from "@/components/ai-elements/tool-execution"
 
 const CHAT_MODELS = [
@@ -58,6 +57,24 @@ interface AIChatProps {
 
 export type ChatMode = "chat" | "prompt-recreate" | "agent"
 
+const SUGGESTIONS_BY_MODE: Record<ChatMode, string[]> = {
+  chat: [
+    "How do I get started on the canvas?",
+    "Which models are best for images?",
+    "Fastest path from idea to export?",
+  ],
+  "prompt-recreate": [
+    "What should I upload for best results?",
+    "What does the JSON output include?",
+    "Tips for matching lighting and color",
+  ],
+  agent: [
+    "Add a text layer titled Hello",
+    "Split the selected clip at the playhead",
+    "Remove the selected items",
+  ],
+}
+
 export function AIChat({ className }: AIChatProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [mode, setMode] = React.useState<ChatMode>("chat")
@@ -70,10 +87,9 @@ export function AIChat({ className }: AIChatProps) {
     activeRoute: "other",
   })
   const dragCounter = React.useRef(0)
-  const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const chatContainerRef = React.useRef<HTMLDivElement>(null)
 
-  const { messages, sendMessage, setMessages } = useChat({
+  const { messages, sendMessage, setMessages, status: chatStatus } = useChat({
     chat: generalChat,
     experimental_throttle: 50,
   })
@@ -83,6 +99,7 @@ export function AIChat({ className }: AIChatProps) {
     clearAgentMessages,
     commandHistory,
     pendingAction,
+    status: agentStatus,
   } = useProjectAgentChat({
     projectId: editorContext.projectId,
     selectionItemIds: editorContext.selectionItemIds,
@@ -91,6 +108,8 @@ export function AIChat({ className }: AIChatProps) {
 
   const activeMessages = mode === "agent" ? agentMessages : messages
   const agentAvailable = Boolean(editorContext.projectId)
+  const streamStatus = mode === "agent" ? agentStatus : chatStatus
+  const suggestionsIdle = streamStatus === "ready"
 
   const clearMessages = React.useCallback(() => {
     if (mode === "agent") {
@@ -124,9 +143,12 @@ export function AIChat({ className }: AIChatProps) {
     [mode, sendAgentMessage, sendMessage],
   )
 
-  React.useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [activeMessages])
+  const handleSuggestionSend = React.useCallback(
+    (text: string) => {
+      void handleSendMessage({ role: "user", parts: [{ type: "text", text }] }, model)
+    },
+    [handleSendMessage, model],
+  )
 
   React.useEffect(() => {
     const handleOpenChat = () => {
@@ -365,41 +387,51 @@ export function AIChat({ className }: AIChatProps) {
                 </div>
               </div>
 
-              <Conversation className="p-4">
-                <ConversationContent className="space-y-4">
-                  {activeMessages.length === 0 && (
-                    <div className="flex h-full flex-col items-center justify-center space-y-3 text-center text-muted-foreground">
-                      <Image src="/logo.svg" alt="" width={64} height={64} className="dark:invert" />
-                      <div className="mx-auto max-w-[min(100%,20rem)] space-y-2">
-                        {mode === "chat" ? (
-                          <>
-                            <p className="font-medium text-foreground">Hi - I&apos;m {UNICAN_ASSISTANT_NAME}</p>
-                            <p className="text-sm leading-relaxed">
-                              Ask me about workflows, models, the canvas, or the fastest way to go
-                              from idea to finished content.
-                            </p>
-                          </>
-                        ) : mode === "prompt-recreate" ? (
-                          <>
-                            <p className="font-medium text-foreground">Prompt Recreate</p>
-                            <p className="text-sm">
-                              Upload an image to decompose its visual elements and get a
-                              NanoBanana Pro JSON prompt to recreate it.
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="font-medium text-foreground">Editor Agent</p>
-                            <p className="text-sm">
-                              {agentAvailable
+              <Conversation className="min-h-0 flex-1">
+                <ConversationContent
+                  className={
+                    activeMessages.length === 0
+                      ? "flex min-h-full flex-col items-center justify-center gap-6 p-4 text-center"
+                      : undefined
+                  }
+                >
+                  {activeMessages.length === 0 ? (
+                    <>
+                      <ConversationEmptyState
+                        className="h-auto min-h-0 w-full max-w-sm shrink-0 text-muted-foreground"
+                        icon={
+                          <Image src="/logo.svg" alt="" width={64} height={64} className="dark:invert" />
+                        }
+                        title={
+                          mode === "chat"
+                            ? `Hi, I'm ${UNICAN_ASSISTANT_NAME}`
+                            : mode === "prompt-recreate"
+                              ? "Prompt Recreate"
+                              : "Editor Agent"
+                        }
+                        description={
+                          mode === "chat"
+                            ? "Ask me about workflows, models, the canvas, or the fastest way to go from idea to finished content."
+                            : mode === "prompt-recreate"
+                              ? "Upload an image to decompose its visual elements and get a NanoBanana Pro JSON prompt to recreate it."
+                              : agentAvailable
                                 ? "Ask me to add text, split clips, remove items, move clips, change speed, or chain several actions together."
-                                : "Open an editor project first to bind the agent to a timeline."}
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                                : "Open an editor project first to bind the agent to a timeline."
+                        }
+                      />
+                      {suggestionsIdle && (mode !== "agent" || agentAvailable) ? (
+                        <div className="flex w-full max-w-md flex-wrap justify-center gap-2">
+                          {SUGGESTIONS_BY_MODE[mode].map((suggestion) => (
+                            <Suggestion
+                              key={suggestion}
+                              suggestion={suggestion}
+                              onClick={handleSuggestionSend}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : null}
 
                   {mode === "agent" && pendingAction ? (
                     <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
@@ -407,27 +439,23 @@ export function AIChat({ className }: AIChatProps) {
                     </div>
                   ) : null}
 
-                  {activeMessages.map((message) => (
-                    <Message
-                      key={message.id}
-                      from={message.role === "user" ? "user" : "assistant"}
-                    >
-                      {message.role === "assistant" && (
-                        <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white">
-                          <Image src="/logo.svg" alt="" width={16} height={16} />
-                        </div>
-                      )}
+                  {activeMessages.map((message) => {
+                    const fromRole = message.role === "user" ? "user" : "assistant"
+                    return (
+                      <Message key={message.id} from={fromRole}>
+                        {message.role === "assistant" ? (
+                          <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white">
+                            <Image src="/logo.svg" alt="" width={16} height={16} />
+                          </div>
+                        ) : null}
 
-                      <MessageContent from={message.role === "user" ? "user" : "assistant"}>
-                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                        <MessageContent>
                           {message.parts.map((part, index) => {
                             if (part.type === "text") {
                               return (
-                                <MemoizedMarkdown
-                                  key={`${message.id}-${index}`}
-                                  id={message.id}
-                                  content={part.text}
-                                />
+                                <MessageResponse key={`${message.id}-${index}`}>
+                                  {part.text}
+                                </MessageResponse>
                               )
                             }
 
@@ -470,18 +498,33 @@ export function AIChat({ className }: AIChatProps) {
 
                             return null
                           })}
-                        </div>
-                      </MessageContent>
-                    </Message>
-                  ))}
+                        </MessageContent>
+                      </Message>
+                    )
+                  })}
 
                   {mode === "agent" && commandHistory.length > 0 ? (
                     <ToolExecutionList entries={commandHistory.slice(-3).reverse()} />
                   ) : null}
-
-                  <div ref={messagesEndRef} />
                 </ConversationContent>
+                <ConversationScrollButton />
               </Conversation>
+
+              {activeMessages.length > 0 &&
+              suggestionsIdle &&
+              (mode !== "agent" || agentAvailable) ? (
+                <div className="shrink-0 border-t border-border/60 px-4 pb-2 pt-3">
+                  <Suggestions className="pb-1">
+                    {SUGGESTIONS_BY_MODE[mode].map((suggestion) => (
+                      <Suggestion
+                        key={suggestion}
+                        suggestion={suggestion}
+                        onClick={handleSuggestionSend}
+                      />
+                    ))}
+                  </Suggestions>
+                </div>
+              ) : null}
 
               <MessageInput
                 mode={mode}

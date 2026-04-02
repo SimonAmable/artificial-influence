@@ -8,16 +8,13 @@ import { ArrowUp, NotePencil, SpinnerGap } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { MemoizedMarkdown } from "@/components/memoized-markdown"
 import {
   Conversation,
   ConversationContent,
   ConversationEmptyState,
+  ConversationScrollButton,
 } from "@/components/ai-elements/conversation"
-import {
-  Message,
-  MessageContent,
-} from "@/components/ai-elements/message"
+import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message"
 import { ToolExecutionList } from "@/components/ai-elements/tool-execution"
 import { EditorComposition } from "@/components/editor/editor-composition"
 import { fetchEditorProject, fetchEditorProjects } from "@/lib/editor/database"
@@ -160,8 +157,14 @@ export function AgentChatWorkspace({
               </Button>
             </CardHeader>
             <CardContent className="flex h-[65vh] flex-col">
-              <Conversation>
-                <ConversationContent className="space-y-4 pr-2">
+              <Conversation className="min-h-0 flex-1">
+                <ConversationContent
+                  className={
+                    messages.length === 0
+                      ? "flex min-h-full flex-col items-center justify-center gap-4 p-4"
+                      : "pr-2"
+                  }
+                >
                   {messages.length === 0 ? (
                     <ConversationEmptyState
                       title={projectId ? "Start directing the timeline" : "Pick a project"}
@@ -177,14 +180,12 @@ export function AgentChatWorkspace({
                         key={message.id}
                         from={message.role === "user" ? "user" : "assistant"}
                       >
-                        <MessageContent from={message.role === "user" ? "user" : "assistant"}>
+                        <MessageContent>
                           {message.parts.map((part, index) =>
                             part.type === "text" ? (
-                              <MemoizedMarkdown
-                                key={`${message.id}-${index}`}
-                                id={message.id}
-                                content={part.text}
-                              />
+                              <MessageResponse key={`${message.id}-${index}`}>
+                                {part.text}
+                              </MessageResponse>
                             ) : null,
                           )}
                         </MessageContent>
@@ -202,6 +203,7 @@ export function AgentChatWorkspace({
                     <ToolExecutionList entries={commandHistory.slice(-5).reverse()} />
                   ) : null}
                 </ConversationContent>
+                <ConversationScrollButton />
               </Conversation>
 
               <form onSubmit={handleSubmit} className="mt-4 space-y-3">
@@ -220,9 +222,11 @@ export function AgentChatWorkspace({
                 />
                 <Button
                   type="submit"
-                  disabled={!projectId || !input.trim() || status === "submitted"}
+                  disabled={
+                    !projectId || !input.trim() || status === "submitted" || status === "streaming"
+                  }
                 >
-                  {status === "submitted" ? (
+                  {status === "submitted" || status === "streaming" ? (
                     <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <ArrowUp className="mr-2 h-4 w-4" />
