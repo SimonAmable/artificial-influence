@@ -39,6 +39,19 @@ function getNodeLabel(node: Node): string {
   return node.type ?? "Node"
 }
 
+function getNodeLabelDisplay(node: Node): string {
+  return getNodeLabel(node).toUpperCase()
+}
+
+function getPromptPlaceholder(node: Node): string {
+  const label = getNodeLabelDisplay(node)
+  return `${label} — ENTER YOUR INSTRUCTIONS`
+}
+
+function getUploadButtonText(label: string): string {
+  return `UPLOAD ${label}`
+}
+
 function getTextNodeValue(node: Node): string {
   const data = (node.data ?? {}) as Record<string, unknown>
   if (typeof data.text === "string") return data.text
@@ -157,11 +170,11 @@ function MiniAppUploadField({
 }) {
   return (
     <Card className="overflow-hidden border-white/10 bg-zinc-950/60">
-      <CardContent className="p-3">
-        <Label className="mb-2 block text-xs uppercase tracking-[0.2em] text-zinc-500">
+      <CardContent className="p-2.5">
+        <Label className="mb-1.5 block text-[11px] uppercase tracking-[0.2em] text-zinc-500 leading-tight">
           {label}
         </Label>
-        <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/5 px-4 py-5 text-center">
+        <label className="flex min-h-[78px] cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/5 px-3 py-3 text-center">
           <input
             type="file"
             accept="image/*,video/*,audio/*"
@@ -182,14 +195,13 @@ function MiniAppUploadField({
               className="max-h-36 w-full rounded-lg object-contain"
             />
           ) : (
-            <>
-              <p className="text-sm font-medium text-zinc-100">Upload file</p>
-              <p className="mt-1 text-xs text-zinc-500">Image, video, or audio</p>
-            </>
+            <span className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-200">
+              {getUploadButtonText(label)}
+            </span>
           )}
         </label>
         {value.file ? (
-          <p className="mt-2 truncate text-xs text-zinc-400">{value.file.name}</p>
+          <p className="mt-1.5 truncate text-[11px] text-zinc-400">{value.file.name}</p>
         ) : null}
       </CardContent>
     </Card>
@@ -300,17 +312,13 @@ function MiniAppInputPanel({
       <CardContent className="p-5">
         <div className="space-y-3">
           {textInputNodes.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {textInputNodes.map((node) => {
-                const label = getNodeLabel(node)
                 return (
-                  <div key={node.id} className="grid gap-2">
-                    <Label htmlFor={`mini-app-input-${node.id}`} className="text-sm text-zinc-200">
-                      {label}
-                    </Label>
+                  <div key={node.id} className="grid gap-0">
                     <Textarea
                       id={`mini-app-input-${node.id}`}
-                      rows={4}
+                      rows={3}
                       value={textInputs[node.id] ?? ""}
                       onChange={(event) =>
                         setTextInputs((current) => ({
@@ -318,7 +326,8 @@ function MiniAppInputPanel({
                           [node.id]: event.target.value,
                         }))
                       }
-                      placeholder={`Enter ${label.toLowerCase()}`}
+                      placeholder={getPromptPlaceholder(node)}
+                      className="min-h-[84px]"
                     />
                   </div>
                 )
@@ -329,7 +338,7 @@ function MiniAppInputPanel({
           {mediaInputNodes.length > 0 ? (
             <div
               className={cn(
-                "gap-3",
+                "gap-2.5",
                 isRowLayout
                   ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
                   : "space-y-3"
@@ -338,11 +347,12 @@ function MiniAppInputPanel({
               {mediaInputNodes.map((node) => {
                 const config = nodeConfig[node.id]
                 const label = getNodeLabel(node)
+                const labelDisplay = getNodeLabelDisplay(node)
 
                 return (
                   <MiniAppUploadField
                     key={node.id}
-                    label={`${label}${config?.required ? " *" : ""}`}
+                    label={`${labelDisplay}${config?.required ? " *" : ""}`}
                     value={uploadInputs[node.id] ?? { file: null, previewUrl: null }}
                     onChange={(nextValue) =>
                       setUploadInputs((current) => {
@@ -366,10 +376,10 @@ function MiniAppInputPanel({
             .filter((node) => node.type !== "text" && node.type !== "upload")
             .map((node) => {
             const config = nodeConfig[node.id]
-            const label = getNodeLabel(node)
+            const labelDisplay = getNodeLabelDisplay(node)
             return (
               <div key={node.id} className="grid gap-2">
-                <Label className="text-sm text-zinc-200">{label}</Label>
+                <Label className="text-sm text-zinc-200">{labelDisplay}</Label>
                 <Input value="Unsupported input type" disabled />
               </div>
             )
