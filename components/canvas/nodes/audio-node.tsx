@@ -37,9 +37,13 @@ import {
   DEFAULT_INWORLD_TTS_MODEL,
   INWORLD_TTS_MODEL_OPTIONS,
 } from "@/lib/constants/inworld-tts"
+import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
+import { useNodeErrorToast } from "@/hooks/use-node-error-toast"
 
 export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as AudioNodeData
+  useNodeErrorToast(id, nodeData.error)
+  const multiSelectActive = useFlowMultiSelectActive()
   const { isConnecting, connectingFromId } = useStore((state) => ({
     isConnecting: state.connection.inProgress,
     connectingFromId: state.connection.fromHandle?.nodeId,
@@ -178,7 +182,7 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
     <>
       {/* Floating toolbar using NodeToolbar */}
       <NodeToolbar
-        isVisible={selected && hasContent}
+        isVisible={selected && !multiSelectActive && hasContent}
         position={Position.Top}
         offset={35}
       >
@@ -205,12 +209,12 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleTitleBlur}
             onKeyDown={handleTitleKeyDown}
-            className="text-xs font-medium text-orange-400 uppercase tracking-wider bg-transparent border border-orange-500/40 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-orange-500/40"
+            className="text-base font-medium text-orange-400 uppercase tracking-wider bg-transparent border border-orange-500/40 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-orange-500/40"
           />
         ) : (
           <span 
             className={cn(
-              "text-xs font-medium text-orange-400 uppercase tracking-wider",
+              "text-base font-medium text-orange-400 uppercase tracking-wider",
               selected && "cursor-pointer hover:text-orange-300 transition-colors"
             )}
           >
@@ -312,7 +316,7 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
 
     {/* Prompt input box using NodeToolbar positioned at bottom */}
     <NodeToolbar
-      isVisible={selected}
+      isVisible={selected && !multiSelectActive}
       position={Position.Bottom}
       offset={12}
     >

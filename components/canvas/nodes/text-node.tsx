@@ -20,6 +20,7 @@ import {
   DialogContent,
 } from "@/components/ui/dialog"
 import Image from "next/image"
+import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
 
 // Calculate node dimensions based on text content
 const calculateNodeDimensions = (text: string) => {
@@ -54,6 +55,7 @@ const calculateNodeDimensions = (text: string) => {
 
 export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as TextNodeData
+  const multiSelectActive = useFlowMultiSelectActive()
   const [isHovered, setIsHovered] = React.useState(false)
   const [isEditingTitle, setIsEditingTitle] = React.useState(false)
   const [title, setTitle] = React.useState(nodeData.label || "Text")
@@ -209,19 +211,11 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
 
   const handleDoubleClick = () => {
     if (isFocused) return
-    const node = reactFlow.getNode(id)
-    if (node) {
-      const padding = 100
-      reactFlow.fitBounds(
-        {
-          x: node.position.x - padding,
-          y: node.position.y - padding,
-          width: dimensions.width + padding * 2,
-          height: dimensions.height + padding * 2,
-        },
-        { duration: 600 }
-      )
-    }
+    void reactFlow.fitView({
+      nodes: [{ id }],
+      padding: 0.2,
+      duration: 400,
+    })
     setIsFocused(true)
     requestAnimationFrame(() => {
       textareaRef.current?.focus()
@@ -251,7 +245,7 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
     <>
       {/* Floating toolbar using NodeToolbar */}
       <NodeToolbar
-        isVisible={selected}
+        isVisible={selected && !multiSelectActive}
         position={Position.Top}
         offset={35}
       >
@@ -281,12 +275,12 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleTitleBlur}
             onKeyDown={handleTitleKeyDown}
-            className="text-xs font-medium text-emerald-400 uppercase tracking-wider bg-transparent border border-emerald-500/40 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-emerald-500/40"
+            className="text-base font-medium text-emerald-400 uppercase tracking-wider bg-transparent border border-emerald-500/40 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-emerald-500/40"
           />
         ) : (
           <span 
             className={cn(
-              "text-xs font-medium text-emerald-400 uppercase tracking-wider",
+              "text-base font-medium text-emerald-400 uppercase tracking-wider",
               selected && "cursor-pointer hover:text-emerald-300 transition-colors"
             )}
           >
@@ -431,7 +425,7 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
 
     {/* AI Chat input using NodeToolbar positioned at bottom */}
     <NodeToolbar
-      isVisible={selected}
+      isVisible={selected && !multiSelectActive}
       position={Position.Bottom}
       offset={12}
     >

@@ -3,10 +3,16 @@
 import * as React from "react"
 import { NodeProps, NodeResizer } from "@xyflow/react"
 import type { GroupNodeData } from "@/lib/canvas/types"
+import { applyGroupShellOpacity } from "@/lib/canvas/group-shell-color"
+import { useCanvasWorkflowExecution } from "@/components/canvas/canvas-workflow-execution-context"
+import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
 import { cn } from "@/lib/utils"
 
 export const GroupNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as GroupNodeData
+  const { executingGroupId } = useCanvasWorkflowExecution()
+  const isWorkflowRunning = executingGroupId === id
+  const multiSelectActive = useFlowMultiSelectActive()
   const [isEditingLabel, setIsEditingLabel] = React.useState(false)
   const [labelValue, setLabelValue] = React.useState(nodeData.label)
   const labelInputRef = React.useRef<HTMLInputElement>(null)
@@ -43,11 +49,21 @@ export const GroupNodeComponent = React.memo(({ id, data, selected }: NodeProps)
     }
   }
 
+  const shellBackgroundColor =
+    !nodeData.backgroundColor || nodeData.backgroundColor === "#f0f0f0"
+      ? "transparent"
+      : nodeData.backgroundColor
+
+  const shellFill =
+    shellBackgroundColor === "transparent"
+      ? "transparent"
+      : applyGroupShellOpacity(shellBackgroundColor)
+
   return (
     <>
       {/* Resizer - only visible when selected */}
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected && !multiSelectActive}
         minWidth={250}
         minHeight={200}
         lineClassName="border-zinc-500/40"
@@ -67,12 +83,12 @@ export const GroupNodeComponent = React.memo(({ id, data, selected }: NodeProps)
             onChange={(e) => setLabelValue(e.target.value)}
             onBlur={handleLabelBlur}
             onKeyDown={handleLabelKeyDown}
-            className="text-xs font-medium text-zinc-400 uppercase tracking-wider bg-transparent border border-zinc-500/40 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-zinc-500/40"
+            className="text-base font-medium text-zinc-400 uppercase tracking-wider bg-transparent border border-zinc-500/40 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-zinc-500/40"
           />
         ) : (
           <span 
             className={cn(
-              "text-xs font-medium text-zinc-400 uppercase tracking-wider",
+              "text-base font-medium text-zinc-400 uppercase tracking-wider",
               selected && "cursor-pointer hover:text-zinc-300 transition-colors"
             )}
           >
@@ -81,11 +97,38 @@ export const GroupNodeComponent = React.memo(({ id, data, selected }: NodeProps)
         )}
       </div>
 
-      {/* Simple group container with natural low opacity background */}
       <div
-        
-        
-      />
+        className={cn(
+          "w-full h-full min-h-[120px] rounded-none border relative overflow-hidden transition-[box-shadow,border-color]",
+          selected ? "border-zinc-500/45" : "border-white/10",
+          isWorkflowRunning && "ring-2 ring-emerald-400/35 border-emerald-500/25"
+        )}
+        style={{ backgroundColor: shellFill }}
+      >
+        {isWorkflowRunning ? (
+          <>
+            <div
+              className="absolute inset-y-0 left-0 z-10 bg-gradient-to-r from-zinc-800 to-zinc-700 rounded-none"
+              style={{
+                width: "0%",
+                animation: "groupWorkflowFill 24s linear infinite",
+                boxShadow: "2px 0 8px 0 rgba(255, 255, 255, 0.35)",
+              }}
+            />
+            <div className="absolute inset-0 z-[11] bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/35 pointer-events-none rounded-none" />
+            <style jsx>{`
+              @keyframes groupWorkflowFill {
+                0% {
+                  width: 0%;
+                }
+                100% {
+                  width: 100%;
+                }
+              }
+            `}</style>
+          </>
+        ) : null}
+      </div>
     </>
   )
 })

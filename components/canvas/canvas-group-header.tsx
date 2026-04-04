@@ -1,13 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { Play, Folder, FolderOpen } from "@phosphor-icons/react"
+import { Play, Folder, FolderOpen, CircleNotch } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 
 interface CanvasGroupHeaderProps {
   groupName: string
   onRunGroup?: () => void
+  isRunGroupRunning?: boolean
   onUngroup: () => void
   onCreateWorkflow?: () => void
 }
@@ -15,6 +16,7 @@ interface CanvasGroupHeaderProps {
 export function CanvasGroupHeader({
   groupName,
   onRunGroup,
+  isRunGroupRunning = false,
   onUngroup,
   onCreateWorkflow,
 }: CanvasGroupHeaderProps) {
@@ -39,10 +41,15 @@ export function CanvasGroupHeader({
             size="sm"
             variant="ghost"
             onClick={onRunGroup}
-            className="h-7 gap-2 text-xs hover:bg-white/5 hover:text-emerald-400"
+            disabled={isRunGroupRunning}
+            className="h-7 gap-2 text-xs hover:bg-white/5 hover:text-emerald-400 disabled:opacity-70"
           >
-            <Play className="w-3.5 h-3.5" weight="fill" />
-            Run Group
+            {isRunGroupRunning ? (
+              <CircleNotch className="w-3.5 h-3.5 animate-spin" weight="bold" />
+            ) : (
+              <Play className="w-3.5 h-3.5" weight="fill" />
+            )}
+            {isRunGroupRunning ? "Running…" : "Run Group"}
           </Button>
         )}
 

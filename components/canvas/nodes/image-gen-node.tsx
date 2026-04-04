@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { useModels } from "@/hooks/use-models"
+import { useNodeErrorToast } from "@/hooks/use-node-error-toast"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { uploadFilesToSupabase } from "@/lib/canvas/upload-helpers"
@@ -62,6 +63,7 @@ import { ImageEditorDialog } from "@/components/image-editor"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { InfluencerInputBox } from "@/components/tools/influencer"
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
+import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
 
 // Helper function to get dimensions for aspect ratio
 const getImageDimensions = (aspectRatio: string) => {
@@ -114,6 +116,8 @@ function getFirstAvailableImageUrl(data: ImageGenNodeData): string | null {
 
 export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as ImageGenNodeData
+  useNodeErrorToast(id, nodeData.error)
+  const multiSelectActive = useFlowMultiSelectActive()
   const { models: imageModels } = useModels("image")
   const effectiveImageModels = React.useMemo(() => {
     if (imageModels.length === 0) return imageModels
@@ -779,16 +783,6 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : "Generation failed"
-      if (message.includes("Insufficient credits")) {
-        toast.error(message, {
-          description: "Upgrade your plan to continue generating images",
-          action: { label: "View Plans", onClick: () => window.open("/pricing", "_blank") }
-        })
-      } else if (message.includes("Concurrency limit reached")) {
-        toast.error("Too many active generations", {
-          description: `${message} Wait for one to finish, then try again.`,
-        })
-      }
       const remainingPendingGenerationCount = Math.max(0, getLatestPendingGenerationCount() - 1)
       nodeData.onDataChange?.(id, {
         pendingGenerationCount: remainingPendingGenerationCount,
@@ -804,7 +798,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     <>
       {/* Floating toolbar using NodeToolbar */}
       <NodeToolbar
-        isVisible={selected && hasContent && !isCropping}
+        isVisible={selected && !multiSelectActive && hasContent && !isCropping}
         position={Position.Top}
         offset={35}
       >
@@ -835,7 +829,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
 
       {/* Crop Controls Toolbar */}
       <NodeToolbar
-        isVisible={isCropping}
+        isVisible={isCropping && !multiSelectActive}
         position={Position.Top}
         offset={35}
       >
@@ -920,12 +914,12 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleTitleBlur}
             onKeyDown={handleTitleKeyDown}
-            className="text-xs font-medium text-purple-400 uppercase tracking-wider bg-transparent border border-purple-500/40 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-purple-500/40"
+            className="text-base font-medium text-purple-400 uppercase tracking-wider bg-transparent border border-purple-500/40 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-purple-500/40"
           />
         ) : (
           <span 
             className={cn(
-              "text-xs font-medium text-purple-400 uppercase tracking-wider",
+              "text-base font-medium text-purple-400 uppercase tracking-wider",
               selected && "cursor-pointer hover:text-purple-300 transition-colors"
             )}
           >
@@ -1129,7 +1123,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
 
     {/* Same input component as /image page */}
     <NodeToolbar
-      isVisible={selected && !isCropping}
+      isVisible={selected && !multiSelectActive && !isCropping}
       position={Position.Bottom}
       offset={12}
     >

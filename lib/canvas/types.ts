@@ -215,6 +215,7 @@ export interface SavedWorkflow {
 export interface NodeOutput {
   text?: string
   imageUrl?: string
+  imageUrls?: string[]
   videoUrl?: string
   audioUrl?: string
   fileUrl?: string

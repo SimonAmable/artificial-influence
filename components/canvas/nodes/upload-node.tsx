@@ -18,6 +18,7 @@ import {
   PaperPlaneTilt,
   PencilSimple,
   FloppyDisk,
+  FolderOpen,
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
 import type { UploadNodeData } from "@/lib/canvas/types"
@@ -35,7 +36,9 @@ import {
 import { getConstrainedSize, loadImageSize, loadVideoSize } from "@/lib/canvas/media-sizing"
 import { ImageEditorDialog } from "@/components/image-editor"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
 import type { AssetType } from "@/lib/assets/types"
+import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
 
 function toPersistedUploadFileType(
   fromUpload: UploadResult["fileType"],
@@ -47,6 +50,7 @@ function toPersistedUploadFileType(
 
 export const UploadNodeComponent = React.memo(({ id, data, selected, width: propWidth, height: propHeight }: NodeProps) => {
   const nodeData = data as UploadNodeData
+  const multiSelectActive = useFlowMultiSelectActive()
   const inputRef = React.useRef<HTMLInputElement>(null)
   const reactFlow = useReactFlow()
   const updateNodeInternals = useUpdateNodeInternals()
@@ -60,6 +64,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
   const [isEditorOpen, setIsEditorOpen] = React.useState(false)
   const [isUploading, setIsUploading] = React.useState(false)
   const [isCreateAssetOpen, setIsCreateAssetOpen] = React.useState(false)
+  const [assetModalOpen, setAssetModalOpen] = React.useState(false)
   
   // Defer internals refresh until after DOM/layout catches up with node style changes.
   const scheduleUpdateNodeInternals = React.useCallback(() => {
@@ -434,6 +439,74 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
     }
   }
 
+  const handleAssetSelectFromModal = async (assetUrl: string) => {
+    try {
+      const response = await fetch(assetUrl)
+      if (!response.ok) throw new Error("Failed to fetch")
+      const blob = await response.blob()
+      let fileType: "image" | "video" | "audio" | null = null
+      if (blob.type.startsWith("image/")) fileType = "image"
+      else if (blob.type.startsWith("video/")) fileType = "video"
+      else if (blob.type.startsWith("audio/")) fileType = "audio"
+
+      if (!fileType) {
+        toast.error("This file type is not supported on upload nodes")
+        return
+      }
+
+      const fileName =
+        decodeURIComponent(
+          assetUrl.split("/").pop()?.split("?")[0] || ""
+        ) || "asset"
+
+      if (fileType === "image") {
+        const img = new Image()
+        img.onload = () => {
+          const constrained = getConstrainedSize({
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+          })
+          reactFlow.updateNodeData(id, {
+            fileUrl: assetUrl,
+            fileType,
+            fileName,
+          })
+          applyNodeSize(constrained.width, constrained.height)
+          toast.success("Asset loaded")
+        }
+        img.onerror = () => toast.error("Could not load image")
+        img.src = assetUrl
+      } else if (fileType === "video") {
+        const video = document.createElement("video")
+        video.onloadedmetadata = () => {
+          const constrained = getConstrainedSize({
+            width: video.videoWidth,
+            height: video.videoHeight,
+          })
+          reactFlow.updateNodeData(id, {
+            fileUrl: assetUrl,
+            fileType,
+            fileName,
+          })
+          applyNodeSize(constrained.width, constrained.height)
+          toast.success("Asset loaded")
+        }
+        video.onerror = () => toast.error("Could not load video")
+        video.src = assetUrl
+      } else {
+        reactFlow.updateNodeData(id, {
+          fileUrl: assetUrl,
+          fileType,
+          fileName,
+        })
+        applyNodeSize(280, 280)
+        toast.success("Asset loaded")
+      }
+    } catch {
+      toast.error("Could not load asset")
+    }
+  }
+
   const handleClear = () => {
     nodeData.onDataChange?.(id, {
       fileUrl: null,
@@ -461,7 +534,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
     <>
       {/* Floating toolbar using NodeToolbar */}
       <NodeToolbar
-        isVisible={selected && hasContent}
+        isVisible={selected && !multiSelectActive && hasContent}
         position={Position.Top}
         offset={35}
       >
@@ -518,12 +591,12 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleTitleBlur}
             onKeyDown={handleTitleKeyDown}
-            className="text-xs font-medium text-zinc-400 uppercase tracking-wider bg-transparent border border-zinc-400/40 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-zinc-400/40"
+            className="text-base font-medium text-zinc-400 uppercase tracking-wider bg-transparent border border-zinc-400/40 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-zinc-400/40"
           />
         ) : (
           <span 
             className={cn(
-              "text-xs font-medium text-zinc-400 uppercase tracking-wider",
+              "text-base font-medium text-zinc-400 uppercase tracking-wider",
               selected && "cursor-pointer hover:text-zinc-300 transition-colors"
             )}
           >
@@ -651,7 +724,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
 
     {/* File picker using NodeToolbar positioned at bottom */}
     <NodeToolbar
-      isVisible={selected}
+      isVisible={selected && !multiSelectActive}
       position={Position.Bottom}
       offset={12}
     >
@@ -681,21 +754,44 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
               </Button>
             </div>
           ) : (
-            <Button
-              onClick={() => inputRef.current?.click()}
-              variant="outline"
-              className={cn(
-                "w-full flex flex-col items-center gap-2 h-auto py-5 border-dashed",
-                "text-zinc-500 hover:text-zinc-300 hover:border-white/25 hover:bg-white/[0.03]"
-              )}
-            >
-              <Upload size={22} weight="duotone" />
-              <span className="text-xs">Click or drop file</span>
-            </Button>
+            <div className="flex flex-col gap-2 w-[min(100%,200px)]">
+              <Button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "w-full justify-center gap-2 h-9",
+                  "text-zinc-300 border-white/15 hover:border-white/25 hover:bg-white/5"
+                )}
+              >
+                <Upload size={16} weight="duotone" className="shrink-0" />
+                <span className="text-xs">Upload reference</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setAssetModalOpen(true)}
+                className={cn(
+                  "w-full justify-center gap-2 h-9",
+                  "text-zinc-300 border-white/15 hover:border-white/25 hover:bg-white/5"
+                )}
+              >
+                <FolderOpen size={16} className="shrink-0" />
+                <span className="text-xs">Select asset</span>
+              </Button>
+            </div>
           )}
         </div>
       </div>
     </NodeToolbar>
+
+    <AssetSelectionModal
+      open={assetModalOpen}
+      onOpenChange={setAssetModalOpen}
+      onSelect={handleAssetSelectFromModal}
+    />
 
     {/* Fullscreen Dialog */}
     {nodeData.fileUrl && (

@@ -46,9 +46,13 @@ import {
 import { getConstrainedSize, loadVideoSize } from "@/lib/canvas/media-sizing"
 import { uploadBlobToSupabase } from "@/lib/canvas/upload-helpers"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
+import { useNodeErrorToast } from "@/hooks/use-node-error-toast"
 
 export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as VideoGenNodeData
+  useNodeErrorToast(id, nodeData.error)
+  const multiSelectActive = useFlowMultiSelectActive()
   const nodes = useNodes()
   const edges = useEdges()
   const reactFlow = useReactFlow()
@@ -857,7 +861,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     <>
       {/* Floating toolbar using NodeToolbar */}
       <NodeToolbar
-        isVisible={selected && hasContent}
+        isVisible={selected && !multiSelectActive && hasContent}
         position={Position.Top}
         offset={35}
       >
@@ -912,12 +916,12 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleTitleBlur}
             onKeyDown={handleTitleKeyDown}
-            className="text-xs font-medium text-blue-400 uppercase tracking-wider bg-transparent border border-blue-500/40 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-500/40"
+            className="text-base font-medium text-blue-400 uppercase tracking-wider bg-transparent border border-blue-500/40 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-500/40"
           />
         ) : (
           <span 
             className={cn(
-              "text-xs font-medium text-blue-400 uppercase tracking-wider",
+              "text-base font-medium text-blue-400 uppercase tracking-wider",
               selected && "cursor-pointer hover:text-blue-300 transition-colors"
             )}
           >
@@ -1064,7 +1068,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
 
     {/* Prompt input box using NodeToolbar positioned at bottom */}
     <NodeToolbar
-      isVisible={selected}
+      isVisible={selected && !multiSelectActive}
       position={Position.Bottom}
       offset={12}
     >

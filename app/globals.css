@@ -578,3 +578,35 @@
     0 0 0 1px rgba(255, 255, 255, 0.18) inset,
     0 8px 24px 0 rgba(59, 130, 246, 0.5);
 }
+
+/* React Flow canvas: clear selection ring on all custom nodes */
+.react-flow__node.selectable.selected {
+  outline: 2px solid rgba(255, 255, 255, 0.95);
+  outline-offset: 3px;
+  border-radius: 14px;
+}
+
+/* Group nodes: RF defaults add 10px padding + radius so the shell looked inset; flush fill to the real bounds */
+.react-flow__node-group {
+  padding: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.react-flow__node-group.selectable:hover {
+  box-shadow: none !important;
+}
+
+.react-flow__node-group.selectable.selected,
+.react-flow__node-group.selectable:focus,
+.react-flow__node-group.selectable:focus-visible {
+  box-shadow: none !important;
+}
+
+/* Square group outline matches full-bleed shell (no rounded gap vs fill) */
+.react-flow__node-group.selectable.selected {
+  outline-offset: 0;
+  border-radius: 0 !important;
+}

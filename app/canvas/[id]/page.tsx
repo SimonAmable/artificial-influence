@@ -9,7 +9,7 @@ import {
   useEdgesState,
   addEdge,
   useReactFlow,
-  useOnSelectionChange,
+  useStore,
   useUpdateNodeInternals,
   type Connection,
   type Node,
@@ -24,6 +24,7 @@ import { CanvasHeader } from "@/components/canvas/canvas-header"
 import { CanvasSidebar } from "@/components/canvas/canvas-sidebar"
 import { CanvasToolbar } from "@/components/canvas/canvas-toolbar"
 import { CanvasSelectionActionBar } from "@/components/canvas/canvas-selection-action-bar"
+import { CanvasWorkflowExecutionContext } from "@/components/canvas/canvas-workflow-execution-context"
 import { CanvasContextMenu } from "@/components/canvas/canvas-context-menu"
 import { SaveWorkflowDialog } from "@/components/canvas/save-workflow-dialog"
 import { EditWorkflowDialog } from "@/components/canvas/edit-workflow-dialog"
@@ -53,6 +54,10 @@ import type { Workflow } from "@/lib/workflows/database-server"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import {
+  selectFlowSelectedNodesWithKey,
+  equalFlowSelectionKey,
+} from "@/lib/canvas/flow-store-selection"
 
 // Register custom node types - MUST be outside component for stable reference
 const nodeTypes = {
@@ -80,9 +85,9 @@ function CanvasContent() {
   const updateNodeInternals = useUpdateNodeInternals()
   const [workflowName, setWorkflowName] = React.useState("Canvas")
   const [isExecuting, setIsExecuting] = React.useState(false)
+  const [executingGroupId, setExecutingGroupId] = React.useState<string | null>(null)
   const [isSaving, setIsSaving] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(true)
-  const [selectedNodes, setSelectedNodes] = React.useState<Node[]>([])
   const [userId, setUserId] = React.useState<string>("")
   const [saveWorkflowDialogOpen, setSaveWorkflowDialogOpen] = React.useState(false)
   const [editWorkflowDialogOpen, setEditWorkflowDialogOpen] = React.useState(false)
@@ -119,12 +124,10 @@ function CanvasContent() {
     })
   }, [])
 
-  // Track selection changes
-  useOnSelectionChange({
-    onChange: React.useCallback(({ nodes }) => {
-      setSelectedNodes(nodes)
-    }, []),
-  })
+  const { nodes: selectedNodes } = useStore(
+    selectFlowSelectedNodesWithKey,
+    equalFlowSelectionKey
+  )
 
   // Check if a single group node is selected
   const selectedGroupNode = React.useMemo(() => {
@@ -569,12 +572,13 @@ function CanvasContent() {
 
   // Group selected nodes
   const handleGroup = React.useCallback(() => {
-    if (selectedNodes.length < 2) {
+    const nodesToGroup = reactFlowInstance
+      .getNodes()
+      .filter((n) => n.selected === true)
+    if (nodesToGroup.length < 2) {
       toast.error("Select at least 2 nodes to group")
       return
     }
-
-    const nodesToGroup = selectedNodes
     
     nodeCounter.current += 1
     const groupId = `group-${nodeCounter.current}`
@@ -590,7 +594,6 @@ function CanvasContent() {
 
     const groupData: GroupNodeData = {
       label: "Group",
-      backgroundColor: "#f0f0f0",
       onDataChange: handleNodeDataChange,
     }
 
@@ -629,17 +632,25 @@ function CanvasContent() {
     })
 
     toast.success(`Grouped ${nodesToGroup.length} nodes`)
-  }, [selectedNodes, handleNodeDataChange, setNodes])
+  }, [reactFlowInstance, handleNodeDataChange, setNodes])
 
   // Copy selected nodes and edges to clipboard
   const handleCopy = React.useCallback(() => {
-    if (selectedNodes.length === 0) return
+    const selected = reactFlowInstance
+      .getNodes()
+      .filter((n) => n.selected === true)
+    if (selected.length === 0) return
 
-    const selectedNodeIds = new Set(selectedNodes.map(n => n.id))
-    const nodesToCopy = nodes.filter(n => selectedNodeIds.has(n.id))
-    const edgesToCopy = edges.filter(e => 
-      selectedNodeIds.has(e.source) && selectedNodeIds.has(e.target)
-    )
+    const selectedNodeIds = new Set(selected.map((n) => n.id))
+    const nodesToCopy = reactFlowInstance
+      .getNodes()
+      .filter((n) => selectedNodeIds.has(n.id))
+    const edgesToCopy = reactFlowInstance
+      .getEdges()
+      .filter(
+        (e) =>
+          selectedNodeIds.has(e.source) && selectedNodeIds.has(e.target)
+      )
 
     const clipboard = {
       nodes: nodesToCopy,
@@ -649,7 +660,7 @@ function CanvasContent() {
     localStorage.setItem('rf-clipboard', JSON.stringify(clipboard))
     setHasClipboard(true)
     toast.success(`Copied ${nodesToCopy.length} node${nodesToCopy.length > 1 ? 's' : ''}`)
-  }, [selectedNodes, nodes, edges])
+  }, [reactFlowInstance])
 
   // Paste nodes from clipboard at cursor position
   const handlePaste = React.useCallback((position: { x: number; y: number }) => {
@@ -994,6 +1005,10 @@ function CanvasContent() {
           error: null,
         }
 
+        if (typeof output.text === "string") {
+          updates.text = output.text
+        }
+
         if (typeof output.imageUrl === "string" && output.imageUrl.length > 0) {
           const existingImageUrls = Array.isArray((n.data as { generatedImageUrls?: unknown }).generatedImageUrls)
             ? ((n.data as { generatedImageUrls?: unknown }).generatedImageUrls as unknown[])
@@ -1036,12 +1051,15 @@ function CanvasContent() {
     inputEdges,
     emptyMessage,
     successMessage,
+    scopeGroupId,
   }: {
     executionNodes: Node[]
     executionEdges: Edge[]
     inputEdges?: Edge[]
     emptyMessage: string
     successMessage: string
+    /** When set, group node shows running UI; omit for full-canvas execute. */
+    scopeGroupId?: string | null
   }) => {
     if (executionNodes.length === 0) {
       toast.error(emptyMessage)
@@ -1054,6 +1072,7 @@ function CanvasContent() {
     }
 
     setIsExecuting(true)
+    if (scopeGroupId) setExecutingGroupId(scopeGroupId)
 
     try {
       await executeWorkflow(
@@ -1077,6 +1096,7 @@ function CanvasContent() {
       )
     } finally {
       setIsExecuting(false)
+      setExecutingGroupId(null)
     }
   }, [
     handleNodeExecutionComplete,
@@ -1144,8 +1164,14 @@ function CanvasContent() {
       inputEdges,
       emptyMessage: "This group has no runnable nodes",
       successMessage: `${groupLabel} execution complete`,
+      scopeGroupId: groupId,
     })
   }, [collectGroupDescendantIds, edges, nodes, runWorkflowExecution, selectedGroupNode])
+
+  const workflowExecutionContextValue = React.useMemo(
+    () => ({ executingGroupId }),
+    [executingGroupId]
+  )
 
   if (isLoading) {
     return (
@@ -1156,6 +1182,7 @@ function CanvasContent() {
   }
 
   return (
+    <CanvasWorkflowExecutionContext.Provider value={workflowExecutionContextValue}>
     <div className="flex flex-col h-screen overflow-hidden" ref={canvasRef}>
       <CanvasHeader
         name={workflowName}
@@ -1242,7 +1269,7 @@ function CanvasContent() {
           </Panel>
 
           {selectedNodes.length >= 2 && !selectedGroupNode && (
-            <Panel position="top-center" className="mt-4">
+            <Panel position="top-center" className="z-40 mt-4">
               <CanvasSelectionActionBar
                 selectedCount={selectedNodes.length}
                 onGroup={handleGroup}
@@ -1254,12 +1281,23 @@ function CanvasContent() {
 
            {/* Single group selected - show action bar with ungroup + save workflow */}
            {selectedGroupNode && (
-             <Panel position="top-center" className="mt-4">
+             <Panel position="top-center" className="z-40 mt-4">
                <CanvasSelectionActionBar
                  selectedCount={1}
                  selectedGroupId={selectedGroupNode.id}
+                 groupBackgroundColor={
+                   typeof selectedGroupNode.data?.backgroundColor === "string"
+                     ? selectedGroupNode.data.backgroundColor
+                     : undefined
+                 }
+                 onGroupBackgroundColorChange={(color) =>
+                   handleNodeDataChange(selectedGroupNode.id, {
+                     backgroundColor: color,
+                   })
+                 }
                  onGroup={() => {}}
                  onRunGroup={() => handleExecuteGroup(selectedGroupNode.id)}
+                 isRunGroupRunning={executingGroupId === selectedGroupNode.id}
                  onUngroup={() => handleUngroup(selectedGroupNode.id)}
                  onDuplicate={handleDuplicate}
                  onDelete={handleDelete}
@@ -1300,6 +1338,7 @@ function CanvasContent() {
         onOpenChange={setEditWorkflowDialogOpen}
       />
     </div>
+    </CanvasWorkflowExecutionContext.Provider>
   )
 }
 
