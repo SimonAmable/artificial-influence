@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import { extractClipboardImageFiles } from "@/lib/utils/clipboard"
 
 interface VideoPromptFieldsProps {
   promptValue: string
@@ -13,6 +14,7 @@ interface VideoPromptFieldsProps {
   className?: string
   variant?: "page" | "toolbar"
   onPromptKeyDown?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void
+  onPasteImage?: (file: File) => void
 }
 
 export function VideoPromptFields({
@@ -25,8 +27,18 @@ export function VideoPromptFields({
   className,
   variant = "page",
   onPromptKeyDown,
+  onPasteImage,
 }: VideoPromptFieldsProps) {
   const isToolbar = variant === "toolbar"
+
+  const handlePaste = React.useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedImage = extractClipboardImageFiles(e.clipboardData?.items)[0]
+    if (!pastedImage || !onPasteImage) return
+
+    e.preventDefault()
+    e.stopPropagation()
+    onPasteImage(pastedImage)
+  }, [onPasteImage])
 
   return (
     <div className={cn("flex-1", className)}>
@@ -34,6 +46,7 @@ export function VideoPromptFields({
         value={promptValue}
         onChange={(e) => onPromptChange(e.target.value)}
         onKeyDown={onPromptKeyDown}
+        onPaste={handlePaste}
         placeholder={placeholder}
         className={cn(
           "w-full border-none outline-none resize-none bg-transparent text-sm",
@@ -45,6 +58,7 @@ export function VideoPromptFields({
         <textarea
           value={negativePromptValue}
           onChange={(e) => onNegativePromptChange(e.target.value)}
+          onPaste={handlePaste}
           placeholder="What to exclude from the video..."
           className={cn(
             "w-full border-none outline-none resize-none bg-transparent text-xs text-muted-foreground mt-1",

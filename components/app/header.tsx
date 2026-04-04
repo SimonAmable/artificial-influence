@@ -27,7 +27,8 @@ export function Header() {
   const router = useRouter()
   const layoutModeContext = useLayoutMode()
   const isCustomComponentsPage = pathname === "/custom-components"
-  const isInfluencerGeneratorPage = pathname === "/influencer-generator"
+  const isInpaintPage =
+    pathname === "/inpaint" || pathname === "/image-editor"
   const isImagePage = pathname === "/image"
   const isCharacterSwapPage = pathname === "/character-swap"
   const isMotionCopyPage = pathname === "/motion-copy"
@@ -220,8 +221,8 @@ export function Header() {
             </>
           )}
           <SettingsDropdown
-            layoutMode={(isCustomComponentsPage || isInfluencerGeneratorPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.layoutMode : undefined}
-            onLayoutModeChange={(isCustomComponentsPage || isInfluencerGeneratorPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.setLayoutMode : undefined}
+            layoutMode={(isCustomComponentsPage || isInpaintPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.layoutMode : undefined}
+            onLayoutModeChange={(isCustomComponentsPage || isInpaintPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.setLayoutMode : undefined}
           />
         </div>
       </div>

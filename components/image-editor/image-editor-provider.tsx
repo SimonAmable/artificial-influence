@@ -11,7 +11,11 @@ import type {
 } from "@/lib/image-editor/types"
 import { INITIAL_EDITOR_STATE } from "@/lib/image-editor/constants"
 import { serializeCanvas, deserializeCanvas } from "@/lib/image-editor/history-manager"
-import { loadImageOntoCanvas, exportCanvasToBlob } from "@/lib/image-editor/fabric-utils"
+import {
+  getThemeWorkspaceBackgroundColor,
+  loadImageOntoCanvas,
+  exportCanvasToBlob,
+} from "@/lib/image-editor/fabric-utils"
 
 // Reducer
 function imageEditorReducer(
@@ -248,7 +252,7 @@ export function ImageEditorProvider({
     try {
       // Clear existing objects
       canvas.clear()
-      canvas.set({ backgroundColor: "#18181b" })
+      canvas.set({ backgroundColor: getThemeWorkspaceBackgroundColor() })
 
       // Load new image
       await loadImageOntoCanvas(canvas, url)

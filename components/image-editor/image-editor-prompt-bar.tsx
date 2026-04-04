@@ -75,6 +75,8 @@ function formatModelName(identifier: string, name: string): string {
 }
 
 const INPAINT_MODEL = MODEL_IDENTIFIERS.GOOGLE_NANO_BANANA_2
+/** Replicate `google/nano-banana-2` output size: 512 | 1K | 2K | 4K */
+const INPAINT_RESOLUTION = "2K"
 
 export function ImageEditorPromptBar({
   className,
@@ -257,7 +259,7 @@ export function ImageEditorPromptBar({
             return
           }
 
-          const finalPrompt = `${prompt.trim()}\n\nInpaint: edit only the region indicated by the mask image. Keep all pixels outside the mask identical. Follow the description above for what to put inside the masked region.`
+          const finalPrompt = `${prompt.trim()}\n\nInpaint: Image order is (1) base scene, (2) optional reference images for style or content only, (3) mask as the last image — white/light marks the region to edit. Edit only that masked region; keep everything outside identical.`
           formData.append("hasMask", "true")
           formData.append("prompt", finalPrompt)
           formData.append("n", "1")
@@ -265,6 +267,7 @@ export function ImageEditorPromptBar({
           formData.append("aspectRatio", "match_input_image")
           formData.append("enhancePrompt", "false")
           formData.append("model", INPAINT_MODEL)
+          formData.append("resolution", INPAINT_RESOLUTION)
 
           if (exports.baseDataUrl) {
             formData.append(
@@ -278,16 +281,19 @@ export function ImageEditorPromptBar({
               "referenceImages",
               new File([blob], "base-image.png", { type: "image/png" })
             )
+          } else {
+            toast.error("No image to edit")
+            return
           }
+
+          referenceFiles.forEach((file) => {
+            formData.append("referenceImages", file)
+          })
 
           formData.append(
             "referenceImages",
             await dataUrlToFile(exports.maskDataUrl, "mask-image.png")
           )
-
-          referenceFiles.forEach((file) => {
-            formData.append("referenceImages", file)
-          })
         } else {
           let finalPrompt = prompt.trim()
           if (!finalPrompt.toLowerCase().includes(editorInstruction)) {

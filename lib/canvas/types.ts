@@ -1,5 +1,9 @@
 import type { Node, Edge } from "@xyflow/react"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
+import {
+  DEFAULT_INWORLD_TTS_MODEL,
+  DEFAULT_INWORLD_VOICE_ID,
+} from "@/lib/constants/inworld-tts"
 
 // ===== Node Type Identifiers =====
 export type CanvasNodeType = "image-gen" | "video-gen" | "text" | "audio" | "upload" | "group"
@@ -67,6 +71,7 @@ export interface AudioNodeData extends Record<string, unknown> {
   label: string
   text: string
   voice: string
+  model: string
   generatedAudioUrl: string | null
   isGenerating: boolean
   error: string | null
@@ -119,7 +124,7 @@ export function createImageGenNodeData(): ImageGenNodeData {
     connectedImageUrls: [],
     manualImageUrls: [],
     model: DEFAULT_IMAGE_MODEL_IDENTIFIER,
-    aspectRatio: "1:1",
+    aspectRatio: "",
     enhancePrompt: false,
     generatedImageUrl: null,
     isGenerating: false,
@@ -171,7 +176,8 @@ export function createAudioNodeData(): AudioNodeData {
   return {
     label: "Audio Generation",
     text: "",
-    voice: "alloy",
+    voice: DEFAULT_INWORLD_VOICE_ID,
+    model: DEFAULT_INWORLD_TTS_MODEL,
     generatedAudioUrl: null,
     isGenerating: false,
     error: null,

@@ -257,6 +257,22 @@ export function VideoInputBox({
   const canAcceptImageDrop = nextImageDropSlot !== null
   const canAcceptPromptDrop = needsPrompt && (canAcceptImageDrop || canDropReferenceVideo)
 
+  const handlePromptImageFile = React.useCallback((file?: File) => {
+    if (!file || !file.type.startsWith("image/")) return
+
+    const imageUpload: ImageUpload = {
+      file,
+      url: URL.createObjectURL(file),
+    }
+
+    if (nextImageDropSlot === "lastFrame") {
+      onLastFrameChange(imageUpload)
+      return
+    }
+
+    onInputImageChange(imageUpload)
+  }, [nextImageDropSlot, onInputImageChange, onLastFrameChange])
+
   const getDraggedMediaKind = React.useCallback((dataTransfer: DataTransfer): "image" | "video" | "unknown" => {
     const items = Array.from(dataTransfer.items || [])
     const fileItem = items.find((item) => item.kind === "file")
@@ -346,7 +362,7 @@ export function VideoInputBox({
     ? (
       isPromptDragActive && canAcceptPromptDrop
         ? `Drop file to set ${promptDropLabel}...`
-        : `Describe the video you want to generate...${canAcceptPromptDrop ? ` (or drag file anywhere in this box to set ${promptDropLabel})` : ""}`
+        : `Describe the video you want to generate...${canAcceptPromptDrop ? ` (or paste an image / drag a file anywhere in this box to set ${promptDropLabel})` : ""}`
     )
     : "Describe the video you want to generate..."
 
@@ -466,6 +482,7 @@ export function VideoInputBox({
               placeholder={promptPlaceholderText}
               variant="page"
               onPromptKeyDown={handleTextInputKeyDown}
+              onPasteImage={canAcceptImageDrop ? handlePromptImageFile : undefined}
             />
           </div>
         )}

@@ -49,6 +49,11 @@ import { uploadFilesToSupabase } from "@/lib/canvas/upload-helpers"
 import { toast } from "sonner"
 import { createNodeDragHandler } from "@/lib/canvas/drag-utils"
 import {
+  getDefaultAspectRatioForModel,
+  getSupportedAspectRatios,
+  resolveAspectRatioForRequest,
+} from "@/lib/utils/aspect-ratios"
+import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog"
@@ -156,6 +161,46 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     nodeData.model,
     nodeData.onDataChange,
   ])
+
+  const selectedModelObject = React.useMemo(
+    () =>
+      effectiveImageModels.find((model) => model.identifier === canvasSelectedImageModel) ??
+      null,
+    [canvasSelectedImageModel, effectiveImageModels]
+  )
+
+  const previousModelRef = React.useRef<string | null>(null)
+
+  React.useEffect(() => {
+    if (!selectedModelObject) return
+
+    const currentModelIdentifier = selectedModelObject.identifier
+    const currentAspectRatio = nodeData.aspectRatio?.trim() ?? ""
+    const supportedAspectRatios = getSupportedAspectRatios(selectedModelObject)
+    const needsInitialization =
+      currentAspectRatio.length === 0 ||
+      (supportedAspectRatios.length > 0 && !supportedAspectRatios.includes(currentAspectRatio))
+
+    if (previousModelRef.current === null) {
+      previousModelRef.current = currentModelIdentifier
+      if (needsInitialization) {
+        nodeData.onDataChange?.(id, {
+          aspectRatio: getDefaultAspectRatioForModel(selectedModelObject),
+        })
+      }
+      return
+    }
+
+    const modelChanged = previousModelRef.current !== currentModelIdentifier
+    previousModelRef.current = currentModelIdentifier
+
+    if (modelChanged || needsInitialization) {
+      const nextAspectRatio = getDefaultAspectRatioForModel(selectedModelObject)
+      if (currentAspectRatio !== nextAspectRatio) {
+        nodeData.onDataChange?.(id, { aspectRatio: nextAspectRatio })
+      }
+    }
+  }, [id, nodeData.aspectRatio, nodeData.onDataChange, selectedModelObject])
 
   const [width, height] = getImageDimensions(nodeData.aspectRatio || "match_input_image")
   const [isHovered, setIsHovered] = React.useState(false)
@@ -666,21 +711,26 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     })
 
     try {
-      const formData = new FormData()
-      formData.append("prompt", fullPrompt)
-      formData.append("model", canvasSelectedImageModel)
-      formData.append("enhancePrompt", String(nodeData.enhancePrompt))
-      if (nodeData.aspectRatio) {
-        formData.append("aspectRatio", nodeData.aspectRatio)
-        formData.append("aspect_ratio", nodeData.aspectRatio)
-      }
-
-      // Add reference images if any connected or manual images exist
       const allReferenceImages = [
         ...(nodeData.connectedImageUrls || []),
         ...(nodeData.manualImageUrls || [])
       ]
-      
+      const requestAspectRatio = resolveAspectRatioForRequest({
+        model: selectedModelObject,
+        selectedAspectRatio: nodeData.aspectRatio,
+        hasReferenceImages: allReferenceImages.length > 0,
+      })
+
+      const formData = new FormData()
+      formData.append("prompt", fullPrompt)
+      formData.append("model", canvasSelectedImageModel)
+      formData.append("enhancePrompt", String(nodeData.enhancePrompt))
+      if (requestAspectRatio) {
+        formData.append("aspectRatio", requestAspectRatio)
+        formData.append("aspect_ratio", requestAspectRatio)
+      }
+
+      // Add reference images if any connected or manual images exist
       if (allReferenceImages.length > 0) {
         // Fetch and append all reference images
         for (let i = 0; i < allReferenceImages.length; i++) {
@@ -1085,21 +1135,23 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     >
       <div className="nopan nodrag w-full max-w-sm sm:max-w-lg lg:max-w-4xl">
         {nodeData.connectedPrompt && (
-          <div className="mb-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-            <span className="text-xs text-zinc-500">From connections: </span>
-            <span className="text-xs text-zinc-300 line-clamp-2">{nodeData.connectedPrompt}</span>
+          <div className="mb-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 [.react-flow.light_&]:border-zinc-300/90 [.react-flow.light_&]:bg-zinc-100/95">
+            <span className="text-xs text-zinc-500 [.react-flow.light_&]:text-zinc-600">From connections: </span>
+            <span className="text-xs text-zinc-300 line-clamp-2 [.react-flow.light_&]:text-zinc-800">
+              {nodeData.connectedPrompt}
+            </span>
           </div>
         )}
         {connectedImageUrls.length > 0 && (
-          <div className="mb-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-            <span className="text-xs text-zinc-500">Reference images from connections: </span>
+          <div className="mb-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 [.react-flow.light_&]:border-zinc-300/90 [.react-flow.light_&]:bg-zinc-100/95">
+            <span className="text-xs text-zinc-500 [.react-flow.light_&]:text-zinc-600">Reference images from connections: </span>
             <div className="flex gap-1.5 mt-1.5 flex-wrap">
               {connectedImageUrls.map((url) => (
                 <img
                   key={url}
                   src={url}
                   alt=""
-                  className="w-12 h-12 rounded object-cover border border-white/10 shrink-0"
+                  className="w-12 h-12 rounded object-cover border border-white/10 shrink-0 [.react-flow.light_&]:border-zinc-300/90"
                 />
               ))}
             </div>

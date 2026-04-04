@@ -43,6 +43,7 @@ import {
   type CanvasNodeType,
   type CanvasNodeData,
   type GroupNodeData,
+  type NodeOutput,
 } from "@/lib/canvas/types"
 import { fetchCanvas, saveCanvasClient } from "@/lib/canvas/database"
 import { generateAndUploadThumbnail } from "@/lib/canvas/thumbnails"
@@ -973,67 +974,103 @@ function CanvasContent() {
     }
   }, [canvasId, workflowName, userId, reactFlowInstance, waitForUploads, setNodes])
 
-  // Execute workflow
-  const handleExecute = React.useCallback(async () => {
-    if (nodes.length === 0) {
-      toast.error("Add nodes to the canvas first")
+  const handleNodeExecutionStart = React.useCallback((nodeId: string) => {
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === nodeId
+          ? { ...n, data: { ...n.data, isGenerating: true, error: null } }
+          : n
+      )
+    )
+  }, [setNodes])
+
+  const handleNodeExecutionComplete = React.useCallback((nodeId: string, output: NodeOutput) => {
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id !== nodeId) return n
+
+        const updates: Record<string, unknown> = {
+          isGenerating: false,
+          error: null,
+        }
+
+        if (typeof output.imageUrl === "string" && output.imageUrl.length > 0) {
+          const existingImageUrls = Array.isArray((n.data as { generatedImageUrls?: unknown }).generatedImageUrls)
+            ? ((n.data as { generatedImageUrls?: unknown }).generatedImageUrls as unknown[])
+                .filter((url): url is string => typeof url === "string" && url.length > 0)
+            : []
+          const fallbackSingle = typeof (n.data as { generatedImageUrl?: unknown }).generatedImageUrl === "string"
+            ? [(n.data as { generatedImageUrl: string }).generatedImageUrl]
+            : []
+          const currentImageUrls = existingImageUrls.length > 0 ? existingImageUrls : fallbackSingle
+          const maxGeneratedImages = 20
+          const nextImageUrls = [...currentImageUrls, output.imageUrl].slice(-maxGeneratedImages)
+          const nextActiveIndex = nextImageUrls.length - 1
+
+          updates.generatedImageUrls = nextImageUrls
+          updates.activeImageIndex = nextActiveIndex
+          updates.generatedImageUrl = nextImageUrls[nextActiveIndex] ?? null
+        }
+
+        if (typeof output.videoUrl === "string") updates.generatedVideoUrl = output.videoUrl
+        if (typeof output.audioUrl === "string") updates.generatedAudioUrl = output.audioUrl
+
+        return { ...n, data: { ...n.data, ...updates } }
+      })
+    )
+  }, [setNodes])
+
+  const handleNodeExecutionError = React.useCallback((nodeId: string, error: string) => {
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === nodeId
+          ? { ...n, data: { ...n.data, isGenerating: false, error } }
+          : n
+      )
+    )
+  }, [setNodes])
+
+  const runWorkflowExecution = React.useCallback(async ({
+    executionNodes,
+    executionEdges,
+    inputEdges,
+    emptyMessage,
+    successMessage,
+  }: {
+    executionNodes: Node[]
+    executionEdges: Edge[]
+    inputEdges?: Edge[]
+    emptyMessage: string
+    successMessage: string
+  }) => {
+    if (executionNodes.length === 0) {
+      toast.error(emptyMessage)
+      return
+    }
+
+    if (isExecuting) {
+      toast.error("A workflow is already running")
       return
     }
 
     setIsExecuting(true)
-    try {
-      await executeWorkflow(nodes, edges, {
-        onNodeStart: (nodeId) => {
-          setNodes((nds) =>
-            nds.map((n) =>
-              n.id === nodeId
-                ? { ...n, data: { ...n.data, isGenerating: true, error: null } }
-                : n
-            )
-          )
-        },
-        onNodeComplete: (nodeId, output) => {
-          setNodes((nds) =>
-            nds.map((n) => {
-              if (n.id !== nodeId) return n
-              const updates: Record<string, unknown> = {
-                isGenerating: false,
-                error: null,
-              }
-              if (output.imageUrl) {
-                const existingImageUrls = Array.isArray((n.data as { generatedImageUrls?: unknown }).generatedImageUrls)
-                  ? ((n.data as { generatedImageUrls?: unknown }).generatedImageUrls as unknown[])
-                      .filter((url): url is string => typeof url === "string" && url.length > 0)
-                  : []
-                const fallbackSingle = typeof (n.data as { generatedImageUrl?: unknown }).generatedImageUrl === "string"
-                  ? [(n.data as { generatedImageUrl: string }).generatedImageUrl]
-                  : []
-                const currentImageUrls = existingImageUrls.length > 0 ? existingImageUrls : fallbackSingle
-                const maxGeneratedImages = 20
-                const nextImageUrls = [...currentImageUrls, output.imageUrl].slice(-maxGeneratedImages)
-                const nextActiveIndex = nextImageUrls.length - 1
 
-                updates.generatedImageUrls = nextImageUrls
-                updates.activeImageIndex = nextActiveIndex
-                updates.generatedImageUrl = nextImageUrls[nextActiveIndex] ?? null
-              }
-              if (output.videoUrl) updates.generatedVideoUrl = output.videoUrl
-              if (output.audioUrl) updates.generatedAudioUrl = output.audioUrl
-              return { ...n, data: { ...n.data, ...updates } }
-            })
-          )
+    try {
+      await executeWorkflow(
+        executionNodes,
+        executionEdges,
+        {
+          onNodeStart: handleNodeExecutionStart,
+          onNodeComplete: handleNodeExecutionComplete,
+          onNodeError: handleNodeExecutionError,
         },
-        onNodeError: (nodeId, error) => {
-          setNodes((nds) =>
-            nds.map((n) =>
-              n.id === nodeId
-                ? { ...n, data: { ...n.data, isGenerating: false, error } }
-                : n
-            )
-          )
-        },
-      })
-      toast.success("Workflow execution complete")
+        {
+          inputEdges,
+          fallbackNodes: nodes,
+        }
+      )
+
+      toast.success(successMessage)
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Workflow execution failed"
@@ -1041,7 +1078,74 @@ function CanvasContent() {
     } finally {
       setIsExecuting(false)
     }
-  }, [nodes, edges, setNodes])
+  }, [
+    handleNodeExecutionComplete,
+    handleNodeExecutionError,
+    handleNodeExecutionStart,
+    isExecuting,
+    nodes,
+  ])
+
+  const collectGroupDescendantIds = React.useCallback((groupId: string) => {
+    const descendantIds = new Set<string>()
+    const groupsToVisit = [groupId]
+
+    while (groupsToVisit.length > 0) {
+      const currentGroupId = groupsToVisit.pop()
+      if (!currentGroupId) continue
+
+      nodes.forEach((node) => {
+        if (node.parentId !== currentGroupId || descendantIds.has(node.id)) return
+
+        descendantIds.add(node.id)
+
+        if (node.type === "group") {
+          groupsToVisit.push(node.id)
+        }
+      })
+    }
+
+    return descendantIds
+  }, [nodes])
+
+  // Execute workflow
+  const handleExecute = React.useCallback(async () => {
+    const executableNodes = nodes.filter((node) => node.type !== "group")
+    const executableNodeIds = new Set(executableNodes.map((node) => node.id))
+    const executableEdges = edges.filter(
+      (edge) => executableNodeIds.has(edge.source) && executableNodeIds.has(edge.target)
+    )
+
+    await runWorkflowExecution({
+      executionNodes: executableNodes,
+      executionEdges: executableEdges,
+      emptyMessage: "Add nodes to the canvas first",
+      successMessage: "Workflow execution complete",
+    })
+  }, [edges, nodes, runWorkflowExecution])
+
+  const handleExecuteGroup = React.useCallback(async (groupId: string) => {
+    const descendantIds = collectGroupDescendantIds(groupId)
+    const executionNodes = nodes.filter(
+      (node) => descendantIds.has(node.id) && node.type !== "group"
+    )
+    const executionNodeIds = new Set(executionNodes.map((node) => node.id))
+    const executionEdges = edges.filter(
+      (edge) => executionNodeIds.has(edge.source) && executionNodeIds.has(edge.target)
+    )
+    const inputEdges = edges.filter((edge) => executionNodeIds.has(edge.target))
+    const groupLabel = typeof selectedGroupNode?.data?.label === "string"
+      ? selectedGroupNode.data.label
+      : "Group"
+
+    await runWorkflowExecution({
+      executionNodes,
+      executionEdges,
+      inputEdges,
+      emptyMessage: "This group has no runnable nodes",
+      successMessage: `${groupLabel} execution complete`,
+    })
+  }, [collectGroupDescendantIds, edges, nodes, runWorkflowExecution, selectedGroupNode])
 
   if (isLoading) {
     return (
@@ -1148,18 +1252,19 @@ function CanvasContent() {
             </Panel>
           )}
 
-          {/* Single group selected - show action bar with ungroup + save workflow */}
-          {selectedGroupNode && (
-            <Panel position="top-center" className="mt-4">
-              <CanvasSelectionActionBar
-                selectedCount={1}
-                selectedGroupId={selectedGroupNode.id}
-                onGroup={() => {}}
-                onUngroup={() => handleUngroup(selectedGroupNode.id)}
-                onDuplicate={handleDuplicate}
-                onDelete={handleDelete}
-                onSaveWorkflow={() => setSaveWorkflowDialogOpen(true)}
-              />
+           {/* Single group selected - show action bar with ungroup + save workflow */}
+           {selectedGroupNode && (
+             <Panel position="top-center" className="mt-4">
+               <CanvasSelectionActionBar
+                 selectedCount={1}
+                 selectedGroupId={selectedGroupNode.id}
+                 onGroup={() => {}}
+                 onRunGroup={() => handleExecuteGroup(selectedGroupNode.id)}
+                 onUngroup={() => handleUngroup(selectedGroupNode.id)}
+                 onDuplicate={handleDuplicate}
+                 onDelete={handleDelete}
+                 onSaveWorkflow={() => setSaveWorkflowDialogOpen(true)}
+               />
             </Panel>
           )}
         </ReactFlow>

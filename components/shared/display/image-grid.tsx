@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
-import { ArrowsOutSimple, Copy, DownloadSimple, Check, X, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise } from "@phosphor-icons/react"
+import { ArrowsOutSimple, Copy, DownloadSimple, Check, X, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple } from "@phosphor-icons/react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -570,6 +570,19 @@ export function ImageGrid({
                   >
                     Reference
                   </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      router.push(`/inpaint?image=${encodeURIComponent(item.data.url)}`)
+                    }}
+                  >
+                    <PencilSimple className="mr-1 size-3" />
+                    Edit
+                  </Button>
                   {onRecreate && (
                     <Button
                       type="button"
@@ -666,6 +679,16 @@ export function ImageGrid({
                       >
                         <ArrowsOutSimple className="mr-2 size-4" />
                         Use as Reference
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          router.push(`/inpaint?image=${encodeURIComponent(item.data.url)}`)
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <PencilSimple className="mr-2 size-4" />
+                        Edit
                       </DropdownMenuItem>
                       {onRecreate && (
                         <DropdownMenuItem

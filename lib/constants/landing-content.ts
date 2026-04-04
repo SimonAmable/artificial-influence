@@ -8,8 +8,7 @@ import type {
 export const landingHero = {
   eyebrow: "Creative workflows",
   title: "Create winning ads with AI",
-  description:
-    "Choose top AI actors and video templates, then dial in the details with our creative tools.",
+  description: "Choose top AI actors and video templates, then dial in the details with our creative tools.",
   primaryCtaLabel: "Get Started Free",
   primaryCtaHref: "/login?mode=signup",
   secondaryCtaLabel: "See Workflows",
@@ -75,15 +74,15 @@ export const workflowItems: LandingWorkflowItem[] = [
     href: "/image",
   },
   {
-    category: "Influencer",
-    title: "Design complete influencer campaigns",
+    category: "Image editing",
+    title: "Refine regions with mask inpaint",
     description:
-      "Spin up personas, style references, and final content batches from one guided flow.",
+      "Brush a mask, describe the change, and keep everything outside the mask pixel-locked.",
     mediaType: "image",
     mediaSrc: "/canvas_landing_page_assets/influencer_workflows.png",
     backgroundSrc: "/canvas_landing_page_assets/influencer_workflows.png",
     backgroundType: "image",
-    href: "/influencer-generator",
+    href: "/inpaint",
   },
 ]
 
@@ -114,7 +113,7 @@ export const modelCards: LandingModelCard[] = [
     tagline: "Retouch, expand, and adapt visuals without leaving the workflow.",
     mediaType: "image",
     mediaSrc: "/hero_showcase_images/image_editing_wide.png",
-    href: "/image-editor",
+    href: "/inpaint",
   },
 ]
 

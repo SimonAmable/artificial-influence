@@ -143,6 +143,8 @@ export interface ImageEditorDialogProps {
   onOpenChange: (open: boolean) => void
   initialImage?: string
   onSave?: (imageUrl: string) => void
+  /** Defaults to `inpaint` (mask + Nano Banana 2). Use `full` only for legacy flows. */
+  variant?: ImageEditorVariant
 }
 
 // Tool definition for toolbar

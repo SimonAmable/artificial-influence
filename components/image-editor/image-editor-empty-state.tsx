@@ -1,9 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { UploadSimple, Image as ImageIcon } from "@phosphor-icons/react"
+import { UploadSimple, Image as ImageIcon, FolderOpen } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
+import { toast } from "sonner"
 import { useImageEditor } from "./image-editor-provider"
 
 interface ImageEditorEmptyStateProps {
@@ -14,6 +16,7 @@ export function ImageEditorEmptyState({ className }: ImageEditorEmptyStateProps)
   const { loadImage } = useImageEditor()
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = React.useState(false)
+  const [assetModalOpen, setAssetModalOpen] = React.useState(false)
   const dragCounter = React.useRef(0)
 
   const handleFileSelect = async (file: File) => {
@@ -72,11 +75,28 @@ export function ImageEditorEmptyState({ className }: ImageEditorEmptyStateProps)
     }
   }
 
+  const handleAssetSelect = async (imageUrl: string) => {
+    try {
+      const response = await fetch(imageUrl)
+      if (!response.ok) throw new Error("Failed to fetch")
+      const blob = await response.blob()
+      if (!blob.type.startsWith("image/")) {
+        toast.error("Selected item must be an image")
+        return
+      }
+      // Use the canonical URL for canvas + state so currentImage stays valid for export/generate (same as /image references).
+      await loadImage(imageUrl)
+      setAssetModalOpen(false)
+    } catch {
+      toast.error("Could not load image from library")
+    }
+  }
+
   return (
     <div
       className={cn(
         "absolute inset-0 flex items-center justify-center z-10",
-        "bg-zinc-950",
+        "bg-muted",
         className
       )}
       onDrop={handleDrop}
@@ -97,39 +117,55 @@ export function ImageEditorEmptyState({ className }: ImageEditorEmptyStateProps)
           "flex flex-col items-center justify-center p-12 rounded-2xl border-2 border-dashed transition-all",
           isDragging
             ? "border-primary bg-primary/10 scale-105"
-            : "border-zinc-700 bg-zinc-900/50 hover:border-zinc-500"
+            : "border-border bg-card/60 hover:border-muted-foreground/40"
         )}
       >
         <div
           className={cn(
             "w-20 h-20 rounded-full flex items-center justify-center mb-6 transition-colors",
-            isDragging ? "bg-primary/20" : "bg-zinc-800"
+            isDragging ? "bg-primary/20" : "bg-muted"
           )}
         >
           {isDragging ? (
             <UploadSimple size={40} className="text-primary" />
           ) : (
-            <ImageIcon size={40} className="text-zinc-500" />
+            <ImageIcon size={40} className="text-muted-foreground" />
           )}
         </div>
 
-        <h3 className="text-xl font-medium text-zinc-200 mb-2">
+        <h3 className="text-xl font-medium text-foreground mb-2">
           {isDragging ? "Drop image here" : "Start editing"}
         </h3>
 
-        <p className="text-sm text-zinc-500 mb-6 text-center max-w-xs">
+        <p className="text-sm text-muted-foreground mb-6 text-center max-w-xs">
           Upload an image to start editing, or drag and drop a file here
         </p>
 
-        <Button
-          onClick={() => fileInputRef.current?.click()}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground"
-        >
-          <UploadSimple size={18} className="mr-2" />
-          Upload Image
-        </Button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full max-w-xs sm:max-w-none sm:w-auto">
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-shadow hover:shadow-lg hover:shadow-black/35 dark:hover:shadow-black/50"
+          >
+            <UploadSimple size={18} className="mr-2" />
+            Upload Image
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setAssetModalOpen(true)}
+          >
+            <FolderOpen size={18} className="mr-2" />
+            Select Asset
+          </Button>
+        </div>
 
-        <p className="text-xs text-zinc-600 mt-4">
+        <AssetSelectionModal
+          open={assetModalOpen}
+          onOpenChange={setAssetModalOpen}
+          onSelect={handleAssetSelect}
+        />
+
+        <p className="text-xs text-muted-foreground/80 mt-4">
           Supports PNG, JPG, GIF, WebP
         </p>
       </div>

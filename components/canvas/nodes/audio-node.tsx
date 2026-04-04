@@ -13,13 +13,16 @@ import {
   PaperPlaneTilt,
   FloppyDisk,
 } from "@phosphor-icons/react"
-import { AnimatePresence, motion } from "framer-motion"
+import { motion } from "framer-motion"
 import type { AudioNodeData } from "@/lib/canvas/types"
 import { cn } from "@/lib/utils"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -29,6 +32,11 @@ import {
   DialogContent,
 } from "@/components/ui/dialog"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { InworldVoiceSelector } from "@/components/audio/inworld-voice-selector"
+import {
+  DEFAULT_INWORLD_TTS_MODEL,
+  INWORLD_TTS_MODEL_OPTIONS,
+} from "@/lib/constants/inworld-tts"
 
 export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as AudioNodeData
@@ -82,14 +90,18 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
       const response = await fetch(nodeData.generatedAudioUrl)
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
-      
+      const extensionMatch = new URL(nodeData.generatedAudioUrl).pathname.match(
+        /\.([a-z0-9]+)$/i
+      )
+      const extension = extensionMatch?.[1] ?? "wav"
+
       const link = document.createElement('a')
       link.href = url
-      link.download = `${title.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.mp3`
+      link.download = `${title.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.${extension}`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      
+
       setTimeout(() => URL.revokeObjectURL(url), 100)
     } catch (error) {
       console.error('Error downloading audio:', error)
@@ -120,6 +132,11 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
       return
     }
 
+    if (!nodeData.voice.trim()) {
+      nodeData.onDataChange?.(id, { error: "Choose an Inworld voice first" })
+      return
+    }
+
     nodeData.onDataChange?.(id, { isGenerating: true, error: null })
 
     try {
@@ -129,6 +146,7 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
         body: JSON.stringify({
           text: nodeData.text.trim(),
           voice: nodeData.voice,
+          model: nodeData.model || DEFAULT_INWORLD_TTS_MODEL,
         }),
       })
 
@@ -166,29 +184,6 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
       >
         <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl px-2 py-2 flex flex-nowrap items-center gap-2 overflow-x-auto nopan nodrag">
           <ToolbarIconButton icon={PaperPlaneTilt} onClick={handleSendToChat} label="Send to AI Chat" />
-          <div className="w-px h-5 bg-white/10" />
-          
-          {/* Voice selector */}
-          <label className="text-[10px] text-zinc-500 uppercase tracking-wider px-1">
-            Voice
-          </label>
-          <Select
-            value={nodeData.voice || "alloy"}
-            onValueChange={(value) => nodeData.onDataChange?.(id, { voice: value })}
-          >
-            <SelectTrigger className="h-7 text-xs w-fit min-w-[100px] bg-zinc-800/80 border-white/10">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="alloy">Alloy</SelectItem>
-              <SelectItem value="echo">Echo</SelectItem>
-              <SelectItem value="fable">Fable</SelectItem>
-              <SelectItem value="onyx">Onyx</SelectItem>
-              <SelectItem value="nova">Nova</SelectItem>
-              <SelectItem value="shimmer">Shimmer</SelectItem>
-            </SelectContent>
-          </Select>
-
           <div className="w-px h-5 bg-white/10" />
 
           <ToolbarIconButton icon={DownloadSimple} onClick={handleDownload} label="Download" />
@@ -270,7 +265,7 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
           ) : (
             <div className="w-full h-full px-4 flex items-center justify-center">
               <p className="text-xs text-zinc-500 text-center leading-relaxed max-w-[220px]">
-                Enter the text you want spoken, choose a voice, then click Generate audio.
+                Enter the text you want spoken, search an Inworld voice, choose a model, then generate audio.
               </p>
             </div>
           )}
@@ -321,21 +316,21 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
       position={Position.Bottom}
       offset={12}
     >
-      <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl overflow-hidden nopan nodrag">
-        {/* Text input area */}
-        <div className="p-2.5 space-y-2">
-          <textarea
+        <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl overflow-hidden nopan nodrag">
+          {/* Text input area */}
+          <div className="p-2.5 space-y-2">
+            <textarea
             value={nodeData.text || ""}
             onChange={(e) => nodeData.onDataChange?.(id, { text: e.target.value })}
             placeholder="Enter text to convert to speech..."
             rows={3}
             className={cn(
-              "w-full bg-transparent border-0 text-sm text-zinc-200 placeholder:text-zinc-600 resize-none outline-none",
-            )}
-          />
+                "w-full bg-transparent border-0 text-sm text-zinc-200 placeholder:text-zinc-600 resize-none outline-none",
+              )}
+            />
 
-          {nodeData.error && (
-            <div className="flex items-center justify-between bg-red-500/10 border border-red-500/20 rounded-lg px-2.5 py-2">
+            {nodeData.error && (
+              <div className="flex items-center justify-between bg-red-500/10 border border-red-500/20 rounded-lg px-2.5 py-2">
               <span className="text-[11px] text-red-400">{nodeData.error}</span>
               <button
                 onClick={handleGenerate}
@@ -349,20 +344,60 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
           )}
         </div>
 
-        {/* Bottom bar: badge + generate */}
+        {/* Bottom bar: controls + generate */}
         <div className="border-t border-white/5 px-3 py-2.5 flex flex-nowrap items-center gap-2 overflow-x-auto">
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400">
-            Beta
-          </span>
+          <Select
+            value={nodeData.model || DEFAULT_INWORLD_TTS_MODEL}
+            onValueChange={(value) =>
+              nodeData.onDataChange?.(id, { model: value, error: null })
+            }
+          >
+            <SelectTrigger className="h-8 min-w-[140px] shrink-0 bg-zinc-800/80 border-white/10 text-xs">
+              <SelectValue placeholder="Select model" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Current</SelectLabel>
+                {INWORLD_TTS_MODEL_OPTIONS.filter(
+                  (option) => option.group === "Current"
+                ).map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+              <SelectSeparator />
+              <SelectGroup>
+                <SelectLabel>Legacy</SelectLabel>
+                {INWORLD_TTS_MODEL_OPTIONS.filter(
+                  (option) => option.group === "Legacy"
+                ).map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
 
-          <div className="flex-1" />
+          <InworldVoiceSelector
+            className="max-w-[260px] shrink-0 space-y-0!"
+            triggerClassName="min-w-[120px]"
+            value={nodeData.voice || ""}
+            onValueChange={(voice) =>
+              nodeData.onDataChange?.(id, { voice, error: null })
+            }
+          />
+
+          <div className="flex-1 min-w-2" />
 
           <Button
             onClick={handleGenerate}
-            disabled={nodeData.isGenerating}
+            disabled={nodeData.isGenerating || !nodeData.voice || !nodeData.text.trim()}
             size="sm"
-            className="text-xs"
+            className="h-8 w-8 px-0"
             variant={nodeData.isGenerating ? "secondary" : "default"}
+            title="Generate audio"
           >
             {nodeData.isGenerating ? (
               <CircleNotch size={12} className="animate-spin" />

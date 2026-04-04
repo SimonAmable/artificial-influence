@@ -76,7 +76,8 @@ export const INITIAL_EDITOR_STATE: ImageEditorState = {
 export const CANVAS_SETTINGS = {
   defaultWidth: 800,
   defaultHeight: 600,
-  backgroundColor: "#18181b", // zinc-900
+  /** Used when `getThemeWorkspaceBackgroundColor` cannot resolve (e.g. SSR). */
+  backgroundColorFallback: "#18181b",
   selectionColor: "rgba(139, 92, 246, 0.3)", // purple with opacity
   selectionBorderColor: "#8b5cf6", // purple
   selectionLineWidth: 1,

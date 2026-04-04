@@ -246,25 +246,25 @@ export default function MotionCopyPage() {
       <MotionCopyShowcaseCard
         title="CREATE YOUR"
         highlightedTitle="MOTION COPY"
-        description="Generate dynamic motion copy by combining your image and video inputs—powered by Kling 3.0 motion control."
+        description="Recreate the motion from any UGC hook or short-form dance. Pair a reference clip with your image and get a matching clip for your feed."
         steps={[
           {
             mediaPath: "/motion_copy/step1_image.png",
             mediaType: "image",
             title: "UPLOAD IMAGE",
-            description: "Upload an image to use as the base for your motion copy.",
+            description: "Your photo, product, or character as the subject that should move.",
           },
           {
             mediaPath: "/motion_copy/step2_video.mp4",
             mediaType: "video",
             title: "UPLOAD VIDEO",
-            description: "Upload a video to combine with your image.",
+            description: "Any UGC hook, dance, or trend clip you want the motion from.",
           },
           {
             mediaPath: "/motion_copy/step_3_copy.mp4",
             mediaType: "video",
             title: "GENERATE",
-            description: "Generate your motion copy with AI-powered processing.",
+            description: "Export a short-form clip with your image following that motion.",
           },
         ]}
       />

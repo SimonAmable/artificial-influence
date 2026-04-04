@@ -135,7 +135,7 @@ function ImageEditorInner({
     <div
       ref={containerRef}
       className={cn(
-        "relative flex flex-col bg-zinc-950 w-full min-w-0 flex-1",
+        "relative flex flex-col bg-background w-full min-w-0 flex-1",
         mode === "page" ? "h-full min-h-0" : "h-full min-h-[600px]",
         className
       )}
@@ -170,14 +170,12 @@ function ImageEditorInner({
           {isGenerating && hasImage && (
             <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
               <div
-                className="absolute inset-y-0 -left-1/2 w-1/2"
+                className="absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-foreground/20 to-transparent"
                 style={{
-                  background:
-                    "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0) 100%)",
                   animation: "editorGenerateSweep 20s linear infinite",
                 }}
               />
-              <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-br from-foreground/5 via-transparent to-transparent" />
               <style jsx>{`
                 @keyframes editorGenerateSweep {
                   0% {

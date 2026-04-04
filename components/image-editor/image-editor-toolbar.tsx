@@ -37,7 +37,7 @@ export function ImageEditorToolbar({
     <div
       className={cn(
         "flex items-center gap-0.5 sm:gap-1 px-1.5 py-1 sm:px-2 sm:py-1.5",
-        "bg-zinc-900/90 border border-white/10 rounded-lg sm:rounded-xl backdrop-blur-md",
+        "bg-card/90 border border-border rounded-lg sm:rounded-xl backdrop-blur-md shadow-sm",
         className
       )}
     >
@@ -48,7 +48,7 @@ export function ImageEditorToolbar({
           "h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg transition-colors",
           maskActive
             ? "bg-primary/20 text-primary ring-1 ring-primary/40"
-            : "text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
+            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
         )}
         onClick={activateMask}
         title="Mask (L)"
@@ -63,7 +63,7 @@ export function ImageEditorToolbar({
           "h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg transition-colors",
           eraseActive
             ? "bg-primary/20 text-primary ring-1 ring-primary/40"
-            : "text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
+            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
         )}
         onClick={activateErase}
         title="Erase mask"
@@ -73,11 +73,11 @@ export function ImageEditorToolbar({
 
       {onToggleFullscreen && (
         <>
-          <div className="w-px h-4 sm:h-6 bg-white/10 mx-0.5 sm:mx-1" />
+          <div className="w-px h-4 sm:h-6 bg-border mx-0.5 sm:mx-1" />
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
+            className="h-7 w-7 sm:h-9 sm:w-9 rounded-md sm:rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/50"
             onClick={onToggleFullscreen}
             title={isFullscreen ? "Exit Fullscreen (F)" : "Fullscreen (F)"}
           >

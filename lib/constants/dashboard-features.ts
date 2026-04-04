@@ -81,7 +81,7 @@ export const dashboardFeatures: DashboardFeature[] = [
     slug: "image-editing",
     title: "Image Editing",
     description: "Enhance, retouch, and restyle visuals with AI precision.",
-    toolHref: "/influencer-generator",
+    toolHref: "/inpaint",
     media: {
       type: "image",
       src: "/hero_showcase_images/influencer_generation_showcase.png",

@@ -1,0 +1,269 @@
+"use client"
+
+import * as React from "react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+  VoiceSelector,
+  VoiceSelectorAttributes,
+  VoiceSelectorBullet,
+  VoiceSelectorContent,
+  VoiceSelectorDescription,
+  VoiceSelectorEmpty,
+  VoiceSelectorGroup,
+  VoiceSelectorInput,
+  VoiceSelectorItem,
+  VoiceSelectorList,
+  VoiceSelectorName,
+  VoiceSelectorSeparator,
+  VoiceSelectorTrigger,
+} from "@/components/ai-elements/voice-selector"
+import {
+  DEFAULT_INWORLD_VOICE_ID,
+  DEFAULT_INWORLD_VOICE_NAME,
+  formatInworldLangCode,
+  getInworldVoiceSearchText,
+  getInworldVoiceSourceLabel,
+  type InworldVoice,
+} from "@/lib/constants/inworld-tts"
+import { cn } from "@/lib/utils"
+
+interface InworldVoiceSelectorProps {
+  value: string
+  onValueChange: (voiceId: string) => void
+  onSelectedVoiceChange?: (voice: InworldVoice | null) => void
+  disabled?: boolean
+  className?: string
+  /** Merged onto the trigger button (e.g. min width in tight flex toolbars). */
+  triggerClassName?: string
+  placeholder?: string
+}
+
+function groupVoicesBySource(voices: InworldVoice[]) {
+  const sourceOrder = ["SYSTEM", "IVC", "PVC"]
+  const groups = new Map<string, InworldVoice[]>()
+
+  for (const voice of voices) {
+    const source = voice.source || "SYSTEM"
+    const bucket = groups.get(source)
+
+    if (bucket) {
+      bucket.push(voice)
+    } else {
+      groups.set(source, [voice])
+    }
+  }
+
+  return Array.from(groups.entries()).sort(([a], [b]) => {
+    const indexA = sourceOrder.indexOf(a)
+    const indexB = sourceOrder.indexOf(b)
+
+    if (indexA === -1 && indexB === -1) {
+      return a.localeCompare(b)
+    }
+
+    if (indexA === -1) return 1
+    if (indexB === -1) return -1
+
+    return indexA - indexB
+  })
+}
+
+export function InworldVoiceSelector({
+  value,
+  onValueChange,
+  onSelectedVoiceChange,
+  disabled = false,
+  className,
+  triggerClassName,
+  placeholder = "Search voices...",
+}: InworldVoiceSelectorProps) {
+  const [voices, setVoices] = React.useState<InworldVoice[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+  const [open, setOpen] = React.useState(false)
+  const [query, setQuery] = React.useState("")
+  const onValueChangeRef = React.useRef(onValueChange)
+
+  React.useEffect(() => {
+    onValueChangeRef.current = onValueChange
+  }, [onValueChange])
+
+  React.useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadVoices() {
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        const response = await fetch("/api/inworld/voices", {
+          cache: "no-store",
+          signal: controller.signal,
+        })
+        const data = (await response.json()) as {
+          voices?: InworldVoice[]
+          error?: string
+          message?: string
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || data.message || "Failed to load Inworld voices"
+          )
+        }
+
+        const nextVoices = Array.isArray(data.voices) ? data.voices : []
+        setVoices(nextVoices)
+
+        if (!value) {
+          const defaultVoice =
+            nextVoices.find((voice) => voice.voiceId === DEFAULT_INWORLD_VOICE_ID) ??
+            nextVoices[0]
+
+          if (defaultVoice) {
+            onValueChangeRef.current(defaultVoice.voiceId)
+          }
+        }
+      } catch (fetchError) {
+        if (controller.signal.aborted) {
+          return
+        }
+
+        setError(
+          fetchError instanceof Error
+            ? fetchError.message
+            : "Failed to load Inworld voices"
+        )
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    void loadVoices()
+
+    return () => controller.abort()
+  }, [value])
+
+  const filteredVoices = React.useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+
+    if (!normalizedQuery) {
+      return voices
+    }
+
+    return voices.filter((voice) =>
+      getInworldVoiceSearchText(voice).includes(normalizedQuery)
+    )
+  }, [query, voices])
+
+  const groupedVoices = React.useMemo(
+    () => groupVoicesBySource(filteredVoices),
+    [filteredVoices]
+  )
+
+  const selectedVoice = React.useMemo(
+    () => voices.find((voice) => voice.voiceId === value) ?? null,
+    [value, voices]
+  )
+
+  React.useEffect(() => {
+    onSelectedVoiceChange?.(selectedVoice)
+  }, [onSelectedVoiceChange, selectedVoice])
+
+  const triggerLabel = selectedVoice?.displayName || DEFAULT_INWORLD_VOICE_NAME
+  const triggerId = selectedVoice?.voiceId || value || DEFAULT_INWORLD_VOICE_ID
+
+  return (
+    <div className={cn("space-y-2", className)}>
+      <VoiceSelector
+        onOpenChange={(nextOpen) => {
+          setOpen(nextOpen)
+          if (!nextOpen) {
+            setQuery("")
+          }
+        }}
+        onValueChange={(nextVoiceId) => {
+          if (nextVoiceId) {
+            onValueChange(nextVoiceId)
+            setQuery("")
+          }
+        }}
+        open={open}
+        value={value}
+      >
+        <VoiceSelectorTrigger asChild>
+          <Button
+            className={cn(
+              "h-8 w-full justify-between gap-2 rounded-lg border-white/10 bg-zinc-800/80 px-2.5 text-left text-xs hover:bg-zinc-900",
+              triggerClassName
+            )}
+            disabled={disabled || isLoading}
+            title={!isLoading ? triggerId : undefined}
+            variant="outline"
+          >
+            <span className="min-w-0 flex-1 truncate text-zinc-100">
+              {isLoading ? "Loading voices..." : triggerLabel}
+            </span>
+          </Button>
+        </VoiceSelectorTrigger>
+        <VoiceSelectorContent title="Select Inworld voice">
+          <VoiceSelectorInput
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={placeholder}
+            value={query}
+          />
+          <VoiceSelectorList>
+            {error ? (
+              <VoiceSelectorEmpty>{error}</VoiceSelectorEmpty>
+            ) : groupedVoices.length === 0 ? (
+              <VoiceSelectorEmpty>
+                {isLoading ? "Loading voices..." : "No voices found."}
+              </VoiceSelectorEmpty>
+            ) : (
+              groupedVoices.map(([source, sourceVoices], groupIndex) => (
+                <React.Fragment key={source}>
+                  {groupIndex > 0 ? <VoiceSelectorSeparator /> : null}
+                  <VoiceSelectorGroup>
+                    <div className="px-3 pb-1 pt-2 text-xs text-zinc-500">
+                      {getInworldVoiceSourceLabel(source)}
+                    </div>
+                    {sourceVoices.map((voice) => (
+                      <VoiceSelectorItem
+                        key={voice.voiceId}
+                        onSelect={() => onValueChange(voice.voiceId)}
+                        value={voice.voiceId}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <VoiceSelectorName className="truncate">
+                              {voice.displayName}
+                            </VoiceSelectorName>
+                            <Badge className="h-4 px-1.5 text-[10px]" variant="outline">
+                              {formatInworldLangCode(voice.langCode)}
+                            </Badge>
+                          </div>
+                          <VoiceSelectorAttributes className="mt-0.5">
+                            <span className="truncate">{voice.voiceId}</span>
+                            {voice.description ? <VoiceSelectorBullet /> : null}
+                            {voice.description ? (
+                              <VoiceSelectorDescription className="truncate">
+                                {voice.description}
+                              </VoiceSelectorDescription>
+                            ) : null}
+                          </VoiceSelectorAttributes>
+                        </div>
+                      </VoiceSelectorItem>
+                    ))}
+                  </VoiceSelectorGroup>
+                </React.Fragment>
+              ))
+            )}
+          </VoiceSelectorList>
+        </VoiceSelectorContent>
+      </VoiceSelector>
+    </div>
+  )
+}

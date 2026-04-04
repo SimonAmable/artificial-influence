@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Folder, Copy, Trash, FloppyDisk, FolderOpen } from "@phosphor-icons/react"
+import { Folder, Copy, Trash, FloppyDisk, FolderOpen, Play } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 
@@ -9,6 +9,7 @@ interface CanvasSelectionActionBarProps {
   selectedCount: number
   selectedGroupId?: string | null
   onGroup: () => void
+  onRunGroup?: () => void
   onUngroup?: () => void
   onDuplicate: () => void
   onDelete: () => void
@@ -19,6 +20,7 @@ export function CanvasSelectionActionBar({
   selectedCount,
   selectedGroupId,
   onGroup,
+  onRunGroup,
   onUngroup,
   onDuplicate,
   onDelete,
@@ -39,15 +41,29 @@ export function CanvasSelectionActionBar({
         
         {/* Show Ungroup button when a group is selected */}
         {selectedGroupId && onUngroup ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onUngroup}
-            className="h-8 gap-2 text-xs hover:bg-white/5 hover:text-orange-400"
-          >
-            <FolderOpen className="w-4 h-4" />
-            Ungroup
-          </Button>
+          <>
+            {onRunGroup && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onRunGroup}
+                className="h-8 gap-2 text-xs hover:bg-white/5 hover:text-emerald-400"
+              >
+                <Play className="w-4 h-4" weight="fill" />
+                Run Group
+              </Button>
+            )}
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onUngroup}
+              className="h-8 gap-2 text-xs hover:bg-white/5 hover:text-orange-400"
+            >
+              <FolderOpen className="w-4 h-4" />
+              Ungroup
+            </Button>
+          </>
         ) : (
           <Button
             size="sm"

@@ -13,6 +13,7 @@ import {
 import { motion } from "framer-motion"
 import type { TextNodeData, UploadNodeData, ImageGenNodeData } from "@/lib/canvas/types"
 import { cn } from "@/lib/utils"
+import { appendFilesToFileList, extractClipboardImageFiles } from "@/lib/utils/clipboard"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -523,6 +524,25 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
     }
   }, [files])
 
+  const updateAttachedFiles = React.useCallback((nextFiles?: FileList) => {
+    setFiles(nextFiles && nextFiles.length > 0 ? nextFiles : undefined)
+
+    if (!fileInputRef.current) return
+
+    const dataTransfer = new DataTransfer()
+    Array.from(nextFiles ?? []).forEach((file) => dataTransfer.items.add(file))
+    fileInputRef.current.files = dataTransfer.files
+  }, [])
+
+  const handlePaste = React.useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedImages = extractClipboardImageFiles(e.clipboardData?.items)
+    if (pastedImages.length === 0) return
+
+    e.preventDefault()
+    e.stopPropagation()
+    updateAttachedFiles(appendFilesToFileList(files, pastedImages))
+  }, [files, updateAttachedFiles])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() && !files) return
@@ -605,11 +625,8 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
       }
 
       // Keep prompt input persisted (do not clear); clear only attached files for next run
-      setFiles(undefined)
+      updateAttachedFiles(undefined)
       setUploadedPreviewUrls([])
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
     } catch (error) {
       console.error('[AITextInput] Error generating text:', error)
       alert(error instanceof Error ? error.message : 'Failed to generate text')
@@ -626,11 +643,7 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
           <input
             type="file"
             ref={fileInputRef}
-            onChange={(e) => {
-              if (e.target.files) {
-                setFiles(e.target.files)
-              }
-            }}
+            onChange={(e) => updateAttachedFiles(e.target.files ?? undefined)}
             accept="image/*,video/*"
             multiple
             className="hidden"
@@ -685,10 +698,7 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
                           Array.from(files)
                             .filter((_, i) => i !== index)
                             .forEach(f => dt.items.add(f))
-                          setFiles(dt.files.length > 0 ? dt.files : undefined)
-                          if (fileInputRef.current) {
-                            fileInputRef.current.files = dt.files
-                          }
+                          updateAttachedFiles(dt.files.length > 0 ? dt.files : undefined)
                         }}
                         className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/75 text-[10px] leading-none text-white hover:bg-black"
                         aria-label={`Remove ${file.name}`}
@@ -718,6 +728,7 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
                   handleSubmit(e)
                 }
               }}
+              onPaste={handlePaste}
               placeholder="Ask AI to write, edit, or improve this text..."
               rows={4}
               disabled={isGenerating}

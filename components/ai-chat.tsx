@@ -4,7 +4,7 @@ import * as React from "react"
 import { Chat, useChat, type UIMessage } from "@ai-sdk/react"
 import { DefaultChatTransport } from "ai"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, ArrowUp, Plus, NotePencil, UploadSimple } from "@phosphor-icons/react"
+import { X, ArrowUp, Plus, NotePencil, UploadSimple, SpinnerGap } from "@phosphor-icons/react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import {
@@ -150,6 +150,8 @@ export function AIChat({ className }: AIChatProps) {
   const agentAvailable = Boolean(editorContext.projectId)
   const streamStatus = mode === "agent" ? agentStatus : chatStatus
   const suggestionsIdle = streamStatus === "ready"
+  const isAwaitingStream =
+    streamStatus === "submitted" || streamStatus === "streaming"
 
   const clearMessages = React.useCallback(() => {
     if (mode === "agent") {
@@ -550,6 +552,22 @@ export function AIChat({ className }: AIChatProps) {
                     )
                   })}
 
+                  {streamStatus === "submitted" ? (
+                    <Message from="assistant" role="status" aria-live="polite">
+                      <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white">
+                        <Image src="/logo.svg" alt="" width={16} height={16} />
+                      </div>
+                      <MessageContent className="flex flex-row items-center gap-3 py-3">
+                        <SpinnerGap
+                          className="h-5 w-5 shrink-0 animate-spin text-muted-foreground"
+                          weight="bold"
+                          aria-hidden
+                        />
+                        <span className="text-sm text-muted-foreground">Thinking…</span>
+                      </MessageContent>
+                    </Message>
+                  ) : null}
+
                   {mode === "agent" && commandHistory.length > 0 ? (
                     <ToolExecutionList entries={commandHistory.slice(-3).reverse()} />
                   ) : null}
@@ -582,6 +600,7 @@ export function AIChat({ className }: AIChatProps) {
                 setModel={setModel}
                 onSendMessage={handleSendMessage}
                 agentAvailable={agentAvailable}
+                isAwaitingResponse={isAwaitingStream}
               />
             </motion.div>
           </>
@@ -604,6 +623,7 @@ interface MessageInputProps {
     model: string,
   ) => void | Promise<void>
   agentAvailable: boolean
+  isAwaitingResponse: boolean
 }
 
 function MessageInput({
@@ -613,6 +633,7 @@ function MessageInput({
   setModel,
   onSendMessage,
   agentAvailable,
+  isAwaitingResponse,
 }: MessageInputProps) {
   const [input, setInput] = React.useState("")
   const [files, setFiles] = React.useState<FileList | undefined>(undefined)
@@ -697,6 +718,7 @@ function MessageInput({
   )
 
   const submitCurrentMessage = React.useCallback(async () => {
+    if (isAwaitingResponse) return
     if (!input.trim() && !files && droppedAssets.length === 0) return
     if (mode === "agent" && !agentAvailable) return
 
@@ -726,7 +748,16 @@ function MessageInput({
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
-  }, [agentAvailable, droppedAssets, files, input, mode, model, onSendMessage])
+  }, [
+    agentAvailable,
+    droppedAssets,
+    files,
+    input,
+    isAwaitingResponse,
+    mode,
+    model,
+    onSendMessage,
+  ])
 
   const handleSubmit = React.useCallback(
     async (event: React.FormEvent) => {
@@ -899,7 +930,11 @@ function MessageInput({
               <Button
                 type="submit"
                 size="icon"
-                disabled={(!input.trim() && !files && droppedAssets.length === 0) || (mode === "agent" && !agentAvailable)}
+                disabled={
+                  isAwaitingResponse ||
+                  ((!input.trim() && !files && droppedAssets.length === 0) ||
+                    (mode === "agent" && !agentAvailable))
+                }
                 className="h-9 w-9 shrink-0 bg-foreground text-background hover:bg-foreground/90"
               >
                 <ArrowUp className="h-5 w-5 text-background" weight="bold" />

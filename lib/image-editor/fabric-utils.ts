@@ -1,5 +1,24 @@
 import { Canvas as FabricCanvas, FabricImage, Rect, Line, Group, IText, PencilBrush } from "fabric"
 import { CANVAS_SETTINGS, SHAPE_DEFAULTS, TEXT_DEFAULTS } from "./constants"
+
+/** Resolved `var(--muted)` for Fabric canvas background (light/dark). */
+export function getThemeWorkspaceBackgroundColor(): string {
+  if (typeof document === "undefined") return CANVAS_SETTINGS.backgroundColorFallback
+
+  const probe = document.createElement("div")
+  probe.style.position = "fixed"
+  probe.style.left = "-9999px"
+  probe.style.backgroundColor = "var(--muted)"
+  document.body.appendChild(probe)
+  const resolved = getComputedStyle(probe).backgroundColor
+  document.body.removeChild(probe)
+
+  if (!resolved || resolved === "rgba(0, 0, 0, 0)" || resolved === "transparent") {
+    return CANVAS_SETTINGS.backgroundColorFallback
+  }
+  return resolved
+}
+import { resolveImageUrlForFabric } from "./canvas-image-url"
 import type { EditorTool } from "./types"
 
 type BaseAwareObject = {
@@ -58,7 +77,7 @@ export function initializeCanvas(
   const canvas = new FabricCanvas(canvasElement, {
     width,
     height,
-    backgroundColor: CANVAS_SETTINGS.backgroundColor,
+    backgroundColor: getThemeWorkspaceBackgroundColor(),
     selectionColor: CANVAS_SETTINGS.selectionColor,
     selectionBorderColor: CANVAS_SETTINGS.selectionBorderColor,
     selectionLineWidth: CANVAS_SETTINGS.selectionLineWidth,
@@ -75,7 +94,8 @@ export async function loadImageOntoCanvas(
   canvas: FabricCanvas,
   imageUrl: string
 ): Promise<FabricImage> {
-  const img = await FabricImage.fromURL(imageUrl, { crossOrigin: "anonymous" })
+  const src = resolveImageUrlForFabric(imageUrl)
+  const img = await FabricImage.fromURL(src, { crossOrigin: "anonymous" })
 
   // Scale image to fit canvas while maintaining aspect ratio
   const canvasWidth = canvas.width!

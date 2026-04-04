@@ -30,6 +30,7 @@ import { toast } from "sonner"
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from "@/components/ui/dialog"
 import { getConstrainedSize, loadImageSize, loadVideoSize } from "@/lib/canvas/media-sizing"
 import { ImageEditorDialog } from "@/components/image-editor"
@@ -69,10 +70,27 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
     })
   }, [id, updateNodeInternals])
 
-  // Get current node to read its dimensions
+  // Prefer live node style dimensions so immediate resize updates render correctly.
   const currentNode = reactFlow.getNode(id)
-  const nodeWidth = propWidth || currentNode?.style?.width || currentNode?.width || 280
-  const nodeHeight = propHeight || currentNode?.style?.height || currentNode?.height || 280
+  const toNumber = (value: number | string | undefined) => {
+    if (typeof value === "number") return value
+    if (typeof value === "string") return Number.parseFloat(value)
+    return undefined
+  }
+  const nodeWidth =
+    toNumber(currentNode?.style?.width) ??
+    toNumber(currentNode?.width) ??
+    toNumber(propWidth) ??
+    280
+  const nodeHeight =
+    toNumber(currentNode?.style?.height) ??
+    toNumber(currentNode?.height) ??
+    toNumber(propHeight) ??
+    280
+
+  React.useLayoutEffect(() => {
+    scheduleUpdateNodeInternals()
+  }, [nodeWidth, nodeHeight, scheduleUpdateNodeInternals])
 
   const applyNodeSize = React.useCallback((width: number, height: number) => {
     const existing = reactFlow.getNode(id)
@@ -81,6 +99,8 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
     if (existingWidth === width && existingHeight === height) return
 
     reactFlow.updateNode(id, {
+      width,
+      height,
       style: { width, height },
     })
     scheduleUpdateNodeInternals()
@@ -681,6 +701,9 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
     {nodeData.fileUrl && (
       <Dialog open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
         <DialogContent className="!w-screen !h-screen !max-w-none !m-0 !p-0 gap-0 overflow-hidden border-0 !rounded-none !translate-x-0 !translate-y-0 !left-0 !top-0 !fixed !inset-0">
+          <DialogTitle className="sr-only">
+            Fullscreen preview{title ? `: ${title}` : ""}
+          </DialogTitle>
           <button
             onClick={() => setIsFullscreenOpen(false)}
             className="absolute top-6 right-6 z-10 rounded-full p-2.5 bg-zinc-900/80 backdrop-blur-md hover:bg-zinc-800/80 transition-colors"

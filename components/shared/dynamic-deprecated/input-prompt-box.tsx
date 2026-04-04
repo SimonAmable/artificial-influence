@@ -14,6 +14,7 @@ import { Plus, X, UserList, FilePlus } from "@phosphor-icons/react"
 import { PhotoUpload, ImageUpload } from "@/components/shared/upload/photo-upload"
 import { VideoUpload } from "@/components/shared/upload/video-upload"
 import { cn } from "@/lib/utils"
+import { extractClipboardImageFiles } from "@/lib/utils/clipboard"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 
@@ -209,6 +210,20 @@ export function InputPromptBox({
     fileInputRef.current?.click()
   }
 
+  const handleTextInputPaste = React.useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedImage = extractClipboardImageFiles(e.clipboardData?.items)[0]
+    const canAcceptPastedReference = showPlusButton || Boolean(onReferenceImageChange) || Boolean(referenceImage)
+
+    if (!pastedImage || !canAcceptPastedReference) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const newImage = { file: pastedImage, url: URL.createObjectURL(pastedImage) }
+    setReferenceImage(newImage)
+    onReferenceImageChange?.(newImage)
+  }, [onReferenceImageChange, referenceImage, showPlusButton])
+
   const handleImagePreviewClick = () => {
     setIsFullScreenPreviewOpen(true)
   }
@@ -318,6 +333,7 @@ export function InputPromptBox({
               value={localTextInput}
               onChange={handleTextInputChange}
               onKeyDown={handleTextInputKeyDown}
+              onPaste={handleTextInputPaste}
               placeholder={textInputPlaceholder}
               className={cn("w-full border-none outline-none resize-none bg-transparent", textInputClassName)}
             />

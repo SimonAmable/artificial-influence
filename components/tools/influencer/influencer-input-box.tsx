@@ -382,7 +382,7 @@ export function InfluencerInputBox({
     canAcceptPromptDrop && isPromptDragActive
       ? "Drop image to set Reference Image..."
       : canAcceptPromptDrop
-        ? `${placeholder} (or drag an image anywhere in this box to set Reference Image)`
+        ? `${placeholder} (or paste / drag an image anywhere in this box to set Reference Image)`
         : placeholder
 
   return (

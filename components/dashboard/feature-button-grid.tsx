@@ -19,7 +19,7 @@ const toolButtons = [
   { label: "Video Studio", href: "/video", icon: VideoIcon },
   { label: "Motion Copy", href: "/motion-copy", icon: PencilSimpleIcon },
   { label: "Lip Sync", href: "/lipsync", icon: MicrophoneIcon },
-  { label: "Image Editing", href: "/influencer-generator", icon: PaintBrushIcon },
+  { label: "Image Editing", href: "/inpaint", icon: PaintBrushIcon },
   { label: "Character Swap", href: "/character-swap", icon: ArrowsLeftRight },
   { label: "Workflow", href: "/canvases", icon: FlowArrow },
 ]

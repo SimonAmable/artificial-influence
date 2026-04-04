@@ -12,7 +12,7 @@ function ImageEditorPageContent() {
   const handleSave = async (imageUrl: string) => {
     // In standalone mode, show success toast with download option
     toast.success("Image saved!", {
-      description: "Your edited image has been uploaded.",
+      description: "Your inpainted image has been uploaded.",
       action: {
         label: "Download",
         onClick: () => {
@@ -29,10 +29,11 @@ function ImageEditorPageContent() {
   }
 
   return (
-    <main className="h-screen w-full min-w-0 bg-zinc-950 p-2 sm:p-4 pt-20 overflow-hidden flex flex-col">
+    <main className="h-screen w-full min-w-0 bg-background p-2 sm:p-4 pt-20 overflow-hidden flex flex-col">
       <ImageEditor
         initialImage={initialImage}
         mode="page"
+        variant="inpaint"
         onSave={handleSave}
       />
     </main>
@@ -41,7 +42,7 @@ function ImageEditorPageContent() {
 
 export default function ImageEditorPage() {
   return (
-    <React.Suspense fallback={<main className="h-screen w-full bg-zinc-950 p-4 pt-20" />}>
+    <React.Suspense fallback={<main className="h-screen w-full bg-background p-4 pt-20" />}>
       <ImageEditorPageContent />
     </React.Suspense>
   )

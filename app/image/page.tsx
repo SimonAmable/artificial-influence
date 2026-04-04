@@ -17,6 +17,10 @@ import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import type { GenerateImageAcceptedPayload } from "@/lib/generate-image-client"
 import { toast } from "sonner"
+import {
+  getDefaultAspectRatioForModel,
+  resolveAspectRatioForRequest,
+} from "@/lib/utils/aspect-ratios"
 
 interface ImageHistoryItem {
   id?: string
@@ -209,7 +213,7 @@ export default function ImagePage() {
     if (effectiveImageModels.length > 0 && !selectedModel) {
       const defaultModel = effectiveImageModels.find((m) => m.identifier === DEFAULT_IMAGE_MODEL_IDENTIFIER) ?? effectiveImageModels[0]
       setSelectedModel(defaultModel.identifier)
-      setSelectedAspectRatio(defaultModel.default_aspect_ratio ?? defaultModel.aspect_ratios?.[0] ?? "1:1")
+      setSelectedAspectRatio(getDefaultAspectRatioForModel(defaultModel))
     }
   }, [effectiveImageModels, selectedModel])
 
@@ -217,9 +221,8 @@ export default function ImagePage() {
   React.useEffect(() => {
     if (selectedModel && effectiveImageModels.length > 0) {
       const model = effectiveImageModels.find(m => m.identifier === selectedModel)
-      const fallbackAspectRatio = model?.aspect_ratios?.[0]
-      if (model?.default_aspect_ratio || fallbackAspectRatio) {
-        setSelectedAspectRatio(model?.default_aspect_ratio ?? fallbackAspectRatio ?? "1:1")
+      if (model) {
+        setSelectedAspectRatio(getDefaultAspectRatioForModel(model))
       }
       const maxImages = model?.max_images ?? 1
       setSelectedNumImages((prev) => (maxImages >= 1 ? Math.min(prev, maxImages) : 1))
@@ -388,12 +391,20 @@ export default function ImagePage() {
     const capturedPrompt = isCharacterSwapModel ? CHARACTER_SWAP_PROMPTS[characterSwapMode] : prompt.trim()
     const capturedModel = selectedModel
     const capturedTool = isCharacterSwapModel ? "character_swap" : "image"
-    const capturedAspectRatio = isCharacterSwapModel ? "match_input_image" : selectedAspectRatio
     const capturedRefUrls = isCharacterSwapModel
       ? [characterSwapCharacterImage?.url, characterSwapSceneImage?.url].filter(Boolean) as string[]
       : (referenceImages.length > 0 ? referenceImages : (referenceImage ? [referenceImage] : []))
           .map((image) => image.url)
           .filter(Boolean) as string[]
+    const selectedModelObject =
+      effectiveImageModels.find((model) => model.identifier === selectedModel) ?? null
+    const capturedAspectRatio = isCharacterSwapModel
+      ? "match_input_image"
+      : resolveAspectRatioForRequest({
+          model: selectedModelObject,
+          selectedAspectRatio,
+          hasReferenceImages: capturedRefUrls.length > 0,
+        })
     const clientRequestId = createClientRequestId()
     const optimisticPendingRequest: PendingImageRequest = {
       clientRequestId,
@@ -426,9 +437,9 @@ export default function ImagePage() {
       // Add aspect ratio if selected
       if (isCharacterSwapModel) {
         formData.append('aspect_ratio', 'match_input_image')
-      } else if (selectedAspectRatio) {
-        formData.append('aspectRatio', selectedAspectRatio)
-        formData.append('aspect_ratio', selectedAspectRatio)
+      } else if (capturedAspectRatio) {
+        formData.append('aspectRatio', capturedAspectRatio)
+        formData.append('aspect_ratio', capturedAspectRatio)
       }
       
       // Add reference image files if present (supports both single and multiple)

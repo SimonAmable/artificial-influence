@@ -12,25 +12,26 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { InworldVoiceSelector } from "@/components/audio/inworld-voice-selector"
+import {
+  DEFAULT_INWORLD_TTS_MODEL,
+  DEFAULT_INWORLD_VOICE_ID,
+  INWORLD_TTS_MODEL_OPTIONS,
+  getInworldTtsModelOption,
+  type InworldVoice,
+} from "@/lib/constants/inworld-tts"
 import { CircleNotch } from "@phosphor-icons/react"
-
-const VOICE_PRESETS = [
-  { label: "Adam", value: "pNInz6obpgDQGcFmaJgB" },
-  { label: "Rachel", value: "21m00Tcm4TlvDq8ikWAM" },
-  { label: "Domi", value: "AZnzlk1XvdvUeBnXmlld" },
-  { label: "Bella", value: "EXAVITQu4vr4xnSDxMaL" },
-] as const
-
-const CUSTOM_VALUE = "custom"
 
 export interface GenerateVoiceDialogProps {
   open: boolean
@@ -44,8 +45,9 @@ export function GenerateVoiceDialog({
   onSuccess,
 }: GenerateVoiceDialogProps) {
   const [text, setText] = React.useState("")
-  const [voicePreset, setVoicePreset] = React.useState("")
-  const [customVoiceId, setCustomVoiceId] = React.useState("")
+  const [voiceId, setVoiceId] = React.useState(DEFAULT_INWORLD_VOICE_ID)
+  const [model, setModel] = React.useState<string>(DEFAULT_INWORLD_TTS_MODEL)
+  const [selectedVoice, setSelectedVoice] = React.useState<InworldVoice | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [generatedAudio, setGeneratedAudio] = React.useState<{ url: string } | null>(null)
@@ -54,19 +56,16 @@ export function GenerateVoiceDialog({
   React.useEffect(() => {
     if (open) {
       setText("")
-      setVoicePreset("")
-      setCustomVoiceId("")
+      setVoiceId(DEFAULT_INWORLD_VOICE_ID)
+      setModel(DEFAULT_INWORLD_TTS_MODEL)
+      setSelectedVoice(null)
       setError(null)
       setGeneratedAudio(null)
     }
   }, [open])
 
-  const voiceId =
-    voicePreset === CUSTOM_VALUE ? customVoiceId.trim() : voicePreset
-
   const canGenerate =
-    text.trim() !== "" &&
-    (voicePreset === CUSTOM_VALUE ? customVoiceId.trim() !== "" : voicePreset !== "")
+    text.trim() !== "" && voiceId.trim() !== ""
 
   const handleGenerate = async () => {
     if (!canGenerate || isGenerating) return
@@ -76,7 +75,11 @@ export function GenerateVoiceDialog({
       const res = await fetch("/api/generate-audio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.trim(), voice: voiceId }),
+        body: JSON.stringify({
+          text: text.trim(),
+          voice: voiceId,
+          model,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -139,7 +142,7 @@ export function GenerateVoiceDialog({
             <DialogHeader>
               <DialogTitle>Generate voice line</DialogTitle>
               <DialogDescription>
-                Generate speech with ElevenLabs. Enter text and select a voice.
+                Generate speech with Inworld. Enter text, search voices, and choose a model.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-2">
@@ -158,37 +161,61 @@ export function GenerateVoiceDialog({
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Voice selection</Label>
+                <Label>Voice</Label>
+                <InworldVoiceSelector
+                  value={voiceId}
+                  onSelectedVoiceChange={setSelectedVoice}
+                  onValueChange={(nextVoiceId) => {
+                    setVoiceId(nextVoiceId)
+                    setError(null)
+                  }}
+                />
+                <p className="text-xs text-zinc-500">
+                  Default voice ID: {selectedVoice?.voiceId ?? voiceId}
+                </p>
+              </div>
+              <div className="grid gap-2">
+                <Label>Model</Label>
                 <Select
-                  value={voicePreset}
-                  onValueChange={(v) => {
-                    setVoicePreset(v)
+                  value={model}
+                  onValueChange={(nextModel) => {
+                    setModel(nextModel)
                     setError(null)
                   }}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a voice" />
+                    <SelectValue
+                      placeholder="Select a model"
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {VOICE_PRESETS.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>
-                        {p.label}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value={CUSTOM_VALUE}>Custom</SelectItem>
+                    <SelectGroup>
+                      <SelectLabel>Current</SelectLabel>
+                      {INWORLD_TTS_MODEL_OPTIONS.filter(
+                        (option) => option.group === "Current"
+                      ).map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                    <SelectSeparator />
+                    <SelectGroup>
+                      <SelectLabel>Legacy</SelectLabel>
+                      {INWORLD_TTS_MODEL_OPTIONS.filter(
+                        (option) => option.group === "Legacy"
+                      ).map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
-                {voicePreset === CUSTOM_VALUE && (
-                  <Input
-                    placeholder="ElevenLabs voice ID"
-                    value={customVoiceId}
-                    onChange={(e) => {
-                      setCustomVoiceId(e.target.value)
-                      setError(null)
-                    }}
-                    className="mt-1"
-                  />
-                )}
+                <p className="text-xs text-zinc-500">
+                  {getInworldTtsModelOption(model)?.description ??
+                    "Choose the Inworld TTS model that fits your latency and quality needs."}
+                </p>
               </div>
               {error && (
                 <p className="text-destructive text-sm">{error}</p>

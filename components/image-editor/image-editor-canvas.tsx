@@ -13,12 +13,14 @@ import { cn } from "@/lib/utils"
 import { useImageEditor } from "./image-editor-provider"
 import {
   initializeCanvas,
+  getThemeWorkspaceBackgroundColor,
   setCanvasMode,
   configureBrush,
   addArrow,
   deleteSelected,
   loadImageOntoCanvas,
 } from "@/lib/image-editor/fabric-utils"
+import { resolveImageUrlForFabric } from "@/lib/image-editor/canvas-image-url"
 import { serializeCanvas } from "@/lib/image-editor/history-manager"
 import { CANVAS_SETTINGS, SHAPE_DEFAULTS } from "@/lib/image-editor/constants"
 import type { EditorTool } from "@/lib/image-editor/types"
@@ -268,7 +270,9 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
       const canvas = fabricCanvasRef.current
       if (!canvas) return
 
-      const image = await FabricImage.fromURL(imageUrl, { crossOrigin: "anonymous" })
+      const image = await FabricImage.fromURL(resolveImageUrlForFabric(imageUrl), {
+        crossOrigin: "anonymous",
+      })
 
       const canvasWidth = canvas.width ?? 0
       const canvasHeight = canvas.height ?? 0
@@ -402,11 +406,22 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
     canvas.on("path:created", handlePathCreated)
     canvas.on("object:added", handleObjectAdded)
 
+    const syncCanvasThemeBackground = () => {
+      canvas.set({ backgroundColor: getThemeWorkspaceBackgroundColor() })
+      canvas.requestRenderAll()
+    }
+    syncCanvasThemeBackground()
+    const themeObserver = new MutationObserver(syncCanvasThemeBackground)
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    })
+
     // Load initial image if provided
     if (initialImage && !hasLoadedInitialImage.current) {
-      hasLoadedInitialImage.current = true
       loadImageOntoCanvas(canvas, initialImage)
         .then(() => {
+          hasLoadedInitialImage.current = true
           dispatch({ type: "LOAD_IMAGE", url: initialImage })
           resizeCanvasToContainer()
           // Save initial state to history
@@ -424,6 +439,7 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
     }
 
     return () => {
+      themeObserver.disconnect()
       canvas.off("object:modified", handleModified)
       canvas.off("path:created", handlePathCreated)
       canvas.off("object:added", handleObjectAdded)
@@ -786,7 +802,7 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
     <div
       ref={containerRef}
       className={cn(
-        "relative flex items-center justify-center bg-zinc-950 overflow-hidden",
+        "relative flex items-center justify-center bg-muted overflow-hidden",
         className
       )}
       style={{ cursor: getCursor() }}

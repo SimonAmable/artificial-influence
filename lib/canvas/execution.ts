@@ -1,6 +1,15 @@
 import type { Node, Edge } from "@xyflow/react"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
+import {
+  DEFAULT_INWORLD_TTS_MODEL,
+  DEFAULT_INWORLD_VOICE_ID,
+} from "@/lib/constants/inworld-tts"
 import type { ExecutionCallbacks, NodeOutput } from "./types"
+
+interface ExecuteWorkflowOptions {
+  inputEdges?: Edge[]
+  fallbackNodes?: Node[]
+}
 
 /**
  * Topological sort using Kahn's algorithm.
@@ -52,12 +61,14 @@ function getExecutionOrder(nodes: Node[], edges: Edge[]): string[] {
 function collectInputs(
   targetId: string,
   edges: Edge[],
-  outputs: Map<string, NodeOutput>
+  outputs: Map<string, NodeOutput>,
+  fallbackNodes: Map<string, Node>
 ): NodeOutput {
   const merged: NodeOutput = {}
   for (const edge of edges) {
     if (edge.target === targetId) {
-      const sourceOutput = outputs.get(edge.source)
+      const sourceOutput =
+        outputs.get(edge.source) ?? getPersistedNodeOutput(fallbackNodes.get(edge.source))
       if (sourceOutput) {
         // Merge all fields — later edges override earlier ones
         Object.assign(merged, sourceOutput)
@@ -65,6 +76,60 @@ function collectInputs(
     }
   }
   return merged
+}
+
+function getPersistedNodeOutput(node: Node | undefined): NodeOutput | undefined {
+  if (!node) return undefined
+
+  const data = node.data as Record<string, unknown>
+
+  switch (node.type) {
+    case "text":
+      return { text: (data.text as string) || "" }
+
+    case "upload": {
+      const fileUrl = (data.fileUrl as string) || undefined
+      const fileType = (data.fileType as string) || undefined
+
+      return {
+        fileUrl,
+        fileType,
+        imageUrl: fileType === "image" ? fileUrl : undefined,
+        videoUrl: fileType === "video" ? fileUrl : undefined,
+        audioUrl: fileType === "audio" ? fileUrl : undefined,
+      }
+    }
+
+    case "image-gen": {
+      const generatedImageUrls = Array.isArray(data.generatedImageUrls)
+        ? data.generatedImageUrls.filter(
+            (url): url is string => typeof url === "string" && url.length > 0
+          )
+        : []
+      const activeImageIndex =
+        typeof data.activeImageIndex === "number"
+          ? data.activeImageIndex
+          : generatedImageUrls.length - 1
+      const generatedImageUrl =
+        generatedImageUrls[activeImageIndex] ||
+        (typeof data.generatedImageUrl === "string" ? data.generatedImageUrl : undefined)
+
+      return generatedImageUrl ? { imageUrl: generatedImageUrl } : undefined
+    }
+
+    case "video-gen":
+      return typeof data.generatedVideoUrl === "string"
+        ? { videoUrl: data.generatedVideoUrl }
+        : undefined
+
+    case "audio":
+      return typeof data.generatedAudioUrl === "string"
+        ? { audioUrl: data.generatedAudioUrl }
+        : undefined
+
+    default:
+      return undefined
+  }
 }
 
 /**
@@ -160,7 +225,8 @@ async function executeNode(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: text.trim(),
-          voice: (data.voice as string) || "alloy",
+          voice: (data.voice as string) || DEFAULT_INWORLD_VOICE_ID,
+          model: (data.model as string) || DEFAULT_INWORLD_TTS_MODEL,
         }),
       })
 
@@ -186,11 +252,14 @@ async function executeNode(
 export async function executeWorkflow(
   nodes: Node[],
   edges: Edge[],
-  callbacks: ExecutionCallbacks
+  callbacks: ExecutionCallbacks,
+  options: ExecuteWorkflowOptions = {}
 ): Promise<void> {
   const order = getExecutionOrder(nodes, edges)
   const nodeMap = new Map(nodes.map((n) => [n.id, n]))
+  const fallbackNodes = new Map((options.fallbackNodes ?? nodes).map((n) => [n.id, n]))
   const outputs = new Map<string, NodeOutput>()
+  const inputEdges = options.inputEdges ?? edges
 
   for (const nodeId of order) {
     const node = nodeMap.get(nodeId)
@@ -204,7 +273,7 @@ export async function executeWorkflow(
     }
 
     try {
-      const inputs = collectInputs(nodeId, edges, outputs)
+      const inputs = collectInputs(nodeId, inputEdges, outputs, fallbackNodes)
       const output = await executeNode(node, inputs)
       outputs.set(nodeId, output)
 

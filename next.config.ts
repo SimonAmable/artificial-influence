@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/influencer-generator",
+        destination: "/inpaint",
+        permanent: true,
+      },
+    ]
+  },
   turbopack: {
     root: __dirname,
   },
