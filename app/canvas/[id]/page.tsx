@@ -28,6 +28,7 @@ import { CanvasWorkflowExecutionContext } from "@/components/canvas/canvas-workf
 import { CanvasContextMenu } from "@/components/canvas/canvas-context-menu"
 import { SaveWorkflowDialog } from "@/components/canvas/save-workflow-dialog"
 import { EditWorkflowDialog } from "@/components/canvas/edit-workflow-dialog"
+import { PublishMiniAppDialog } from "@/components/canvas/publish-mini-app-dialog"
 import { TextNodeComponent } from "@/components/canvas/nodes/text-node"
 import { UploadNodeComponent } from "@/components/canvas/nodes/upload-node"
 import { ImageGenNodeComponent } from "@/components/canvas/nodes/image-gen-node"
@@ -91,7 +92,9 @@ function CanvasContent() {
   const [userId, setUserId] = React.useState<string>("")
   const [saveWorkflowDialogOpen, setSaveWorkflowDialogOpen] = React.useState(false)
   const [editWorkflowDialogOpen, setEditWorkflowDialogOpen] = React.useState(false)
+  const [publishMiniAppDialogOpen, setPublishMiniAppDialogOpen] = React.useState(false)
   const [editingWorkflow, setEditingWorkflow] = React.useState<Workflow | null>(null)
+  const [publishingWorkflow, setPublishingWorkflow] = React.useState<Workflow | null>(null)
   const [contextMenuPosition, setContextMenuPosition] = React.useState<{ x: number; y: number } | null>(null)
   const [clickedNode, setClickedNode] = React.useState<Node | null>(null)
   const [hasClipboard, setHasClipboard] = React.useState(false)
@@ -912,6 +915,11 @@ function CanvasContent() {
     setEditWorkflowDialogOpen(true)
   }, [])
 
+  const handlePublishWorkflow = React.useCallback((workflow: Workflow) => {
+    setPublishingWorkflow(workflow)
+    setPublishMiniAppDialogOpen(true)
+  }, [])
+
   // Save workflow to database
   const handleSave = React.useCallback(async () => {
     setIsSaving(true)
@@ -1261,6 +1269,7 @@ function CanvasContent() {
               onAddNode={handleAddNode}
               onInstantiateWorkflow={handleInstantiateWorkflow}
               onEditWorkflow={handleEditWorkflow}
+              onPublishWorkflow={handlePublishWorkflow}
             />
           </Panel>
             
@@ -1299,12 +1308,16 @@ function CanvasContent() {
                  onRunGroup={() => handleExecuteGroup(selectedGroupNode.id)}
                  isRunGroupRunning={executingGroupId === selectedGroupNode.id}
                  onUngroup={() => handleUngroup(selectedGroupNode.id)}
-                 onDuplicate={handleDuplicate}
-                 onDelete={handleDelete}
-                 onSaveWorkflow={() => setSaveWorkflowDialogOpen(true)}
-               />
-            </Panel>
-          )}
+                  onDuplicate={handleDuplicate}
+                  onDelete={handleDelete}
+                  onSaveWorkflow={() => setSaveWorkflowDialogOpen(true)}
+                  onPublishMiniApp={() => {
+                    setPublishingWorkflow(null)
+                    setPublishMiniAppDialogOpen(true)
+                  }}
+                />
+             </Panel>
+           )}
         </ReactFlow>
 
         {/* Context Menu */}
@@ -1336,6 +1349,18 @@ function CanvasContent() {
         workflow={editingWorkflow}
         open={editWorkflowDialogOpen}
         onOpenChange={setEditWorkflowDialogOpen}
+      />
+
+      <PublishMiniAppDialog
+        groupId={publishingWorkflow ? null : selectedGroupNode?.id || null}
+        workflow={publishingWorkflow}
+        open={publishMiniAppDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setPublishMiniAppDialogOpen(nextOpen)
+          if (!nextOpen) {
+            setPublishingWorkflow(null)
+          }
+        }}
       />
     </div>
     </CanvasWorkflowExecutionContext.Provider>

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { motion } from "framer-motion"
-import { Stack, Pencil, Trash, Globe } from "@phosphor-icons/react"
+import { Stack, Pencil, Trash, Globe, RocketLaunch } from "@phosphor-icons/react"
 import Image from "next/image"
 import type { Workflow } from "@/lib/workflows/database-server"
 import { toast } from "sonner"
@@ -10,10 +10,11 @@ import { toast } from "sonner"
 interface WorkflowsMenuProps {
   onInstantiate?: (workflow: Workflow) => void
   onEdit?: (workflow: Workflow) => void
+  onPublish?: (workflow: Workflow) => void
   isOpen: boolean
 }
 
-export function WorkflowsMenu({ onInstantiate, onEdit, isOpen }: WorkflowsMenuProps) {
+export function WorkflowsMenu({ onInstantiate, onEdit, onPublish, isOpen }: WorkflowsMenuProps) {
   const [workflows, setWorkflows] = React.useState<Workflow[]>([])
   const [loading, setLoading] = React.useState(false)
   const scrollContainerRef = React.useRef<HTMLDivElement>(null)
@@ -134,6 +135,18 @@ export function WorkflowsMenu({ onInstantiate, onEdit, isOpen }: WorkflowsMenuPr
 
                 {/* Action buttons - visible on hover */}
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {onPublish && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onPublish(workflow)
+                      }}
+                      className="w-6 h-6 rounded-md bg-black/60 backdrop-blur-sm hover:bg-cyan-500/90 transition-colors flex items-center justify-center text-white"
+                      title="Publish mini app"
+                    >
+                      <RocketLaunch size={14} weight="bold" />
+                    </button>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation()

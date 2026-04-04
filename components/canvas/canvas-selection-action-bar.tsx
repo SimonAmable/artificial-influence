@@ -9,6 +9,7 @@ import {
   FolderOpen,
   Play,
   CircleNotch,
+  RocketLaunch,
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -95,6 +96,7 @@ interface CanvasSelectionActionBarProps {
   onDuplicate: () => void
   onDelete: () => void
   onSaveWorkflow?: () => void
+  onPublishMiniApp?: () => void
 }
 
 export function CanvasSelectionActionBar({
@@ -109,6 +111,7 @@ export function CanvasSelectionActionBar({
   onDuplicate,
   onDelete,
   onSaveWorkflow,
+  onPublishMiniApp,
 }: CanvasSelectionActionBarProps) {
   const showGroupColor =
     !!selectedGroupId && typeof onGroupBackgroundColorChange === "function"
@@ -187,6 +190,21 @@ export function CanvasSelectionActionBar({
             >
               <FloppyDisk className="w-4 h-4" />
               Save Workflow
+            </Button>
+          </>
+        )}
+
+        {selectedGroupId && onPublishMiniApp && (
+          <>
+            <div className="w-px h-4 bg-white/10" />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onPublishMiniApp}
+              className="h-8 gap-2 text-xs hover:bg-white/5 hover:text-cyan-400"
+            >
+              <RocketLaunch className="w-4 h-4" />
+              Turn Into Mini App
             </Button>
           </>
         )}

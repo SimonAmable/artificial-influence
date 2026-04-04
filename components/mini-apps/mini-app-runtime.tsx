@@ -1,0 +1,644 @@
+"use client"
+
+import * as React from "react"
+import type { Node } from "@xyflow/react"
+import {
+  ArrowSquareOut,
+  CircleNotch,
+  DownloadSimple,
+  Sparkle,
+} from "@phosphor-icons/react"
+import { toast } from "sonner"
+import { executeWorkflow } from "@/lib/canvas/execution"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import type { MiniApp } from "@/lib/mini-apps/types"
+import { getMiniAppVisibleNodes } from "@/lib/mini-apps/heuristics"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
+import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
+import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
+
+interface MiniAppRuntimeProps {
+  miniApp: MiniApp
+}
+
+interface UploadInputValue {
+  file: File | null
+  previewUrl: string | null
+}
+
+function getNodeLabel(node: Node): string {
+  const data = (node.data ?? {}) as Record<string, unknown>
+  if (typeof data.label === "string" && data.label.trim().length > 0) {
+    return data.label.trim()
+  }
+  return node.type ?? "Node"
+}
+
+function getTextNodeValue(node: Node): string {
+  const data = (node.data ?? {}) as Record<string, unknown>
+  if (typeof data.text === "string") return data.text
+  if (typeof data.promptInput === "string") return data.promptInput
+  return ""
+}
+
+function getNodeOutputType(node: Node): "image" | "video" | "audio" | null {
+  const data = (node.data ?? {}) as Record<string, unknown>
+
+  if (node.type === "image-gen") return "image"
+  if (node.type === "video-gen") return "video"
+  if (node.type === "audio") return "audio"
+  if (node.type === "upload" && typeof data.fileType === "string") {
+    if (data.fileType === "image" || data.fileType === "video" || data.fileType === "audio") {
+      return data.fileType
+    }
+  }
+
+  return null
+}
+
+function getNodeOutputUrl(node: Node): string | null {
+  const data = (node.data ?? {}) as Record<string, unknown>
+
+  if (node.type === "image-gen") {
+    const generatedImageUrls = Array.isArray(data.generatedImageUrls)
+      ? data.generatedImageUrls.filter((value): value is string => typeof value === "string")
+      : []
+    const activeImageIndex =
+      typeof data.activeImageIndex === "number" ? data.activeImageIndex : generatedImageUrls.length - 1
+    return (
+      generatedImageUrls[activeImageIndex] ??
+      (typeof data.generatedImageUrl === "string" ? data.generatedImageUrl : null)
+    )
+  }
+
+  if (node.type === "video-gen") {
+    return typeof data.generatedVideoUrl === "string" ? data.generatedVideoUrl : null
+  }
+
+  if (node.type === "audio") {
+    return typeof data.generatedAudioUrl === "string" ? data.generatedAudioUrl : null
+  }
+
+  if (node.type === "upload") {
+    return typeof data.fileUrl === "string" ? data.fileUrl : null
+  }
+
+  return null
+}
+
+async function downloadUrl(url: string, fileName: string) {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) throw new Error("Failed to fetch file")
+    const blob = await response.blob()
+    const objectUrl = window.URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    anchor.href = objectUrl
+    anchor.download = fileName
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    window.URL.revokeObjectURL(objectUrl)
+  } catch {
+    window.open(url, "_blank", "noopener,noreferrer")
+  }
+}
+
+function MiniAppShowcaseCard({
+  miniApp,
+}: {
+  miniApp: MiniApp
+}) {
+  return (
+    <div className="h-[50vh] md:h-[60vh] pt-0 px-4 flex flex-col gap-3">
+      <div className="space-y-2 text-center">
+        <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold leading-tight">
+          {miniApp.name}
+        </h1>
+        {miniApp.description ? (
+          <p className="text-muted-foreground text-sm md:text-base max-w-2xl mx-auto">
+            {miniApp.description}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex-1 flex items-center justify-center px-4 min-h-0">
+        <div className="w-full h-full max-w-4xl">
+          {miniApp.thumbnail_url ? (
+            <img
+              src={miniApp.thumbnail_url}
+              alt={miniApp.name}
+              className="w-full h-full object-contain rounded-lg"
+            />
+          ) : (
+            <div className="w-full h-full rounded-lg border border-white/10 bg-zinc-950/50 flex items-center justify-center">
+              <p className="text-sm text-zinc-500">No showcase thumbnail yet.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MiniAppUploadField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: UploadInputValue
+  onChange: (nextValue: UploadInputValue) => void
+}) {
+  return (
+    <Card className="overflow-hidden border-white/10 bg-zinc-950/60">
+      <CardContent className="p-3">
+        <Label className="mb-2 block text-xs uppercase tracking-[0.2em] text-zinc-500">
+          {label}
+        </Label>
+        <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/5 px-4 py-5 text-center">
+          <input
+            type="file"
+            accept="image/*,video/*,audio/*"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null
+              if (!file) return
+              onChange({
+                file,
+                previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
+              })
+            }}
+          />
+          {value.previewUrl ? (
+            <img
+              src={value.previewUrl}
+              alt={label}
+              className="max-h-36 w-full rounded-lg object-contain"
+            />
+          ) : (
+            <>
+              <p className="text-sm font-medium text-zinc-100">Upload file</p>
+              <p className="mt-1 text-xs text-zinc-500">Image, video, or audio</p>
+            </>
+          )}
+        </label>
+        {value.file ? (
+          <p className="mt-2 truncate text-xs text-zinc-400">{value.file.name}</p>
+        ) : null}
+      </CardContent>
+    </Card>
+  )
+}
+
+function MiniAppOutputCard({
+  node,
+  featured = false,
+}: {
+  node: Node
+  featured?: boolean
+}) {
+  const url = getNodeOutputUrl(node)
+  const type = getNodeOutputType(node)
+  const label = getNodeLabel(node)
+
+  return (
+    <Card
+      className={cn(
+        "overflow-hidden border-white/10 bg-zinc-950/60",
+        featured ? "min-h-[420px]" : "min-h-[180px]"
+      )}
+    >
+      <CardContent className="flex h-full flex-col p-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-zinc-100">{label}</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{type ?? "output"}</p>
+          </div>
+          {url ? (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+              >
+                <ArrowSquareOut className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => downloadUrl(url, `${label.replace(/\s+/g, "-").toLowerCase()}.png`)}
+              >
+                <DownloadSimple className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-1 items-center justify-center rounded-2xl border border-white/10 bg-black/30 p-3">
+          {!url ? (
+            <div className="text-center">
+              <p className="text-sm font-medium text-zinc-200">No output yet</p>
+              <p className="mt-1 text-xs text-zinc-500">Run the mini app to generate this slot.</p>
+            </div>
+          ) : type === "image" ? (
+            <img
+              src={url}
+              alt={label}
+              className="max-h-full w-full rounded-xl object-contain"
+            />
+          ) : type === "video" ? (
+            <video
+              src={url}
+              controls
+              className="max-h-full w-full rounded-xl"
+            />
+          ) : type === "audio" ? (
+            <audio src={url} controls className="w-full" />
+          ) : (
+            <a href={url} target="_blank" rel="noreferrer" className="text-sm text-zinc-200 underline">
+              Open output
+            </a>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function MiniAppInputPanel({
+  nodeConfig,
+  visibleInputs,
+  textInputs,
+  setTextInputs,
+  uploadInputs,
+  setUploadInputs,
+  isRunning,
+  onGenerate,
+  isRowLayout,
+}: {
+  nodeConfig: MiniApp["node_config"]
+  visibleInputs: Node[]
+  textInputs: Record<string, string>
+  setTextInputs: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  uploadInputs: Record<string, UploadInputValue>
+  setUploadInputs: React.Dispatch<React.SetStateAction<Record<string, UploadInputValue>>>
+  isRunning: boolean
+  onGenerate: () => void
+  isRowLayout: boolean
+}) {
+  const textInputNodes = visibleInputs.filter((node) => node.type === "text")
+  const mediaInputNodes = visibleInputs.filter((node) => node.type === "upload")
+
+  return (
+    <Card className="border-white/10 bg-zinc-950/70 w-full max-w-sm sm:max-w-lg lg:max-w-4xl">
+      <CardContent className="p-5">
+        <div className="space-y-3">
+          {textInputNodes.length > 0 ? (
+            <div className="space-y-3">
+              {textInputNodes.map((node) => {
+                const label = getNodeLabel(node)
+                return (
+                  <div key={node.id} className="grid gap-2">
+                    <Label htmlFor={`mini-app-input-${node.id}`} className="text-sm text-zinc-200">
+                      {label}
+                    </Label>
+                    <Textarea
+                      id={`mini-app-input-${node.id}`}
+                      rows={4}
+                      value={textInputs[node.id] ?? ""}
+                      onChange={(event) =>
+                        setTextInputs((current) => ({
+                          ...current,
+                          [node.id]: event.target.value,
+                        }))
+                      }
+                      placeholder={`Enter ${label.toLowerCase()}`}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          ) : null}
+
+          {mediaInputNodes.length > 0 ? (
+            <div
+              className={cn(
+                "gap-3",
+                isRowLayout
+                  ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                  : "space-y-3"
+              )}
+            >
+              {mediaInputNodes.map((node) => {
+                const config = nodeConfig[node.id]
+                const label = getNodeLabel(node)
+
+                return (
+                  <MiniAppUploadField
+                    key={node.id}
+                    label={`${label}${config?.required ? " *" : ""}`}
+                    value={uploadInputs[node.id] ?? { file: null, previewUrl: null }}
+                    onChange={(nextValue) =>
+                      setUploadInputs((current) => {
+                        const previousPreviewUrl = current[node.id]?.previewUrl
+                        if (previousPreviewUrl && previousPreviewUrl !== nextValue.previewUrl) {
+                          URL.revokeObjectURL(previousPreviewUrl)
+                        }
+                        return {
+                          ...current,
+                          [node.id]: nextValue,
+                        }
+                      })
+                    }
+                  />
+                )
+              })}
+            </div>
+          ) : null}
+
+          {visibleInputs
+            .filter((node) => node.type !== "text" && node.type !== "upload")
+            .map((node) => {
+            const config = nodeConfig[node.id]
+            const label = getNodeLabel(node)
+            return (
+              <div key={node.id} className="grid gap-2">
+                <Label className="text-sm text-zinc-200">{label}</Label>
+                <Input value="Unsupported input type" disabled />
+              </div>
+            )
+          })}
+        </div>
+
+        <Button className="mt-5 w-full" onClick={onGenerate} disabled={isRunning}>
+          {isRunning ? (
+            <CircleNotch className="mr-2 h-4 w-4 animate-spin" weight="bold" />
+          ) : (
+            <Sparkle className="mr-2 h-4 w-4" weight="fill" />
+          )}
+          {isRunning ? "Generating..." : "Generate"}
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function MiniAppRuntime({ miniApp }: MiniAppRuntimeProps) {
+  const layoutModeContext = useLayoutMode()
+
+  if (!layoutModeContext) {
+    throw new Error("MiniAppRuntime must be used within LayoutModeProvider")
+  }
+
+  const { layoutMode } = layoutModeContext
+  const isRowLayout = layoutMode === "row"
+
+  const [nodes, setNodes] = React.useState<Node[]>(miniApp.snapshot_nodes)
+  const [isRunning, setIsRunning] = React.useState(false)
+  const [textInputs, setTextInputs] = React.useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      miniApp.snapshot_nodes
+        .filter(
+          (node) =>
+            miniApp.node_config[node.id]?.show_in_mini_app &&
+            miniApp.node_config[node.id]?.role === "input" &&
+            node.type === "text"
+        )
+        .map((node) => [node.id, getTextNodeValue(node)])
+    )
+  )
+  const [uploadInputs, setUploadInputs] = React.useState<Record<string, UploadInputValue>>({})
+
+  React.useEffect(() => {
+    return () => {
+      Object.values(uploadInputs).forEach((value) => {
+        if (value.previewUrl) URL.revokeObjectURL(value.previewUrl)
+      })
+    }
+  }, [uploadInputs])
+
+  const visibleInputs = React.useMemo(
+    () => getMiniAppVisibleNodes(nodes, miniApp.node_config, "input"),
+    [miniApp.node_config, nodes]
+  )
+  const visibleOutputs = React.useMemo(
+    () => getMiniAppVisibleNodes(nodes, miniApp.node_config, "output"),
+    [miniApp.node_config, nodes]
+  )
+
+  const featuredOutput =
+    visibleOutputs.find((node) => node.id === miniApp.featured_output_node_id) ?? visibleOutputs[0] ?? null
+  const alternateOutputs = visibleOutputs.filter((node) => node.id !== featuredOutput?.id)
+  const hasAnyRenderedOutput = visibleOutputs.some((node) => getNodeOutputUrl(node))
+
+  const handleGenerate = async () => {
+    try {
+      setIsRunning(true)
+
+      const nextNodes = await Promise.all(
+        miniApp.snapshot_nodes.map(async (node) => {
+          const config = miniApp.node_config[node.id]
+          if (!config?.show_in_mini_app || !config.user_can_edit || config.role !== "input") {
+            return node
+          }
+
+          if (node.type === "text") {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                text: textInputs[node.id] ?? "",
+              },
+            }
+          }
+
+          if (node.type === "upload") {
+            const inputValue = uploadInputs[node.id]
+            if (!inputValue?.file) {
+              if (config.required) {
+                throw new Error(`${getNodeLabel(node)} is required`)
+              }
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  fileUrl: null,
+                  fileType: null,
+                  fileName: null,
+                },
+              }
+            }
+
+            const uploaded = await uploadFileToSupabase(inputValue.file, "mini-app-inputs")
+            if (!uploaded) {
+              throw new Error(`Failed to upload ${getNodeLabel(node)}`)
+            }
+
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                fileUrl: uploaded.url,
+                fileType: uploaded.fileType === "other" ? null : uploaded.fileType,
+                fileName: uploaded.fileName,
+              },
+            }
+          }
+
+          return node
+        })
+      )
+
+      setNodes(nextNodes)
+
+      const executionNodes = nextNodes.filter((node) => node.type !== "group")
+      const executionNodeIds = new Set(executionNodes.map((node) => node.id))
+      const executionEdges = miniApp.snapshot_edges.filter(
+        (edge) => executionNodeIds.has(edge.source) && executionNodeIds.has(edge.target)
+      )
+      const inputEdges = miniApp.snapshot_edges.filter((edge) => executionNodeIds.has(edge.target))
+
+      await executeWorkflow(
+        executionNodes,
+        executionEdges,
+        {
+          onNodeStart: (nodeId) => {
+            setNodes((current) =>
+              current.map((node) =>
+                node.id === nodeId
+                  ? { ...node, data: { ...node.data, isGenerating: true, error: null } }
+                  : node
+              )
+            )
+          },
+          onNodeComplete: (nodeId, output) => {
+            setNodes((current) =>
+              current.map((node) => {
+                if (node.id !== nodeId) return node
+
+                const nextData: Record<string, unknown> = {
+                  ...(node.data as Record<string, unknown>),
+                  isGenerating: false,
+                  error: null,
+                }
+
+                if (typeof output.text === "string") nextData.text = output.text
+                if (typeof output.imageUrl === "string") {
+                  const currentImageUrls = Array.isArray((node.data as { generatedImageUrls?: unknown }).generatedImageUrls)
+                    ? ((node.data as { generatedImageUrls?: unknown }).generatedImageUrls as unknown[])
+                        .filter((value): value is string => typeof value === "string")
+                    : []
+                  const nextImageUrls = [...currentImageUrls, output.imageUrl].slice(-20)
+                  nextData.generatedImageUrls = nextImageUrls
+                  nextData.activeImageIndex = nextImageUrls.length - 1
+                  nextData.generatedImageUrl = nextImageUrls[nextImageUrls.length - 1] ?? null
+                }
+                if (typeof output.videoUrl === "string") nextData.generatedVideoUrl = output.videoUrl
+                if (typeof output.audioUrl === "string") nextData.generatedAudioUrl = output.audioUrl
+
+                return {
+                  ...node,
+                  data: nextData,
+                }
+              })
+            )
+          },
+          onNodeError: (nodeId, error) => {
+            setNodes((current) =>
+              current.map((node) =>
+                node.id === nodeId
+                  ? { ...node, data: { ...node.data, isGenerating: false, error } }
+                  : node
+              )
+            )
+          },
+        },
+        {
+          inputEdges,
+          fallbackNodes: nextNodes,
+        }
+      )
+
+      toast.success("Mini app run complete")
+    } catch (error) {
+      console.error("Mini app execution error:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to run mini app")
+    } finally {
+      setIsRunning(false)
+    }
+  }
+
+  const inputBox = (
+    <MiniAppInputPanel
+      nodeConfig={miniApp.node_config}
+      visibleInputs={visibleInputs}
+      textInputs={textInputs}
+      setTextInputs={setTextInputs}
+      uploadInputs={uploadInputs}
+      setUploadInputs={setUploadInputs}
+      isRunning={isRunning}
+      onGenerate={handleGenerate}
+      isRowLayout={isRowLayout}
+    />
+  )
+
+  const renderShowcase = () => {
+    if (!hasAnyRenderedOutput) {
+      return <MiniAppShowcaseCard miniApp={miniApp} />
+    }
+
+    return (
+      <div className="w-full space-y-5 px-4 sm:px-0">
+        {featuredOutput ? <MiniAppOutputCard node={featuredOutput} featured /> : null}
+        {alternateOutputs.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {alternateOutputs.map((node) => (
+              <MiniAppOutputCard key={node.id} node={node} />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <div className={cn("min-h-screen bg-background flex flex-col", isRowLayout ? "p-0" : "p-4 sm:p-6 md:p-12")}>
+      <div className={cn("mx-auto flex-1 flex flex-col", isRowLayout ? "w-full pt-10" : "max-w-7xl pt-12")}>
+        <GeneratorLayout layoutMode={layoutMode} className="h-full flex-1 min-h-0">
+          {isRowLayout ? (
+            <>
+              <div className="flex-1 w-full h-full overflow-auto pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                {renderShowcase()}
+              </div>
+              <div className="fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6">
+                <div className="max-w-7xl mx-auto flex justify-center">{inputBox}</div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-full flex-1 min-h-0 lg:pb-0">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 sm:gap-6 lg:gap-12 h-full">
+                  <div className="hidden lg:block lg:sticky lg:top-0 h-fit">
+                    <div className="flex justify-center">{inputBox}</div>
+                  </div>
+                  <div className="w-full h-full overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    {renderShowcase()}
+                  </div>
+                </div>
+              </div>
+              <div className="fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6 lg:hidden">
+                <div className="max-w-7xl mx-auto flex justify-center">{inputBox}</div>
+              </div>
+            </>
+          )}
+        </GeneratorLayout>
+      </div>
+    </div>
+  )
+}

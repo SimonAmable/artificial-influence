@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Handle, Position, NodeToolbar, type NodeProps, useReactFlow, useNodes, useEdges, getIncomers, useStore } from "@xyflow/react"
+import { Handle, Position, NodeToolbar, type NodeProps, useReactFlow, useNodes, useEdges, getIncomers, useStore, useUpdateNodeInternals } from "@xyflow/react"
 import {
   ArrowsOut,
   DownloadSimple,
@@ -63,6 +63,7 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
   const [isFocused, setIsFocused] = React.useState(false)
   const reactFlow = useReactFlow()
+  const updateNodeInternals = useUpdateNodeInternals()
   const { isConnecting, connectingFromId } = useStore((state) => ({
     isConnecting: state.connection.inProgress,
     connectingFromId: state.connection.fromHandle?.nodeId,
@@ -74,6 +75,34 @@ export const TextNodeComponent = React.memo(({ id, data, selected }: NodeProps) 
   
   // Calculate dynamic dimensions
   const dimensions = React.useMemo(() => calculateNodeDimensions(nodeData.text || ''), [nodeData.text])
+
+  // Wait for the node DOM to reflect the new size before asking React Flow to re-measure
+  // so NodeToolbar and handles stay anchored to the resized text card.
+  const scheduleUpdateNodeInternals = React.useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        updateNodeInternals(id)
+      })
+    })
+  }, [id, updateNodeInternals])
+
+  const applyNodeSize = React.useCallback((width: number, height: number) => {
+    const existing = reactFlow.getNode(id)
+    const existingWidth = existing?.style?.width ?? existing?.width
+    const existingHeight = existing?.style?.height ?? existing?.height
+    if (existingWidth === width && existingHeight === height) return
+
+    reactFlow.updateNode(id, {
+      width,
+      height,
+      style: { width, height },
+    })
+  }, [id, reactFlow])
+
+  React.useLayoutEffect(() => {
+    applyNodeSize(dimensions.width, dimensions.height)
+    scheduleUpdateNodeInternals()
+  }, [applyNodeSize, dimensions.height, dimensions.width, scheduleUpdateNodeInternals])
 
   // Track connected nodes for text and image inputs
   const { connectedPrompt, connectedImageUrls } = React.useMemo(() => {

@@ -43,6 +43,7 @@ interface CanvasSidebarProps {
   onAddNode: (type: CanvasNodeType, initialData?: Partial<CanvasNodeData>, screenPosition?: { x: number; y: number }) => void
   onInstantiateWorkflow?: (workflow: Workflow) => void
   onEditWorkflow?: (workflow: Workflow) => void
+  onPublishWorkflow?: (workflow: Workflow) => void
 }
 
 type MenuType = "add-nodes" | "workflows" | "assets" | "history" | null
@@ -79,7 +80,12 @@ function SidebarButton({
   )
 }
 
-export function CanvasSidebar({ onAddNode, onInstantiateWorkflow, onEditWorkflow }: CanvasSidebarProps) {
+export function CanvasSidebar({
+  onAddNode,
+  onInstantiateWorkflow,
+  onEditWorkflow,
+  onPublishWorkflow,
+}: CanvasSidebarProps) {
   const [activeMenu, setActiveMenu] = React.useState<MenuType>(null)
   const [generations, setGenerations] = React.useState<Generation[]>([])
   const [assets, setAssets] = React.useState<AssetRecord[]>([])
@@ -355,6 +361,7 @@ export function CanvasSidebar({ onAddNode, onInstantiateWorkflow, onEditWorkflow
             isOpen={activeMenu === "workflows"}
             onInstantiate={onInstantiateWorkflow}
             onEdit={onEditWorkflow}
+            onPublish={onPublishWorkflow}
           />
         )}
 
