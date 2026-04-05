@@ -314,9 +314,9 @@ export default function PricingPage() {
     <div className="min-h-[90vh] pt-20 bg-background to-muted py-4 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold tracking-tight mb-4">
-            Choose Your Plan
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-4xl font-bold tracking-tight mb-4 uppercase">
+            Pick Your Plan
           </h1>
           <p className="text-xl text-muted-foreground mb-6">
             Select the perfect plan for your needs
@@ -336,11 +336,16 @@ export default function PricingPage() {
                 Yearly
               </span>
             </div>
-            {billingInterval === 'year' && (
-              <span className="inline-flex items-center rounded-full border border-green-600/25 bg-green-600/10 px-3 py-1 text-xs font-semibold text-green-700 dark:border-green-400/30 dark:bg-green-400/10 dark:text-green-400">
-                Save up to 50% on yearly plans
-              </span>
-            )}
+            <div
+              className="flex min-h-9 w-full items-center justify-center"
+              aria-hidden={billingInterval === 'month'}
+            >
+              {billingInterval === 'year' ? (
+                <span className="inline-flex items-center rounded-full border border-green-600/25 bg-green-600/10 px-3 py-1 text-xs font-semibold text-green-700 dark:border-green-400/30 dark:bg-green-400/10 dark:text-green-400">
+                  Save up to 50% on yearly plans
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
 
