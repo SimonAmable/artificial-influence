@@ -43,13 +43,18 @@ function getNodeLabelDisplay(node: Node): string {
   return getNodeLabel(node).toUpperCase()
 }
 
-function getPromptPlaceholder(node: Node): string {
+function getPromptPlaceholder(node: Node, required: boolean): string {
   const label = getNodeLabelDisplay(node)
-  return `${label} — ENTER YOUR INSTRUCTIONS`
+  const hint = required ? "REQUIRED" : "OPTIONAL"
+  return `${label} — ENTER YOUR INSTRUCTIONS (${hint})`
 }
 
-function getUploadButtonText(label: string): string {
-  return `UPLOAD ${label}`
+function getUploadButtonText(): string {
+  return "UPLOAD FILE"
+}
+
+function getUploadButtonDescription(label: string): string {
+  return label.replace(/\s+\*$/, "")
 }
 
 function getTextNodeValue(node: Node): string {
@@ -163,22 +168,24 @@ function MiniAppUploadField({
   label,
   value,
   onChange,
+  className,
 }: {
   label: string
   value: UploadInputValue
   onChange: (nextValue: UploadInputValue) => void
+  className?: string
 }) {
   return (
-    <Card className="overflow-hidden border-white/10 bg-zinc-950/60">
-      <CardContent className="p-2.5">
-        <Label className="mb-1.5 block text-[11px] uppercase tracking-[0.2em] text-zinc-500 leading-tight">
-          {label}
-        </Label>
-        <label className="flex min-h-[78px] cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/5 px-3 py-3 text-center">
+    <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
+      <span className="block text-[11px] leading-tight tracking-[0.2em] text-zinc-500 uppercase">
+        {label}
+      </span>
+      <Button variant="outline" className="h-auto min-h-0 w-full py-2.5" asChild>
+        <label className="cursor-pointer">
           <input
             type="file"
             accept="image/*,video/*,audio/*"
-            className="hidden"
+            className="sr-only"
             onChange={(event) => {
               const file = event.target.files?.[0] ?? null
               if (!file) return
@@ -189,22 +196,40 @@ function MiniAppUploadField({
             }}
           />
           {value.previewUrl ? (
-            <img
-              src={value.previewUrl}
-              alt={label}
-              className="max-h-36 w-full rounded-lg object-contain"
-            />
+            <div className="flex w-full items-center gap-2.5">
+              <img
+                src={value.previewUrl}
+                alt=""
+                className="size-11 shrink-0 rounded-md object-cover"
+              />
+              <div className="min-w-0 flex-1 text-left">
+                <p className="truncate text-xs font-medium text-foreground">{value.file?.name}</p>
+                <p className="text-[10px] text-muted-foreground">Tap to replace</p>
+              </div>
+            </div>
+          ) : value.file ? (
+            <div className="flex w-full items-center gap-2.5">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-muted text-[10px] font-medium text-muted-foreground uppercase">
+                File
+              </div>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="truncate text-xs font-medium text-foreground">{value.file.name}</p>
+                <p className="text-[10px] text-muted-foreground">Tap to replace</p>
+              </div>
+            </div>
           ) : (
-            <span className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-200">
-              {getUploadButtonText(label)}
-            </span>
+            <div className="flex w-full flex-col gap-0.5 text-center">
+              <span className="text-xs font-medium tracking-[0.12em] uppercase">
+                {getUploadButtonText()}
+              </span>
+              <span className="text-[10px] font-normal tracking-[0.16em] text-muted-foreground uppercase">
+                {getUploadButtonDescription(label)}
+              </span>
+            </div>
           )}
         </label>
-        {value.file ? (
-          <p className="mt-1.5 truncate text-[11px] text-zinc-400">{value.file.name}</p>
-        ) : null}
-      </CardContent>
-    </Card>
+      </Button>
+    </div>
   )
 }
 
@@ -314,6 +339,7 @@ function MiniAppInputPanel({
           {textInputNodes.length > 0 ? (
             <div className="space-y-2">
               {textInputNodes.map((node) => {
+                const config = nodeConfig[node.id]
                 return (
                   <div key={node.id} className="grid gap-0">
                     <Textarea
@@ -326,7 +352,7 @@ function MiniAppInputPanel({
                           [node.id]: event.target.value,
                         }))
                       }
-                      placeholder={getPromptPlaceholder(node)}
+                      placeholder={getPromptPlaceholder(node, Boolean(config?.required))}
                       className="min-h-[84px]"
                     />
                   </div>
@@ -340,7 +366,7 @@ function MiniAppInputPanel({
               className={cn(
                 "gap-2.5",
                 isRowLayout
-                  ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                  ? "flex flex-wrap items-start"
                   : "space-y-3"
               )}
             >
@@ -354,6 +380,7 @@ function MiniAppInputPanel({
                     key={node.id}
                     label={`${labelDisplay}${config?.required ? " *" : ""}`}
                     value={uploadInputs[node.id] ?? { file: null, previewUrl: null }}
+                    className={cn(isRowLayout ? "min-w-[220px] flex-1 basis-[240px]" : "w-full")}
                     onChange={(nextValue) =>
                       setUploadInputs((current) => {
                         const previousPreviewUrl = current[node.id]?.previewUrl

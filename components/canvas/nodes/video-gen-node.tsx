@@ -20,7 +20,12 @@ import {
   ArrowsLeftRight,
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
-import type { VideoGenNodeData, UploadNodeData, ImageGenNodeData } from "@/lib/canvas/types"
+import type {
+  VideoGenNodeData,
+  UploadNodeData,
+  ImageGenNodeData,
+  AudioNodeData,
+} from "@/lib/canvas/types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { extractFirstFrame, extractLastFrame } from "@/lib/canvas/frame-extraction"
@@ -108,6 +113,18 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     return null
   }
 
+  function getAudioUrlFromSourceNode(node: Node): string | null {
+    if (node.type === "upload") {
+      const uploadData = node.data as UploadNodeData
+      if (uploadData.fileUrl && uploadData.fileType === "audio") return uploadData.fileUrl
+    }
+    if (node.type === "audio") {
+      const audioData = node.data as AudioNodeData
+      if (audioData.generatedAudioUrl) return audioData.generatedAudioUrl
+    }
+    return null
+  }
+
   // Track connected image / last frame / video / audio from edges and incomers
   React.useEffect(() => {
     const currentNode = nodes.find((n) => n.id === id)
@@ -175,12 +192,10 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
 
     let audioUrl: string | null = null
     for (const node of incomingNodes) {
-      if (node.type === "upload") {
-        const uploadData = node.data as UploadNodeData
-        if (uploadData.fileUrl && uploadData.fileType === "audio") {
-          audioUrl = uploadData.fileUrl
-          break
-        }
+      const url = getAudioUrlFromSourceNode(node)
+      if (url) {
+        audioUrl = url
+        break
       }
     }
 

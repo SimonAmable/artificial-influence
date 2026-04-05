@@ -15,6 +15,7 @@ import {
   VoiceSelectorItem,
   VoiceSelectorList,
   VoiceSelectorName,
+  VoiceSelectorPreview,
   VoiceSelectorSeparator,
   VoiceSelectorTrigger,
 } from "@/components/ai-elements/voice-selector"
@@ -83,7 +84,10 @@ export function InworldVoiceSelector({
   const [error, setError] = React.useState<string | null>(null)
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
+  const [previewingVoiceId, setPreviewingVoiceId] = React.useState<string | null>(null)
+  const [loadingPreviewVoiceId, setLoadingPreviewVoiceId] = React.useState<string | null>(null)
   const onValueChangeRef = React.useRef(onValueChange)
+  const audioRef = React.useRef<HTMLAudioElement | null>(null)
 
   React.useEffect(() => {
     onValueChangeRef.current = onValueChange
@@ -173,6 +177,68 @@ export function InworldVoiceSelector({
     onSelectedVoiceChange?.(selectedVoice)
   }, [onSelectedVoiceChange, selectedVoice])
 
+  const stopPreview = React.useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+      audioRef.current = null
+    }
+
+    setPreviewingVoiceId(null)
+    setLoadingPreviewVoiceId(null)
+  }, [])
+
+  React.useEffect(() => {
+    return () => {
+      stopPreview()
+    }
+  }, [stopPreview])
+
+  const handlePreviewToggle = React.useCallback(
+    async (voice: InworldVoice) => {
+      if (!voice.previewAudioUrl) {
+        return
+      }
+
+      if (previewingVoiceId === voice.voiceId && audioRef.current) {
+        stopPreview()
+        return
+      }
+
+      stopPreview()
+      setLoadingPreviewVoiceId(voice.voiceId)
+
+      try {
+        const audio = new Audio(voice.previewAudioUrl)
+        audioRef.current = audio
+
+        audio.addEventListener("ended", () => {
+          if (audioRef.current === audio) {
+            audioRef.current = null
+            setPreviewingVoiceId(null)
+            setLoadingPreviewVoiceId(null)
+          }
+        })
+
+        audio.addEventListener("error", () => {
+          if (audioRef.current === audio) {
+            audioRef.current = null
+            setPreviewingVoiceId(null)
+            setLoadingPreviewVoiceId(null)
+          }
+        })
+
+        await audio.play()
+        setPreviewingVoiceId(voice.voiceId)
+        setLoadingPreviewVoiceId(null)
+      } catch (playbackError) {
+        console.error("Failed to play voice preview:", playbackError)
+        stopPreview()
+      }
+    },
+    [previewingVoiceId, stopPreview]
+  )
+
   const triggerLabel = selectedVoice?.displayName || DEFAULT_INWORLD_VOICE_NAME
   const triggerId = selectedVoice?.voiceId || value || DEFAULT_INWORLD_VOICE_ID
 
@@ -183,6 +249,7 @@ export function InworldVoiceSelector({
           setOpen(nextOpen)
           if (!nextOpen) {
             setQuery("")
+            stopPreview()
           }
         }}
         onValueChange={(nextVoiceId) => {
@@ -236,6 +303,18 @@ export function InworldVoiceSelector({
                         onSelect={() => onValueChange(voice.voiceId)}
                         value={voice.voiceId}
                       >
+                        <VoiceSelectorPreview
+                          aria-label={`Preview ${voice.displayName}`}
+                          className={
+                            !voice.previewAudioUrl ? "cursor-not-allowed opacity-40" : undefined
+                          }
+                          disabled={!voice.previewAudioUrl}
+                          loading={loadingPreviewVoiceId === voice.voiceId}
+                          onPlay={() => {
+                            void handlePreviewToggle(voice)
+                          }}
+                          playing={previewingVoiceId === voice.voiceId}
+                        />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <VoiceSelectorName className="truncate">

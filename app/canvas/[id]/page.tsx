@@ -59,6 +59,7 @@ import {
   selectFlowSelectedNodesWithKey,
   equalFlowSelectionKey,
 } from "@/lib/canvas/flow-store-selection"
+import { extractClipboardImageFiles } from "@/lib/utils/clipboard"
 
 // Register custom node types - MUST be outside component for stable reference
 const nodeTypes = {
@@ -100,9 +101,11 @@ function CanvasContent() {
   const [hasClipboard, setHasClipboard] = React.useState(false)
   
   const canvasRef = React.useRef<HTMLDivElement>(null)
+  const canvasPaneRef = React.useRef<HTMLDivElement>(null)
   const reactFlowInstance = useReactFlow()
   const [isDraggingFile, setIsDraggingFile] = React.useState(false)
   const dragCounter = React.useRef(0)
+  const lastCanvasPointerRef = React.useRef<{ x: number; y: number } | null>(null)
   const pendingUploadsRef = React.useRef(0)
   const uploadWaitersRef = React.useRef<Array<() => void>>([])
   const uploadErrorsRef = React.useRef(0)
@@ -125,6 +128,33 @@ function CanvasContent() {
     return new Promise<void>((resolve) => {
       uploadWaitersRef.current.push(resolve)
     })
+  }, [])
+
+  const isEditableTarget = React.useCallback((target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false
+
+    return (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target.isContentEditable ||
+      target.closest("[contenteditable='true']") !== null
+    )
+  }, [])
+
+  const getCanvasCenterScreenPosition = React.useCallback(() => {
+    const rect = canvasPaneRef.current?.getBoundingClientRect()
+
+    if (!rect) {
+      return {
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      }
+    }
+
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
   }, [])
 
   const { nodes: selectedNodes } = useStore(
@@ -319,6 +349,113 @@ function CanvasContent() {
     }
   }, [])
 
+  const addUploadNodesFromFiles = React.useCallback(
+    (
+      files: File[],
+      screenPosition: { x: number; y: number },
+      source: "drop" | "paste",
+    ) => {
+      if (files.length === 0) return
+
+      const validFiles = files.filter(
+        (file) =>
+          file.type.startsWith("image/") ||
+          file.type.startsWith("video/") ||
+          file.type.startsWith("audio/")
+      )
+
+      if (validFiles.length === 0) {
+        toast.error(
+          source === "paste"
+            ? "Paste an image from your clipboard to upload it"
+            : "Please drop image, video, or audio files"
+        )
+        return
+      }
+
+      const position = screenToFlowPosition(screenPosition)
+      const newNodes: Node[] = []
+
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i]
+        nodeCounter.current += 1
+        const id = `upload-${nodeCounter.current}`
+        const fileUrl = URL.createObjectURL(file)
+        const fileName =
+          file.name ||
+          `${source === "paste" ? "pasted" : "uploaded"}-${Date.now()}-${i + 1}`
+
+        let fileType: "image" | "video" | "audio" | null = null
+        if (file.type.startsWith("image/")) fileType = "image"
+        else if (file.type.startsWith("video/")) fileType = "video"
+        else if (file.type.startsWith("audio/")) fileType = "audio"
+
+        newNodes.push(
+          attachNodeCallbacks({
+            id,
+            type: "upload",
+            position: {
+              x: position.x + i * 50,
+              y: position.y + i * 50,
+            },
+            data: {
+              ...createUploadNodeData(),
+              fileUrl,
+              fileType,
+              fileName,
+            },
+          })
+        )
+
+        incrementPendingUploads()
+        uploadFileToSupabase(file, "uploads")
+          .then((uploadResult) => {
+            if (!uploadResult) {
+              uploadErrorsRef.current += 1
+              return
+            }
+
+            setNodes((nds) =>
+              nds.map((n) =>
+                n.id === id
+                  ? {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        fileUrl: uploadResult.url,
+                        fileType: uploadResult.fileType,
+                        fileName: uploadResult.fileName,
+                      },
+                    }
+                  : n
+              )
+            )
+            URL.revokeObjectURL(fileUrl)
+          })
+          .catch(() => {
+            uploadErrorsRef.current += 1
+          })
+          .finally(() => {
+            decrementPendingUploads()
+          })
+      }
+
+      setNodes((nds) => [...nds, ...newNodes])
+      toast.success(
+        source === "paste"
+          ? `Pasted ${validFiles.length} image${validFiles.length > 1 ? "s" : ""} onto the canvas`
+          : `Added ${validFiles.length} file${validFiles.length > 1 ? "s" : ""} to canvas`
+      )
+    },
+    [
+      screenToFlowPosition,
+      attachNodeCallbacks,
+      incrementPendingUploads,
+      decrementPendingUploads,
+      setNodes,
+    ]
+  )
+
   // Drag and drop file handlers using React Flow API
   const onDragOver = React.useCallback((event: React.DragEvent) => {
     event.preventDefault()
@@ -357,100 +494,9 @@ function CanvasContent() {
       setIsDraggingFile(false)
 
       const files = Array.from(event.dataTransfer?.files || [])
-
-      if (files.length === 0) return
-
-      // Filter for images, videos, and audio
-      const validFiles = files.filter(
-        (file) =>
-          file.type.startsWith('image/') ||
-          file.type.startsWith('video/') ||
-          file.type.startsWith('audio/')
-      )
-
-      if (validFiles.length === 0) {
-        toast.error('Please drop image, video, or audio files')
-        return
-      }
-
-      // Convert screen position to flow position
-      const position = screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      })
-
-      // Create upload nodes for each file
-      const newNodes: Node[] = []
-      for (let i = 0; i < validFiles.length; i++) {
-        const file = validFiles[i]
-        nodeCounter.current += 1
-        const id = `upload-${nodeCounter.current}`
-
-        // Create object URL for the file
-        const fileUrl = URL.createObjectURL(file)
-        
-        // Determine file type
-        let fileType: "image" | "video" | "audio" | null = null
-        if (file.type.startsWith('image/')) fileType = 'image'
-        else if (file.type.startsWith('video/')) fileType = 'video'
-        else if (file.type.startsWith('audio/')) fileType = 'audio'
-
-        const newNode = attachNodeCallbacks({
-          id,
-          type: 'upload',
-          position: {
-            x: position.x + i * 50, // Offset each node slightly
-            y: position.y + i * 50,
-          },
-          data: {
-            ...createUploadNodeData(),
-            fileUrl,
-            fileType,
-            fileName: file.name,
-          },
-        })
-
-        newNodes.push(newNode)
-
-        incrementPendingUploads()
-        uploadFileToSupabase(file, 'uploads')
-          .then((uploadResult) => {
-            if (!uploadResult) {
-              uploadErrorsRef.current += 1
-              return
-            }
-
-            setNodes((nds) =>
-              nds.map((n) =>
-                n.id === id
-                  ? {
-                      ...n,
-                      data: {
-                        ...n.data,
-                        fileUrl: uploadResult.url,
-                        fileType: uploadResult.fileType,
-                        fileName: uploadResult.fileName,
-                      },
-                    }
-                  : n
-              )
-            )
-            URL.revokeObjectURL(fileUrl)
-          })
-          .catch(() => {
-            uploadErrorsRef.current += 1
-          })
-          .finally(() => {
-            decrementPendingUploads()
-          })
-      }
-
-      setNodes((nds) => [...nds, ...newNodes])
-      toast.success(
-        `Added ${validFiles.length} file${validFiles.length > 1 ? 's' : ''} to canvas`
-      )
+      addUploadNodesFromFiles(files, { x: event.clientX, y: event.clientY }, "drop")
     },
-    [screenToFlowPosition, setNodes, attachNodeCallbacks, incrementPendingUploads, decrementPendingUploads]
+    [addUploadNodesFromFiles]
   )
 
   // Add a new node
@@ -666,7 +712,7 @@ function CanvasContent() {
   }, [reactFlowInstance])
 
   // Paste nodes from clipboard at cursor position
-  const handlePaste = React.useCallback((position: { x: number; y: number }) => {
+  const handlePasteNodes = React.useCallback((position: { x: number; y: number }) => {
     const clipboardData = localStorage.getItem('rf-clipboard')
     if (!clipboardData) return
 
@@ -860,15 +906,6 @@ function CanvasContent() {
         event.preventDefault()
         event.stopPropagation()
         handleCopy()
-      } else if (isMod && event.key === 'v') {
-        event.preventDefault()
-        event.stopPropagation()
-        // Paste at viewport center
-        const viewportCenter = {
-          x: window.innerWidth / 2,
-          y: window.innerHeight / 2,
-        }
-        handlePaste(viewportCenter)
       } else if (isMod && event.key === 'd') {
         event.preventDefault()
         event.stopPropagation()
@@ -879,7 +916,38 @@ function CanvasContent() {
     // Attach to document to ensure it captures all keyboard events
     document.addEventListener('keydown', handleKeyDown, true)
     return () => document.removeEventListener('keydown', handleKeyDown, true)
-  }, [handleCopy, handlePaste, handleDuplicate])
+  }, [handleCopy, handleDuplicate])
+
+  React.useEffect(() => {
+    const handleDocumentPaste = (event: ClipboardEvent) => {
+      if (isEditableTarget(event.target)) return
+
+      const pastedImages = extractClipboardImageFiles(event.clipboardData?.items)
+      const pastePosition =
+        lastCanvasPointerRef.current ?? getCanvasCenterScreenPosition()
+
+      if (pastedImages.length > 0) {
+        event.preventDefault()
+        event.stopPropagation()
+        addUploadNodesFromFiles(pastedImages, pastePosition, "paste")
+        return
+      }
+
+      if (!localStorage.getItem("rf-clipboard")) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      handlePasteNodes(pastePosition)
+    }
+
+    document.addEventListener("paste", handleDocumentPaste, true)
+    return () => document.removeEventListener("paste", handleDocumentPaste, true)
+  }, [
+    addUploadNodesFromFiles,
+    getCanvasCenterScreenPosition,
+    handlePasteNodes,
+    isEditableTarget,
+  ])
 
   // Instantiate a saved workflow on the canvas
   const handleInstantiateWorkflow = React.useCallback((workflow: Workflow) => {
@@ -1201,7 +1269,7 @@ function CanvasContent() {
         isExecuting={isExecuting}
       />
       
-      <div className="flex-1 relative h-full w-full">
+      <div className="flex-1 relative h-full w-full" ref={canvasPaneRef}>
         {/* Drag and Drop Overlay */}
         {isDraggingFile && (
           <div 
@@ -1232,8 +1300,24 @@ function CanvasContent() {
           onDragEnter={onDragEnter}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
+          onPaneMouseMove={(event) => {
+            lastCanvasPointerRef.current = {
+              x: event.clientX,
+              y: event.clientY,
+            }
+          }}
+          onNodeMouseMove={(event) => {
+            lastCanvasPointerRef.current = {
+              x: event.clientX,
+              y: event.clientY,
+            }
+          }}
           onNodeContextMenu={(event, node) => {
             event.preventDefault()
+            lastCanvasPointerRef.current = {
+              x: event.clientX,
+              y: event.clientY,
+            }
             setClickedNode(node)
             setContextMenuPosition({ x: event.clientX, y: event.clientY })
             
@@ -1249,6 +1333,10 @@ function CanvasContent() {
           }}
           onPaneContextMenu={(event) => {
             event.preventDefault()
+            lastCanvasPointerRef.current = {
+              x: event.clientX,
+              y: event.clientY,
+            }
             setClickedNode(null)
             setContextMenuPosition({ x: event.clientX, y: event.clientY })
           }}
@@ -1327,7 +1415,7 @@ function CanvasContent() {
           clickedNode={clickedNode}
           hasClipboard={hasClipboard}
           onCopy={handleCopy}
-          onPaste={handlePaste}
+          onPaste={handlePasteNodes}
           onDuplicate={handleDuplicate}
           onDelete={handleDelete}
           onGroup={handleGroup}

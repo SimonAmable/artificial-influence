@@ -134,7 +134,7 @@ export function VoiceSelectorContent({
   return (
     <DialogContent className={cn("max-w-md p-0 overflow-hidden", className)} {...props}>
       <DialogTitle className="sr-only">{title}</DialogTitle>
-      <div className="flex max-h-[70vh] flex-col">{children}</div>
+      <div className="flex max-h-[70vh] min-w-0 flex-col">{children}</div>
     </DialogContent>
   )
 }
@@ -146,10 +146,10 @@ export function VoiceSelectorInput({
   const { query, setQuery } = useVoiceSelector()
 
   return (
-    <div className="border-b border-white/10 px-3 py-3">
+    <div className="min-w-0 border-b border-white/10 px-3 py-3">
       <input
         className={cn(
-          "w-full rounded-xl border border-white/10 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500",
+          "box-border w-full min-w-0 max-w-full rounded-xl border border-white/10 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500",
           className
         )}
         value={query}

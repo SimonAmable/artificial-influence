@@ -46,6 +46,11 @@ export interface InworldVoice {
   tags: string[]
   source: string
   name?: string
+  provider?: string
+  providerVoiceId?: string
+  model?: string | null
+  previewText?: string
+  previewAudioUrl?: string
 }
 
 export function isInworldTtsModelId(value: string): value is InworldTtsModelId {
@@ -80,6 +85,9 @@ export function getInworldVoiceSearchText(voice: InworldVoice) {
     voice.description,
     voice.langCode,
     voice.source,
+    voice.name,
+    voice.provider,
+    voice.model,
     ...voice.tags,
   ]
     .filter(Boolean)

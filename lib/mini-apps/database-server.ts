@@ -158,6 +158,23 @@ export async function listUserMiniApps(userId: string): Promise<MiniApp[]> {
   return (data as MiniApp[]) ?? []
 }
 
+export async function listPublishedMiniApps(): Promise<MiniApp[]> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("mini_apps")
+    .select("*")
+    .eq("status", "published")
+    .order("updated_at", { ascending: false })
+
+  if (error) {
+    console.error("Error listing published mini apps:", error)
+    throw new Error(`Failed to list published mini apps: ${error.message}`)
+  }
+
+  return (data as MiniApp[]) ?? []
+}
+
 export function getMiniAppSnapshotNodes(miniApp: MiniApp): Node[] {
   return miniApp.snapshot_nodes as Node[]
 }

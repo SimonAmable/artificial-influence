@@ -24,6 +24,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/character-swap", label: "Character Swap" },
   { path: "/motion-copy", label: "Motion Copy" },
   { path: "/lipsync", label: "Lipsync" },
+  { path: "/apps", label: "Apps" },
   { path: "/assets", label: "Assets" },
   { path: "/history", label: "History" },
   { path: "/pricing", label: "Pricing" },

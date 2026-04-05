@@ -9,11 +9,13 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { X, ClockCounterClockwise, FolderOpen, CircleNotch, Copy, Check } from "@phosphor-icons/react"
+import { X, ClockCounterClockwise, FolderOpen, CircleNotch, Copy, Check, Plus } from "@phosphor-icons/react"
 import Image from "next/image"
-import { cn } from "@/lib/utils"
-import type { AssetRecord } from "@/lib/assets/types"
+import type { AssetRecord, AssetType } from "@/lib/assets/types"
 import { listAssets } from "@/lib/assets/library"
+import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { toast } from "sonner"
 
 interface Generation {
   id: string
@@ -59,6 +61,14 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
   const [historyError, setHistoryError] = React.useState<string | null>(null)
   const [assetsError, setAssetsError] = React.useState<string | null>(null)
   const [copiedId, setCopiedId] = React.useState<string | null>(null)
+  const [createAssetOpen, setCreateAssetOpen] = React.useState(false)
+  const [createAssetInitial, setCreateAssetInitial] = React.useState<{
+    url: string
+    assetType: AssetType
+    title?: string
+  } | null>(null)
+  const [createAssetUploading, setCreateAssetUploading] = React.useState(false)
+  const createAssetFileInputRef = React.useRef<HTMLInputElement>(null)
 
   // Fetch history when tab is opened
   React.useEffect(() => {
@@ -124,6 +134,38 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
     }
   }
 
+  const handleCreateAssetFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file) return
+    const type = file.type
+    const isImage = type.startsWith("image/")
+    const isVideo = type.startsWith("video/")
+    const isAudio = type.startsWith("audio/")
+    if (!isImage && !isVideo && !isAudio) {
+      toast.error("Please select an image, video, or audio file")
+      return
+    }
+    setCreateAssetUploading(true)
+    try {
+      const result = await uploadFileToSupabase(file, "asset-library")
+      if (!result) return
+      if (result.fileType === "other") {
+        toast.error("Unsupported file type. Use image, video, or audio.")
+        return
+      }
+      setCreateAssetInitial({
+        url: result.url,
+        assetType: result.fileType,
+        title: result.fileName,
+      })
+      setActiveTab("assets")
+      setCreateAssetOpen(true)
+    } finally {
+      setCreateAssetUploading(false)
+    }
+  }
+
   // Handle keyboard navigation
   React.useEffect(() => {
     if (!open) return
@@ -165,7 +207,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "history" | "assets")} className="flex-1 flex flex-col overflow-hidden">
-          <div className="px-6 pt-2 pb-2">
+          <div className="flex items-center justify-between gap-4 px-6 pt-2 pb-2">
             <TabsList>
               <TabsTrigger value="history" className="gap-2">
                 <ClockCounterClockwise className="h-4 w-4" />
@@ -176,6 +218,29 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                 Assets
               </TabsTrigger>
             </TabsList>
+            <input
+              ref={createAssetFileInputRef}
+              type="file"
+              accept="image/*,video/*,audio/*"
+              className="sr-only"
+              aria-hidden
+              tabIndex={-1}
+              onChange={handleCreateAssetFileChange}
+            />
+            <Button
+              type="button"
+              size="sm"
+              className="shrink-0 gap-1.5"
+              disabled={createAssetUploading}
+              onClick={() => createAssetFileInputRef.current?.click()}
+            >
+              {createAssetUploading ? (
+                <CircleNotch className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" weight="bold" />
+              )}
+              Create asset
+            </Button>
           </div>
 
           {/* History Tab */}
@@ -323,6 +388,25 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
             )}
           </TabsContent>
         </Tabs>
+
+        {createAssetInitial && (
+          <CreateAssetDialog
+            open={createAssetOpen}
+            onOpenChange={(next) => {
+              setCreateAssetOpen(next)
+              if (!next) setCreateAssetInitial(null)
+            }}
+            initial={{
+              url: createAssetInitial.url,
+              assetType: createAssetInitial.assetType,
+              title: createAssetInitial.title,
+              sourceNodeType: "asset-selection",
+            }}
+            onSaved={() => {
+              void fetchAssets()
+            }}
+          />
+        )}
       </DialogContent>
     </Dialog>
   )
