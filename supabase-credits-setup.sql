@@ -33,6 +33,8 @@ DECLARE
     "price_1SrWkoGYRyfMJZ0CCuVwjLKc": 100,
     "price_1SrWl8GYRyfMJZ0CeXU9f7LE": 500,
     "price_1SrWlMGYRyfMJZ0CTNcrZ1gS": 1750,
+    "price_1TIyQeGYRyfMJZ0Cg7gwAPJE": 1750,
+    "price_1TIySoGYRyfMJZ0CKCD93aWh": 1750,
     "price_1SrWlzGYRyfMJZ0CICD6aj5j": 100,
     "price_1SrWmVGYRyfMJZ0CyKUeZ5T9": 500,
     "price_1SrWmtGYRyfMJZ0CzG1ac2Ra": 1750
@@ -53,7 +55,8 @@ DECLARE
   yearly_price_ids TEXT[] := ARRAY[
     'price_1SrWlzGYRyfMJZ0CICD6aj5j',
     'price_1SrWmVGYRyfMJZ0CyKUeZ5T9',
-    'price_1SrWmtGYRyfMJZ0CzG1ac2Ra'
+    'price_1SrWmtGYRyfMJZ0CzG1ac2Ra',
+    'price_1TIySoGYRyfMJZ0CKCD93aWh'
   ];
 BEGIN
   RETURN price_id = ANY(yearly_price_ids);

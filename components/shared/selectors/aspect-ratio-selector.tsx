@@ -11,8 +11,8 @@ import {
 import { cn } from "@/lib/utils"
 import { Model, parseModelParameters, isStringParameter } from "@/lib/types/models"
 
-// Aspect ratio icon component
-function AspectRatioIcon({ ratio }: { ratio: string }) {
+/** Small frame preview for a ratio string (used in selects and toolbars). */
+export function AspectRatioIcon({ ratio }: { ratio: string }) {
   const getIconStyle = () => {
     switch (ratio) {
       case "1:1":
@@ -47,8 +47,8 @@ function AspectRatioIcon({ ratio }: { ratio: string }) {
   )
 }
 
-// Format aspect ratio for display
-function formatAspectRatioLabel(ratio: string): string {
+/** Human-readable label (e.g. match_input_image → Auto). */
+export function formatAspectRatioLabel(ratio: string): string {
   switch (ratio) {
     case "match_input_image":
     case "auto":

@@ -11,8 +11,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { X, ClockCounterClockwise, FolderOpen, CircleNotch, Copy, Check, Plus } from "@phosphor-icons/react"
 import Image from "next/image"
-import type { AssetRecord, AssetType } from "@/lib/assets/types"
-import { listAssets } from "@/lib/assets/library"
+import type {
+  AssetCategory,
+  AssetRecord,
+  AssetType,
+  AssetVisibility,
+} from "@/lib/assets/types"
+import {
+  ASSET_CATEGORIES,
+  ASSET_CATEGORY_LABELS,
+  listAssets,
+} from "@/lib/assets/library"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { toast } from "sonner"
@@ -53,9 +62,11 @@ function formatDate(dateString: string): string {
 }
 
 export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelectionModalProps) {
-  const [activeTab, setActiveTab] = React.useState<"history" | "assets">("history")
+  const [activeTab, setActiveTab] = React.useState<"history" | "assets">("assets")
   const [generations, setGenerations] = React.useState<Generation[]>([])
   const [assets, setAssets] = React.useState<AssetRecord[]>([])
+  const [visibility, setVisibility] = React.useState<AssetVisibility | "all">("all")
+  const [category, setCategory] = React.useState<AssetCategory | "all">("all")
   const [loadingHistory, setLoadingHistory] = React.useState(false)
   const [loadingAssets, setLoadingAssets] = React.useState(false)
   const [historyError, setHistoryError] = React.useState<string | null>(null)
@@ -77,13 +88,6 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
     }
   }, [open, activeTab])
 
-  // Fetch assets when tab is opened
-  React.useEffect(() => {
-    if (open && activeTab === "assets" && assets.length === 0) {
-      fetchAssets()
-    }
-  }, [open, activeTab])
-
   const fetchHistory = async () => {
     setLoadingHistory(true)
     setHistoryError(null)
@@ -102,12 +106,14 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
     }
   }
 
-  const fetchAssets = async () => {
+  const fetchAssets = React.useCallback(async () => {
     setLoadingAssets(true)
     setAssetsError(null)
     try {
       const data = await listAssets({
         limit: 50,
+        visibility: visibility === "all" ? undefined : visibility,
+        category: category === "all" ? undefined : category,
       })
       setAssets(data)
     } catch (error) {
@@ -116,7 +122,12 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
     } finally {
       setLoadingAssets(false)
     }
-  }
+  }, [visibility, category])
+
+  React.useEffect(() => {
+    if (!open || activeTab !== "assets") return
+    void fetchAssets()
+  }, [open, activeTab, fetchAssets])
 
   const handleSelect = (url: string) => {
     onSelect(url)
@@ -191,7 +202,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
           <DialogHeader className="p-0 space-y-0">
             <DialogTitle className="text-xl font-semibold">Select Reference Image</DialogTitle>
             <p id="asset-selection-description" className="text-sm text-muted-foreground mt-1">
-              Choose an image from your history or saved assets
+              Choose an image from your saved assets or generation history
             </p>
           </DialogHeader>
           <Button
@@ -209,13 +220,13 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "history" | "assets")} className="flex-1 flex flex-col overflow-hidden">
           <div className="flex items-center justify-between gap-4 px-6 pt-2 pb-2">
             <TabsList>
-              <TabsTrigger value="history" className="gap-2">
-                <ClockCounterClockwise className="h-4 w-4" />
-                History
-              </TabsTrigger>
               <TabsTrigger value="assets" className="gap-2">
                 <FolderOpen className="h-4 w-4" />
                 Assets
+              </TabsTrigger>
+              <TabsTrigger value="history" className="gap-2">
+                <ClockCounterClockwise className="h-4 w-4" />
+                History
               </TabsTrigger>
             </TabsList>
             <input
@@ -242,6 +253,94 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
               Create asset
             </Button>
           </div>
+
+          {/* Assets Tab */}
+          <TabsContent value="assets" className="flex-1 overflow-y-auto p-4 m-0">
+            <Tabs
+              value={visibility}
+              onValueChange={(value) => setVisibility(value as AssetVisibility | "all")}
+            >
+              <TabsList className="mb-3">
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="private">Private</TabsTrigger>
+                <TabsTrigger value="public">Public</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Tabs
+              value={category}
+              onValueChange={(value) => setCategory(value as AssetCategory | "all")}
+            >
+              <TabsList className="mb-4 flex flex-wrap h-auto">
+                <TabsTrigger value="all">All</TabsTrigger>
+                {ASSET_CATEGORIES.map((item) => (
+                  <TabsTrigger key={item} value={item}>
+                    {ASSET_CATEGORY_LABELS[item]}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            {loadingAssets ? (
+              <div className="flex items-center justify-center h-64">
+                <CircleNotch className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : assetsError ? (
+              <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                <p className="text-sm">{assetsError}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void fetchAssets()}
+                  className="mt-4"
+                >
+                  Try Again
+                </Button>
+              </div>
+            ) : assets.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                <FolderOpen className="h-12 w-12 mb-3 opacity-50" />
+                <p className="text-sm">No saved assets</p>
+                <p className="text-xs mt-1">Try another category or save an asset to see it here</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {assets.map((asset) => (
+                  <div
+                    key={asset.id}
+                    className="overflow-hidden rounded-md"
+                  >
+                    <div 
+                      className="group/image relative aspect-square cursor-pointer hover:ring-2 hover:ring-primary transition-all rounded-md"
+                      onClick={() => handleSelect(asset.url)}
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Select image"
+                    >
+                      <Image
+                        src={asset.thumbnailUrl || asset.url}
+                        alt={asset.title}
+                        fill
+                        className="object-cover rounded-md"
+                        unoptimized
+                      />
+                      {/* Overlay on hover */}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center rounded-md">
+                        <span className="text-white text-sm font-medium">Select</span>
+                      </div>
+                    </div>
+                    {/* Metadata */}
+                    <div className="flex flex-col gap-0.5 mt-2 px-1">
+                      <p className="text-xs text-foreground truncate font-medium">
+                        {asset.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {formatDate(asset.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
           {/* History Tab */}
           <TabsContent value="history" className="flex-1 overflow-y-auto p-4 m-0">
@@ -316,71 +415,6 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                           )}
                         </div>
                       )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Assets Tab */}
-          <TabsContent value="assets" className="flex-1 overflow-y-auto p-4 m-0">
-            {loadingAssets ? (
-              <div className="flex items-center justify-center h-64">
-                <CircleNotch className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : assetsError ? (
-              <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                <p className="text-sm">{assetsError}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchAssets}
-                  className="mt-4"
-                >
-                  Try Again
-                </Button>
-              </div>
-            ) : assets.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                <FolderOpen className="h-12 w-12 mb-3 opacity-50" />
-                <p className="text-sm">No saved assets</p>
-                <p className="text-xs mt-1">Save your first asset to see it here</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {assets.map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="overflow-hidden rounded-md"
-                  >
-                    <div 
-                      className="group/image relative aspect-square cursor-pointer hover:ring-2 hover:ring-primary transition-all rounded-md"
-                      onClick={() => handleSelect(asset.url)}
-                      role="button"
-                      tabIndex={0}
-                      aria-label="Select image"
-                    >
-                      <Image
-                        src={asset.thumbnailUrl || asset.url}
-                        alt={asset.title}
-                        fill
-                        className="object-cover rounded-md"
-                        unoptimized
-                      />
-                      {/* Overlay on hover */}
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center rounded-md">
-                        <span className="text-white text-sm font-medium">Select</span>
-                      </div>
-                    </div>
-                    {/* Metadata */}
-                    <div className="flex flex-col gap-0.5 mt-2 px-1">
-                      <p className="text-xs text-foreground truncate font-medium">
-                        {asset.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {formatDate(asset.createdAt)}
-                      </p>
                     </div>
                   </div>
                 ))}

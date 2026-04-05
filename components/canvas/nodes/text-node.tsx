@@ -660,7 +660,7 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
   }
 
   return (
-    <div className="w-[460px] max-w-[92vw] rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl overflow-hidden nopan nodrag">
+    <div className="w-[min(300px,92vw)] max-w-[92vw] rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl overflow-hidden nopan nodrag">
       <div className="p-3">
         <form onSubmit={handleSubmit}>
           <input
@@ -752,7 +752,7 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
                 }
               }}
               onPaste={handlePaste}
-              placeholder="Ask AI to write, edit, or improve this text..."
+              placeholder="Write, edit, or ask anything—natural language by default. Say you want JSON or a structured Nano Banana pack if you need that. Connect images for context…"
               rows={4}
               disabled={isGenerating}
               className="w-full min-h-28 max-h-80 rounded-md bg-transparent px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none resize-y disabled:opacity-50"
@@ -776,7 +776,7 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
                 size="icon"
                 disabled={(!input.trim() && !files) || isGenerating}
                 className="shrink-0 h-8 w-8 bg-emerald-500 hover:bg-emerald-600 text-zinc-900"
-                title="Generate text"
+                title="Run AI"
               >
                 <ArrowUp className="h-4 w-4" weight="bold" />
               </Button>

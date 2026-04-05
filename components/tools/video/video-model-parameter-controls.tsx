@@ -10,6 +10,10 @@ import { cn } from "@/lib/utils"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition } from "@/lib/types/models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
+import {
+  AspectRatioIcon,
+  formatAspectRatioLabel,
+} from "@/components/shared/selectors/aspect-ratio-selector"
 import { SpeakerHigh } from "@phosphor-icons/react"
 
 interface VideoModelParameterControlsProps {
@@ -106,10 +110,53 @@ export function VideoModelParameterControls({
           </Select>
         )
       }
+
+      const isAspectRatioParam =
+        param.name === "aspect_ratio" || param.name === "aspectRatio"
+      if (isAspectRatioParam) {
+        const aspectVal = String(value ?? param.default ?? param.enum[0])
+        return (
+          <Select
+            key={param.name}
+            value={aspectVal}
+            onValueChange={(val) => onParametersChange({ ...parameters, [param.name]: val })}
+            disabled={disabled}
+          >
+            <SelectTrigger
+              id={param.name}
+              size="sm"
+              className={cn("h-8 text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")}
+            >
+              <SelectValue placeholder={param.label}>
+                {aspectVal ? (
+                  <div className="flex items-center gap-2">
+                    <AspectRatioIcon ratio={aspectVal} />
+                    <span>{formatAspectRatioLabel(aspectVal)}</span>
+                  </div>
+                ) : null}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent side="top">
+              {param.enum.map((option) => {
+                const opt = String(option)
+                return (
+                  <SelectItem key={opt} value={opt} className="text-xs">
+                    <div className="flex items-center gap-2">
+                      <AspectRatioIcon ratio={opt} />
+                      <span>{formatAspectRatioLabel(opt)}</span>
+                    </div>
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+        )
+      }
+
       return (
         <Select
           key={param.name}
-          value={String(value)}
+          value={String(value ?? param.default)}
           onValueChange={(val) => onParametersChange({ ...parameters, [param.name]: val })}
           disabled={disabled}
         >
@@ -168,6 +215,7 @@ export function VideoModelParameterControls({
       param.enum.length > 0
     ) {
       const unit = param.name.includes("duration") ? "s" : ""
+      const compactDurationToolbar = isToolbar && param.name.includes("duration")
       return (
         <Select
           key={param.name}
@@ -180,7 +228,13 @@ export function VideoModelParameterControls({
           <SelectTrigger
             id={param.name}
             size="sm"
-            className={cn("h-8 text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")}
+            className={cn(
+              "h-8 text-xs w-fit px-2",
+              compactDurationToolbar
+                ? "min-w-fit shrink-0 gap-1 px-1.5 tabular-nums [&_svg:not([class*='size-'])]:size-3.5"
+                : "min-w-[80px]",
+              isToolbar && !compactDurationToolbar && "min-w-[70px]"
+            )}
           >
             <SelectValue placeholder={param.label}>
               {value != null ? `${value}${unit}` : param.label}

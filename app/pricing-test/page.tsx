@@ -10,43 +10,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-// Define pricing plans with TEST MODE Stripe Price IDs
+// TEST MODE — Pro / Max only. Swap Max priceId when you create a matching $100/mo test price in Stripe.
 const monthlyPlans = [
-  {
-    id: 'basic-monthly',
-    name: 'Basic',
-    description: 'Perfect for getting started',
-    price: 5.00,
-    priceId: 'price_1SrXYkK2MiVk67BiHuwPn21M', // TEST MODE
-    interval: 'month',
-    credits: 100,
-    features: [
-      {
-        name: 'Access to all AI models',
-        info: 'Includes image generation (Nano Banana, FLUX.2 Flex), video generation (Fabric 1.0), and audio models',
-      },
-      {
-        name: 'Image generation',
-        info: 'Generate high-quality images using state-of-the-art AI models like Nano Banana and FLUX.2 Flex',
-      },
-      {
-        name: 'Video generation',
-        info: 'Create videos with lip sync and animation using Fabric 1.0 and other video models',
-      },
-      {
-        name: 'Concurrent generations',
-        info: 'Generate multiple images and videos simultaneously for faster workflow',
-      },
-      {
-        name: 'Commercial license',
-        info: 'Use generated content for commercial purposes without attribution requirements',
-      },
-      {
-        name: 'Email support',
-        info: 'Get help via email with standard response times',
-      },
-    ],
-  },
   {
     id: 'pro-monthly',
     name: 'Pro',
@@ -80,11 +45,11 @@ const monthlyPlans = [
     popular: true,
   },
   {
-    id: 'creator-monthly',
-    name: 'Creator',
-    description: 'For content creators',
-    price: 50.00,
-    priceId: 'price_1SrXZDK2MiVk67Bi0Y57icpS', // TEST MODE
+    id: 'max-monthly',
+    name: 'Max',
+    description: 'For power users and teams',
+    price: 100.0,
+    priceId: 'price_1SrXZDK2MiVk67Bi0Y57icpS', // TEST MODE — legacy test price; update in Stripe dashboard + here to match $100
     interval: 'month',
     credits: 1750,
     features: [
@@ -191,7 +156,7 @@ export default function PricingTestPage() {
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {monthlyPlans.map((plan) => (
             <div
               key={plan.id}

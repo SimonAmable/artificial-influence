@@ -25,6 +25,7 @@ import type {
   UploadNodeData,
   ImageGenNodeData,
   AudioNodeData,
+  TextNodeData,
 } from "@/lib/canvas/types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -67,6 +68,23 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   }))
   const updateNodeInternals = useUpdateNodeInternals()
   const nodeCounterRef = React.useRef(Date.now())
+
+  const connectedPrompt = React.useMemo(() => {
+    const currentNode = nodes.find((n) => n.id === id)
+    if (!currentNode) return ""
+    const incomingNodes = getIncomers(currentNode, nodes, edges)
+    const textNodes = incomingNodes.filter((node) => node.type === "text")
+    return textNodes
+      .map((node) => (node.data as TextNodeData).text || "")
+      .filter((text) => text.trim())
+      .join(" ")
+  }, [edges, id, nodes])
+
+  React.useEffect(() => {
+    if (connectedPrompt !== (nodeData.connectedPrompt || "")) {
+      nodeData.onDataChange?.(id, { connectedPrompt })
+    }
+  }, [connectedPrompt, nodeData, id])
   const [isHovered, setIsHovered] = React.useState(false)
   const [isEditingTitle, setIsEditingTitle] = React.useState(false)
   const [title, setTitle] = React.useState(nodeData.label || "Video")
@@ -654,7 +672,11 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       nodeData.onDataChange?.(id, { error: "Last frame image is required" })
       return
     }
-    if (!isMotionCopy && !isLipsync && !nodeData.prompt?.trim()) {
+    const fullPrompt = [nodeData.connectedPrompt, nodeData.prompt]
+      .filter((p) => p?.trim())
+      .join(" ")
+      .trim()
+    if (!isMotionCopy && !isLipsync && !fullPrompt) {
       nodeData.onDataChange?.(id, { error: "Prompt is required" })
       return
     }
@@ -761,7 +783,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             videoUrl: videoUpload?.url,
             imageStoragePath: imageUpload?.storagePath,
             videoStoragePath: videoUpload?.storagePath,
-            prompt: nodeData.prompt || "",
+            prompt: fullPrompt,
             mode: (nodeData.parameters?.mode as string) || nodeData.mode || "pro",
             keep_original_sound: nodeData.parameters?.keep_original_sound ?? true,
             character_orientation: nodeData.parameters?.character_orientation || "video",
@@ -785,7 +807,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           model: modelIdentifier,
           ...(nodeData.parameters || {}),
           // Apply node prompt after parameters spread so it is never overwritten by parameters.prompt (model default can be null)
-          prompt: nodeData.prompt?.trim() || "",
+          prompt: fullPrompt,
         }
 
         if (nodeData.negativePrompt?.trim()) {
@@ -1087,9 +1109,18 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       position={Position.Bottom}
       offset={12}
     >
-      <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl overflow-hidden nopan nodrag">
+      <div className="nopan nodrag w-full max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-xl">
+      <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl overflow-hidden">
         {/* Prompt input area */}
         <div className="p-2.5 space-y-2">
+          {nodeData.connectedPrompt && (
+            <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 [.react-flow.light_&]:border-zinc-300/90 [.react-flow.light_&]:bg-zinc-100/95">
+              <span className="text-xs text-zinc-500 [.react-flow.light_&]:text-zinc-600">From connections: </span>
+              <span className="text-xs text-zinc-300 line-clamp-2 [.react-flow.light_&]:text-zinc-800">
+                {nodeData.connectedPrompt}
+              </span>
+            </div>
+          )}
           {/* Media previews */}
           {(() => {
             const finalImageUrl = nodeData.manualImageUrl || nodeData.connectedImageUrl
@@ -1410,6 +1441,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             )}
           </Button>
         </div>
+      </div>
       </div>
     </NodeToolbar>
 

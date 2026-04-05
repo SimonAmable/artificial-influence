@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server';
 import { TEXT_GENERATION_SYSTEM_PROMPT } from '@/lib/constants/system-prompts';
 import { enhancePrompt } from '@/lib/prompt-enhancement';
 
+const TEXT_GEN_MODEL = 'google/gemini-2.5-flash' as const
+
 export async function POST(req: Request) {
   try {
     // Check for API key
@@ -28,12 +30,17 @@ export async function POST(req: Request) {
     }
 
     // Parse request body
-    const { prompt, currentText, images, enhancePrompt: shouldEnhancePrompt }: { 
-      prompt: string; 
-      currentText?: string;
-      images?: Array<{ url: string; mediaType?: string }>;
-      enhancePrompt?: boolean;
-    } = await req.json();
+    const {
+      prompt,
+      currentText,
+      images,
+      enhancePrompt: shouldEnhancePrompt,
+    }: {
+      prompt: string
+      currentText?: string
+      images?: Array<{ url: string; mediaType?: string }>
+      enhancePrompt?: boolean
+    } = await req.json()
 
     if (!prompt || !prompt.trim()) {
       return NextResponse.json(
@@ -62,7 +69,7 @@ export async function POST(req: Request) {
     if (currentText) {
       userContent.push({
         type: 'text' as const,
-        text: `CURRENT TEXT TO EDIT:\n${currentText}\n\nEDITING REQUEST: ${processedPrompt}\n\nProvide the complete updated text.`
+        text: `CURRENT TEXT TO EDIT:\n${currentText}\n\nEDITING REQUEST: ${processedPrompt}\n\nFollow your system instructions: return the complete updated text in natural language unless the user explicitly asked for JSON / a structured Nano Banana package—in that case follow the JSON package rules.`
       });
     } else {
       userContent.push({
@@ -81,9 +88,8 @@ export async function POST(req: Request) {
       });
     }
 
-    // Generate the response using Gemini via AI Gateway
     const result = await generateText({
-      model: gateway('google/gemini-2.5-flash'),
+      model: gateway(TEXT_GEN_MODEL),
       messages: [
         {
           role: 'system',

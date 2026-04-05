@@ -388,6 +388,7 @@ export async function POST(request: NextRequest) {
     const jsonSupportedModels = [
       'google/nano-banana',
       'google/nano-banana-pro',
+      'google/nano-banana-2',
       'bytedance/seedream-4.5'
     ];
     const usingJSONPrompt = jsonSupportedModels.includes(modelIdentifier) && shouldEnhance;

@@ -23,6 +23,8 @@ DECLARE
     "price_1SrWkoGYRyfMJZ0CCuVwjLKc": 100,
     "price_1SrWl8GYRyfMJZ0CeXU9f7LE": 500,
     "price_1SrWlMGYRyfMJZ0CTNcrZ1gS": 1750,
+    "price_1TIyQeGYRyfMJZ0Cg7gwAPJE": 1750,
+    "price_1TIySoGYRyfMJZ0CKCD93aWh": 1750,
     "price_1SrWlzGYRyfMJZ0CICD6aj5j": 100,
     "price_1SrWmVGYRyfMJZ0CyKUeZ5T9": 500,
     "price_1SrWmtGYRyfMJZ0CzG1ac2Ra": 1750
@@ -43,7 +45,8 @@ DECLARE
   yearly_price_ids TEXT[] := ARRAY[
     'price_1SrWlzGYRyfMJZ0CICD6aj5j',
     'price_1SrWmVGYRyfMJZ0CyKUeZ5T9',
-    'price_1SrWmtGYRyfMJZ0CzG1ac2Ra'
+    'price_1SrWmtGYRyfMJZ0CzG1ac2Ra',
+    'price_1TIySoGYRyfMJZ0CKCD93aWh'
   ];
 BEGIN
   RETURN price_id = ANY(yearly_price_ids);
@@ -193,9 +196,9 @@ ORDER BY proname;
 
 -- Step 9: Test the functions
 -- Test get_monthly_credits_for_price_id
-SELECT public.get_monthly_credits_for_price_id('price_1SrWmtGYRyfMJZ0CzG1ac2Ra'::TEXT) as creator_credits;
-SELECT public.get_monthly_credits_for_price_id('price_1SrWkoGYRyfMJZ0CCuVwjLKc'::TEXT) as basic_credits;
+SELECT public.get_monthly_credits_for_price_id('price_1TIyQeGYRyfMJZ0Cg7gwAPJE'::TEXT) as max_monthly_credits;
+SELECT public.get_monthly_credits_for_price_id('price_1SrWl8GYRyfMJZ0CeXU9f7LE'::TEXT) as pro_monthly_credits;
 
 -- Test is_yearly_subscription
-SELECT public.is_yearly_subscription('price_1SrWmtGYRyfMJZ0CzG1ac2Ra'::TEXT) as is_yearly;
-SELECT public.is_yearly_subscription('price_1SrWkoGYRyfMJZ0CCuVwjLKc'::TEXT) as is_monthly;
+SELECT public.is_yearly_subscription('price_1TIySoGYRyfMJZ0CKCD93aWh'::TEXT) as max_yearly;
+SELECT public.is_yearly_subscription('price_1SrWl8GYRyfMJZ0CeXU9f7LE'::TEXT) as pro_monthly;

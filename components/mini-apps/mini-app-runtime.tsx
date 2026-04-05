@@ -177,9 +177,6 @@ function MiniAppUploadField({
 }) {
   return (
     <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
-      <span className="block text-[11px] leading-tight tracking-[0.2em] text-zinc-500 uppercase">
-        {label}
-      </span>
       <Button variant="outline" className="h-auto min-h-0 w-full py-2.5" asChild>
         <label className="cursor-pointer">
           <input
@@ -222,7 +219,7 @@ function MiniAppUploadField({
               <span className="text-xs font-medium tracking-[0.12em] uppercase">
                 {getUploadButtonText()}
               </span>
-              <span className="text-[10px] font-normal tracking-[0.16em] text-muted-foreground uppercase">
+              <span className="text-xs font-normal tracking-[0.16em] text-muted-foreground uppercase">
                 {getUploadButtonDescription(label)}
               </span>
             </div>

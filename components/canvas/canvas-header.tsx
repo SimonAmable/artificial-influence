@@ -31,6 +31,8 @@ interface CanvasHeaderProps {
   onExecute: () => void
   isExecuting: boolean
   isSaving: boolean
+  saveStatus?: "saved" | "dirty" | "saving" | "error"
+  lastSavedAt?: string | null
 }
 
 export function CanvasHeader({
@@ -40,11 +42,27 @@ export function CanvasHeader({
   onExecute,
   isExecuting,
   isSaving,
+  saveStatus = "saved",
+  lastSavedAt = null,
 }: CanvasHeaderProps) {
   const router = useRouter()
   const [isEditing, setIsEditing] = React.useState(false)
   const [showExecuteDialog, setShowExecuteDialog] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
+  const saveStatusLabel = React.useMemo(() => {
+    if (saveStatus === "saving") return "Saving..."
+    if (saveStatus === "dirty") return "Unsaved changes"
+    if (saveStatus === "error") return "Autosave failed"
+    if (!lastSavedAt) return "Saved"
+
+    const savedAt = new Date(lastSavedAt)
+    if (Number.isNaN(savedAt.getTime())) return "Saved"
+
+    return `Saved ${savedAt.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    })}`
+  }, [lastSavedAt, saveStatus])
 
   React.useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -118,6 +136,21 @@ export function CanvasHeader({
 
       {/* Right floating group: Desktop buttons (Save + Execute) */}
       <div className="absolute top-4 right-4 z-30 hidden lg:flex items-center gap-2">
+        <div
+          className={cn(
+            "rounded-xl border px-2.5 py-1 text-[11px] font-medium shadow-xl backdrop-blur-md",
+            saveStatus === "error"
+              ? "border-red-500/20 bg-red-500/10 text-red-200"
+              : saveStatus === "dirty"
+                ? "border-amber-500/20 bg-amber-500/10 text-amber-100"
+                : "border-white/10 bg-zinc-900/95 text-zinc-400"
+          )}
+        >
+          {saveStatus === "saving" && (
+            <CircleNotch size={12} className="mr-1 inline animate-spin" />
+          )}
+          {saveStatusLabel}
+        </div>
         <Button
           variant="outline"
           size="sm"
@@ -165,6 +198,9 @@ export function CanvasHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem disabled className="text-xs opacity-100">
+            {saveStatusLabel}
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={onSave} disabled={isSaving}>
             {isSaving ? (
               <CircleNotch size={16} className="animate-spin mr-2" />

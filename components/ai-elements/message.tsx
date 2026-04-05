@@ -295,6 +295,7 @@ export const MessageResponse = memo(
         "prose prose-sm max-w-none dark:prose-invert size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         className,
       )}
+      controls={{ code: { copy: true } }}
       plugins={streamdownPlugins}
       {...props}
     />

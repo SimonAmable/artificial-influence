@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Sparkle, Info } from '@phosphor-icons/react';
@@ -11,50 +12,31 @@ import {
 } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
 
-// Define your pricing plans with actual Stripe Price IDs
-const monthlyPlans = [
-  {
-    id: 'basic-monthly',
-    name: 'Basic',
-    description: 'Perfect for getting started',
-    price: 5.00,
-    priceId: 'price_1SrWkoGYRyfMJZ0CCuVwjLKc',
-    interval: 'month',
-    credits: 100,
-    features: [
-      {
-        name: 'Access to all AI models',
-        info: 'Includes image generation (Nano Banana, FLUX.2 Flex), video generation (Fabric 1.0), and audio models',
-      },
-      {
-        name: 'Image generation',
-        info: 'Generate high-quality images using state-of-the-art AI models like Nano Banana and FLUX.2 Flex',
-      },
-      {
-        name: 'Video generation',
-        info: 'Create videos with lip sync and animation using Fabric 1.0 and other video models',
-      },
-      {
-        name: 'Concurrent generations',
-        info: 'Generate multiple images and videos simultaneously for faster workflow',
-      },
-      {
-        name: 'Commercial license',
-        info: 'Use generated content for commercial purposes without attribution requirements',
-      },
-      {
-        name: 'Email support',
-        info: 'Get help via email with standard response times',
-      },
-    ],
-  },
+type PricingPlan = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  priceId: string;
+  interval: 'month' | 'year';
+  currency: 'USD' | 'CAD';
+  credits: number;
+  features: { name: string; info: string }[];
+  popular?: boolean;
+  savings?: string;
+  priceNote?: string;
+};
+
+// Stripe live Price IDs — Pro / Max only (Max monthly credits match former Creator tier)
+const monthlyPlans: PricingPlan[] = [
   {
     id: 'pro-monthly',
     name: 'Pro',
     description: 'For professional users',
-    price: 20.00,
+    price: 20.0,
     priceId: 'price_1SrWl8GYRyfMJZ0CeXU9f7LE',
-    interval: 'month',
+    interval: 'month' as const,
+    currency: 'USD' as const,
     credits: 500,
     features: [
       {
@@ -81,12 +63,13 @@ const monthlyPlans = [
     popular: true,
   },
   {
-    id: 'creator-monthly',
-    name: 'Creator',
-    description: 'For content creators',
-    price: 50.00,
-    priceId: 'price_1SrWlMGYRyfMJZ0CTNcrZ1gS',
-    interval: 'month',
+    id: 'max-monthly',
+    name: 'Max',
+    description: 'For power users and teams',
+    price: 100.0,
+    priceId: 'price_1TIyQeGYRyfMJZ0Cg7gwAPJE',
+    interval: 'month' as const,
+    currency: 'USD' as const,
     credits: 1750,
     features: [
       {
@@ -117,50 +100,15 @@ const monthlyPlans = [
   },
 ];
 
-const yearlyPlans = [
-  {
-    id: 'basic-yearly',
-    name: 'Basic',
-    description: 'Perfect for getting started',
-    price: 50.00,
-    priceId: 'price_1SrWlzGYRyfMJZ0CICD6aj5j',
-    interval: 'year',
-    savings: 'Save 17%',
-    credits: 100,
-    features: [
-      {
-        name: 'Access to all AI models',
-        info: 'Includes image generation (Nano Banana, FLUX.2 Flex), video generation (Fabric 1.0), and audio models',
-      },
-      {
-        name: 'Image generation',
-        info: 'Generate high-quality images using state-of-the-art AI models like Nano Banana and FLUX.2 Flex',
-      },
-      {
-        name: 'Video generation',
-        info: 'Create videos with lip sync and animation using Fabric 1.0 and other video models',
-      },
-      {
-        name: 'Concurrent generations',
-        info: 'Generate multiple images and videos simultaneously for faster workflow',
-      },
-      {
-        name: 'Commercial license',
-        info: 'Use generated content for commercial purposes without attribution requirements',
-      },
-      {
-        name: 'Email support',
-        info: 'Get help via email with standard response times',
-      },
-    ],
-  },
+const yearlyPlans: PricingPlan[] = [
   {
     id: 'pro-yearly',
     name: 'Pro',
     description: 'For professional users',
-    price: 160.00,
+    price: 160.0,
     priceId: 'price_1SrWmVGYRyfMJZ0CyKUeZ5T9',
-    interval: 'year',
+    interval: 'year' as const,
+    currency: 'USD' as const,
     savings: 'Save 33%',
     credits: 500,
     features: [
@@ -188,12 +136,13 @@ const yearlyPlans = [
     popular: true,
   },
   {
-    id: 'creator-yearly',
-    name: 'Creator',
-    description: 'For content creators',
-    price: 300.00,
-    priceId: 'price_1SrWmtGYRyfMJZ0CzG1ac2Ra',
-    interval: 'year',
+    id: 'max-yearly',
+    name: 'Max',
+    description: 'For power users and teams',
+    price: 600.0,
+    priceId: 'price_1TIySoGYRyfMJZ0CKCD93aWh',
+    interval: 'year' as const,
+    currency: 'USD' as const,
     savings: 'Save 50%',
     credits: 1750,
     features: [
@@ -224,6 +173,86 @@ const yearlyPlans = [
     ],
   },
 ];
+
+const ENTERPRISE_CONTACT_EMAIL =
+  process.env.NEXT_PUBLIC_ENTERPRISE_CONTACT_EMAIL ?? 'support@unican.ai';
+
+const freeFeatures: { name: string; info: string }[] = [
+  {
+    name: 'Sign up at no cost',
+    info: 'Create an account and explore the platform without a subscription',
+  },
+  {
+    name: 'Try core AI tools',
+    info: 'Sample image, video, audio, and text workflows with starter access',
+  },
+  {
+    name: 'Canvas & assets',
+    info: 'Build simple node workflows and save a limited set of assets',
+  },
+  {
+    name: 'Community pace',
+    info: 'Standard queue times; upgrade when you need more volume or priority',
+  },
+];
+
+const enterpriseFeatures: { name: string; info: string }[] = [
+  {
+    name: 'Custom credit volume',
+    info: 'Negotiated monthly or annual pools tailored to your team or production load',
+  },
+  {
+    name: 'Security & compliance',
+    info: 'Discuss SSO, data handling, and procurement requirements with our team',
+  },
+  {
+    name: 'Dedicated success',
+    info: 'Named contact, onboarding help, and priority escalation paths',
+  },
+  {
+    name: 'Invoicing & terms',
+    info: 'Net payment terms and contracts where your finance team needs them',
+  },
+];
+
+function PlanFeatureList({ features }: { features: { name: string; info: string }[] }) {
+  return (
+    <ul className="space-y-3 mb-8">
+      {features.map((feature, index) => (
+        <li key={index} className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2 flex-1">
+            <svg
+              className="w-5 h-5 text-primary mt-0.5 shrink-0"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span className="text-sm">{feature.name}</span>
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                aria-label="More information"
+              >
+                <Info className="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-xs text-sm">{feature.info}</p>
+            </TooltipContent>
+          </Tooltip>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function PricingPage() {
   const [loading, setLoading] = useState<string | null>(null);
@@ -302,25 +331,48 @@ export default function PricingPage() {
               </span>
             </div>
             {billingInterval === 'year' && (
-              <span className="text-sm text-green-600 dark:text-green-400 font-semibold">
-                Save up to 50%
+              <span className="inline-flex items-center rounded-full border border-green-600/25 bg-green-600/10 px-3 py-1 text-xs font-semibold text-green-700 dark:border-green-400/30 dark:bg-green-400/10 dark:text-green-400">
+                Save up to 50% on yearly plans
               </span>
             )}
           </div>
         </div>
 
-        {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Pricing Cards: Free | Pro | Max | Enterprise */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8 max-w-7xl mx-auto items-stretch">
+          {/* Free */}
+          <div className="relative bg-card rounded-lg border-2 border-border p-8 shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold mb-2">Free</h2>
+              <p className="text-muted-foreground mb-4">Explore the platform</p>
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-baseline justify-center gap-1">
+                  <span className="text-5xl font-bold">$0</span>
+                </div>
+                <span className="text-sm text-muted-foreground">Forever</span>
+              </div>
+            </div>
+            <Link
+              href="/login?redirect=/pricing"
+              className="w-full py-3 px-6 rounded-lg font-semibold transition-colors mb-6 text-center bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            >
+              Get started
+            </Link>
+            <div className="flex flex-col items-center gap-2 mb-6">
+              <p className="text-sm text-muted-foreground text-center">
+                Limited free usage — upgrade for full credits
+              </p>
+            </div>
+            <PlanFeatureList features={freeFeatures} />
+          </div>
+
           {pricingPlans.map((plan) => (
             <div
               key={plan.id}
-              className={`relative bg-card rounded-lg border-2 p-8 shadow-lg hover:shadow-xl transition-shadow ${
-                plan.popular
-                  ? 'border-primary scale-105'
-                  : 'border-border'
+              className={`relative bg-card rounded-lg border-2 p-8 shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full ${
+                plan.popular ? 'border-primary xl:scale-[1.02] z-10' : 'border-border'
               }`}
             >
-              {/* Popular Badge */}
               {plan.popular && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                   <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold">
@@ -329,24 +381,28 @@ export default function PricingPage() {
                 </div>
               )}
 
-              {/* Plan Header */}
               <div className="text-center mb-6">
                 <h2 className="text-2xl font-bold mb-2">{plan.name}</h2>
                 <p className="text-muted-foreground mb-4">{plan.description}</p>
                 <div className="flex flex-col items-center gap-1">
                   <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-5xl font-bold">${plan.price}</span>
+                    <span className="text-5xl font-bold">
+                      {plan.currency === 'CAD' ? 'CA$' : '$'}
+                      {plan.price % 1 === 0 ? plan.price.toFixed(0) : plan.price.toFixed(2)}
+                    </span>
                     <span className="text-muted-foreground">/{plan.interval}</span>
                   </div>
-                  {('savings' in plan && plan.savings) ? (
+                  {plan.priceNote ? (
+                    <span className="text-xs text-muted-foreground">{plan.priceNote}</span>
+                  ) : null}
+                  {plan.savings ? (
                     <span className="text-sm text-green-600 dark:text-green-400 font-semibold">
-                      {typeof plan.savings === 'string' ? plan.savings : String(plan.savings)}
+                      {plan.savings}
                     </span>
                   ) : null}
                 </div>
               </div>
 
-              {/* Subscribe Button */}
               <button
                 onClick={() => handleSubscribe(plan.priceId, plan.id)}
                 disabled={loading === plan.id}
@@ -385,7 +441,6 @@ export default function PricingPage() {
                 )}
               </button>
 
-              {/* Credits Display */}
               <div className="flex flex-col items-center gap-2 mb-6">
                 <div className="flex items-center justify-center gap-2">
                   <Sparkle className="w-5 h-5 text-primary" weight="fill" />
@@ -415,43 +470,33 @@ export default function PricingPage() {
                 </Tooltip>
               </div>
 
-              {/* Features List */}
-              <ul className="space-y-3 mb-8">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-2 flex-1">
-                      <svg
-                        className="w-5 h-5 text-primary mt-0.5 shrink-0"
-                        fill="none"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path d="M5 13l4 4L19 7"></path>
-                      </svg>
-                      <span className="text-sm">{feature.name}</span>
-                    </div>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                          aria-label="More information"
-                        >
-                          <Info className="w-4 h-4" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-xs text-sm">{feature.info}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </li>
-                ))}
-              </ul>
+              <PlanFeatureList features={plan.features} />
             </div>
           ))}
+
+          {/* Enterprise */}
+          <div className="relative bg-card rounded-lg border-2 border-border p-8 shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold mb-2">Enterprise</h2>
+              <p className="text-muted-foreground mb-4">For organizations at scale</p>
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-3xl font-bold tracking-tight">Custom</span>
+                <span className="text-sm text-muted-foreground">Let&apos;s scope your needs</span>
+              </div>
+            </div>
+            <a
+              href={`mailto:${ENTERPRISE_CONTACT_EMAIL}?subject=${encodeURIComponent('Enterprise plan inquiry')}`}
+              className="w-full py-3 px-6 rounded-lg font-semibold transition-colors mb-6 text-center bg-secondary text-secondary-foreground hover:bg-secondary/80 inline-block"
+            >
+              Contact us
+            </a>
+            <div className="flex flex-col items-center gap-2 mb-6">
+              <p className="text-sm text-muted-foreground text-center">
+                Volume pricing, security reviews, and tailored terms
+              </p>
+            </div>
+            <PlanFeatureList features={enterpriseFeatures} />
+          </div>
         </div>
 
         {/* Footer Note */}

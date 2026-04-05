@@ -1,5 +1,18 @@
-import { generateText } from 'ai';
+import { createGateway, generateText } from 'ai';
 import { NANO_BANANA_PRO_ENHANCEMENT_PROMPT } from './constants/system-prompts';
+
+/** Must match AI Gateway model ids (see @ai-sdk/gateway), not legacy `x-ai/...` strings. */
+const PROMPT_ENHANCEMENT_MODEL = 'xai/grok-4.1-fast-non-reasoning' as const;
+
+function enhancementLanguageModel() {
+  const apiKey = process.env.AI_GATEWAY_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'AI_GATEWAY_API_KEY is not set; prompt enhancement uses the Vercel AI Gateway (same as /api/generate-text).'
+    );
+  }
+  return createGateway({ apiKey })(PROMPT_ENHANCEMENT_MODEL);
+}
 
 // Prompt constants for different use cases
 const PROMPT_ENHANCEMENT_PROMPTS = {
@@ -22,7 +35,7 @@ export async function enhancePrompt(
   const enhancementPrompt = PROMPT_ENHANCEMENT_PROMPTS[useCase];
 
   const { text } = await generateText({
-    model: 'x-ai/grok-4.1-fast',
+    model: enhancementLanguageModel(),
     prompt: `${enhancementPrompt}\n\n${prompt}`,
   });
 
@@ -57,7 +70,7 @@ export async function enhancePromptForJSONModels(
 
   // Use the NanoBanana Pro JSON enhancement system
   const { text } = await generateText({
-    model: 'x-ai/grok-4.1-fast',
+    model: enhancementLanguageModel(),
     prompt: `${NANO_BANANA_PRO_ENHANCEMENT_PROMPT}\n\nUser prompt: ${prompt}`,
   });
 

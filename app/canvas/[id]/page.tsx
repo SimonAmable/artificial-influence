@@ -14,6 +14,8 @@ import {
   type Connection,
   type Node,
   type Edge,
+  type NodeChange,
+  type EdgeChange,
   ReactFlowProvider,
   BackgroundVariant,
   Panel,
@@ -47,7 +49,11 @@ import {
   type GroupNodeData,
   type NodeOutput,
 } from "@/lib/canvas/types"
-import { fetchCanvas, saveCanvasClient } from "@/lib/canvas/database"
+import {
+  fetchCanvas,
+  saveCanvasClient,
+  type UpdateCanvasInput,
+} from "@/lib/canvas/database"
 import { generateAndUploadThumbnail } from "@/lib/canvas/thumbnails"
 import { executeWorkflow } from "@/lib/canvas/execution"
 import { instantiateWorkflow } from "@/lib/workflows/utils"
@@ -76,13 +82,159 @@ const edgeTypes = {
   "node-to-node": NodeToNodeEdge,
 }
 
+const AUTOSAVE_DELAY_MS = 1000
+
+type CanvasSaveStatus = "saved" | "dirty" | "saving" | "error"
+
+function isTransientCanvasUrl(value: string): boolean {
+  return value.startsWith("blob:") || value.startsWith("data:")
+}
+
+function sanitizeCanvasValue(value: unknown): unknown {
+  if (value == null) return value
+
+  if (typeof value === "function") {
+    return undefined
+  }
+
+  if (typeof File !== "undefined" && value instanceof File) {
+    return undefined
+  }
+
+  if (typeof Blob !== "undefined" && value instanceof Blob) {
+    return undefined
+  }
+
+  if (typeof value === "string") {
+    return isTransientCanvasUrl(value) ? null : value
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizeCanvasValue(item))
+      .filter((item) => item !== undefined)
+  }
+
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>
+    const sanitizedEntries = Object.entries(record).flatMap(([key, entryValue]) => {
+      if (
+        key === "onDataChange" ||
+        key === "onBackgroundUploadStart" ||
+        key === "onBackgroundUploadEnd"
+      ) {
+        return []
+      }
+
+      const sanitizedValue = sanitizeCanvasValue(entryValue)
+      return sanitizedValue === undefined ? [] : [[key, sanitizedValue] as const]
+    })
+
+    return Object.fromEntries(sanitizedEntries)
+  }
+
+  return value
+}
+
+function sanitizeNodeForPersistence(node: Node): Node {
+  const sanitizedData = sanitizeCanvasValue(node.data)
+  const data =
+    sanitizedData && typeof sanitizedData === "object" && !Array.isArray(sanitizedData)
+      ? { ...(sanitizedData as Record<string, unknown>) }
+      : {}
+
+  if (node.type === "upload" && typeof data.fileUrl === "string" && isTransientCanvasUrl(data.fileUrl)) {
+    data.fileUrl = null
+  }
+
+  const sanitizedNode: Node = {
+    id: node.id,
+    type: node.type,
+    position: node.position,
+    data,
+  }
+
+  if (node.width !== undefined) sanitizedNode.width = node.width
+  if (node.height !== undefined) sanitizedNode.height = node.height
+  if (node.parentId !== undefined) sanitizedNode.parentId = node.parentId
+  if (node.zIndex !== undefined) sanitizedNode.zIndex = node.zIndex
+  if (node.extent !== undefined) sanitizedNode.extent = node.extent
+  if (node.style !== undefined) {
+    sanitizedNode.style = (sanitizeCanvasValue(node.style) as Node["style"]) ?? node.style
+  }
+  if (node.className !== undefined) sanitizedNode.className = node.className
+
+  return sanitizedNode
+}
+
+function sanitizeEdgeForPersistence(edge: Edge): Edge {
+  const sanitizedEdge: Edge = {
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    type: edge.type || "node-to-node",
+  }
+
+  if (typeof edge.sourceHandle === "string" && edge.sourceHandle.trim().length > 0) {
+    sanitizedEdge.sourceHandle = edge.sourceHandle
+  }
+  if (typeof edge.targetHandle === "string" && edge.targetHandle.trim().length > 0) {
+    sanitizedEdge.targetHandle = edge.targetHandle
+  }
+  if (edge.animated !== undefined) sanitizedEdge.animated = edge.animated
+  if (edge.style !== undefined) {
+    sanitizedEdge.style = (sanitizeCanvasValue(edge.style) as Edge["style"]) ?? edge.style
+  }
+  if (edge.className !== undefined) sanitizedEdge.className = edge.className
+
+  const sanitizedLabel = sanitizeCanvasValue(edge.label)
+  if (sanitizedLabel !== undefined) {
+    sanitizedEdge.label = sanitizedLabel as Edge["label"]
+  }
+
+  const sanitizedLabelStyle = sanitizeCanvasValue(edge.labelStyle)
+  if (sanitizedLabelStyle !== undefined) {
+    sanitizedEdge.labelStyle = sanitizedLabelStyle as Edge["labelStyle"]
+  }
+
+  if (edge.labelShowBg !== undefined) sanitizedEdge.labelShowBg = edge.labelShowBg
+
+  const sanitizedLabelBgStyle = sanitizeCanvasValue(edge.labelBgStyle)
+  if (sanitizedLabelBgStyle !== undefined) {
+    sanitizedEdge.labelBgStyle = sanitizedLabelBgStyle as Edge["labelBgStyle"]
+  }
+
+  return sanitizedEdge
+}
+
+function buildCanvasSavePayload(
+  name: string,
+  nodes: Node[],
+  edges: Edge[]
+): UpdateCanvasInput {
+  return {
+    name,
+    nodes: nodes.map((node) => sanitizeNodeForPersistence(node)),
+    edges: edges.map((edge) => sanitizeEdgeForPersistence(edge)),
+  }
+}
+
+function countTransientUploadNodes(nodes: Node[]): number {
+  return nodes.reduce((count, node) => {
+    if (node.type !== "upload") return count
+    const nodeData = node.data as Partial<CanvasNodeData> | null
+    const url = typeof nodeData?.fileUrl === "string" ? nodeData.fileUrl : null
+    return url && isTransientCanvasUrl(url) ? count + 1 : count
+  }, 0)
+}
+
 function CanvasContent() {
   const params = useParams()
   const router = useRouter()
   const canvasId = params.id as string
   
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const [nodes, setNodes, applyNodesChange] = useNodesState<Node>([])
+  const [edges, setEdges, applyEdgesChange] = useEdgesState<Edge>([])
   const { screenToFlowPosition } = useReactFlow()
   const updateNodeInternals = useUpdateNodeInternals()
   const [workflowName, setWorkflowName] = React.useState("Canvas")
@@ -90,6 +242,8 @@ function CanvasContent() {
   const [executingGroupId, setExecutingGroupId] = React.useState<string | null>(null)
   const [isSaving, setIsSaving] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(true)
+  const [saveStatus, setSaveStatus] = React.useState<CanvasSaveStatus>("saved")
+  const [lastSavedAt, setLastSavedAt] = React.useState<string | null>(null)
   const [userId, setUserId] = React.useState<string>("")
   const [saveWorkflowDialogOpen, setSaveWorkflowDialogOpen] = React.useState(false)
   const [editWorkflowDialogOpen, setEditWorkflowDialogOpen] = React.useState(false)
@@ -109,6 +263,15 @@ function CanvasContent() {
   const pendingUploadsRef = React.useRef(0)
   const uploadWaitersRef = React.useRef<Array<() => void>>([])
   const uploadErrorsRef = React.useRef(0)
+  const saveTimeoutRef = React.useRef<number | null>(null)
+  const lastSavedSnapshotRef = React.useRef<string | null>(null)
+  const autosaveInFlightRef = React.useRef(false)
+  const queuedSnapshotRef = React.useRef<string | null>(null)
+  const queuedPayloadRef = React.useRef<UpdateCanvasInput | null>(null)
+  const saveRequestIdRef = React.useRef(0)
+  const latestAppliedSaveIdRef = React.useRef(0)
+  const pauseAutosaveRef = React.useRef(false)
+  const skipAutosaveOnceRef = React.useRef(false)
 
   const incrementPendingUploads = React.useCallback(() => {
     pendingUploadsRef.current += 1
@@ -211,6 +374,99 @@ function CanvasContent() {
       }
     },
     [handleNodeDataChange, incrementPendingUploads, decrementPendingUploads]
+  )
+
+  const persistCanvasSnapshot = React.useCallback(
+    async (snapshot: string, payload: UpdateCanvasInput) => {
+      if (snapshot === lastSavedSnapshotRef.current) {
+        setSaveStatus("saved")
+        return
+      }
+
+      if (autosaveInFlightRef.current) {
+        queuedSnapshotRef.current = snapshot
+        queuedPayloadRef.current = payload
+        return
+      }
+
+      autosaveInFlightRef.current = true
+      setSaveStatus("saving")
+      const requestId = ++saveRequestIdRef.current
+
+      try {
+        const savedCanvas = await saveCanvasClient(canvasId, payload)
+        if (requestId < latestAppliedSaveIdRef.current) {
+          return
+        }
+        latestAppliedSaveIdRef.current = requestId
+        lastSavedSnapshotRef.current = snapshot
+        setLastSavedAt(savedCanvas.updated_at)
+        setSaveStatus("saved")
+      } catch (error) {
+        console.error("Autosave error:", error)
+        setSaveStatus("error")
+      } finally {
+        autosaveInFlightRef.current = false
+
+        if (
+          queuedSnapshotRef.current &&
+          queuedPayloadRef.current &&
+          queuedSnapshotRef.current !== lastSavedSnapshotRef.current
+        ) {
+          const nextSnapshot = queuedSnapshotRef.current
+          const nextPayload = queuedPayloadRef.current
+          queuedSnapshotRef.current = null
+          queuedPayloadRef.current = null
+          void persistCanvasSnapshot(nextSnapshot, nextPayload)
+        }
+      }
+    },
+    [canvasId]
+  )
+
+  const handleNodesChange = React.useCallback(
+    (changes: NodeChange<Node>[]) => {
+      const selectionOnly =
+        changes.length > 0 && changes.every((change) => change.type === "select")
+      const dragging = changes.some(
+        (change) => change.type === "position" && change.dragging === true
+      )
+      const dragEnded = changes.some(
+        (change) => change.type === "position" && change.dragging === false
+      )
+      const resizing = changes.some(
+        (change) => change.type === "dimensions" && change.resizing === true
+      )
+      const resizeEnded = changes.some(
+        (change) => change.type === "dimensions" && change.resizing === false
+      )
+
+      if (selectionOnly) {
+        skipAutosaveOnceRef.current = true
+      } else {
+        if (dragging || resizing) {
+          pauseAutosaveRef.current = true
+        }
+
+        if (dragEnded || resizeEnded) {
+          pauseAutosaveRef.current = false
+        }
+      }
+
+      applyNodesChange(changes)
+    },
+    [applyNodesChange]
+  )
+
+  const handleEdgesChange = React.useCallback(
+    (changes: EdgeChange<Edge>[]) => {
+      if (changes.length > 0 && changes.every((change) => change.type === "select")) {
+        skipAutosaveOnceRef.current = true
+      }
+
+      applyEdgesChange(changes)
+    },
+    [applyEdgesChange]
   )
 
   // Load canvas on mount
@@ -318,6 +574,17 @@ function CanvasContent() {
           return max
         }, 0)
         nodeCounter.current = maxId
+        lastSavedSnapshotRef.current = JSON.stringify(
+          buildCanvasSavePayload(canvas.name, nodesWithCallbacks, edgesWithType)
+        )
+        queuedSnapshotRef.current = null
+        queuedPayloadRef.current = null
+        setLastSavedAt(canvas.updated_at)
+        setSaveStatus("saved")
+        saveRequestIdRef.current = 0
+        latestAppliedSaveIdRef.current = 0
+        pauseAutosaveRef.current = false
+        skipAutosaveOnceRef.current = false
         
       } catch (error) {
         console.error("Error loading canvas:", error)
@@ -331,14 +598,65 @@ function CanvasContent() {
     loadCanvas()
   }, [canvasId, router, attachNodeCallbacks, setNodes, setEdges, updateNodeInternals])
 
-  // Add beforeunload event listener to warn users before closing
   React.useEffect(() => {
+    if (isLoading || isSaving) return
+
+    if (pauseAutosaveRef.current) {
+      return
+    }
+
+    if (skipAutosaveOnceRef.current) {
+      skipAutosaveOnceRef.current = false
+      return
+    }
+
+    const payload = buildCanvasSavePayload(workflowName, nodes, edges)
+    const snapshot = JSON.stringify(payload)
+
+    if (snapshot === lastSavedSnapshotRef.current) {
+      if (!autosaveInFlightRef.current) {
+        setSaveStatus("saved")
+      }
+      return
+    }
+
+    setSaveStatus((currentStatus) =>
+      currentStatus === "saving" ? "saving" : "dirty"
+    )
+
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current)
+    }
+
+    saveTimeoutRef.current = window.setTimeout(() => {
+      void persistCanvasSnapshot(snapshot, payload)
+    }, AUTOSAVE_DELAY_MS)
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        window.clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [edges, isLoading, isSaving, nodes, persistCanvasSnapshot, workflowName])
+
+  React.useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        window.clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  // Warn users only when a change still hasn't been persisted.
+  React.useEffect(() => {
+    const shouldWarn =
+      saveStatus === "dirty" || saveStatus === "saving" || saveStatus === "error"
+
+    if (!shouldWarn) return
+
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Modern browsers require returnValue to be set
       e.preventDefault()
-      // Chrome requires returnValue to be set
       e.returnValue = ''
-      // Some browsers display this message, others show a generic message
       return ''
     }
 
@@ -347,7 +665,7 @@ function CanvasContent() {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
-  }, [])
+  }, [saveStatus])
 
   const addUploadNodesFromFiles = React.useCallback(
     (
@@ -990,6 +1308,10 @@ function CanvasContent() {
 
   // Save workflow to database
   const handleSave = React.useCallback(async () => {
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current)
+    }
+
     setIsSaving(true)
     try {
       uploadErrorsRef.current = 0
@@ -1010,42 +1332,26 @@ function CanvasContent() {
         return
       }
 
-      // Use React Flow's toObject to get properly serialized flow state
+      // Use the current React Flow snapshot, but persist only stable serializable data.
       const flow = reactFlowInstance.toObject()
-      
-      // Avoid persisting transient local URLs by clearing them during save.
-      // This keeps saving unblocked while uploads are still in progress.
-      let transientMediaCount = 0
-      const nodesForSave = flow.nodes.map((node) => {
-        if (node.type !== "upload") return node
-        const nodeData = node.data as Partial<CanvasNodeData> | null
-        const url = typeof nodeData?.fileUrl === "string" ? nodeData.fileUrl : null
-        const isTransientUrl = !!url && (url.startsWith("blob:") || url.startsWith("data:"))
-        if (!isTransientUrl) return node
+      const payload = buildCanvasSavePayload(workflowName, flow.nodes, flow.edges)
+      const transientMediaCount = countTransientUploadNodes(flow.nodes)
+      const requestId = ++saveRequestIdRef.current
 
-        transientMediaCount += 1
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            fileUrl: null,
-          },
-        }
-      })
-      
-      console.log('[handleSave] Flow from toObject:', {
-        nodesCount: flow.nodes.length,
-        edgesCount: flow.edges.length,
-        edges: flow.edges,
-      })
-      
       // Save canvas to database
-      await saveCanvasClient(canvasId, {
-        name: workflowName,
-        nodes: nodesForSave,
-        edges: flow.edges,
+      const savedCanvas = await saveCanvasClient(canvasId, {
+        ...payload,
         thumbnail_url: thumbnailUrl || undefined,
       })
+
+      if (requestId >= latestAppliedSaveIdRef.current) {
+        latestAppliedSaveIdRef.current = requestId
+        lastSavedSnapshotRef.current = JSON.stringify(payload)
+        queuedSnapshotRef.current = null
+        queuedPayloadRef.current = null
+        setLastSavedAt(savedCanvas.updated_at)
+        setSaveStatus("saved")
+      }
       
       if (transientMediaCount > 0) {
         toast.warning(
@@ -1055,11 +1361,12 @@ function CanvasContent() {
       toast.success("Canvas saved")
     } catch (error) {
       console.error("Save error:", error)
+      setSaveStatus("error")
       toast.error("Failed to save canvas")
     } finally {
       setIsSaving(false)
     }
-  }, [canvasId, workflowName, userId, reactFlowInstance, waitForUploads, setNodes])
+  }, [canvasId, reactFlowInstance, userId, waitForUploads, workflowName])
 
   const handleNodeExecutionStart = React.useCallback((nodeId: string) => {
     setNodes((nds) =>
@@ -1267,6 +1574,8 @@ function CanvasContent() {
         onExecute={handleExecute}
         isSaving={isSaving}
         isExecuting={isExecuting}
+        saveStatus={saveStatus}
+        lastSavedAt={lastSavedAt}
       />
       
       <div className="flex-1 relative h-full w-full" ref={canvasPaneRef}>
@@ -1291,8 +1600,8 @@ function CanvasContent() {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}

@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
 import type { MiniApp } from "@/lib/mini-apps/types"
 
 interface MiniAppsShowcaseSectionProps {
@@ -10,10 +11,13 @@ export function MiniAppsShowcaseSection({ miniApps }: MiniAppsShowcaseSectionPro
     return (
       <section className="w-full bg-background py-16 sm:py-24">
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="mx-auto max-w-2xl text-center">
+            <Badge
+              variant="secondary"
+              className="font-semibold uppercase tracking-[0.2em] text-muted-foreground"
+            >
               Mini Apps
-            </p>
+            </Badge>
             <h1 className="mt-3 text-3xl font-semibold text-foreground sm:text-4xl">
               Published creator apps
             </h1>
@@ -29,10 +33,13 @@ export function MiniAppsShowcaseSection({ miniApps }: MiniAppsShowcaseSectionPro
   return (
     <section className="w-full bg-background py-16 sm:py-24">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="mx-auto max-w-2xl text-center">
+          <Badge
+            variant="secondary"
+            className="font-semibold uppercase tracking-[0.2em] text-muted-foreground"
+          >
             Mini Apps
-          </p>
+          </Badge>
           <h1 className="mt-3 text-3xl font-semibold text-foreground sm:text-4xl">
             Published creator apps
           </h1>
@@ -61,14 +68,14 @@ export function MiniAppsShowcaseSection({ miniApps }: MiniAppsShowcaseSectionPro
                   )}
                 </div>
 
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/25 to-transparent" />
+                <div
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-linear-to-t from-black/75 from-35% via-black/45 to-transparent"
+                  aria-hidden
+                />
 
                 <div className="absolute bottom-0 left-0 right-0 p-8 sm:p-12">
                   <div className="max-w-2xl">
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">
-                      Mini App
-                    </p>
-                    <h2 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
+                    <h2 className="text-3xl font-semibold text-white sm:text-4xl">
                       {miniApp.name}
                     </h2>
                     {miniApp.description ? (
