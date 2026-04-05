@@ -51,7 +51,7 @@ const monthlyPlans = [
     price: 100.0,
     priceId: 'price_1SrXZDK2MiVk67Bi0Y57icpS', // TEST MODE — legacy test price; update in Stripe dashboard + here to match $100
     interval: 'month',
-    credits: 1750,
+    credits: 3000,
     features: [
       {
         name: 'Access to all AI models',

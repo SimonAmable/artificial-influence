@@ -81,7 +81,7 @@ export const NANO_BANANA_2_META: ModelMetadata = {
   type: 'image',
   provider: 'replicate',
   is_active: true,
-  model_cost: 2.0,
+  model_cost: 4.0,
   supports_reference_image: true,
   supports_reference_video: false,
   aspect_ratios: ['match_input_image', '1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9', '1:4', '4:1', '1:8', '8:1'],

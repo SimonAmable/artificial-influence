@@ -93,7 +93,7 @@ SELECT cron.schedule(
 
 - **Basic**: 100 credits/month
 - **Pro**: 500 credits/month
-- **Creator**: 1750 credits/month
+- **Max**: 3000 credits/month
 
 Applies to both monthly and yearly subscriptions (yearly gets monthly credits granted monthly).
 

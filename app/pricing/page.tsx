@@ -27,7 +27,7 @@ type PricingPlan = {
   priceNote?: string;
 };
 
-// Stripe live Price IDs — Pro / Max only (Max monthly credits match former Creator tier)
+// Stripe live Price IDs — Pro / Max only
 const monthlyPlans: PricingPlan[] = [
   {
     id: 'pro-monthly',
@@ -70,7 +70,7 @@ const monthlyPlans: PricingPlan[] = [
     priceId: 'price_1TIyQeGYRyfMJZ0Cg7gwAPJE',
     interval: 'month' as const,
     currency: 'USD' as const,
-    credits: 1750,
+    credits: 3000,
     features: [
       {
         name: 'Access to all AI models',
@@ -144,7 +144,7 @@ const yearlyPlans: PricingPlan[] = [
     interval: 'year' as const,
     currency: 'USD' as const,
     savings: 'Save 50%',
-    credits: 1750,
+    credits: 3000,
     features: [
       {
         name: 'Access to all AI models',
@@ -176,6 +176,12 @@ const yearlyPlans: PricingPlan[] = [
 
 const ENTERPRISE_CONTACT_EMAIL =
   process.env.NEXT_PUBLIC_ENTERPRISE_CONTACT_EMAIL ?? 'support@unican.ai';
+
+function formatPlanCurrency(amount: number, currency: 'USD' | 'CAD') {
+  const prefix = currency === 'CAD' ? 'CA$' : '$';
+  const body = amount % 1 === 0 ? amount.toFixed(0) : amount.toFixed(2);
+  return `${prefix}${body}`;
+}
 
 const freeFeatures: { name: string; info: string }[] = [
   {
@@ -366,7 +372,9 @@ export default function PricingPage() {
             <PlanFeatureList features={freeFeatures} />
           </div>
 
-          {pricingPlans.map((plan) => (
+          {pricingPlans.map((plan) => {
+            const listMonthly = monthlyPlans.find((p) => p.name === plan.name)?.price;
+            return (
             <div
               key={plan.id}
               className={`relative bg-card rounded-lg border-2 p-8 shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full ${
@@ -385,13 +393,41 @@ export default function PricingPage() {
                 <h2 className="text-2xl font-bold mb-2">{plan.name}</h2>
                 <p className="text-muted-foreground mb-4">{plan.description}</p>
                 <div className="flex flex-col items-center gap-1">
-                  <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-5xl font-bold">
-                      {plan.currency === 'CAD' ? 'CA$' : '$'}
-                      {plan.price % 1 === 0 ? plan.price.toFixed(0) : plan.price.toFixed(2)}
-                    </span>
-                    <span className="text-muted-foreground">/{plan.interval}</span>
-                  </div>
+                  {plan.interval === 'year' && listMonthly != null ? (
+                    <div
+                      className="flex flex-col items-center gap-1 w-full"
+                      aria-label={`${formatPlanCurrency(plan.price / 12, plan.currency)} per month with annual billing, compared to ${formatPlanCurrency(listMonthly, plan.currency)} per month on the monthly plan`}
+                    >
+                      <div className="flex items-baseline justify-center gap-2 flex-wrap">
+                        <span className="text-3xl sm:text-4xl font-bold text-primary line-through decoration-2 decoration-primary">
+                          {formatPlanCurrency(listMonthly, plan.currency)}
+                        </span>
+                        <span className="text-5xl font-bold tracking-tight text-foreground">
+                          {formatPlanCurrency(plan.price / 12, plan.currency)}
+                        </span>
+                        <span className="text-muted-foreground text-base font-medium">
+                          /month
+                        </span>
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {formatPlanCurrency(plan.price, plan.currency)} billed annually
+                      </span>
+                    </div>
+                  ) : plan.interval === 'year' ? (
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className="text-5xl font-bold">
+                        {formatPlanCurrency(plan.price, plan.currency)}
+                      </span>
+                      <span className="text-muted-foreground">/year</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className="text-5xl font-bold">
+                        {formatPlanCurrency(plan.price, plan.currency)}
+                      </span>
+                      <span className="text-muted-foreground">/{plan.interval}</span>
+                    </div>
+                  )}
                   {plan.priceNote ? (
                     <span className="text-xs text-muted-foreground">{plan.priceNote}</span>
                   ) : null}
@@ -452,19 +488,33 @@ export default function PricingPage() {
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors flex flex-col items-center gap-1"
                       aria-label="Credit usage information"
                     >
-                      <span>
-                        ~{plan.credits} images or ~{Math.floor(plan.credits / 20)} videos
-                      </span>
-                      <Info className="w-3 h-3" />
+                      <div className="flex items-start justify-center gap-1">
+                        <span className="flex flex-col items-center gap-0.5 text-center leading-snug">
+                          <span>
+                            {`~${Math.floor(plan.credits / 4)}–${Math.floor(plan.credits / 2)} Nano Banana images`}
+                          </span>
+                          <span>
+                            {`~${Math.floor(plan.credits / 20)} Kling 3.0 motion control videos`}
+                          </span>
+                        </span>
+                        <Info className="w-3 h-3 shrink-0 mt-0.5" />
+                      </div>
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="text-sm space-y-1">
-                      <p>1 credit = 1 image generation</p>
-                      <p>20 credits = 1 video generation</p>
+                  <TooltipContent className="max-w-sm">
+                    <div className="text-sm space-y-2">
+                      <p className="font-medium">Example credit costs</p>
+                      <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+                        <li>2 credits = 1 Google Nano Banana image</li>
+                        <li>4 credits = 1 Nano Banana 2 or Nano Banana Pro image</li>
+                        <li>20 credits = 1 Kling 3.0 motion control video</li>
+                      </ul>
+                      <p className="text-xs text-muted-foreground">
+                        Totals above use these examples; other models use different amounts.
+                      </p>
                     </div>
                   </TooltipContent>
                 </Tooltip>
@@ -472,7 +522,8 @@ export default function PricingPage() {
 
               <PlanFeatureList features={plan.features} />
             </div>
-          ))}
+            );
+          })}
 
           {/* Enterprise */}
           <div className="relative bg-card rounded-lg border-2 border-border p-8 shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full">

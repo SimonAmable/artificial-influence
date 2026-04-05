@@ -37,7 +37,7 @@ INSERT INTO public.models (
   'image',
   'replicate',
   true,
-  0.002,
+  4,
   '{
     "parameters": [
       {

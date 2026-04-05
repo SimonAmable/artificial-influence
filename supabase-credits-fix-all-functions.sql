@@ -19,15 +19,15 @@ DECLARE
   credits_map JSONB := '{
     "price_1SrXYkK2MiVk67BiHuwPn21M": 100,
     "price_1SrXZ0K2MiVk67BiQY0XpX7z": 500,
-    "price_1SrXZDK2MiVk67Bi0Y57icpS": 1750,
+    "price_1SrXZDK2MiVk67Bi0Y57icpS": 3000,
     "price_1SrWkoGYRyfMJZ0CCuVwjLKc": 100,
     "price_1SrWl8GYRyfMJZ0CeXU9f7LE": 500,
-    "price_1SrWlMGYRyfMJZ0CTNcrZ1gS": 1750,
-    "price_1TIyQeGYRyfMJZ0Cg7gwAPJE": 1750,
-    "price_1TIySoGYRyfMJZ0CKCD93aWh": 1750,
+    "price_1SrWlMGYRyfMJZ0CTNcrZ1gS": 3000,
+    "price_1TIyQeGYRyfMJZ0Cg7gwAPJE": 3000,
+    "price_1TIySoGYRyfMJZ0CKCD93aWh": 3000,
     "price_1SrWlzGYRyfMJZ0CICD6aj5j": 100,
     "price_1SrWmVGYRyfMJZ0CyKUeZ5T9": 500,
-    "price_1SrWmtGYRyfMJZ0CzG1ac2Ra": 1750
+    "price_1SrWmtGYRyfMJZ0CzG1ac2Ra": 3000
   }'::JSONB;
 BEGIN
   RETURN COALESCE((credits_map->>price_id)::INTEGER, 0);

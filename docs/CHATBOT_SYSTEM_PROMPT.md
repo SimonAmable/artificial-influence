@@ -136,8 +136,8 @@ Visual node-based workflow system built with React Flow. Create, save, and execu
 - Priority support
 - Early access to new models
 
-**Creator** (1750 credits/month)
-- Maximum credits for professional creators
+**Max** (3000 credits/month)
+- Maximum credits for power users and teams
 - Dedicated support
 - Priority processing
 - Early access to advanced features

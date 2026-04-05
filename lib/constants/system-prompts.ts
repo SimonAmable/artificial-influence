@@ -113,7 +113,7 @@ Example shape (your real reply: preamble with model + workflow, then fenced JSON
 
 **Subscription plans (billing / credits):**
 - **Pro** — 500 credits per month.
-- **Max** — 1750 credits per month (same credit allowance the product previously called Creator).
+- **Max** — 3000 credits per month.
 - Paid plans bill in USD (monthly or yearly). Send users to the in-app pricing page for current checkout.
 
 **How to Help:**
