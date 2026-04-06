@@ -356,7 +356,7 @@ async function executeNode(
     }
 
     case "audio": {
-      const text = inputs.text || (data.text as string) || ""
+      const text = joinPromptParts([inputs.text, data.text])
       if (!text.trim()) {
         throw new Error("Audio generation requires text input")
       }

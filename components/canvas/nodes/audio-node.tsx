@@ -1,7 +1,16 @@
 "use client"
 
 import * as React from "react"
-import { Handle, Position, NodeToolbar, type NodeProps, useStore } from "@xyflow/react"
+import {
+  Handle,
+  Position,
+  NodeToolbar,
+  type NodeProps,
+  useStore,
+  useNodes,
+  useEdges,
+  getIncomers,
+} from "@xyflow/react"
 import {
   CircleNotch,
   Play,
@@ -14,7 +23,7 @@ import {
   FloppyDisk,
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
-import type { AudioNodeData } from "@/lib/canvas/types"
+import type { AudioNodeData, TextNodeData } from "@/lib/canvas/types"
 import { cn } from "@/lib/utils"
 import {
   Select,
@@ -48,6 +57,38 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
     isConnecting: state.connection.inProgress,
     connectingFromId: state.connection.fromHandle?.nodeId,
   }))
+  const nodes = useNodes()
+  const edges = useEdges()
+
+  const { connectedPrompt } = React.useMemo(() => {
+    const currentNode = nodes.find((n) => n.id === id)
+    if (!currentNode) return { connectedPrompt: "" }
+
+    const incomingNodes = getIncomers(currentNode, nodes, edges)
+    const textNodes = incomingNodes.filter((node) => node.type === "text")
+    const combinedText = textNodes
+      .map((node) => (node.data as TextNodeData).text || "")
+      .filter((text) => text.trim())
+      .join(" ")
+
+    return { connectedPrompt: combinedText }
+  }, [edges, id, nodes])
+
+  React.useEffect(() => {
+    if (connectedPrompt !== (nodeData.connectedPrompt || "")) {
+      nodeData.onDataChange?.(id, { connectedPrompt })
+    }
+  }, [connectedPrompt, nodeData, id])
+
+  const fullSpeechText = React.useMemo(
+    () =>
+      [connectedPrompt, nodeData.text || ""]
+        .filter((p) => p.trim())
+        .join(" ")
+        .trim(),
+    [connectedPrompt, nodeData.text]
+  )
+
   const [isHovered, setIsHovered] = React.useState(false)
   const [isEditingTitle, setIsEditingTitle] = React.useState(false)
   const [title, setTitle] = React.useState(nodeData.label || "Audio")
@@ -131,8 +172,10 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
   }
 
   const handleGenerate = async () => {
-    if (!nodeData.text.trim()) {
-      nodeData.onDataChange?.(id, { error: "Enter text to generate audio" })
+    if (!fullSpeechText) {
+      nodeData.onDataChange?.(id, {
+        error: "Enter text or connect a Text node with script to generate audio",
+      })
       return
     }
 
@@ -148,7 +191,7 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: nodeData.text.trim(),
+          text: fullSpeechText,
           voice: nodeData.voice,
           model: nodeData.model || DEFAULT_INWORLD_TTS_MODEL,
         }),
@@ -269,7 +312,7 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
           ) : (
             <div className="w-full h-full px-4 flex items-center justify-center">
               <p className="text-xs text-zinc-500 text-center leading-relaxed max-w-[220px]">
-                Enter the text you want spoken, search an Inworld voice, choose a model, then generate audio.
+                Type script below or connect a Text node, pick an Inworld voice and model, then generate.
               </p>
             </div>
           )}
@@ -323,10 +366,20 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
         <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl overflow-hidden nopan nodrag">
           {/* Text input area */}
           <div className="p-2.5 space-y-2">
+            {connectedPrompt.trim() ? (
+              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 [.react-flow.light_&]:border-zinc-300/90 [.react-flow.light_&]:bg-zinc-100/95">
+                <span className="text-xs text-zinc-500 [.react-flow.light_&]:text-zinc-600">
+                  From connections:{" "}
+                </span>
+                <span className="text-xs text-zinc-300 line-clamp-3 [.react-flow.light_&]:text-zinc-800">
+                  {connectedPrompt}
+                </span>
+              </div>
+            ) : null}
             <textarea
             value={nodeData.text || ""}
             onChange={(e) => nodeData.onDataChange?.(id, { text: e.target.value })}
-            placeholder="Enter text to convert to speech..."
+            placeholder="Additional copy (optional if a Text node is connected)…"
             rows={3}
             className={cn(
                 "w-full bg-transparent border-0 text-sm text-zinc-200 placeholder:text-zinc-600 resize-none outline-none",
@@ -397,7 +450,7 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
 
           <Button
             onClick={handleGenerate}
-            disabled={nodeData.isGenerating || !nodeData.voice || !nodeData.text.trim()}
+            disabled={nodeData.isGenerating || !nodeData.voice || !fullSpeechText}
             size="sm"
             className="h-8 w-8 px-0"
             variant={nodeData.isGenerating ? "secondary" : "default"}

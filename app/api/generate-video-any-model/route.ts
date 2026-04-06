@@ -259,9 +259,106 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[generate-video-test] Generated video URL:', generatedVideoUrl);
+    console.log('[generate-video-test] Generated video URL (Replicate):', generatedVideoUrl);
 
-    // Deduct credits after successful generation
+    // Persist to Supabase — Replicate delivery URLs expire; canvas save/load needs a stable URL (same as generate-image / generate-video).
+    console.log('[generate-video-test] Downloading generated video from Replicate...');
+    const downloadStartTime = Date.now();
+    const videoResponse = await fetch(generatedVideoUrl);
+
+    if (!videoResponse.ok) {
+      console.error(
+        '[generate-video-test] Failed to download video:',
+        videoResponse.status,
+        videoResponse.statusText
+      );
+      return NextResponse.json(
+        { error: 'Failed to download generated video from Replicate' },
+        { status: 500 }
+      );
+    }
+
+    const videoBlob = await videoResponse.blob();
+    const videoArrayBuffer = await videoBlob.arrayBuffer();
+    const videoBuffer = Buffer.from(videoArrayBuffer);
+    const downloadTime = Date.now() - downloadStartTime;
+    console.log(
+      '[generate-video-test] ✓ Video downloaded in',
+      downloadTime,
+      'ms, size:',
+      videoBuffer.length,
+      'bytes'
+    );
+
+    const contentType =
+      videoBlob.type && videoBlob.type.startsWith('video/')
+        ? videoBlob.type
+        : videoResponse.headers.get('content-type')?.split(';')[0]?.trim() || 'video/mp4';
+    const ext =
+      contentType.includes('webm') ? 'webm' : contentType.includes('quicktime') ? 'mov' : 'mp4';
+
+    console.log('[generate-video-test] Uploading generated video to Supabase...');
+    const uploadStartTime = Date.now();
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(7);
+    const generatedVideoFilename = `${timestamp}-${randomStr}.${ext}`;
+    const generatedVideoStoragePath = `${user.id}/video-generations/${generatedVideoFilename}`;
+
+    const { error: generatedVideoUploadError } = await supabase.storage
+      .from('public-bucket')
+      .upload(generatedVideoStoragePath, videoBuffer, {
+        contentType,
+        upsert: false,
+      });
+
+    if (generatedVideoUploadError) {
+      console.error('[generate-video-test] Error uploading generated video:', generatedVideoUploadError);
+      return NextResponse.json(
+        {
+          error: 'Failed to upload generated video',
+          message: generatedVideoUploadError.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    const { data: generatedVideoUrlData } = supabase.storage
+      .from('public-bucket')
+      .getPublicUrl(generatedVideoStoragePath);
+
+    const finalVideoUrl = generatedVideoUrlData.publicUrl;
+    const uploadTime = Date.now() - uploadStartTime;
+    console.log('[generate-video-test] ✓ Generated video uploaded in', uploadTime, 'ms');
+    console.log('[generate-video-test] Final video URL:', finalVideoUrl);
+
+    const saveGenerationToDatabase = async () => {
+      try {
+        const tool = typeof body.tool === 'string' ? body.tool : null;
+        const generationData = {
+          user_id: user.id,
+          prompt: typeof prompt === 'string' ? prompt : null,
+          supabase_storage_path: generatedVideoStoragePath,
+          reference_images_supabase_storage_path: null,
+          reference_videos_supabase_storage_path: null,
+          model,
+          type: 'video' as const,
+          is_public: true,
+          tool,
+        };
+
+        const { error: saveError } = await supabase.from('generations').insert(generationData);
+
+        if (saveError) {
+          console.error('[generate-video-test] Error saving generation to database:', saveError);
+        }
+      } catch (e) {
+        console.error('[generate-video-test] Exception saving generation to database:', e);
+      }
+    };
+
+    await saveGenerationToDatabase();
+
+    // Deduct credits after successful upload (aligned with image route: charge only when we have a durable asset).
     await deductUserCredits(user.id, requiredCredits);
     console.log('[generate-video-test] ✓ Credits deducted:', requiredCredits);
 
@@ -269,7 +366,11 @@ export async function POST(request: NextRequest) {
     console.log('[generate-video-test] ✓ Request completed in', totalTime, 'ms');
 
     return NextResponse.json({
-      videoUrl: generatedVideoUrl,
+      video: {
+        url: finalVideoUrl,
+        mimeType: contentType,
+      },
+      videoUrl: finalVideoUrl,
       model,
       creditsUsed: requiredCredits,
     });

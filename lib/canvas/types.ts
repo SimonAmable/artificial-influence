@@ -71,6 +71,8 @@ export interface TextNodeData extends Record<string, unknown> {
 
 export interface AudioNodeData extends Record<string, unknown> {
   label: string
+  /** Text from connected text nodes (toolbar preview, merged into TTS input). */
+  connectedPrompt: string
   text: string
   voice: string
   model: string
@@ -178,6 +180,7 @@ export function createTextNodeData(): TextNodeData {
 export function createAudioNodeData(): AudioNodeData {
   return {
     label: "Audio Generation",
+    connectedPrompt: "",
     text: "",
     voice: DEFAULT_INWORLD_VOICE_ID,
     model: DEFAULT_INWORLD_TTS_MODEL,
