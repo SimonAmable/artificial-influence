@@ -400,8 +400,8 @@ export default function PricingPage() {
                 <div className="flex flex-col items-center gap-1">
                   {plan.interval === 'year' && listMonthly != null ? (
                     <div
-                      className="flex flex-col items-center gap-1 w-full"
-                      aria-label={`${formatPlanCurrency(plan.price / 12, plan.currency)} per month with annual billing, compared to ${formatPlanCurrency(listMonthly, plan.currency)} per month on the monthly plan`}
+                      className="flex flex-col items-center gap-2 w-full"
+                      aria-label={`${formatPlanCurrency(plan.price / 12, plan.currency)} per month, billed annually (${formatPlanCurrency(plan.price, plan.currency)} per year), compared to ${formatPlanCurrency(listMonthly, plan.currency)} per month on the monthly plan`}
                     >
                       <div className="flex items-baseline justify-center gap-2 flex-wrap">
                         <span className="text-3xl sm:text-4xl font-bold text-primary line-through decoration-2 decoration-primary">
@@ -413,10 +413,10 @@ export default function PricingPage() {
                         <span className="text-muted-foreground text-base font-medium">
                           /month
                         </span>
+                        <span className="text-muted-foreground text-base font-medium">
+                          , billed annually
+                        </span>
                       </div>
-                      <span className="text-sm text-muted-foreground">
-                        {formatPlanCurrency(plan.price, plan.currency)} billed annually
-                      </span>
                     </div>
                   ) : plan.interval === 'year' ? (
                     <div className="flex items-baseline justify-center gap-1">
@@ -437,7 +437,7 @@ export default function PricingPage() {
                     <span className="text-xs text-muted-foreground">{plan.priceNote}</span>
                   ) : null}
                   {plan.savings ? (
-                    <span className="text-sm text-green-600 dark:text-green-400 font-semibold">
+                    <span className="inline-flex items-center rounded-full border border-green-600/25 bg-green-600/10 px-3 py-1 text-xs font-semibold text-green-700 dark:border-green-400/30 dark:bg-green-400/10 dark:text-green-400">
                       {plan.savings}
                     </span>
                   ) : null}
