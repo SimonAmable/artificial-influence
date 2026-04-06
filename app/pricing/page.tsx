@@ -411,10 +411,7 @@ export default function PricingPage() {
                           {formatPlanCurrency(plan.price / 12, plan.currency)}
                         </span>
                         <span className="text-muted-foreground text-base font-medium">
-                          /month
-                        </span>
-                        <span className="text-muted-foreground text-base font-medium">
-                          , billed annually
+                          /month, billed annually
                         </span>
                       </div>
                     </div>
