@@ -553,7 +553,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
             Redo
           </Button>
           <Button variant="outline" asChild>
-            <Link href={`/agent-chat?projectId=${project.id}`}>
+            <Link href={`/chat?projectId=${project.id}`}>
               <Sparkles className="mr-2 h-4 w-4" />
               Agent Chat
             </Link>

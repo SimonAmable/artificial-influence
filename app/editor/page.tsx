@@ -175,7 +175,7 @@ export default function EditorProjectsPage() {
                         <Link href={`/editor/${project.id}`}>Open Editor</Link>
                       </Button>
                       <Button variant="outline" asChild>
-                        <Link href={`/agent-chat?projectId=${project.id}`}>Open Agent</Link>
+                        <Link href={`/chat?projectId=${project.id}`}>Open Agent</Link>
                       </Button>
                       <Button
                         variant="outline"

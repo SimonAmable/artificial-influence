@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { inferStoragePathFromUrl, normalizeTags } from "@/lib/assets/library"
+import { ASSET_CATEGORIES, inferStoragePathFromUrl, normalizeTags } from "@/lib/assets/library"
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
 
 function mapAssetRow(row: Record<string, unknown>) {
@@ -47,7 +47,7 @@ export async function PATCH(
     if (!["image", "video", "audio"].includes(assetType)) {
       return NextResponse.json({ error: "Invalid asset type" }, { status: 400 })
     }
-    if (!["character", "scene", "texture", "motion", "audio"].includes(category)) {
+    if (!ASSET_CATEGORIES.includes(category)) {
       return NextResponse.json({ error: "Invalid category" }, { status: 400 })
     }
     if (!["private", "public"].includes(visibility)) {

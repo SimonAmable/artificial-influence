@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   ImageIcon,
   VideoIcon,
@@ -12,17 +13,59 @@ import {
   PencilSimpleIcon,
   ArrowsLeftRight,
   FlowArrow,
+  Palette,
 } from "@phosphor-icons/react"
 
 const toolButtons = [
-  { label: "Image Studio", href: "/image", icon: ImageIcon },
-  { label: "Video Studio", href: "/video", icon: VideoIcon },
-  { label: "Motion Copy", href: "/motion-copy", icon: PencilSimpleIcon },
-  { label: "Lip Sync", href: "/lipsync", icon: MicrophoneIcon },
-  { label: "Image Editing", href: "/inpaint", icon: PaintBrushIcon },
-  { label: "Character Swap", href: "/character-swap", icon: ArrowsLeftRight },
-  { label: "Workflow", href: "/canvases", icon: FlowArrow },
-]
+  {
+    label: "Brand kit",
+    href: "/brand",
+    icon: Palette,
+    hint: "Logos, colors, type, and voice for consistent AI output.",
+  },
+  {
+    label: "Motion Copy",
+    href: "/motion-copy",
+    icon: FlowArrow,
+    hint: "Copy motion from ads or dance clips onto your character—animate a still with prompts.",
+  },
+  {
+    label: "Lip Sync",
+    href: "/lipsync",
+    icon: MicrophoneIcon,
+    hint: "Sync speech to a face in an image or clip.",
+  },
+  {
+    label: "Image Studio",
+    href: "/image",
+    icon: ImageIcon,
+    hint: "Generate images from text and references.",
+  },
+  {
+    label: "Video Studio",
+    href: "/video",
+    icon: VideoIcon,
+    hint: "Text or image to video generation.",
+  },
+  {
+    label: "Image Editing",
+    href: "/inpaint",
+    icon: PaintBrushIcon,
+    hint: "Edit regions of an image with prompts.",
+  },
+  {
+    label: "Character Swap",
+    href: "/character-swap",
+    icon: ArrowsLeftRight,
+    hint: "Swap a subject while keeping the scene.",
+  },
+  {
+    label: "Workflow",
+    href: "/canvases",
+    icon: PencilSimpleIcon,
+    hint: "Node-based pipelines and canvas projects.",
+  },
+] as const
 
 export function FeatureButtonGrid() {
   const router = useRouter()
@@ -58,7 +101,6 @@ export function FeatureButtonGrid() {
 
   return (
     <div className="w-full space-y-6 rounded-[24px]">
-      {/* Header: Title + Create New Project */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-semibold">Tools</h2>
         <Button
@@ -73,23 +115,29 @@ export function FeatureButtonGrid() {
         </Button>
       </div>
 
-      {/* Tool buttons: icon left, label right; fill row width responsively */}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
         {toolButtons.map((tool) => {
           const Icon = tool.icon
           return (
-            <Link
-              key={tool.href}
-              href={tool.href}
-              className="flex min-w-0 items-center gap-3 rounded-[24px] px-4 py-3 transition-shadow duration-200 hover:shadow-md"
-            >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[24px] bg-muted text-foreground shadow-sm">
-                <Icon size={22} weight="duotone" className="shrink-0" />
-              </div>
-              <span className="font-semibold text-sm text-foreground text-center flex-1 min-w-0">
-                {tool.label}
-              </span>
-            </Link>
+            <Tooltip key={tool.href}>
+              <TooltipTrigger asChild>
+                <Link
+                  href={tool.href}
+                  title={tool.hint}
+                  className="flex min-w-0 items-center gap-3 rounded-[24px] px-4 py-3 outline-none transition-shadow duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[24px] bg-muted text-foreground shadow-sm">
+                    <Icon size={22} weight="duotone" className="shrink-0" />
+                  </div>
+                  <span className="min-w-0 flex-1 text-center text-sm font-semibold text-foreground">
+                    {tool.label}
+                  </span>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[240px] text-left leading-snug">
+                {tool.hint}
+              </TooltipContent>
+            </Tooltip>
           )
         })}
       </div>

@@ -15,7 +15,6 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation"
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message"
-import { ToolExecutionList } from "@/components/ai-elements/tool-execution"
 import { EditorComposition } from "@/components/editor/editor-composition"
 import { fetchEditorProject, fetchEditorProjects } from "@/lib/editor/database"
 import { dispatchEditorRuntimeContext } from "@/lib/editor/runtime"
@@ -38,8 +37,6 @@ export function AgentChatWorkspace({
     sendAgentMessage,
     clearAgentMessages,
     status,
-    commandHistory,
-    pendingAction,
   } = useProjectAgentChat({
     projectId,
     selectionItemIds: [],
@@ -51,7 +48,7 @@ export function AgentChatWorkspace({
       .then((nextProjects) => {
         setProjects(nextProjects)
         if (!projectId && nextProjects.length === 1) {
-          router.replace(`/agent-chat?projectId=${nextProjects[0].id}`)
+          router.replace(`/chat?projectId=${nextProjects[0].id}`)
         }
       })
       .catch(console.error)
@@ -129,7 +126,7 @@ export function AgentChatWorkspace({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => router.push(`/agent-chat?projectId=${item.id}`)}
+                  onClick={() => router.push(`/chat?projectId=${item.id}`)}
                   className={`w-full rounded-lg border p-3 text-left ${
                     item.id === projectId ? "border-primary bg-primary/5" : "border-border"
                   }`}
@@ -150,7 +147,7 @@ export function AgentChatWorkspace({
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <Card className="min-h-[70vh]">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Agent Thread</CardTitle>
+              <CardTitle>Project Chat</CardTitle>
               <Button variant="outline" size="sm" onClick={() => void clearAgentMessages()}>
                 <NotePencil className="mr-2 h-4 w-4" />
                 Clear
@@ -167,11 +164,11 @@ export function AgentChatWorkspace({
                 >
                   {messages.length === 0 ? (
                     <ConversationEmptyState
-                      title={projectId ? "Start directing the timeline" : "Pick a project"}
+                      title={projectId ? "Start a project conversation" : "Pick a project"}
                       description={
                         projectId
-                          ? "Ask the agent to add a clip, add text, split it, move it, change speed, and apply a transition in one request."
-                          : "Choose a project to start a project-scoped agent thread."
+                          ? "Ask questions about the timeline, get editing suggestions, or talk through what to change next."
+                          : "Choose a project to start a project-scoped chat."
                       }
                     />
                   ) : (
@@ -192,16 +189,6 @@ export function AgentChatWorkspace({
                       </Message>
                     ))
                   )}
-
-                  {pendingAction ? (
-                    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                      Pending confirmation: {pendingAction.label}
-                    </div>
-                  ) : null}
-
-                  {commandHistory.length > 0 ? (
-                    <ToolExecutionList entries={commandHistory.slice(-5).reverse()} />
-                  ) : null}
                 </ConversationContent>
                 <ConversationScrollButton />
               </Conversation>
@@ -216,7 +203,7 @@ export function AgentChatWorkspace({
                   className="w-full rounded-xl border border-input bg-background px-4 py-3"
                   placeholder={
                     projectId
-                      ? 'Add this clip, split it, move it to 3 seconds, set it to 1.5x, and crossfade it...'
+                      ? "Ask about the edit, the structure, or what to change next..."
                       : "Select a project first..."
                   }
                 />
@@ -279,7 +266,7 @@ export function AgentChatWorkspace({
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Choose a project to show its preview and bind the agent thread.
+                  Choose a project to show its preview and bind the chat thread.
                 </p>
               )}
             </CardContent>

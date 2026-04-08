@@ -1,13 +1,22 @@
 "use client"
 
 import * as React from "react"
-import { useSearchParams } from "next/navigation"
-import { AgentChatWorkspace } from "@/components/editor/agent-chat-workspace"
+import { useRouter, useSearchParams } from "next/navigation"
 
-function AgentChatPageContent() {
+function AgentChatRedirectContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const projectId = searchParams.get("projectId")
-  return <AgentChatWorkspace projectId={projectId} />
+
+  React.useEffect(() => {
+    router.replace(projectId ? `/chat?projectId=${encodeURIComponent(projectId)}` : "/chat")
+  }, [projectId, router])
+
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
+      Redirecting to chat...
+    </div>
+  )
 }
 
 export default function AgentChatPage() {
@@ -15,11 +24,11 @@ export default function AgentChatPage() {
     <React.Suspense
       fallback={
         <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-          Loading…
+          Redirecting to chat...
         </div>
       }
     >
-      <AgentChatPageContent />
+      <AgentChatRedirectContent />
     </React.Suspense>
   )
 }

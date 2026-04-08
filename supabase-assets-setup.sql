@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS public.assets (
   title TEXT NOT NULL,
   description TEXT NULL,
   asset_type TEXT NOT NULL CHECK (asset_type IN ('image', 'video', 'audio')),
-  category TEXT NOT NULL CHECK (category IN ('character', 'scene', 'texture', 'motion', 'audio')),
+  category TEXT NOT NULL CHECK (category IN ('character', 'scene', 'texture', 'thumbnails', 'motion', 'audio', 'shorts', 'product')),
   visibility TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private', 'public')),
   tags TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
   asset_url TEXT NOT NULL,

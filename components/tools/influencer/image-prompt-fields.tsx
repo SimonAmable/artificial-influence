@@ -2,10 +2,16 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
+import type { AssetType } from "@/lib/assets/types"
+import { CommandTextarea } from "@/components/commands/command-textarea"
 
 export interface ImagePromptFieldsProps {
   promptValue: string
   onPromptChange: (value: string) => void
+  /** @-reference chips (merged into prompt on generate) */
+  attachedRefs?: AttachedRef[]
+  onRefsChange?: (refs: AttachedRef[]) => void
   /** Optional read-only prompt from connected text nodes (toolbar/canvas only) */
   connectedPrompt?: string
   placeholder?: string
@@ -15,41 +21,47 @@ export interface ImagePromptFieldsProps {
   onPromptKeyDown?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void
   /** When pasting an image, called with the file; if handler returns true, default paste is prevented */
   onPasteImage?: (file: File) => void
+  /** Restrict @ → assets list (e.g. `["image"]` on /image) */
+  allowedAssetTypes?: AssetType[]
+  /** Badge to the right of each / command title (preset family label) */
+  slashCommandsContext?: string | null
+  onSlashUiAction?: (action: SlashCommandUiAction) => void
 }
 
 export function ImagePromptFields({
   promptValue,
   onPromptChange,
+  attachedRefs = [],
+  onRefsChange = () => {},
   connectedPrompt,
-  placeholder = "Enter your prompt...",
+  placeholder = "Describe your image — use / for presets and @ for brand kits & assets.",
   className,
   variant = "page",
   onPromptKeyDown,
   onPasteImage,
+  allowedAssetTypes,
+  slashCommandsContext = "Image Prompts",
+  onSlashUiAction,
 }: ImagePromptFieldsProps) {
   const [isPromptExpanded, setIsPromptExpanded] = React.useState(false)
   const isToolbar = variant === "toolbar" || variant === "node"
   const isNode = variant === "node"
 
-  const handlePaste = React.useCallback(
-    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-      const items = e.clipboardData?.items
-      if (!items || !onPasteImage) return
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        if (item.type.startsWith("image/")) {
-          const file = item.getAsFile()
-          if (file) {
-            e.preventDefault()
-            e.stopPropagation()
-            onPasteImage(file)
-            return
-          }
-        }
-      }
-    },
-    [onPasteImage]
+  const placeholderResolved =
+    isToolbar && connectedPrompt
+      ? "Add more — / for presets, @ for brand kits & assets."
+      : isToolbar
+        ? "Type a prompt — / for presets, @ for brand kits & assets."
+        : placeholder
+
+  const textareaClassName = cn(
+    "w-full border-none outline-none resize-none bg-transparent text-sm overflow-y-auto",
+    variant === "toolbar" && "min-h-[50px] max-h-[120px] text-zinc-200 placeholder:text-zinc-600",
+    variant === "page" && "min-h-[60px] max-h-[120px]",
+    isNode && "min-h-[60px] max-h-[120px] text-zinc-200 placeholder:text-zinc-500"
   )
+
+  const rows = isToolbar && !isNode ? 2 : 3
 
   return (
     <div className={cn("flex flex-col", className)}>
@@ -81,25 +93,19 @@ export function ImagePromptFields({
         </div>
       )}
 
-      <textarea
+      <CommandTextarea
         value={promptValue}
-        onChange={(e) => onPromptChange(e.target.value)}
-        onKeyDown={onPromptKeyDown}
-        onPaste={handlePaste}
-        placeholder={
-          isToolbar && connectedPrompt
-            ? "Add more to the prompt..."
-            : isToolbar
-              ? "Type a prompt or press '/' for commands..."
-              : placeholder
-        }
-        rows={isToolbar && !isNode ? 2 : 3}
-        className={cn(
-          "w-full border-none outline-none resize-none bg-transparent text-sm overflow-y-auto",
-          variant === "toolbar" && "min-h-[50px] max-h-[120px] text-zinc-200 placeholder:text-zinc-600",
-          variant === "page" && "min-h-[60px] max-h-[120px]",
-          isNode && "min-h-[60px] max-h-[120px] text-zinc-200 placeholder:text-zinc-500"
-        )}
+        onChange={onPromptChange}
+        refs={attachedRefs}
+        onRefsChange={onRefsChange}
+        rows={rows}
+        className={textareaClassName}
+        placeholder={placeholderResolved}
+        onPromptKeyDown={onPromptKeyDown}
+        onPasteImage={onPasteImage}
+        allowedAssetTypes={allowedAssetTypes}
+        slashCommandsContext={slashCommandsContext}
+        onSlashUiAction={onSlashUiAction}
       />
     </div>
   )

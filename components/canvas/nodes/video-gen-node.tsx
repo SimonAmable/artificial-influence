@@ -50,7 +50,17 @@ import {
   DialogContent,
 } from "@/components/ui/dialog"
 import { getConstrainedSize, loadVideoSize } from "@/lib/canvas/media-sizing"
-import { uploadBlobToSupabase } from "@/lib/canvas/upload-helpers"
+import { uploadBlobToSupabase, uploadFileToSupabase as uploadAssetFileToSupabase } from "@/lib/canvas/upload-helpers"
+import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
+import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
+import { brandRefsOnly } from "@/lib/commands/ref-image-pipeline"
+import { getVideoChipSlotInfo } from "@/lib/commands/video-chip-slots"
+import { allowedAssetTypesForVideoModel } from "@/lib/commands/allowed-asset-types"
+import { VIDEO_PRESET_COMMANDS } from "@/lib/commands/presets-video"
+import { validateVideoAttachedRefs } from "@/lib/commands/validate-video-refs"
+import { BrandKitNewFlowDialog } from "@/components/brand-kit/brand-kit-new-flow-dialog"
+import type { AssetType } from "@/lib/assets/types"
+import { toast } from "sonner"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
 import { useNodeErrorToast } from "@/hooks/use-node-error-toast"
@@ -98,6 +108,16 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const audioUploadRef = React.useRef<HTMLInputElement>(null)
   const [videoDuration, setVideoDuration] = React.useState<number | null>(null)
   const [isExtractingFrame, setIsExtractingFrame] = React.useState(false)
+  const [promptAttachedRefs, setPromptAttachedRefs] = React.useState<AttachedRef[]>([])
+  const slashCreateAssetFileRef = React.useRef<HTMLInputElement>(null)
+  const [slashCreateAssetOpen, setSlashCreateAssetOpen] = React.useState(false)
+  const [slashCreateAssetInitial, setSlashCreateAssetInitial] = React.useState<{
+    url: string
+    assetType: AssetType
+    title?: string
+  } | null>(null)
+  const [slashCreateAssetUploading, setSlashCreateAssetUploading] = React.useState(false)
+  const [brandKitNewFlowOpen, setBrandKitNewFlowOpen] = React.useState(false)
 
   // Helper function to get video duration
   const getVideoDuration = (url: string): Promise<number> => {
@@ -278,6 +298,54 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       nodeData.onDataChange?.(id, { parameters: defaults })
     }
   }, [id, nodeData, selectedModel])
+
+  const videoToolbarAllowedAssetTypes = React.useMemo(() => {
+    if (!selectedModel) return undefined
+    return allowedAssetTypesForVideoModel(selectedModel)
+  }, [selectedModel])
+
+  const handleSlashUiActionToolbar = React.useCallback((action: SlashCommandUiAction) => {
+    if (action === "create-asset") {
+      slashCreateAssetFileRef.current?.click()
+    } else if (action === "create-brand-kit") {
+      setBrandKitNewFlowOpen(true)
+    }
+  }, [])
+
+  const handleSlashCreateAssetFileToolbar = React.useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      e.target.value = ""
+      if (!file) return
+      const type = file.type
+      if (
+        !type.startsWith("image/") &&
+        !type.startsWith("video/") &&
+        !type.startsWith("audio/")
+      ) {
+        toast.error("Please select an image, video, or audio file")
+        return
+      }
+      setSlashCreateAssetUploading(true)
+      try {
+        const result = await uploadAssetFileToSupabase(file, "asset-library")
+        if (!result) return
+        if (result.fileType === "other") {
+          toast.error("Unsupported file type. Use image, video, or audio.")
+          return
+        }
+        setSlashCreateAssetInitial({
+          url: result.url,
+          assetType: result.fileType,
+          title: result.fileName,
+        })
+        setSlashCreateAssetOpen(true)
+      } finally {
+        setSlashCreateAssetUploading(false)
+      }
+    },
+    []
+  )
 
   const applyNodeSize = React.useCallback((width: number, height: number) => {
     const existing = reactFlow.getNode(id)
@@ -655,6 +723,11 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         param.name === "first_frame_image" ||
         param.name === "start_image"
     )
+    const modelSupportsLastFrame = selectedModel.parameters.parameters?.some(
+      (param) => param.name === "last_frame"
+    )
+    const isKlingV3 = modelIdentifier === "kwaivgi/kling-v3-video"
+    const isKlingV3Omni = modelIdentifier === "kwaivgi/kling-v3-omni-video"
 
     if (isMotionCopy && (!finalImageUrl || !finalVideoUrl)) {
       nodeData.onDataChange?.(id, { error: "Image and video are required" })
@@ -664,19 +737,41 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       nodeData.onDataChange?.(id, { error: "Image and audio are required" })
       return
     }
-    if (!isMotionCopy && !isLipsync && modelSupportsImage && !finalImageUrl) {
-      nodeData.onDataChange?.(id, { error: "Image input is required" })
-      return
-    }
-    if (!isMotionCopy && !isLipsync && modelSupportsLastFrame && !finalLastFrameUrl) {
-      nodeData.onDataChange?.(id, { error: "Last frame image is required" })
-      return
-    }
-    const fullPrompt = [nodeData.connectedPrompt, nodeData.prompt]
+    const baseJoined = [nodeData.connectedPrompt, nodeData.prompt]
       .filter((p) => p?.trim())
       .join(" ")
       .trim()
-    if (!isMotionCopy && !isLipsync && !fullPrompt) {
+    const fullPrompt = buildPromptWithRefs(baseJoined, brandRefsOnly(promptAttachedRefs)).trim()
+    const chipSlots = getVideoChipSlotInfo(selectedModel, promptAttachedRefs, {
+      hasInputImage: !!finalImageUrl,
+      hasLastFrame: !!finalLastFrameUrl,
+      hasReferenceVideo: !!finalVideoUrl,
+    })
+
+    const refErr = validateVideoAttachedRefs(promptAttachedRefs, selectedModel!)
+    if (refErr) {
+      nodeData.onDataChange?.(id, { error: refErr })
+      return
+    }
+
+    if (!isMotionCopy && !isLipsync && modelSupportsImage && !finalImageUrl && !chipSlots.startImageChipUrl) {
+      nodeData.onDataChange?.(id, { error: "Image input is required" })
+      return
+    }
+    if (!isMotionCopy && !isLipsync && modelSupportsLastFrame && !finalLastFrameUrl && !chipSlots.lastFrameChipUrl) {
+      nodeData.onDataChange?.(id, { error: "Last frame image is required" })
+      return
+    }
+
+    if (
+      !isMotionCopy &&
+      !isLipsync &&
+      !fullPrompt &&
+      !chipSlots.startImageChipUrl &&
+      !chipSlots.lastFrameChipUrl &&
+      !chipSlots.referenceVideoChipUrl &&
+      chipSlots.omniStyleImageChipUrls.length === 0
+    ) {
       nodeData.onDataChange?.(id, { error: "Prompt is required" })
       return
     }
@@ -747,10 +842,39 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       let videoUpload: { url: string; storagePath: string } | null = null
       let audioUpload: { url: string; storagePath: string } | null = null
 
-      if (finalImageUrl) {
+      let lipsyncImageUpload: { url: string; storagePath: string } | null = null
+      let lipsyncVideoUpload: { url: string; storagePath: string } | null = null
+
+      if (finalImageUrl && !isLipsync) {
         imageUpload = nodeData.manualImageFile
           ? await uploadFileToSupabase(nodeData.manualImageFile, "video-gen-images")
           : await uploadUrlToSupabase(finalImageUrl, "video-gen-images")
+      }
+
+      if (isLipsync && finalImageUrl) {
+        if (nodeData.manualImageFile) {
+          if (nodeData.manualImageFile.type.startsWith("video/")) {
+            lipsyncVideoUpload = await uploadFileToSupabase(
+              nodeData.manualImageFile,
+              "video-gen-lipsync-videos"
+            )
+          } else {
+            lipsyncImageUpload = await uploadFileToSupabase(
+              nodeData.manualImageFile,
+              "video-gen-images"
+            )
+          }
+        } else {
+          const looksVideo = /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(finalImageUrl)
+          if (looksVideo) {
+            lipsyncVideoUpload = await uploadUrlToSupabase(
+              finalImageUrl,
+              "video-gen-lipsync-videos"
+            )
+          } else {
+            lipsyncImageUpload = await uploadUrlToSupabase(finalImageUrl, "video-gen-images")
+          }
+        }
       }
 
       let lastFrameUpload: { url: string; storagePath: string } | null = null
@@ -791,16 +915,23 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           }),
         })
       } else if (isLipsync) {
+        const lipsyncPayload: Record<string, string> = {
+          audioUrl: audioUpload!.url,
+          audioStoragePath: audioUpload!.storagePath,
+        }
+        if (lipsyncVideoUpload) {
+          lipsyncPayload.videoUrl = lipsyncVideoUpload.url
+          lipsyncPayload.videoStoragePath = lipsyncVideoUpload.storagePath
+        } else if (lipsyncImageUpload) {
+          lipsyncPayload.imageUrl = lipsyncImageUpload.url
+          lipsyncPayload.imageStoragePath = lipsyncImageUpload.storagePath
+          lipsyncPayload.resolution =
+            (nodeData.parameters?.resolution as string) || "720p"
+        }
         response = await fetch("/api/generate-lipsync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            imageUrl: imageUpload?.url,
-            audioUrl: audioUpload?.url,
-            imageStoragePath: imageUpload?.storagePath,
-            audioStoragePath: audioUpload?.storagePath,
-            resolution: nodeData.parameters?.resolution || "720p",
-          }),
+          body: JSON.stringify(lipsyncPayload),
         })
       } else {
         const requestBody: Record<string, unknown> = {
@@ -817,6 +948,8 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         if (imageUpload?.url) {
           if (modelIdentifier === "kwaivgi/kling-v2.6") {
             requestBody.start_image = imageUpload.url
+          } else if (isKlingV3 || isKlingV3Omni) {
+            requestBody.start_image = imageUpload.url
           } else {
             requestBody.image = imageUpload.url
           }
@@ -824,8 +957,50 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             requestBody.first_frame_image = imageUpload.url
           }
         }
+        if (
+          !requestBody.start_image &&
+          !requestBody.image &&
+          !requestBody.first_frame_image &&
+          chipSlots.startImageChipUrl
+        ) {
+          const u = chipSlots.startImageChipUrl
+          if (modelIdentifier === "kwaivgi/kling-v2.6" || isKlingV3 || isKlingV3Omni) {
+            requestBody.start_image = u
+          } else if (modelIdentifier === "minimax/hailuo-2.3-fast") {
+            requestBody.first_frame_image = u
+          } else {
+            requestBody.image = u
+          }
+        }
         if (lastFrameUpload?.url) {
           requestBody.last_frame = lastFrameUpload.url
+          if (isKlingV3 || isKlingV3Omni) {
+            requestBody.end_image = lastFrameUpload.url
+          }
+        }
+        if (!requestBody.last_frame && chipSlots.lastFrameChipUrl && modelSupportsLastFrame) {
+          requestBody.last_frame = chipSlots.lastFrameChipUrl
+          if (isKlingV3 || isKlingV3Omni) {
+            requestBody.end_image = chipSlots.lastFrameChipUrl
+          }
+        }
+
+        const isKlingOmniNode = modelIdentifier === "kwaivgi/kling-v3-omni-video"
+        if (isKlingOmniNode && chipSlots.omniStyleImageChipUrls.length > 0) {
+          const existing = Array.isArray(requestBody.reference_images)
+            ? (requestBody.reference_images as string[])
+            : []
+          requestBody.reference_images = [...new Set([...existing, ...chipSlots.omniStyleImageChipUrls])]
+        }
+        if (isKlingOmniNode && !requestBody.reference_video && chipSlots.referenceVideoChipUrl) {
+          requestBody.reference_video = chipSlots.referenceVideoChipUrl
+        }
+        if (
+          modelIdentifier === "xai/grok-imagine-video" &&
+          !requestBody.video &&
+          chipSlots.referenceVideoChipUrl
+        ) {
+          requestBody.video = chipSlots.referenceVideoChipUrl
         }
 
         requestBody.tool = "node"
@@ -1110,7 +1285,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       offset={12}
     >
       <div className="nopan nodrag w-full max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-xl">
-      <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl overflow-hidden">
+      <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl overflow-visible">
         {/* Prompt input area */}
         <div className="p-2.5 space-y-2">
           {nodeData.connectedPrompt && (
@@ -1297,8 +1472,13 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
               negativePromptValue={nodeData.negativePrompt || ""}
               onNegativePromptChange={(value) => nodeData.onDataChange?.(id, { negativePrompt: value })}
               showNegativePrompt={!!modelSupportsNegativePrompt}
-              placeholder="Describe the video you want to generate..."
+              placeholder="Describe the video — / for presets, @ for brand kits & assets."
               variant="toolbar"
+              attachedRefs={promptAttachedRefs}
+              onRefsChange={setPromptAttachedRefs}
+              allowedAssetTypes={videoToolbarAllowedAssetTypes}
+              slashCommands={VIDEO_PRESET_COMMANDS}
+              onSlashUiAction={handleSlashUiActionToolbar}
             />
           )}
 
@@ -1444,6 +1624,33 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       </div>
       </div>
     </NodeToolbar>
+
+    {slashCreateAssetInitial ? (
+      <CreateAssetDialog
+        open={slashCreateAssetOpen}
+        onOpenChange={(open) => {
+          setSlashCreateAssetOpen(open)
+          if (!open) setSlashCreateAssetInitial(null)
+        }}
+        initial={{
+          url: slashCreateAssetInitial.url,
+          assetType: slashCreateAssetInitial.assetType,
+          title: slashCreateAssetInitial.title,
+        }}
+      />
+    ) : null}
+
+    <BrandKitNewFlowDialog open={brandKitNewFlowOpen} onOpenChange={setBrandKitNewFlowOpen} />
+
+    <input
+      ref={slashCreateAssetFileRef}
+      type="file"
+      accept="image/*,video/*,audio/*"
+      onChange={handleSlashCreateAssetFileToolbar}
+      className="hidden"
+      aria-hidden
+      disabled={slashCreateAssetUploading}
+    />
 
     {/* Fullscreen Dialog */}
     {nodeData.generatedVideoUrl && (

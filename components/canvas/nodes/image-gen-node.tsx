@@ -63,6 +63,13 @@ import { ImageEditorDialog } from "@/components/image-editor"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { InfluencerInputBox } from "@/components/tools/influencer"
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
+import type { AttachedRef } from "@/lib/commands/types"
+import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
+import {
+  brandRefsOnly,
+  getImageAssetUrlsFromRefChips,
+  hasVideoOrAudioAssetRefs,
+} from "@/lib/commands/ref-image-pipeline"
 import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
 
 // Helper function to get dimensions for aspect ratio
@@ -695,14 +702,26 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     })
   }, [activeImageIndex, generatedImageUrls, id, nodeData])
 
-  const handleGenerate = async () => {
-    // Combine connected prompt and user prompt
-    const fullPrompt = [nodeData.connectedPrompt, nodeData.prompt]
-      .filter(p => p?.trim())
-      .join(' ')
-      .trim()
+  const attachedRefsRef = React.useRef<AttachedRef[]>([])
+  const [attachedCommandRefCount, setAttachedCommandRefCount] = React.useState(0)
 
-    if (!fullPrompt) {
+  const handleGenerate = async () => {
+    if (hasVideoOrAudioAssetRefs(attachedRefsRef.current)) {
+      toast.error("Video and audio assets can't be used as references for image generation.", {
+        description: "Remove those @ chips or use image assets only.",
+      })
+      return
+    }
+
+    // Combine connected prompt and user prompt; brand @ context in text, image @ assets as files
+    const baseText = [nodeData.connectedPrompt, nodeData.prompt]
+      .filter((p) => p?.trim())
+      .join(" ")
+      .trim()
+    const chipImageUrls = getImageAssetUrlsFromRefChips(attachedRefsRef.current)
+    const fullPrompt = buildPromptWithRefs(baseText, brandRefsOnly(attachedRefsRef.current)).trim()
+
+    if (!fullPrompt && chipImageUrls.length === 0) {
       nodeData.onDataChange?.(id, { error: "Enter a prompt" })
       return
     }
@@ -715,10 +734,11 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     })
 
     try {
-      const allReferenceImages = [
+      const baseRefUrls = [
         ...(nodeData.connectedImageUrls || []),
-        ...(nodeData.manualImageUrls || [])
+        ...(nodeData.manualImageUrls || []),
       ]
+      const allReferenceImages = [...new Set([...baseRefUrls, ...chipImageUrls])]
       const requestAspectRatio = resolveAspectRatioForRequest({
         model: selectedModelObject,
         selectedAspectRatio: nodeData.aspectRatio,
@@ -1164,9 +1184,13 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           </div>
         )}
         <InfluencerInputBox
-          className="border-white/10 bg-zinc-900/95 shadow-xl rounded-xl overflow-hidden"
+          className="border-white/10 bg-zinc-900/95 shadow-xl rounded-xl overflow-visible"
           promptValue={nodeData.prompt || ""}
           onPromptChange={(value) => nodeData.onDataChange?.(id, { prompt: value })}
+          onAttachedRefsChange={(refs) => {
+            attachedRefsRef.current = refs
+            setAttachedCommandRefCount(refs.length)
+          }}
           referenceImages={(nodeData.manualImageUrls || []).map((url) => ({ url }))}
           onReferenceImagesChange={handleReferenceImagesChange}
           enhancePrompt={nodeData.enhancePrompt ?? false}
@@ -1185,9 +1209,11 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           selectedNumImages={1}
           onNumImagesChange={() => {}}
           showNumImagesSelector={false}
-          placeholder="Enter your prompt..."
+          placeholder="Describe your image — use / for presets and @ for brand kits & assets."
+          allowedAssetTypes={["image"]}
           isReadyOverride={
-            [nodeData.connectedPrompt, nodeData.prompt].filter((p) => p?.trim()).join(" ").trim().length > 0
+            [nodeData.connectedPrompt, nodeData.prompt].filter((p) => p?.trim()).join(" ").trim().length > 0 ||
+            attachedCommandRefCount > 0
           }
         />
       </div>

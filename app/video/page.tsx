@@ -18,12 +18,23 @@ import type { Model, ParameterDefinition } from "@/lib/types/models"
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
 import type { AudioUploadValue } from "@/components/shared/upload/audio-upload"
 import type { MultiShotItem } from "@/components/tools/video/multi-shot-editor"
+import type { AttachedRef } from "@/lib/commands/types"
+import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
+import { brandRefsOnly } from "@/lib/commands/ref-image-pipeline"
+import { validateVideoAttachedRefs } from "@/lib/commands/validate-video-refs"
+import { getVideoChipSlotInfo } from "@/lib/commands/video-chip-slots"
 
 interface GeneratedVideo {
   url: string
   model: string
   timestamp: number
   parameters: Record<string, unknown>
+}
+
+const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
+  "grok-imagine-video": "xai/grok-imagine-video",
+  "soul-cinema": "kwaivgi/kling-v3-video",
+  "kling-v3-video": "kwaivgi/kling-v3-video",
 }
 
 function VideoPageContent() {
@@ -51,6 +62,27 @@ function VideoPageContent() {
       })
     }
   }, [videoModels, selectedModel])
+
+  React.useEffect(() => {
+    if (videoModels.length === 0) return
+
+    const rawModelParam = searchParams.get("model")
+    if (!rawModelParam) return
+
+    const modelParam = rawModelParam.trim().toLowerCase()
+    const targetIdentifier = VIDEO_MODEL_QUERY_ALIASES[modelParam] ?? rawModelParam.trim()
+    const resolvedModel = videoModels.find(
+      (model) => model.identifier.toLowerCase() === targetIdentifier.toLowerCase()
+    )
+
+    if (!resolvedModel) return
+    if (selectedModel?.identifier === resolvedModel.identifier) return
+
+    setSelectedModel({
+      ...resolvedModel,
+      parameters: { parameters: buildVideoModelParameters(resolvedModel) },
+    })
+  }, [searchParams, videoModels, selectedModel?.identifier])
   const [prompt, setPrompt] = React.useState("")
   const [negativePrompt, setNegativePrompt] = React.useState("")
   const [inputImage, setInputImage] = React.useState<ImageUpload | null>(null)
@@ -64,6 +96,7 @@ function VideoPageContent() {
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [generatedVideos, setGeneratedVideos] = React.useState<GeneratedVideo[]>([])
+  const [attachedCommandRefs, setAttachedCommandRefs] = React.useState<AttachedRef[]>([])
 
   // Handle pre-loaded start frame from URL parameter (only load once)
   const hasLoadedFromUrl = React.useRef(false)
@@ -186,7 +219,20 @@ function VideoPageContent() {
         return
       }
     }
-    
+
+    const mergedPrompt = buildPromptWithRefs(prompt, brandRefsOnly(attachedCommandRefs)).trim()
+    const chipSlots = getVideoChipSlotInfo(selectedModel, attachedCommandRefs, {
+      hasInputImage: !!(inputImage?.file || inputImage?.url),
+      hasLastFrame: !!(lastFrameImage?.file || lastFrameImage?.url),
+      hasReferenceVideo: !!(inputVideo?.file || inputVideo?.url),
+    })
+
+    const refErr = validateVideoAttachedRefs(attachedCommandRefs, selectedModel)
+    if (refErr) {
+      setError(refErr)
+      return
+    }
+
     // Validation based on model type
     if (isMotionCopy) {
       if (!inputImage?.file) {
@@ -213,16 +259,27 @@ function VideoPageContent() {
       }
     } else if (isLipsync) {
       if (!inputImage?.file) {
-        setError("Please upload an image")
+        setError("Please upload an image or video")
+        return
+      }
+      const refIsImage = inputImage.file.type.startsWith("image/")
+      const refIsVideo = inputImage.file.type.startsWith("video/")
+      if (!refIsImage && !refIsVideo) {
+        setError("Please upload a valid image or video file")
         return
       }
       if (!inputAudio?.file) {
         setError("Please upload an audio file")
         return
       }
-    } else if (!prompt.trim()) {
+    } else if (!mergedPrompt.trim()) {
       const allowNoPrompt = (isKlingV3 || isKlingV3Omni) && (
-        (multiShotMode && multiShotShots.length > 0) || !!inputImage
+        (multiShotMode && multiShotShots.length > 0) ||
+        !!inputImage ||
+        !!chipSlots.startImageChipUrl ||
+        !!chipSlots.lastFrameChipUrl ||
+        !!chipSlots.referenceVideoChipUrl ||
+        chipSlots.omniStyleImageChipUrls.length > 0
       )
       if (!allowNoPrompt) {
         setError("Please enter a prompt")
@@ -246,7 +303,7 @@ function VideoPageContent() {
       const { prompt: _prompt, image: _image, video: _video, ...otherParameters } = parameters
       const requestBody: Record<string, unknown> = {
         model: selectedModel.identifier,
-        prompt,
+        prompt: mergedPrompt,
         ...otherParameters,
       }
 
@@ -258,14 +315,22 @@ function VideoPageContent() {
         requestBody.videoPublicUrl = videoUpload.url
       }
       
-      // Handle lipsync uploads
+      // Handle lipsync uploads (image → veed/fabric; video → pixverse/lipsync)
       else if (isLipsync && inputImage?.file && inputAudio?.file) {
-        const imageUpload = await uploadImageToSupabase(inputImage.file, user.id, 'lipsync-images')
         const audioUpload = await uploadImageToSupabase(inputAudio.file, user.id, 'lipsync-audio')
-        requestBody.imageUrl = imageUpload.url
         requestBody.audioUrl = audioUpload.url
-        requestBody.imageStoragePath = imageUpload.storagePath
         requestBody.audioStoragePath = audioUpload.storagePath
+
+        if (inputImage.file.type.startsWith('video/')) {
+          const videoUpload = await uploadImageToSupabase(inputImage.file, user.id, 'lipsync-videos')
+          requestBody.videoUrl = videoUpload.url
+          requestBody.videoStoragePath = videoUpload.storagePath
+        } else {
+          const imageUpload = await uploadImageToSupabase(inputImage.file, user.id, 'lipsync-images')
+          requestBody.imageUrl = imageUpload.url
+          requestBody.imageStoragePath = imageUpload.storagePath
+          requestBody.resolution = (parameters.resolution as string) || '720p'
+        }
       }
       
       // Handle other models with image uploads
@@ -298,6 +363,22 @@ function VideoPageContent() {
         }
       }
 
+      if (
+        !requestBody.start_image &&
+        !requestBody.image &&
+        !requestBody.first_frame_image &&
+        chipSlots.startImageChipUrl
+      ) {
+        const u = chipSlots.startImageChipUrl
+        if (selectedModel.identifier === 'kwaivgi/kling-v2.6' || isKlingV3 || isKlingV3Omni) {
+          requestBody.start_image = u
+        } else if (selectedModel.identifier === 'minimax/hailuo-2.3-fast') {
+          requestBody.first_frame_image = u
+        } else {
+          requestBody.image = u
+        }
+      }
+
       if (lastFrameImage?.file && (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni)) {
         const lastFrameUpload = await uploadImageToSupabase(lastFrameImage.file, user.id, 'video-gen-last-frames')
         requestBody.last_frame = lastFrameUpload.url
@@ -306,6 +387,14 @@ function VideoPageContent() {
       if (lastFrameImage?.url && (isKlingV3 || isKlingV3Omni)) {
         requestBody.end_image = lastFrameImage.url
       }
+      if (
+        !requestBody.last_frame &&
+        chipSlots.lastFrameChipUrl &&
+        (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni)
+      ) {
+        requestBody.last_frame = chipSlots.lastFrameChipUrl
+        if (isKlingV3 || isKlingV3Omni) requestBody.end_image = chipSlots.lastFrameChipUrl
+      }
 
       if (negativePrompt && (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni)) {
         requestBody.negative_prompt = negativePrompt
@@ -313,7 +402,8 @@ function VideoPageContent() {
 
       if ((isKlingV3 || isKlingV3Omni) && multiShotMode && multiShotShots.length > 0) {
         requestBody.multi_prompt = JSON.stringify(multiShotShots)
-        requestBody.prompt = multiShotShots[0]?.prompt ?? prompt
+        const first = multiShotShots[0]?.prompt ?? prompt
+        requestBody.prompt = buildPromptWithRefs(first, brandRefsOnly(attachedCommandRefs)).trim()
       }
 
       // Kling v3 Omni: reference video (editing or style reference)
@@ -323,6 +413,9 @@ function VideoPageContent() {
       }
       if (isKlingV3Omni && inputVideo?.url) {
         requestBody.reference_video = inputVideo.url
+      }
+      if (isKlingV3Omni && !requestBody.reference_video && chipSlots.referenceVideoChipUrl) {
+        requestBody.reference_video = chipSlots.referenceVideoChipUrl
       }
 
       // Kling v3 Omni: reference images (elements, scenes, styles). Max 7 without video, 4 with video.
@@ -338,11 +431,24 @@ function VideoPageContent() {
         }
         if (refUrls.length > 0) requestBody.reference_images = refUrls
       }
+      if (isKlingV3Omni && chipSlots.omniStyleImageChipUrls.length > 0) {
+        const existing = Array.isArray(requestBody.reference_images)
+          ? (requestBody.reference_images as string[])
+          : []
+        requestBody.reference_images = [...new Set([...existing, ...chipSlots.omniStyleImageChipUrls])]
+      }
 
       // Grok Imagine Video: reference video for video editing mode
       if (inputVideo?.file && selectedModel.identifier === 'xai/grok-imagine-video') {
         const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'video-gen-reference-videos')
         requestBody.video = videoUpload.url
+      }
+      if (
+        selectedModel.identifier === "xai/grok-imagine-video" &&
+        !requestBody.video &&
+        chipSlots.referenceVideoChipUrl
+      ) {
+        requestBody.video = chipSlots.referenceVideoChipUrl
       }
 
       requestBody.tool = isLipsync ? 'lipsync' : 'video'
@@ -366,12 +472,19 @@ function VideoPageContent() {
 
       const data = await response.json()
 
-      if (data.videoUrl) {
+      const resultVideoUrl =
+        typeof data.videoUrl === "string"
+          ? data.videoUrl
+          : typeof data.video?.url === "string"
+            ? data.video.url
+            : undefined
+
+      if (resultVideoUrl) {
         const newVideo: GeneratedVideo = {
-          url: data.videoUrl,
+          url: resultVideoUrl,
           model: selectedModel.name,
           timestamp: Date.now(),
-          parameters: { ...parameters, prompt },
+          parameters: { ...parameters, prompt: mergedPrompt },
         }
         setGeneratedVideos(prev => [newVideo, ...prev])
       }
@@ -491,6 +604,8 @@ function VideoPageContent() {
                     onMultiShotShotsChange={setMultiShotShots}
                     referenceImages={referenceImages}
                     onReferenceImagesChange={setReferenceImages}
+                    attachedRefs={attachedCommandRefs}
+                    onAttachedRefsChange={setAttachedCommandRefs}
                   />
                 </div>
               </div>
@@ -531,6 +646,8 @@ function VideoPageContent() {
                         onMultiShotShotsChange={setMultiShotShots}
                         referenceImages={referenceImages}
                         onReferenceImagesChange={setReferenceImages}
+                        attachedRefs={attachedCommandRefs}
+                        onAttachedRefsChange={setAttachedCommandRefs}
                       />
                     </div>
                   </div>
@@ -572,6 +689,8 @@ function VideoPageContent() {
                     onMultiShotShotsChange={setMultiShotShots}
                     referenceImages={referenceImages}
                     onReferenceImagesChange={setReferenceImages}
+                    attachedRefs={attachedCommandRefs}
+                    onAttachedRefsChange={setAttachedCommandRefs}
                   />
                 </div>
               </div>

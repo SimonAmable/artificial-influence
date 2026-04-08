@@ -14,13 +14,25 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useModels } from "@/hooks/use-models"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
+import { useSearchParams } from "next/navigation"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
-import type { GenerateImageAcceptedPayload } from "@/lib/generate-image-client"
+import {
+  type GenerateImageAcceptedPayload,
+  isInsufficientCreditsError,
+  isInsufficientCreditsMessage,
+} from "@/lib/generate-image-client"
 import { toast } from "sonner"
 import {
   getDefaultAspectRatioForModel,
   resolveAspectRatioForRequest,
 } from "@/lib/utils/aspect-ratios"
+import type { AttachedRef } from "@/lib/commands/types"
+import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
+import {
+  brandRefsOnly,
+  getImageAssetUrlsFromRefChips,
+  hasVideoOrAudioAssetRefs,
+} from "@/lib/commands/ref-image-pipeline"
 
 interface ImageHistoryItem {
   id?: string
@@ -130,6 +142,12 @@ function prependUniqueHistoryItems(
 
 const CHARACTER_SWAP_UI_MODEL_IDENTIFIER = "custom/character-swap"
 const CHARACTER_SWAP_BASE_MODEL_IDENTIFIER = "google/nano-banana-pro"
+const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
+  "nano-banana": "google/nano-banana-2",
+  flux2: "prunaai/flux-kontext-fast",
+  "gpt-image": "openai/gpt-image-1.5",
+  "grok-imagine": "xai/grok-imagine-image",
+}
 const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
   full_character:
     "Character swap task using two reference images. First image is the reference character. " +
@@ -147,8 +165,9 @@ const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
     "Adjust the transferred face to match the reference's lighting direction, color temperature, perspective, and scale. Blend seamlessly with no visible seams.",
 }
 
-export default function ImagePage() {
+function ImagePageContent() {
   const layoutModeContext = useLayoutMode()
+  const searchParams = useSearchParams()
   
   if (!layoutModeContext) {
     throw new Error("ImagePage must be used within LayoutModeProvider")
@@ -158,6 +177,7 @@ export default function ImagePage() {
 
   // State management
   const [prompt, setPrompt] = React.useState("")
+  const [attachedCommandRefs, setAttachedCommandRefs] = React.useState<AttachedRef[]>([])
   const [referenceImage, setReferenceImage] = React.useState<ImageUpload | null>(null)
   const [referenceImages, setReferenceImages] = React.useState<ImageUpload[]>([])
   const [characterSwapCharacterImage, setCharacterSwapCharacterImage] = React.useState<ImageUpload | null>(null)
@@ -216,6 +236,25 @@ export default function ImagePage() {
       setSelectedAspectRatio(getDefaultAspectRatioForModel(defaultModel))
     }
   }, [effectiveImageModels, selectedModel])
+
+  React.useEffect(() => {
+    if (effectiveImageModels.length === 0) return
+
+    const rawModelParam = searchParams.get("model")
+    if (!rawModelParam) return
+
+    const normalized = rawModelParam.trim().toLowerCase()
+    const targetIdentifier = IMAGE_MODEL_QUERY_ALIASES[normalized] ?? rawModelParam.trim()
+    const resolvedModel = effectiveImageModels.find(
+      (model) => model.identifier.toLowerCase() === targetIdentifier.toLowerCase()
+    )
+
+    if (!resolvedModel) return
+    if (selectedModel === resolvedModel.identifier) return
+
+    setSelectedModel(resolvedModel.identifier)
+    setSelectedAspectRatio(getDefaultAspectRatioForModel(resolvedModel))
+  }, [searchParams, effectiveImageModels, selectedModel])
 
   // Update aspect ratio and clamp numImages when model changes
   React.useEffect(() => {
@@ -348,7 +387,22 @@ export default function ImagePage() {
 
   // Handle image generation
   const handleGenerate = async () => {
-    if (!isCharacterSwapModel && !prompt.trim()) {
+    if (!isCharacterSwapModel && hasVideoOrAudioAssetRefs(attachedCommandRefs)) {
+      toast.error("Video and audio assets can't be used as references for image generation.", {
+        description: "Remove those @ chips or use image assets only.",
+      })
+      return
+    }
+
+    const mergedPrompt = buildPromptWithRefs(prompt, brandRefsOnly(attachedCommandRefs))
+    const chipImageUrls = getImageAssetUrlsFromRefChips(attachedCommandRefs)
+    if (
+      !isCharacterSwapModel &&
+      !mergedPrompt.trim() &&
+      chipImageUrls.length === 0 &&
+      referenceImages.length === 0 &&
+      !referenceImage
+    ) {
       setError("Please enter a prompt")
       return
     }
@@ -388,14 +442,19 @@ export default function ImagePage() {
     }
 
     // Capture form state for append (avoids stale closure when concurrent requests complete out of order)
-    const capturedPrompt = isCharacterSwapModel ? CHARACTER_SWAP_PROMPTS[characterSwapMode] : prompt.trim()
+    const capturedPrompt = isCharacterSwapModel
+      ? CHARACTER_SWAP_PROMPTS[characterSwapMode]
+      : mergedPrompt.trim()
     const capturedModel = selectedModel
     const capturedTool = isCharacterSwapModel ? "character_swap" : "image"
-    const capturedRefUrls = isCharacterSwapModel
-      ? [characterSwapCharacterImage?.url, characterSwapSceneImage?.url].filter(Boolean) as string[]
-      : (referenceImages.length > 0 ? referenceImages : (referenceImage ? [referenceImage] : []))
+    const manualRefUrls = isCharacterSwapModel
+      ? ([characterSwapCharacterImage?.url, characterSwapSceneImage?.url].filter(Boolean) as string[])
+      : (referenceImages.length > 0 ? referenceImages : referenceImage ? [referenceImage] : [])
           .map((image) => image.url)
           .filter(Boolean) as string[]
+    const capturedRefUrls = isCharacterSwapModel
+      ? manualRefUrls
+      : [...new Set([...manualRefUrls, ...chipImageUrls])]
     const selectedModelObject =
       effectiveImageModels.find((model) => model.identifier === selectedModel) ?? null
     const capturedAspectRatio = isCharacterSwapModel
@@ -422,7 +481,10 @@ export default function ImagePage() {
 
       // Create FormData for the request
       const formData = new FormData()
-      formData.append('prompt', isCharacterSwapModel ? CHARACTER_SWAP_PROMPTS[characterSwapMode] : prompt.trim())
+      formData.append(
+        "prompt",
+        isCharacterSwapModel ? CHARACTER_SWAP_PROMPTS[characterSwapMode] : mergedPrompt.trim()
+      )
       formData.append('enhancePrompt', enhancePrompt.toString())
       
       // Add model identifier if selected
@@ -443,14 +505,23 @@ export default function ImagePage() {
       }
       
       // Add reference image files if present (supports both single and multiple)
-      const imagesToUpload = isCharacterSwapModel
+      const baseRefImages = isCharacterSwapModel
         ? [characterSwapCharacterImage, characterSwapSceneImage].filter(
             (img): img is ImageUpload => Boolean(img)
           )
         : referenceImages.length > 0
           ? referenceImages
-          : (referenceImage ? [referenceImage] : [])
-      
+          : referenceImage
+            ? [referenceImage]
+            : []
+      const manualUrlSet = new Set(
+        baseRefImages.map((i) => i.url).filter((u): u is string => Boolean(u))
+      )
+      const extraFromAssetChips: ImageUpload[] = chipImageUrls
+        .filter((u) => !manualUrlSet.has(u))
+        .map((url) => ({ url }))
+      const imagesToUpload = [...baseRefImages, ...extraFromAssetChips]
+
       for (const refImage of imagesToUpload) {
         if (refImage.file) {
           formData.append('referenceImages', refImage.file)
@@ -515,13 +586,17 @@ export default function ImagePage() {
       setHistoryImages((currentImages) => prependUniqueHistoryItems(currentImages, newItems))
       void fetchImageHistory(20)
     } catch (err) {
-      console.error('Error generating image:', err)
       const message = err instanceof Error ? err.message : 'Failed to generate image'
+      const isCredits =
+        isInsufficientCreditsError(err) || isInsufficientCreditsMessage(message)
+      if (!isCredits) {
+        console.error('Error generating image:', err)
+      }
       setPendingRequests((currentRequests) => removePendingRequest(currentRequests, optimisticPendingRequest))
-      if (message.includes('Insufficient credits')) {
+      if (isCredits) {
         toast.error(message, {
-          description: "Upgrade your plan to continue generating images",
-          action: { label: "View Plans", onClick: () => window.open("/pricing", "_blank") }
+          description: 'Upgrade your plan to continue generating images',
+          action: { label: 'View Plans', onClick: () => window.open('/pricing', '_blank') },
         })
       } else if (message.includes('Concurrency limit reached')) {
         toast.error('Too many active generations', {
@@ -563,6 +638,7 @@ export default function ImagePage() {
           forceRowLayout={forceRowLayout}
           promptValue={prompt}
           onPromptChange={setPrompt}
+          onAttachedRefsChange={setAttachedCommandRefs}
           referenceImage={referenceImage}
           onReferenceImageChange={setReferenceImage}
           referenceImages={referenceImages}
@@ -583,6 +659,7 @@ export default function ImagePage() {
           selectedNumImages={selectedNumImages}
           onNumImagesChange={setSelectedNumImages}
           showNumImagesSelector={true}
+          allowedAssetTypes={["image"]}
         />
       )
     }
@@ -625,6 +702,7 @@ export default function ImagePage() {
   const handleRecreate = React.useCallback((image: { prompt?: string | null; url: string; referenceImageUrls?: string[] }) => {
     if (image.prompt?.trim()) {
       setPrompt(image.prompt)
+      setAttachedCommandRefs([])
     }
     // Use referenceImageUrls from the generation; if none, use the main image as reference
     const refUrls = image.referenceImageUrls && image.referenceImageUrls.length > 0
@@ -865,5 +943,13 @@ export default function ImagePage() {
         />
       )}
     </div>
+  )
+}
+
+export default function ImagePage() {
+  return (
+    <React.Suspense fallback={null}>
+      <ImagePageContent />
+    </React.Suspense>
   )
 }

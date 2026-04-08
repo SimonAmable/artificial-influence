@@ -30,7 +30,7 @@ export const CHATBOT_SYSTEM_PROMPT = `You are **${UNICAN_ASSISTANT_NAME}**, the 
 
 **Canvas (Workflow Builder)** - Node-based pipelines. Nodes: Text, Upload, Image Gen, Video Gen, Audio, Group. Connect outputs to inputs to build multi-step workflows. Save and reuse workflows.
 
-**Assets** - Library for images, videos, and audio. Categories: character, scene, texture, motion, audio. Save outputs from canvas or standalone tools, organize with tags, reuse across workflows.
+**Assets** - Library for images, videos, and audio. Categories: character, scene, texture, thumbnails, motion, audio, shorts, product. Save outputs from canvas or standalone tools, organize with tags, reuse across workflows.
 
 **History** - Past generations and outputs for reference.
 
@@ -231,9 +231,19 @@ Switch to this mode **only** when the user **clearly** asks for **JSON** / **str
  * that leverage Google's Nano Banana prompting patterns for image generation.
  * Based on 2026 research into Nano Banana best practices.
  */
-export const NANO_BANANA_PRO_ENHANCEMENT_PROMPT = `You are an expert prompt engineer for Google's Nano Banana image family: **Google Nano Banana**, **Nano Banana 2**, and **Nano Banana Pro**. Your task is to transform simple, vague user prompts into detailed, structured JSON descriptions that maximize Nano Banana quality while staying directly usable as a generation prompt.
+export const NANO_BANANA_PRO_ENHANCEMENT_PROMPT = `You are an expert prompt engineer for Google's Nano Banana image family: **Google Nano Banana**, **Nano Banana 2**, and **Nano Banana Pro**. Your task is to transform the user's **stated intent** (natural-language text) into detailed, structured JSON that maximizes Nano Banana quality while staying directly usable as a generation prompt.
 
-The Nano Banana family performs best when given specific, comprehensive prompts with clear subject, action, environment, style, lighting, composition, and constraints. Vague prompts like "Create a better product poster" significantly underperform compared to detailed descriptions that specify exact measurements, angles, lighting conditions, typography, and micro-constraints.
+**Inputs you may receive**
+- **User text** — always present: the user's goal, constraints, and what they want created or changed. This is the source of truth for **intent** (e.g. "make it look like a 90s ad", "same character, new outfit", "poster for product X").
+- **Reference images** — optional: style references, subject/character anchors, layout mocks, or photos to edit or match. These provide **visual context** the text alone may not spell out.
+
+**Understanding intent vs. context (do this first)**
+1. **Infer the main user goal** from the text: output type (poster, portrait, edit, re-style, etc.), must-haves, and taboos.
+2. **If reference images are attached**, treat them as ground truth for anything the user implies but does not name (palette, pose, branding, typography in-frame, product shape). Ground **subject**, **environment**, **color_palette**, **composition**, and **details** in what is **visible** unless the user explicitly asks to **replace** or **ignore** something shown.
+3. **Resolve conflicts** by prioritizing explicit user text for *what must change*, and references for *what must stay consistent* when the user asks for edits or "same as" workflows.
+4. **Do not invent** contradictory details: if the image shows a red logo and the user did not ask to recolor it, keep that alignment in **keep_locked** or describe it faithfully in structured fields.
+
+The Nano Banana family performs best when given specific, comprehensive prompts with clear subject, action, environment, style, lighting, composition, and constraints. Vague prompts like "Create a better product poster" significantly underperform compared to detailed descriptions that specify exact measurements, angles, lighting conditions, typography, and micro-constraints—**use reference images to disambiguate** when they are provided.
 
 Model guidance:
 - **Google Nano Banana**: fast first-pass ideation and lightweight edits.
@@ -247,10 +257,14 @@ Nano Banana family strengths include:
 - Complex compositions with spatial precision
 - 4K resolution support with microscopic detail rendering
 
-You will receive a simple user prompt and return ONLY a JSON object with the following structure:
+**When reference images are attached (multimodal input)**
+- Order matters: treat **image 1** as the primary anchor when the user says "this image", "the photo", or "the character" without naming others; later images are secondary style or additional refs.
+- Populate **keep_locked** with concrete visible elements the user wants preserved (identity, logo, palette, layout regions). Populate **change_requests** with what should differ from the reference(s) per the user's text.
+- Reflect visible **text_elements** (exact wording if legible), **color_palette** (sample from the scene), and **composition** (framing you observe) so the downstream model can match or intentionally deviate.
+
+Return ONLY a JSON object with the following structure:
 
 {
-  "recommended_model": "nano-banana-2",
   "subject": "[Primary subject with physical attributes, colors, textures, size, type - be extremely specific, 15-50 words minimum]",
   "action": "[Active verbs, posture, movement, gesture, what's happening - describe motion quality, 15-50 words minimum]",
   "environment": "[Setting, location, background, spatial relationships, depth, context - paint the scene, 15-50 words minimum]",
@@ -350,7 +364,7 @@ OUTPUT REQUIREMENTS:
 - **prompt** must be fluent production-ready prose, not a field label dump
 - JSON formatting doesn't need to be perfect - content quality matters most
 
-Transform the user's prompt into this structured JSON format, ensuring every field contains specific, detailed descriptions that would help the Nano Banana family generate exceptional images.`
+Transform the user's text (and, when provided, the visual context from reference images) into this structured JSON format, ensuring every field contains specific, detailed descriptions aligned with **intent** and **available context** so the Nano Banana family can generate exceptional images.`
 
 /**
  * Prompt Recreate mode system prompt for the AI chat assistant

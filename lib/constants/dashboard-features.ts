@@ -15,6 +15,22 @@ export type DashboardFeature = {
 
 export const dashboardFeatures: DashboardFeature[] = [
   {
+    slug: "motion-copy",
+    title: "Motion Copy",
+    description: "Animate a single image into a lively, shareable video.",
+    toolHref: "/motion-copy",
+    media: {
+      type: "video",
+      src: "/hero_showcase_images/motion_copy.mp4",
+      poster: "/hero_showcase_images/image_editing_wide.png",
+    },
+    highlights: [
+      "One-click motion presets",
+      "Loop-ready clips",
+      "Perfect for social formats",
+    ],
+  },
+  {
     slug: "image",
     title: "Image Generation",
     description: "Turn text prompts into studio-grade visuals with a single prompt.",
@@ -43,22 +59,6 @@ export const dashboardFeatures: DashboardFeature[] = [
       "Dynamic camera movement",
       "Shot-to-shot consistency",
       "Fast iteration previews",
-    ],
-  },
-  {
-    slug: "motion-copy",
-    title: "Motion Copy",
-    description: "Animate a single image into a lively, shareable video.",
-    toolHref: "/motion-copy",
-    media: {
-      type: "video",
-      src: "/hero_showcase_images/motion_copy.mp4",
-      poster: "/hero_showcase_images/image_editing_wide.png",
-    },
-    highlights: [
-      "One-click motion presets",
-      "Loop-ready clips",
-      "Perfect for social formats",
     ],
   },
   {

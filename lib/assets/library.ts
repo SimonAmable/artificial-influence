@@ -10,16 +10,22 @@ export const ASSET_CATEGORIES: AssetCategory[] = [
   "character",
   "scene",
   "texture",
+  "thumbnails",
   "motion",
   "audio",
+  "shorts",
+  "product",
 ]
 
 export const ASSET_CATEGORY_LABELS: Record<AssetCategory, string> = {
   character: "Characters",
   scene: "Scenes",
   texture: "Textures",
+  thumbnails: "Thumbnails",
   motion: "Motion",
   audio: "Audio",
+  shorts: "Shorts",
+  product: "Product",
 }
 
 export const STARTER_TAGS = [

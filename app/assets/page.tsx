@@ -18,6 +18,7 @@ import {
   Image as ImageIcon,
   Video,
   MusicNote,
+  Images,
   UploadSimple,
 } from "@phosphor-icons/react"
 import Image from "next/image"
@@ -87,6 +88,15 @@ export default function AssetsPage() {
     void refreshAssets()
   }, [refreshAssets])
 
+  const emptyStateTitle = React.useMemo(() => {
+    if (category !== "all") {
+      return `No ${ASSET_CATEGORY_LABELS[category]} yet`
+    }
+    if (visibility === "private") return "No private assets yet"
+    if (visibility === "public") return "No public assets yet"
+    return "Nothing here yet"
+  }, [category, visibility])
+
   const handleFileUpload = React.useCallback(async (file: File) => {
     if (!file) return
     const type = file.type
@@ -107,7 +117,7 @@ export default function AssetsPage() {
     setUploadedAssetType(result.fileType)
     setUploadedFileName(result.fileName)
     setCreateDialogOpen(true)
-  }, [])
+  }, [category, visibility])
 
   const handleFileSelect = React.useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -322,7 +332,7 @@ export default function AssetsPage() {
           <div>
             <h1 className="text-3xl font-bold">Asset Library</h1>
             <p className="text-muted-foreground mt-1">
-              Save references for characters, scenes, textures, motion clips, and audio.
+              Save references for characters, scenes, textures, thumbnails, motion clips, and audio.
             </p>
             <Link
               href="/history"
@@ -367,7 +377,23 @@ export default function AssetsPage() {
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">Loading assets...</div>
         ) : assets.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">No assets in this filter.</div>
+          <div className="mx-auto flex max-w-md flex-col items-center py-14 text-center">
+            <div className="mb-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-muted">
+              <Images className="h-7 w-7 text-muted-foreground" weight="duotone" />
+            </div>
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">{emptyStateTitle}</h2>
+            <p className="mt-2 max-w-sm text-balance text-sm text-muted-foreground">
+              Drop a file anywhere on this page, or use Upload below.
+            </p>
+            <Button
+              type="button"
+              className="mt-8 w-full gap-2 sm:w-auto"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <UploadSimple className="h-4 w-4" />
+              Create asset
+            </Button>
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {assets.map((asset) => renderAssetCard(asset))}
@@ -390,6 +416,8 @@ export default function AssetsPage() {
             url: uploadedFileUrl,
             assetType: uploadedAssetType,
             title: uploadedFileName,
+            ...(category !== "all" ? { category } : {}),
+            ...(visibility !== "all" ? { visibility } : {}),
           }}
           onSaved={() => void refreshAssets()}
         />

@@ -339,8 +339,12 @@ export async function POST(request: NextRequest) {
         ];
 
         if (jsonSupportedModels.includes(modelIdentifier)) {
-          console.log('[generate-image] Using JSON prompt enhancement for:', modelIdentifier);
-          finalPrompt = await enhancePromptForJSONModels(prompt, modelIdentifier);
+          console.log('[generate-image] Using JSON prompt enhancement for:', modelIdentifier, {
+            referenceImagesForEnhance: referenceImageUrls.length,
+          });
+          finalPrompt = await enhancePromptForJSONModels(prompt, modelIdentifier, {
+            imageUrls: referenceImageUrls,
+          });
           console.log('[generate-image] ✓ JSON prompt enhanced - returned structured data');
         } else {
           console.log('[generate-image] Using standard prompt enhancement');

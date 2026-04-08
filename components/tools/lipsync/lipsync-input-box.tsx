@@ -84,9 +84,10 @@ export function LipsyncInputBox({
             <PhotoUpload
               value={inputImage}
               onChange={handleImageChange}
-              title="Upload Image"
-              description="Click to upload image"
+              title="Image or video"
+              description="Portrait image or talking-head clip"
               {...photoUploadProps}
+              allowVideo
             />
           </div>
           <div className="flex-1">

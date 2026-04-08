@@ -31,6 +31,15 @@ import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { AspectRatioSelector } from "@/components/shared/selectors/aspect-ratio-selector"
 import { getActiveModelMetadata, type ModelMetadata } from "@/lib/constants/model-metadata"
 import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
+import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
+import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { BrandKitNewFlowDialog } from "@/components/brand-kit/brand-kit-new-flow-dialog"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import type { AssetType } from "@/lib/assets/types"
+import { toast } from "sonner"
+import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
+import { extendMentionRangeEnd } from "@/lib/commands/mention-token"
+import { brandRefsOnly, getImageAssetUrlsFromRefChips } from "@/lib/commands/ref-image-pipeline"
 
 interface InfluencerInputBoxProps {
   className?: string
@@ -74,6 +83,10 @@ interface InfluencerInputBoxProps {
   allowConcurrent?: boolean
   /** When true, model selector, aspect ratio, and other options stay enabled during generation */
   allowOptionsDuringGeneration?: boolean
+  /** Lift @-reference chips to parent (e.g. merge into generate API prompt) */
+  onAttachedRefsChange?: (refs: AttachedRef[]) => void
+  /** Restrict @ → assets (e.g. `["image"]` on /image) */
+  allowedAssetTypes?: AssetType[]
 }
 
 export function InfluencerInputBox({
@@ -89,7 +102,7 @@ export function InfluencerInputBox({
   onEnhancePromptChange,
   isGenerating = false,
   forceRowLayout: _forceRowLayout = false,
-  placeholder = "Enter your prompt...",
+  placeholder = "Describe your image — use / for presets and @ for brand kits & assets.",
   selectedModel,
   onModelChange,
   showModelSelector = false,
@@ -113,15 +126,27 @@ export function InfluencerInputBox({
   uploadMenuItems,
   allowConcurrent = false,
   allowOptionsDuringGeneration = false,
+  onAttachedRefsChange,
+  allowedAssetTypes,
 }: InfluencerInputBoxProps) {
   const [localPrompt, setLocalPrompt] = React.useState(promptValue)
+  const [attachedRefs, setAttachedRefs] = React.useState<AttachedRef[]>([])
   const [localReferenceImage, setLocalReferenceImage] = React.useState<ImageUpload | null>(referenceImage || null)
   const [localReferenceImages, setLocalReferenceImages] = React.useState<ImageUpload[]>(referenceImages || [])
   const [isPromptDragActive, setIsPromptDragActive] = React.useState(false)
   const [isFullScreenPreviewOpen, setIsFullScreenPreviewOpen] = React.useState(false)
   const [fullScreenImageIndex, setFullScreenImageIndex] = React.useState(0)
   const [assetModalOpen, setAssetModalOpen] = React.useState(false)
+  const [brandKitNewFlowOpen, setBrandKitNewFlowOpen] = React.useState(false)
+  const [slashCreateAssetOpen, setSlashCreateAssetOpen] = React.useState(false)
+  const [slashCreateAssetInitial, setSlashCreateAssetInitial] = React.useState<{
+    url: string
+    assetType: AssetType
+    title?: string
+  } | null>(null)
+  const [slashCreateAssetUploading, setSlashCreateAssetUploading] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const slashCreateAssetFileRef = React.useRef<HTMLInputElement>(null)
   const promptDragCounter = React.useRef(0)
   
   // Use DB models when provided, else fallback to constants
@@ -242,11 +267,65 @@ export function InfluencerInputBox({
     [canAcceptPromptDrop, handlePromptImageFile]
   )
 
+  const handleRefsChange = React.useCallback(
+    (refs: AttachedRef[]) => {
+      setAttachedRefs(refs)
+      onAttachedRefsChange?.(refs)
+    },
+    [onAttachedRefsChange]
+  )
+
+  const handleSlashUiAction = React.useCallback((action: SlashCommandUiAction) => {
+    if (action === "create-asset") {
+      slashCreateAssetFileRef.current?.click()
+    } else if (action === "create-brand-kit") {
+      setBrandKitNewFlowOpen(true)
+    }
+  }, [])
+
+  const handleSlashCreateAssetFile = React.useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      e.target.value = ""
+      if (!file) return
+      const type = file.type
+      const isImage = type.startsWith("image/")
+      const isVideo = type.startsWith("video/")
+      const isAudio = type.startsWith("audio/")
+      if (!isImage && !isVideo && !isAudio) {
+        toast.error("Please select an image, video, or audio file")
+        return
+      }
+      setSlashCreateAssetUploading(true)
+      try {
+        const result = await uploadFileToSupabase(file, "asset-library")
+        if (!result) return
+        if (result.fileType === "other") {
+          toast.error("Unsupported file type. Use image, video, or audio.")
+          return
+        }
+        setSlashCreateAssetInitial({
+          url: result.url,
+          assetType: result.fileType,
+          title: result.fileName,
+        })
+        setSlashCreateAssetOpen(true)
+      } finally {
+        setSlashCreateAssetUploading(false)
+      }
+    },
+    []
+  )
+
   const handleTextInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // If Enter is pressed without Shift, trigger generate
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      if (localPrompt.trim().length > 0 && onGenerate) {
+      if (
+        (buildPromptWithRefs(localPrompt, brandRefsOnly(attachedRefs)).trim().length > 0 ||
+          getImageAssetUrlsFromRefChips(attachedRefs).length > 0) &&
+        onGenerate
+      ) {
         onGenerate()
       }
     }
@@ -269,6 +348,26 @@ export function InfluencerInputBox({
       }
     }
   }
+
+  const removeAttachedAssetImageRef = React.useCallback(
+    (ref: AttachedRef) => {
+      const without = attachedRefs.filter((r) => r.chipId !== ref.chipId)
+      let next = localPrompt
+      const token = ref.mentionToken
+      if (token) {
+        const start = localPrompt.indexOf(token)
+        if (start !== -1) {
+          const end = extendMentionRangeEnd(localPrompt, start, token.length)
+          next = localPrompt.slice(0, start) + localPrompt.slice(end)
+        }
+      }
+      const pruned = without.filter((r) => !r.mentionToken || next.includes(r.mentionToken))
+      setLocalPrompt(next)
+      onPromptChange?.(next)
+      handleRefsChange(pruned)
+    },
+    [attachedRefs, localPrompt, onPromptChange, handleRefsChange]
+  )
 
   const handleReferenceImageRemove = (index?: number) => {
     // Support both single and multiple reference images
@@ -368,15 +467,39 @@ export function InfluencerInputBox({
     if (typeof isReadyOverride === "boolean") {
       return isReadyOverride
     }
-    return localPrompt.trim().length > 0
-  }, [isReadyOverride, localPrompt])
+    return (
+      buildPromptWithRefs(localPrompt, brandRefsOnly(attachedRefs)).trim().length > 0 ||
+      getImageAssetUrlsFromRefChips(attachedRefs).length > 0
+    )
+  }, [isReadyOverride, localPrompt, attachedRefs])
 
-  // Determine which images to display (multiple or single)
-  const displayImages = onReferenceImagesChange 
-    ? localReferenceImages 
-    : localReferenceImage 
-      ? [localReferenceImage] 
+  // Manually uploaded reference(s) — same row as @-attached image assets below
+  const manualDisplayImages = onReferenceImagesChange
+    ? localReferenceImages
+    : localReferenceImage
+      ? [localReferenceImage]
       : []
+
+  /** Image library assets tagged in the prompt with a usable preview URL */
+  const attachedImageAssetsWithPreview = React.useMemo(
+    () =>
+      attachedRefs.filter((r) => {
+        if (r.category !== "asset" || r.assetType !== "image") return false
+        const url = (r.assetUrl || r.previewUrl || "").trim()
+        return Boolean(url)
+      }),
+    [attachedRefs]
+  )
+
+  const previewRowCount = manualDisplayImages.length + attachedImageAssetsWithPreview.length
+
+  const allPreviewImageUrls = React.useMemo(
+    () => [
+      ...manualDisplayImages.map((img) => img.url),
+      ...attachedImageAssetsWithPreview.map((r) => (r.assetUrl || r.previewUrl || "").trim()),
+    ],
+    [manualDisplayImages, attachedImageAssetsWithPreview]
+  )
 
   const promptPlaceholderText =
     canAcceptPromptDrop && isPromptDragActive
@@ -389,7 +512,9 @@ export function InfluencerInputBox({
     <Card
       className={cn(
         "w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative transition-colors",
-        className
+        className,
+        /* Card defaults to overflow-hidden; allow slash/@ palette to extend above the prompt */
+        "overflow-visible"
       )}
       onDrop={handlePromptDrop}
       onDragOver={handlePromptDragOver}
@@ -402,10 +527,10 @@ export function InfluencerInputBox({
       )}
       <CardContent className="p-2 flex flex-col gap-1.5">
         {/* Image Preview - Above Text Input */}
-        {showReferenceControls && displayImages.length > 0 && (
+        {showReferenceControls && previewRowCount > 0 && (
           <div className="relative w-full flex gap-2 flex-wrap">
-            {displayImages.map((image, index) => (
-              <div key={index} className="relative">
+            {manualDisplayImages.map((image, index) => (
+              <div key={`upload-${index}`} className="relative">
                 <img
                   src={image.url}
                   alt={`Reference image ${index + 1}`}
@@ -413,6 +538,7 @@ export function InfluencerInputBox({
                   onClick={() => handleImagePreviewClick(index)}
                 />
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation()
                     handleReferenceImageRemove(onReferenceImagesChange ? index : undefined)
@@ -424,6 +550,31 @@ export function InfluencerInputBox({
                 </button>
               </div>
             ))}
+            {attachedImageAssetsWithPreview.map((ref, assetIdx) => {
+              const url = (ref.assetUrl || ref.previewUrl || "").trim()
+              const globalIndex = manualDisplayImages.length + assetIdx
+              return (
+                <div key={`asset-${ref.chipId}`} className="relative">
+                  <img
+                    src={url}
+                    alt={ref.label ? `Asset reference: ${ref.label}` : "Attached asset reference"}
+                    className="h-[60px] w-auto max-w-full rounded object-contain border border-border cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => handleImagePreviewClick(globalIndex)}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeAttachedAssetImageRef(ref)
+                    }}
+                    className="absolute -top-1 -right-1 bg-background hover:bg-destructive text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10"
+                    aria-label={`Remove ${ref.label || "attached asset"} from prompt`}
+                  >
+                    <X className="size-3" weight="bold" />
+                  </button>
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -436,10 +587,14 @@ export function InfluencerInputBox({
                 setLocalPrompt(value)
                 onPromptChange?.(value)
               }}
+              attachedRefs={attachedRefs}
+              onRefsChange={handleRefsChange}
               placeholder={promptPlaceholderText}
               variant="page"
               onPromptKeyDown={handleTextInputKeyDown}
               onPasteImage={canAcceptPromptDrop ? (file) => handlePromptImageFile(file) : undefined}
+              allowedAssetTypes={allowedAssetTypes}
+              onSlashUiAction={handleSlashUiAction}
             />
           </div>
 
@@ -658,17 +813,26 @@ export function InfluencerInputBox({
           onChange={handleReferenceImageUpload}
           className="hidden"
         />
+        <input
+          ref={slashCreateAssetFileRef}
+          type="file"
+          accept="image/*,video/*,audio/*"
+          onChange={handleSlashCreateAssetFile}
+          className="hidden"
+          aria-hidden
+          disabled={slashCreateAssetUploading}
+        />
       </CardContent>
 
       {/* Full Screen Image Preview */}
-      {isFullScreenPreviewOpen && displayImages[fullScreenImageIndex]?.url && (
+      {isFullScreenPreviewOpen && allPreviewImageUrls[fullScreenImageIndex] && (
         <div
           className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={handleCloseFullScreenPreview}
         >
           <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
             <img
-              src={displayImages[fullScreenImageIndex].url}
+              src={allPreviewImageUrls[fullScreenImageIndex]}
               alt="Reference image full screen"
               className="max-w-full max-h-[90vh] object-contain rounded-lg"
             />
@@ -689,6 +853,23 @@ export function InfluencerInputBox({
         onOpenChange={setAssetModalOpen}
         onSelect={handleAssetSelect}
       />
+
+      {slashCreateAssetInitial ? (
+        <CreateAssetDialog
+          open={slashCreateAssetOpen}
+          onOpenChange={(open) => {
+            setSlashCreateAssetOpen(open)
+            if (!open) setSlashCreateAssetInitial(null)
+          }}
+          initial={{
+            url: slashCreateAssetInitial.url,
+            assetType: slashCreateAssetInitial.assetType,
+            title: slashCreateAssetInitial.title,
+          }}
+        />
+      ) : null}
+
+      <BrandKitNewFlowDialog open={brandKitNewFlowOpen} onOpenChange={setBrandKitNewFlowOpen} />
     </Card>
   )
 }

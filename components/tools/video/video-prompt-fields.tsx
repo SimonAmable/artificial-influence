@@ -3,6 +3,10 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { extractClipboardImageFiles } from "@/lib/utils/clipboard"
+import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
+import type { AssetType } from "@/lib/assets/types"
+import type { CommandItem } from "@/lib/commands/types"
+import { CommandTextarea } from "@/components/commands/command-textarea"
 
 interface VideoPromptFieldsProps {
   promptValue: string
@@ -15,6 +19,12 @@ interface VideoPromptFieldsProps {
   variant?: "page" | "toolbar"
   onPromptKeyDown?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void
   onPasteImage?: (file: File) => void
+  attachedRefs?: AttachedRef[]
+  onRefsChange?: (refs: AttachedRef[]) => void
+  allowedAssetTypes?: AssetType[]
+  slashCommands?: CommandItem[]
+  slashCommandsContext?: string | null
+  onSlashUiAction?: (action: SlashCommandUiAction) => void
 }
 
 export function VideoPromptFields({
@@ -23,36 +33,55 @@ export function VideoPromptFields({
   negativePromptValue,
   onNegativePromptChange,
   showNegativePrompt = false,
-  placeholder = "Describe the video you want to generate...",
+  placeholder = "Describe the video you want to generate — use / for presets and @ for brand kits & assets.",
   className,
   variant = "page",
   onPromptKeyDown,
   onPasteImage,
+  attachedRefs = [],
+  onRefsChange = () => {},
+  allowedAssetTypes,
+  slashCommands,
+  slashCommandsContext = "Video Prompts",
+  onSlashUiAction,
 }: VideoPromptFieldsProps) {
   const isToolbar = variant === "toolbar"
 
-  const handlePaste = React.useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const pastedImage = extractClipboardImageFiles(e.clipboardData?.items)[0]
-    if (!pastedImage || !onPasteImage) return
+  const handlePaste = React.useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const pastedImage = extractClipboardImageFiles(e.clipboardData?.items)[0]
+      if (!pastedImage || !onPasteImage) return
 
-    e.preventDefault()
-    e.stopPropagation()
-    onPasteImage(pastedImage)
-  }, [onPasteImage])
+      e.preventDefault()
+      e.stopPropagation()
+      onPasteImage(pastedImage)
+    },
+    [onPasteImage]
+  )
+
+  const textareaClassName = cn(
+    "w-full border-none outline-none resize-none bg-transparent text-sm overflow-y-auto",
+    isToolbar ? "min-h-[50px] max-h-[120px]" : "min-h-[60px] max-h-[120px]"
+  )
+
+  const rows = isToolbar ? 2 : 3
 
   return (
     <div className={cn("flex-1", className)}>
-      <textarea
+      <CommandTextarea
         value={promptValue}
-        onChange={(e) => onPromptChange(e.target.value)}
-        onKeyDown={onPromptKeyDown}
-        onPaste={handlePaste}
+        onChange={onPromptChange}
+        refs={attachedRefs}
+        onRefsChange={onRefsChange}
+        rows={rows}
+        className={textareaClassName}
         placeholder={placeholder}
-        className={cn(
-          "w-full border-none outline-none resize-none bg-transparent text-sm",
-          isToolbar ? "min-h-[50px] max-h-[120px]" : "min-h-[60px] max-h-[120px]"
-        )}
-        rows={isToolbar ? 2 : 3}
+        onPromptKeyDown={onPromptKeyDown}
+        onPasteImage={onPasteImage}
+        allowedAssetTypes={allowedAssetTypes}
+        slashCommandsContext={slashCommandsContext}
+        slashCommands={slashCommands}
+        onSlashUiAction={onSlashUiAction}
       />
       {showNegativePrompt && (
         <textarea

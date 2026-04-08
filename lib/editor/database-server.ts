@@ -1,11 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import type {
   CreateEditorProjectInput,
-  EditorAgentSession,
   EditorProject,
   EditorProjectSummary,
   EditorRenderJob,
-  PendingAgentAction,
   UpdateEditorProjectInput,
 } from "@/lib/editor/types"
 import { createDefaultProjectInput } from "@/lib/editor/utils"
@@ -26,22 +24,6 @@ function mapProject(row: Record<string, unknown>): EditorProject {
       (row.last_render_status as EditorProject["last_render_status"] | null) ??
       "idle",
     last_rendered_at: (row.last_rendered_at as string | null) ?? null,
-  }
-}
-
-function mapAgentSession(row: Record<string, unknown>): EditorAgentSession {
-  return {
-    id: row.id as string,
-    project_id: row.project_id as string,
-    user_id: row.user_id as string,
-    messages: Array.isArray(row.messages) ? (row.messages as unknown[]) : [],
-    pending_action:
-      (row.pending_action as PendingAgentAction | null | undefined) ?? null,
-    command_history: Array.isArray(row.command_history)
-      ? (row.command_history as EditorAgentSession["command_history"])
-      : [],
-    created_at: row.created_at as string,
-    updated_at: row.updated_at as string,
   }
 }
 
@@ -173,7 +155,6 @@ export async function deleteEditorProject(
 ): Promise<void> {
   const supabase = await createClient()
 
-  await supabase.from("editor_agent_sessions").delete().eq("project_id", projectId).eq("user_id", userId)
   await supabase.from("editor_renders").delete().eq("project_id", projectId).eq("user_id", userId)
 
   const { error } = await supabase
@@ -206,80 +187,6 @@ export async function duplicateEditorProject(
   })
 }
 
-export async function ensureEditorAgentSession(
-  projectId: string,
-  userId: string,
-): Promise<EditorAgentSession> {
-  const supabase = await createClient()
-  const { data: existing, error: existingError } = await supabase
-    .from("editor_agent_sessions")
-    .select("*")
-    .eq("project_id", projectId)
-    .eq("user_id", userId)
-    .single()
-
-  if (!existingError && existing) {
-    return mapAgentSession(existing as Record<string, unknown>)
-  }
-
-  const { data, error } = await supabase
-    .from("editor_agent_sessions")
-    .insert({
-      project_id: projectId,
-      user_id: userId,
-      messages: [],
-      pending_action: null,
-      command_history: [],
-    })
-    .select("*")
-    .single()
-
-  if (error || !data) {
-    console.error("Error ensuring editor agent session:", error)
-    throw new Error(`Failed to ensure editor agent session: ${error?.message}`)
-  }
-
-  return mapAgentSession(data as Record<string, unknown>)
-}
-
-export async function saveEditorAgentSession(
-  projectId: string,
-  userId: string,
-  updates: Partial<Pick<EditorAgentSession, "messages" | "pending_action" | "command_history">>,
-): Promise<EditorAgentSession> {
-  const supabase = await createClient()
-  await ensureEditorAgentSession(projectId, userId)
-
-  const { data, error } = await supabase
-    .from("editor_agent_sessions")
-    .update({
-      ...(updates.messages !== undefined ? { messages: updates.messages } : {}),
-      ...(updates.pending_action !== undefined
-        ? { pending_action: updates.pending_action }
-        : {}),
-      ...(updates.command_history !== undefined
-        ? { command_history: updates.command_history }
-        : {}),
-    })
-    .eq("project_id", projectId)
-    .eq("user_id", userId)
-    .select("*")
-    .single()
-
-  if (error || !data) {
-    console.error("Error saving editor agent session:", error)
-    throw new Error(`Failed to save editor agent session: ${error?.message}`)
-  }
-
-  return mapAgentSession(data as Record<string, unknown>)
-}
-
-export async function getEditorAgentSession(
-  projectId: string,
-  userId: string,
-): Promise<EditorAgentSession> {
-  return ensureEditorAgentSession(projectId, userId)
-}
 
 export async function createEditorRenderJob(
   projectId: string,

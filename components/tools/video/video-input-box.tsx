@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CircleNotch, Plus, FilePlus, X, Sparkle } from "@phosphor-icons/react"
+import { CircleNotch, Plus, FilePlus, X, Sparkle, Check } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import type { Model } from "@/lib/types/models"
 import { PhotoUpload, ImageUpload } from "@/components/shared/upload/photo-upload"
@@ -21,6 +21,18 @@ import { VideoModelParameterControls } from "@/components/tools/video/video-mode
 import { MultiShotEditor, type MultiShotItem } from "@/components/tools/video/multi-shot-editor"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
+import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
+import { brandRefsOnly, getImageAssetUrlsFromRefChips, getVideoAssetUrlsFromRefChips } from "@/lib/commands/ref-image-pipeline"
+import { allowedAssetTypesForVideoModel } from "@/lib/commands/allowed-asset-types"
+import { VIDEO_PRESET_COMMANDS } from "@/lib/commands/presets-video"
+import { getVideoChipSlotInfo } from "@/lib/commands/video-chip-slots"
+import { extendMentionRangeEnd } from "@/lib/commands/mention-token"
+import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { BrandKitNewFlowDialog } from "@/components/brand-kit/brand-kit-new-flow-dialog"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import type { AssetType } from "@/lib/assets/types"
+import { toast } from "sonner"
 
 interface VideoInputBoxProps {
   videoModels: Model[]
@@ -51,6 +63,9 @@ interface VideoInputBoxProps {
   /** Kling v3 Omni: reference images for elements, scenes, or styles (max 7 without video, 4 with video) */
   referenceImages?: ImageUpload[]
   onReferenceImagesChange?: (images: ImageUpload[]) => void
+  /** Lift @ / command refs to parent for generate merge */
+  attachedRefs?: AttachedRef[]
+  onAttachedRefsChange?: (refs: AttachedRef[]) => void
 }
 
 export function VideoInputBox({
@@ -80,8 +95,31 @@ export function VideoInputBox({
   onMultiShotShotsChange,
   referenceImages = [],
   onReferenceImagesChange,
+  attachedRefs: attachedRefsProp,
+  onAttachedRefsChange,
 }: VideoInputBoxProps) {
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+  const [attachedRefsLocal, setAttachedRefsLocal] = React.useState<AttachedRef[]>([])
+  const attachedRefs = attachedRefsProp ?? attachedRefsLocal
+  const setAttachedRefs = React.useCallback(
+    (next: AttachedRef[]) => {
+      if (attachedRefsProp === undefined) {
+        setAttachedRefsLocal(next)
+      }
+      onAttachedRefsChange?.(next)
+    },
+    [attachedRefsProp, onAttachedRefsChange]
+  )
+
+  const slashCreateAssetFileRef = React.useRef<HTMLInputElement>(null)
+  const [slashCreateAssetOpen, setSlashCreateAssetOpen] = React.useState(false)
+  const [brandKitNewFlowOpen, setBrandKitNewFlowOpen] = React.useState(false)
+  const [slashCreateAssetInitial, setSlashCreateAssetInitial] = React.useState<{
+    url: string
+    assetType: AssetType
+    title?: string
+  } | null>(null)
+  const [slashCreateAssetUploading, setSlashCreateAssetUploading] = React.useState(false)
+
   const inputRef = React.useRef<HTMLInputElement>(null)
   const lastFrameRef = React.useRef<HTMLInputElement>(null)
   const videoRef = React.useRef<HTMLInputElement>(null)
@@ -130,19 +168,66 @@ export function VideoInputBox({
   const isKlingV3OrOmni = isKlingV3 || isKlingV3Omni
   const totalDuration = Number(parameters.duration) || 5
   const maxReferenceImages = inputVideo ? 4 : 7
-  const canAddReferenceImage = isKlingV3Omni && referenceImages.length < maxReferenceImages
 
   // Determine if we need prompt
   const needsPrompt = !isMotionCopyModel && !isLipsyncModel
 
-  const handleTextInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      if (isReady) {
-        onGenerate()
+  const allowedAssetTypes = React.useMemo(
+    () => allowedAssetTypesForVideoModel(selectedModel),
+    [selectedModel]
+  )
+
+  const mergedPromptForReady = React.useMemo(
+    () => buildPromptWithRefs(promptValue, brandRefsOnly(attachedRefs)).trim(),
+    [promptValue, attachedRefs]
+  )
+
+  const hasRefChips = React.useMemo(() => {
+    return (
+      getImageAssetUrlsFromRefChips(attachedRefs).length > 0 ||
+      getVideoAssetUrlsFromRefChips(attachedRefs).length > 0
+    )
+  }, [attachedRefs])
+
+  const chipSlotInfo = React.useMemo(
+    () =>
+      getVideoChipSlotInfo(selectedModel, attachedRefs, {
+        hasInputImage: !!(inputImage?.file || inputImage?.url),
+        hasLastFrame: !!(lastFrameImage?.file || lastFrameImage?.url),
+        hasReferenceVideo: !!(inputVideo?.file || inputVideo?.url),
+      }),
+    [selectedModel, attachedRefs, inputImage, lastFrameImage, inputVideo]
+  )
+
+  const removeAttachedRef = React.useCallback(
+    (ref: AttachedRef) => {
+      const without = attachedRefs.filter((r) => r.chipId !== ref.chipId)
+      let next = promptValue
+      const token = ref.mentionToken
+      if (token) {
+        const start = promptValue.indexOf(token)
+        if (start !== -1) {
+          const end = extendMentionRangeEnd(promptValue, start, token.length)
+          next = promptValue.slice(0, start) + promptValue.slice(end)
+        }
       }
-    }
-  }
+      const pruned = without.filter((r) => !r.mentionToken || next.includes(r.mentionToken))
+      onPromptChange(next)
+      setAttachedRefs(pruned)
+    },
+    [attachedRefs, onPromptChange, promptValue, setAttachedRefs]
+  )
+
+  const canAddReferenceImage = React.useMemo(() => {
+    if (!isKlingV3Omni) return false
+    const nChipStyle = chipSlotInfo.omniStyleImageChipUrls.length
+    return referenceImages.length + nChipStyle < maxReferenceImages
+  }, [
+    isKlingV3Omni,
+    referenceImages.length,
+    chipSlotInfo.omniStyleImageChipUrls.length,
+    maxReferenceImages,
+  ])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'input' | 'lastFrame') => {
     const file = e.target.files?.[0]
@@ -174,7 +259,11 @@ export function VideoInputBox({
   const handleReferenceImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !file.type.match(/^image\/(jpeg|jpg|png)$/i)) return
-    if (!onReferenceImagesChange || referenceImages.length >= maxReferenceImages) return
+    if (
+      !onReferenceImagesChange ||
+      referenceImages.length + chipSlotInfo.omniStyleImageChipUrls.length >= maxReferenceImages
+    )
+      return
     const next: ImageUpload = { file, url: URL.createObjectURL(file) }
     onReferenceImagesChange([...referenceImages, next])
     e.target.value = ''
@@ -185,35 +274,98 @@ export function VideoInputBox({
     onReferenceImagesChange(referenceImages.filter((_, i) => i !== index))
   }
 
-  const isReady = (() => {
-    // Motion copy model needs image + video
+  const isReady = React.useMemo(() => {
     if (isMotionCopyModel) {
       return !!(inputImage && inputVideo)
     }
-    // Lipsync model needs image + audio
     if (isLipsyncModel) {
       return !!(inputImage && inputAudio)
     }
-    // Kling v3 / Omni multi-shot: ready if shots have prompts and total duration matches
     if (isKlingV3OrOmni && multiShotMode && multiShotShots.length > 0) {
       const sum = multiShotShots.reduce((acc, s) => acc + s.duration, 0)
       const validSum = sum === totalDuration
       const hasPrompts = multiShotShots.every((s) => s.prompt.trim().length > 0)
       return validSum && hasPrompts
     }
-    // Kling v3 / Omni single-shot: prompt or start image
     if (isKlingV3OrOmni && !multiShotMode) {
-      return promptValue.trim().length > 0 || !!inputImage
+      return mergedPromptForReady.length > 0 || !!inputImage || hasRefChips
     }
-    // For models requiring images, check if images are uploaded
     if (modelSupportsImage || modelSupportsLastFrame) {
       if (modelSupportsImage && !inputImage) return false
       if (modelSupportsLastFrame && !lastFrameImage) return false
       return true
     }
-    // For text-only models, check prompt
-    return promptValue.trim().length > 0
-  })()
+    return mergedPromptForReady.length > 0 || hasRefChips
+  }, [
+    isMotionCopyModel,
+    isLipsyncModel,
+    inputImage,
+    inputVideo,
+    inputAudio,
+    isKlingV3OrOmni,
+    multiShotMode,
+    multiShotShots,
+    totalDuration,
+    mergedPromptForReady,
+    hasRefChips,
+    modelSupportsImage,
+    modelSupportsLastFrame,
+    lastFrameImage,
+  ])
+
+  const handleSlashUiAction = React.useCallback((action: SlashCommandUiAction) => {
+    if (action === "create-asset") {
+      slashCreateAssetFileRef.current?.click()
+    } else if (action === "create-brand-kit") {
+      setBrandKitNewFlowOpen(true)
+    }
+  }, [])
+
+  const handleSlashCreateAssetFile = React.useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      e.target.value = ""
+      if (!file) return
+      const type = file.type
+      const isImage = type.startsWith("image/")
+      const isVideo = type.startsWith("video/")
+      const isAudio = type.startsWith("audio/")
+      if (!isImage && !isVideo && !isAudio) {
+        toast.error("Please select an image, video, or audio file")
+        return
+      }
+      setSlashCreateAssetUploading(true)
+      try {
+        const result = await uploadFileToSupabase(file, "asset-library")
+        if (!result) return
+        if (result.fileType === "other") {
+          toast.error("Unsupported file type. Use image, video, or audio.")
+          return
+        }
+        setSlashCreateAssetInitial({
+          url: result.url,
+          assetType: result.fileType,
+          title: result.fileName,
+        })
+        setSlashCreateAssetOpen(true)
+      } finally {
+        setSlashCreateAssetUploading(false)
+      }
+    },
+    []
+  )
+
+  const handleTextInputKeyDown = React.useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault()
+        if (isReady) {
+          onGenerate()
+        }
+      }
+    },
+    [isReady, onGenerate]
+  )
 
   const canDropReferenceVideo = React.useMemo(() => {
     if (!isReferenceVideoSupported) return false
@@ -369,7 +521,10 @@ export function VideoInputBox({
   // Unified interface structure
   return (
     <Card
-      className={cn("w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative", forceRowLayout && "backdrop-blur-xl bg-background/95 shadow-2xl border-2")}
+      className={cn(
+        "w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative overflow-visible",
+        forceRowLayout && "backdrop-blur-xl bg-background/95 shadow-2xl border-2"
+      )}
       onDropCapture={handlePromptDrop}
       onDragOverCapture={handlePromptDragOver}
       onDragEnterCapture={handlePromptDragEnter}
@@ -379,10 +534,153 @@ export function VideoInputBox({
         <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] border-2 border-dashed border-primary bg-primary/20" />
       )}
       <CardContent className="p-2 flex flex-col gap-1.5">
-        {/* Image/Video Previews - Show uploaded assets from plus button (only when not using custom upload components) */}
-        {((!isMotionCopyModel && !isLipsyncModel && (inputImage || lastFrameImage || (isReferenceVideoSupported && inputVideo) || (isKlingV3Omni && referenceImages.length > 0))) || (isMotionCopyModel && (inputImage || inputVideo))) && (
+        {/* Image/Video Previews — manual uploads + @ library slots (same API fields) */}
+        {((!isMotionCopyModel &&
+          !isLipsyncModel &&
+          (inputImage ||
+            lastFrameImage ||
+            (isReferenceVideoSupported && inputVideo) ||
+            (isKlingV3Omni && referenceImages.length > 0) ||
+            chipSlotInfo.inputSlotFromChip ||
+            chipSlotInfo.lastFrameSlotFromChip ||
+            chipSlotInfo.referenceVideoSlotFromChip ||
+            (isKlingV3Omni && chipSlotInfo.omniStyleImageChipUrls.length > 0))) ||
+          (isMotionCopyModel && (inputImage || inputVideo))) && (
           <div className="flex flex-wrap gap-2 px-2 pt-1">
-            {inputImage && inputImage.url && (
+            {(inputImage?.url || chipSlotInfo.startImageChipUrl) && !isMotionCopyModel && !isLipsyncModel && (
+              <div className="relative inline-block">
+                <Image
+                  src={inputImage?.url ?? chipSlotInfo.startImageChipUrl!}
+                  alt="Input preview"
+                  width={200}
+                  height={150}
+                  className="w-auto h-auto max-h-32 rounded-md object-contain border border-border"
+                />
+                <button
+                  onClick={() => {
+                    if (inputImage) onInputImageChange(null)
+                    else if (chipSlotInfo.startImageRef) removeAttachedRef(chipSlotInfo.startImageRef)
+                  }}
+                  className="absolute top-1 right-1 bg-background/80 hover:bg-destructive/80 text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10 backdrop-blur-sm"
+                  aria-label="Remove input image"
+                  type="button"
+                >
+                  <X className="size-3" weight="bold" />
+                </button>
+                <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-medium border border-border">
+                  {inputImage?.url
+                    ? selectedModel.identifier === "minimax/hailuo-2.3-fast"
+                      ? "First Frame"
+                      : isKlingV3OrOmni
+                        ? "Start Frame"
+                        : "Input"
+                    : "@ Library · start"}
+                </div>
+              </div>
+            )}
+            {(lastFrameImage?.url || chipSlotInfo.lastFrameChipUrl) && !isMotionCopyModel && !isLipsyncModel && (
+              <div className="relative inline-block">
+                <Image
+                  src={lastFrameImage?.url ?? chipSlotInfo.lastFrameChipUrl!}
+                  alt="Last frame preview"
+                  width={200}
+                  height={150}
+                  className="w-auto h-auto max-h-32 rounded-md object-contain border border-border"
+                />
+                <button
+                  onClick={() => {
+                    if (lastFrameImage) onLastFrameChange(null)
+                    else if (chipSlotInfo.lastFrameRef) removeAttachedRef(chipSlotInfo.lastFrameRef)
+                  }}
+                  className="absolute top-1 right-1 bg-background/80 hover:bg-destructive/80 text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10 backdrop-blur-sm"
+                  aria-label="Remove last frame"
+                  type="button"
+                >
+                  <X className="size-3" weight="bold" />
+                </button>
+                <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-medium border border-border">
+                  {lastFrameImage?.url ? "Last Frame" : "@ Library · last"}
+                </div>
+              </div>
+            )}
+            {isReferenceVideoSupported && (inputVideo?.url || chipSlotInfo.referenceVideoChipUrl) && (
+              <div className="relative inline-block">
+                <video
+                  src={inputVideo?.url ?? chipSlotInfo.referenceVideoChipUrl!}
+                  className="w-auto h-auto max-h-32 rounded-md object-contain border border-border"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+                <button
+                  onClick={() => {
+                    if (inputVideo) onInputVideoChange(null)
+                    else if (chipSlotInfo.referenceVideoRef) removeAttachedRef(chipSlotInfo.referenceVideoRef)
+                  }}
+                  className="absolute top-1 right-1 bg-background/80 hover:bg-destructive/80 text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10 backdrop-blur-sm"
+                  aria-label={isMotionCopyModel ? "Remove background source" : "Remove reference video"}
+                  type="button"
+                >
+                  <X className="size-3" weight="bold" />
+                </button>
+                <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-medium border border-border">
+                  {inputVideo?.url
+                    ? isMotionCopyModel
+                      ? "Background source"
+                      : "Reference Video"
+                    : "@ Library · video"}
+                </div>
+              </div>
+            )}
+            {isKlingV3Omni &&
+              referenceImages.map((ref, index) =>
+                ref.url ? (
+                  <div key={`upload-ref-${index}`} className="relative inline-block">
+                    <Image
+                      src={ref.url}
+                      alt={`Reference ${index + 1}`}
+                      width={80}
+                      height={60}
+                      className="w-auto h-auto max-h-20 rounded-md object-cover border border-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeReferenceImage(index)}
+                      className="absolute top-0.5 right-0.5 bg-background/80 hover:bg-destructive/80 text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10 backdrop-blur-sm"
+                      aria-label={`Remove reference image ${index + 1}`}
+                    >
+                      <X className="size-2.5" weight="bold" />
+                    </button>
+                    <div className="absolute bottom-0.5 left-0.5 bg-background/80 backdrop-blur-sm px-1 py-0.5 rounded text-[9px] font-medium border border-border">
+                      Ref {index + 1}
+                    </div>
+                  </div>
+                ) : null
+              )}
+            {isKlingV3Omni &&
+              chipSlotInfo.omniStyleImageRefs.map((ref, i) => (
+                <div key={`chip-style-${ref.chipId}`} className="relative inline-block">
+                  <Image
+                    src={ref.assetUrl ?? ref.previewUrl ?? ""}
+                    alt={ref.label || "Style reference"}
+                    width={80}
+                    height={60}
+                    className="w-auto h-auto max-h-20 rounded-md object-cover border border-border"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeAttachedRef(ref)}
+                    className="absolute top-0.5 right-0.5 bg-background/80 hover:bg-destructive/80 text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10 backdrop-blur-sm"
+                    aria-label="Remove style reference from prompt"
+                  >
+                    <X className="size-2.5" weight="bold" />
+                  </button>
+                  <div className="absolute bottom-0.5 left-0.5 bg-background/80 backdrop-blur-sm px-1 py-0.5 rounded text-[9px] font-medium border border-border">
+                    @ Style {i + 1}
+                  </div>
+                </div>
+              ))}
+            {isMotionCopyModel && inputImage?.url && (
               <div className="relative inline-block">
                 <Image
                   src={inputImage.url}
@@ -395,36 +693,16 @@ export function VideoInputBox({
                   onClick={() => onInputImageChange(null)}
                   className="absolute top-1 right-1 bg-background/80 hover:bg-destructive/80 text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10 backdrop-blur-sm"
                   aria-label="Remove input image"
+                  type="button"
                 >
                   <X className="size-3" weight="bold" />
                 </button>
                 <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-medium border border-border">
-                  {selectedModel.identifier === 'minimax/hailuo-2.3-fast' ? 'First Frame' : isKlingV3OrOmni ? 'Start Frame' : 'Input'}
+                  Reference Image
                 </div>
               </div>
             )}
-            {lastFrameImage && lastFrameImage.url && (
-              <div className="relative inline-block">
-                <Image
-                  src={lastFrameImage.url}
-                  alt="Last frame preview"
-                  width={200}
-                  height={150}
-                  className="w-auto h-auto max-h-32 rounded-md object-contain border border-border"
-                />
-                <button
-                  onClick={() => onLastFrameChange(null)}
-                  className="absolute top-1 right-1 bg-background/80 hover:bg-destructive/80 text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10 backdrop-blur-sm"
-                  aria-label="Remove last frame"
-                >
-                  <X className="size-3" weight="bold" />
-                </button>
-                <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-medium border border-border">
-                  Last Frame
-                </div>
-              </div>
-            )}
-            {isReferenceVideoSupported && inputVideo?.url && (
+            {isMotionCopyModel && inputVideo?.url && (
               <div className="relative inline-block">
                 <video
                   src={inputVideo.url}
@@ -436,37 +714,16 @@ export function VideoInputBox({
                 <button
                   onClick={() => onInputVideoChange(null)}
                   className="absolute top-1 right-1 bg-background/80 hover:bg-destructive/80 text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10 backdrop-blur-sm"
-                  aria-label={isMotionCopyModel ? "Remove background source" : "Remove reference video"}
+                  aria-label="Remove background source"
+                  type="button"
                 >
                   <X className="size-3" weight="bold" />
                 </button>
                 <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-medium border border-border">
-                  {isMotionCopyModel ? "Background source" : "Reference Video"}
+                  Background source
                 </div>
               </div>
             )}
-            {isKlingV3Omni && referenceImages.map((ref, index) => ref.url && (
-              <div key={index} className="relative inline-block">
-                <Image
-                  src={ref.url}
-                  alt={`Reference ${index + 1}`}
-                  width={80}
-                  height={60}
-                  className="w-auto h-auto max-h-20 rounded-md object-cover border border-border"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeReferenceImage(index)}
-                  className="absolute top-0.5 right-0.5 bg-background/80 hover:bg-destructive/80 text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10 backdrop-blur-sm"
-                  aria-label={`Remove reference image ${index + 1}`}
-                >
-                  <X className="size-2.5" weight="bold" />
-                </button>
-                <div className="absolute bottom-0.5 left-0.5 bg-background/80 backdrop-blur-sm px-1 py-0.5 rounded text-[9px] font-medium border border-border">
-                  {index + 1}
-                </div>
-              </div>
-            ))}
           </div>
         )}
 
@@ -483,6 +740,11 @@ export function VideoInputBox({
               variant="page"
               onPromptKeyDown={handleTextInputKeyDown}
               onPasteImage={canAcceptImageDrop ? handlePromptImageFile : undefined}
+              attachedRefs={attachedRefs}
+              onRefsChange={setAttachedRefs}
+              allowedAssetTypes={allowedAssetTypes}
+              slashCommands={VIDEO_PRESET_COMMANDS}
+              onSlashUiAction={handleSlashUiAction}
             />
           </div>
         )}
@@ -598,8 +860,9 @@ export function VideoInputBox({
               <PhotoUpload
                 value={inputImage}
                 onChange={onInputImageChange}
-                title="Upload Image"
-                description="Click to upload"
+                allowVideo
+                title="Image or video"
+                description="Portrait or talking-head clip"
               />
             </div>
             <div className="flex-1">
@@ -631,21 +894,50 @@ export function VideoInputBox({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   {modelSupportsImage && (
-                    <DropdownMenuItem onClick={() => inputRef.current?.click()}>
-                      <FilePlus className="size-4 mr-2" />
-                      {selectedModel.identifier === 'minimax/hailuo-2.3-fast' ? 'Upload First Frame' : 'Upload Input Image'}
+                    <DropdownMenuItem
+                      onClick={() => inputRef.current?.click()}
+                      disabled={!!inputImage || chipSlotInfo.inputSlotFromChip}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="flex items-center">
+                        <FilePlus className="size-4 mr-2 shrink-0" />
+                        {selectedModel.identifier === "minimax/hailuo-2.3-fast"
+                          ? "Upload First Frame"
+                          : "Upload Input Image"}
+                      </span>
+                      {(chipSlotInfo.inputSlotFromChip || inputImage) && (
+                        <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
+                      )}
                     </DropdownMenuItem>
                   )}
                   {modelSupportsLastFrame && (
-                    <DropdownMenuItem onClick={() => lastFrameRef.current?.click()}>
-                      <FilePlus className="size-4 mr-2" />
-                      Upload Last Frame
+                    <DropdownMenuItem
+                      onClick={() => lastFrameRef.current?.click()}
+                      disabled={!!lastFrameImage || chipSlotInfo.lastFrameSlotFromChip}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="flex items-center">
+                        <FilePlus className="size-4 mr-2 shrink-0" />
+                        Upload Last Frame
+                      </span>
+                      {(chipSlotInfo.lastFrameSlotFromChip || lastFrameImage) && (
+                        <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
+                      )}
                     </DropdownMenuItem>
                   )}
                   {isReferenceVideoSupported && (
-                    <DropdownMenuItem onClick={() => videoRef.current?.click()}>
-                      <FilePlus className="size-4 mr-2" />
-                      Upload Reference Video
+                    <DropdownMenuItem
+                      onClick={() => videoRef.current?.click()}
+                      disabled={!!inputVideo || chipSlotInfo.referenceVideoSlotFromChip}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="flex items-center">
+                        <FilePlus className="size-4 mr-2 shrink-0" />
+                        Upload Reference Video
+                      </span>
+                      {(chipSlotInfo.referenceVideoSlotFromChip || inputVideo) && (
+                        <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
+                      )}
                     </DropdownMenuItem>
                   )}
                   {canAddReferenceImage && (
@@ -690,7 +982,7 @@ export function VideoInputBox({
             onParametersChange={onParametersChange}
             disabled={isGenerating}
             variant="page"
-            referenceVideoProvided={!!inputVideo}
+            referenceVideoProvided={!!inputVideo || chipSlotInfo.referenceVideoSlotFromChip}
           />
 
           <div className="flex-1" />
@@ -725,7 +1017,34 @@ export function VideoInputBox({
             )}
           </Button>
         </div>
+
+        <input
+          ref={slashCreateAssetFileRef}
+          type="file"
+          accept="image/*,video/*,audio/*"
+          onChange={handleSlashCreateAssetFile}
+          className="hidden"
+          aria-hidden
+          disabled={slashCreateAssetUploading}
+        />
       </CardContent>
+
+      {slashCreateAssetInitial ? (
+        <CreateAssetDialog
+          open={slashCreateAssetOpen}
+          onOpenChange={(open) => {
+            setSlashCreateAssetOpen(open)
+            if (!open) setSlashCreateAssetInitial(null)
+          }}
+          initial={{
+            url: slashCreateAssetInitial.url,
+            assetType: slashCreateAssetInitial.assetType,
+            title: slashCreateAssetInitial.title,
+          }}
+        />
+      ) : null}
+
+      <BrandKitNewFlowDialog open={brandKitNewFlowOpen} onOpenChange={setBrandKitNewFlowOpen} />
     </Card>
   )
 }

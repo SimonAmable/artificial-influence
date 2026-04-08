@@ -6,6 +6,29 @@
 const POLL_INTERVAL_MS = 2500;
 const POLL_MAX_ATTEMPTS = 240; // ~10 min
 
+/** POST /api/generate-image 402 — plain Error so devtools don’t surface a custom class name. */
+function makeInsufficientCreditsError(message: string): Error {
+  const err = new Error(message);
+  err.name = 'InsufficientCreditsError';
+  return err;
+}
+
+/** Detect 402-style credit messages when only a string is available (e.g. canvas node error). */
+export function isInsufficientCreditsMessage(message: string): boolean {
+  const t = message.trim();
+  if (!t) return false;
+  const l = t.toLowerCase();
+  if (l.includes('insufficient credit')) return true;
+  if (/requires\s+\d+\s+credits?\b/i.test(t)) return true;
+  if (/not enough\s+credits?\b/i.test(l)) return true;
+  return false;
+}
+
+/** Prefer over `instanceof` — safe across chunk splits; 402 errors use `name === 'InsufficientCreditsError'`. */
+export function isInsufficientCreditsError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'InsufficientCreditsError';
+}
+
 export type GenerateImageResult =
   | { image: { url: string; mimeType?: string }; images?: undefined }
   | { images: { url: string; mimeType?: string }[]; image?: undefined };
@@ -44,7 +67,7 @@ export async function generateImageAndWait(
 
   if (response.status === 402) {
     const d = await response.json();
-    throw new Error(d.message || d.error || 'Insufficient credits');
+    throw makeInsufficientCreditsError(d.message || d.error || 'Insufficient credits');
   }
 
   if (response.status === 429) {

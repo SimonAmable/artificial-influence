@@ -32,7 +32,7 @@ export default function LipsyncPage() {
   // Handle generation
   const handleGenerate = async () => {
     if (!inputImage?.file) {
-      setError("Please upload an image")
+      setError("Please upload an image or video")
       return
     }
 
@@ -45,9 +45,11 @@ export default function LipsyncPage() {
     setError(null)
 
     try {
-      // Validate image file
-      if (!inputImage.file.type.startsWith('image/')) {
-        setError('Image must be a valid image file')
+      const isRefVideo = inputImage.file.type.startsWith("video/")
+      const isRefImage = inputImage.file.type.startsWith("image/")
+
+      if (!isRefImage && !isRefVideo) {
+        setError("Please upload a valid image or video file")
         setIsGenerating(false)
         return
       }
@@ -59,12 +61,19 @@ export default function LipsyncPage() {
         return
       }
       
-      // Validate file sizes (max 10MB for image, 20MB for audio)
+      // Validate file sizes (10MB image, 100MB video, 20MB audio)
       const maxImageSize = 10 * 1024 * 1024 // 10MB
+      const maxVideoSize = 100 * 1024 * 1024 // 100MB
       const maxAudioSize = 20 * 1024 * 1024 // 20MB
-      
-      if (inputImage.file.size > maxImageSize) {
+
+      if (isRefImage && inputImage.file.size > maxImageSize) {
         setError('Image is too large. Maximum size is 10MB.')
+        setIsGenerating(false)
+        return
+      }
+
+      if (isRefVideo && inputImage.file.size > maxVideoSize) {
+        setError('Video is too large. Maximum size is 100MB.')
         setIsGenerating(false)
         return
       }
@@ -83,30 +92,60 @@ export default function LipsyncPage() {
         throw new Error('Please log in to generate lipsync videos')
       }
 
-      // Upload image to Supabase Storage
-      console.log('Uploading image to Supabase...')
-      const imageExtension = inputImage.file.name.split('.').pop() || 'png'
-      const imageTimestamp = Date.now()
-      const imageRandomStr = Math.random().toString(36).substring(7)
-      const imageFilename = `${imageTimestamp}-${imageRandomStr}.${imageExtension}`
-      const imageStoragePath = `${user.id}/lipsync-images/${imageFilename}`
+      let imagePublicUrl: string | undefined
+      let imageStoragePath: string | undefined
+      let videoPublicUrl: string | undefined
+      let videoStoragePath: string | undefined
 
-      const { error: imageUploadError } = await supabase.storage
-        .from('public-bucket')
-        .upload(imageStoragePath, inputImage.file, {
-          contentType: inputImage.file.type,
-          upsert: false,
-        })
+      if (isRefImage) {
+        console.log('Uploading reference image to Supabase...')
+        const imageExtension = inputImage.file.name.split('.').pop() || 'png'
+        const imageTimestamp = Date.now()
+        const imageRandomStr = Math.random().toString(36).substring(7)
+        const imageFilename = `${imageTimestamp}-${imageRandomStr}.${imageExtension}`
+        imageStoragePath = `${user.id}/lipsync-images/${imageFilename}`
 
-      if (imageUploadError) {
-        throw new Error(`Failed to upload image: ${imageUploadError.message}`)
+        const { error: imageUploadError } = await supabase.storage
+          .from('public-bucket')
+          .upload(imageStoragePath, inputImage.file, {
+            contentType: inputImage.file.type,
+            upsert: false,
+          })
+
+        if (imageUploadError) {
+          throw new Error(`Failed to upload image: ${imageUploadError.message}`)
+        }
+
+        const { data: imageUrlData } = supabase.storage
+          .from('public-bucket')
+          .getPublicUrl(imageStoragePath)
+        imagePublicUrl = imageUrlData.publicUrl
+        console.log('✓ Image uploaded:', imagePublicUrl)
+      } else {
+        console.log('Uploading reference video to Supabase...')
+        const videoExtension = inputImage.file.name.split('.').pop() || 'mp4'
+        const videoTimestamp = Date.now()
+        const videoRandomStr = Math.random().toString(36).substring(7)
+        const videoFilename = `${videoTimestamp}-${videoRandomStr}.${videoExtension}`
+        videoStoragePath = `${user.id}/lipsync-videos/${videoFilename}`
+
+        const { error: videoUploadError } = await supabase.storage
+          .from('public-bucket')
+          .upload(videoStoragePath, inputImage.file, {
+            contentType: inputImage.file.type,
+            upsert: false,
+          })
+
+        if (videoUploadError) {
+          throw new Error(`Failed to upload video: ${videoUploadError.message}`)
+        }
+
+        const { data: videoUrlData } = supabase.storage
+          .from('public-bucket')
+          .getPublicUrl(videoStoragePath)
+        videoPublicUrl = videoUrlData.publicUrl
+        console.log('✓ Video uploaded:', videoPublicUrl)
       }
-
-      const { data: imageUrlData } = supabase.storage
-        .from('public-bucket')
-        .getPublicUrl(imageStoragePath)
-      const imagePublicUrl = imageUrlData.publicUrl
-      console.log('✓ Image uploaded:', imagePublicUrl)
 
       // Upload audio to Supabase Storage
       console.log('Uploading audio to Supabase...')
@@ -133,20 +172,26 @@ export default function LipsyncPage() {
       const audioPublicUrl = audioUrlData.publicUrl
       console.log('✓ Audio uploaded:', audioPublicUrl)
 
-      // Send URLs to API route for lipsync generation
-      console.log('Sending lipsync request with image and audio URLs')
-      
+      console.log('Sending lipsync request with reference media and audio URLs')
+
       const response = await fetch('/api/generate-lipsync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          imageUrl: imagePublicUrl,
+          ...(imagePublicUrl
+            ? {
+                imageUrl: imagePublicUrl,
+                imageStoragePath,
+                resolution: '720p',
+              }
+            : {
+                videoUrl: videoPublicUrl,
+                videoStoragePath,
+              }),
           audioUrl: audioPublicUrl,
-          imageStoragePath,
           audioStoragePath,
-          resolution: '720p', // Default to 720p, can be made configurable later
         }),
       })
       
@@ -200,13 +245,13 @@ export default function LipsyncPage() {
       <LipsyncShowcaseCard
         title="CREATE YOUR"
         highlightedTitle="LIPSYNC VIDEO"
-        description="Generate realistic lipsync videos by combining your image with audio."
+        description="Generate realistic lipsync from a portrait image or a talking-head video plus audio."
         steps={[
           {
             mediaPath: "/lip_sync/step1_ref-Image.png",
             mediaType: "image",
-            title: "UPLOAD IMAGE",
-            description: "Upload an image of the person you want to lipsync.",
+            title: "UPLOAD IMAGE OR VIDEO",
+            description: "Upload a portrait image or a short video of the face to sync.",
           },
           {
             mediaPath: "/lip_sync/step-2-best-speak.mp3",
@@ -259,8 +304,8 @@ export default function LipsyncPage() {
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
                     photoUploadProps={{
-                      title: "Upload Image",
-                      description: "Click to upload image"
+                      title: "Image or video",
+                      description: "Portrait or talking-head clip",
                     }}
                     audioUploadProps={{
                       title: "Upload Audio",
@@ -288,8 +333,8 @@ export default function LipsyncPage() {
                         isGenerating={isGenerating}
                         onGenerate={handleGenerate}
                         photoUploadProps={{
-                          title: "Upload Image",
-                          description: "Click to upload image"
+                          title: "Image or video",
+                          description: "Portrait or talking-head clip",
                         }}
                         audioUploadProps={{
                           title: "Upload Audio",
@@ -318,8 +363,8 @@ export default function LipsyncPage() {
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
                     photoUploadProps={{
-                      title: "Upload Image",
-                      description: "Click to upload image"
+                      title: "Image or video",
+                      description: "Portrait or talking-head clip",
                     }}
                     audioUploadProps={{
                       title: "Upload Audio",

@@ -9,7 +9,11 @@ import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { generateImageAndWait } from "@/lib/generate-image-client"
+import {
+  generateImageAndWait,
+  isInsufficientCreditsError,
+  isInsufficientCreditsMessage,
+} from "@/lib/generate-image-client"
 import { toast } from "sonner"
 
 const CHARACTER_SWAP_PROMPT =
@@ -180,7 +184,12 @@ export default function CharacterSwapPage() {
       await fetchImageHistory(20)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to generate character swap image"
-      if (message.includes("Concurrency limit reached")) {
+      if (isInsufficientCreditsError(err) || isInsufficientCreditsMessage(message)) {
+        toast.error(message, {
+          description: "Upgrade your plan to continue generating images",
+          action: { label: "View Plans", onClick: () => window.open("/pricing", "_blank") },
+        })
+      } else if (message.includes("Concurrency limit reached")) {
         toast.error("Too many active generations", {
           description: `${message} Wait for one to finish, then try again.`,
         })

@@ -27,6 +27,7 @@ import {
   updateAsset,
 } from "@/lib/assets/library"
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
+import { invalidateCommandCache } from "@/lib/commands/cache"
 import { toast } from "sonner"
 
 interface CreateAssetDialogProps {
@@ -94,6 +95,7 @@ export function CreateAssetDialog({
           sourceNodeType: initial.sourceNodeType,
         })
         toast.success("Asset updated")
+        invalidateCommandCache()
       } else {
         await saveAsset({
           title,
@@ -105,6 +107,7 @@ export function CreateAssetDialog({
           sourceNodeType: initial.sourceNodeType,
         })
         toast.success("Asset saved")
+        invalidateCommandCache()
       }
       onOpenChange(false)
       onSaved?.()

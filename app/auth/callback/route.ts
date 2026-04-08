@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
 import { NextResponse } from "next/server"
 
 export async function GET(request: Request) {
@@ -34,17 +35,39 @@ export async function GET(request: Request) {
     }
 
     if (data.session) {
+      const userId = data.session.user.id
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_completed_at")
+        .eq("id", userId)
+        .maybeSingle()
+
+      const needsOnboarding = !profile?.onboarding_completed_at
+      const destination = needsOnboarding ? "/onboarding" : next
+
       const forwardedHost = request.headers.get("x-forwarded-host") // original origin before load balancer
       const isLocalEnv = process.env.NODE_ENV === "development"
-      
-      if (isLocalEnv) {
-        // we can be sure that there is no load balancer in between, so no need to watch for X-Forwarded-Host
-        return NextResponse.redirect(`${origin}${next}`)
-      } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`)
-      } else {
-        return NextResponse.redirect(`${origin}${next}`)
+
+      const base =
+        isLocalEnv
+          ? origin
+          : forwardedHost
+            ? `https://${forwardedHost}`
+            : origin
+
+      const response = NextResponse.redirect(`${base}${destination}`)
+
+      if (!needsOnboarding) {
+        response.cookies.set(ONBOARDING_DONE_COOKIE, userId, {
+          path: "/",
+          maxAge: 60 * 60 * 24 * 365,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          httpOnly: false,
+        })
       }
+
+      return response
     }
   }
 

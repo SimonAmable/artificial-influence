@@ -1,4 +1,3 @@
-export * from "@/lib/editor/agent"
 export * from "@/lib/editor/commands"
 export * from "@/lib/editor/database"
 export * from "@/lib/editor/database-server"

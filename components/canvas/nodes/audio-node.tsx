@@ -48,6 +48,8 @@ import {
 } from "@/lib/constants/inworld-tts"
 import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
 import { useNodeErrorToast } from "@/hooks/use-node-error-toast"
+import { Sparkles } from "lucide-react"
+import { toast } from "sonner"
 
 export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as AudioNodeData
@@ -95,6 +97,7 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
   const titleInputRef = React.useRef<HTMLInputElement>(null)
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
   const [isCreateAssetOpen, setIsCreateAssetOpen] = React.useState(false)
+  const [isEnhancing, setIsEnhancing] = React.useState(false)
 
   React.useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -168,6 +171,48 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
   const handleFullscreen = () => {
     if (nodeData.generatedAudioUrl) {
       setIsFullscreenOpen(true)
+    }
+  }
+
+  const handleEnhanceScript = async () => {
+    const source = fullSpeechText.trim()
+    if (!source) {
+      toast.error("Add script in the box or connect a Text node first")
+      return
+    }
+
+    setIsEnhancing(true)
+    nodeData.onDataChange?.(id, { error: null })
+    try {
+      const response = await fetch("/api/enhance-tts-script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: source }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Enhancement failed")
+      }
+      const enhanced = typeof data.text === "string" ? data.text : ""
+      if (!enhanced.trim()) {
+        throw new Error("Empty response from enhancer")
+      }
+      nodeData.onDataChange?.(id, { text: enhanced })
+      if (connectedPrompt.trim()) {
+        toast.message("Enhanced script is in the additional copy field", {
+          description:
+            "Disconnect the Text node if you do not want the original connected text spoken as well.",
+        })
+      } else {
+        toast.success("Script optimized for TTS")
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not enhance script"
+      nodeData.onDataChange?.(id, { error: message })
+      toast.error(message)
+    } finally {
+      setIsEnhancing(false)
     }
   }
 
@@ -385,6 +430,29 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
                 "w-full bg-transparent border-0 text-sm text-zinc-200 placeholder:text-zinc-600 resize-none outline-none",
               )}
             />
+
+            <div className="flex justify-end pt-0.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 border-white/15 bg-zinc-800/50 text-xs text-zinc-200 hover:bg-zinc-800 hover:text-zinc-50"
+                disabled={
+                  isEnhancing ||
+                  !!nodeData.isGenerating ||
+                  !fullSpeechText.trim()
+                }
+                title="Rewrite script for natural Inworld TTS (emphasis, pacing, spoken numbers)"
+                onClick={handleEnhanceScript}
+              >
+                {isEnhancing ? (
+                  <CircleNotch size={14} className="shrink-0 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                )}
+                Enhance
+              </Button>
+            </div>
 
             {nodeData.error && (
               <div className="flex items-center justify-between bg-red-500/10 border border-red-500/20 rounded-lg px-2.5 py-2">

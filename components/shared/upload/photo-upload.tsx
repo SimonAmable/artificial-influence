@@ -20,7 +20,12 @@ export interface PhotoUploadProps {
   accept?: string
   maxHeight?: string
   minHeight?: string
+  /** When true, accepts common video types and previews with a video element. */
+  allowVideo?: boolean
 }
+
+const DEFAULT_VIDEO_ACCEPT =
+  "image/*,video/mp4,video/quicktime,video/webm,video/x-m4v,.mp4,.mov,.webm,.m4v"
 
 export function PhotoUpload({
   value,
@@ -31,14 +36,21 @@ export function PhotoUpload({
   accept = "image/*",
   maxHeight = "max-h-[45px]",
   minHeight = "min-h-[50px] sm:min-h-[55px]",
+  allowVideo = false,
 }: PhotoUploadProps) {
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
   const [isDragging, setIsDragging] = React.useState(false)
   const dragCounter = React.useRef(0)
 
+  const resolvedAccept = allowVideo ? DEFAULT_VIDEO_ACCEPT : accept
+
+  const isVideoFile = (file: File) => file.type.startsWith("video/")
+
   const handleFileUpload = (file?: File) => {
     if (!file) return
-    if (!file.type.startsWith("image/")) return
+    const okImage = file.type.startsWith("image/")
+    const okVideo = allowVideo && isVideoFile(file)
+    if (!okImage && !okVideo) return
 
     const url = URL.createObjectURL(file)
     const newImage = { file, url }
@@ -53,8 +65,10 @@ export function PhotoUpload({
     handleFileUpload(e.target.files?.[0])
   }
 
+  const previewIsVideo = !!(value?.file && isVideoFile(value.file))
+
   const handleImageClick = () => {
-    if (value?.url) {
+    if (value?.url && !previewIsVideo) {
       setIsFullscreenOpen(true)
     }
   }
@@ -106,16 +120,25 @@ export function PhotoUpload({
       <CardContent className={cn("p-1.5 sm:p-2 h-full flex items-center justify-center", minHeight)}>
         {value?.url ? (
           <div className="relative group flex items-center justify-center w-full h-full min-h-[45px] p-1">
-            <img
-              src={value.url}
-              alt="Uploaded photo"
-              className={cn("max-w-full w-auto h-auto object-contain rounded-xl cursor-pointer", maxHeight)}
-              onClick={handleImageClick}
-            />
+            {previewIsVideo ? (
+              <video
+                src={value.url}
+                muted
+                playsInline
+                className={cn("max-w-full w-auto h-auto object-contain rounded-xl", maxHeight)}
+              />
+            ) : (
+              <img
+                src={value.url}
+                alt="Uploaded photo"
+                className={cn("max-w-full w-auto h-auto object-contain rounded-xl cursor-pointer", maxHeight)}
+                onClick={handleImageClick}
+              />
+            )}
             <button
               onClick={handleRemove}
               className="absolute top-2 right-2 bg-background/80 hover:bg-background rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-              aria-label="Remove image"
+              aria-label="Remove upload"
             >
               <X className="size-4" />
             </button>
@@ -124,7 +147,7 @@ export function PhotoUpload({
           <label className="flex flex-col items-center justify-center gap-0.5 cursor-pointer w-full h-full">
             <input
               type="file"
-              accept={accept}
+              accept={resolvedAccept}
               onChange={handleUpload}
               className="hidden"
             />

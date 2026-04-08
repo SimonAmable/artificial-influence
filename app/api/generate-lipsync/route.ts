@@ -1,6 +1,9 @@
 import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
+
+const LIPSYNC_CREDITS_COST = 10;
 
 export async function POST(request: NextRequest) {
   const requestStartTime = Date.now();
@@ -34,25 +37,41 @@ export async function POST(request: NextRequest) {
     // Parse JSON body (files are already uploaded to Supabase by client)
     console.log('[generate-lipsync] Parsing request body...');
     const body = await request.json();
-    const imagePublicUrl = body.imageUrl as string;
+    const imagePublicUrl = body.imageUrl as string | undefined;
+    const videoPublicUrl = body.videoUrl as string | undefined;
     const audioPublicUrl = body.audioUrl as string;
-    const imageStoragePath = body.imageStoragePath as string;
+    const imageStoragePath = body.imageStoragePath as string | undefined;
+    const videoStoragePath = body.videoStoragePath as string | undefined;
     const audioStoragePath = body.audioStoragePath as string;
     const resolution = (body.resolution as string) || '720p';
 
+    const hasImage =
+      typeof imagePublicUrl === 'string' && imagePublicUrl.length > 0;
+    const hasVideo =
+      typeof videoPublicUrl === 'string' && videoPublicUrl.length > 0;
+
     console.log('[generate-lipsync] Request body parsed:', {
-      hasImageUrl: !!imagePublicUrl,
+      hasImageUrl: hasImage,
+      hasVideoUrl: hasVideo,
       hasAudioUrl: !!audioPublicUrl,
       imageStoragePath: imageStoragePath || 'none',
+      videoStoragePath: videoStoragePath || 'none',
       audioStoragePath: audioStoragePath || 'none',
       resolution,
     });
 
-    // Validate required URLs
-    if (!imagePublicUrl || typeof imagePublicUrl !== 'string') {
-      console.error('[generate-lipsync] Missing or invalid image URL');
+    if (hasImage && hasVideo) {
+      console.error('[generate-lipsync] Both image and video URLs provided');
       return NextResponse.json(
-        { error: 'Image URL is required' },
+        { error: 'Provide either imageUrl or videoUrl, not both' },
+        { status: 400 }
+      );
+    }
+
+    if (!hasImage && !hasVideo) {
+      console.error('[generate-lipsync] Missing reference media URL');
+      return NextResponse.json(
+        { error: 'Image URL or video URL is required' },
         { status: 400 }
       );
     }
@@ -65,16 +84,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate resolution
-    if (resolution !== '720p' && resolution !== '480p') {
-      console.error('[generate-lipsync] Invalid resolution:', resolution);
-      return NextResponse.json(
-        { error: 'Resolution must be "720p" or "480p"' },
-        { status: 400 }
-      );
+    if (hasImage) {
+      if (resolution !== '720p' && resolution !== '480p') {
+        console.error('[generate-lipsync] Invalid resolution:', resolution);
+        return NextResponse.json(
+          { error: 'Resolution must be "720p" or "480p"' },
+          { status: 400 }
+        );
+      }
     }
 
     console.log('[generate-lipsync] ✓ URLs validated');
+
+    const hasCredits = await checkUserHasCredits(
+      user.id,
+      LIPSYNC_CREDITS_COST
+    );
+    if (!hasCredits) {
+      return NextResponse.json(
+        {
+          error: `Insufficient credits. Lip sync requires ${LIPSYNC_CREDITS_COST} credits.`,
+        },
+        { status: 402 }
+      );
+    }
 
     // Initialize Replicate client
     console.log('[generate-lipsync] Initializing Replicate client...');
@@ -82,22 +115,23 @@ export async function POST(request: NextRequest) {
       auth: process.env.REPLICATE_API_TOKEN,
     });
 
-    // Call Replicate API
-    console.log('[generate-lipsync] Calling Replicate API...');
-    const replicateInput = {
-      audio: audioPublicUrl,
-      image: imagePublicUrl,
-      resolution: resolution as '720p' | '480p',
-    };
+    const modelId = hasVideo ? 'pixverse/lipsync' : 'veed/fabric-1.0';
+    const replicateInput = hasVideo
+      ? { video: videoPublicUrl!, audio: audioPublicUrl }
+      : {
+          audio: audioPublicUrl,
+          image: imagePublicUrl!,
+          resolution: resolution as '720p' | '480p',
+        };
 
-    console.log('[generate-lipsync] Replicate input:', {
-      imageUrl: replicateInput.image.substring(0, 50) + '...',
-      audioUrl: replicateInput.audio.substring(0, 50) + '...',
-      resolution: replicateInput.resolution,
+    console.log('[generate-lipsync] Calling Replicate API...', {
+      modelId,
+      refKind: hasVideo ? 'video' : 'image',
+      audioPreview: audioPublicUrl.substring(0, 50) + '...',
     });
 
     const generationStartTime = Date.now();
-    const output = await replicate.run('veed/fabric-1.0', {
+    const output = await replicate.run(modelId, {
       input: replicateInput,
     });
     const generationTime = Date.now() - generationStartTime;
@@ -198,8 +232,10 @@ export async function POST(request: NextRequest) {
           prompt: null, // Lipsync doesn't use a text prompt
           supabase_storage_path: generatedVideoStoragePath,
           reference_images_supabase_storage_path: imageStoragePath ? [imageStoragePath] : null,
-          reference_videos_supabase_storage_path: null, // Audio is not a video reference
-          model: 'veed/fabric-1.0',
+          reference_videos_supabase_storage_path: videoStoragePath
+            ? [videoStoragePath]
+            : null,
+          model: modelId,
           type: 'video',
           is_public: true,
           tool: 'lipsync',
@@ -225,6 +261,9 @@ export async function POST(request: NextRequest) {
 
     await saveGenerationToDatabase();
 
+    await deductUserCredits(user.id, LIPSYNC_CREDITS_COST);
+    console.log('[generate-lipsync] ✓ Credits deducted:', LIPSYNC_CREDITS_COST);
+
     const totalTime = Date.now() - requestStartTime;
     console.log('[generate-lipsync] ===== Request completed successfully in', totalTime, 'ms =====');
 
@@ -233,6 +272,7 @@ export async function POST(request: NextRequest) {
         url: finalVideoUrl,
         mimeType: 'video/mp4',
       },
+      creditsUsed: LIPSYNC_CREDITS_COST,
     });
   } catch (error) {
     const totalTime = Date.now() - requestStartTime;
@@ -262,23 +302,31 @@ export async function POST(request: NextRequest) {
 // GET method for API documentation
 export async function GET() {
   return NextResponse.json({
-    message: 'Lip Sync Generation API - VEED Fabric 1.0',
-    model: 'veed/fabric-1.0',
+    message:
+      'Lip Sync API — veed/fabric-1.0 (image + audio) or pixverse/lipsync (video + audio)',
+    models: ['veed/fabric-1.0', 'pixverse/lipsync'],
     usage: {
       method: 'POST',
       contentType: 'application/json',
       body: {
-        imageUrl: 'string (required) - Public URL of reference image (uploaded to Supabase)',
+        imageUrl:
+          'string (optional) - Reference image URL; use with audio. Model: veed/fabric-1.0',
+        videoUrl:
+          'string (optional) - Reference video URL; use with audio. Model: pixverse/lipsync',
         audioUrl: 'string (required) - Public URL of audio file (uploaded to Supabase)',
-        imageStoragePath: 'string (required) - Supabase storage path for image',
-        audioStoragePath: 'string (required) - Supabase storage path for audio',
-        resolution: 'string (optional) - Output resolution: "720p" or "480p" (default: "720p")',
+        imageStoragePath: 'string (optional) - Supabase path for reference image',
+        videoStoragePath: 'string (optional) - Supabase path for reference video',
+        audioStoragePath: 'string (optional) - Supabase storage path for audio',
+        resolution:
+          'string (optional) - For image mode only: "720p" or "480p" (default: "720p")',
       },
+      credits: 10,
       response: {
         video: {
           url: 'string - Public URL of the generated video',
           mimeType: 'string - MIME type (video/mp4)',
         },
+        creditsUsed: 'number - Credits deducted (10 per generation)',
       },
     },
   });

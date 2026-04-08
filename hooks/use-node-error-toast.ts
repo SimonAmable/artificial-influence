@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import { toast } from "sonner"
+import { isInsufficientCreditsMessage } from "@/lib/generate-image-client"
 
 /** Show `nodeData.error` as a Sonner toast (in addition to inline UI in the prompt toolbar). */
 export function useNodeErrorToast(nodeId: string, error: string | null | undefined) {
@@ -12,7 +13,7 @@ export function useNodeErrorToast(nodeId: string, error: string | null | undefin
     const normalized = error?.trim() ? error : null
 
     if (normalized && normalized !== prevRef.current) {
-      if (normalized.includes("Insufficient credits")) {
+      if (isInsufficientCreditsMessage(normalized)) {
         toast.error(normalized, {
           id: toastId,
           description: "Upgrade your plan to continue generating.",

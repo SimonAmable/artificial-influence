@@ -1,6 +1,5 @@
 import type {
   CreateEditorProjectInput,
-  EditorAgentSession,
   EditorProject,
   EditorProjectSummary,
   EditorRenderJob,
@@ -71,31 +70,6 @@ export async function duplicateEditorProjectClient(
   })
   if (!response.ok) {
     throw new Error("Failed to duplicate editor project")
-  }
-  return response.json()
-}
-
-export async function fetchEditorAgentSession(
-  projectId: string,
-): Promise<EditorAgentSession> {
-  const response = await fetch(`/api/editor-agent-sessions?projectId=${encodeURIComponent(projectId)}`)
-  if (!response.ok) {
-    throw new Error("Failed to fetch editor agent session")
-  }
-  return response.json()
-}
-
-export async function saveEditorAgentSessionClient(
-  projectId: string,
-  updates: Partial<Pick<EditorAgentSession, "messages" | "pending_action" | "command_history">>,
-): Promise<EditorAgentSession> {
-  const response = await fetch("/api/editor-agent-sessions", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ projectId, ...updates }),
-  })
-  if (!response.ok) {
-    throw new Error("Failed to save editor agent session")
   }
   return response.json()
 }

@@ -4,8 +4,11 @@ export type AssetCategory =
   | "character"
   | "scene"
   | "texture"
+  | "thumbnails"
   | "motion"
   | "audio"
+  | "shorts"
+  | "product"
 
 export type AssetType = "image" | "video" | "audio"
 

@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { User, SignOut, CaretDownIcon, ChatCircleDots } from "@phosphor-icons/react"
+import { User, SignOut, CaretDownIcon, ChatCircleDots, ClockCounterClockwise } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -19,8 +19,96 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { navigationItems } from "@/lib/constants/navigation"
+import { megaNavGroups, navigationItems, type MegaNavBadge, type MegaNavGroup, type MegaNavItem } from "@/lib/constants/navigation"
 import { FeedbackDialog } from "@/components/app/feedback-dialog"
+import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
+import { clearOnboardingCompletedLocal } from "@/lib/onboarding/client-storage"
+
+function getBadgeClasses(badge: MegaNavBadge) {
+  if (badge === "new") {
+    return {
+      pill: "bg-primary text-primary-foreground",
+      ring: "ring-1 ring-primary/70 border-primary/60",
+    }
+  }
+
+  return {
+      pill: "bg-destructive text-destructive-foreground",
+      ring: "ring-1 ring-destructive/70 border-destructive/60",
+  }
+}
+
+function MenuBadge({ badge }: { badge: MegaNavBadge }) {
+  const classes = getBadgeClasses(badge)
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide leading-none",
+        classes.pill
+      )}
+    >
+      {badge === "new" ? "New" : "Top"}
+    </span>
+  )
+}
+
+function isGroupActive(pathname: string, group: MegaNavGroup) {
+  if (group.path) return pathname === group.path
+  const items = [
+    ...(group.simpleItems ?? []),
+    ...((group.sections ?? []).flatMap((section) => section.items)),
+  ]
+  return items.some((item) => pathname === item.path.split("?")[0])
+}
+
+function HeaderMenuItem({ item, onSelect }: { item: MegaNavItem; onSelect: (path: string) => void }) {
+  const classes = item.badge ? getBadgeClasses(item.badge) : null
+  return (
+    <DropdownMenuItem onClick={() => onSelect(item.path)} className="py-2.5">
+      <div className="flex w-full items-start gap-3">
+        <div className="relative">
+          <div
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-muted text-[10px] font-bold text-foreground shadow-sm",
+              classes?.ring
+            )}
+          >
+            {item.path === "/history" ? (
+              <ClockCounterClockwise className="h-[18px] w-[18px] text-foreground" weight="duotone" />
+            ) : item.iconSrc ? (
+              <Image
+                src={item.iconSrc}
+                alt={`${item.label} icon`}
+                width={18}
+                height={18}
+                className={cn(
+                  "h-[18px] w-[18px] object-contain brightness-0 dark:invert",
+                  item.path === "/brand" && "invert"
+                )}
+              />
+            ) : (
+              item.iconText ?? item.label.slice(0, 2).toUpperCase()
+            )}
+          </div>
+          {item.badge ? (
+            <span
+              className={cn(
+                "absolute left-1/2 -top-1 -translate-x-1/2 inline-flex rounded-full px-1 py-0.5 text-[8px] font-extrabold uppercase leading-none",
+                classes?.pill
+              )}
+            >
+              {item.badge === "new" ? "New" : "Top"}
+            </span>
+          ) : null}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-foreground">{item.label}</p>
+          <p className="line-clamp-1 text-xs text-muted-foreground">{item.description}</p>
+        </div>
+      </div>
+    </DropdownMenuItem>
+  )
+}
 
 export function Header() {
   const pathname = usePathname()
@@ -37,11 +125,15 @@ export function Header() {
   const isHomePage = pathname === "/"
   const isCanvasPage = pathname === "/canvas"
   const isCanvasDetailPage = pathname?.startsWith("/canvas/")
+  const isOnboardingPage =
+    pathname === "/onboarding" || pathname?.startsWith("/onboarding/")
   const [user, setUser] = React.useState<{ id: string; email?: string } | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [isScrolled, setIsScrolled] = React.useState(false)
   const [credits, setCredits] = React.useState<number | null>(null)
   const [feedbackOpen, setFeedbackOpen] = React.useState(false)
+  const [openGroupLabel, setOpenGroupLabel] = React.useState<string | null>(null)
+  const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const currentPage = navigationItems.find(item => item.path === pathname)?.path || pathname
   const isPageInDropdown = navigationItems.some(item => item.path === pathname)
@@ -105,17 +197,43 @@ export function Header() {
   }, [user?.id])
 
   const handleLogout = async () => {
+    clearOnboardingCompletedLocal(user?.id)
+    if (typeof document !== "undefined") {
+      document.cookie = `${ONBOARDING_DONE_COOKIE}=; path=/; max-age=0`
+    }
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push("/")
     router.refresh()
   }
 
-  if (isCanvasPage || isCanvasDetailPage) return null
+  const clearCloseTimer = React.useCallback(() => {
+    if (!closeTimeoutRef.current) return
+    clearTimeout(closeTimeoutRef.current)
+    closeTimeoutRef.current = null
+  }, [])
+
+  const scheduleClose = React.useCallback(() => {
+    clearCloseTimer()
+    closeTimeoutRef.current = setTimeout(() => {
+      setOpenGroupLabel(null)
+      closeTimeoutRef.current = null
+    }, 180)
+  }, [clearCloseTimer])
+
+  React.useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  if (isCanvasPage || isCanvasDetailPage || isOnboardingPage) return null
 
   return (
     <header className={cn(
-      "fixed z-50 flex flex-col rounded-none bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pointer-events-auto",
+      "fixed z-50 flex flex-col rounded-none bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 pointer-events-auto",
       "transition-all duration-300 ease-in-out",
       isScrolled ? "shadow-lg" : "",
       isAuthPage ? "top-0 left-0 right-0 rounded-none" : isScrolled ? "top-4 left-4 right-4" : "top-0 left-0 right-0"
@@ -132,20 +250,91 @@ export function Header() {
             />
           </Link>
           {/* Desktop Navigation - hidden on tablet and smaller */}
-          <nav className="hidden lg:flex items-center gap-6 whitespace-nowrap overflow-hidden">
-            {navigationItems.map((item) => (
-              <Link
-                key={item.path}
-                href={item.path}
-                className={cn(
-                  "text-foreground font-bold transition-colors hover:text-primary whitespace-nowrap",
-                  pathname === item.path && "text-primary",
-                  item.className
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
+          <nav className="hidden lg:flex items-center gap-2 whitespace-nowrap overflow-hidden">
+            {megaNavGroups.map((group) => {
+              const active = isGroupActive(pathname, group)
+
+              if (group.path && !group.sections?.length && !group.simpleItems?.length) {
+                return (
+                  <Link
+                    key={group.label}
+                    href={group.path}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-bold text-foreground transition-colors hover:text-primary",
+                      active && "text-primary"
+                    )}
+                  >
+                    <span>{group.label}</span>
+                    {group.badge ? <MenuBadge badge={group.badge} /> : null}
+                  </Link>
+                )
+              }
+
+              const isSimple = Boolean(group.simpleItems?.length)
+              const widthClass = isSimple ? "w-80" : "w-[660px]"
+              const groupPath = group.path ?? "#"
+              const isOpen = openGroupLabel === group.label
+
+              return (
+                <DropdownMenu
+                  key={group.label}
+                  open={isOpen}
+                  onOpenChange={(open) => {
+                    if (!open && isOpen) setOpenGroupLabel(null)
+                  }}
+                >
+                  <DropdownMenuTrigger asChild>
+                    <div
+                      onPointerEnter={() => {
+                        clearCloseTimer()
+                        setOpenGroupLabel(group.label)
+                      }}
+                      onPointerLeave={scheduleClose}
+                      className={cn(
+                        "inline-flex h-8 items-center gap-1 rounded-md px-3 text-sm font-bold text-foreground transition-colors hover:text-primary",
+                        active && "text-primary"
+                      )}
+                    >
+                      <Link href={groupPath} className="inline-flex items-center gap-2">
+                        <span>{group.label}</span>
+                        {group.badge ? <MenuBadge badge={group.badge} /> : null}
+                      </Link>
+                      <CaretDownIcon className="h-3.5 w-3.5 opacity-60" />
+                    </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className={cn("p-3", widthClass)}
+                    onPointerEnter={() => {
+                      clearCloseTimer()
+                      setOpenGroupLabel(group.label)
+                    }}
+                    onPointerLeave={scheduleClose}
+                  >
+                    {isSimple ? (
+                      <div className="space-y-1">
+                        {(group.simpleItems ?? []).map((item) => (
+                          <HeaderMenuItem key={item.path} item={item} onSelect={(path) => router.push(path)} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        {(group.sections ?? []).map((section) => (
+                          <div key={section.title} className="space-y-1">
+                            <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              {section.title}
+                            </p>
+                            {section.items.map((item) => (
+                              <HeaderMenuItem key={item.path} item={item} onSelect={(path) => router.push(path)} />
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )
+            })}
           </nav>
           {/* Mobile/Tablet Dropdown - visible on tablet and smaller */}
           <div className="lg:hidden">

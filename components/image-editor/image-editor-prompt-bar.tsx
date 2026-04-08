@@ -37,6 +37,10 @@ import type { Model } from "@/lib/types/models"
 import type { Canvas as FabricCanvas } from "fabric"
 import { toast } from "sonner"
 import type { ImageEditorVariant } from "@/lib/image-editor/types"
+import {
+  isInsufficientCreditsError,
+  isInsufficientCreditsMessage,
+} from "@/lib/generate-image-client"
 
 type CanvasWithMaskStore = FabricCanvas & {
   __maskWorkCanvas?: FabricCanvas
@@ -252,15 +256,13 @@ export function ImageEditorPromptBar({
         const exports = await exportGenerationInputs()
 
         if (isInpaint) {
-          if (!exports?.hadMask || !exports.maskDataUrl) {
-            toast.error("Paint a mask first", {
-              description: "Brush over the region you want Nano Banana 2 to change.",
-            })
-            return
-          }
+          const hasMask = Boolean(exports?.hadMask && exports.maskDataUrl)
 
-          const finalPrompt = `${prompt.trim()}\n\nInpaint: Image order is (1) base scene, (2) optional reference images for style or content only, (3) mask as the last image — white/light marks the region to edit. Edit only that masked region; keep everything outside identical.`
-          formData.append("hasMask", "true")
+          const finalPrompt = hasMask
+            ? `${prompt.trim()}\n\nInpaint: Image order is (1) base scene, (2) optional reference images for style or content only, (3) mask as the last image — white/light marks the region to edit. Edit only that masked region; keep everything outside identical.`
+            : `${prompt.trim()}\n\nImage editing: The first image is the scene to edit. Any additional images are optional style or content references only. Apply the described changes to the full image (no mask supplied).`
+
+          formData.append("hasMask", hasMask ? "true" : "false")
           formData.append("prompt", finalPrompt)
           formData.append("n", "1")
           formData.append("aspect_ratio", "match_input_image")
@@ -290,10 +292,12 @@ export function ImageEditorPromptBar({
             formData.append("referenceImages", file)
           })
 
-          formData.append(
-            "referenceImages",
-            await dataUrlToFile(exports.maskDataUrl, "mask-image.png")
-          )
+          if (hasMask && exports.maskDataUrl) {
+            formData.append(
+              "referenceImages",
+              await dataUrlToFile(exports.maskDataUrl, "mask-image.png")
+            )
+          }
         } else {
           let finalPrompt = prompt.trim()
           if (!finalPrompt.toLowerCase().includes(editorInstruction)) {
@@ -364,12 +368,16 @@ export function ImageEditorPromptBar({
         }
       }
     } catch (error) {
-      console.error("Generation failed:", error)
       const message = error instanceof Error ? error.message : "Generation failed"
-      if (message.includes("Insufficient credits")) {
+      const isCredits =
+        isInsufficientCreditsError(error) || isInsufficientCreditsMessage(message)
+      if (!isCredits) {
+        console.error("Generation failed:", error)
+      }
+      if (isCredits) {
         toast.error(message, {
           description: "Upgrade your plan to continue generating images",
-          action: { label: "View Plans", onClick: () => window.open("/pricing", "_blank") }
+          action: { label: "View Plans", onClick: () => window.open("/pricing", "_blank") },
         })
       }
     } finally {
@@ -488,7 +496,7 @@ export function ImageEditorPromptBar({
               onKeyDown={handleKeyDown}
               placeholder={
                 isInpaint
-                  ? "Describe the change inside the masked area…"
+                  ? "Describe your edit — paint a mask to change a region, or skip the mask to edit the whole image…"
                   : "Enter prompt for image editing..."
               }
               className="w-full border-none outline-none resize-none bg-transparent text-sm min-h-[60px] max-h-[120px] overflow-y-auto"
@@ -568,7 +576,7 @@ export function ImageEditorPromptBar({
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <ModelIcon identifier={INPAINT_MODEL} size={16} />
               <span className="font-medium text-foreground">Nano Banana 2</span>
-              <span className="hidden sm:inline">· mask inpaint</span>
+              <span className="hidden sm:inline">· mask optional</span>
             </div>
           </div>
         ) : (
