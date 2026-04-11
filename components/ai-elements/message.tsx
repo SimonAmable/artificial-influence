@@ -34,10 +34,10 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
 export const Message = ({ className, from, ...props }: MessageProps) => (
   <div
     className={cn(
-      "group flex w-full max-w-full gap-2",
+      "group flex w-full min-w-0 max-w-full gap-2",
       from === "user"
         ? "is-user ml-auto max-w-[95%] flex-row justify-end"
-        : "is-assistant flex-row items-start justify-start",
+        : "is-assistant min-w-0 flex-row items-start justify-start",
       className,
     )}
     {...props}
@@ -292,7 +292,7 @@ export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
     <Streamdown
       className={cn(
-        "prose prose-sm max-w-none dark:prose-invert size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+        "prose prose-sm max-w-none dark:prose-invert size-full min-w-0 wrap-break-word [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_code]:wrap-break-word",
         className,
       )}
       controls={{ code: { copy: true } }}

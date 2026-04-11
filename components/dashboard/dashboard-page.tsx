@@ -9,26 +9,30 @@ import { Stack } from "@phosphor-icons/react"
 // import { FeatureShowcaseCarousel } from "@/components/dashboard/feature-showcase-carousel"
 import { FeatureButtonGrid } from "@/components/dashboard/feature-button-grid"
 import { CanvasesSection } from "@/components/dashboard/canvases-section"
+import { Footer } from "@/components/landing/footer"
 import type { Workflow } from "@/lib/workflows/database-server"
 
 export function DashboardPage() {
   return (
-    <div className="min-h-screen bg-background px-4 pt-4">
-      {/* Hero Section with Carousel — hidden until showcase assets are updated */}
-      {/* <section className="mx-auto w-full pt-[60px]">
+    <div className="flex min-h-screen flex-col bg-background">
+      <div className="flex-1 px-4 pt-4">
+        {/* Hero Section with Carousel — hidden until showcase assets are updated */}
+        {/* <section className="mx-auto w-full pt-[60px]">
         <FeatureShowcaseCarousel />
       </section> */}
 
-      {/* Tools Section */}
-      <section className="mx-auto w-full py-10">
-        <FeatureButtonGrid />
-      </section>
+        {/* Tools Section */}
+        <section className="mx-auto w-full py-10">
+          <FeatureButtonGrid />
+        </section>
 
-      {/* Canvases Section */}
-      <CanvasesSection />
+        {/* Canvases Section */}
+        <CanvasesSection />
 
-      {/* Workflows Section */}
-      {/* <WorkflowsSection /> */}
+        {/* Workflows Section */}
+        {/* <WorkflowsSection /> */}
+      </div>
+      <Footer />
     </div>
   )
 }

@@ -139,7 +139,8 @@ export function VideoInputBox({
   const isReferenceVideoSupported =
     selectedModel.supports_reference_video === true ||
     selectedModel.identifier === 'xai/grok-imagine-video' ||
-    selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
+    selectedModel.identifier === 'kwaivgi/kling-v3-omni-video' ||
+    selectedModel.identifier === 'bytedance/seedance-2.0'
 
   // Check if model supports image/last frame based on parameters
   const modelSupportsImage = React.useMemo(() => {
@@ -153,7 +154,7 @@ export function VideoInputBox({
 
   const modelSupportsLastFrame = React.useMemo(() => {
     return selectedModel.parameters.parameters?.some(
-      param => param.name === 'last_frame'
+      (param) => param.name === 'last_frame' || param.name === 'last_frame_image'
     ) ?? false
   }, [selectedModel])
 
@@ -165,9 +166,11 @@ export function VideoInputBox({
 
   const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
   const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
+  const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
   const isKlingV3OrOmni = isKlingV3 || isKlingV3Omni
+  const usesRefImageGallery = isKlingV3Omni || isSeedance2
   const totalDuration = Number(parameters.duration) || 5
-  const maxReferenceImages = inputVideo ? 4 : 7
+  const maxReferenceImages = isSeedance2 ? 9 : inputVideo ? 4 : 7
 
   // Determine if we need prompt
   const needsPrompt = !isMotionCopyModel && !isLipsyncModel
@@ -219,11 +222,11 @@ export function VideoInputBox({
   )
 
   const canAddReferenceImage = React.useMemo(() => {
-    if (!isKlingV3Omni) return false
+    if (!usesRefImageGallery) return false
     const nChipStyle = chipSlotInfo.omniStyleImageChipUrls.length
     return referenceImages.length + nChipStyle < maxReferenceImages
   }, [
-    isKlingV3Omni,
+    usesRefImageGallery,
     referenceImages.length,
     chipSlotInfo.omniStyleImageChipUrls.length,
     maxReferenceImages,
@@ -290,6 +293,16 @@ export function VideoInputBox({
     if (isKlingV3OrOmni && !multiShotMode) {
       return mergedPromptForReady.length > 0 || !!inputImage || hasRefChips
     }
+    if (isSeedance2) {
+      return (
+        mergedPromptForReady.length > 0 ||
+        !!inputImage ||
+        !!lastFrameImage ||
+        !!inputVideo ||
+        referenceImages.length > 0 ||
+        hasRefChips
+      )
+    }
     if (modelSupportsImage || modelSupportsLastFrame) {
       if (modelSupportsImage && !inputImage) return false
       if (modelSupportsLastFrame && !lastFrameImage) return false
@@ -311,6 +324,9 @@ export function VideoInputBox({
     modelSupportsImage,
     modelSupportsLastFrame,
     lastFrameImage,
+    isSeedance2,
+    inputVideo,
+    referenceImages.length,
   ])
 
   const handleSlashUiAction = React.useCallback((action: SlashCommandUiAction) => {
@@ -540,11 +556,11 @@ export function VideoInputBox({
           (inputImage ||
             lastFrameImage ||
             (isReferenceVideoSupported && inputVideo) ||
-            (isKlingV3Omni && referenceImages.length > 0) ||
+            (usesRefImageGallery && referenceImages.length > 0) ||
             chipSlotInfo.inputSlotFromChip ||
             chipSlotInfo.lastFrameSlotFromChip ||
             chipSlotInfo.referenceVideoSlotFromChip ||
-            (isKlingV3Omni && chipSlotInfo.omniStyleImageChipUrls.length > 0))) ||
+            (usesRefImageGallery && chipSlotInfo.omniStyleImageChipUrls.length > 0))) ||
           (isMotionCopyModel && (inputImage || inputVideo))) && (
           <div className="flex flex-wrap gap-2 px-2 pt-1">
             {(inputImage?.url || chipSlotInfo.startImageChipUrl) && !isMotionCopyModel && !isLipsyncModel && (
@@ -632,7 +648,7 @@ export function VideoInputBox({
                 </div>
               </div>
             )}
-            {isKlingV3Omni &&
+            {usesRefImageGallery &&
               referenceImages.map((ref, index) =>
                 ref.url ? (
                   <div key={`upload-ref-${index}`} className="relative inline-block">
@@ -657,7 +673,7 @@ export function VideoInputBox({
                   </div>
                 ) : null
               )}
-            {isKlingV3Omni &&
+            {usesRefImageGallery &&
               chipSlotInfo.omniStyleImageRefs.map((ref, i) => (
                 <div key={`chip-style-${ref.chipId}`} className="relative inline-block">
                   <Image
@@ -782,10 +798,12 @@ export function VideoInputBox({
         )}
 
         {/* Kling v3 Omni: Reference images */}
-        {isKlingV3Omni && onReferenceImagesChange && (
+        {usesRefImageGallery && onReferenceImagesChange && (
           <div className="px-2 space-y-1.5 border-t border-border/50 pt-2 mt-1">
             <p className="text-[11px] text-muted-foreground">
-              Reference images for elements, scenes, or styles. Supports .jpg/.jpeg/.png. Max {maxReferenceImages} without video, 4 with video.
+              {isSeedance2
+                ? `Extra reference images for multimodal prompts ([Image1], etc.). Supports .jpg/.jpeg/.png. Up to ${maxReferenceImages} images.`
+                : `Reference images for elements, scenes, or styles. Supports .jpg/.jpeg/.png. Max ${maxReferenceImages} without video, 4 with video.`}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {referenceImages.length > 0 && referenceImages.map((ref, index) => ref.url && (

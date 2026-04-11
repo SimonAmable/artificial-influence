@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
+import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeftIcon, EnvelopeSimpleIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
@@ -336,15 +337,15 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
             <p className="mt-16 text-center text-xs text-white/55 sm:mt-24">
               By continuing, I acknowledge the
               {" "}
-              <a href="#" className="underline underline-offset-2 hover:text-white">
+              <Link href="/privacy" className="underline underline-offset-2 hover:text-white">
                 Privacy Policy
-              </a>
+              </Link>
               {" "}
               and agree to the
               {" "}
-              <a href="#" className="underline underline-offset-2 hover:text-white">
+              <Link href="/terms" className="underline underline-offset-2 hover:text-white">
                 Terms of Use
-              </a>
+              </Link>
               . I also confirm that I am at least 18 years old.
             </p>
           </div>

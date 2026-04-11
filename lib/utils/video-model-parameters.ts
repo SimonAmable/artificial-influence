@@ -73,7 +73,11 @@ export function buildVideoModelParameters(input: VideoParamsInput): ParameterDef
     params.push(FALLBACK_FIRST_FRAME);
   }
 
-  if (input.supports_last_frame && !hasParameter(params, "last_frame")) {
+  if (
+    input.supports_last_frame &&
+    !hasParameter(params, "last_frame") &&
+    !hasParameter(params, "last_frame_image")
+  ) {
     params.push(FALLBACK_LAST_FRAME);
   }
 

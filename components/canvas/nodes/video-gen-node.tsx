@@ -725,10 +725,11 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         param.name === "start_image"
     )
     const modelSupportsLastFrame = selectedModel.parameters.parameters?.some(
-      (param) => param.name === "last_frame"
+      (param) => param.name === "last_frame" || param.name === "last_frame_image",
     )
     const isKlingV3 = modelIdentifier === "kwaivgi/kling-v3-video"
     const isKlingV3Omni = modelIdentifier === "kwaivgi/kling-v3-omni-video"
+    const isSeedance2 = modelIdentifier === "bytedance/seedance-2.0"
 
     if (isMotionCopy && (!finalImageUrl || !finalVideoUrl)) {
       nodeData.onDataChange?.(id, { error: "Image and video are required" })
@@ -755,7 +756,14 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       return
     }
 
-    if (!isMotionCopy && !isLipsync && modelSupportsImage && !finalImageUrl && !chipSlots.startImageChipUrl) {
+    if (
+      !isMotionCopy &&
+      !isLipsync &&
+      modelSupportsImage &&
+      !isSeedance2 &&
+      !finalImageUrl &&
+      !chipSlots.startImageChipUrl
+    ) {
       nodeData.onDataChange?.(id, { error: "Image input is required" })
       return
     }
@@ -771,7 +779,8 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       !chipSlots.startImageChipUrl &&
       !chipSlots.lastFrameChipUrl &&
       !chipSlots.referenceVideoChipUrl &&
-      chipSlots.omniStyleImageChipUrls.length === 0
+      chipSlots.omniStyleImageChipUrls.length === 0 &&
+      !(isSeedance2 && (finalImageUrl || finalLastFrameUrl || finalVideoUrl))
     ) {
       nodeData.onDataChange?.(id, { error: "Prompt is required" })
       return
@@ -970,19 +979,21 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         }
         if (lastFrameUpload?.url) {
           requestBody.last_frame = lastFrameUpload.url
+          if (isSeedance2) requestBody.last_frame_image = lastFrameUpload.url
           if (isKlingV3 || isKlingV3Omni) {
             requestBody.end_image = lastFrameUpload.url
           }
         }
         if (!requestBody.last_frame && chipSlots.lastFrameChipUrl && modelSupportsLastFrame) {
           requestBody.last_frame = chipSlots.lastFrameChipUrl
+          if (isSeedance2) requestBody.last_frame_image = chipSlots.lastFrameChipUrl
           if (isKlingV3 || isKlingV3Omni) {
             requestBody.end_image = chipSlots.lastFrameChipUrl
           }
         }
 
         const isKlingOmniNode = modelIdentifier === "kwaivgi/kling-v3-omni-video"
-        if (isKlingOmniNode && chipSlots.omniStyleImageChipUrls.length > 0) {
+        if ((isKlingOmniNode || isSeedance2) && chipSlots.omniStyleImageChipUrls.length > 0) {
           const existing = Array.isArray(requestBody.reference_images)
             ? (requestBody.reference_images as string[])
             : []
@@ -990,6 +1001,12 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         }
         if (isKlingOmniNode && !requestBody.reference_video && chipSlots.referenceVideoChipUrl) {
           requestBody.reference_video = chipSlots.referenceVideoChipUrl
+        }
+        if (isSeedance2 && videoUpload?.url) {
+          requestBody.reference_videos = [videoUpload.url]
+        }
+        if (isSeedance2 && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
+          requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
         }
         if (
           modelIdentifier === "xai/grok-imagine-video" &&
@@ -1050,11 +1067,12 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       param.name === "start_image"
   )
   const modelSupportsLastFrame = selectedModel?.parameters.parameters?.some(
-    (param) => param.name === "last_frame"
+    (param) => param.name === "last_frame" || param.name === "last_frame_image",
   )
 
   const showImageUpload = !!(modelSupportsImage || isMotionCopyModel || isLipsyncModel)
-  const showVideoUpload = !!isMotionCopyModel
+  const showVideoUpload =
+    !!isMotionCopyModel || selectedModel?.identifier === "bytedance/seedance-2.0"
   const showAudioUpload = !!isLipsyncModel
   const showLastFrameUpload = !!modelSupportsLastFrame
   const hasUploadOptions = showImageUpload || showVideoUpload || showAudioUpload || showLastFrameUpload

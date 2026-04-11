@@ -36,6 +36,8 @@ const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
   "grok-imagine-video": "xai/grok-imagine-video",
   "soul-cinema": "kwaivgi/kling-v3-video",
   "kling-v3-video": "kwaivgi/kling-v3-video",
+  "seedance-2": "bytedance/seedance-2.0",
+  "seedance-2.0": "bytedance/seedance-2.0",
 }
 
 function VideoPageContent() {
@@ -126,11 +128,13 @@ function VideoPageContent() {
     setParameters(defaultParams)
   }, [selectedModel])
 
-  // Omni: when reference video is added, cap reference images at 4
+  // Kling Omni / Seedance: when reference video is added, cap extra reference images
   React.useEffect(() => {
-    if (selectedModel?.identifier !== 'kwaivgi/kling-v3-omni-video') return
-    if (inputVideo && referenceImages.length > 4) {
-      setReferenceImages((prev) => prev.slice(0, 4))
+    const id = selectedModel?.identifier
+    if (id !== 'kwaivgi/kling-v3-omni-video' && id !== 'bytedance/seedance-2.0') return
+    const maxWithVideo = id === 'bytedance/seedance-2.0' ? 9 : 4
+    if (inputVideo && referenceImages.length > maxWithVideo) {
+      setReferenceImages((prev) => prev.slice(0, maxWithVideo))
     }
   }, [inputVideo, referenceImages.length, selectedModel?.identifier])
 
@@ -202,6 +206,7 @@ function VideoPageContent() {
     const isMotionCopy = selectedModel.identifier === 'kwaivgi/kling-v2.6-motion-control' || selectedModel.identifier === 'kwaivgi/kling-v3-motion-control'
     const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
     const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
+    const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
     const isLipsync =
       selectedModel.identifier.includes('lipsync') ||
       selectedModel.identifier.includes('wav2lip') ||
@@ -274,14 +279,23 @@ function VideoPageContent() {
         return
       }
     } else if (!mergedPrompt.trim()) {
-      const allowNoPrompt = (isKlingV3 || isKlingV3Omni) && (
-        (multiShotMode && multiShotShots.length > 0) ||
-        !!inputImage ||
-        !!chipSlots.startImageChipUrl ||
-        !!chipSlots.lastFrameChipUrl ||
-        !!chipSlots.referenceVideoChipUrl ||
-        chipSlots.omniStyleImageChipUrls.length > 0
-      )
+      const allowNoPrompt =
+        ((isKlingV3 || isKlingV3Omni) &&
+          ((multiShotMode && multiShotShots.length > 0) ||
+            !!inputImage ||
+            !!chipSlots.startImageChipUrl ||
+            !!chipSlots.lastFrameChipUrl ||
+            !!chipSlots.referenceVideoChipUrl ||
+            chipSlots.omniStyleImageChipUrls.length > 0)) ||
+        (isSeedance2 &&
+          (!!inputImage ||
+            !!lastFrameImage ||
+            !!inputVideo ||
+            referenceImages.length > 0 ||
+            !!chipSlots.startImageChipUrl ||
+            !!chipSlots.lastFrameChipUrl ||
+            !!chipSlots.referenceVideoChipUrl ||
+            chipSlots.omniStyleImageChipUrls.length > 0))
       if (!allowNoPrompt) {
         setError("Please enter a prompt")
         return
@@ -380,20 +394,28 @@ function VideoPageContent() {
         }
       }
 
-      if (lastFrameImage?.file && (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni)) {
+      if (
+        lastFrameImage?.file &&
+        (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni || isSeedance2)
+      ) {
         const lastFrameUpload = await uploadImageToSupabase(lastFrameImage.file, user.id, 'video-gen-last-frames')
         requestBody.last_frame = lastFrameUpload.url
+        if (isSeedance2) requestBody.last_frame_image = lastFrameUpload.url
         if (isKlingV3 || isKlingV3Omni) requestBody.end_image = lastFrameUpload.url
       }
       if (lastFrameImage?.url && (isKlingV3 || isKlingV3Omni)) {
         requestBody.end_image = lastFrameImage.url
       }
+      if (lastFrameImage?.url && isSeedance2) {
+        requestBody.last_frame_image = lastFrameImage.url
+      }
       if (
         !requestBody.last_frame &&
         chipSlots.lastFrameChipUrl &&
-        (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni)
+        (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni || isSeedance2)
       ) {
         requestBody.last_frame = chipSlots.lastFrameChipUrl
+        if (isSeedance2) requestBody.last_frame_image = chipSlots.lastFrameChipUrl
         if (isKlingV3 || isKlingV3Omni) requestBody.end_image = chipSlots.lastFrameChipUrl
       }
 
@@ -419,8 +441,19 @@ function VideoPageContent() {
         requestBody.reference_video = chipSlots.referenceVideoChipUrl
       }
 
-      // Kling v3 Omni: reference images (elements, scenes, styles). Max 7 without video, 4 with video.
-      if (isKlingV3Omni && referenceImages.length > 0) {
+      if (isSeedance2 && inputVideo?.file) {
+        const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'video-gen-reference-videos')
+        requestBody.reference_videos = [videoUpload.url]
+      }
+      if (isSeedance2 && inputVideo?.url) {
+        requestBody.reference_videos = [inputVideo.url]
+      }
+      if (isSeedance2 && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
+        requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
+      }
+
+      // Kling v3 Omni / Seedance 2.0: extra reference images
+      if ((isKlingV3Omni || isSeedance2) && referenceImages.length > 0) {
         const refUrls: string[] = []
         for (const ref of referenceImages) {
           if (ref.file) {
@@ -432,7 +465,7 @@ function VideoPageContent() {
         }
         if (refUrls.length > 0) requestBody.reference_images = refUrls
       }
-      if (isKlingV3Omni && chipSlots.omniStyleImageChipUrls.length > 0) {
+      if ((isKlingV3Omni || isSeedance2) && chipSlots.omniStyleImageChipUrls.length > 0) {
         const existing = Array.isArray(requestBody.reference_images)
           ? (requestBody.reference_images as string[])
           : []

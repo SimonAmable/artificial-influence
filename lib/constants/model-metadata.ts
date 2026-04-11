@@ -495,6 +495,39 @@ export const HAILUO_2_3_FAST_META: ModelMetadata = {
   ],
 };
 
+export const SEEDANCE_2_0_META: ModelMetadata = {
+  id: 'seedance-2.0-meta',
+  identifier: 'bytedance/seedance-2.0',
+  name: 'Seedance 2.0',
+  description:
+    'ByteDance multimodal video with native synced audio: text-to-video, first/last frame, reference images and clips, editing and extension.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 20,
+  supports_reference_image: true,
+  supports_reference_video: true,
+  aspect_ratios: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive'],
+  supports_first_frame: true,
+  supports_last_frame: true,
+  customParameters: [
+    {
+      name: 'resolution',
+      label: 'Resolution',
+      options: ['480p', '720p'],
+      default: '720p',
+      description: 'Output resolution',
+    },
+    {
+      name: 'generate_audio',
+      label: 'Generate Audio',
+      options: ['true', 'false'],
+      default: 'true',
+      description: 'Synchronized dialogue, SFX, and music',
+    },
+  ],
+};
+
 // ============================================================================
 // ORGANIZED COLLECTIONS
 // ============================================================================
@@ -524,6 +557,7 @@ export const VIDEO_MODELS_METADATA: ModelMetadata[] = [
   VEO_3_1_FAST_META,
   KLING_V2_6_PRO_META,
   HAILUO_2_3_FAST_META,
+  SEEDANCE_2_0_META,
 ];
 
 /**
@@ -567,6 +601,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     VEO_3_1_FAST_META,
     KLING_V2_6_PRO_META,
     HAILUO_2_3_FAST_META,
+    SEEDANCE_2_0_META,
   ],
   xai: [GROK_IMAGINE_META],
 };

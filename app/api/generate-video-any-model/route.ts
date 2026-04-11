@@ -244,6 +244,52 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case 'bytedance/seedance-2.0': {
+        const refVideosRaw = [
+          ...(Array.isArray(body.reference_videos) ? body.reference_videos : []),
+          body.video,
+          otherParams.video,
+          otherParams.reference_video,
+        ].filter((v): v is string => typeof v === 'string' && v.length > 0);
+        const refVideos = [...new Set(refVideosRaw)];
+
+        let refImages = [...(Array.isArray(body.reference_images) ? body.reference_images : [])].filter(
+          (v): v is string => typeof v === 'string' && v.length > 0,
+        );
+
+        const startImg =
+          image ||
+          first_frame_image ||
+          otherParams.image ||
+          otherParams.start_image;
+        const endImg =
+          body.last_frame_image ||
+          last_frame ||
+          otherParams.last_frame_image ||
+          otherParams.end_image;
+
+        const refMode = refVideos.length > 0 || refImages.length > 0;
+        if (refMode) {
+          if (typeof startImg === 'string' && startImg && !refImages.includes(startImg)) {
+            refImages = [startImg, ...refImages];
+          }
+          if (refImages.length > 0) replicateInput.reference_images = refImages;
+          if (refVideos.length > 0) replicateInput.reference_videos = refVideos;
+        } else {
+          if (typeof startImg === 'string' && startImg) replicateInput.image = startImg;
+          if (typeof endImg === 'string' && endImg) replicateInput.last_frame_image = endImg;
+        }
+
+        if (otherParams.duration != null && otherParams.duration !== undefined) {
+          replicateInput.duration = Number(otherParams.duration);
+        }
+        if (otherParams.resolution) replicateInput.resolution = otherParams.resolution;
+        if (otherParams.aspect_ratio) replicateInput.aspect_ratio = otherParams.aspect_ratio;
+        if (otherParams.generate_audio !== undefined) replicateInput.generate_audio = otherParams.generate_audio;
+        if (otherParams.seed !== null && otherParams.seed !== undefined) replicateInput.seed = otherParams.seed;
+        break;
+      }
+
       default:
         return NextResponse.json(
           { error: `Unsupported model: ${model}` },
@@ -261,12 +307,14 @@ export async function POST(request: NextRequest) {
       replicateInput.first_frame_image,
       replicateInput.start_image,
       replicateInput.last_frame,
+      replicateInput.last_frame_image,
       replicateInput.end_image,
       replicateInput.reference_images,
     ]);
     const referenceVideoStoragePaths = collectStoragePaths([
       replicateInput.video,
       replicateInput.reference_video,
+      replicateInput.reference_videos,
     ]);
 
     const webhookBase = process.env.REPLICATE_WEBHOOK_BASE_URL?.replace(/\/$/, '');

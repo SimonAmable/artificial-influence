@@ -34,6 +34,7 @@ export const MODEL_IDENTIFIERS = {
   VEED_FABRIC_1_0: 'veed/fabric-1.0',
   MINIMAX_HAILUO_2_3_FAST: 'minimax/hailuo-2.3-fast',
   GOOGLE_VEO_3_1_FAST: 'google/veo-3.1-fast',
+  BYTEDANCE_SEEDANCE_2_0: 'bytedance/seedance-2.0',
 } as const;
 
 /** Default model for image generation (used when no model is specified). */
@@ -454,6 +455,75 @@ const KLING_V3_OMNI_VIDEO_PARAMS: ParameterDefinition[] = [
     required: false,
     default: null,
     ui_type: 'textarea',
+  },
+];
+
+// ByteDance Seedance 2.0 (bytedance/seedance-2.0)
+const SEEDANCE_2_0_VIDEO_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'image',
+    type: 'string',
+    label: 'First Frame',
+    description: 'Optional first frame (not used with reference_images mode)',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
+    name: 'last_frame_image',
+    type: 'string',
+    label: 'Last Frame',
+    description: 'Optional last frame (requires first frame; not used with reference_images)',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
+    name: 'duration',
+    type: 'number',
+    label: 'Duration',
+    description: 'Seconds; use -1 for model-chosen length',
+    required: false,
+    default: 5,
+    min: -1,
+    max: 15,
+    ui_type: 'number',
+  },
+  {
+    name: 'resolution',
+    type: 'string',
+    label: 'Resolution',
+    required: false,
+    default: '720p',
+    enum: ['480p', '720p'],
+    ui_type: 'select',
+  },
+  {
+    name: 'aspect_ratio',
+    type: 'string',
+    label: 'Aspect Ratio',
+    required: false,
+    default: '16:9',
+    enum: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive'],
+    ui_type: 'select',
+  },
+  {
+    name: 'generate_audio',
+    type: 'boolean',
+    label: 'Generate Audio',
+    required: false,
+    default: true,
+    ui_type: 'switch',
+  },
+  {
+    name: 'seed',
+    type: 'number',
+    label: 'Seed',
+    required: false,
+    default: null,
+    min: 0,
+    max: 2147483647,
+    ui_type: 'number',
   },
 ];
 
@@ -1218,6 +1288,26 @@ export const KLING_V3_OMNI_VIDEO_MODEL: Model = {
 };
 
 /**
+ * ByteDance Seedance 2.0 — multimodal video with native audio
+ */
+export const SEEDANCE_2_0_VIDEO_MODEL: Model = {
+  id: 'model-bytedance-seedance-2.0',
+  identifier: MODEL_IDENTIFIERS.BYTEDANCE_SEEDANCE_2_0,
+  name: 'Seedance 2.0',
+  description:
+    'ByteDance Seedance 2.0: text-to-video, first/last frame, reference images and videos, synchronized audio.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 20,
+  parameters: {
+    parameters: SEEDANCE_2_0_VIDEO_PARAMS,
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+/**
  * Flux Kontext Fast - Ultra fast image generation
  */
 export const FLUX_KONTEXT_FAST_MODEL: Model = {
@@ -1379,6 +1469,7 @@ export const VIDEO_MODELS = [
   FABRIC_1_0_MODEL,
   HAILUO_2_3_FAST_MODEL,
   VEO_3_1_FAST_MODEL,
+  SEEDANCE_2_0_VIDEO_MODEL,
 ] as const;
 
 export const AUDIO_MODELS = [] as const;
@@ -1413,6 +1504,7 @@ const VIDEO_MODELS_FIXED = [
   FABRIC_1_0_MODEL,
   HAILUO_2_3_FAST_MODEL,
   VEO_3_1_FAST_MODEL,
+  SEEDANCE_2_0_VIDEO_MODEL,
 ] as const;
 
 const ALL_MODELS_FIXED = [

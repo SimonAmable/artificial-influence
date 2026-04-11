@@ -467,6 +467,23 @@ export function createGenerateVideoTool({
           if (keepOriginalSound !== undefined) replicateInput.keep_original_sound = keepOriginalSound
           if (negativePrompt) replicateInput.negative_prompt = negativePrompt
           break
+        case "bytedance/seedance-2.0": {
+          const refMode = Boolean(primaryVideo) || additionalImages.length > 0
+          if (duration != null) replicateInput.duration = duration
+          if (aspectRatio) replicateInput.aspect_ratio = aspectRatio
+          if (generateAudio !== undefined) replicateInput.generate_audio = generateAudio
+          if (refMode) {
+            const refImages = [primaryImage, secondaryImage, ...additionalImages].filter(
+              (url): url is string => typeof url === "string" && url.length > 0,
+            )
+            if (refImages.length > 0) replicateInput.reference_images = refImages
+            if (primaryVideo) replicateInput.reference_videos = [primaryVideo]
+          } else {
+            if (primaryImage) replicateInput.image = primaryImage
+            if (secondaryImage) replicateInput.last_frame_image = secondaryImage
+          }
+          break
+        }
         default:
           throw new Error(`Unsupported video model: ${resolvedModel}`)
       }

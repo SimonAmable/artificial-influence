@@ -29,13 +29,17 @@ export function getVideoChipSlotInfo(model: Model, attachedRefs: AttachedRef[], 
   const imgs = imageAssetRefs(attachedRefs)
   const vids = videoAssetRefs(attachedRefs)
   const isOmni = id === "kwaivgi/kling-v3-omni-video"
+  const isSeedance = id === "bytedance/seedance-2.0"
+  const useOmniStyleChips = isOmni || (isSeedance && opts.hasReferenceVideo)
 
   const supportsInput =
     model.parameters?.parameters?.some((p) =>
       ["image", "first_frame_image", "start_image"].includes(p.name)
     ) ?? false
   const supportsLast =
-    model.parameters?.parameters?.some((p) => p.name === "last_frame") ?? false
+    model.parameters?.parameters?.some((p) =>
+      ["last_frame", "last_frame_image"].includes(p.name)
+    ) ?? false
 
   let imgIdx = 0
   let startImageChipUrl: string | null = null
@@ -45,7 +49,7 @@ export function getVideoChipSlotInfo(model: Model, attachedRefs: AttachedRef[], 
   let lastFrameRef: AttachedRef | null = null
   const omniStyleImageRefs: AttachedRef[] = []
 
-  if (isOmni) {
+  if (useOmniStyleChips) {
     if (!opts.hasInputImage && imgs[imgIdx]) {
       startImageChipUrl = imgs[imgIdx].assetUrl!.trim()
       startImageRef = imgs[imgIdx]

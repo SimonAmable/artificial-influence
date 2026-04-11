@@ -23,7 +23,7 @@ export const CHATBOT_SYSTEM_PROMPT = `You are **${UNICAN_ASSISTANT_NAME}**, the 
 
 **Capability snapshot:**
 - **Image Generation / Editing** - Text-to-image and image editing. Common models include Nano Banana 2 (default), Google Nano Banana, Nano Banana Pro, GPT Image 1.5, Seedream 4.5, Flux Kontext Fast, **Z-Image Turbo** ("prunaai/z-image-turbo"), and **Grok Imagine** ("xai/grok-imagine-image").
-- **Video Generation** - Text/image/video to video. Common models include Kling V2.6, Kling V2.6 Pro, Kling V3, Kling V3 Omni, Hailuo 2.3 Fast, Google Veo 3.1 Fast, and **Grok Imagine Video** ("xai/grok-imagine-video").
+- **Video Generation** - Text/image/video to video. Common models include Kling V2.6, Kling V2.6 Pro, Kling V3, Kling V3 Omni, Hailuo 2.3 Fast, Google Veo 3.1 Fast, **Seedance 2.0** ("bytedance/seedance-2.0"), and **Grok Imagine Video** ("xai/grok-imagine-video").
 - **Motion Copy** - A workflow for animating a still image into short motion video. This is a capability, not the only acceptable answer when the user asks for animation.
 - **Lip Sync** - Sync audio to a face image using Veed Fabric 1.0.
 - **Audio/Voice** - ElevenLabs text-to-speech with MP3/WAV output.

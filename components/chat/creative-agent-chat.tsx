@@ -11,6 +11,7 @@ import { Conversation, ConversationContent, ConversationEmptyState, Conversation
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message"
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion"
 import { ImageGrid } from "@/components/shared/display/image-grid"
+import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -1591,6 +1592,13 @@ export function CreativeAgentChat({
   const chatGatewayModelRef = React.useRef<string>(DEFAULT_CHAT_GATEWAY_MODEL)
   const [chatGatewayModelId, setChatGatewayModelId] = React.useState(DEFAULT_CHAT_GATEWAY_MODEL)
 
+  const selectedChatGatewayOption = React.useMemo(
+    () =>
+      CHAT_GATEWAY_MODEL_OPTIONS.find((option) => option.id === chatGatewayModelId) ??
+      CHAT_GATEWAY_MODEL_OPTIONS[0],
+    [chatGatewayModelId],
+  )
+
   const chat = React.useMemo(
     () =>
       new Chat({
@@ -1963,7 +1971,7 @@ export function CreativeAgentChat({
           </div>
         ) : null}
 
-        <Conversation className="min-h-0 flex-1 overflow-y-auto">
+        <Conversation className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
           <ConversationContent
             className={
               messages.length === 0
@@ -2044,7 +2052,7 @@ export function CreativeAgentChat({
                       <MessageParts message={message} />
                     </MessageContent>
                   ) : (
-                    <div className="flex w-full max-w-3xl items-start gap-3">
+                    <div className="flex w-full min-w-0 max-w-3xl items-start gap-3">
                       <span className="mt-1 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/40">
                         <Image
                           src="/logo.svg"
@@ -2054,7 +2062,7 @@ export function CreativeAgentChat({
                           className="dark:invert"
                         />
                       </span>
-                      <div className="w-full space-y-3 text-left text-[15px] leading-7 text-foreground">
+                      <div className="min-w-0 flex-1 space-y-3 text-left text-[15px] leading-7 text-foreground">
                         <MessageParts message={message} />
                       </div>
                     </div>
@@ -2180,14 +2188,29 @@ export function CreativeAgentChat({
                         <SelectTrigger
                           size="sm"
                           aria-label="Chat model"
-                          className="h-9 max-w-[min(100%,11rem)] shrink border-border/50 bg-background/40 hover:bg-background/60"
+                          className="h-9 w-fit min-w-0 max-w-[min(100%,16rem)] shrink border-border/50 bg-background/40 px-2.5 hover:bg-background/60"
                         >
-                          <SelectValue placeholder="Model" />
+                          <SelectValue placeholder="Model">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <ModelIcon identifier={selectedChatGatewayOption.id} size={16} />
+                              <span className="truncate">{selectedChatGatewayOption.label}</span>
+                            </div>
+                          </SelectValue>
                         </SelectTrigger>
-                        <SelectContent align="start">
+                        <SelectContent align="start" position="popper" sideOffset={4} className="w-[min(calc(100vw-2rem),22rem)]">
                           {CHAT_GATEWAY_MODEL_OPTIONS.map((option) => (
                             <SelectItem key={option.id} value={option.id}>
-                              {option.label}
+                              <div className="flex items-center gap-3">
+                                <div className="shrink-0 rounded-md border border-border bg-muted/30 p-1.5">
+                                  <ModelIcon identifier={option.id} size={20} />
+                                </div>
+                                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                  <span className="text-sm font-semibold">{option.label}</span>
+                                  {option.description ? (
+                                    <span className="text-xs text-muted-foreground">{option.description}</span>
+                                  ) : null}
+                                </div>
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>

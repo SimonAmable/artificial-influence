@@ -3,7 +3,7 @@ import Link from "next/link"
 export function Footer() {
   return (
     <footer className="w-full bg-background py-12">
-      <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-3 lg:px-8">
+      <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-4 lg:px-8">
         <div className="lg:col-span-2">
           <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
             UniCan
@@ -29,6 +29,30 @@ export function Footer() {
             <li>
               <Link href="/pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
                 Pricing
+              </Link>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">Legal</p>
+          <ul className="mt-4 space-y-2">
+            <li>
+              <Link href="/privacy" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+                Privacy
+              </Link>
+            </li>
+            <li>
+              <Link href="/terms" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+                Terms
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/delete-account"
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Delete account
               </Link>
             </li>
           </ul>
