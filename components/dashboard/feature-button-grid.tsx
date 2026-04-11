@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { dashboardToolNavItems, type DashboardToolIcon } from "@/lib/constants/navigation"
 import {
   ImageIcon,
   VideoIcon,
@@ -14,58 +15,22 @@ import {
   ArrowsLeftRight,
   FlowArrow,
   Palette,
+  SquaresFour,
+  ChatCircleDots,
 } from "@phosphor-icons/react"
 
-const toolButtons = [
-  {
-    label: "Brand kit",
-    href: "/brand",
-    icon: Palette,
-    hint: "Logos, colors, type, and voice for consistent AI output.",
-  },
-  {
-    label: "Motion Copy",
-    href: "/motion-copy",
-    icon: FlowArrow,
-    hint: "Copy motion from ads or dance clips onto your character—animate a still with prompts.",
-  },
-  {
-    label: "Lip Sync",
-    href: "/lipsync",
-    icon: MicrophoneIcon,
-    hint: "Sync speech to a face in an image or clip.",
-  },
-  {
-    label: "Image Studio",
-    href: "/image",
-    icon: ImageIcon,
-    hint: "Generate images from text and references.",
-  },
-  {
-    label: "Video Studio",
-    href: "/video",
-    icon: VideoIcon,
-    hint: "Text or image to video generation.",
-  },
-  {
-    label: "Image Editing",
-    href: "/inpaint",
-    icon: PaintBrushIcon,
-    hint: "Edit regions of an image with prompts.",
-  },
-  {
-    label: "Character Swap",
-    href: "/character-swap",
-    icon: ArrowsLeftRight,
-    hint: "Swap a subject while keeping the scene.",
-  },
-  {
-    label: "Workflow",
-    href: "/canvases",
-    icon: PencilSimpleIcon,
-    hint: "Node-based pipelines and canvas projects.",
-  },
-] as const
+const toolIconMap: Record<DashboardToolIcon, typeof ImageIcon> = {
+  palette: Palette,
+  "flow-arrow": FlowArrow,
+  microphone: MicrophoneIcon,
+  image: ImageIcon,
+  video: VideoIcon,
+  "paint-brush": PaintBrushIcon,
+  "arrows-left-right": ArrowsLeftRight,
+  "pencil-simple": PencilSimpleIcon,
+  "squares-four": SquaresFour,
+  "chat-circle-dots": ChatCircleDots,
+}
 
 export function FeatureButtonGrid() {
   const router = useRouter()
@@ -116,8 +81,8 @@ export function FeatureButtonGrid() {
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
-        {toolButtons.map((tool) => {
-          const Icon = tool.icon
+        {dashboardToolNavItems.map((tool) => {
+          const Icon = toolIconMap[tool.icon]
           return (
             <Tooltip key={tool.href}>
               <TooltipTrigger asChild>

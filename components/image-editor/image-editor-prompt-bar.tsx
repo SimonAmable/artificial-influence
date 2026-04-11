@@ -271,7 +271,7 @@ export function ImageEditorPromptBar({
           formData.append("model", INPAINT_MODEL)
           formData.append("resolution", INPAINT_RESOLUTION)
 
-          if (exports.baseDataUrl) {
+          if (exports?.baseDataUrl) {
             formData.append(
               "referenceImages",
               await dataUrlToFile(exports.baseDataUrl, "base-image.png")
@@ -292,7 +292,7 @@ export function ImageEditorPromptBar({
             formData.append("referenceImages", file)
           })
 
-          if (hasMask && exports.maskDataUrl) {
+          if (hasMask && exports?.maskDataUrl) {
             formData.append(
               "referenceImages",
               await dataUrlToFile(exports.maskDataUrl, "mask-image.png")

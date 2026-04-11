@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { generateVideoAndWait } from "@/lib/generate-video-client"
 
 const MOTION_COPY_MODEL = 'kwaivgi/kling-v3-motion-control' as const
 
@@ -177,12 +178,7 @@ export default function MotionCopyPage() {
       // Send URLs to API route
       console.log('Sending motion copy request with image and video URLs')
       
-      const response = await fetch('/api/generate-video', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const data = await generateVideoAndWait('/api/generate-video', {
           imageUrl: imagePublicUrl,
           videoUrl: videoPublicUrl,
           imageStoragePath,
@@ -193,15 +189,7 @@ export default function MotionCopyPage() {
           character_orientation: characterOrientation,
           model: MOTION_COPY_MODEL,
           tool: 'motion_copy',
-        }),
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || errorData.message || 'Failed to generate motion copy')
-      }
-
-      const data = await response.json()
       
       // Handle response - extract video URL and PREPEND to existing videos
       if (data.video?.url) {

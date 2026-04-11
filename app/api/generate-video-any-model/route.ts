@@ -2,6 +2,24 @@ import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
+import { inferStoragePathFromUrl } from '@/lib/assets/library';
+
+function collectStoragePaths(values: unknown[]): string[] {
+  const paths = values.flatMap((value) => {
+    if (typeof value === 'string') {
+      const storagePath = inferStoragePathFromUrl(value);
+      return storagePath ? [storagePath] : [];
+    }
+
+    if (Array.isArray(value)) {
+      return collectStoragePaths(value);
+    }
+
+    return [];
+  });
+
+  return [...new Set(paths)];
+}
 
 export async function POST(request: NextRequest) {
   const requestStartTime = Date.now();
@@ -77,12 +95,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check credits (10 credits for video generation)
-    const requiredCredits = 10;
-    const hasCredits = await checkUserHasCredits(user.id, requiredCredits);
+    const { data: modelData, error: modelError } = await supabase
+      .from('models')
+      .select('model_cost')
+      .eq('identifier', model)
+      .eq('type', 'video')
+      .eq('is_active', true)
+      .single();
+
+    if (modelError || !modelData) {
+      return NextResponse.json(
+        { error: `Model "${model}" not found or is inactive` },
+        { status: 400 }
+      );
+    }
+
+    const requiredCredits = Math.max(1, Number(modelData.model_cost ?? 10) || 10);
+    const hasCredits = await checkUserHasCredits(user.id, requiredCredits, supabase);
     if (!hasCredits) {
       return NextResponse.json(
-        { error: 'Insufficient credits. Video generation requires 10 credits.' },
+        { error: `Insufficient credits. Video generation requires ${requiredCredits} credits.` },
         { status: 402 }
       );
     }
@@ -223,6 +255,75 @@ export async function POST(request: NextRequest) {
       model,
       inputKeys: Object.keys(replicateInput),
     });
+
+    const referenceImageStoragePaths = collectStoragePaths([
+      replicateInput.image,
+      replicateInput.first_frame_image,
+      replicateInput.start_image,
+      replicateInput.last_frame,
+      replicateInput.end_image,
+      replicateInput.reference_images,
+    ]);
+    const referenceVideoStoragePaths = collectStoragePaths([
+      replicateInput.video,
+      replicateInput.reference_video,
+    ]);
+
+    const webhookBase = process.env.REPLICATE_WEBHOOK_BASE_URL?.replace(/\/$/, '');
+    if (webhookBase) {
+      const webhookUrl = `${webhookBase}/api/webhooks/replicate`;
+      const replicateModelMatch = model.match(/^([^/]+\/[^:]+):(.+)$/);
+      const prediction = await replicate.predictions.create(
+        replicateModelMatch
+          ? {
+              version: replicateModelMatch[2],
+              input: replicateInput,
+              webhook: webhookUrl,
+              webhook_events_filter: ['completed'],
+            }
+          : {
+              model: model as `${string}/${string}`,
+              input: replicateInput,
+              webhook: webhookUrl,
+              webhook_events_filter: ['completed'],
+            }
+      );
+
+      const { data: pendingGeneration, error: insertError } = await supabase
+        .from('generations')
+        .insert({
+          user_id: user.id,
+          prompt: typeof effectivePrompt === 'string' ? effectivePrompt : null,
+          supabase_storage_path: null,
+          reference_images_supabase_storage_path:
+            referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+          reference_videos_supabase_storage_path:
+            referenceVideoStoragePaths.length > 0 ? referenceVideoStoragePaths : null,
+          model,
+          type: 'video',
+          is_public: true,
+          tool: typeof body.tool === 'string' ? body.tool : null,
+          status: 'pending',
+          replicate_prediction_id: prediction.id,
+        })
+        .select('id')
+        .single();
+
+      if (insertError || !pendingGeneration) {
+        console.error('[generate-video-test] Failed to insert pending generation:', insertError);
+        throw new Error('Failed to create pending generation');
+      }
+
+      return NextResponse.json(
+        {
+          status: 'pending',
+          predictionId: prediction.id,
+          generationId: pendingGeneration.id,
+          message: `Video generation started. Poll GET /api/generate-video/status?predictionId=${prediction.id}`,
+        },
+        { status: 202 }
+      );
+    }
 
     // Call Replicate API
     const generationStartTime = Date.now();

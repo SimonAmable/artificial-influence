@@ -19,6 +19,48 @@ const supabaseAdmin = createClient(
 // Disable body parsing for webhook signature verification
 export const runtime = 'nodejs';
 
+function toIsoOrNull(value: unknown): string | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return new Date(value * 1000).toISOString();
+  }
+
+  if (typeof value === 'string') {
+    const asNumber = Number(value);
+    if (!Number.isNaN(asNumber) && Number.isFinite(asNumber)) {
+      return new Date(asNumber * 1000).toISOString();
+    }
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+
+  return null;
+}
+
+function getSubscriptionPeriodIso(
+  subscription: Stripe.Subscription,
+  field: 'current_period_start' | 'current_period_end'
+): string | null {
+  const subscriptionWithOptionalPeriods = subscription as Stripe.Subscription & {
+    current_period_start?: unknown;
+    current_period_end?: unknown;
+    items: {
+      data: Array<
+        Stripe.SubscriptionItem & {
+          current_period_start?: unknown;
+          current_period_end?: unknown;
+        }
+      >;
+    };
+  };
+
+  // Newer Stripe API versions may expose period bounds on the item, not subscription root.
+  const subscriptionValue = subscriptionWithOptionalPeriods[field];
+  const itemValue = subscriptionWithOptionalPeriods.items.data[0]?.[field];
+  return toIsoOrNull(subscriptionValue) ?? toIsoOrNull(itemValue);
+}
+
 async function buffer(readable: ReadableStream) {
   const chunks = [];
   const reader = readable.getReader();
@@ -418,6 +460,14 @@ async function upsertSubscription(
   userId: string
 ) {
   const priceId = subscription.items.data[0]?.price.id;
+  const currentPeriodStart = getSubscriptionPeriodIso(
+    subscription,
+    'current_period_start'
+  );
+  const currentPeriodEnd = getSubscriptionPeriodIso(
+    subscription,
+    'current_period_end'
+  );
 
   const subscriptionData = {
     user_id: userId,
@@ -427,10 +477,8 @@ async function upsertSubscription(
     price_id: priceId,
     quantity: subscription.items.data[0]?.quantity || 1,
     cancel_at_period_end: subscription.cancel_at_period_end,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    current_period_start: new Date(((subscription as any).current_period_start as number) * 1000).toISOString(),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    current_period_end: new Date(((subscription as any).current_period_end as number) * 1000).toISOString(),
+    current_period_start: currentPeriodStart,
+    current_period_end: currentPeriodEnd,
     updated_at: new Date().toISOString(),
   };
 

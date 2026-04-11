@@ -142,6 +142,7 @@ export function BrandKitEditor({
   const loadInProgressRef = React.useRef(false)
   const [loading, setLoading] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
+  const [deleting, setDeleting] = React.useState(false)
   const [notFound, setNotFound] = React.useState(false)
   const [kits, setKits] = React.useState<BrandKit[]>([])
 
@@ -401,6 +402,29 @@ export function BrandKitEditor({
       toast.error(e instanceof Error ? e.message : "Save failed")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const deleteCurrentKit = async () => {
+    if (!kitId) return
+    const ok = window.confirm(`Delete "${name.trim() || "this brand kit"}"? This cannot be undone.`)
+    if (!ok) return
+
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/brand-kits/${kitId}`, { method: "DELETE" })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || "Delete failed")
+      }
+      invalidateCommandCache()
+      toast.success("Brand kit deleted")
+      router.push("/brand")
+    } catch (e) {
+      console.error(e)
+      toast.error(e instanceof Error ? e.message : "Delete failed")
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -748,9 +772,27 @@ export function BrandKitEditor({
           <p className="text-sm text-muted-foreground">
             Next we&apos;ll use your Business DNA to generate on-brand content and campaigns.
           </p>
-          <Button type="button" disabled={saving} onClick={() => void save()} className={cn("rounded-full px-8 py-6 text-base font-semibold", ACCENT)}>
-            {saving ? "Saving…" : "Looks good"}
-          </Button>
+          <div className="flex items-center gap-2 self-end">
+            {!isNew && kitId ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving || deleting}
+                onClick={() => void deleteCurrentKit()}
+                className="rounded-full border-destructive/40 text-destructive hover:bg-destructive/10"
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              disabled={saving || deleting}
+              onClick={() => void save()}
+              className={cn("rounded-full px-8 py-6 text-base font-semibold", ACCENT)}
+            >
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

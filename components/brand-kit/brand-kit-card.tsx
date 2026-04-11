@@ -3,22 +3,55 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Stack } from "@phosphor-icons/react"
+import { DotsThree, Stack, Trash } from "@phosphor-icons/react"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { BrandKit } from "@/lib/brand-kit/types"
 import { cn } from "@/lib/utils"
 
 export type BrandKitCardProps = {
   kit: BrandKit
   className?: string
+  onDeleted?: (id: string) => void
 }
 
-export function BrandKitCard({ kit, className }: BrandKitCardProps) {
+export function BrandKitCard({ kit, className, onDeleted }: BrandKitCardProps) {
   const thumb = kit.logoUrl ?? kit.iconUrl
   const updated = new Date(kit.updatedAt)
   const updatedLabel = Number.isNaN(updated.getTime())
     ? ""
     : updated.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+  const [deleting, setDeleting] = React.useState(false)
+
+  const handleDelete = async (event: Event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (deleting) return
+    const ok = window.confirm(`Delete "${kit.name}"? This cannot be undone.`)
+    if (!ok) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/brand-kits/${kit.id}`, { method: "DELETE" })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || "Delete failed")
+      }
+      toast.success("Brand kit deleted")
+      onDeleted?.(kit.id)
+    } catch (error) {
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : "Delete failed")
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <Link href={`/brand/${kit.id}`} className={cn("group block", className)}>
@@ -36,7 +69,36 @@ export function BrandKitCard({ kit, className }: BrandKitCardProps) {
           </div>
         </div>
         <div className="px-5 pb-5 pt-4">
-          <p className="text-lg font-medium text-foreground">{kit.name}</p>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-lg font-medium text-foreground">{kit.name}</p>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={deleting}
+                  className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  aria-label="More actions"
+                >
+                  <DotsThree className="h-4 w-4" weight="bold" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={(e) => void handleDelete(e)}
+                >
+                  <Trash className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {kit.isDefault ? "Default kit" : "Brand kit"}
             {updatedLabel ? ` · ${updatedLabel}` : ""}

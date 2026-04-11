@@ -20,6 +20,8 @@ export const MODEL_IDENTIFIERS = {
   GOOGLE_NANO_BANANA_2: 'google/nano-banana-2',
   OPENAI_GPT_IMAGE_1_5: 'openai/gpt-image-1.5',
   BYTEDANCE_SEEDREAM_4_5: 'bytedance/seedream-4.5',
+  BYTEDANCE_SEEDREAM_5_LITE: 'bytedance/seedream-5-lite',
+  PRUNAAI_Z_IMAGE_TURBO: 'prunaai/z-image-turbo',
   PRUNAAI_FLUX_KONTEXT_FAST: 'prunaai/flux-kontext-fast',
   XAI_GROK_IMAGINE: 'xai/grok-imagine-image',
   
@@ -889,6 +891,157 @@ const SEEDREAM_4_5_PARAMS: ParameterDefinition[] = [
   },
 ];
 
+// Seedream 5.0 lite parameters (Replicate bytedance/seedream-5-lite)
+const SEEDREAM_5_LITE_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'size',
+    type: 'string',
+    label: 'Size',
+    description: 'Pre-set image resolution (2K / 3K)',
+    required: false,
+    default: '2K',
+    enum: ['2K', '3K'],
+    ui_type: 'select',
+  },
+  {
+    name: 'aspect_ratio',
+    type: 'string',
+    label: 'Aspect Ratio',
+    description: 'Output aspect ratio',
+    required: false,
+    default: '1:1',
+    enum: ['1:1', '4:3', '3:4', '16:9', '9:16', '3:2', '2:3', '21:9'],
+    ui_type: 'select',
+  },
+  {
+    name: 'sequential_image_generation',
+    type: 'string',
+    label: 'Sequential Image Generation',
+    description: 'Generate sets of related images in one request',
+    required: false,
+    default: 'disabled',
+    enum: ['disabled', 'auto'],
+    ui_type: 'select',
+  },
+  {
+    name: 'max_images',
+    type: 'number',
+    label: 'Max Images',
+    description: 'Max images when sequential mode is enabled',
+    required: false,
+    default: 1,
+    min: 1,
+    max: 14,
+    ui_type: 'number',
+  },
+  {
+    name: 'num_images',
+    type: 'number',
+    label: 'Number of Images',
+    description: 'Number of separate generations',
+    required: false,
+    default: 1,
+    min: 1,
+    max: 10,
+    ui_type: 'number',
+  },
+  {
+    name: 'seed',
+    type: 'number',
+    label: 'Seed',
+    description: 'Random seed for reproducible results',
+    required: false,
+    default: null,
+    min: 0,
+    max: 2147483647,
+    ui_type: 'number',
+  },
+];
+
+// Z-Image Turbo (prunaai/z-image-turbo)
+const Z_IMAGE_TURBO_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'width',
+    type: 'number',
+    label: 'Width',
+    description: 'Width of the generated image',
+    required: false,
+    default: 1024,
+    min: 64,
+    max: 2048,
+    ui_type: 'number',
+  },
+  {
+    name: 'height',
+    type: 'number',
+    label: 'Height',
+    description: 'Height of the generated image',
+    required: false,
+    default: 1024,
+    min: 64,
+    max: 2048,
+    ui_type: 'number',
+  },
+  {
+    name: 'num_inference_steps',
+    type: 'number',
+    label: 'Inference Steps',
+    required: false,
+    default: 8,
+    min: 1,
+    max: 50,
+    ui_type: 'number',
+  },
+  {
+    name: 'guidance_scale',
+    type: 'number',
+    label: 'Guidance Scale',
+    description: 'Use 0 for Turbo models',
+    required: false,
+    default: 0,
+    min: 0,
+    max: 20,
+    ui_type: 'slider',
+  },
+  {
+    name: 'seed',
+    type: 'number',
+    label: 'Seed',
+    required: false,
+    default: null,
+    min: 0,
+    max: 2147483647,
+    ui_type: 'number',
+  },
+  {
+    name: 'go_fast',
+    type: 'boolean',
+    label: 'Go Fast',
+    required: false,
+    default: false,
+    ui_type: 'switch',
+  },
+  {
+    name: 'output_format',
+    type: 'string',
+    label: 'Output Format',
+    required: false,
+    default: 'jpg',
+    enum: ['png', 'jpg', 'webp'],
+    ui_type: 'select',
+  },
+  {
+    name: 'output_quality',
+    type: 'number',
+    label: 'Output Quality',
+    required: false,
+    default: 80,
+    min: 0,
+    max: 100,
+    ui_type: 'slider',
+  },
+];
+
 // ============================================================================
 // MODEL DEFINITIONS
 // ============================================================================
@@ -1160,6 +1313,45 @@ export const SEEDREAM_4_5_MODEL: Model = {
   updated_at: new Date().toISOString(),
 };
 
+/**
+ * Seedream 5.0 lite - ByteDance image model with reasoning and 3K output
+ */
+export const SEEDREAM_5_LITE_MODEL: Model = {
+  id: 'model-seedream-5-lite',
+  identifier: MODEL_IDENTIFIERS.BYTEDANCE_SEEDREAM_5_LITE,
+  name: 'Seedream 5.0',
+  description:
+    "ByteDance image model with built-in reasoning, example-based editing, and up to 3K resolution",
+  type: 'image',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 0.002,
+  parameters: {
+    parameters: SEEDREAM_5_LITE_PARAMS,
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+/**
+ * Z-Image Turbo - Fast 6B text-to-image (Tongyi-MAI)
+ */
+export const Z_IMAGE_TURBO_MODEL: Model = {
+  id: 'model-z-image-turbo',
+  identifier: MODEL_IDENTIFIERS.PRUNAAI_Z_IMAGE_TURBO,
+  name: 'Z-Image Turbo',
+  description: 'Super fast text-to-image model of 6B parameters developed by Tongyi-MAI',
+  type: 'image',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 0.001,
+  parameters: {
+    parameters: Z_IMAGE_TURBO_PARAMS,
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 // ============================================================================
 // MODEL COLLECTIONS
 // ============================================================================
@@ -1172,6 +1364,8 @@ export const IMAGE_MODELS = [
   NANO_BANANA_PRO_MODEL,
   GPT_IMAGE_1_5_MODEL,
   SEEDREAM_4_5_MODEL,
+  SEEDREAM_5_LITE_MODEL,
+  Z_IMAGE_TURBO_MODEL,
   FLUX_KONTEXT_FAST_MODEL,
   GROK_IMAGINE_MODEL,
 ] as const;
@@ -1204,6 +1398,8 @@ const IMAGE_MODELS_FIXED = [
   NANO_BANANA_PRO_MODEL,
   GPT_IMAGE_1_5_MODEL,
   SEEDREAM_4_5_MODEL,
+  SEEDREAM_5_LITE_MODEL,
+  Z_IMAGE_TURBO_MODEL,
   FLUX_KONTEXT_FAST_MODEL,
   GROK_IMAGINE_MODEL,
 ] as const;

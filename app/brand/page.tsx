@@ -68,7 +68,13 @@ export default function BrandHubPage() {
                     No kits yet. Create a brand kit to get started—manually or from a website.
                   </p>
                 )
-              : kits.map((kit) => <BrandKitCard key={kit.id} kit={kit} />)}
+              : kits.map((kit) => (
+                  <BrandKitCard
+                    key={kit.id}
+                    kit={kit}
+                    onDeleted={(id) => setKits((prev) => prev.filter((item) => item.id !== id))}
+                  />
+                ))}
           </div>
         </section>
       </div>

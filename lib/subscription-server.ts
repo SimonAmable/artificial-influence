@@ -16,7 +16,7 @@ export async function getUserSubscription(
     .in('status', ['active', 'trialing'])
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error fetching subscription:', error);

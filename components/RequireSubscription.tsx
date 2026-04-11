@@ -40,7 +40,7 @@ export default function RequireSubscription({
           .select('status')
           .eq('user_id', user.id)
           .in('status', ['active', 'trialing'])
-          .single();
+          .maybeSingle();
 
         if (subscription) {
           setHasSubscription(true);

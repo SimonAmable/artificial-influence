@@ -169,6 +169,51 @@ export const SEEDREAM_4_5_META: ModelMetadata = {
   ],
 };
 
+export const SEEDREAM_5_LITE_META: ModelMetadata = {
+  id: 'seedream-5-lite-meta',
+  identifier: 'bytedance/seedream-5-lite',
+  name: 'Seedream 5.0',
+  description:
+    'ByteDance image model with reasoning, example-based editing, and up to 3K output',
+  type: 'image',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 2.0,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['1:1', '4:3', '3:4', '16:9', '9:16', '3:2', '2:3', '21:9'],
+  customParameters: [
+    {
+      name: 'size',
+      label: 'Size',
+      options: ['2K', '3K'],
+      default: '2K',
+      description: 'Pre-set image resolution',
+    },
+    {
+      name: 'sequential_image_generation',
+      label: 'Multi-Image Mode',
+      options: ['disabled', 'auto'],
+      default: 'disabled',
+      description: 'Generate related image sets in one request',
+    },
+  ],
+};
+
+export const Z_IMAGE_TURBO_META: ModelMetadata = {
+  id: 'z-image-turbo-meta',
+  identifier: 'prunaai/z-image-turbo',
+  name: 'Z-Image Turbo',
+  description: 'Fast 6B Tongyi-MAI text-to-image, ideal for quick iterations',
+  type: 'image',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 1.0,
+  supports_reference_image: false,
+  supports_reference_video: false,
+  aspect_ratios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+};
+
 export const GROK_IMAGINE_META: ModelMetadata = {
   id: '53060a45-d751-4e17-9db9-00b412cf3f87',
   identifier: 'xai/grok-imagine-image',
@@ -462,8 +507,10 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
   NANO_BANANA_PRO_META,
   NANO_BANANA_2_META,
   SEEDREAM_4_5_META,
+  SEEDREAM_5_LITE_META,
   GROK_IMAGINE_META,
   GPT_IMAGE_1_5_META,
+  Z_IMAGE_TURBO_META,
   FLUX_KONTEXT_FAST_META,
 ];
 
@@ -510,7 +557,9 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     NANO_BANANA_PRO_META,
     NANO_BANANA_2_META,
     SEEDREAM_4_5_META,
+    SEEDREAM_5_LITE_META,
     GPT_IMAGE_1_5_META,
+    Z_IMAGE_TURBO_META,
     FLUX_KONTEXT_FAST_META,
     KLING_V2_6_MOTION_META,
     KLING_V3_MOTION_META,

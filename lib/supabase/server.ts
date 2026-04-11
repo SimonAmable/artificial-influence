@@ -1,3 +1,5 @@
+// AI guardrail: keep this helper close to the Supabase SSR docs.
+// Do not refactor cookie handling here unless required by an official Supabase update.
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 

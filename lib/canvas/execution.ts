@@ -87,25 +87,15 @@ function createBrowserRuntime(): WorkflowExecutionRuntime {
     },
 
     async generateVideo({ imageUrl, videoUrl, prompt, mode }) {
-      const response = await fetch("/api/generate-video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const { generateVideoAndWait } = await import("@/lib/generate-video-client")
+      const result = await generateVideoAndWait("/api/generate-video", {
           imageUrl,
           videoUrl,
           imageStoragePath: "",
           videoStoragePath: "",
           prompt,
           mode,
-        }),
       })
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error.error || error.message || "Video generation failed")
-      }
-
-      const result = await response.json()
       if (!result.video?.url) throw new Error("No video URL in response")
       return { videoUrl: result.video.url as string }
     },

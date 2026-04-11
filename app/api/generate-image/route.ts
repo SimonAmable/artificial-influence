@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 import { modelUsesDimensions, aspectRatioToDimensions } from '@/lib/utils/model-parameters';
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from '@/lib/constants/models';
+import { runReplicatePollingImageGeneration } from '@/lib/server/replicate-image-generation';
 
 const STALE_PENDING_MINUTES = 30;
 const FREE_CONCURRENCY_LIMIT = 1;
@@ -638,47 +639,44 @@ export async function POST(request: NextRequest) {
           inputKeys: Object.keys(replicateInput),
         });
 
-        const replicateOutput = await replicateClient.run(modelIdentifier as `${string}/${string}`, {
-          input: replicateInput,
-          wait: { mode: 'poll', interval: 2000 },
+        const syncResult = await runReplicatePollingImageGeneration({
+          aspectRatio: aspectRatio || aspect_ratio || null,
+          modelIdentifier,
+          prompt: finalPrompt,
+          referenceImageStoragePaths,
+          replicateInput,
+          requiredCredits,
+          skipCreditCheck: true,
+          supabase,
+          tool: tool || null,
+          userId: user.id,
         });
 
-        const extractUrl = (value: unknown): string | null => {
-          if (typeof value === 'string') return value;
-          if (value && typeof value === 'object') {
-            const candidate = value as { url?: string | (() => string) };
-            if (typeof candidate.url === 'function') return candidate.url();
-            if (typeof candidate.url === 'string') return candidate.url;
-          }
-          return null;
-        };
+        const generationTime = Date.now() - generationStartTime;
+        const totalTime = Date.now() - requestStartTime;
+        console.log('[generate-image] ✓ Image generation completed in', generationTime, 'ms');
+        console.log('[generate-image] ✓ Persisted', syncResult.images.length, 'image(s) from polling mode');
+        console.log('[generate-image] ===== Request completed successfully in', totalTime, 'ms =====');
 
-        const outputUrls = Array.isArray(replicateOutput)
-          ? replicateOutput.map(extractUrl).filter((url): url is string => Boolean(url))
-          : (() => {
-              const single = extractUrl(replicateOutput);
-              return single ? [single] : [];
-            })();
-
-        if (outputUrls.length === 0) {
-          throw new Error('Replicate returned no output URLs');
+        if (syncResult.images.length > 1) {
+          return NextResponse.json({
+            images: syncResult.images.map((image) => ({
+              url: image.url,
+              mimeType: image.mimeType,
+            })),
+            warnings: [],
+            creditsUsed: syncResult.creditsUsed,
+          });
         }
 
-        console.log('[generate-image] Downloading Replicate output image(s):', outputUrls.length);
-        const outputBase64Images = await Promise.all(
-          outputUrls.map(async (url) => {
-            const response = await fetch(url);
-            if (!response.ok) {
-              throw new Error(`Failed to download Replicate output (${response.status})`);
-            }
-            const arrayBuffer = await response.arrayBuffer();
-            return Buffer.from(arrayBuffer).toString('base64');
-          })
-        );
-
-        result = outputBase64Images.length > 1
-          ? { images: outputBase64Images.map((base64) => ({ base64 })), warnings: [] }
-          : { image: { base64: outputBase64Images[0] }, warnings: [] };
+        return NextResponse.json({
+          image: {
+            url: syncResult.images[0].url,
+            mimeType: syncResult.images[0].mimeType,
+          },
+          warnings: [],
+          creditsUsed: syncResult.creditsUsed,
+        });
       }
     } catch (genError: unknown) {
       const generationTime = Date.now() - generationStartTime;

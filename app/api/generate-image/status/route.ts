@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+function inferImageMimeType(storagePath: string) {
+  const lower = storagePath.toLowerCase();
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.avif')) return 'image/avif';
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+  return 'image/png';
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -15,51 +25,67 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'predictionId is required' }, { status: 400 });
     }
 
-    const { data: generation, error } = await supabase
+    const { data: generations, error } = await supabase
       .from('generations')
-      .select('id, status, supabase_storage_path, error_message')
+      .select('id, status, supabase_storage_path, error_message, created_at')
       .eq('replicate_prediction_id', predictionId)
       .eq('user_id', user.id)
-      .maybeSingle();
+      .eq('type', 'image')
+      .order('created_at', { ascending: true });
 
     if (error) {
       console.error('[generate-image/status]', error);
       return NextResponse.json({ error: 'Failed to fetch status' }, { status: 500 });
     }
 
-    if (!generation) {
+    if (!generations || generations.length === 0) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    if (generation.status === 'pending') {
+    const pendingGeneration = generations.find((generation) => generation.status === 'pending');
+    if (pendingGeneration) {
       return NextResponse.json({
         status: 'pending',
-        generationId: generation.id,
+        generationId: pendingGeneration.id,
       });
     }
 
-    if (generation.status === 'failed') {
-      return NextResponse.json({
-        status: 'failed',
-        generationId: generation.id,
-        error: generation.error_message || 'Generation failed',
-      });
-    }
+    const completedGenerations = generations.filter(
+      (generation) => generation.status === 'completed' && generation.supabase_storage_path
+    );
 
-    if (generation.status === 'completed' && generation.supabase_storage_path) {
-      const { data: urlData } = supabase.storage
-        .from('public-bucket')
-        .getPublicUrl(generation.supabase_storage_path);
+    if (completedGenerations.length > 0) {
+      const images = completedGenerations.map((generation) => {
+        const { data: urlData } = supabase.storage
+          .from('public-bucket')
+          .getPublicUrl(generation.supabase_storage_path!);
+
+        return {
+          url: urlData.publicUrl,
+          mimeType: inferImageMimeType(generation.supabase_storage_path!),
+        };
+      });
+
       return NextResponse.json({
         status: 'completed',
-        generationId: generation.id,
-        image: { url: urlData.publicUrl, mimeType: 'image/png' },
+        generationId: completedGenerations[0].id,
+        image: images[0],
+        images,
+      });
+    }
+
+    const failedGeneration = generations.find((generation) => generation.status === 'failed');
+    if (failedGeneration) {
+      return NextResponse.json({
+        status: 'failed',
+        generationId: failedGeneration.id,
+        error: failedGeneration.error_message || 'Generation failed',
       });
     }
 
     return NextResponse.json({
-      status: generation.status,
-      generationId: generation.id,
+      status: generations[0].status,
+      generationId: generations[0].id,
     });
   } catch (e) {
     console.error('[generate-image/status]', e);

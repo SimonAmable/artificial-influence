@@ -1,46 +1,28 @@
-"use client"
+import { notFound, redirect } from "next/navigation"
+import { ChatPageShell } from "@/components/chat/chat-page-shell"
+import { getChatThreadById } from "@/lib/chat/database-server"
+import { createClient } from "@/lib/supabase/server"
 
-import { use } from "react"
-import * as React from "react"
-import { useSearchParams } from "next/navigation"
-import { CreativeAgentChat } from "@/components/chat/creative-agent-chat"
-
-function ThreadPageContent({ threadId }: { threadId: string }) {
-  const searchParams = useSearchParams()
-  const projectId = searchParams.get("projectId")
-  return <CreativeAgentChat initialThreadId={threadId} initialProjectId={projectId} />
-}
-
-function ChatThreadWithParams({ params }: { params: Promise<{ id: string }> }) {
-  const { id: threadId } = use(params)
-
-  return (
-    <React.Suspense
-      fallback={
-        <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-          Loading chat...
-        </div>
-      }
-    >
-      <ThreadPageContent threadId={threadId} />
-    </React.Suspense>
-  )
-}
-
-export default function ChatThreadPage({
+export default async function ChatThreadPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
-  return (
-    <React.Suspense
-      fallback={
-        <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-          Loading chat...
-        </div>
-      }
-    >
-      <ChatThreadWithParams params={params} />
-    </React.Suspense>
-  )
+  const { id } = await params
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect("/login")
+  }
+
+  const thread = await getChatThreadById(id, user.id)
+
+  if (!thread) {
+    notFound()
+  }
+
+  return <ChatPageShell currentThreadId={thread.id} initialMessages={thread.messages} />
 }

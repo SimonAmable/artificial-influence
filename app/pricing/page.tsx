@@ -356,10 +356,8 @@ export default function PricingPage() {
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold mb-2">Free</h2>
               <p className="text-muted-foreground mb-4">Explore the platform</p>
-              <div className="flex flex-col items-center gap-1">
-                <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-5xl font-bold">$0</span>
-                </div>
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="text-5xl font-bold">$0</span>
                 <span className="text-sm text-muted-foreground">Forever</span>
               </div>
             </div>

@@ -32,6 +32,7 @@ export interface CommandTextareaProps {
   /** Override default slash entries (e.g. video presets) */
   slashCommands?: CommandItem[]
   onSlashUiAction?: (action: SlashCommandUiAction) => void
+  referenceInsertMode?: (item: AtPaletteRow["item"]) => "inline" | "external"
 }
 
 export function CommandTextarea({
@@ -48,6 +49,7 @@ export function CommandTextarea({
   slashCommandsContext,
   slashCommands,
   onSlashUiAction,
+  referenceInsertMode,
 }: CommandTextareaProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const layerRef = React.useRef<HTMLDivElement>(null)
@@ -81,6 +83,7 @@ export function CommandTextarea({
     allowedAssetTypes,
     slashCommands,
     onSlashUiAction,
+    referenceInsertMode,
   })
 
   const measurePalettePosition = React.useCallback(() => {
@@ -265,6 +268,7 @@ export function CommandTextarea({
             "relative z-10 box-border m-0 w-full border-none p-0 outline-none resize-none bg-transparent text-sm leading-snug",
             "overflow-y-auto whitespace-pre-wrap break-words",
             "text-transparent caret-foreground selection:bg-primary/25",
+            "placeholder:text-muted-foreground placeholder:opacity-100",
             "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
             className
           )}

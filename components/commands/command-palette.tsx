@@ -90,15 +90,18 @@ function SlashCommandRow({
   slashCommandsContext?: string | null
 }) {
   const badgeLabel = item.uiAction ? "ACTION" : slashCommandsContext
+  const isActive = paletteIndex === activeIndex
   return (
     <button
       type="button"
       data-palette-index={paletteIndex}
       role="option"
-      aria-selected={paletteIndex === activeIndex}
+      aria-selected={isActive}
       className={cn(
-        "flex w-full flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-sm transition-colors",
-        paletteIndex === activeIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted/80"
+        "flex w-full flex-col gap-0.5 rounded-lg border border-transparent px-2 py-2 text-left text-sm transition-[background-color,box-shadow,border-color,color]",
+        isActive
+          ? "bg-background text-foreground border-border/70 shadow-[0_0_0_1px_hsl(var(--border)/0.45),0_14px_30px_-18px_hsl(var(--foreground)/0.9)]"
+          : "hover:bg-muted/80"
       )}
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => onSelectSlash(item)}
@@ -245,8 +248,10 @@ export function CommandPalette({
                   role="option"
                   aria-selected={i === activeIndex}
                   className={cn(
-                    "flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors",
-                    i === activeIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted/80"
+                    "flex w-full items-start gap-2 rounded-lg border border-transparent px-2 py-2 text-left text-sm transition-[background-color,box-shadow,border-color,color]",
+                    i === activeIndex
+                      ? "bg-background text-foreground border-border/70 shadow-[0_0_0_1px_hsl(var(--border)/0.45),0_14px_30px_-18px_hsl(var(--foreground)/0.9)]"
+                      : "hover:bg-muted/80"
                   )}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => onSelectAt(row)}

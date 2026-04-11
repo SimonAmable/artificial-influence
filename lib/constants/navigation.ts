@@ -39,6 +39,25 @@ export interface MegaNavGroup {
   simpleItems?: MegaNavItem[]
 }
 
+export type DashboardToolIcon =
+  | "palette"
+  | "flow-arrow"
+  | "microphone"
+  | "image"
+  | "video"
+  | "paint-brush"
+  | "arrows-left-right"
+  | "pencil-simple"
+  | "squares-four"
+  | "chat-circle-dots"
+
+export interface DashboardToolNavItem {
+  label: string
+  href: string
+  hint: string
+  icon: DashboardToolIcon
+}
+
 const baseNavigationItems: NavigationItem[] = [
   { path: "/", label: "Home" },
   { path: "/canvases", label: "Canvas" },
@@ -50,8 +69,9 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/lipsync", label: "Lipsync" },
   { path: "/apps", label: "Apps" },
   { path: "/assets", label: "Assets" },
+  { path: "/autopost", label: "Autopost" },
   { path: "/brand", label: "Brand" },
-  { path: "/chat", label: "Chat" },
+  { path: "/chat", label: "Agent" },
   { path: "/history", label: "History" },
   { path: "/pricing", label: "Pricing" },
   { path: "/pricing-test", label: "Pricing (Test)", devOnly: true },
@@ -143,6 +163,20 @@ export const megaNavGroups: MegaNavGroup[] = [
             badge: "popular",
             iconSrc: "/ai_icons/grok.svg",
           },
+          {
+            path: "/image?model=bytedance/seedream-5-lite",
+            label: "Seedream 5.0",
+            description: "ByteDance reasoning, refs, up to 3K",
+            badge: "new",
+            iconSrc: "/ai_icons/bytedance-color.svg",
+          },
+          {
+            path: "/image?model=prunaai/z-image-turbo",
+            label: "Z-Image Turbo",
+            description: "Ultra-fast 6B text-to-image",
+            badge: "new",
+            iconSrc: "/ai_icons/flux.svg",
+          },
         ],
       },
     ],
@@ -211,5 +245,74 @@ export const megaNavGroups: MegaNavGroup[] = [
     ],
   },
   { label: "Canvas", path: "/canvases" },
-  { label: "Chat", path: "/chat" },
+  { label: "Apps", path: "/apps", badge: "new" },
+  { label: "Agent", path: "/chat", badge: "new" },
+  { label: "Pricing", path: "/pricing" },
+]
+
+/**
+ * Dashboard quick-action tools.
+ * Keep this alongside navigation constants so dashboard and nav stay aligned.
+ */
+export const dashboardToolNavItems: DashboardToolNavItem[] = [
+  {
+    label: "Brand kit",
+    href: "/brand",
+    icon: "palette",
+    hint: "Logos, colors, type, and voice for consistent AI output.",
+  },
+  {
+    label: "Motion Copy",
+    href: "/motion-copy",
+    icon: "flow-arrow",
+    hint: "Copy motion from ads or dance clips onto your character-animate a still with prompts.",
+  },
+  {
+    label: "Lip Sync",
+    href: "/lipsync",
+    icon: "microphone",
+    hint: "Sync speech to a face in an image or clip.",
+  },
+  {
+    label: "Image Studio",
+    href: "/image",
+    icon: "image",
+    hint: "Generate images from text and references.",
+  },
+  {
+    label: "Video Studio",
+    href: "/video",
+    icon: "video",
+    hint: "Text or image to video generation.",
+  },
+  {
+    label: "Image Editing",
+    href: "/inpaint",
+    icon: "paint-brush",
+    hint: "Edit regions of an image with prompts.",
+  },
+  {
+    label: "Character Swap",
+    href: "/character-swap",
+    icon: "arrows-left-right",
+    hint: "Swap a subject while keeping the scene.",
+  },
+  {
+    label: "Workflow",
+    href: "/canvases",
+    icon: "pencil-simple",
+    hint: "Node-based pipelines and canvas projects.",
+  },
+  {
+    label: "Apps",
+    href: "/apps",
+    icon: "squares-four",
+    hint: "Explore ready-made AI apps and tools.",
+  },
+  {
+    label: "Agent",
+    href: "/chat",
+    icon: "chat-circle-dots",
+    hint: "Open AI chat to plan and create faster.",
+  },
 ]

@@ -378,15 +378,6 @@ function normalizeEdgesForStorage(edges: Edge[]): Edge[] {
  */
 function denormalizeEdgesFromStorage(edges: Edge[]): Edge[] {
   return edges.map((edge) => {
-    // Log raw edge data to see what's actually in the database
-    console.log('[denormalizeEdgesFromStorage] Raw edge:', {
-      id: edge.id,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-      sourceHandleType: typeof edge.sourceHandle,
-      targetHandleType: typeof edge.targetHandle,
-    })
-    
     const denormalized: Edge = {
       id: edge.id,
       source: edge.source,
@@ -410,15 +401,7 @@ function denormalizeEdgesFromStorage(edges: Edge[]): Edge[] {
     if (isValidHandle(edge.targetHandle)) {
       denormalized.targetHandle = edge.targetHandle
     }
-    
-    console.log('[denormalizeEdgesFromStorage] Denormalized edge:', {
-      id: denormalized.id,
-      hasSourceHandle: 'sourceHandle' in denormalized,
-      hasTargetHandle: 'targetHandle' in denormalized,
-      sourceHandle: denormalized.sourceHandle,
-      targetHandle: denormalized.targetHandle,
-    })
-    
+
     // Preserve other edge properties
     if (edge.animated !== undefined) denormalized.animated = edge.animated
     if (edge.style) denormalized.style = edge.style

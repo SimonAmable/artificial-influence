@@ -47,6 +47,7 @@ interface ImageGridProps {
   onUpscale?: (imageUrl: string, index: number) => void
   upscalingImageUrl?: string | null
   onDelete?: (id: string, imageUrl: string, index: number) => void
+  basicActionsOnly?: boolean
 }
 
 // Normalize model names by removing prefix before slash, replacing dashes with spaces, and capitalizing
@@ -82,6 +83,7 @@ export function ImageGrid({
   onUpscale,
   upscalingImageUrl = null,
   onDelete,
+  basicActionsOnly = false,
 }: ImageGridProps) {
   const router = useRouter()
   const [columnCount, setColumnCount] = React.useState(2) // Default 2 columns
@@ -450,17 +452,21 @@ export function ImageGrid({
                     className="w-48"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <DropdownMenuItem
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onCreateAsset?.(item.data.url, index)
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <Plus className="mr-2 size-4" />
-                      Create Asset
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
+                    {!basicActionsOnly && onCreateAsset && (
+                      <>
+                        <DropdownMenuItem
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            onCreateAsset(item.data.url, index)
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <Plus className="mr-2 size-4" />
+                          Create Asset
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
                     <DropdownMenuItem
                       onClick={(event) => {
                         event.stopPropagation()
@@ -500,7 +506,7 @@ export function ImageGrid({
                         </>
                       )}
                     </DropdownMenuItem>
-                    {item.data.id && onDelete && (
+                    {!basicActionsOnly && item.data.id && onDelete && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -543,6 +549,8 @@ export function ImageGrid({
                   )}
                 </div>
                 
+                {!basicActionsOnly ? (
+                <>
                 {/* Desktop buttons (sm and up) - column */}
                 <div className="hidden sm:flex shrink-0 flex-col items-end gap-1">
                   <Button
@@ -721,6 +729,8 @@ export function ImageGrid({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+                </>
+                ) : null}
               </div>
             </div>
           ))}

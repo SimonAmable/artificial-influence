@@ -23,6 +23,7 @@ import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
 import { brandRefsOnly } from "@/lib/commands/ref-image-pipeline"
 import { validateVideoAttachedRefs } from "@/lib/commands/validate-video-refs"
 import { getVideoChipSlotInfo } from "@/lib/commands/video-chip-slots"
+import { generateVideoAndWait } from "@/lib/generate-video-client"
 
 interface GeneratedVideo {
   url: string
@@ -457,27 +458,29 @@ function VideoPageContent() {
 
       const endpoint = isLipsync ? '/api/generate-lipsync' : '/api/generate-video-any-model'
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      })
+      const data = isLipsync
+        ? await (async () => {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(requestBody),
+            })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || errorData.message || 'Failed to generate video')
-      }
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}))
+              throw new Error(errorData.error || errorData.message || 'Failed to generate video')
+            }
 
-      const data = await response.json()
+            return response.json()
+          })()
+        : await generateVideoAndWait(endpoint, requestBody)
 
       const resultVideoUrl =
-        typeof data.videoUrl === "string"
-          ? data.videoUrl
-          : typeof data.video?.url === "string"
-            ? data.video.url
-            : undefined
+        typeof data.video?.url === "string"
+          ? data.video.url
+          : undefined
 
       if (resultVideoUrl) {
         const newVideo: GeneratedVideo = {

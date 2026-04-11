@@ -68,6 +68,11 @@ export function useCommandInput(options: {
   slashCommands?: CommandItem[]
   /** Called for slash commands with `uiAction` (create asset, brand kit, …) */
   onSlashUiAction?: (action: SlashCommandUiAction) => void
+  /**
+   * Inline keeps the @token in the textarea. External removes the typed trigger and
+   * keeps the reference in `refs`, useful for chat attachments/pills.
+   */
+  referenceInsertMode?: (item: ReferenceItem) => "inline" | "external"
 }) {
   const {
     value,
@@ -78,6 +83,7 @@ export function useCommandInput(options: {
     allowedAssetTypes,
     slashCommands: slashCommandsOption,
     onSlashUiAction,
+    referenceInsertMode,
   } = options
   const slashCommandList = slashCommandsOption ?? PRESET_COMMANDS
 
@@ -209,22 +215,35 @@ export function useCommandInput(options: {
       const end = el?.selectionStart ?? cursor
       const t = getTriggerState(value, end)
       if (!t || t.type !== "at") return
+      const external = referenceInsertMode?.(item) === "external"
+      const chipId =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `chip-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+      if (external) {
+        const existing = refs.find((r) => r.id === item.id)
+        const nextRefs = existing
+          ? refs
+          : ([...refs, { ...item, chipId, mentionToken: "" }] satisfies AttachedRef[])
+        onRefsChange(nextRefs)
+        const next = value.slice(0, t.start) + value.slice(end)
+        applyValueAndCursor(next, t.start)
+        return
+      }
+
       const existing = refs.find((r) => r.id === item.id)
       const taken = new Set(refs.map((r) => r.mentionToken))
       const mentionToken = existing?.mentionToken ?? makeMentionToken(item, taken)
       const insert = mentionToken + mentionReserveTail()
       const next = value.slice(0, t.start) + insert + value.slice(end)
-      const chipId =
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `chip-${Date.now()}-${Math.random().toString(36).slice(2)}`
       const nextRefs = existing
         ? refs
         : ([...refs, { ...item, chipId, mentionToken }] satisfies AttachedRef[])
       onRefsChange(nextRefs)
       applyValueAndCursor(next, t.start + insert.length)
     },
-    [applyValueAndCursor, cursor, onRefsChange, refs, textareaRef, value]
+    [applyValueAndCursor, cursor, onRefsChange, referenceInsertMode, refs, textareaRef, value]
   )
 
   const selectActive = React.useCallback(() => {
@@ -244,7 +263,7 @@ export function useCommandInput(options: {
       const sel = e.target.selectionStart ?? v.length
       setCursor(sel)
       onChange(v)
-      const pruned = refs.filter((r) => r.mentionToken && v.includes(r.mentionToken))
+      const pruned = refs.filter((r) => !r.mentionToken || v.includes(r.mentionToken))
       if (pruned.length !== refs.length) {
         onRefsChange(pruned)
       }
@@ -275,7 +294,7 @@ export function useCommandInput(options: {
                 e.preventDefault()
                 const next = value.slice(0, p.start) + value.slice(p.end)
                 onChange(next)
-                const pruned = refs.filter((r) => r.mentionToken && next.includes(r.mentionToken))
+                const pruned = refs.filter((r) => !r.mentionToken || next.includes(r.mentionToken))
                 onRefsChange(pruned)
                 requestAnimationFrame(() => {
                   const ta = textareaRef.current

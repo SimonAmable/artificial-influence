@@ -64,6 +64,7 @@ import { toast } from "sonner"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
 import { useNodeErrorToast } from "@/hooks/use-node-error-toast"
+import { generateVideoAndWait } from "@/lib/generate-video-client"
 
 export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as VideoGenNodeData
@@ -896,24 +897,22 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           : await uploadUrlToSupabase(finalAudioUrl, "video-gen-audio")
       }
 
-      let response: Response
+      let endpoint: string
+      let requestBody: Record<string, unknown>
 
       if (isMotionCopy) {
-        response = await fetch("/api/generate-video", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            imageUrl: imageUpload?.url,
-            videoUrl: videoUpload?.url,
-            imageStoragePath: imageUpload?.storagePath,
-            videoStoragePath: videoUpload?.storagePath,
-            prompt: fullPrompt,
-            mode: (nodeData.parameters?.mode as string) || nodeData.mode || "pro",
-            keep_original_sound: nodeData.parameters?.keep_original_sound ?? true,
-            character_orientation: nodeData.parameters?.character_orientation || "video",
-            tool: "node",
-          }),
-        })
+        endpoint = "/api/generate-video"
+        requestBody = {
+          imageUrl: imageUpload?.url,
+          videoUrl: videoUpload?.url,
+          imageStoragePath: imageUpload?.storagePath,
+          videoStoragePath: videoUpload?.storagePath,
+          prompt: fullPrompt,
+          mode: (nodeData.parameters?.mode as string) || nodeData.mode || "pro",
+          keep_original_sound: nodeData.parameters?.keep_original_sound ?? true,
+          character_orientation: nodeData.parameters?.character_orientation || "video",
+          tool: "node",
+        }
       } else if (isLipsync) {
         const lipsyncPayload: Record<string, string> = {
           audioUrl: audioUpload!.url,
@@ -928,13 +927,10 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           lipsyncPayload.resolution =
             (nodeData.parameters?.resolution as string) || "720p"
         }
-        response = await fetch("/api/generate-lipsync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(lipsyncPayload),
-        })
+        endpoint = "/api/generate-lipsync"
+        requestBody = lipsyncPayload
       } else {
-        const requestBody: Record<string, unknown> = {
+        requestBody = {
           model: modelIdentifier,
           ...(nodeData.parameters || {}),
           // Apply node prompt after parameters spread so it is never overwritten by parameters.prompt (model default can be null)
@@ -1004,20 +1000,26 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         }
 
         requestBody.tool = "node"
-
-        response = await fetch("/api/generate-video-any-model", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody),
-        })
+        endpoint = "/api/generate-video-any-model"
       }
 
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error || err.message || "Failed to generate video")
-      }
+      const result = isLipsync
+        ? await (async () => {
+            const response = await fetch(endpoint, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(requestBody),
+            })
 
-      const result = await response.json()
+            if (!response.ok) {
+              const err = await response.json().catch(() => ({}))
+              throw new Error(err.error || err.message || "Failed to generate video")
+            }
+
+            return response.json()
+          })()
+        : await generateVideoAndWait(endpoint, requestBody)
+
       const videoUrl = result.video?.url || result.videoUrl
       if (!videoUrl) throw new Error("No video URL received")
 
