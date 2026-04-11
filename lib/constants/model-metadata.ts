@@ -37,6 +37,8 @@ export interface ModelMetadata {
   supports_reference_image: boolean;
   /** Video models only: reference video for editing or motion copy. */
   supports_reference_video?: boolean;
+  /** Video models only: reference audio (e.g. rhythm, lip-sync hints). */
+  supports_reference_audio?: boolean;
   aspect_ratios: string[];
   supports_first_frame?: boolean; // Video models only
   supports_last_frame?: boolean; // Video models only
@@ -500,13 +502,14 @@ export const SEEDANCE_2_0_META: ModelMetadata = {
   identifier: 'bytedance/seedance-2.0',
   name: 'Seedance 2.0',
   description:
-    'ByteDance multimodal video with native synced audio: text-to-video, first/last frame, reference images and clips, editing and extension.',
+    'ByteDance multimodal video with native synced audio: text-to-video, first/last frame, reference images and clips, reference audio, editing and extension.',
   type: 'video',
   provider: 'replicate',
   is_active: true,
   model_cost: 20,
   supports_reference_image: true,
   supports_reference_video: true,
+  supports_reference_audio: true,
   aspect_ratios: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive'],
   supports_first_frame: true,
   supports_last_frame: true,

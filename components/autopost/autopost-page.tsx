@@ -2,11 +2,21 @@
 
 import * as React from "react"
 import { useSearchParams } from "next/navigation"
-import { Loader2, CalendarClock, Link2, ShieldCheck, Upload } from "lucide-react"
+import { Loader2, CalendarClock, Link2, ShieldCheck, Upload, UserRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { ensureJpegForInstagramFeed } from "@/lib/autopost/convert-image-for-instagram"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -53,6 +63,7 @@ export function AutopostPage() {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
   const [isPostingDraft, setIsPostingDraft] = React.useState(false)
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const searchParams = useSearchParams()
   const hasHandledAuthParams = React.useRef(false)
@@ -129,6 +140,7 @@ export function AutopostPage() {
         throw new Error(data.error || "Failed to disconnect Instagram account.")
       }
       toast.success("Instagram account disconnected.")
+      setDisconnectDialogOpen(false)
       await fetchStatus()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to disconnect Instagram account")
@@ -263,7 +275,7 @@ export function AutopostPage() {
   const isConnected = Boolean(status?.connected)
 
   return (
-    <div className="min-h-screen bg-background px-4 py-6">
+    <div className="min-h-screen bg-background px-4 pb-6 pt-20 md:pt-24">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">Autopost</h1>
@@ -272,7 +284,7 @@ export function AutopostPage() {
           </p>
         </div>
 
-        <Card>
+        <Card className="py-4 sm:py-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Link2 className="h-4 w-4" />
@@ -294,29 +306,46 @@ export function AutopostPage() {
                   {isConnected ? "Connected" : "Not connected"}
                 </Badge>
                 {isConnected ? (
-                  <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-                    <p>
-                      Username: <span className="text-foreground">{connection?.instagramUsername || "Unknown"}</span>
-                    </p>
-                    <p>
-                      Instagram ID: <span className="text-foreground">{connection?.instagramUserId || "Unknown"}</span>
-                    </p>
-                    <p>
-                      Account type: <span className="text-foreground">{connection?.accountType || "Unknown"}</span>
-                    </p>
-                    <p>
-                      Token expires:{" "}
-                      <span className="text-foreground">
-                        {connection?.tokenExpiresAt
-                          ? new Date(connection.tokenExpiresAt).toLocaleString()
-                          : "Not provided"}
-                      </span>
-                    </p>
+                  <div className="rounded-xl border border-border/80 bg-muted/30 p-4 shadow-sm">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+                      <UserRound className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      <span>Linked Instagram account</span>
+                      <Badge variant="secondary" className="ml-auto text-xs font-normal">
+                        Active
+                      </Badge>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2.5">
+                        <p className="text-xs font-medium text-muted-foreground">Username</p>
+                        <p className="mt-0.5 text-sm text-foreground">{connection?.instagramUsername || "Unknown"}</p>
+                      </div>
+                      <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2.5">
+                        <p className="text-xs font-medium text-muted-foreground">Instagram ID</p>
+                        <p className="mt-0.5 break-all text-sm text-foreground">
+                          {connection?.instagramUserId || "Unknown"}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2.5">
+                        <p className="text-xs font-medium text-muted-foreground">Account type</p>
+                        <p className="mt-0.5 text-sm text-foreground">{connection?.accountType || "Unknown"}</p>
+                      </div>
+                      <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2.5">
+                        <p className="text-xs font-medium text-muted-foreground">Token expires</p>
+                        <p className="mt-0.5 text-sm text-foreground">
+                          {connection?.tokenExpiresAt
+                            ? new Date(connection.tokenExpiresAt).toLocaleString()
+                            : "Not provided"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 ) : (
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <p>Connect an Instagram professional account to continue.</p>
-                    <p>Business and Creator accounts are supported. A Facebook Page link is not required.</p>
+                  <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">No account linked</p>
+                    <p className="mt-1">Connect an Instagram professional account to continue.</p>
+                    <p className="mt-2 text-xs">
+                      Business and Creator accounts are supported. A Facebook Page link is not required.
+                    </p>
                   </div>
                 )}
               </div>
@@ -326,16 +355,16 @@ export function AutopostPage() {
             <Button onClick={handleConnect}>Connect Instagram</Button>
             <Button
               variant="outline"
-              onClick={handleDisconnect}
+              onClick={() => setDisconnectDialogOpen(true)}
               disabled={!isConnected || isDisconnecting}
             >
-              {isDisconnecting ? "Disconnecting..." : "Disconnect"}
+              Disconnect
             </Button>
           </CardFooter>
         </Card>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
+          <Card className="py-4 sm:py-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" />
@@ -411,7 +440,7 @@ export function AutopostPage() {
             </CardFooter>
           </Card>
 
-          <Card>
+          <Card className="py-4 sm:py-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CalendarClock className="h-4 w-4" />
@@ -429,6 +458,51 @@ export function AutopostPage() {
           </Card>
         </div>
       </div>
+
+      <AlertDialog
+        open={disconnectDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && isDisconnecting) {
+            return
+          }
+          setDisconnectDialogOpen(open)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect Instagram?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the link to{" "}
+              {connection?.instagramUsername ? (
+                <span className="font-medium text-foreground">@{connection.instagramUsername}</span>
+              ) : (
+                "your Instagram account"
+              )}
+              . You will need to connect again before publishing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDisconnecting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault()
+                void handleDisconnect()
+              }}
+              disabled={isDisconnecting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDisconnecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Disconnecting…
+                </>
+              ) : (
+                "Disconnect"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

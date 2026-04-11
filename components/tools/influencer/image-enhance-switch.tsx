@@ -30,7 +30,10 @@ export function ImageEnhanceSwitch({
       onPressedChange={onCheckedChange}
       aria-label="Enhance prompt"
       className={cn(
-        "h-9 px-2 rounded-[28px] border border-border bg-muted/30 hover:bg-muted/50 data-[state=on]:bg-muted data-[state=on]:border-foreground/20",
+        "h-9 px-2 rounded-[28px] border border-border bg-muted/30 hover:bg-muted/50",
+        "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary/30",
+        "data-[state=on]:hover:bg-primary/90 data-[state=on]:hover:text-primary-foreground",
+        "aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/90",
         isToolbar ? "gap-1.5" : "gap-1.5",
         className
       )}

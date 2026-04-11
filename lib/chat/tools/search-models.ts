@@ -40,12 +40,24 @@ function tokenizeSearchTerms(value: string) {
 }
 
 function scoreModelMatch(
-  model: { identifier: string; name: string; description: string | null; provider: string | null },
+  model: {
+    identifier: string
+    name: string
+    description: string | null
+    provider: string | null
+    supportsReferenceAudio?: boolean
+  },
   query: string,
 ) {
   if (!query) return 1
 
+  const capabilityHints: string[] = []
+  if (model.supportsReferenceAudio) {
+    capabilityHints.push("reference audio", "audio reference", "soundtrack")
+  }
+
   const rawHaystacks = [
+    ...capabilityHints,
     model.name.toLowerCase(),
     model.identifier.toLowerCase(),
     (model.description ?? "").toLowerCase(),
@@ -99,7 +111,7 @@ export function createSearchModelsTool({ supabase }: CreateSearchModelsToolOptio
       let dbQuery = supabase
         .from("models")
         .select(
-          "identifier, name, description, provider, type, model_cost, default_aspect_ratio, supports_reference_image, supports_reference_video, supports_first_frame, supports_last_frame, max_images",
+          "identifier, name, description, provider, type, model_cost, default_aspect_ratio, supports_reference_image, supports_reference_video, supports_reference_audio, supports_first_frame, supports_last_frame, max_images",
         )
         .eq("is_active", true)
         .order("name", { ascending: true })
@@ -137,6 +149,7 @@ export function createSearchModelsTool({ supabase }: CreateSearchModelsToolOptio
           provider: typeof model.provider === "string" ? model.provider : null,
           supportsFirstFrame: Boolean(model.supports_first_frame),
           supportsLastFrame: Boolean(model.supports_last_frame),
+          supportsReferenceAudio: Boolean(model.supports_reference_audio),
           supportsReferenceImage: Boolean(model.supports_reference_image),
           supportsReferenceVideo: Boolean(model.supports_reference_video),
           type: model.type as ModelTypeFilter,

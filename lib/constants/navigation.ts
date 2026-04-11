@@ -24,6 +24,8 @@ export interface MegaNavItem {
   badge?: MegaNavBadge
   iconSrc?: string
   iconText?: string
+  /** Replicate-style model id, surfaced on menu items as data-model-identifier */
+  modelIdentifier?: string
 }
 
 export interface MegaNavSection {
@@ -217,6 +219,14 @@ export const megaNavGroups: MegaNavGroup[] = [
             label: "Veo 3.1 Fast",
             description: "High-fidelity video with native audio",
             iconSrc: "/ai_icons/gemini-color.svg",
+          },
+          {
+            path: "/video?model=bytedance/seedance-2.0",
+            label: "Seedance 2.0",
+            description: "Multimodal video with reference audio and frames",
+            badge: "new",
+            iconSrc: "/ai_icons/bytedance-color.svg",
+            modelIdentifier: "bytedance/seedance-2.0",
           },
           {
             path: "/video?model=kwaivgi/kling-v3-motion-control",

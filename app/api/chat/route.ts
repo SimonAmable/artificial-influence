@@ -24,7 +24,7 @@ import type {
   AvailableChatImageReference,
   ChatImageReference,
 } from "@/lib/chat/tools/generate-image-with-nano-banana"
-import type { ChatVideoReference } from "@/lib/chat/tools/generate-video"
+import type { ChatAudioReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
 
 type GenerateImageToolPart = {
   type: "tool-generateImageWithNanoBanana"
@@ -87,6 +87,32 @@ function getLatestUserVideoAttachments(messages: UIMessage[]): ChatVideoReferenc
     }
 
     if (!part.mediaType?.startsWith("video/")) {
+      return []
+    }
+
+    return [
+      {
+        filename: part.filename,
+        mediaType: part.mediaType,
+        url: part.url,
+      },
+    ]
+  })
+}
+
+function getLatestUserAudioAttachments(messages: UIMessage[]): ChatAudioReference[] {
+  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user")
+
+  if (!latestUserMessage) {
+    return []
+  }
+
+  return latestUserMessage.parts.flatMap((part) => {
+    if (part.type !== "file") {
+      return []
+    }
+
+    if (!part.mediaType?.startsWith("audio/")) {
       return []
     }
 
@@ -315,6 +341,7 @@ export async function POST(req: Request) {
       availableReferences: [],
       latestUserImages: [],
       latestUserVideos: [],
+      latestUserAudios: [],
       supabase,
       userId: user.id,
     }) as NonNullable<Parameters<typeof validateUIMessages>[0]["tools"]>
@@ -385,6 +412,7 @@ export async function POST(req: Request) {
       availableReferences: getAvailableConversationImageReferences(validatedMessages),
       latestUserImages: getLatestUserImageAttachments(validatedMessages),
       latestUserVideos: getLatestUserVideoAttachments(validatedMessages),
+      latestUserAudios: getLatestUserAudioAttachments(validatedMessages),
       model,
       selectedReferenceContext,
       supabase,

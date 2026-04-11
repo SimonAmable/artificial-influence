@@ -70,7 +70,7 @@ export async function ChatPageShell({
   return (
     <div className="flex h-dvh min-h-0 gap-3 bg-background pt-16 md:gap-4 md:pt-[60px]">
       {user ? (
-        <aside className="hidden w-72 shrink-0 md:flex md:h-[calc(100dvh-60px-2rem)] md:min-h-0 md:ml-4 md:my-4 md:flex-col md:overflow-hidden md:rounded-[26px] md:border md:border-border/60 md:bg-background/95 md:shadow-[0_24px_80px_-36px_rgba(0,0,0,0.8)] md:backdrop-blur">
+        <aside className="hidden w-72 shrink-0 md:flex md:h-[calc(100dvh-60px-2rem)] md:min-h-0 md:ml-4 md:my-4 md:flex-col md:overflow-hidden md:rounded-[26px] md:border md:border-border/60 md:bg-background/95 md:shadow-2xl md:backdrop-blur">
           <div className="border-b border-border/60 px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -115,6 +115,7 @@ export async function ChatPageShell({
           enablePersistence
           initialMessages={initialMessages}
           initialThreadId={currentThreadId}
+          mobileThreads={user ? threads : undefined}
           syncUrlOnThreadCreate
         />
       </main>

@@ -64,7 +64,11 @@ function isGroupActive(pathname: string, group: MegaNavGroup) {
 function HeaderMenuItem({ item, onSelect }: { item: MegaNavItem; onSelect: (path: string) => void }) {
   const classes = item.badge ? getBadgeClasses(item.badge) : null
   return (
-    <DropdownMenuItem onClick={() => onSelect(item.path)} className="py-2.5">
+    <DropdownMenuItem
+      onClick={() => onSelect(item.path)}
+      className="py-2.5"
+      {...(item.modelIdentifier ? { "data-model-identifier": item.modelIdentifier } : {})}
+    >
       <div className="flex w-full items-start gap-3">
         <div className="relative">
           <div

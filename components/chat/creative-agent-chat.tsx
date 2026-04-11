@@ -2,11 +2,12 @@
 
 import * as React from "react"
 import Image from "next/image"
+import Link from "next/link"
 import type { UIMessage } from "ai"
 import { DefaultChatTransport } from "ai"
 import { Chat, useChat } from "@ai-sdk/react"
 import { useRouter } from "next/navigation"
-import { ArrowUp, CircleNotch, NotePencil, Palette, Plus, X } from "@phosphor-icons/react"
+import { ArrowUp, CircleNotch, ClockCounterClockwise, NotePencil, Palette, Plus, X } from "@phosphor-icons/react"
 import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message"
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion"
@@ -16,6 +17,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group"
 import {
   Select,
@@ -41,13 +49,59 @@ import {
   type ChatReferenceMetadataItem,
 } from "@/lib/chat/reference-metadata"
 
-const STARTER_PROMPTS = [
-  "What can this agent do?",
-  "Turn my rough idea into a detailed image-generation prompt.",
-  "What workflow should I use to take this from concept to finished visuals?",
-  "I’ll attach a reference. Break down what stands out and how to borrow from it.",
-  "I’ll attach an image. Extract detailed visual traits as JSON for a Nano Banana prompt.",
-  "Turn these notes into a clear, client-ready creative brief.",
+/** Serializable thread row for mobile history (matches ChatThreadListItem). */
+type MobileChatThreadListItem = {
+  id: string
+  title: string
+  updated_at: string
+}
+
+function formatThreadUpdatedAt(value: string) {
+  const date = new Date(value)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMinutes = Math.floor(diffMs / 60000)
+
+  if (diffMinutes < 1) return "Just now"
+  if (diffMinutes < 60) return `${diffMinutes}m ago`
+
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `${diffHours}h ago`
+
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 7) return `${diffDays}d ago`
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  })
+}
+
+const STARTER_PROMPTS: { label: string; prompt: string }[] = [
+  { label: "What can this agent do?", prompt: "What can this agent do?" },
+  {
+    label: "Image prompt from a rough idea",
+    prompt: "Turn my rough idea into a detailed image-generation prompt.",
+  },
+  {
+    label: "Concept → finished visuals",
+    prompt:
+      "What workflow should I use to take this from concept to finished visuals?",
+  },
+  {
+    label: "Break down a reference",
+    prompt:
+      "I’ll attach a reference. Break down what stands out and how to borrow from it.",
+  },
+  {
+    label: "Visual traits as JSON",
+    prompt:
+      "I’ll attach an image. Extract detailed visual traits as JSON for a Nano Banana prompt.",
+  },
+  {
+    label: "Notes → client brief",
+    prompt: "Turn these notes into a clear, client-ready creative brief.",
+  },
 ]
 
 const IMAGE_FILENAME_EXT = /\.(jpe?g|png|gif|webp|avif|bmp|svg)$/i
@@ -139,6 +193,7 @@ type GenerateVideoToolPart = {
     status?: "pending" | "completed" | "failed"
     usedImageReferenceCount?: number
     usedVideoReferenceCount?: number
+    usedAudioReferenceCount?: number
     video?: {
       mimeType?: string
       storagePath?: string | null
@@ -168,6 +223,7 @@ type SearchModelsToolPart = {
       provider?: string | null
       supportsFirstFrame?: boolean
       supportsLastFrame?: boolean
+      supportsReferenceAudio?: boolean
       supportsReferenceImage?: boolean
       supportsReferenceVideo?: boolean
       type: "image" | "video" | "audio" | "upscale"
@@ -1000,6 +1056,12 @@ function VideoGenerationResultCard({
                 {part.output?.usedVideoReferenceCount || 0} video ref
                 {(part.output?.usedVideoReferenceCount || 0) === 1 ? "" : "s"}
               </Badge>
+              {(part.output?.usedAudioReferenceCount ?? 0) > 0 ? (
+                <Badge variant="outline">
+                  {part.output?.usedAudioReferenceCount} audio ref
+                  {(part.output?.usedAudioReferenceCount ?? 0) === 1 ? "" : "s"}
+                </Badge>
+              ) : null}
             </div>
             {part.output?.message ? (
               <p className="text-sm text-muted-foreground">{part.output.message}</p>
@@ -1028,6 +1090,12 @@ function VideoGenerationResultCard({
               {part.output?.usedVideoReferenceCount || 0} video ref
               {(part.output?.usedVideoReferenceCount || 0) === 1 ? "" : "s"}
             </Badge>
+            {(part.output?.usedAudioReferenceCount ?? 0) > 0 ? (
+              <Badge variant="outline">
+                {part.output?.usedAudioReferenceCount} audio ref
+                {(part.output?.usedAudioReferenceCount ?? 0) === 1 ? "" : "s"}
+              </Badge>
+            ) : null}
           </div>
           {part.output?.message ? (
             <p className="text-sm text-muted-foreground">{part.output.message}</p>
@@ -1205,6 +1273,9 @@ function MessageParts({ message }: { message: UIMessage }) {
                                 ) : null}
                                 {model.supportsReferenceVideo ? (
                                   <Badge variant="outline">ref video</Badge>
+                                ) : null}
+                                {model.supportsReferenceAudio ? (
+                                  <Badge variant="outline">ref audio</Badge>
                                 ) : null}
                                 {model.supportsFirstFrame ? (
                                   <Badge variant="outline">first frame</Badge>
@@ -1567,6 +1638,7 @@ export function CreativeAgentChat({
   enablePersistence = false,
   initialMessages = EMPTY_MESSAGES,
   initialThreadId,
+  mobileThreads,
   onThreadIdChange,
   syncUrlOnThreadCreate = false,
 }: {
@@ -1574,6 +1646,8 @@ export function CreativeAgentChat({
   enablePersistence?: boolean
   initialMessages?: UIMessage[]
   initialThreadId?: string
+  /** When set (e.g. logged-in chat page), shows mobile history dropdown + new chat bar. */
+  mobileThreads?: MobileChatThreadListItem[]
   onThreadIdChange?: (threadId: string | undefined) => void
   syncUrlOnThreadCreate?: boolean
 }) {
@@ -1590,7 +1664,7 @@ export function CreativeAgentChat({
   const initialChatId = React.useMemo(() => initialThreadId ?? "creative-chat-draft", [initialThreadId])
   const threadIdRef = React.useRef<string | undefined>(initialThreadId)
   const chatGatewayModelRef = React.useRef<string>(DEFAULT_CHAT_GATEWAY_MODEL)
-  const [chatGatewayModelId, setChatGatewayModelId] = React.useState(DEFAULT_CHAT_GATEWAY_MODEL)
+  const [chatGatewayModelId, setChatGatewayModelId] = React.useState<string>(DEFAULT_CHAT_GATEWAY_MODEL)
 
   const selectedChatGatewayOption = React.useMemo(
     () =>
@@ -1908,7 +1982,7 @@ export function CreativeAgentChat({
   }, [attachedRefs, composerAttachments, composerValue, enablePersistence, hasPendingUploads, isCreatingThread, onThreadIdChange, sendMessage, syncUrlOnThreadCreate, threadId, userId])
 
   const clearChat = React.useCallback(() => {
-    if (enablePersistence && !compact && threadId) {
+    if (enablePersistence && threadId) {
       setComposerValue("")
       setAttachedFiles([])
       setAttachedRefs([])
@@ -1926,7 +2000,7 @@ export function CreativeAgentChat({
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
-  }, [compact, enablePersistence, onThreadIdChange, router, setMessages, threadId])
+  }, [enablePersistence, onThreadIdChange, router, setMessages, threadId])
 
   const showLoggedInEmptyState = authReady && userId && messages.length === 0
 
@@ -1939,6 +2013,66 @@ export function CreativeAgentChat({
           : "h-dvh min-h-0 overflow-hidden bg-background pt-16 md:pt-20 px-0 lg:px-4",
       )}
     >
+      {compact && mobileThreads !== undefined ? (
+        <div className="flex shrink-0 items-center justify-start gap-2 bg-background/95 px-3 py-2 backdrop-blur md:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="shrink-0"
+                aria-label="Chat history"
+              >
+                <ClockCounterClockwise className="h-4 w-4" aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[min(100vw-2rem,20rem)] max-h-[min(70vh,24rem)] overflow-y-auto">
+              <DropdownMenuLabel className="font-normal text-muted-foreground">
+                Chat history
+              </DropdownMenuLabel>
+              {mobileThreads.length === 0 ? (
+                <div className="px-2 py-3 text-sm text-muted-foreground">
+                  No threads yet. Start a conversation to build your history.
+                </div>
+              ) : (
+                mobileThreads.map((thread) => {
+                  const isActive = threadId === thread.id
+                  return (
+                    <DropdownMenuItem key={thread.id} asChild>
+                      <Link
+                        href={`/chat/${thread.id}`}
+                        className={cn(
+                          "flex cursor-pointer flex-col items-start gap-0.5 py-2",
+                          isActive && "bg-accent/50",
+                        )}
+                      >
+                        <span className="line-clamp-2 w-full text-left text-sm font-medium">
+                          {thread.title}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatThreadUpdatedAt(thread.updated_at)}
+                        </span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )
+                })
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="shrink-0"
+            aria-label="New chat"
+            onClick={clearChat}
+          >
+            <NotePencil className="h-4 w-4" aria-hidden />
+          </Button>
+        </div>
+      ) : null}
+
       <div
         className={cn(
           "mx-auto flex w-full max-w-5xl min-h-0 flex-1 flex-col",
@@ -2025,13 +2159,14 @@ export function CreativeAgentChat({
                   description="Ask a question, attach references, brainstorm ideas, or talk through a creative direction."
                 />
                 <Suggestions className="justify-center">
-                  {STARTER_PROMPTS.map((prompt) => (
+                  {STARTER_PROMPTS.map((item) => (
                     <Suggestion
-                      key={prompt}
-                      suggestion={prompt}
+                      key={item.prompt}
+                      suggestion={item.prompt}
+                      title={item.prompt}
                       onClick={(value) => setComposerValue(value)}
                     >
-                      {prompt}
+                      {item.label}
                     </Suggestion>
                   ))}
                 </Suggestions>
@@ -2124,7 +2259,7 @@ export function CreativeAgentChat({
             {userId ? (
               <div
                 className={cn(
-                  "rounded-[26px] border border-border/60 bg-transparent p-2 shadow-[0_24px_80px_-36px_rgba(0,0,0,0.8)] transition-[box-shadow,ring-color]",
+                  "rounded-[26px] p-2 transition-[box-shadow,ring-color]",
                   composerDropActive && "ring-2 ring-primary/50 ring-offset-2 ring-offset-transparent",
                 )}
                 onDragEnter={handleComposerDragEnter}
@@ -2132,7 +2267,7 @@ export function CreativeAgentChat({
                 onDragOverCapture={handleComposerDragOverCapture}
                 onDropCapture={handleComposerDropCapture}
               >
-                <InputGroup className="items-end">
+                <InputGroup className="items-end rounded-[22px] border-border/60 bg-background/95 p-1 shadow-2xl backdrop-blur-sm has-[textarea]:rounded-[22px]">
                   <CommandTextarea
                     value={composerValue}
                     onChange={setComposerValue}

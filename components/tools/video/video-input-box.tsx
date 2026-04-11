@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CircleNotch, Plus, FilePlus, X, Sparkle, Check } from "@phosphor-icons/react"
+import { CircleNotch, Plus, FilePlus, X, Sparkle, Check, Waveform } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import type { Model } from "@/lib/types/models"
 import { PhotoUpload, ImageUpload } from "@/components/shared/upload/photo-upload"
@@ -124,6 +124,7 @@ export function VideoInputBox({
   const lastFrameRef = React.useRef<HTMLInputElement>(null)
   const videoRef = React.useRef<HTMLInputElement>(null)
   const referenceImagesRef = React.useRef<HTMLInputElement>(null)
+  const referenceAudioRef = React.useRef<HTMLInputElement>(null)
   const promptDragCounter = React.useRef(0)
   const [isPromptDragActive, setIsPromptDragActive] = React.useState(false)
   const [draggedMediaKind, setDraggedMediaKind] = React.useState<"image" | "video" | "unknown" | null>(null)
@@ -232,6 +233,11 @@ export function VideoInputBox({
     maxReferenceImages,
   ])
 
+  const canAddSeedanceReferenceAudio = React.useMemo(() => {
+    if (!isSeedance2) return false
+    return !(inputAudio?.file || inputAudio?.url)
+  }, [isSeedance2, inputAudio])
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'input' | 'lastFrame') => {
     const file = e.target.files?.[0]
     if (file) {
@@ -277,6 +283,19 @@ export function VideoInputBox({
     onReferenceImagesChange(referenceImages.filter((_, i) => i !== index))
   }
 
+  const handleReferenceAudioAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file) return
+    const byMime = file.type.startsWith("audio/")
+    const byName = /\.(wav|mp3|mpeg|m4a|aac)$/i.test(file.name)
+    if (!byMime && !byName) {
+      toast.error("Use a supported audio file (.wav, .mp3, .m4a, or .aac).")
+      return
+    }
+    onInputAudioChange({ file, url: URL.createObjectURL(file) })
+  }
+
   const isReady = React.useMemo(() => {
     if (isMotionCopyModel) {
       return !!(inputImage && inputVideo)
@@ -299,6 +318,7 @@ export function VideoInputBox({
         !!inputImage ||
         !!lastFrameImage ||
         !!inputVideo ||
+        !!inputAudio ||
         referenceImages.length > 0 ||
         hasRefChips
       )
@@ -802,7 +822,7 @@ export function VideoInputBox({
           <div className="px-2 space-y-1.5 border-t border-border/50 pt-2 mt-1">
             <p className="text-[11px] text-muted-foreground">
               {isSeedance2
-                ? `Extra reference images for multimodal prompts ([Image1], etc.). Supports .jpg/.jpeg/.png. Up to ${maxReferenceImages} images.`
+                ? `Seedance multimodal references — This row: extra stills as .jpg / .jpeg / .png (up to ${maxReferenceImages}; use [Image1], … in the prompt). Reference audio: add via either + as .wav / .mp3 / .m4a / .aac (~15s combined with other media; use [Audio1], …). Frames & reference video: use the bottom + for input/start image, last frame, or reference video (e.g. .mp4, .webm, .mov). Reference audio needs at least one of those image or video references.`
                 : `Reference images for elements, scenes, or styles. Supports .jpg/.jpeg/.png. Max ${maxReferenceImages} without video, 4 with video.`}
             </p>
             <div className="flex flex-wrap items-center gap-2">
@@ -825,7 +845,66 @@ export function VideoInputBox({
                   </button>
                 </div>
               ))}
-              {canAddReferenceImage && (
+              {isSeedance2 && (inputAudio?.url || inputAudio?.file) && (
+                  <div className="relative flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md border border-dashed border-border bg-muted/25">
+                    <Waveform className="size-5 text-primary" weight="duotone" aria-hidden />
+                    <button
+                      type="button"
+                      onClick={() => onInputAudioChange(null)}
+                      className="absolute -top-1 -right-1 rounded-full border border-border bg-destructive p-0.5 text-destructive-foreground shadow"
+                      aria-label="Remove reference audio"
+                    >
+                      <X className="size-2.5" weight="bold" />
+                    </button>
+                    <span className="pointer-events-none absolute bottom-0.5 left-1/2 -translate-x-1/2 rounded bg-background/90 px-1 py-0.5 text-[8px] font-medium text-muted-foreground">
+                      Audio
+                    </span>
+                  </div>
+              )}
+              {isSeedance2 && (canAddReferenceImage || canAddSeedanceReferenceAudio) ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-12 w-12 rounded-md border-dashed p-0"
+                      disabled={isGenerating}
+                      aria-label="Add reference image or audio"
+                    >
+                      <Plus className="size-5" weight="bold" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem
+                      disabled={!canAddReferenceImage}
+                      onClick={() => referenceImagesRef.current?.click()}
+                      className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
+                    >
+                      <span className="flex items-center text-sm font-medium">
+                        <FilePlus className="mr-2 size-4 shrink-0" />
+                        Reference image
+                      </span>
+                      <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                        JPEG or PNG, up to {maxReferenceImages}. Use [Image1] in your prompt.
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={!canAddSeedanceReferenceAudio}
+                      onClick={() => referenceAudioRef.current?.click()}
+                      className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
+                    >
+                      <span className="flex items-center text-sm font-medium">
+                        <Waveform className="mr-2 size-4 shrink-0" weight="duotone" />
+                        Reference audio
+                      </span>
+                      <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                        .wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a start/end frame, input image, or reference video.
+                      </span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : !isSeedance2 && canAddReferenceImage ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -837,7 +916,7 @@ export function VideoInputBox({
                 >
                   <Plus className="size-5" weight="bold" />
                 </Button>
-              )}
+              ) : null}
             </div>
             <input
               ref={referenceImagesRef}
@@ -846,6 +925,16 @@ export function VideoInputBox({
               onChange={handleReferenceImageAdd}
               className="hidden"
             />
+            {isSeedance2 ? (
+              <input
+                ref={referenceAudioRef}
+                type="file"
+                accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac"
+                onChange={handleReferenceAudioAdd}
+                className="hidden"
+                aria-hidden
+              />
+            ) : null}
           </div>
         )}
 
@@ -905,7 +994,11 @@ export function VideoInputBox({
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 rounded-md bg-muted/20 hover:bg-muted/40 border border-border"
-                    aria-label="Add image or video"
+                    aria-label={
+                      isSeedance2
+                        ? "Add image, video, or reference (image/audio)"
+                        : "Add image or video"
+                    }
                   >
                     <Plus className="size-3.5" weight="bold" />
                   </Button>
@@ -958,10 +1051,36 @@ export function VideoInputBox({
                       )}
                     </DropdownMenuItem>
                   )}
-                  {canAddReferenceImage && (
-                    <DropdownMenuItem onClick={() => referenceImagesRef.current?.click()}>
-                      <FilePlus className="size-4 mr-2" />
-                      Add reference image
+                  {usesRefImageGallery && onReferenceImagesChange && (
+                    <DropdownMenuItem
+                      disabled={!canAddReferenceImage}
+                      onClick={() => referenceImagesRef.current?.click()}
+                      className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
+                    >
+                      <span className="flex items-center text-sm font-medium">
+                        <FilePlus className="mr-2 size-4 shrink-0" />
+                        {isSeedance2 ? "Reference image" : "Add reference image"}
+                      </span>
+                      {isSeedance2 ? (
+                        <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                          JPEG or PNG, up to {maxReferenceImages}. Use [Image1] in your prompt.
+                        </span>
+                      ) : null}
+                    </DropdownMenuItem>
+                  )}
+                  {isSeedance2 && (
+                    <DropdownMenuItem
+                      disabled={!canAddSeedanceReferenceAudio}
+                      onClick={() => referenceAudioRef.current?.click()}
+                      className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
+                    >
+                      <span className="flex items-center text-sm font-medium">
+                        <Waveform className="mr-2 size-4 shrink-0" weight="duotone" />
+                        Reference audio
+                      </span>
+                      <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                        .wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a frame or reference video.
+                      </span>
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>

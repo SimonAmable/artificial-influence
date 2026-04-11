@@ -5,7 +5,7 @@ import type {
 } from "@/lib/chat/tools/generate-image-with-nano-banana"
 import { createGenerateImageTool } from "@/lib/chat/tools/generate-image"
 import { createGenerateImageWithNanoBananaTool } from "@/lib/chat/tools/generate-image-with-nano-banana"
-import type { ChatVideoReference } from "@/lib/chat/tools/generate-video"
+import type { ChatAudioReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
 import { createGenerateVideoTool } from "@/lib/chat/tools/generate-video"
 import { createGetBrandContextTool } from "@/lib/chat/tools/get-brand-context"
 import { createListRecentGenerationsTool } from "@/lib/chat/tools/list-recent-generations"
@@ -17,6 +17,7 @@ interface CreateCreativeChatToolsOptions {
   availableReferences: AvailableChatImageReference[]
   latestUserImages: ChatImageReference[]
   latestUserVideos: ChatVideoReference[]
+  latestUserAudios: ChatAudioReference[]
   supabase: SupabaseClient
   userId: string
 }
@@ -25,6 +26,7 @@ export function createCreativeChatTools({
   availableReferences,
   latestUserImages,
   latestUserVideos,
+  latestUserAudios,
   supabase,
   userId,
 }: CreateCreativeChatToolsOptions) {
@@ -45,6 +47,7 @@ export function createCreativeChatTools({
       availableReferences,
       latestUserImages,
       latestUserVideos,
+      latestUserAudios,
       supabase,
       userId,
     }),

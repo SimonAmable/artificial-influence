@@ -291,6 +291,7 @@ function VideoPageContent() {
           (!!inputImage ||
             !!lastFrameImage ||
             !!inputVideo ||
+            !!inputAudio ||
             referenceImages.length > 0 ||
             !!chipSlots.startImageChipUrl ||
             !!chipSlots.lastFrameChipUrl ||
@@ -450,6 +451,14 @@ function VideoPageContent() {
       }
       if (isSeedance2 && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
         requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
+      }
+
+      if (isSeedance2 && inputAudio?.file) {
+        const audioUpload = await uploadImageToSupabase(inputAudio.file, user.id, 'video-gen-reference-audios')
+        requestBody.reference_audios = [audioUpload.url]
+      }
+      if (isSeedance2 && inputAudio?.url) {
+        requestBody.reference_audios = [inputAudio.url]
       }
 
       // Kling v3 Omni / Seedance 2.0: extra reference images

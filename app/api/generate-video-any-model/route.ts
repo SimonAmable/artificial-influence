@@ -287,6 +287,30 @@ export async function POST(request: NextRequest) {
         if (otherParams.aspect_ratio) replicateInput.aspect_ratio = otherParams.aspect_ratio;
         if (otherParams.generate_audio !== undefined) replicateInput.generate_audio = otherParams.generate_audio;
         if (otherParams.seed !== null && otherParams.seed !== undefined) replicateInput.seed = otherParams.seed;
+
+        const refAudiosRaw = [
+          ...(Array.isArray(body.reference_audios) ? body.reference_audios : []),
+          ...(Array.isArray(otherParams.reference_audios) ? otherParams.reference_audios : []),
+        ].filter((u): u is string => typeof u === 'string' && u.length > 0);
+        const refAudios = [...new Set(refAudiosRaw)];
+        if (refAudios.length > 0) replicateInput.reference_audios = refAudios;
+
+        const ra = replicateInput.reference_audios;
+        if (Array.isArray(ra) && ra.length > 0) {
+          const hasVisualAnchor =
+            (Array.isArray(replicateInput.reference_images) && replicateInput.reference_images.length > 0) ||
+            (Array.isArray(replicateInput.reference_videos) && replicateInput.reference_videos.length > 0) ||
+            typeof replicateInput.image === 'string';
+          if (!hasVisualAnchor) {
+            return NextResponse.json(
+              {
+                error:
+                  'Seedance reference audio requires at least one reference image, reference video, or first-frame image.',
+              },
+              { status: 400 },
+            );
+          }
+        }
         break;
       }
 

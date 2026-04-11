@@ -9,7 +9,7 @@ import {
   type AvailableChatImageReference,
   type ChatImageReference,
 } from "@/lib/chat/tools/generate-image-with-nano-banana"
-import type { ChatVideoReference } from "@/lib/chat/tools/generate-video"
+import type { ChatAudioReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
 import { createCreativeChatTools } from "@/lib/chat/tools"
 
 function buildReferenceManifest(references: AvailableChatImageReference[]) {
@@ -45,6 +45,7 @@ Agent rules:
 - When the request depends on an existing image, such as recreate, edit, replace text, keep the same composition, use the first image, use the earlier upload, or make this version with changes, you must ensure the tool call includes reference images.
 - Current-turn image attachments from the user's latest message are passed into the tool automatically. Do not ask the user to reattach an image they attached in this same turn.
 - Current-turn video attachments from the user's latest message are passed into the video tool automatically. Do not ask the user to reattach a video they attached in this same turn.
+- Current-turn **audio** attachments from the user's latest message are passed into the video tool automatically for models that support reference audio (e.g. Seedance 2.0). They still need a reference **image** or **video** (or first-frame image) alongside audio per the model.
 - For earlier images from the conversation, use referenceIds such as ref_1 and ref_2. Do not try to copy raw URLs from chat history.
 - For earlier generated chat images that should be reused in a video, use referenceIds such as ref_1. Do not try to turn generated image URLs or storage paths into assetIds.
 - Only pass assetIds when you have real asset UUIDs from the asset-search tool. Never pass URLs, storage paths, filenames, or chat-generated file paths as assetIds.
@@ -88,6 +89,7 @@ interface CreateCreativeAgentOptions {
   availableReferences: AvailableChatImageReference[]
   latestUserImages: ChatImageReference[]
   latestUserVideos: ChatVideoReference[]
+  latestUserAudios: ChatAudioReference[]
   model: string
   selectedReferenceContext?: string
   supabase: SupabaseClient
@@ -98,6 +100,7 @@ export function createCreativeAgent({
   availableReferences,
   latestUserImages,
   latestUserVideos,
+  latestUserAudios,
   model,
   selectedReferenceContext,
   supabase,
@@ -119,6 +122,7 @@ export function createCreativeAgent({
       availableReferences,
       latestUserImages,
       latestUserVideos,
+      latestUserAudios,
       supabase,
       userId,
     }),

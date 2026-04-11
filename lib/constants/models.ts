@@ -516,6 +516,16 @@ const SEEDANCE_2_0_VIDEO_PARAMS: ParameterDefinition[] = [
     ui_type: 'switch',
   },
   {
+    name: 'reference_audios',
+    type: 'string',
+    label: 'Reference audios',
+    description:
+      'Optional: up to 3 HTTPS URLs (wav/mp3). Label in prompt as [Audio1]; requires a reference image/video or first-frame image.',
+    required: false,
+    default: null,
+    ui_type: 'textarea',
+  },
+  {
     name: 'seed',
     type: 'number',
     label: 'Seed',

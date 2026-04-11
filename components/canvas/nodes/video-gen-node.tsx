@@ -18,6 +18,7 @@ import {
   PaperPlaneTilt,
   FloppyDisk,
   ArrowsLeftRight,
+  Waveform,
 } from "@phosphor-icons/react"
 import { motion } from "framer-motion"
 import type {
@@ -1008,6 +1009,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         if (isSeedance2 && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
           requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
         }
+        if (isSeedance2 && audioUpload?.url) {
+          requestBody.reference_audios = [audioUpload.url]
+        }
         if (
           modelIdentifier === "xai/grok-imagine-video" &&
           !requestBody.video &&
@@ -1070,10 +1074,10 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     (param) => param.name === "last_frame" || param.name === "last_frame_image",
   )
 
+  const isSeedance2Node = selectedModel?.identifier === "bytedance/seedance-2.0"
   const showImageUpload = !!(modelSupportsImage || isMotionCopyModel || isLipsyncModel)
-  const showVideoUpload =
-    !!isMotionCopyModel || selectedModel?.identifier === "bytedance/seedance-2.0"
-  const showAudioUpload = !!isLipsyncModel
+  const showVideoUpload = !!isMotionCopyModel || isSeedance2Node
+  const showAudioUpload = !!isLipsyncModel || isSeedance2Node
   const showLastFrameUpload = !!modelSupportsLastFrame
   const hasUploadOptions = showImageUpload || showVideoUpload || showAudioUpload || showLastFrameUpload
   const showDualFrameHandles =
@@ -1419,7 +1423,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                   {/* Audio preview */}
                   {finalAudioUrl && (
                     <div className="relative rounded-lg overflow-hidden border border-white/10 group flex items-center justify-center bg-zinc-900/60" style={{ width: '120px', height: '80px' }}>
-                      <div className="text-[10px] text-zinc-300">Audio</div>
+                      <div className="text-[10px] text-zinc-300">
+                        {isSeedance2Node && !isLipsyncModel ? "Ref audio" : "Audio"}
+                      </div>
                       {nodeData.manualAudioUrl && (
                         <button
                           onClick={handleRemoveAudio}
@@ -1565,9 +1571,24 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         <DropdownMenuItem
           onClick={() => audioUploadRef.current?.click()}
           disabled={!!(nodeData.manualAudioUrl || nodeData.connectedAudioUrl)}
+          className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
         >
-          <VideoCamera size={14} className="mr-2" />
-          Upload Audio {(nodeData.manualAudioUrl || nodeData.connectedAudioUrl) && 'OK'}
+          <span className="flex items-center text-sm font-medium">
+            {isSeedance2Node && !isLipsyncModel ? (
+              <Waveform size={14} className="mr-2 shrink-0" weight="duotone" />
+            ) : (
+              <VideoCamera size={14} className="mr-2 shrink-0" />
+            )}
+            {isSeedance2Node && !isLipsyncModel ? "Reference audio" : "Upload audio (lip sync)"}
+            {(nodeData.manualAudioUrl || nodeData.connectedAudioUrl) && (
+              <span className="ml-1 text-muted-foreground">OK</span>
+            )}
+          </span>
+          {isSeedance2Node && !isLipsyncModel ? (
+            <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+              .wav / .mp3 / .m4a / .aac (~15s). Use [Audio1] in prompt; needs a frame or reference video.
+            </span>
+          ) : null}
         </DropdownMenuItem>
       )}
     </DropdownMenuContent>

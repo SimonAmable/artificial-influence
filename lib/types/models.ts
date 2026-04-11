@@ -101,6 +101,8 @@ export interface Model {
   supports_reference_image?: boolean;
   /** Video models only: reference video for editing or motion copy (e.g. Grok Imagine Video, Kling motion). */
   supports_reference_video?: boolean;
+  /** Video models only: reference audio clips (e.g. Seedance 2.0). */
+  supports_reference_audio?: boolean;
   supports_first_frame?: boolean;
   supports_last_frame?: boolean;
   duration_options?: number[];

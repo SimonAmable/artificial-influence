@@ -1,14 +1,14 @@
 import { Canvas as FabricCanvas, FabricImage, Rect, Line, Group, IText, PencilBrush } from "fabric"
 import { CANVAS_SETTINGS, SHAPE_DEFAULTS, TEXT_DEFAULTS } from "./constants"
 
-/** Resolved `var(--muted)` for Fabric canvas background (light/dark). */
+/** Resolved `var(--background)` for Fabric canvas (matches page, avoids a grey slab). */
 export function getThemeWorkspaceBackgroundColor(): string {
   if (typeof document === "undefined") return CANVAS_SETTINGS.backgroundColorFallback
 
   const probe = document.createElement("div")
   probe.style.position = "fixed"
   probe.style.left = "-9999px"
-  probe.style.backgroundColor = "var(--muted)"
+  probe.style.backgroundColor = "var(--background)"
   document.body.appendChild(probe)
   const resolved = getComputedStyle(probe).backgroundColor
   document.body.removeChild(probe)

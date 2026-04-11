@@ -802,7 +802,7 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
     <div
       ref={containerRef}
       className={cn(
-        "relative flex items-center justify-center bg-muted overflow-hidden",
+        "relative flex items-center justify-center bg-background overflow-hidden",
         className
       )}
       style={{ cursor: getCursor() }}

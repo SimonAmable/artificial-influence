@@ -10,6 +10,7 @@ const DEFAULT_TEXT_TO_VIDEO_MODEL = "kwaivgi/kling-v2.6" as const
 const DEFAULT_MOTION_COPY_MODEL = "kwaivgi/kling-v2.6-motion-control" as const
 const MAX_REFERENCE_IMAGES = 4
 const MAX_REFERENCE_VIDEOS = 2
+const MAX_REFERENCE_AUDIOS = 3
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
 export interface ChatVideoReference {
@@ -17,6 +18,9 @@ export interface ChatVideoReference {
   mediaType?: string
   url: string
 }
+
+/** Same shape as {@link ChatVideoReference}; used for current-turn user audio attachments. */
+export type ChatAudioReference = ChatVideoReference
 
 interface CreateGenerateVideoToolOptions {
   availableReferences: AvailableChatImageReference[]
@@ -26,6 +30,7 @@ interface CreateGenerateVideoToolOptions {
     url: string
   }>
   latestUserVideos: ChatVideoReference[]
+  latestUserAudios: ChatAudioReference[]
   supabase: SupabaseClient
   userId: string
 }
@@ -45,6 +50,13 @@ function getFileExtension(mimeType: string, fallback: string) {
   if (normalized === "image/jpeg") return "jpg"
   if (normalized === "image/png") return "png"
   if (normalized === "image/webp") return "webp"
+  if (normalized === "audio/mpeg" || normalized === "audio/mp3") return "mp3"
+  if (normalized === "audio/wav" || normalized === "audio/x-wav") return "wav"
+  if (normalized === "audio/webm") return "webm"
+  if (normalized === "audio/ogg") return "ogg"
+  if (normalized === "audio/flac") return "flac"
+  if (normalized === "audio/mp4" || normalized === "audio/x-m4a") return "m4a"
+  if (normalized === "audio/aac") return "aac"
 
   return fallback
 }
@@ -175,7 +187,7 @@ async function uploadMediaReference({
   userId,
 }: {
   folder: string
-  kind: "image" | "video"
+  kind: "image" | "video" | "audio"
   reference: { filename?: string; mediaType?: string; url: string }
   index: number
   supabase: SupabaseClient
@@ -184,7 +196,9 @@ async function uploadMediaReference({
   if (!reference.url.startsWith("data:")) {
     validateReferenceUrl(reference.url)
     return {
-      mimeType: reference.mediaType ?? (kind === "video" ? "video/mp4" : "image/png"),
+      mimeType:
+        reference.mediaType ??
+        (kind === "video" ? "video/mp4" : kind === "audio" ? "audio/mpeg" : "image/png"),
       storagePath: inferStoragePathFromUrl(reference.url),
       url: reference.url,
     }
@@ -234,6 +248,7 @@ export function createGenerateVideoTool({
   availableReferences,
   latestUserImages,
   latestUserVideos,
+  latestUserAudios,
   supabase,
   userId,
 }: CreateGenerateVideoToolOptions) {
@@ -262,7 +277,9 @@ export function createGenerateVideoTool({
         .array(z.string().uuid())
         .max(6)
         .optional()
-        .describe("Saved asset UUIDs from searchAssets. Mixed image and video assets are allowed. Do not pass URLs or storage paths here."),
+        .describe(
+          "Saved asset UUIDs from searchAssets. Mixed image, video, and audio assets are allowed (e.g. reference audio for Seedance 2.0). Do not pass URLs or storage paths here.",
+        ),
       referenceIds: z
         .array(z.string().min(1))
         .max(MAX_REFERENCE_IMAGES)
@@ -326,8 +343,18 @@ export function createGenerateVideoTool({
             url: asset.url,
           })),
       ]).slice(0, MAX_REFERENCE_VIDEOS)
+      const audioReferences = dedupeReferences([
+        ...latestUserAudios,
+        ...assetReferences
+          .filter((asset) => asset.assetType === "audio")
+          .map((asset) => ({
+            filename: asset.title,
+            mediaType: "audio/mpeg",
+            url: asset.url,
+          })),
+      ]).slice(0, MAX_REFERENCE_AUDIOS)
 
-      const [uploadedImages, uploadedVideos] = await Promise.all([
+      const [uploadedImages, uploadedVideos, uploadedAudios] = await Promise.all([
         Promise.all(
           imageReferences.map((reference, index) =>
             uploadMediaReference({
@@ -352,12 +379,25 @@ export function createGenerateVideoTool({
             }),
           ),
         ),
+        Promise.all(
+          audioReferences.map((reference, index) =>
+            uploadMediaReference({
+              folder: "chat-video-audio-references",
+              index,
+              kind: "audio",
+              reference,
+              supabase,
+              userId,
+            }),
+          ),
+        ),
       ])
 
       const primaryImage = uploadedImages[0]?.url
       const secondaryImage = uploadedImages[1]?.url
       const additionalImages = uploadedImages.slice(2).map((item) => item.url)
       const primaryVideo = uploadedVideos[0]?.url
+      const referenceAudioUrls = uploadedAudios.map((item) => item.url).filter((url) => typeof url === "string" && url.length > 0)
       const normalizedPrompt = prompt.trim()
       const resolvedModel =
         modelIdentifier ??
@@ -372,6 +412,17 @@ export function createGenerateVideoTool({
 
       if (!isMotionCopy && normalizedPrompt.length === 0) {
         throw new Error("A prompt is required for this video model.")
+      }
+
+      if (
+        resolvedModel === "bytedance/seedance-2.0" &&
+        referenceAudioUrls.length > 0 &&
+        uploadedImages.length === 0 &&
+        uploadedVideos.length === 0
+      ) {
+        throw new Error(
+          "Seedance 2.0 reference audio requires at least one reference image, reference video, or first-frame image. Attach an image or video (or use saved image/video assets) alongside the audio.",
+        )
       }
 
       const { data: modelData, error: modelError } = await supabase
@@ -482,6 +533,7 @@ export function createGenerateVideoTool({
             if (primaryImage) replicateInput.image = primaryImage
             if (secondaryImage) replicateInput.last_frame_image = secondaryImage
           }
+          if (referenceAudioUrls.length > 0) replicateInput.reference_audios = referenceAudioUrls
           break
         }
         default:
@@ -550,6 +602,7 @@ export function createGenerateVideoTool({
         status: "pending" as const,
         usedImageReferenceCount: uploadedImages.length,
         usedVideoReferenceCount: uploadedVideos.length,
+        usedAudioReferenceCount: uploadedAudios.length,
       }
     },
   })
