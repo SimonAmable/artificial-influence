@@ -139,14 +139,17 @@ export async function publishAutopostJob(
       mediaType: row.media_type as "image" | "reel",
     })
 
+    const publishedAt = new Date().toISOString()
+
     const { error: successUpdateError } = await supabase
       .from("autopost_jobs")
       .update({
         status: "published",
+        published_at: publishedAt,
         provider_container_id: containerId,
         provider_publish_id: mediaId,
         last_error: null,
-        updated_at: new Date().toISOString(),
+        updated_at: publishedAt,
       })
       .eq("id", jobId)
       .eq("user_id", row.user_id)

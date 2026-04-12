@@ -17,7 +17,7 @@ export async function GET() {
     const { data: jobs, error } = await supabase
       .from("autopost_jobs")
       .select(
-        "id, media_url, caption, media_type, status, scheduled_at, created_at, updated_at, last_error, provider_publish_id, provider_container_id"
+        "id, media_url, caption, media_type, status, scheduled_at, published_at, created_at, updated_at, last_error, provider_publish_id, provider_container_id"
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })

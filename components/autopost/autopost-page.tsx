@@ -87,11 +87,56 @@ export type AutopostJobRow = {
   media_type: string
   status: string
   scheduled_at: string | null
+  published_at: string | null
   created_at: string
   updated_at: string
   last_error: string | null
   provider_publish_id: string | null
   provider_container_id: string | null
+}
+
+function formatLocal(iso: string) {
+  return new Date(iso).toLocaleString()
+}
+
+/** Primary line next to the status badge (human-readable “when” for this status). */
+function postStatusTimeLine(job: AutopostJobRow): string {
+  switch (job.status) {
+    case "published": {
+      const t = job.published_at ?? job.updated_at
+      return `Published ${formatLocal(t)}`
+    }
+    case "queued":
+      return job.scheduled_at
+        ? `Scheduled for ${formatLocal(job.scheduled_at)}`
+        : `Queued ${formatLocal(job.created_at)}`
+    case "draft":
+      return `Saved ${formatLocal(job.created_at)}`
+    case "processing":
+      return `Publishing… ${formatLocal(job.updated_at)}`
+    case "failed":
+      return `Failed ${formatLocal(job.updated_at)}`
+    case "cancelled":
+      return `Cancelled ${formatLocal(job.updated_at)}`
+    default:
+      return formatLocal(job.created_at)
+  }
+}
+
+/** If the post was scheduled and published at a different time, show context (cron skew). */
+function scheduledVsPublishedNote(job: AutopostJobRow): string | null {
+  if (job.status !== "published" || !job.scheduled_at || !job.published_at) {
+    return null
+  }
+  const sched = new Date(job.scheduled_at).getTime()
+  const pub = new Date(job.published_at).getTime()
+  if (!Number.isFinite(sched) || !Number.isFinite(pub)) {
+    return null
+  }
+  if (Math.abs(pub - sched) < 90_000) {
+    return null
+  }
+  return `Originally scheduled for ${formatLocal(job.scheduled_at)}`
 }
 
 type InstagramConnectionStatus = {
@@ -834,6 +879,7 @@ export function AutopostPage() {
                     {jobs.map((job) => {
                       const busy = actionJobId === job.id
                       const isImage = job.media_type === "image"
+                      const scheduleNote = scheduledVsPublishedNote(job)
                       return (
                         <li
                           key={job.id}
@@ -874,13 +920,11 @@ export function AutopostPage() {
                                   {statusLabel(job.status)}
                                 </Badge>
                                 <span className="text-[11px] text-muted-foreground">
-                                  {new Date(job.created_at).toLocaleString()}
+                                  {postStatusTimeLine(job)}
                                 </span>
                               </div>
-                              {job.status === "queued" && job.scheduled_at ? (
-                                <p className="text-xs text-sky-700 dark:text-sky-400">
-                                  Scheduled: {new Date(job.scheduled_at).toLocaleString()}
-                                </p>
+                              {scheduleNote ? (
+                                <p className="text-xs text-muted-foreground">{scheduleNote}</p>
                               ) : null}
                               {job.caption ? (
                                 <p className="line-clamp-2 text-sm text-foreground">{job.caption}</p>
