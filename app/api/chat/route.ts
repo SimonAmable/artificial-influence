@@ -14,6 +14,7 @@ import { getChatThreadById, updateChatThreadMessages } from "@/lib/chat/database
 import { createClient } from "@/lib/supabase/server"
 import { PROMPT_RECREATE_SYSTEM_PROMPT } from "@/lib/constants/system-prompts"
 import { createCreativeAgent } from "@/lib/chat/creative-agent"
+import { loadSkillsCatalog } from "@/lib/chat/skills/catalog"
 import { bindPendingGenerationsToChatMessages } from "@/lib/chat/media-persistence"
 import { createCreativeChatTools } from "@/lib/chat/tools"
 import { getSelectedReferencesFromMessage } from "@/lib/chat/reference-metadata"
@@ -337,6 +338,8 @@ export async function POST(req: Request) {
       return new Response(JSON.stringify({ error: "No chat messages were provided" }), { status: 400 })
     }
 
+    const skillsCatalog = await loadSkillsCatalog(supabase, user.id)
+
     const validationTools = createCreativeChatTools({
       availableReferences: [],
       latestUserImages: [],
@@ -344,6 +347,7 @@ export async function POST(req: Request) {
       latestUserAudios: [],
       supabase,
       userId: user.id,
+      skillsCatalog,
     }) as NonNullable<Parameters<typeof validateUIMessages>[0]["tools"]>
 
     let validatedMessages: UIMessage[]
@@ -415,6 +419,7 @@ export async function POST(req: Request) {
       latestUserAudios: getLatestUserAudioAttachments(validatedMessages),
       model,
       selectedReferenceContext,
+      skillsCatalog,
       supabase,
       userId: user.id,
     })

@@ -17,13 +17,13 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
+    // Request bodies through middleware/proxy (default 10MB). Needed for large JSON to /api/*
+    proxyClientMaxBodySize: '50mb',
     serverActions: {
       bodySizeLimit: '50mb',
     },
   },
-  // Configure body size limit for API routes (Route Handlers)
-  // This is separate from serverActions.bodySizeLimit
-  // Note: middlewareClientMaxBodySize is not a valid Next.js config option
+  // serverActions.bodySizeLimit = Server Actions only; proxyClientMaxBodySize = middleware/proxy buffering
   images: {
     remotePatterns: [
       {

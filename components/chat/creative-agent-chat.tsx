@@ -8,7 +8,9 @@ import { DefaultChatTransport } from "ai"
 import { Chat, useChat } from "@ai-sdk/react"
 import { useRouter } from "next/navigation"
 import { ArrowUp, CircleNotch, ClockCounterClockwise, NotePencil, Palette, Plus, X } from "@phosphor-icons/react"
+import { toast } from "sonner"
 import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from "@/components/ai-elements/conversation"
+import { SpeechInput } from "@/components/ai-elements/speech-input"
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message"
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion"
 import { ImageGrid } from "@/components/shared/display/image-grid"
@@ -358,6 +360,41 @@ type GetBrandContextToolPart = {
       name: string
       websiteUrl?: string | null
     }>
+  }
+  errorText?: string
+}
+
+type SaveSkillToolPart = {
+  type: "tool-saveSkill"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    description?: string
+    instructionsBody?: string
+    slug?: string
+    title?: string
+  }
+  output?: {
+    message?: string
+    slug?: string
+    status?: "error" | "saved"
+  }
+  errorText?: string
+}
+
+type ActivateSkillToolPart = {
+  type: "tool-activateSkill"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    slug?: string
+  }
+  output?: {
+    message?: string
+    name?: string
+    slug?: string
+    status?: "not-found" | "ok" | "parse-error"
+    title?: string | null
   }
   errorText?: string
 }
@@ -1627,6 +1664,111 @@ function MessageParts({ message }: { message: UIMessage }) {
           }
         }
 
+        if (part.type === "tool-saveSkill") {
+          const toolPart = part as SaveSkillToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+                  <CircleNotch className="h-4 w-4 animate-spin" />
+                  Saving skill{toolPart.input?.slug ? ` “${toolPart.input.slug}”` : ""}…
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card
+                key={`${message.id}-${index}`}
+                className="border-destructive/30 bg-destructive/5"
+              >
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Skill save failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-available") {
+            const output = toolPart.output
+            const ok = output?.status === "saved"
+            return (
+              <Card
+                key={`${message.id}-${index}`}
+                className={
+                  ok ? "border-border/60 bg-muted/10" : "border-destructive/30 bg-destructive/5"
+                }
+              >
+                <CardContent className="space-y-1 p-4 text-sm">
+                  <p className="font-medium">{ok ? "Skill saved" : "Skill not saved"}</p>
+                  {output?.slug ? (
+                    <p className="text-muted-foreground">
+                      <span className="font-mono text-xs">{output.slug}</span>
+                    </p>
+                  ) : null}
+                  {output?.message ? <p className="text-muted-foreground">{output.message}</p> : null}
+                </CardContent>
+              </Card>
+            )
+          }
+        }
+
+        if (part.type === "tool-activateSkill") {
+          const toolPart = part as ActivateSkillToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+                  <CircleNotch className="h-4 w-4 animate-spin" />
+                  Loading skill{toolPart.input?.slug ? ` “${toolPart.input.slug}”` : ""}…
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card
+                key={`${message.id}-${index}`}
+                className="border-destructive/30 bg-destructive/5"
+              >
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Skill activation failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-available") {
+            const output = toolPart.output
+            const ok = output?.status === "ok"
+            return (
+              <Card
+                key={`${message.id}-${index}`}
+                className={
+                  ok ? "border-border/60 bg-muted/10" : "border-destructive/30 bg-destructive/5"
+                }
+              >
+                <CardContent className="space-y-1 p-4 text-sm">
+                  <p className="font-medium">{ok ? "Skill loaded" : "Skill not loaded"}</p>
+                  {output?.slug ? (
+                    <p className="text-muted-foreground">
+                      {output.title ? `${output.title} · ` : null}
+                      <span className="font-mono text-xs">{output.slug}</span>
+                    </p>
+                  ) : null}
+                  {output?.message ? <p className="text-muted-foreground">{output.message}</p> : null}
+                </CardContent>
+              </Card>
+            )
+          }
+        }
+
         return null
       })}
     </>
@@ -1904,6 +2046,40 @@ export function CreativeAgentChat({
       const end = extendMentionRangeEnd(prev, start, ref.mentionToken.length)
       return prev.slice(0, start) + prev.slice(end)
     })
+  }, [])
+
+  const transcribeAudioBlob = React.useCallback(async (audioBlob: Blob) => {
+    const formData = new FormData()
+    formData.append("audio", audioBlob, "audio.webm")
+
+    const response = await fetch("/api/transcribe", {
+      method: "POST",
+      body: formData,
+    })
+
+    const payload = (await response.json().catch(() => ({}))) as { error?: string; text?: string }
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Transcription failed")
+    }
+
+    return typeof payload.text === "string" ? payload.text : ""
+  }, [])
+
+  const handleSpeechTranscription = React.useCallback((text: string) => {
+    const next = text.trim()
+    if (!next) return
+
+    setComposerValue((prev) => {
+      const p = prev.trimEnd()
+      if (!p) return next
+      return `${p} ${next}`
+    })
+  }, [])
+
+  const handleSpeechError = React.useCallback((error: unknown) => {
+    const message = error instanceof Error ? error.message : "Voice input failed"
+    toast.error(message)
   }, [])
 
   const handleSendMessage = React.useCallback(async () => {
@@ -2351,24 +2527,40 @@ export function CreativeAgentChat({
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button
-                      type="button"
-                      size="icon"
-                      onClick={() => void handleSendMessage()}
-                      disabled={
-                        isCreatingThread ||
-                        hasPendingUploads ||
-                        status === "submitted" ||
-                        status === "streaming" ||
-                        (!composerValue.trim() && composerAttachments.length === 0)
-                      }
-                    >
-                      {isCreatingThread || hasPendingUploads || status === "submitted" || status === "streaming" ? (
-                        <CircleNotch className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <ArrowUp className="h-4 w-4" />
-                      )}
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <SpeechInput
+                        forceServerTranscription
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Voice input"
+                        onAudioRecorded={transcribeAudioBlob}
+                        onTranscriptionChange={handleSpeechTranscription}
+                        onTranscriptionError={handleSpeechError}
+                        disabled={
+                          isCreatingThread ||
+                          status === "submitted" ||
+                          status === "streaming"
+                        }
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        onClick={() => void handleSendMessage()}
+                        disabled={
+                          isCreatingThread ||
+                          hasPendingUploads ||
+                          status === "submitted" ||
+                          status === "streaming" ||
+                          (!composerValue.trim() && composerAttachments.length === 0)
+                        }
+                      >
+                        {isCreatingThread || hasPendingUploads || status === "submitted" || status === "streaming" ? (
+                          <CircleNotch className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ArrowUp className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </InputGroupAddon>
                 </InputGroup>
               </div>

@@ -230,13 +230,13 @@ export function createGenerateImageWithNanoBananaTool({
 
   return tool({
     description:
-      "Generate or edit an image with Nano Banana 2. Use this when the user explicitly wants an image created or transformed. The user's current-turn image attachments are passed automatically. If the request depends on an earlier image from the conversation, include its referenceIds in the tool call.",
+      "Generate or edit an image with Nano Banana 2 (google/nano-banana-2). The Replicate `prompt` input must be a JSON string whose **content** describes the scene or edit: include a rich `image_description` object (text-to-image) **or** a rich `edit_description` object (edits), plus `prompt` and `negative_constraints` as needed. Do **not** embed `recommended_model` or `output_specs` here—the tool is always Nano Banana 2; set aspectRatio and variantCount on the tool instead. Current-turn image attachments are passed automatically; include referenceIds for earlier chat images when needed.",
     inputSchema: z.object({
       prompt: z
         .string()
         .min(2)
         .describe(
-          "Image brief. Use the user's exact wording when their request is detailed/explicit or they asked for literal/exact use; only expand when the ask was vague and they did not forbid rewriting.",
+          "JSON string sent to the model: structured brief only. Use either (1) `image_description` { ... } for new images, or (2) `edit_description` { ... } for edits (what to preserve vs change, target outcome). Always include a fluent master `prompt` and `negative_constraints` when useful. Omit `recommended_model` and `output_specs`. Do not pass prose-only when a structured package was composed.",
         ),
       aspectRatio: aspectRatioSchema
         .optional()

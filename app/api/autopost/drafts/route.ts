@@ -5,7 +5,9 @@ import { createClient } from "@/lib/supabase/server"
 
 type MediaType = "image" | "reel"
 
-function parseBody(body: unknown): { mediaUrl: string; caption: string; mediaType: MediaType } | null {
+function parseBody(
+  body: unknown
+): { mediaUrl: string; caption: string; mediaType: MediaType; scheduledAt?: Date } | "invalid_schedule" | null {
   if (!body || typeof body !== "object") {
     return null
   }
@@ -18,7 +20,17 @@ function parseBody(body: unknown): { mediaUrl: string; caption: string; mediaTyp
     return null
   }
 
-  return { mediaUrl, caption, mediaType }
+  const scheduledRaw = typeof record.scheduledAt === "string" ? record.scheduledAt.trim() : ""
+  if (scheduledRaw === "") {
+    return { mediaUrl, caption, mediaType }
+  }
+
+  const scheduledAt = new Date(scheduledRaw)
+  if (!Number.isFinite(scheduledAt.getTime())) {
+    return "invalid_schedule"
+  }
+
+  return { mediaUrl, caption, mediaType, scheduledAt }
 }
 
 export async function POST(request: Request) {
@@ -46,12 +58,18 @@ export async function POST(request: Request) {
     }
 
     const parsed = parseBody(json)
+    if (parsed === "invalid_schedule") {
+      return NextResponse.json({ error: "Invalid scheduledAt (use an ISO 8601 date-time string)." }, { status: 400 })
+    }
     if (!parsed) {
       return NextResponse.json(
         { error: "Expected mediaUrl (string) and mediaType (\"image\" | \"reel\")." },
         { status: 400 }
       )
     }
+
+    const now = Date.now()
+    const scheduleLater = parsed.scheduledAt !== undefined && parsed.scheduledAt.getTime() > now
 
     if (!isUserPublicBucketMediaUrl(parsed.mediaUrl, user.id, supabaseUrl)) {
       return NextResponse.json(
@@ -75,9 +93,10 @@ export async function POST(request: Request) {
         media_type: parsed.mediaType,
         media_url: parsed.mediaUrl,
         caption: parsed.caption.trim().length > 0 ? parsed.caption.trim() : null,
-        status: "draft",
+        status: scheduleLater ? "queued" : "draft",
+        scheduled_at: scheduleLater ? parsed.scheduledAt!.toISOString() : null,
       })
-      .select("id, media_url, caption, media_type, status, created_at")
+      .select("id, media_url, caption, media_type, status, scheduled_at, created_at")
       .single()
 
     if (insertError) {

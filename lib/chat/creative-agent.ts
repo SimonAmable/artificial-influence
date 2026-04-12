@@ -9,6 +9,10 @@ import {
   type AvailableChatImageReference,
   type ChatImageReference,
 } from "@/lib/chat/tools/generate-image-with-nano-banana"
+import {
+  buildSkillsCatalogAppendix,
+  type SkillCatalogEntry,
+} from "@/lib/chat/skills/catalog"
 import type { ChatAudioReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
 import { createCreativeChatTools } from "@/lib/chat/tools"
 
@@ -32,6 +36,7 @@ You are operating as a creative tool-calling agent inside UniCan chat.
 Agent rules:
 - You currently have creative tools for image generation, video generation, model lookup, asset lookup, recent generation lookup, generation-to-asset saving, and saved brand-kit context.
 - **Tool prompt fidelity:** For **generateImage**, **generateImageWithNanoBanana**, and **generateVideo**, copy the user's creative brief into the tool \`prompt\` **verbatim** when (a) it is already **detailed or explicit**, or (b) they ask for **exact / verbatim / literal / as written / use my prompt / do not rewrite / no enhancement**. Do not substitute your own expanded wording in those cases. When they want literal execution, set **enhancePrompt: false** on **generateImage** (never turn on enhancement after they forbade it). When the user message is **vague** and they want media **now** with no literal constraint, you may compose a fuller prompt in the tool call and set **enhancePrompt: true** only if a stronger brief is clearly needed and they did not ask to preserve their exact text.
+- **generateImageWithNanoBanana** always targets **google/nano-banana-2**. Its \`prompt\` argument **must** be a **JSON string** whose payload is the **model-facing brief only**: either a rich \`image_description\` (text-to-image) **or** a rich \`edit_description\` (edits), plus \`prompt\` and \`negative_constraints\` as needed. **Do not** put \`recommended_model\`, \`workflow\`, or \`output_specs\` inside that JSON—set **aspectRatio** and **variantCount** on the tool. Strip those keys from user copy-paste JSON if present, then stringify the rest.
 - First decide whether the user wants advice/prompting help or wants you to execute.
 - If the user is asking for a prompt, prompt pack, wording help, concept refinement, critique, or brainstorming, do not call the tool. Respond with the prompt, plan, or recommendation directly.
 - Only call generation tools when the user is clearly asking you to actually make, generate, create, render, visualize, animate, or output media now.
@@ -92,6 +97,7 @@ interface CreateCreativeAgentOptions {
   latestUserAudios: ChatAudioReference[]
   model: string
   selectedReferenceContext?: string
+  skillsCatalog?: SkillCatalogEntry[]
   supabase: SupabaseClient
   userId: string
 }
@@ -103,6 +109,7 @@ export function createCreativeAgent({
   latestUserAudios,
   model,
   selectedReferenceContext,
+  skillsCatalog = [],
   supabase,
   userId,
 }: CreateCreativeAgentOptions) {
@@ -110,12 +117,14 @@ export function createCreativeAgent({
     apiKey: process.env.AI_GATEWAY_API_KEY,
   })
 
+  const skillsAppendix = buildSkillsCatalogAppendix(skillsCatalog)
+  const baseAppendix = buildCreativeAgentAppendix(availableReferences, selectedReferenceContext)
+  const combinedAppendix =
+    skillsAppendix.length > 0 ? `${baseAppendix}\n\n${skillsAppendix}` : baseAppendix
+
   return new ToolLoopAgent({
     model: gateway(model),
-    instructions: `${CHATBOT_SYSTEM_PROMPT}\n\n${buildCreativeAgentAppendix(
-      availableReferences,
-      selectedReferenceContext,
-    )}`.trim(),
+    instructions: `${CHATBOT_SYSTEM_PROMPT}\n\n${combinedAppendix}`.trim(),
     stopWhen: stepCountIs(10),
     temperature: 0.7,
     tools: createCreativeChatTools({
@@ -125,6 +134,7 @@ export function createCreativeAgent({
       latestUserAudios,
       supabase,
       userId,
+      skillsCatalog,
     }),
   })
 }
