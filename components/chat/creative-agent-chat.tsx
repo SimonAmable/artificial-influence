@@ -2788,13 +2788,7 @@ export function CreativeAgentChat({
   }, [attachedRefs, composerAttachments, composerValue, enablePersistence, hasPendingUploads, isCreatingThread, onThreadIdChange, sendMessage, syncUrlOnThreadCreate, threadId, userId])
 
   const clearChat = React.useCallback(() => {
-    if (enablePersistence && threadId) {
-      setComposerValue("")
-      setAttachedFiles([])
-      setAttachedRefs([])
-      router.push("/chat")
-      return
-    }
+    const shouldNavigateToDraft = enablePersistence && Boolean(threadId)
 
     setMessages([])
     setComposerValue("")
@@ -2803,8 +2797,13 @@ export function CreativeAgentChat({
     setThreadId(undefined)
     threadIdRef.current = undefined
     onThreadIdChange?.(undefined)
+
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
+    }
+
+    if (shouldNavigateToDraft) {
+      router.push("/chat")
     }
   }, [enablePersistence, onThreadIdChange, router, setMessages, threadId])
 
