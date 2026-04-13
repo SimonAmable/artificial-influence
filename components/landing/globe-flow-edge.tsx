@@ -21,16 +21,23 @@ export function GlobeFlowEdge({
 
   return (
     <>
-      <BaseEdge id={id} path={edgePath} style={{ stroke: "rgba(255,255,255,0.15)", strokeWidth: 1.5 }} />
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        style={{
+          stroke: "color-mix(in oklch, var(--foreground) 22%, transparent)",
+          strokeWidth: 1.5,
+        }}
+      />
 
       <path
         d={edgePath}
         fill="none"
-        stroke="rgba(255,255,255,0.8)"
+        stroke="color-mix(in oklch, var(--foreground) 48%, transparent)"
         strokeWidth="2"
         strokeLinecap="round"
         strokeDasharray="20 200"
-        style={{ filter: "blur(1.5px) drop-shadow(0 0 4px rgba(255,255,255,0.6))" }}
+        style={{ filter: "blur(1.5px)" }}
       >
         <animate attributeName="stroke-dashoffset" from="0" to="-220" dur="3s" repeatCount="indefinite" />
       </path>

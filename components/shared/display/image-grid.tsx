@@ -48,6 +48,8 @@ interface ImageGridProps {
   upscalingImageUrl?: string | null
   onDelete?: (id: string, imageUrl: string, index: number) => void
   basicActionsOnly?: boolean
+  /** Initial column count for the layout slider (default 2). */
+  initialColumnCount?: number
 }
 
 // Normalize model names by removing prefix before slash, replacing dashes with spaces, and capitalizing
@@ -84,9 +86,10 @@ export function ImageGrid({
   upscalingImageUrl = null,
   onDelete,
   basicActionsOnly = false,
+  initialColumnCount = 2,
 }: ImageGridProps) {
   const router = useRouter()
-  const [columnCount, setColumnCount] = React.useState(2) // Default 2 columns
+  const [columnCount, setColumnCount] = React.useState(initialColumnCount)
   const [fullscreenImage, setFullscreenImage] = React.useState<ImageData | null>(null)
   const [copiedImageUrl, setCopiedImageUrl] = React.useState<string | null>(null)
   const [copiedPromptKey, setCopiedPromptKey] = React.useState<string | null>(null)

@@ -9,11 +9,14 @@ import { createGenerateImageWithNanoBananaTool } from "@/lib/chat/tools/generate
 import type { ChatAudioReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
 import { createGenerateVideoTool } from "@/lib/chat/tools/generate-video"
 import { createGetBrandContextTool } from "@/lib/chat/tools/get-brand-context"
+import { createListInstagramConnectionsTool } from "@/lib/chat/tools/list-instagram-connections"
 import { createListRecentGenerationsTool } from "@/lib/chat/tools/list-recent-generations"
 import { createSaveGenerationAsAssetTool } from "@/lib/chat/tools/save-generation-as-asset"
+import { createPrepareInstagramPostTool } from "@/lib/chat/tools/prepare-instagram-post"
 import { createSearchAssetsTool } from "@/lib/chat/tools/search-assets"
 import { createSearchModelsTool } from "@/lib/chat/tools/search-models"
 import { createActivateSkillTool, createSaveSkillTool } from "@/lib/chat/tools/skills"
+import { createListThreadMediaTool } from "@/lib/chat/tools/list-thread-media"
 
 interface CreateCreativeChatToolsOptions {
   availableReferences: AvailableChatImageReference[]
@@ -21,6 +24,7 @@ interface CreateCreativeChatToolsOptions {
   latestUserVideos: ChatVideoReference[]
   latestUserAudios: ChatAudioReference[]
   supabase: SupabaseClient
+  threadId?: string
   userId: string
   skillsCatalog?: SkillCatalogEntry[]
 }
@@ -31,6 +35,7 @@ export function createCreativeChatTools({
   latestUserVideos,
   latestUserAudios,
   supabase,
+  threadId,
   userId,
   skillsCatalog = [],
 }: CreateCreativeChatToolsOptions) {
@@ -44,17 +49,32 @@ export function createCreativeChatTools({
         })
       : null
 
+  const listThreadMediaTool = threadId
+    ? createListThreadMediaTool({ supabase, threadId, userId })
+    : null
+
   return {
+    ...(listThreadMediaTool ? { listThreadMedia: listThreadMediaTool } : {}),
+    listInstagramConnections: createListInstagramConnectionsTool({
+      supabase,
+      userId,
+    }),
+    prepareInstagramPost: createPrepareInstagramPostTool({
+      supabase,
+      userId,
+    }),
     generateImage: createGenerateImageTool({
       availableReferences,
       latestUserImages,
       supabase,
+      threadId,
       userId,
     }),
     generateImageWithNanoBanana: createGenerateImageWithNanoBananaTool({
       availableReferences,
       latestUserImages,
       supabase,
+      threadId,
       userId,
     }),
     generateVideo: createGenerateVideoTool({
@@ -63,6 +83,7 @@ export function createCreativeChatTools({
       latestUserVideos,
       latestUserAudios,
       supabase,
+      threadId,
       userId,
     }),
     getBrandContext: createGetBrandContextTool({

@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { decryptAutopostToken } from "@/lib/autopost/crypto"
+import type { AutopostJobMetadata } from "@/lib/autopost/types"
 import { InstagramGraphError } from "@/lib/instagram/graph"
-import { publishToInstagramFeed } from "@/lib/instagram/publish"
+import { publishInstagramContent, type PublishJobSpec } from "@/lib/instagram/publish"
 
 export type PublishAutopostJobResult =
   | { ok: true; instagramMediaId: string; containerId: string }
@@ -11,12 +12,62 @@ export type PublishAutopostJobResult =
 type AutopostJobRow = {
   id: string
   user_id: string
+  instagram_connection_id: string | null
   media_url: string
   caption: string | null
   media_type: string
   status: string
   attempts: number | null
   scheduled_at: string | null
+  metadata: unknown
+}
+
+function parseMetadata(raw: unknown): AutopostJobMetadata {
+  if (!raw || typeof raw !== "object") {
+    return {}
+  }
+  return raw as AutopostJobMetadata
+}
+
+function buildPublishSpec(row: AutopostJobRow): PublishJobSpec {
+  const meta = parseMetadata(row.metadata)
+
+  switch (row.media_type) {
+    case "image":
+      return { kind: "feed_image", mediaUrl: row.media_url, caption: row.caption }
+    case "feed_video":
+      return { kind: "feed_video", mediaUrl: row.media_url, caption: row.caption }
+    case "reel":
+      return {
+        kind: "reel",
+        mediaUrl: row.media_url,
+        caption: row.caption,
+        shareToFeed: meta.publishOptions?.shareToFeed !== false,
+        coverUrl: meta.publishOptions?.coverUrl,
+        trialParams: meta.publishOptions?.trialParams,
+      }
+    case "story": {
+      const assetKind = meta.assetKind === "video" ? "video" : "image"
+      return { kind: "story", mediaUrl: row.media_url, assetKind }
+    }
+    case "carousel": {
+      const items = meta.carouselItems ?? []
+      if (items.length < 2) {
+        throw new InstagramGraphError(
+          "Carousel post is missing at least two media items.",
+          undefined,
+          "INVALID_JOB"
+        )
+      }
+      return { kind: "carousel", caption: row.caption, items }
+    }
+    default:
+      throw new InstagramGraphError(
+        `Unsupported media_type "${row.media_type}".`,
+        undefined,
+        "INVALID_JOB"
+      )
+  }
 }
 
 /**
@@ -37,7 +88,9 @@ export async function publishAutopostJob(
 
   let query = supabase
     .from("autopost_jobs")
-    .select("id, user_id, media_url, caption, media_type, status, attempts, scheduled_at")
+    .select(
+      "id, user_id, instagram_connection_id, media_url, caption, media_type, status, attempts, scheduled_at, metadata"
+    )
     .eq("id", jobId)
 
   if (userId) {
@@ -71,12 +124,19 @@ export async function publishAutopostJob(
     }
   }
 
-  const { data: connection, error: connectionError } = await supabase
+  let connectionQuery = supabase
     .from("instagram_connections")
     .select("id, instagram_user_id, access_token_encrypted, token_expires_at, status")
     .eq("user_id", row.user_id)
     .eq("status", "connected")
-    .maybeSingle()
+
+  if (row.instagram_connection_id) {
+    connectionQuery = connectionQuery.eq("id", row.instagram_connection_id)
+  } else {
+    connectionQuery = connectionQuery.order("updated_at", { ascending: false }).limit(1)
+  }
+
+  const { data: connection, error: connectionError } = await connectionQuery.maybeSingle()
 
   if (connectionError || !connection?.instagram_user_id || !connection.access_token_encrypted) {
     return { ok: false, error: "Connect Instagram before publishing.", statusCode: 400 }
@@ -131,12 +191,11 @@ export async function publishAutopostJob(
   }
 
   try {
-    const { containerId, mediaId } = await publishToInstagramFeed({
+    const spec = buildPublishSpec(row)
+    const { containerId, mediaId } = await publishInstagramContent({
       accessToken,
       instagramUserId: connection.instagram_user_id,
-      mediaUrl: row.media_url,
-      caption: row.caption,
-      mediaType: row.media_type as "image" | "reel",
+      job: spec,
     })
 
     const publishedAt = new Date().toISOString()

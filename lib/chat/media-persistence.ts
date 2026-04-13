@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { UIMessage } from "ai"
 import { replaceChatThreadMessages } from "@/lib/chat/database-server"
+import {
+  syncChatThreadMediaForPrediction,
+  syncMissingChatThreadMediaForThread,
+} from "@/lib/chat/thread-media/server"
 
 type PendingMediaToolPart =
   | {
@@ -167,8 +171,12 @@ function patchMessagesForGenerationResult({
           : {}
 
       if (failedGeneration) {
+        const { output: _ignoredOutput, ...partWithoutOutput } = part as typeof part & {
+          output?: unknown
+        }
+
         return {
-          ...part,
+          ...partWithoutOutput,
           state: "output-error" as const,
           errorText: failedGeneration.error_message || "Generation failed.",
         }
@@ -337,7 +345,11 @@ export async function bindPendingGenerationsToChatMessages({
       toolCallId: binding.toolCallId,
       userId,
     })
+
+    await syncChatThreadMediaForPrediction(supabase, binding.predictionId)
   }
+
+  await syncMissingChatThreadMediaForThread(supabase, userId, threadId)
 }
 
 export async function syncGenerationResultToPersistedChat({

@@ -35,8 +35,8 @@ export async function POST(request: Request) {
     }
 
     const forceQueuedBeforeDue =
-      json &&
       typeof json === "object" &&
+      json !== null &&
       (json as { publishNow?: unknown }).publishNow === true
 
     const result = await publishAutopostJob(supabase, jobId, {

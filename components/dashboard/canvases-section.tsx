@@ -146,21 +146,22 @@ export function CanvasesSection() {
                     </div>
                   )}
 
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => handleDeleteClick(canvas, e)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
                 </div>
 
-                <div className="p-2">
+                <div className="relative p-2 pr-12">
                   <h3 className="font-semibold text-lg truncate">{canvas.name}</h3>
                   <p className="text-xs text-muted-foreground mt-1">
                     {new Date(canvas.updated_at).toLocaleDateString()}
                   </p>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => handleDeleteClick(canvas, e)}
+                    aria-label={`Delete ${canvas.name}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
             </div>

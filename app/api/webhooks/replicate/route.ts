@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
+import { syncChatThreadMediaForPrediction } from "@/lib/chat/thread-media/server"
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -263,6 +264,8 @@ export async function POST(request: NextRequest) {
       predictionId,
       supabase: supabaseAdmin,
     })
+
+    await syncChatThreadMediaForPrediction(supabaseAdmin, predictionId)
 
     await deductUserCredits(pendingGeneration.user_id, requiredCredits, supabaseAdmin)
     console.log(

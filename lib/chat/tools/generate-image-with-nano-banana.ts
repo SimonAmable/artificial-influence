@@ -7,6 +7,7 @@ import {
   runReplicatePollingImageGeneration,
 } from "@/lib/server/replicate-image-generation"
 import { checkUserHasCredits } from "@/lib/credits"
+import { resolveThreadMediaIdsToImageReferences } from "@/lib/chat/thread-media/server"
 
 const NANO_BANANA_MODEL = "google/nano-banana-2" as const
 const MAX_REFERENCE_IMAGES = 4
@@ -37,6 +38,7 @@ interface CreateGenerateImageWithNanoBananaToolOptions {
   availableReferences: AvailableChatImageReference[]
   latestUserImages: ChatImageReference[]
   supabase: SupabaseClient
+  threadId?: string
   userId: string
 }
 
@@ -222,6 +224,7 @@ export function createGenerateImageWithNanoBananaTool({
   availableReferences,
   latestUserImages,
   supabase,
+  threadId,
   userId,
 }: CreateGenerateImageWithNanoBananaToolOptions) {
   const availableReferenceMap = new Map(
@@ -230,7 +233,7 @@ export function createGenerateImageWithNanoBananaTool({
 
   return tool({
     description:
-      "Generate or edit an image with Nano Banana 2 (google/nano-banana-2). The Replicate `prompt` input must be a JSON string whose **content** describes the scene or edit: include a rich `image_description` object (text-to-image) **or** a rich `edit_description` object (edits), plus `prompt` and `negative_constraints` as needed. Do **not** embed `recommended_model` or `output_specs` here—the tool is always Nano Banana 2; set aspectRatio and variantCount on the tool instead. Current-turn image attachments are passed automatically; include referenceIds for earlier chat images when needed.",
+      "Generate or edit an image with Nano Banana 2 (google/nano-banana-2). The Replicate `prompt` input must be a JSON string whose **content** describes the scene or edit: include a rich `image_description` object (text-to-image) **or** a rich `edit_description` object (edits), plus `prompt` and `negative_constraints` as needed. Do **not** embed `recommended_model` or `output_specs` here—the tool is always Nano Banana 2; set aspectRatio and variantCount on the tool instead. Current-turn image attachments are passed automatically; use listThreadMedia + mediaIds for earlier thread images when needed.",
     inputSchema: z.object({
       prompt: z
         .string()
@@ -248,21 +251,32 @@ export function createGenerateImageWithNanoBananaTool({
         .max(4)
         .optional()
         .describe("How many image variations to generate. Keep this low unless the user explicitly asks for multiple options."),
+      mediaIds: z
+        .array(z.string().uuid())
+        .max(MAX_REFERENCE_IMAGES)
+        .optional()
+        .describe("UUIDs from listThreadMedia for earlier thread images or generations."),
       referenceIds: z
         .array(z.string().min(1))
         .max(MAX_REFERENCE_IMAGES)
         .optional()
-        .describe("Reference IDs for earlier chat images, such as ref_1 or ref_2. Use these when the request depends on an earlier image from the conversation."),
+        .describe("Legacy ref_1 style IDs when mediaIds are unavailable."),
     }),
     execute: async ({
       aspectRatio,
       prompt,
+      mediaIds = [],
       referenceIds = [],
       variantCount = 1,
     }) => {
       if (!process.env.REPLICATE_API_TOKEN) {
         throw new Error("REPLICATE_API_TOKEN is not configured.")
       }
+
+      const resolvedFromThread =
+        threadId && mediaIds.length > 0
+          ? await resolveThreadMediaIdsToImageReferences(supabase, userId, threadId, mediaIds)
+          : []
 
       const resolvedReferenceIds = referenceIds.map((referenceId) => {
         const reference = availableReferenceMap.get(referenceId)
@@ -276,6 +290,7 @@ export function createGenerateImageWithNanoBananaTool({
 
       const referenceImages = dedupeReferences([
         ...latestUserImages,
+        ...resolvedFromThread,
         ...resolvedReferenceIds,
       ]).slice(0, MAX_REFERENCE_IMAGES)
       const uploadedReferences = await Promise.all(

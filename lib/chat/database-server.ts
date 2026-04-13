@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { UIMessage } from "ai"
 import { createClient } from "@/lib/supabase/server"
+import { sanitizeToolErrorPartsInMessages } from "@/lib/chat/sanitize-ui-messages"
 
 export interface ChatThread {
   id: string
@@ -138,12 +139,14 @@ export async function replaceChatThreadMessages(
   userId: string,
   messages: UIMessage[],
 ): Promise<void> {
-  const title = deriveChatTitleFromMessages(messages)
+  const sanitized = sanitizeToolErrorPartsInMessages(messages)
+  const nextMessages = sanitized.messages
+  const title = deriveChatTitleFromMessages(nextMessages)
 
   const { error } = await supabase
     .from("chat_threads")
     .update({
-      messages,
+      messages: nextMessages,
       title,
       updated_at: new Date().toISOString(),
     })
@@ -172,7 +175,7 @@ export async function replaceChatThreadMessages(
   const { error: insertError } = await supabase
     .from("chat_messages")
     .insert(
-      messages.map((message, index) => ({
+      nextMessages.map((message, index) => ({
         thread_id: threadId,
         message_id: message.id,
         role: message.role,

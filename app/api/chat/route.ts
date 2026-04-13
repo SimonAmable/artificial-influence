@@ -16,6 +16,7 @@ import { PROMPT_RECREATE_SYSTEM_PROMPT } from "@/lib/constants/system-prompts"
 import { createCreativeAgent } from "@/lib/chat/creative-agent"
 import { loadSkillsCatalog } from "@/lib/chat/skills/catalog"
 import { bindPendingGenerationsToChatMessages } from "@/lib/chat/media-persistence"
+import { sanitizeToolErrorPartsInMessages } from "@/lib/chat/sanitize-ui-messages"
 import { createCreativeChatTools } from "@/lib/chat/tools"
 import { getSelectedReferencesFromMessage } from "@/lib/chat/reference-metadata"
 import { brandKitFromRow } from "@/lib/brand-kit/database-server"
@@ -26,6 +27,7 @@ import type {
   ChatImageReference,
 } from "@/lib/chat/tools/generate-image-with-nano-banana"
 import type { ChatAudioReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
+import { registerThreadMediaFromUserMessageParts } from "@/lib/chat/thread-media/server"
 
 type GenerateImageToolPart = {
   type: "tool-generateImageWithNanoBanana"
@@ -338,6 +340,17 @@ export async function POST(req: Request) {
       return new Response(JSON.stringify({ error: "No chat messages were provided" }), { status: 400 })
     }
 
+    const sanitizedRequest = sanitizeToolErrorPartsInMessages(requestMessages)
+    requestMessages = sanitizedRequest.messages
+
+    if (threadId && sanitizedRequest.changed) {
+      try {
+        await updateChatThreadMessages(threadId, user.id, requestMessages)
+      } catch (sanitizePersistError) {
+        console.error("[chat] Failed to persist sanitized thread:", sanitizePersistError)
+      }
+    }
+
     const skillsCatalog = await loadSkillsCatalog(supabase, user.id)
 
     const validationTools = createCreativeChatTools({
@@ -346,6 +359,7 @@ export async function POST(req: Request) {
       latestUserVideos: [],
       latestUserAudios: [],
       supabase,
+      threadId,
       userId: user.id,
       skillsCatalog,
     }) as NonNullable<Parameters<typeof validateUIMessages>[0]["tools"]>
@@ -360,6 +374,9 @@ export async function POST(req: Request) {
     } catch (validationError) {
       if (validationError instanceof TypeValidationError) {
         console.error("[chat] Message validation failed:", validationError)
+        if ("cause" in validationError) {
+          console.error("[chat] Message validation cause:", validationError.cause)
+        }
         return new Response(
           JSON.stringify({ error: "Stored chat messages no longer match the current tool schema." }),
           { status: 400 },
@@ -367,6 +384,20 @@ export async function POST(req: Request) {
       }
 
       throw validationError
+    }
+
+    const lastUserMessageForMedia = [...validatedMessages].reverse().find((m) => m.role === "user")
+    if (threadId && lastUserMessageForMedia) {
+      try {
+        await registerThreadMediaFromUserMessageParts(
+          supabase,
+          user.id,
+          threadId,
+          lastUserMessageForMedia.parts,
+        )
+      } catch (registerError) {
+        console.error("[chat] Thread media registration failed:", registerError)
+      }
     }
 
     if (mode === "prompt-recreate") {
@@ -421,6 +452,7 @@ export async function POST(req: Request) {
       selectedReferenceContext,
       skillsCatalog,
       supabase,
+      threadId,
       userId: user.id,
     })
     type CreativeAgentUIMessage = InferAgentUIMessage<typeof creativeAgent>

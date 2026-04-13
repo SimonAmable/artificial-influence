@@ -16,6 +16,7 @@ import type {
   AvailableChatImageReference,
   ChatImageReference,
 } from "@/lib/chat/tools/generate-image-with-nano-banana"
+import { resolveThreadMediaIdsToImageReferences } from "@/lib/chat/thread-media/server"
 
 const DEFAULT_IMAGE_MODEL = "google/nano-banana-2" as const
 const MAX_REFERENCE_IMAGES = 4
@@ -31,6 +32,7 @@ interface CreateGenerateImageToolOptions {
   availableReferences: AvailableChatImageReference[]
   latestUserImages: ChatImageReference[]
   supabase: SupabaseClient
+  threadId?: string
   userId: string
 }
 
@@ -279,6 +281,7 @@ export function createGenerateImageTool({
   availableReferences,
   latestUserImages,
   supabase,
+  threadId,
   userId,
 }: CreateGenerateImageToolOptions) {
   const availableReferenceMap = new Map(
@@ -287,7 +290,7 @@ export function createGenerateImageTool({
 
   return tool({
     description:
-      "Generate or edit an image using any active UniCan image model. Use this when the user explicitly wants an image created now, especially if they name a model, ask for non-Nano output, or want you to use saved asset references.",
+      "Generate or edit an image using any active UniCan image model. Use this when the user explicitly wants an image created now, especially if they name a model, ask for non-Nano output, or want you to use saved asset references. For earlier thread images, use listThreadMedia + mediaIds (UUIDs).",
     inputSchema: z.object({
       prompt: z
         .string()
@@ -314,11 +317,18 @@ export function createGenerateImageTool({
         .max(4)
         .optional()
         .describe("How many image variations to generate. Keep this low unless the user explicitly asks for multiple options."),
+      mediaIds: z
+        .array(z.string().uuid())
+        .max(MAX_REFERENCE_IMAGES)
+        .optional()
+        .describe(
+          "UUIDs from listThreadMedia for earlier thread images or generated images (same thread). Prefer this over legacy referenceIds.",
+        ),
       referenceIds: z
         .array(z.string().min(1))
         .max(MAX_REFERENCE_IMAGES)
         .optional()
-        .describe("Reference IDs for earlier chat images, such as ref_1 or ref_2."),
+        .describe("Legacy ref_1 style IDs from older chats only when listThreadMedia UUIDs are unavailable."),
       assetIds: z
         .array(z.string().uuid())
         .max(MAX_REFERENCE_IMAGES)
@@ -338,9 +348,15 @@ export function createGenerateImageTool({
       enhancePrompt: shouldEnhance = false,
       modelIdentifier = DEFAULT_IMAGE_MODEL,
       prompt,
+      mediaIds = [],
       referenceIds = [],
       variantCount = 1,
     }) => {
+      const resolvedFromThread =
+        threadId && mediaIds.length > 0
+          ? await resolveThreadMediaIdsToImageReferences(supabase, userId, threadId, mediaIds)
+          : []
+
       const resolvedReferenceIds = referenceIds.map((referenceId) => {
         const reference = availableReferenceMap.get(referenceId)
 
@@ -353,7 +369,7 @@ export function createGenerateImageTool({
 
       const [uploadedReferences, assetReferences, modelResponse] = await Promise.all([
         Promise.all(
-          dedupeReferences([...latestUserImages, ...resolvedReferenceIds])
+          dedupeReferences([...latestUserImages, ...resolvedFromThread, ...resolvedReferenceIds])
             .slice(0, MAX_REFERENCE_IMAGES)
             .map((reference, index) => uploadReferenceImage(reference, index, supabase, userId)),
         ),

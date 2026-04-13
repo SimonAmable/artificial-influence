@@ -198,10 +198,15 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
         aria-describedby="asset-selection-description"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-          <DialogHeader className="p-0 space-y-0">
-            <DialogTitle className="text-xl font-semibold">Select Reference Image</DialogTitle>
-            <p id="asset-selection-description" className="text-sm text-muted-foreground mt-1">
+        <div className="flex items-start justify-between gap-3 p-6 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+          <DialogHeader className="min-w-0 flex-1 gap-1 p-0 pr-2 text-left">
+            <DialogTitle className="text-left text-xl font-semibold leading-snug">
+              Select Reference Image
+            </DialogTitle>
+            <p
+              id="asset-selection-description"
+              className="text-left text-sm leading-relaxed text-muted-foreground"
+            >
               Choose an image from your saved assets or generation history
             </p>
           </DialogHeader>
@@ -209,7 +214,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
             variant="ghost"
             size="icon"
             onClick={() => onOpenChange(false)}
-            className="h-8 w-8 rounded-full"
+            className="h-8 w-8 shrink-0 rounded-full"
             aria-label="Close dialog"
           >
             <X className="h-4 w-4" weight="bold" />
@@ -217,68 +222,85 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "history" | "assets")} className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between gap-4 px-6 pt-2 pb-2">
-            <TabsList>
-              <TabsTrigger value="assets" className="gap-2">
-                <FolderOpen className="h-4 w-4" />
-                Assets
-              </TabsTrigger>
-              <TabsTrigger value="history" className="gap-2">
-                <ClockCounterClockwise className="h-4 w-4" />
-                History
-              </TabsTrigger>
-            </TabsList>
-            <input
-              ref={createAssetFileInputRef}
-              type="file"
-              accept="image/*,video/*,audio/*"
-              className="sr-only"
-              aria-hidden
-              tabIndex={-1}
-              onChange={handleCreateAssetFileChange}
-            />
-            <Button
-              type="button"
-              size="sm"
-              className="shrink-0 gap-1.5"
-              disabled={createAssetUploading}
-              onClick={() => createAssetFileInputRef.current?.click()}
-            >
-              {createAssetUploading ? (
-                <CircleNotch className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" weight="bold" />
-              )}
-              Create asset
-            </Button>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "history" | "assets")} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex shrink-0 flex-col gap-3 px-6 pt-2 pb-0">
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+              <div className="flex min-w-0 flex-col gap-3">
+                <TabsList>
+                  <TabsTrigger value="assets" className="gap-2">
+                    <FolderOpen className="h-4 w-4" />
+                    Assets
+                  </TabsTrigger>
+                  <TabsTrigger value="history" className="gap-2">
+                    <ClockCounterClockwise className="h-4 w-4" />
+                    History
+                  </TabsTrigger>
+                </TabsList>
+                {activeTab === "assets" ? (
+                  <Tabs
+                    value={visibility}
+                    onValueChange={(value) => setVisibility(value as AssetVisibility | "all")}
+                  >
+                    <TabsList>
+                      <TabsTrigger value="all">All</TabsTrigger>
+                      <TabsTrigger value="private">Private</TabsTrigger>
+                      <TabsTrigger value="public">Public</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                ) : null}
+              </div>
+              <input
+                ref={createAssetFileInputRef}
+                type="file"
+                accept="image/*,video/*,audio/*"
+                className="sr-only"
+                aria-hidden
+                tabIndex={-1}
+                onChange={handleCreateAssetFileChange}
+              />
+              <Button
+                type="button"
+                size="sm"
+                className="shrink-0 gap-1.5"
+                disabled={createAssetUploading}
+                onClick={() => createAssetFileInputRef.current?.click()}
+              >
+                {createAssetUploading ? (
+                  <CircleNotch className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" weight="bold" />
+                )}
+                Create asset
+              </Button>
+            </div>
+            {activeTab === "assets" ? (
+              <div className="min-w-0 w-full">
+                <Tabs
+                  value={category}
+                  onValueChange={(value) => setCategory(value as AssetCategory | "all")}
+                >
+                  <div
+                    className="-mx-1 flex max-w-full overflow-x-auto overscroll-x-contain px-1 pb-0.5 [scrollbar-gutter:stable]"
+                    role="presentation"
+                  >
+                    <TabsList className="inline-flex h-auto min-h-9 w-max max-w-none flex-nowrap justify-start">
+                      <TabsTrigger value="all" className="shrink-0 grow-0 basis-auto">
+                        All
+                      </TabsTrigger>
+                      {ASSET_CATEGORIES.map((item) => (
+                        <TabsTrigger key={item} value={item} className="shrink-0 grow-0 basis-auto">
+                          {ASSET_CATEGORY_LABELS[item]}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </div>
+                </Tabs>
+              </div>
+            ) : null}
           </div>
 
           {/* Assets Tab */}
-          <TabsContent value="assets" className="flex-1 overflow-y-auto p-4 m-0">
-            <Tabs
-              value={visibility}
-              onValueChange={(value) => setVisibility(value as AssetVisibility | "all")}
-            >
-              <TabsList className="mb-3">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="private">Private</TabsTrigger>
-                <TabsTrigger value="public">Public</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <Tabs
-              value={category}
-              onValueChange={(value) => setCategory(value as AssetCategory | "all")}
-            >
-              <TabsList className="mb-4 flex flex-wrap h-auto">
-                <TabsTrigger value="all">All</TabsTrigger>
-                {ASSET_CATEGORIES.map((item) => (
-                  <TabsTrigger key={item} value={item}>
-                    {ASSET_CATEGORY_LABELS[item]}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+          <TabsContent value="assets" className="m-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
             {loadingAssets ? (
               <div className="flex items-center justify-center h-64">
                 <CircleNotch className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -343,7 +365,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
           </TabsContent>
 
           {/* History Tab */}
-          <TabsContent value="history" className="flex-1 overflow-y-auto p-4 m-0">
+          <TabsContent value="history" className="m-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
             {loadingHistory ? (
               <div className="flex items-center justify-center h-64">
                 <CircleNotch className="h-8 w-8 animate-spin text-muted-foreground" />

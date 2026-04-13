@@ -18,12 +18,11 @@ import { createCreativeChatTools } from "@/lib/chat/tools"
 
 function buildReferenceManifest(references: AvailableChatImageReference[]) {
   if (references.length === 0) {
-    return "Earlier image references available in the conversation:\n- none"
+    return "Legacy transcript ref hints (ref_1, ref_2, …): none. Prefer **listThreadMedia** + **mediaIds** when that tool is available."
   }
 
-  const recentReferences = references.slice(-12)
-  const lines = recentReferences.map((reference) => `- ${reference.id}: ${reference.label}`)
-  return `Earlier image references available in the conversation:\n${lines.join("\n")}`
+  const lines = references.map((reference) => `- ${reference.id}: ${reference.label}`)
+  return `Legacy transcript-only ref hints (prefer **listThreadMedia** + **mediaIds** when available):\n${lines.join("\n")}`
 }
 
 function buildCreativeAgentAppendix(
@@ -34,7 +33,7 @@ function buildCreativeAgentAppendix(
 You are operating as a creative tool-calling agent inside UniCan chat.
 
 Agent rules:
-- You currently have creative tools for image generation, video generation, model lookup, asset lookup, recent generation lookup, generation-to-asset saving, and saved brand-kit context.
+- You currently have creative tools for image generation, video generation, thread media listing (listThreadMedia, when the chat thread is persisted), model lookup, asset lookup, recent generation lookup, generation-to-asset saving, saved brand-kit context, Instagram account listing, and Instagram post preparation.
 - **Tool prompt fidelity:** For **generateImage**, **generateImageWithNanoBanana**, and **generateVideo**, copy the user's creative brief into the tool \`prompt\` **verbatim** when (a) it is already **detailed or explicit**, or (b) they ask for **exact / verbatim / literal / as written / use my prompt / do not rewrite / no enhancement**. Do not substitute your own expanded wording in those cases. When they want literal execution, set **enhancePrompt: false** on **generateImage** (never turn on enhancement after they forbade it). When the user message is **vague** and they want media **now** with no literal constraint, you may compose a fuller prompt in the tool call and set **enhancePrompt: true** only if a stronger brief is clearly needed and they did not ask to preserve their exact text.
 - **generateImageWithNanoBanana** always targets **google/nano-banana-2**. Its \`prompt\` argument **must** be a **JSON string** whose payload is the **model-facing brief only**: either a rich \`image_description\` (text-to-image) **or** a rich \`edit_description\` (edits), plus \`prompt\` and \`negative_constraints\` as needed. **Do not** put \`recommended_model\`, \`workflow\`, or \`output_specs\` inside that JSON—set **aspectRatio** and **variantCount** on the tool. Strip those keys from user copy-paste JSON if present, then stringify the rest.
 - First decide whether the user wants advice/prompting help or wants you to execute.
@@ -51,8 +50,9 @@ Agent rules:
 - Current-turn image attachments from the user's latest message are passed into the tool automatically. Do not ask the user to reattach an image they attached in this same turn.
 - Current-turn video attachments from the user's latest message are passed into the video tool automatically. Do not ask the user to reattach a video they attached in this same turn.
 - Current-turn **audio** attachments from the user's latest message are passed into the video tool automatically for models that support reference audio (e.g. Seedance 2.0). They still need a reference **image** or **video** (or first-frame image) alongside audio per the model.
-- For earlier images from the conversation, use referenceIds such as ref_1 and ref_2. Do not try to copy raw URLs from chat history.
-- For earlier generated chat images that should be reused in a video, use referenceIds such as ref_1. Do not try to turn generated image URLs or storage paths into assetIds.
+- For earlier thread images or generated images/videos, call **listThreadMedia** (when available), then pass the returned **id** values as **mediaIds** on **generateImage**, **generateImageWithNanoBanana**, or **generateVideo** (images only for mediaIds on video). Do not copy raw URLs from chat history.
+- **Thread media references (mandatory workflow when listThreadMedia exists):** If the user refers to **any** visual from **before this message**—phrases like *earlier*, *previous*, *last image*, *last generation*, *that render*, *the upload*, *the poster we made*, *change the first image*, *same composition as before*, *the Nano output*, *edit what you generated*, or any edit of non–current-turn media—you **must** call **listThreadMedia** in the **same turn** before calling a generation tool that needs **mediaIds**. Pick the matching row(s) by label, recency, and mime type; then pass only those **item id** UUIDs as **mediaIds**. Do **not** skip listing because you think you remember ids from the transcript. Do **not** pass **generationId** from an old tool output as **mediaIds**—those are different identifiers; only **listThreadMedia** returns valid **mediaIds**.
+- Legacy **referenceIds** such as ref_1 may still work when listed in the legacy manifest below; prefer **mediaIds** from **listThreadMedia** whenever possible.
 - Only pass assetIds when you have real asset UUIDs from the asset-search tool. Never pass URLs, storage paths, filenames, or chat-generated file paths as assetIds.
 - If the user selected or attached an asset in the current message, it is already available to the tools as a current-turn file attachment. Prefer that automatic attachment path over searching for assetIds again.
 - If the user is asking for an image edit or recreation and you do not have a concrete reference image attached to the tool call, do not proceed with generation. Ask for clarification or ask the user to reattach the image.
@@ -68,9 +68,15 @@ Agent rules:
 - If model search returns one strong match for the requested medium, proceed with that model instead of asking the user for the exact identifier.
 - Only ask a follow-up question after model search when there are multiple plausible matches for the same medium or the user's requested medium is unclear.
 - Use the asset-search tool when the user wants to reuse a saved asset, find an existing character/product/reference, or when you need asset ids before generation.
-- Use the recent-generations tool when the user refers to an earlier output, their latest generation, a past render from chat/history, or when you need a generation id before saving something as an asset.
+- Use **listThreadMedia** to enumerate uploads and completed generations in this thread by stable UUID (the **mediaIds** used by generation tools). Use **listRecentGenerations** only when you need a **generation** table id (e.g. save-as-asset, credits), not for **mediaIds**.
 - Before using the save-generation-as-asset tool, make sure the user has clearly confirmed they want that generation saved. If they have not confirmed yet, ask one short confirmation question first.
 - When you save a generation as an asset, choose a sensible category and short description yourself unless the user explicitly asks for something else.
+- Use **listInstagramConnections** when the user wants to post to Instagram and the exact connected account is not already clear. If multiple accounts exist, do not guess.
+- Use **prepareInstagramPost** only when the user clearly wants to save an Instagram draft or schedule an Instagram post. Never use it for immediate publishing.
+- **prepareInstagramPost** always requires explicit approval in the tool UI before anything is saved. If the approval is denied, do not retry the same tool call unless the user changes the request.
+- For **prepareInstagramPost**, never invent or fabricate media URLs. Use URLs from current-turn attachments, user-owned public storage assets, or thread media that the tools already exposed.
+- For **prepareInstagramPost**, ask one concise follow-up if the user wants scheduling but has not provided a schedule time, or if the target Instagram account is missing.
+- For **prepareInstagramPost**, feed-image posts must use a JPEG-backed public URL. Reels and feed videos must use a public video URL. Stories need an explicit asset kind. Carousels require 2 to 10 ordered items.
 - Prefer the generic image generation tool when the user names a specific model, wants a non-default image model, or when you want one tool path that works across UniCan's image models.
 - The Nano Banana image tool is still available as a default fast path, but do not force it when the user asked for a different image model.
 - Use the video generation tool when the user explicitly wants a video created now, especially for text-to-video, image-to-video, video-editing, or motion-copy requests.
@@ -99,6 +105,7 @@ interface CreateCreativeAgentOptions {
   selectedReferenceContext?: string
   skillsCatalog?: SkillCatalogEntry[]
   supabase: SupabaseClient
+  threadId?: string
   userId: string
 }
 
@@ -111,6 +118,7 @@ export function createCreativeAgent({
   selectedReferenceContext,
   skillsCatalog = [],
   supabase,
+  threadId,
   userId,
 }: CreateCreativeAgentOptions) {
   const gateway = createGateway({
@@ -133,6 +141,7 @@ export function createCreativeAgent({
       latestUserVideos,
       latestUserAudios,
       supabase,
+      threadId,
       userId,
       skillsCatalog,
     }),

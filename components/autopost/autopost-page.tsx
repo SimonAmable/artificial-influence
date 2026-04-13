@@ -3,23 +3,29 @@
 import * as React from "react"
 import { useSearchParams } from "next/navigation"
 import {
+  AlertTriangle,
   Calendar as CalendarIcon,
   CalendarClock,
   Film,
   ImageIcon,
+  Layers,
   LayoutList,
   Link2,
   Loader2,
+  RefreshCw,
   ShieldCheck,
+  Sparkles,
   Trash2,
   Upload,
   UserRound,
   Zap,
 } from "lucide-react"
-import { format, isBefore, startOfDay, startOfToday } from "date-fns"
+import { format, formatDistanceToNow, isBefore, startOfDay, startOfToday } from "date-fns"
 import { toast } from "sonner"
 
+import type { AutopostJobMetadata } from "@/lib/autopost/types"
 import { ensureJpegForInstagramFeed } from "@/lib/autopost/convert-image-for-instagram"
+import type { InstagramSavedProfile } from "@/lib/instagram/profile"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import {
   AlertDialog,
@@ -55,18 +61,36 @@ import {
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 
 const AUTOPOST_MEDIA_FOLDER = "autopost-drafts"
 
-function inferDraftMediaType(file: File): "image" | "reel" | null {
+type PostFormat = "feed_image" | "feed_video" | "reel" | "carousel" | "story"
+
+function inferFileKind(file: File): "image" | "video" | null {
   if (file.type.startsWith("image/")) {
     return "image"
   }
   if (file.type.startsWith("video/")) {
-    return "reel"
+    return "video"
   }
   return null
+}
+
+function postFormatToApiMediaType(format: PostFormat): "image" | "feed_video" | "reel" | "carousel" | "story" {
+  switch (format) {
+    case "feed_image":
+      return "image"
+    case "feed_video":
+      return "feed_video"
+    case "reel":
+      return "reel"
+    case "carousel":
+      return "carousel"
+    case "story":
+      return "story"
+  }
 }
 
 function defaultScheduleDate() {
@@ -85,6 +109,7 @@ export type AutopostJobRow = {
   media_url: string
   caption: string | null
   media_type: string
+  metadata?: AutopostJobMetadata | null
   status: string
   scheduled_at: string | null
   published_at: string | null
@@ -93,6 +118,8 @@ export type AutopostJobRow = {
   last_error: string | null
   provider_publish_id: string | null
   provider_container_id: string | null
+  instagram_connection_id: string | null
+  instagram_username: string | null
 }
 
 function formatLocal(iso: string) {
@@ -139,16 +166,90 @@ function scheduledVsPublishedNote(job: AutopostJobRow): string | null {
   return `Originally scheduled for ${formatLocal(job.scheduled_at)}`
 }
 
+/** Label for which IG account a job targets (shown prominently in the list). */
+function jobAccountLabel(job: AutopostJobRow): string {
+  const u = job.instagram_username?.trim()
+  if (u) {
+    return `@${u}`
+  }
+  if (job.instagram_connection_id) {
+    return `Account ${job.instagram_connection_id.slice(0, 8)}…`
+  }
+  return "No Instagram link (legacy or disconnected)"
+}
+
+const AUTOPOST_COMPOSER_ACCOUNT_KEY = "autopost-composer-instagram-connection-id"
+
+function mediaTypeLabel(mediaType: string): string {
+  switch (mediaType) {
+    case "image":
+      return "Feed photo"
+    case "feed_video":
+      return "Feed video"
+    case "reel":
+      return "Reel"
+    case "carousel":
+      return "Carousel"
+    case "story":
+      return "Story"
+    default:
+      return mediaType
+  }
+}
+
+function jobListThumbnailIsVideo(job: AutopostJobRow): boolean {
+  const t = job.media_type
+  if (t === "reel" || t === "feed_video") {
+    return true
+  }
+  if (t === "story") {
+    return job.metadata?.assetKind === "video"
+  }
+  if (t === "carousel") {
+    return job.metadata?.carouselItems?.[0]?.kind === "video"
+  }
+  return false
+}
+
+const TOKEN_EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000
+
+function instagramTokenExpiryBanner(tokenExpiresAt: string | null): {
+  variant: "expired" | "soon"
+  body: string
+} | null {
+  if (!tokenExpiresAt) return null
+  const expires = new Date(tokenExpiresAt)
+  const t = expires.getTime()
+  if (!Number.isFinite(t)) return null
+  const now = Date.now()
+  if (t <= now) {
+    return {
+      variant: "expired",
+      body: "Access token expired. Disconnect and connect Instagram again to keep publishing.",
+    }
+  }
+  if (t - now > TOKEN_EXPIRY_WARNING_MS) return null
+  const when = expires.toLocaleString()
+  return {
+    variant: "soon",
+    body: `Token expires ${formatDistanceToNow(expires, { addSuffix: true })} (${when}). Reconnect before then to avoid interruptions.`,
+  }
+}
+
+type InstagramConnectionItem = {
+  id: string
+  instagramUsername: string | null
+  instagramUserId: string | null
+  accountType: string | null
+  profile: InstagramSavedProfile | null
+  provider: string | null
+  tokenExpiresAt: string | null
+  updatedAt: string
+}
+
 type InstagramConnectionStatus = {
   connected: boolean
-  connection?: {
-    instagramUsername: string | null
-    instagramUserId: string | null
-    accountType: string | null
-    provider: string | null
-    tokenExpiresAt: string | null
-    updatedAt: string
-  }
+  connections: InstagramConnectionItem[]
 }
 
 function statusLabel(status: string) {
@@ -192,9 +293,14 @@ export function AutopostPage() {
   const [status, setStatus] = React.useState<InstagramConnectionStatus | null>(null)
   const [isLoadingStatus, setIsLoadingStatus] = React.useState(true)
   const [isDisconnecting, setIsDisconnecting] = React.useState(false)
+  const [refreshingConnectionId, setRefreshingConnectionId] = React.useState<string | null>(null)
+  const [selectedComposerConnectionId, setSelectedComposerConnectionId] = React.useState<string | null>(null)
   const [caption, setCaption] = React.useState("")
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
+  const [postFormat, setPostFormat] = React.useState<PostFormat>("feed_image")
+  const [selectedFiles, setSelectedFiles] = React.useState<File[]>([])
+  const [previewUrls, setPreviewUrls] = React.useState<string[]>([])
+  const [shareReelToFeed, setShareReelToFeed] = React.useState(true)
+  const [reelCoverUrl, setReelCoverUrl] = React.useState("")
   const [composerTab, setComposerTab] = React.useState<"now" | "schedule">("now")
   const [scheduleDate, setScheduleDate] = React.useState(defaultScheduleDate)
   const [schedulePickerOpen, setSchedulePickerOpen] = React.useState(false)
@@ -204,18 +310,30 @@ export function AutopostPage() {
   const [isPostingDraft, setIsPostingDraft] = React.useState(false)
   const [actionJobId, setActionJobId] = React.useState<string | null>(null)
 
-  const [disconnectDialogOpen, setDisconnectDialogOpen] = React.useState(false)
+  const [disconnectTargetId, setDisconnectTargetId] = React.useState<string | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const searchParams = useSearchParams()
   const hasHandledAuthParams = React.useRef(false)
 
   React.useEffect(() => {
     return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl)
-      }
+      previewUrls.forEach((u) => URL.revokeObjectURL(u))
     }
-  }, [previewUrl])
+  }, [previewUrls])
+
+  React.useEffect(() => {
+    setSelectedFiles([])
+    setPreviewUrls((prev) => {
+      prev.forEach((u) => URL.revokeObjectURL(u))
+      return []
+    })
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+    if (postFormat === "story") {
+      setCaption("")
+    }
+  }, [postFormat])
 
   const fetchStatus = React.useCallback(async () => {
     setIsLoadingStatus(true)
@@ -227,14 +345,62 @@ export function AutopostPage() {
         throw new Error("error" in data && data.error ? data.error : "Failed to load Instagram connection status.")
       }
 
-      setStatus(data as InstagramConnectionStatus)
+      const payload = data as InstagramConnectionStatus
+      setStatus({
+        connected: payload.connected,
+        connections: payload.connections ?? [],
+      })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load Instagram status")
-      setStatus({ connected: false })
+      setStatus({ connected: false, connections: [] })
     } finally {
       setIsLoadingStatus(false)
     }
   }, [])
+
+  const handleRefreshProfile = React.useCallback(
+    async (connectionId: string) => {
+      setRefreshingConnectionId(connectionId)
+      try {
+        const response = await fetch("/api/instagram/refresh-profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ connectionId }),
+        })
+        const data = (await response.json()) as { ok?: boolean; error?: string }
+        if (!response.ok) {
+          throw new Error(data.error || "Could not refresh Instagram profile.")
+        }
+        toast.success("Profile data updated.")
+        void fetchStatus()
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not refresh profile")
+      } finally {
+        setRefreshingConnectionId(null)
+      }
+    },
+    [fetchStatus]
+  )
+
+  React.useEffect(() => {
+    const list = status?.connections ?? []
+    if (list.length === 0) {
+      setSelectedComposerConnectionId(null)
+      return
+    }
+    setSelectedComposerConnectionId((current) => {
+      if (current && list.some((c) => c.id === current)) {
+        return current
+      }
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem(AUTOPOST_COMPOSER_ACCOUNT_KEY)
+        if (stored && list.some((c) => c.id === stored)) {
+          return stored
+        }
+      }
+      return list[0].id
+    })
+  }, [status?.connections])
 
   const fetchJobs = React.useCallback(async () => {
     setIsLoadingJobs(true)
@@ -291,15 +457,26 @@ export function AutopostPage() {
   }
 
   const handleDisconnect = async () => {
+    if (!disconnectTargetId) {
+      return
+    }
+    const id = disconnectTargetId
     setIsDisconnecting(true)
     try {
-      const response = await fetch("/api/instagram/disconnect", { method: "POST" })
+      const response = await fetch("/api/instagram/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connectionId: id }),
+      })
       const data = (await response.json()) as { error?: string }
       if (!response.ok) {
         throw new Error(data.error || "Failed to disconnect Instagram account.")
       }
       toast.success("Instagram account disconnected.")
-      setDisconnectDialogOpen(false)
+      setDisconnectTargetId(null)
+      if (typeof window !== "undefined" && localStorage.getItem(AUTOPOST_COMPOSER_ACCOUNT_KEY) === id) {
+        localStorage.removeItem(AUTOPOST_COMPOSER_ACCOUNT_KEY)
+      }
       await fetchStatus()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to disconnect Instagram account")
@@ -309,42 +486,42 @@ export function AutopostPage() {
   }
 
   const handleMediaFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null
-    if (!file) {
-      setSelectedFile(null)
-      setPreviewUrl((previous) => {
-        if (previous) {
-          URL.revokeObjectURL(previous)
-        }
-        return null
+    const isCarousel = postFormat === "carousel"
+    const picked = isCarousel ? Array.from(event.target.files ?? []) : event.target.files?.[0] ? [event.target.files[0]] : []
+
+    if (picked.length === 0) {
+      setSelectedFiles([])
+      setPreviewUrls((previous) => {
+        previous.forEach((u) => URL.revokeObjectURL(u))
+        return []
       })
       return
     }
 
-    if (!inferDraftMediaType(file)) {
-      toast.error("Use an image (JPEG, PNG, WebP, GIF) or a video (MP4, MOV).")
-      event.target.value = ""
-      return
+    for (const file of picked) {
+      if (!inferFileKind(file)) {
+        toast.error("Use images (JPEG, PNG, WebP, GIF) or video (MP4, MOV).")
+        event.target.value = ""
+        return
+      }
     }
 
-    setPreviewUrl((previous) => {
-      if (previous) {
-        URL.revokeObjectURL(previous)
-      }
-      return URL.createObjectURL(file)
+    setPreviewUrls((previous) => {
+      previous.forEach((u) => URL.revokeObjectURL(u))
+      return picked.map((file) => URL.createObjectURL(file))
     })
-    setSelectedFile(file)
+    setSelectedFiles(picked)
   }
 
   const resetComposer = () => {
     setCaption("")
-    setSelectedFile(null)
-    setPreviewUrl((previous) => {
-      if (previous) {
-        URL.revokeObjectURL(previous)
-      }
-      return null
+    setSelectedFiles([])
+    setPreviewUrls((previous) => {
+      previous.forEach((u) => URL.revokeObjectURL(u))
+      return []
     })
+    setShareReelToFeed(true)
+    setReelCoverUrl("")
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -352,8 +529,8 @@ export function AutopostPage() {
   }
 
   const uploadAndCreateDraft = async (scheduledAtIso: string | null) => {
-    if (!selectedFile) {
-      toast.error("Choose a media file first.")
+    if (selectedFiles.length === 0) {
+      toast.error("Choose media first.")
       return null
     }
 
@@ -362,36 +539,111 @@ export function AutopostPage() {
       return null
     }
 
-    const mediaType = inferDraftMediaType(selectedFile)
-    if (!mediaType) {
+    if (!selectedComposerConnectionId) {
+      toast.error("Select an Instagram account for this post.")
+      return null
+    }
+
+    const apiMediaType = postFormatToApiMediaType(postFormat)
+
+    if (postFormat === "carousel") {
+      if (selectedFiles.length < 2 || selectedFiles.length > 10) {
+        toast.error("Carousel needs between 2 and 10 images or videos.")
+        return null
+      }
+    } else if (selectedFiles.length !== 1) {
+      toast.error("Select a single file for this post type.")
+      return null
+    }
+
+    const single = selectedFiles[0]
+    const singleKind = inferFileKind(single)
+    if (!singleKind) {
       toast.error("Unsupported media type.")
       return null
     }
 
-    let fileToUpload: File = selectedFile
-    if (mediaType === "image") {
-      try {
-        fileToUpload = await ensureJpegForInstagramFeed(selectedFile)
-      } catch (conversionError) {
-        toast.error(
-          conversionError instanceof Error ? conversionError.message : "Could not convert image to JPEG."
-        )
-        return null
-      }
+    if (postFormat === "feed_image" && singleKind !== "image") {
+      toast.error("Feed photo requires an image file.")
+      return null
     }
-
-    const uploaded = await uploadFileToSupabase(fileToUpload, AUTOPOST_MEDIA_FOLDER)
-    if (!uploaded) {
+    if (postFormat === "feed_video" && singleKind !== "video") {
+      toast.error("Feed video requires a video file.")
+      return null
+    }
+    if (postFormat === "reel" && singleKind !== "video") {
+      toast.error("Reels require a video file.")
+      return null
+    }
+    if (postFormat === "story" && singleKind !== "image" && singleKind !== "video") {
+      toast.error("Story requires an image or video.")
       return null
     }
 
     const body: Record<string, unknown> = {
-      mediaUrl: uploaded.url,
       caption,
-      mediaType,
+      mediaType: apiMediaType,
+      instagramConnectionId: selectedComposerConnectionId,
     }
     if (scheduledAtIso) {
       body.scheduledAt = scheduledAtIso
+    }
+
+    if (postFormat === "carousel") {
+      const carouselItems: { url: string; kind: "image" | "video" }[] = []
+      for (const file of selectedFiles) {
+        const k = inferFileKind(file)
+        if (!k) {
+          toast.error("Unsupported file in carousel.")
+          return null
+        }
+        let fileToUpload = file
+        if (k === "image") {
+          try {
+            fileToUpload = await ensureJpegForInstagramFeed(file)
+          } catch (conversionError) {
+            toast.error(
+              conversionError instanceof Error ? conversionError.message : "Could not convert image to JPEG."
+            )
+            return null
+          }
+        }
+        const uploaded = await uploadFileToSupabase(fileToUpload, AUTOPOST_MEDIA_FOLDER)
+        if (!uploaded) {
+          return null
+        }
+        carouselItems.push({ url: uploaded.url, kind: k })
+      }
+      body.carouselItems = carouselItems
+    } else {
+      let fileToUpload: File = single
+      if (singleKind === "image") {
+        try {
+          fileToUpload = await ensureJpegForInstagramFeed(single)
+        } catch (conversionError) {
+          toast.error(
+            conversionError instanceof Error ? conversionError.message : "Could not convert image to JPEG."
+          )
+          return null
+        }
+      }
+      const uploaded = await uploadFileToSupabase(fileToUpload, AUTOPOST_MEDIA_FOLDER)
+      if (!uploaded) {
+        return null
+      }
+      body.mediaUrl = uploaded.url
+      if (postFormat === "story") {
+        body.assetKind = singleKind
+      }
+      if (postFormat === "reel") {
+        if (!shareReelToFeed) {
+          body.shareToFeed = false
+        }
+        const cover = reelCoverUrl.trim()
+        if (cover) {
+          body.coverUrl = cover
+        }
+      }
     }
 
     const draftResponse = await fetch("/api/autopost/drafts", {
@@ -411,7 +663,7 @@ export function AutopostPage() {
       throw new Error("Draft saved but missing job id.")
     }
 
-    return { jobId, mediaType }
+    return { jobId, mediaType: apiMediaType }
   }
 
   const handlePublishNow = async () => {
@@ -424,9 +676,9 @@ export function AutopostPage() {
 
       const { jobId, mediaType } = result
 
-      if (mediaType === "reel") {
-        toast.message("Publishing reel…", {
-          description: "Instagram may take up to a few minutes to process the video.",
+      if (mediaType === "reel" || mediaType === "feed_video" || mediaType === "carousel") {
+        toast.message("Publishing…", {
+          description: "Instagram may take a few minutes to process video or multi-slide posts.",
         })
       }
 
@@ -482,9 +734,9 @@ export function AutopostPage() {
   const handlePublishJobFromList = async (job: AutopostJobRow) => {
     setActionJobId(job.id)
     try {
-      if (job.media_type === "reel") {
-        toast.message("Publishing reel…", {
-          description: "Instagram may take up to a few minutes to process the video.",
+      if (job.media_type === "reel" || job.media_type === "feed_video" || job.media_type === "carousel") {
+        toast.message("Publishing…", {
+          description: "Instagram may take a few minutes to process video or multi-slide posts.",
         })
       }
       const body =
@@ -547,8 +799,13 @@ export function AutopostPage() {
     }
   }
 
-  const connection = status?.connection
-  const isConnected = Boolean(status?.connected)
+  const connections = status?.connections ?? []
+  const isConnected = connections.length > 0
+
+  const composerReady =
+    postFormat === "carousel"
+      ? selectedFiles.length >= 2 && selectedFiles.length <= 10
+      : selectedFiles.length === 1
 
   return (
     <div className="min-h-screen bg-background px-4 pb-6 pt-20 md:pt-24">
@@ -579,41 +836,155 @@ export function AutopostPage() {
             ) : (
               <div className="space-y-3">
                 <Badge variant={isConnected ? "default" : "outline"}>
-                  {isConnected ? "Connected" : "Not connected"}
+                  {isConnected
+                    ? `${connections.length} account${connections.length === 1 ? "" : "s"} connected`
+                    : "Not connected"}
                 </Badge>
                 {isConnected ? (
-                  <div className="rounded-xl border border-border/80 bg-muted/30 p-4 shadow-sm">
-                    <div className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
-                      <UserRound className="h-4 w-4 text-muted-foreground" aria-hidden />
-                      <span>Linked Instagram account</span>
-                      <Badge variant="secondary" className="ml-auto text-xs font-normal">
-                        Active
-                      </Badge>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2.5">
-                        <p className="text-xs font-medium text-muted-foreground">Username</p>
-                        <p className="mt-0.5 text-sm text-foreground">{connection?.instagramUsername || "Unknown"}</p>
-                      </div>
-                      <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2.5">
-                        <p className="text-xs font-medium text-muted-foreground">Instagram ID</p>
-                        <p className="mt-0.5 break-all text-sm text-foreground">
-                          {connection?.instagramUserId || "Unknown"}
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2.5">
-                        <p className="text-xs font-medium text-muted-foreground">Account type</p>
-                        <p className="mt-0.5 text-sm text-foreground">{connection?.accountType || "Unknown"}</p>
-                      </div>
-                      <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2.5">
-                        <p className="text-xs font-medium text-muted-foreground">Token expires</p>
-                        <p className="mt-0.5 text-sm text-foreground">
-                          {connection?.tokenExpiresAt
-                            ? new Date(connection.tokenExpiresAt).toLocaleString()
-                            : "Not provided"}
-                        </p>
-                      </div>
-                    </div>
+                  <div className="flex flex-col gap-4">
+                    {connections.map((connection) => {
+                      const tokenBanner = instagramTokenExpiryBanner(connection.tokenExpiresAt)
+                      const profile = connection.profile
+                      return (
+                        <div
+                          key={connection.id}
+                          className="rounded-xl border border-border/80 bg-muted/30 p-4 shadow-sm"
+                        >
+                          <div className="flex gap-3 sm:gap-4">
+                            {profile?.profile_picture_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- remote Instagram CDN URL from Graph API
+                              <img
+                                src={profile.profile_picture_url}
+                                alt=""
+                                className="h-14 w-14 shrink-0 rounded-full border border-border/80 object-cover"
+                                width={56}
+                                height={56}
+                              />
+                            ) : (
+                              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-border/80 bg-muted">
+                                <UserRound className="h-7 w-7 text-muted-foreground" aria-hidden />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1 space-y-2">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div className="min-w-0 space-y-0.5">
+                                  <p className="font-semibold leading-tight text-foreground">
+                                    {profile?.name?.trim() ||
+                                      (connection.instagramUsername
+                                        ? `@${connection.instagramUsername}`
+                                        : "Instagram")}
+                                  </p>
+                                  {connection.instagramUsername ? (
+                                    <a
+                                      href={`https://www.instagram.com/${connection.instagramUsername}/`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-sm text-primary underline-offset-4 hover:underline"
+                                    >
+                                      instagram.com/{connection.instagramUsername}
+                                    </a>
+                                  ) : null}
+                                </div>
+                                <div className="flex shrink-0 items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon-sm"
+                                    className="shrink-0"
+                                    disabled={refreshingConnectionId === connection.id}
+                                    aria-label={`Refresh profile for ${connection.instagramUsername ?? "account"}`}
+                                    onClick={() => void handleRefreshProfile(connection.id)}
+                                  >
+                                    <RefreshCw
+                                      className={cn(
+                                        "h-3.5 w-3.5",
+                                        refreshingConnectionId === connection.id && "animate-spin"
+                                      )}
+                                      aria-hidden
+                                    />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="shrink-0"
+                                    disabled={isDisconnecting}
+                                    onClick={() => setDisconnectTargetId(connection.id)}
+                                  >
+                                    Disconnect
+                                  </Button>
+                                </div>
+                              </div>
+                              {profile?.biography ? (
+                                <p className="line-clamp-3 text-sm text-muted-foreground">{profile.biography}</p>
+                              ) : null}
+                              {profile &&
+                              (profile.followers_count != null ||
+                                profile.follows_count != null ||
+                                profile.media_count != null) ? (
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                  {profile.followers_count != null ? (
+                                    <span>
+                                      <span className="font-medium text-foreground">
+                                        {profile.followers_count.toLocaleString()}
+                                      </span>{" "}
+                                      followers
+                                    </span>
+                                  ) : null}
+                                  {profile.follows_count != null ? (
+                                    <span>
+                                      <span className="font-medium text-foreground">
+                                        {profile.follows_count.toLocaleString()}
+                                      </span>{" "}
+                                      following
+                                    </span>
+                                  ) : null}
+                                  {profile.media_count != null ? (
+                                    <span>
+                                      <span className="font-medium text-foreground">
+                                        {profile.media_count.toLocaleString()}
+                                      </span>{" "}
+                                      posts
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              {profile?.website ? (
+                                <a
+                                  href={
+                                    profile.website.startsWith("http")
+                                      ? profile.website
+                                      : `https://${profile.website}`
+                                  }
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-block max-w-full truncate text-xs text-primary underline-offset-4 hover:underline"
+                                >
+                                  {profile.website}
+                                </a>
+                              ) : null}
+                            </div>
+                          </div>
+                          {tokenBanner ? (
+                            <div
+                              role="alert"
+                              className={cn(
+                                "mt-3 flex gap-2 rounded-lg border px-3 py-2.5 text-sm",
+                                tokenBanner.variant === "expired"
+                                  ? "border-destructive/50 bg-destructive/10 text-destructive"
+                                  : "border-amber-500/45 bg-amber-500/10 text-amber-950 dark:text-amber-100"
+                              )}
+                            >
+                              <AlertTriangle
+                                className="mt-0.5 h-4 w-4 shrink-0 opacity-90"
+                                aria-hidden
+                              />
+                              <p className="min-w-0 leading-snug">{tokenBanner.body}</p>
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    })}
                   </div>
                 ) : (
                   <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
@@ -629,13 +1000,6 @@ export function AutopostPage() {
           </CardContent>
           <CardFooter className="gap-2">
             <Button onClick={handleConnect}>Connect Instagram</Button>
-            <Button
-              variant="outline"
-              onClick={() => setDisconnectDialogOpen(true)}
-              disabled={!isConnected || isDisconnecting}
-            >
-              Disconnect
-            </Button>
           </CardFooter>
         </Card>
 
@@ -647,40 +1011,154 @@ export function AutopostPage() {
                 Draft Composer
               </CardTitle>
               <CardDescription>
-                Images are converted to JPEG before upload for Instagram feed rules. Use MP4/MOV for reels.
+                Choose a post type, then upload media. Images are converted to JPEG where required. Carousels are
+                multi-slide feed posts (not Reels).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
+                <Label htmlFor="autopost-post-type">Post type</Label>
+                <Select
+                  value={postFormat}
+                  onValueChange={(v) => setPostFormat(v as PostFormat)}
+                  disabled={!isConnected || connections.length === 0}
+                >
+                  <SelectTrigger id="autopost-post-type" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-120">
+                    <SelectItem value="feed_image">Feed photo</SelectItem>
+                    <SelectItem value="feed_video">Feed video</SelectItem>
+                    <SelectItem value="reel">Reel</SelectItem>
+                    <SelectItem value="carousel">Carousel (feed)</SelectItem>
+                    <SelectItem value="story">Story</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Reels are single videos. Carousel = up to 10 slides on the feed. Stories expire after 24h.
+                </p>
+              </div>
+
+              {postFormat === "reel" ? (
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="autopost-reel-feed"
+                    checked={shareReelToFeed}
+                    onCheckedChange={(c) => setShareReelToFeed(c === true)}
+                    className="mt-0.5"
+                  />
+                  <div className="space-y-0.5">
+                    <Label htmlFor="autopost-reel-feed" className="cursor-pointer font-normal leading-snug">
+                      Also show this reel on the main feed
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      When off, Meta may still surface the reel in Reels only (per Instagram rules).
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="space-y-2">
+                <Label htmlFor="autopost-account">Instagram account</Label>
+                <Select
+                  value={selectedComposerConnectionId ?? undefined}
+                  onValueChange={(value) => {
+                    setSelectedComposerConnectionId(value)
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem(AUTOPOST_COMPOSER_ACCOUNT_KEY, value)
+                    }
+                  }}
+                  disabled={!isConnected || connections.length === 0}
+                >
+                  <SelectTrigger id="autopost-account" className="w-full">
+                    <SelectValue placeholder={isConnected ? "Select account" : "Connect Instagram first"} />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-120">
+                    {connections.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.instagramUsername ? `@${c.instagramUsername}` : c.instagramUserId ?? "Account"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  New posts and drafts are saved for the account you pick here.
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="autopost-media">Media</Label>
                 <Input
+                  key={postFormat}
                   id="autopost-media"
                   ref={fileInputRef}
                   type="file"
                   accept="image/*,video/*"
+                  multiple={postFormat === "carousel"}
                   className="cursor-pointer"
                   onChange={handleMediaFileChange}
                 />
                 <p className="text-xs text-muted-foreground">
-                  PNG/WebP/GIF are converted to JPEG (transparent areas become white). Public URL for Instagram (
+                  {postFormat === "carousel"
+                    ? "Select 2–10 images and/or videos. Order is preserved."
+                    : "One image or one video depending on post type."}{" "}
+                  PNG/WebP/GIF are converted to JPEG where needed (
                   <span className="text-foreground/80">max 10 MB</span> upload).
                 </p>
               </div>
 
-              {previewUrl && selectedFile?.type.startsWith("image/") ? (
+              {postFormat === "reel" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="autopost-reel-cover">Cover image URL (optional)</Label>
+                  <Input
+                    id="autopost-reel-cover"
+                    value={reelCoverUrl}
+                    onChange={(e) => setReelCoverUrl(e.target.value)}
+                    placeholder="https://… (JPEG, public HTTPS)"
+                    className="font-mono text-xs"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Use a public JPEG URL from your uploads (same storage as media).
+                  </p>
+                </div>
+              ) : null}
+
+              {previewUrls.length > 0 && postFormat === "carousel" ? (
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {previewUrls.map((url, i) => {
+                    const file = selectedFiles[i]
+                    const kind = file ? inferFileKind(file) : null
+                    return (
+                      <div
+                        key={`${url}-${i}`}
+                        className="relative aspect-square overflow-hidden rounded-md border bg-muted/30"
+                      >
+                        {kind === "image" ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img alt="" className="h-full w-full object-cover" src={url} />
+                        ) : kind === "video" ? (
+                          <video className="h-full w-full object-cover" src={url} muted playsInline />
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : null}
+
+              {previewUrls.length === 1 && selectedFiles[0]?.type.startsWith("image/") && postFormat !== "carousel" ? (
                 <div className="overflow-hidden rounded-md border bg-muted/30">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     alt="Selected media preview"
                     className="max-h-48 w-full object-contain"
-                    src={previewUrl}
+                    src={previewUrls[0]}
                   />
                 </div>
               ) : null}
 
-              {selectedFile && !selectedFile.type.startsWith("image/") ? (
+              {selectedFiles.length === 1 && selectedFiles[0] && !selectedFiles[0].type.startsWith("image/") ? (
                 <p className="text-sm text-muted-foreground">
-                  Selected: <span className="text-foreground">{selectedFile.name}</span>
+                  Selected: <span className="text-foreground">{selectedFiles[0].name}</span>
                 </p>
               ) : null}
 
@@ -692,7 +1170,13 @@ export function AutopostPage() {
                   onChange={(event) => setCaption(event.target.value)}
                   placeholder="Write your caption..."
                   rows={5}
+                  disabled={postFormat === "story"}
                 />
+                {postFormat === "story" ? (
+                  <p className="text-xs text-muted-foreground">
+                    Story captions are not supported by the Instagram publishing API; compose text in-app if needed.
+                  </p>
+                ) : null}
               </div>
 
               <Tabs value={composerTab} onValueChange={(v) => setComposerTab(v as "now" | "schedule")}>
@@ -714,7 +1198,7 @@ export function AutopostPage() {
                     type="button"
                     className="w-full"
                     onClick={() => void handlePublishNow()}
-                    disabled={!selectedFile || isPostingDraft || !isConnected}
+                    disabled={!composerReady || isPostingDraft || !isConnected || !selectedComposerConnectionId}
                   >
                     {isPostingDraft && composerTab === "now" ? (
                       <>
@@ -834,7 +1318,7 @@ export function AutopostPage() {
                     className="w-full"
                     variant="secondary"
                     onClick={() => void handleSchedulePost()}
-                    disabled={!selectedFile || isPostingDraft || !isConnected}
+                    disabled={!composerReady || isPostingDraft || !isConnected || !selectedComposerConnectionId}
                   >
                     {isPostingDraft && composerTab === "schedule" ? (
                       <>
@@ -860,7 +1344,7 @@ export function AutopostPage() {
                 Your posts
               </CardTitle>
               <CardDescription>
-                Drafts, scheduled, publishing, published, and failed attempts for your account.
+                Drafts through failed attempts. The account badge on each row is where that post will go (or went).
               </CardDescription>
             </CardHeader>
             <CardContent className="min-h-0 flex-1 px-2 sm:px-6">
@@ -878,7 +1362,8 @@ export function AutopostPage() {
                   <ul className="flex flex-col gap-3">
                     {jobs.map((job) => {
                       const busy = actionJobId === job.id
-                      const isImage = job.media_type === "image"
+                      const thumbIsVideo = jobListThumbnailIsVideo(job)
+                      const carouselCount = job.media_type === "carousel" ? job.metadata?.carouselItems?.length : undefined
                       const scheduleNote = scheduledVsPublishedNote(job)
                       return (
                         <li
@@ -887,7 +1372,7 @@ export function AutopostPage() {
                         >
                           <div className="flex gap-3">
                             <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border bg-background">
-                              {isImage ? (
+                              {!thumbIsVideo ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                   alt=""
@@ -904,14 +1389,33 @@ export function AutopostPage() {
                                 />
                               )}
                               <span className="absolute bottom-1 right-1 rounded bg-background/90 px-1 py-0.5 text-[10px] text-muted-foreground">
-                                {job.media_type === "reel" ? (
+                                {job.media_type === "carousel" ? (
+                                  <Layers className="inline h-3 w-3" />
+                                ) : job.media_type === "reel" || job.media_type === "feed_video" ? (
                                   <Film className="inline h-3 w-3" />
+                                ) : job.media_type === "story" ? (
+                                  <Sparkles className="inline h-3 w-3" />
                                 ) : (
                                   <ImageIcon className="inline h-3 w-3" />
                                 )}
                               </span>
                             </div>
-                            <div className="min-w-0 flex-1 space-y-1">
+                            <div className="min-w-0 flex-1 space-y-1.5">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge
+                                  variant="secondary"
+                                  className="max-w-full truncate px-2.5 py-1 text-sm font-semibold tracking-tight"
+                                  title={jobAccountLabel(job)}
+                                >
+                                  {jobAccountLabel(job)}
+                                </Badge>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                {mediaTypeLabel(job.media_type)}
+                                {carouselCount != null && carouselCount > 0
+                                  ? ` · ${carouselCount} slides`
+                                  : ""}
+                              </p>
                               <div className="flex flex-wrap items-center gap-2">
                                 <Badge
                                   variant="outline"
@@ -1014,12 +1518,14 @@ export function AutopostPage() {
       </div>
 
       <AlertDialog
-        open={disconnectDialogOpen}
+        open={disconnectTargetId !== null}
         onOpenChange={(open) => {
           if (!open && isDisconnecting) {
             return
           }
-          setDisconnectDialogOpen(open)
+          if (!open) {
+            setDisconnectTargetId(null)
+          }
         }}
       >
         <AlertDialogContent>
@@ -1027,12 +1533,15 @@ export function AutopostPage() {
             <AlertDialogTitle>Disconnect Instagram?</AlertDialogTitle>
             <AlertDialogDescription>
               This removes the link to{" "}
-              {connection?.instagramUsername ? (
-                <span className="font-medium text-foreground">@{connection.instagramUsername}</span>
+              {connections.find((c) => c.id === disconnectTargetId)?.instagramUsername ? (
+                <span className="font-medium text-foreground">
+                  @
+                  {connections.find((c) => c.id === disconnectTargetId)?.instagramUsername}
+                </span>
               ) : (
-                "your Instagram account"
+                "this Instagram account"
               )}
-              . You will need to connect again before publishing.
+              . You will need to connect again before publishing to it.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

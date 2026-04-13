@@ -55,19 +55,19 @@ export function CanvasHeroSection() {
         >
           <motion.p
             variants={heroFadeUp}
-            className="mb-3 w-full max-w-3xl text-center text-xs font-semibold uppercase tracking-[0.2em] text-zinc-300"
+            className="mb-3 w-full max-w-3xl text-center text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground"
           >
             {landingHero.eyebrow}
           </motion.p>
           <motion.h1
             variants={heroFadeUp}
-            className="w-full max-w-3xl text-balance text-center text-4xl font-extrabold uppercase tracking-tighter leading-tight text-white sm:text-5xl md:text-6xl"
+            className="w-full max-w-3xl text-balance text-center text-4xl font-extrabold uppercase tracking-tighter leading-tight text-foreground sm:text-5xl md:text-6xl"
           >
             {landingHero.title}
           </motion.h1>
           <motion.p
             variants={heroFadeUp}
-            className="mx-auto mt-4 w-full max-w-2xl text-pretty text-center text-sm text-zinc-300 sm:text-base"
+            className="mx-auto mt-4 w-full max-w-2xl text-pretty text-center text-sm text-muted-foreground sm:text-base"
           >
             {landingHero.description}
           </motion.p>
@@ -89,7 +89,7 @@ export function CanvasHeroSection() {
 
           <motion.div
             variants={heroFadeUp}
-            className="mt-8 w-full max-w-sm overflow-hidden rounded-2xl border border-white/20 bg-zinc-950/70 shadow-2xl"
+            className="mt-8 w-full max-w-sm overflow-hidden rounded-2xl border border-border bg-card/90 shadow-xl backdrop-blur-sm"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={mobileWorkflowPreview} alt="Workflow preview" className="h-auto w-full object-cover" />
@@ -106,19 +106,19 @@ export function CanvasHeroSection() {
             >
               <motion.p
                 variants={heroFadeUp}
-                className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-300"
+                className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground"
               >
                 {landingHero.eyebrow}
               </motion.p>
               <motion.h1
                 variants={heroFadeUp}
-                className="text-balance text-4xl font-extrabold uppercase tracking-tighter leading-tight text-white sm:text-5xl md:text-6xl"
+                className="text-balance text-4xl font-extrabold uppercase tracking-tighter leading-tight text-foreground sm:text-5xl md:text-6xl"
               >
                 {landingHero.title}
               </motion.h1>
               <motion.p
                 variants={heroFadeUp}
-                className="mx-auto mt-4 max-w-2xl text-pretty text-sm text-zinc-300 sm:text-base"
+                className="mx-auto mt-4 max-w-2xl text-pretty text-sm text-muted-foreground sm:text-base"
               >
                 {landingHero.description}
               </motion.p>

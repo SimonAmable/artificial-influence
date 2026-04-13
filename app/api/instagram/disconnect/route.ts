@@ -2,7 +2,15 @@ import { NextResponse } from "next/server"
 
 import { createClient } from "@/lib/supabase/server"
 
-export async function POST() {
+function parseConnectionId(body: unknown): string | null {
+  if (!body || typeof body !== "object") {
+    return null
+  }
+  const id = (body as { connectionId?: unknown }).connectionId
+  return typeof id === "string" && id.trim().length > 0 ? id.trim() : null
+}
+
+export async function POST(request: Request) {
   try {
     const supabase = await createClient()
     const {
@@ -14,7 +22,23 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 })
     }
 
-    const { error } = await supabase.from("instagram_connections").delete().eq("user_id", user.id)
+    let json: unknown
+    try {
+      json = await request.json()
+    } catch {
+      return NextResponse.json({ error: "Expected JSON body with connectionId." }, { status: 400 })
+    }
+
+    const connectionId = parseConnectionId(json)
+    if (!connectionId) {
+      return NextResponse.json({ error: "Expected connectionId (string)." }, { status: 400 })
+    }
+
+    const { error } = await supabase
+      .from("instagram_connections")
+      .delete()
+      .eq("id", connectionId)
+      .eq("user_id", user.id)
 
     if (error) {
       console.error("[instagram/disconnect] delete failed:", error)

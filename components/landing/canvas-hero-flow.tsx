@@ -71,7 +71,7 @@ function CanvasMediaNode({ data }: NodeProps<Node<CanvasMediaNodeData>>) {
   return (
     <>
       <div className="absolute bottom-full mb-1.5 left-0">
-        <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           {data.label}
         </span>
       </div>
@@ -234,7 +234,7 @@ function CanvasHeroFlowInner() {
           variant={BackgroundVariant.Dots}
           gap={22}
           size={1}
-          color="rgba(255,255,255,0.14)"
+          color="color-mix(in oklch, var(--foreground) 18%, transparent)"
         />
       </ReactFlow>
     </div>

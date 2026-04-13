@@ -2,13 +2,13 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
 import { encryptAutopostToken } from "@/lib/autopost/crypto"
+import { fetchInstagramMeForLink, type InstagramMeResponse, type InstagramSavedProfile } from "@/lib/instagram/profile"
 import { resolveInstagramOAuthRedirectUri } from "@/lib/instagram/oauth-redirect"
 import { createClient } from "@/lib/supabase/server"
 
 const OAUTH_STATE_COOKIE = "instagram_oauth_state"
 const INSTAGRAM_TOKEN_URL = "https://api.instagram.com/oauth/access_token"
 const INSTAGRAM_LONG_LIVED_TOKEN_URL = "https://graph.instagram.com/access_token"
-const INSTAGRAM_ME_URL = "https://graph.instagram.com/me"
 const PROFESSIONAL_ACCOUNT_TYPES = new Set(["BUSINESS", "CREATOR", "MEDIA_CREATOR"])
 
 type MetaOAuthErrorPayload = {
@@ -22,12 +22,6 @@ type MetaInstagramTokenResponse = {
   token_type?: string
   expires_in?: number
   user_id?: number | string
-}
-
-type MetaInstagramProfileResponse = {
-  id?: string
-  username?: string
-  account_type?: string
 }
 
 async function getJsonResponse<T>(url: string, init?: RequestInit) {
@@ -160,15 +154,26 @@ export async function GET(request: Request) {
       console.warn("[instagram/callback] long-lived token exchange failed:", tokenExchangeError)
     }
 
-    const meUrl = new URL(INSTAGRAM_ME_URL)
-    meUrl.searchParams.set("fields", "id,username,account_type")
-    meUrl.searchParams.set("access_token", tokenPayload.access_token)
+    let me: InstagramMeResponse
+    let savedProfile: InstagramSavedProfile
+    try {
+      const fetched = await fetchInstagramMeForLink(tokenPayload.access_token)
+      me = fetched.me
+      savedProfile = fetched.profile
+    } catch (profileError) {
+      console.error("[instagram/callback] /me profile fetch failed:", profileError)
+      return buildAutopostRedirect(appUrl, {
+        error:
+          profileError instanceof Error
+            ? profileError.message
+            : "Instagram Login succeeded, but we could not read your account profile.",
+      })
+    }
 
-    const profile = await getJsonResponse<MetaInstagramProfileResponse>(meUrl.toString())
-    const accountType = profile.account_type?.toUpperCase() || null
-    const instagramUserId = profile.id || String(shortLivedToken.user_id || "")
+    const accountType = me.account_type?.toUpperCase() || null
+    const instagramUserId = me.id || String(shortLivedToken.user_id || "")
 
-    if (!instagramUserId || !profile.username) {
+    if (!instagramUserId || !me.username) {
       return buildAutopostRedirect(appUrl, {
         error: "Instagram Login succeeded, but we could not read your account profile.",
       })
@@ -191,7 +196,7 @@ export async function GET(request: Request) {
         user_id: user.id,
         provider: "instagram_login",
         instagram_user_id: instagramUserId,
-        instagram_username: profile.username,
+        instagram_username: me.username,
         facebook_page_id: null,
         facebook_page_name: null,
         access_token_encrypted: encryptedToken,
@@ -199,15 +204,16 @@ export async function GET(request: Request) {
         token_expires_at: tokenExpiresAt,
         status: "connected",
         metadata: {
-          account_type: profile.account_type || null,
+          account_type: me.account_type || null,
           connection_method: "instagram_login",
           token_type: tokenPayload.token_type || null,
           token_strategy: tokenStrategy,
+          profile: savedProfile,
         },
         updated_at: new Date().toISOString(),
       },
       {
-        onConflict: "user_id",
+        onConflict: "user_id,instagram_user_id",
       }
     )
 

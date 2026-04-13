@@ -4,16 +4,29 @@ import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import type { UIMessage } from "ai"
-import { DefaultChatTransport } from "ai"
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai"
 import { Chat, useChat } from "@ai-sdk/react"
 import { useRouter } from "next/navigation"
-import { ArrowUp, CircleNotch, ClockCounterClockwise, NotePencil, Palette, Plus, X } from "@phosphor-icons/react"
+import {
+  ArrowUp,
+  CircleNotch,
+  ClockCounterClockwise,
+  FilePlus,
+  FolderOpen,
+  Images,
+  NotePencil,
+  Palette,
+  Plus,
+  X,
+} from "@phosphor-icons/react"
 import { toast } from "sonner"
 import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { SpeechInput } from "@/components/ai-elements/speech-input"
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message"
+import { Shimmer } from "@/components/ai-elements/shimmer"
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion"
 import { ImageGrid } from "@/components/shared/display/image-grid"
+import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
@@ -109,6 +122,9 @@ const STARTER_PROMPTS: { label: string; prompt: string }[] = [
 const IMAGE_FILENAME_EXT = /\.(jpe?g|png|gif|webp|avif|bmp|svg)$/i
 const VIDEO_FILENAME_EXT = /\.(mp4|webm|mov|m4v|mkv)$/i
 const AUDIO_FILENAME_EXT = /\.(mp3|wav|ogg|m4a|aac|flac)$/i
+const MARKDOWN_IMAGE_URL_REGEX = /!\[[^\]]*]\((https?:\/\/[^\s)]+)\)/gi
+const MARKDOWN_LINK_URL_REGEX = /\[[^\]]+\]\((https?:\/\/[^\s)]+)\)/gi
+const RAW_URL_REGEX = /https?:\/\/[^\s<>"')\]]+/gi
 
 type MediaValueType = "image" | "video" | "audio" | "other"
 
@@ -304,6 +320,29 @@ type ListRecentGenerationsToolPart = {
   errorText?: string
 }
 
+type ListThreadMediaToolPart = {
+  type: "tool-listThreadMedia"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    limit?: number
+    mediaKind?: "user_upload" | "generation" | "all"
+  }
+  output?: {
+    threadId?: string
+    count?: number
+    items?: Array<{
+      id: string
+      mediaKind: "user_upload" | "generation"
+      mimeType: string
+      label: string
+      publicUrl: string
+      createdAt: string
+    }>
+  }
+  errorText?: string
+}
+
 type SaveGenerationAsAssetToolPart = {
   type: "tool-saveGenerationAsAsset"
   toolCallId: string
@@ -360,6 +399,96 @@ type GetBrandContextToolPart = {
       name: string
       websiteUrl?: string | null
     }>
+  }
+  errorText?: string
+}
+
+type InstagramConnectionToolSummary = {
+  accountType?: string | null
+  id: string
+  instagramUserId?: string | null
+  instagramUsername?: string | null
+  profileFetchedAt?: string | null
+  tokenExpiresAt?: string | null
+  updatedAt: string
+}
+
+type ListInstagramConnectionsToolPart = {
+  type: "tool-listInstagramConnections"
+  toolCallId: string
+  state:
+    | "input-streaming"
+    | "input-available"
+    | "approval-requested"
+    | "approval-responded"
+    | "output-available"
+    | "output-error"
+    | "output-denied"
+  output?: {
+    connections?: InstagramConnectionToolSummary[]
+    message?: string
+    total?: number
+  }
+  errorText?: string
+}
+
+type PrepareInstagramPostToolInput = {
+  action: "draft" | "schedule"
+  caption?: string
+  carouselItems?: Array<{
+    kind: "image" | "video"
+    url: string
+  }>
+  coverUrl?: string
+  instagramConnectionId: string
+  mediaType: "image" | "feed_video" | "reel" | "carousel" | "story"
+  mediaUrl?: string
+  scheduledAt?: string
+  shareToFeed?: boolean
+  storyAssetKind?: "image" | "video"
+  trialParams?: {
+    graduationStrategy: "MANUAL" | "SS_PERFORMANCE"
+  }
+}
+
+type PrepareInstagramPostToolPart = {
+  type: "tool-prepareInstagramPost"
+  toolCallId: string
+  state:
+    | "input-streaming"
+    | "input-available"
+    | "approval-requested"
+    | "approval-responded"
+    | "output-available"
+    | "output-error"
+    | "output-denied"
+  input?: PrepareInstagramPostToolInput
+  output?: {
+    action: "draft" | "schedule"
+    instagramAccount?: InstagramConnectionToolSummary
+    message?: string
+    post?: {
+      caption?: string | null
+      createdAt: string
+      id: string
+      instagramConnectionId: string
+      mediaType: "image" | "feed_video" | "reel" | "carousel" | "story"
+      mediaUrl: string
+      metadata?: {
+        assetKind?: "image" | "video"
+        carouselItems?: Array<{
+          kind: "image" | "video"
+          url: string
+        }>
+      } | null
+      scheduledAt?: string | null
+      status: string
+    }
+  }
+  approval?: {
+    approved?: boolean
+    id: string
+    reason?: string
   }
   errorText?: string
 }
@@ -460,6 +589,49 @@ function inferMediaTypeFromFile(file: File): MediaValueType {
 
 function inferMediaTypeFromAssetType(assetType: ComposerAssetAttachment["assetType"]): MediaValueType {
   return assetType
+}
+
+function normalizeUrlCandidate(url: string): string | null {
+  const trimmed = url.trim().replace(/[),.;!?]+$/, "")
+  if (!trimmed) return null
+  return trimmed
+}
+
+function isImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return IMAGE_FILENAME_EXT.test(parsed.pathname)
+  } catch {
+    return IMAGE_FILENAME_EXT.test(url)
+  }
+}
+
+function extractInlineImageUrlsFromText(text: string): string[] {
+  const imageUrls = new Set<string>()
+  const markdownImageUrls = new Set<string>()
+
+  for (const match of text.matchAll(MARKDOWN_IMAGE_URL_REGEX)) {
+    const url = normalizeUrlCandidate(match[1] ?? "")
+    if (url) {
+      markdownImageUrls.add(url)
+    }
+  }
+
+  for (const match of text.matchAll(MARKDOWN_LINK_URL_REGEX)) {
+    const url = normalizeUrlCandidate(match[1] ?? "")
+    if (url && !markdownImageUrls.has(url) && isImageUrl(url)) {
+      imageUrls.add(url)
+    }
+  }
+
+  for (const match of text.matchAll(RAW_URL_REGEX)) {
+    const url = normalizeUrlCandidate(match[0] ?? "")
+    if (url && !markdownImageUrls.has(url) && isImageUrl(url)) {
+      imageUrls.add(url)
+    }
+  }
+
+  return Array.from(imageUrls)
 }
 
 function fallbackMediaTypeForAssetType(assetType: ComposerAssetAttachment["assetType"]) {
@@ -906,7 +1078,7 @@ function ImageGenerationResultCard({
           ) : null}
           {effectiveImages.length > 0 ? (
             <div className="overflow-hidden rounded-2xl border border-border/60 bg-background">
-              <ImageGrid images={imageGridImages} className="h-auto" basicActionsOnly />
+              <ImageGrid images={imageGridImages} className="h-auto" basicActionsOnly initialColumnCount={1} />
             </div>
           ) : null}
         </CardContent>
@@ -1153,15 +1325,89 @@ function VideoGenerationResultCard({
   return null
 }
 
-function MessageParts({ message }: { message: UIMessage }) {
+function formatInstagramSchedule(value?: string | null) {
+  if (!value) return null
+
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) {
+    return value
+  }
+
+  return date.toLocaleString()
+}
+
+function InstagramMediaPreview({
+  input,
+}: {
+  input?: PrepareInstagramPostToolInput
+}) {
+  if (!input) {
+    return null
+  }
+
+  const items =
+    input.mediaType === "carousel"
+      ? input.carouselItems ?? []
+      : input.mediaUrl
+        ? [{ kind: input.mediaType === "image" ? "image" : "video", url: input.mediaUrl }]
+        : []
+
+  if (items.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {items.slice(0, 4).map((item, index) =>
+        item.kind === "image" ? (
+          <img
+            key={`${item.url}-${index}`}
+            src={item.url}
+            alt=""
+            className="max-h-48 w-full rounded-xl border border-border/60 object-cover"
+          />
+        ) : (
+          <video
+            key={`${item.url}-${index}`}
+            src={item.url}
+            controls
+            className="max-h-48 w-full rounded-xl border border-border/60 bg-black"
+          />
+        ),
+      )}
+    </div>
+  )
+}
+
+function MessageParts({
+  message,
+  instagramConnectionsById,
+  onToolApprovalResponse,
+}: {
+  message: UIMessage
+  instagramConnectionsById: Map<string, InstagramConnectionToolSummary>
+  onToolApprovalResponse: (approvalId: string, approved: boolean) => void
+}) {
   return (
     <>
       {message.parts.map((part, index) => {
         if (part.type === "text") {
+          const inlineImageUrls = extractInlineImageUrlsFromText(part.text)
           return (
-            <MessageResponse key={`${message.id}-${index}`}>
-              {part.text}
-            </MessageResponse>
+            <div key={`${message.id}-${index}`} className="space-y-3">
+              <MessageResponse>
+                {part.text}
+              </MessageResponse>
+              {inlineImageUrls.map((url) => (
+                <img
+                  key={`${message.id}-${index}-${url}`}
+                  src={url}
+                  alt=""
+                  className="max-h-[480px] w-full rounded-xl border border-border/60 object-contain"
+                  loading="lazy"
+                />
+              ))}
+            </div>
           )
         }
 
@@ -1231,6 +1477,228 @@ function MessageParts({ message }: { message: UIMessage }) {
         if (part.type === "tool-generateVideo") {
           const toolPart = part as GenerateVideoToolPart
           return <VideoGenerationResultCard key={`${message.id}-${index}`} messageId={`${message.id}-${index}`} part={toolPart} />
+        }
+
+        if (part.type === "tool-listInstagramConnections") {
+          const toolPart = part as unknown as ListInstagramConnectionsToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Checking Instagram connections</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      Looking up connected Instagram accounts
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Instagram account lookup failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const connections = toolPart.output?.connections ?? []
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Instagram Accounts</Badge>
+                  {typeof toolPart.output?.total === "number" ? (
+                    <Badge variant="outline">
+                      {toolPart.output.total} result{toolPart.output.total === 1 ? "" : "s"}
+                    </Badge>
+                  ) : null}
+                </div>
+                {toolPart.output?.message ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
+                ) : null}
+                <div className="space-y-2">
+                  {connections.map((connection) => (
+                    <div
+                      key={connection.id}
+                      className="rounded-xl border border-border/60 bg-background/80 p-3"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium">
+                          {connection.instagramUsername || "Unnamed Instagram account"}
+                        </p>
+                        {connection.accountType ? (
+                          <Badge variant="outline">{connection.accountType}</Badge>
+                        ) : null}
+                        <Badge variant="outline">{connection.id.slice(0, 8)}</Badge>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                        <span>Updated {new Date(connection.updatedAt).toLocaleString()}</span>
+                        {connection.tokenExpiresAt ? (
+                          <span>Token expires {new Date(connection.tokenExpiresAt).toLocaleString()}</span>
+                        ) : null}
+                        {connection.profileFetchedAt ? (
+                          <span>Profile fetched {new Date(connection.profileFetchedAt).toLocaleString()}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )
+        }
+
+        if (part.type === "tool-prepareInstagramPost") {
+          const toolPart = part as unknown as PrepareInstagramPostToolPart
+          const resolvedAccount = toolPart.output?.instagramAccount
+            ?? (toolPart.input
+              ? instagramConnectionsById.get(toolPart.input.instagramConnectionId)
+              : undefined)
+          const scheduleLabel =
+            formatInstagramSchedule(toolPart.output?.post?.scheduledAt)
+            ?? formatInstagramSchedule(toolPart.input?.scheduledAt)
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Preparing Instagram post</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      Building the post summary for approval
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "approval-requested") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+                <CardContent className="space-y-4 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>Instagram Approval</Badge>
+                    {toolPart.input?.action ? <Badge variant="outline">{toolPart.input.action}</Badge> : null}
+                    {toolPart.input?.mediaType ? <Badge variant="outline">{toolPart.input.mediaType}</Badge> : null}
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <p className="font-medium">
+                      {resolvedAccount?.instagramUsername || toolPart.input?.instagramConnectionId || "Instagram account"}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {toolPart.input?.action === "schedule"
+                        ? `Schedule this post${scheduleLabel ? ` for ${scheduleLabel}` : ""}?`
+                        : "Save this post as a draft?"}
+                    </p>
+                  </div>
+                  {toolPart.input?.caption ? (
+                    <div className="rounded-xl border border-border/60 bg-background/80 p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Caption</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">
+                        {toolPart.input.caption}
+                      </p>
+                    </div>
+                  ) : null}
+                  <InstagramMediaPreview input={toolPart.input} />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => toolPart.approval?.id && onToolApprovalResponse(toolPart.approval.id, true)}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => toolPart.approval?.id && onToolApprovalResponse(toolPart.approval.id, false)}
+                    >
+                      Deny
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "approval-responded") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Processing approval</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {toolPart.approval?.approved ? "Finishing the Instagram post request" : "Recording the denial"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-denied") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+                <CardContent className="space-y-2 p-4 text-sm">
+                  <p className="font-medium">Instagram post not created</p>
+                  <p className="text-muted-foreground">The approval request was denied, so no post was saved.</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Instagram post failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>{toolPart.output?.post?.status === "queued" ? "Instagram Scheduled" : "Instagram Draft"}</Badge>
+                  {toolPart.output?.post?.mediaType ? <Badge variant="outline">{toolPart.output.post.mediaType}</Badge> : null}
+                  {resolvedAccount?.instagramUsername ? (
+                    <Badge variant="outline">{resolvedAccount.instagramUsername}</Badge>
+                  ) : null}
+                </div>
+                {toolPart.output?.message ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
+                ) : null}
+                {toolPart.output?.post ? (
+                  <div className="rounded-xl border border-border/60 bg-background/80 p-3">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                      <span>Job {toolPart.output.post.id.slice(0, 8)}</span>
+                      <span>Created {new Date(toolPart.output.post.createdAt).toLocaleString()}</span>
+                      {scheduleLabel ? <span>Scheduled {scheduleLabel}</span> : null}
+                    </div>
+                    {toolPart.output.post.caption ? (
+                      <p className="mt-3 whitespace-pre-wrap text-sm text-foreground">
+                        {toolPart.output.post.caption}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <InstagramMediaPreview input={toolPart.input} />
+              </CardContent>
+            </Card>
+          )
         }
 
         if (part.type === "tool-searchModels") {
@@ -1472,6 +1940,104 @@ function MessageParts({ message }: { message: UIMessage }) {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          )
+        }
+
+        if (part.type === "tool-listThreadMedia") {
+          const toolPart = part as ListThreadMediaToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Loading thread media</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {toolPart.input?.mediaKind && toolPart.input.mediaKind !== "all"
+                        ? `Filter: ${toolPart.input.mediaKind}`
+                        : "Listing uploads and generations for this chat"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Thread media list failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const items = toolPart.output?.items ?? []
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="gap-1">
+                    <Images className="h-3.5 w-3.5" aria-hidden />
+                    Thread media
+                  </Badge>
+                  {typeof toolPart.output?.count === "number" ? (
+                    <Badge variant="outline">
+                      {toolPart.output.count} item{toolPart.output.count === 1 ? "" : "s"}
+                    </Badge>
+                  ) : null}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  IDs here are valid <span className="font-mono">mediaIds</span> for image/video tools. Use
+                  listThreadMedia before referencing earlier chat visuals.
+                </p>
+                {items.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No media registered for this thread yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {items.map((item) => {
+                      const isImage = item.mimeType.startsWith("image/")
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex gap-3 rounded-xl border border-border/60 bg-background/80 p-3"
+                        >
+                          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-muted/20">
+                            {isImage ? (
+                              <img
+                                src={item.publicUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center p-1 text-center text-[10px] text-muted-foreground">
+                                {item.mimeType}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="text-sm font-medium leading-snug">{item.label}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline">{item.mediaKind}</Badge>
+                              <Badge variant="outline">{item.mimeType}</Badge>
+                            </div>
+                            <p className="font-mono text-[11px] text-muted-foreground break-all">
+                              {item.id}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {new Date(item.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )
@@ -1795,12 +2361,14 @@ export function CreativeAgentChat({
 }) {
   const router = useRouter()
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+  const [assetModalOpen, setAssetModalOpen] = React.useState(false)
   const [composerDropActive, setComposerDropActive] = React.useState(false)
   const [userId, setUserId] = React.useState<string | null>(null)
   const [authReady, setAuthReady] = React.useState(false)
   const [composerValue, setComposerValue] = React.useState("")
   const [attachedFiles, setAttachedFiles] = React.useState<ComposerUploadAttachment[]>([])
   const [attachedRefs, setAttachedRefs] = React.useState<AttachedRef[]>([])
+  const [instagramConnections, setInstagramConnections] = React.useState<InstagramConnectionToolSummary[]>([])
   const [threadId, setThreadId] = React.useState<string | undefined>(initialThreadId)
   const [isCreatingThread, setIsCreatingThread] = React.useState(false)
   const initialChatId = React.useMemo(() => initialThreadId ?? "creative-chat-draft", [initialThreadId])
@@ -1820,6 +2388,19 @@ export function CreativeAgentChat({
       new Chat({
         id: initialChatId,
         messages: initialMessages,
+        onFinish: () => {
+          const activeThreadId = threadIdRef.current
+
+          if (
+            enablePersistence &&
+            syncUrlOnThreadCreate &&
+            activeThreadId &&
+            window.location.pathname !== `/chat/${activeThreadId}`
+          ) {
+            window.history.replaceState(window.history.state, "", `/chat/${activeThreadId}`)
+          }
+        },
+        sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
         transport: new DefaultChatTransport({
           api: "/api/chat",
           prepareSendMessagesRequest: ({ messages }) => {
@@ -1846,24 +2427,12 @@ export function CreativeAgentChat({
           },
         }),
       }),
-    [enablePersistence, initialChatId, initialMessages],
+    [enablePersistence, initialChatId, initialMessages, syncUrlOnThreadCreate],
   )
 
-  const { messages, sendMessage, setMessages, status, error } = useChat({
+  const { addToolApprovalResponse, messages, sendMessage, setMessages, status, error } = useChat({
     chat,
     experimental_throttle: 50,
-    onFinish: () => {
-      const activeThreadId = threadIdRef.current
-
-      if (
-        enablePersistence &&
-        syncUrlOnThreadCreate &&
-        activeThreadId &&
-        window.location.pathname !== `/chat/${activeThreadId}`
-      ) {
-        window.history.replaceState(window.history.state, "", `/chat/${activeThreadId}`)
-      }
-    },
   })
 
   React.useEffect(() => {
@@ -1895,6 +2464,62 @@ export function CreativeAgentChat({
       subscription.unsubscribe()
     }
   }, [])
+
+  React.useEffect(() => {
+    if (!authReady || !userId) {
+      setInstagramConnections([])
+      return
+    }
+
+    let cancelled = false
+
+    void fetch("/api/instagram/status", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Failed to load Instagram accounts.")
+        }
+        return response.json() as Promise<{
+          connections?: Array<{
+            accountType?: string | null
+            id: string
+            instagramUserId?: string | null
+            instagramUsername?: string | null
+            profileFetchedAt?: string | null
+            tokenExpiresAt?: string | null
+            updatedAt: string
+          }>
+        }>
+      })
+      .then((data) => {
+        if (cancelled) return
+        setInstagramConnections(
+          Array.isArray(data.connections)
+            ? data.connections.map((connection) => ({
+                accountType: connection.accountType ?? null,
+                id: connection.id,
+                instagramUserId: connection.instagramUserId ?? null,
+                instagramUsername: connection.instagramUsername ?? null,
+                profileFetchedAt: connection.profileFetchedAt ?? null,
+                tokenExpiresAt: connection.tokenExpiresAt ?? null,
+                updatedAt: connection.updatedAt,
+              }))
+            : [],
+        )
+      })
+      .catch(() => {
+        if (cancelled) return
+        setInstagramConnections([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [authReady, userId])
+
+  const instagramConnectionsById = React.useMemo(
+    () => new Map(instagramConnections.map((connection) => [connection.id, connection])),
+    [instagramConnections],
+  )
 
   const assetAttachments = React.useMemo<ComposerAssetAttachment[]>(
     () =>
@@ -1973,6 +2598,11 @@ export function CreativeAgentChat({
         )
       }),
     )
+  }, [])
+
+  const handleAssetLibrarySelect = React.useCallback((imageUrl: string) => {
+    setAttachedRefs((prev) => [...prev, attachedRefFromDroppedMediaUrl(imageUrl, "image")])
+    setAssetModalOpen(false)
   }, [])
 
   const handleComposerDragEnter = React.useCallback((event: React.DragEvent<HTMLDivElement>) => {
@@ -2179,6 +2809,7 @@ export function CreativeAgentChat({
   }, [enablePersistence, onThreadIdChange, router, setMessages, threadId])
 
   const showLoggedInEmptyState = authReady && userId && messages.length === 0
+  const showSubmittedLoading = status === "submitted" && messages.length > 0
 
   return (
     <div
@@ -2318,8 +2949,9 @@ export function CreativeAgentChat({
             ) : null}
 
             {showLoggedInEmptyState ? (
-              <div className="flex w-full max-w-2xl flex-col items-center gap-6">
+              <div className="flex w-full max-w-2xl flex-col items-center gap-2">
                 <ConversationEmptyState
+                  className="pb-0"
                   icon={(
                     <span className="flex size-12 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/30">
                       <Image
@@ -2360,7 +2992,16 @@ export function CreativeAgentChat({
                 >
                   {isUserMessage ? (
                     <MessageContent className="max-w-[85%] rounded-[24px] px-4 py-3 shadow-sm">
-                      <MessageParts message={message} />
+                      <MessageParts
+                        message={message}
+                        instagramConnectionsById={instagramConnectionsById}
+                        onToolApprovalResponse={(approvalId, approved) => {
+                          void addToolApprovalResponse({
+                            id: approvalId,
+                            approved,
+                          })
+                        }}
+                      />
                     </MessageContent>
                   ) : (
                     <div className="flex w-full min-w-0 max-w-3xl items-start gap-3">
@@ -2374,13 +3015,41 @@ export function CreativeAgentChat({
                         />
                       </span>
                       <div className="min-w-0 flex-1 space-y-3 text-left text-[15px] leading-7 text-foreground">
-                        <MessageParts message={message} />
+                        <MessageParts
+                          message={message}
+                          instagramConnectionsById={instagramConnectionsById}
+                          onToolApprovalResponse={(approvalId, approved) => {
+                            void addToolApprovalResponse({
+                              id: approvalId,
+                              approved,
+                            })
+                          }}
+                        />
                       </div>
                     </div>
                   )}
                 </Message>
               )
             })}
+
+            {showSubmittedLoading ? (
+              <Message from="assistant" className="mb-2">
+                <div className="flex w-full min-w-0 max-w-3xl items-center gap-3">
+                  <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/40">
+                    <Image
+                      src="/logo.svg"
+                      alt="Website AI"
+                      width={16}
+                      height={16}
+                      className="dark:invert"
+                    />
+                  </span>
+                  <div className="min-w-0 flex-1 text-left text-sm text-foreground">
+                    <Shimmer className="leading-none">Loading...</Shimmer>
+                  </div>
+                </div>
+              </Message>
+            ) : null}
 
             {error ? (
               <Card className="w-full border-destructive/30 bg-destructive/5">
@@ -2433,6 +3102,7 @@ export function CreativeAgentChat({
             ) : null}
 
             {userId ? (
+              <>
               <div
                 className={cn(
                   "rounded-[26px] p-2 transition-[box-shadow,ring-color]",
@@ -2471,19 +3141,54 @@ export function CreativeAgentChat({
                       onChange={(event) => {
                         const files = Array.from(event.target.files ?? [])
                         void handleAttachFiles(files)
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = ""
+                        }
                       }}
                     />
                     <div className="flex min-w-0 flex-1 items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => fileInputRef.current?.click()}
-                        aria-label="Attach files"
-                      >
-                        <Plus className="h-4 w-4" />
-                        <span className="sr-only">Attach</span>
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Attach files or assets"
+                            disabled={
+                              isCreatingThread ||
+                              status === "submitted" ||
+                              status === "streaming"
+                            }
+                          >
+                            <Plus className="h-4 w-4" />
+                            <span className="sr-only">Attach</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" side="top" sideOffset={4}>
+                          <DropdownMenuItem
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={
+                              isCreatingThread ||
+                              status === "submitted" ||
+                              status === "streaming"
+                            }
+                          >
+                            <FilePlus className="mr-2 size-4" />
+                            Upload files
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setAssetModalOpen(true)}
+                            disabled={
+                              isCreatingThread ||
+                              status === "submitted" ||
+                              status === "streaming"
+                            }
+                          >
+                            <FolderOpen className="mr-2 size-4" />
+                            Select asset
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Select
                         value={chatGatewayModelId}
                         onValueChange={(value) => {
@@ -2564,6 +3269,12 @@ export function CreativeAgentChat({
                   </InputGroupAddon>
                 </InputGroup>
               </div>
+              <AssetSelectionModal
+                open={assetModalOpen}
+                onOpenChange={setAssetModalOpen}
+                onSelect={handleAssetLibrarySelect}
+              />
+              </>
             ) : null}
           </div>
         </div>

@@ -5,6 +5,7 @@ import { z } from "zod"
 import { inferStoragePathFromUrl } from "@/lib/assets/library"
 import { checkUserHasCredits } from "@/lib/credits"
 import type { AvailableChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
+import { resolveThreadMediaIdsToImageReferences } from "@/lib/chat/thread-media/server"
 
 const DEFAULT_TEXT_TO_VIDEO_MODEL = "kwaivgi/kling-v2.6" as const
 const DEFAULT_MOTION_COPY_MODEL = "kwaivgi/kling-v2.6-motion-control" as const
@@ -32,6 +33,7 @@ interface CreateGenerateVideoToolOptions {
   latestUserVideos: ChatVideoReference[]
   latestUserAudios: ChatAudioReference[]
   supabase: SupabaseClient
+  threadId?: string
   userId: string
 }
 
@@ -250,6 +252,7 @@ export function createGenerateVideoTool({
   latestUserVideos,
   latestUserAudios,
   supabase,
+  threadId,
   userId,
 }: CreateGenerateVideoToolOptions) {
   const availableReferenceMap = new Map(
@@ -258,7 +261,7 @@ export function createGenerateVideoTool({
 
   return tool({
     description:
-      "Generate a video using UniCan's active video models. Current-turn image and video attachments are passed automatically. If the request depends on an earlier chat image, include its referenceIds. Use assetIds only for saved library assets.",
+      "Generate a video using UniCan's active video models. Current-turn image and video attachments are passed automatically. For earlier chat images, use listThreadMedia + mediaIds. Use assetIds only for saved library assets.",
     inputSchema: z.object({
       prompt: z
         .string()
@@ -280,11 +283,16 @@ export function createGenerateVideoTool({
         .describe(
           "Saved asset UUIDs from searchAssets. Mixed image, video, and audio assets are allowed (e.g. reference audio for Seedance 2.0). Do not pass URLs or storage paths here.",
         ),
+      mediaIds: z
+        .array(z.string().uuid())
+        .max(MAX_REFERENCE_IMAGES)
+        .optional()
+        .describe("UUIDs from listThreadMedia for earlier thread images (not video rows)."),
       referenceIds: z
         .array(z.string().min(1))
         .max(MAX_REFERENCE_IMAGES)
         .optional()
-        .describe("Reference IDs for earlier chat images, such as ref_1 or ref_2."),
+        .describe("Legacy ref_1 style IDs for earlier chat images."),
       aspectRatio: z.string().min(1).max(32).optional(),
       duration: z.number().int().min(1).max(15).optional(),
       negativePrompt: z.string().max(1000).optional(),
@@ -298,6 +306,7 @@ export function createGenerateVideoTool({
       prompt = "",
       modelIdentifier,
       assetIds = [],
+      mediaIds = [],
       referenceIds = [],
       aspectRatio,
       duration,
@@ -307,6 +316,11 @@ export function createGenerateVideoTool({
       mode,
       characterOrientation,
     }) => {
+      const resolvedFromThread =
+        threadId && mediaIds.length > 0
+          ? await resolveThreadMediaIdsToImageReferences(supabase, userId, threadId, mediaIds)
+          : []
+
       const resolvedReferenceIds = referenceIds.map((referenceId) => {
         const reference = availableReferenceMap.get(referenceId)
 
@@ -324,6 +338,7 @@ export function createGenerateVideoTool({
       const assetReferences = await loadAssetReferences(assetIds, supabase, userId)
       const imageReferences = dedupeReferences([
         ...latestUserImages,
+        ...resolvedFromThread,
         ...resolvedReferenceIds,
         ...assetReferences
           .filter((asset) => asset.assetType === "image")

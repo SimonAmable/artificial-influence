@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { parseSavedProfileFromMetadata } from "@/lib/instagram/profile"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
@@ -14,39 +15,41 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 })
     }
 
-    const { data, error } = await supabase
+    const { data: rows, error } = await supabase
       .from("instagram_connections")
       .select(
-        "instagram_user_id, instagram_username, token_expires_at, updated_at, status, provider, metadata"
+        "id, instagram_user_id, instagram_username, token_expires_at, updated_at, status, provider, metadata"
       )
       .eq("user_id", user.id)
-      .maybeSingle()
+      .eq("status", "connected")
+      .order("updated_at", { ascending: false })
 
     if (error) {
       console.error("[instagram/status] query failed:", error)
       return NextResponse.json({ error: "Failed to fetch connection status." }, { status: 500 })
     }
 
-    if (!data || data.status !== "connected") {
-      return NextResponse.json({ connected: false })
-    }
+    const connections = (rows ?? []).map((data) => ({
+      id: data.id,
+      instagramUserId: data.instagram_user_id,
+      instagramUsername: data.instagram_username,
+      accountType:
+        data.metadata &&
+        typeof data.metadata === "object" &&
+        "account_type" in data.metadata &&
+        typeof data.metadata.account_type === "string"
+          ? data.metadata.account_type
+          : null,
+      profile: parseSavedProfileFromMetadata(data.metadata),
+      provider: data.provider,
+      tokenExpiresAt: data.token_expires_at,
+      profileFetchedAt: parseSavedProfileFromMetadata(data.metadata)?.fetched_at ?? null,
+      updatedAt: data.updated_at,
+    }))
 
     return NextResponse.json({
-      connected: true,
-      connection: {
-        instagramUserId: data.instagram_user_id,
-        instagramUsername: data.instagram_username,
-        accountType:
-          data.metadata &&
-          typeof data.metadata === "object" &&
-          "account_type" in data.metadata &&
-          typeof data.metadata.account_type === "string"
-            ? data.metadata.account_type
-            : null,
-        provider: data.provider,
-        tokenExpiresAt: data.token_expires_at,
-        updatedAt: data.updated_at,
-      },
+      connected: connections.length > 0,
+      connections,
     })
   } catch (error) {
     console.error("[instagram/status] GET exception:", error)

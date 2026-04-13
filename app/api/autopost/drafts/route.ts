@@ -1,36 +1,75 @@
 import { NextResponse } from "next/server"
 
-import { isUserPublicBucketMediaUrl } from "@/lib/autopost/validate-media-url"
+import { createInstagramPostJob, type PrepareInstagramPostInput } from "@/lib/autopost/create-instagram-post-job"
 import { createClient } from "@/lib/supabase/server"
 
-type MediaType = "image" | "reel"
+type MediaType = "image" | "reel" | "feed_video" | "carousel" | "story"
 
 function parseBody(
-  body: unknown
-): { mediaUrl: string; caption: string; mediaType: MediaType; scheduledAt?: Date } | "invalid_schedule" | null {
+  body: unknown,
+): PrepareInstagramPostInput | "invalid_body" {
   if (!body || typeof body !== "object") {
-    return null
+    return "invalid_body"
   }
   const record = body as Record<string, unknown>
-  const mediaUrl = typeof record.mediaUrl === "string" ? record.mediaUrl.trim() : ""
   const caption = typeof record.caption === "string" ? record.caption : ""
-  const mediaType = record.mediaType === "reel" ? "reel" : record.mediaType === "image" ? "image" : null
+  const instagramConnectionId =
+    typeof record.instagramConnectionId === "string" ? record.instagramConnectionId.trim() : ""
 
-  if (!mediaUrl || !mediaType) {
-    return null
+  const mediaTypeRaw = record.mediaType
+  const mediaType: MediaType | null =
+    mediaTypeRaw === "reel"
+      ? "reel"
+      : mediaTypeRaw === "image"
+        ? "image"
+        : mediaTypeRaw === "feed_video"
+          ? "feed_video"
+          : mediaTypeRaw === "carousel"
+            ? "carousel"
+            : mediaTypeRaw === "story"
+              ? "story"
+              : null
+
+  if (!mediaType || !instagramConnectionId) {
+    return "invalid_body"
   }
 
-  const scheduledRaw = typeof record.scheduledAt === "string" ? record.scheduledAt.trim() : ""
-  if (scheduledRaw === "") {
-    return { mediaUrl, caption, mediaType }
+  return {
+    action: "draft",
+    caption,
+    carouselItems: Array.isArray(record.carouselItems)
+      ? record.carouselItems
+          .filter((item): item is { url: string; kind: "image" | "video" } => {
+            if (!item || typeof item !== "object") return false
+            const candidate = item as Record<string, unknown>
+            return (
+              typeof candidate.url === "string" &&
+              (candidate.kind === "image" || candidate.kind === "video")
+            )
+          })
+          .map((item) => ({
+            kind: item.kind,
+            url: item.url.trim(),
+          }))
+      : undefined,
+    coverUrl: typeof record.coverUrl === "string" ? record.coverUrl.trim() : undefined,
+    instagramConnectionId,
+    mediaType,
+    mediaUrl: typeof record.mediaUrl === "string" ? record.mediaUrl.trim() : undefined,
+    scheduledAt: typeof record.scheduledAt === "string" ? record.scheduledAt.trim() : undefined,
+    shareToFeed: record.shareToFeed === false ? false : undefined,
+    storyAssetKind:
+      record.assetKind === "video" ? "video" : record.assetKind === "image" ? "image" : undefined,
+    trialParams:
+      record.trialParams && typeof record.trialParams === "object"
+        ? {
+            graduationStrategy:
+              (record.trialParams as { graduationStrategy?: unknown }).graduationStrategy === "SS_PERFORMANCE"
+                ? "SS_PERFORMANCE"
+                : "MANUAL",
+          }
+        : undefined,
   }
-
-  const scheduledAt = new Date(scheduledRaw)
-  if (!Number.isFinite(scheduledAt.getTime())) {
-    return "invalid_schedule"
-  }
-
-  return { mediaUrl, caption, mediaType, scheduledAt }
 }
 
 export async function POST(request: Request) {
@@ -58,53 +97,43 @@ export async function POST(request: Request) {
     }
 
     const parsed = parseBody(json)
-    if (parsed === "invalid_schedule") {
-      return NextResponse.json({ error: "Invalid scheduledAt (use an ISO 8601 date-time string)." }, { status: 400 })
-    }
-    if (!parsed) {
+    if (parsed === "invalid_body") {
       return NextResponse.json(
-        { error: "Expected mediaUrl (string) and mediaType (\"image\" | \"reel\")." },
+        {
+          error:
+            "Invalid body. Send mediaType (image | reel | feed_video | carousel | story), instagramConnectionId, mediaUrl (or carouselItems for carousels), and for story assetKind (image | video).",
+        },
         { status: 400 }
       )
     }
+    const hasScheduledAt = typeof parsed.scheduledAt === "string" && parsed.scheduledAt.trim().length > 0
+    const scheduledAtMs = hasScheduledAt ? new Date(parsed.scheduledAt as string).getTime() : Number.NaN
 
-    const now = Date.now()
-    const scheduleLater = parsed.scheduledAt !== undefined && parsed.scheduledAt.getTime() > now
-
-    if (!isUserPublicBucketMediaUrl(parsed.mediaUrl, user.id, supabaseUrl)) {
+    if (hasScheduledAt && !Number.isFinite(scheduledAtMs)) {
       return NextResponse.json(
-        { error: "Media URL must be a public file uploaded to your account storage." },
-        { status: 400 }
+        { error: "Invalid scheduledAt (use an ISO 8601 date-time string)." },
+        { status: 400 },
       )
     }
 
-    const { data: connection } = await supabase
-      .from("instagram_connections")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("status", "connected")
-      .maybeSingle()
+    const scheduleLater = hasScheduledAt && scheduledAtMs > Date.now()
 
-    const { data: job, error: insertError } = await supabase
-      .from("autopost_jobs")
-      .insert({
-        user_id: user.id,
-        instagram_connection_id: connection?.id ?? null,
-        media_type: parsed.mediaType,
-        media_url: parsed.mediaUrl,
-        caption: parsed.caption.trim().length > 0 ? parsed.caption.trim() : null,
-        status: scheduleLater ? "queued" : "draft",
-        scheduled_at: scheduleLater ? parsed.scheduledAt!.toISOString() : null,
-      })
-      .select("id, media_url, caption, media_type, status, scheduled_at, created_at")
-      .single()
+    const result = await createInstagramPostJob({
+      input: {
+        ...parsed,
+        action: scheduleLater ? "schedule" : "draft",
+        scheduledAt: scheduleLater ? parsed.scheduledAt : undefined,
+      },
+      supabase,
+      supabaseUrl,
+      userId: user.id,
+    })
 
-    if (insertError) {
-      console.error("[autopost/drafts] insert failed:", insertError)
-      return NextResponse.json({ error: "Failed to save draft." }, { status: 500 })
+    if (!result.ok) {
+      return NextResponse.json({ error: result.message }, { status: result.statusCode })
     }
 
-    return NextResponse.json({ draft: job })
+    return NextResponse.json({ draft: result.job })
   } catch (error) {
     console.error("[autopost/drafts] POST exception:", error)
     return NextResponse.json({ error: "Internal server error." }, { status: 500 })
