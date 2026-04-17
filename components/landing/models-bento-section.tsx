@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { getActiveModelMetadata } from "@/lib/constants/model-metadata"
 import { aiVendorIconSrc } from "@/lib/constants/ai-vendor-icons"
@@ -10,6 +12,7 @@ import {
 } from "@/lib/utils/models-vendor-grouping"
 import { Button } from "@/components/ui/button"
 import { BentoCard, BentoGrid } from "@/components/ui/bento-grid"
+import { BlurFade } from "@/components/ui/blur-fade"
 import type { LandingBentoCardMedia } from "@/lib/types/landing"
 import { cn } from "@/lib/utils"
 
@@ -97,20 +100,22 @@ export function ModelsBentoSection() {
   return (
     <section id="models-bento" className="w-full bg-background py-16 sm:py-24">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-          <div className="max-w-2xl">
-            <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">{modelsBentoCopy.title}</h2>
-            <p className="mt-4 text-muted-foreground">{modelsBentoCopy.description}</p>
+        <BlurFade inView blur="10px" direction="up" offset={14} duration={0.5} className="w-full">
+          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+            <div className="max-w-2xl">
+              <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">{modelsBentoCopy.title}</h2>
+              <p className="mt-4 text-muted-foreground">{modelsBentoCopy.description}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 md:shrink-0">
+              <Button variant="outline" asChild>
+                <Link href={modelsBentoCopy.secondaryCtaHref}>{modelsBentoCopy.secondaryCtaLabel}</Link>
+              </Button>
+              <Button asChild>
+                <Link href={modelsBentoCopy.primaryCtaHref}>{modelsBentoCopy.primaryCtaLabel}</Link>
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 md:shrink-0">
-            <Button variant="outline" asChild>
-              <Link href={modelsBentoCopy.secondaryCtaHref}>{modelsBentoCopy.secondaryCtaLabel}</Link>
-            </Button>
-            <Button asChild>
-              <Link href={modelsBentoCopy.primaryCtaHref}>{modelsBentoCopy.primaryCtaLabel}</Link>
-            </Button>
-          </div>
-        </div>
+        </BlurFade>
 
         <BentoGrid className="mt-10 auto-rows-[minmax(26rem,_auto)] grid-cols-1 md:grid-cols-2 md:auto-rows-[minmax(28rem,_auto)] lg:auto-rows-[minmax(26rem,_auto)] lg:grid-cols-12 lg:gap-4">
           {groups.map((group, index) => {
@@ -121,20 +126,31 @@ export function ModelsBentoSection() {
             const media = pickBentoCardMedia(group.vendorSlug)
 
             return (
-              <BentoCard
+              <BlurFade
                 key={group.vendorSlug}
-                name={group.displayName}
-                logoSrc={aiVendorIconSrc(group.vendorSlug)}
-                logoAlt={`${group.displayName} logo`}
-                description={summarizeVendorModels(group.models)}
-                href={href}
-                cta="Open"
+                inView
+                inViewMargin="-12% 0px"
+                blur="12px"
+                direction="up"
+                offset={16}
+                duration={0.45}
+                delay={index * 0.05}
                 className={cn(
-                  "!aspect-auto min-h-[280px] border-white/10 md:aspect-auto",
+                  "h-full",
                   modelBentoLayoutClass(index, totalGroups, group.vendorSlug)
                 )}
-                background={<BentoMediaBackground media={media} />}
-              />
+              >
+                <BentoCard
+                  name={group.displayName}
+                  logoSrc={aiVendorIconSrc(group.vendorSlug)}
+                  logoAlt={`${group.displayName} logo`}
+                  description={summarizeVendorModels(group.models)}
+                  href={href}
+                  cta="Open"
+                  className="h-full !aspect-auto min-h-[280px] border-white/10 md:aspect-auto"
+                  background={<BentoMediaBackground media={media} />}
+                />
+              </BlurFade>
             )
           })}
         </BentoGrid>

@@ -86,8 +86,8 @@ export function ProofSection() {
               Every week you wait, they&apos;re posting faster
             </h2>
             <p className="mt-4 text-muted-foreground">
-              Creators use this to save time and strip friction, so posting stays easy and daily consistency actually
-              sticks. The gap widens while you&apos;re still &quot;getting ready.&quot; Real feeds below, not mockups.
+              Creators are already using this technology to save time and strip friction, so posting stays easy and daily consistency
+              actually sticks. The gap widens while you&apos;re still <br/> &quot;getting ready.&quot; 
             </p>
           </motion.div>
         </div>

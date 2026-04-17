@@ -2,9 +2,11 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { Robot } from "@phosphor-icons/react"
 import { getModelIconPath } from "@/lib/utils/model-icons"
 import { cn } from "@/lib/utils"
+
+/** Shown when no vendor icon exists for a model (same asset as `custom/character-swap`). */
+const FALLBACK_ICON_PATH = "/logo.svg"
 
 // Icons that are monochrome black and need inversion in dark mode
 const DARK_MODE_INVERT_ICONS = new Set([
@@ -22,12 +24,15 @@ export function ModelIcon({ identifier, size = 16, className }: ModelIconProps) 
   const iconPath = getModelIconPath(identifier)
   
   if (!iconPath) {
-    // Fallback to generic robot icon if no mapping exists
     return (
-      <Robot 
-        size={size} 
-        className={cn("text-muted-foreground", className)}
-        weight="regular"
+      <Image
+        src={FALLBACK_ICON_PATH}
+        alt=""
+        width={size}
+        height={size}
+        className={cn("object-contain dark:invert", className)}
+        unoptimized
+        aria-hidden
       />
     )
   }

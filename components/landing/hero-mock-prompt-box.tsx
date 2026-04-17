@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { FilePlus, FolderOpen, Plus, Sparkle } from "@phosphor-icons/react"
+import { FilePlus, FolderOpen, PaperPlaneTilt, Plus } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -117,7 +117,7 @@ export function HeroMockPromptBox({ className, sendHref = DEFAULT_SEND_HREF }: H
       />
       <CardContent className="relative z-10 flex flex-col gap-1.5 p-2">
         <p className="sr-only">
-          Example prompt layout. Model and aspect settings are for preview only. Use Send to open the sign-in page.
+          Example prompt layout. Model and aspect settings are for preview only. The send button opens the sign-in page.
         </p>
         <div className="flex items-start gap-2 px-2 pt-1">
           <div className="min-w-0 flex-1">
@@ -126,7 +126,7 @@ export function HeroMockPromptBox({ className, sendHref = DEFAULT_SEND_HREF }: H
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={3}
-              aria-label="Prompt preview: type to try the layout; Send still opens sign-in"
+              aria-label="Prompt preview: type to try the layout; send opens sign-in"
               className="max-h-[120px] min-h-[60px] w-full resize-none overflow-y-auto border-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0"
               placeholder={MOCK_PLACEHOLDER}
             />
@@ -141,22 +141,15 @@ export function HeroMockPromptBox({ className, sendHref = DEFAULT_SEND_HREF }: H
             >
               <Button
                 asChild
+                size="icon-lg"
                 className={cn(
-                  "relative z-0 h-10 min-w-[100px] bg-primary px-4 py-6 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:bg-primary/80",
+                  "relative z-0 bg-primary text-primary-foreground transition-all duration-300 hover:bg-primary/80",
                   hasPromptText &&
                     "shadow-[0_0_28px_hsl(var(--primary)/0.55)] ring-2 ring-primary/35 ring-offset-2 ring-offset-background dark:ring-offset-background"
                 )}
               >
-                <Link href={sendHref}>
-                  <span className="flex flex-col items-center gap-0.5">
-                    <span className="text-sm font-semibold">Send</span>
-                    <span className="flex items-center gap-0.5">
-                      <Sparkle size={8} weight="fill" />
-                      <span className="text-[10px]">
-                        {selectedModelObject?.model_cost != null ? selectedModelObject.model_cost : "-"}
-                      </span>
-                    </span>
-                  </span>
+                <Link href={sendHref} aria-label="Send — opens sign-in">
+                  <PaperPlaneTilt className="size-5" weight="fill" />
                 </Link>
               </Button>
             </div>
