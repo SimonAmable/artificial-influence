@@ -30,11 +30,11 @@ export function VideoDisplay({ videos, isGenerating = false, className }: VideoD
         
         {videos.map((videoUrl, index) => (
           <Card key={index} className="w-full overflow-hidden">
-            <CardContent className="p-0">
+            <CardContent className="p-0 flex justify-center bg-black/40">
               <video
                 src={videoUrl}
                 controls
-                className="w-full h-auto"
+                className="w-full max-h-[min(85dvh,960px)] object-contain"
                 preload="metadata"
               >
                 Your browser does not support the video tag.

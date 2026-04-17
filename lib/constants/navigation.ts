@@ -65,6 +65,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/canvases", label: "Canvas" },
   { path: "/image", label: "Image" },
   { path: "/video", label: "Video" },
+  { path: "/editor", label: "Editor" },
   { path: "/inpaint", label: "Image Editing" },
   { path: "/character-swap", label: "Character Swap" },
   { path: "/motion-copy", label: "Motion Copy" },
@@ -190,6 +191,13 @@ export const megaNavGroups: MegaNavGroup[] = [
       {
         title: "Features",
         items: [
+          {
+            path: "/editor",
+            label: "Video Editor",
+            description: "Remotion timeline and canvas",
+            badge: "new",
+            iconSrc: "/ai_icons/kling-color.svg",
+          },
           {
             path: "/motion-copy",
             label: "Motion Copy",

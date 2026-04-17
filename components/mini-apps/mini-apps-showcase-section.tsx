@@ -1,5 +1,4 @@
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
 import type { MiniApp } from "@/lib/mini-apps/types"
 
 interface MiniAppsShowcaseSectionProps {
@@ -12,13 +11,7 @@ export function MiniAppsShowcaseSection({ miniApps }: MiniAppsShowcaseSectionPro
       <section className="w-full bg-background py-16 sm:py-24">
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <Badge
-              variant="secondary"
-              className="font-semibold uppercase tracking-[0.2em] text-muted-foreground"
-            >
-              Mini Apps
-            </Badge>
-            <h1 className="mt-3 text-3xl font-semibold text-foreground sm:text-4xl">
+            <h1 className="text-3xl font-semibold text-foreground sm:text-4xl">
               Published creator apps
             </h1>
             <p className="mt-4 text-sm text-muted-foreground sm:text-base">
@@ -34,13 +27,7 @@ export function MiniAppsShowcaseSection({ miniApps }: MiniAppsShowcaseSectionPro
     <section className="w-full bg-background py-16 sm:py-24">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <Badge
-            variant="secondary"
-            className="font-semibold uppercase tracking-[0.2em] text-muted-foreground"
-          >
-            Mini Apps
-          </Badge>
-          <h1 className="mt-3 text-3xl font-semibold text-foreground sm:text-4xl">
+          <h1 className="text-3xl font-semibold text-foreground sm:text-4xl">
             Published creator apps
           </h1>
           <p className="mt-4 text-sm text-muted-foreground sm:text-base">

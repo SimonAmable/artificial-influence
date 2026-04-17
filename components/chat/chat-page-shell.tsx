@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { ClockCounterClockwise, NotePencil } from "@phosphor-icons/react/dist/ssr"
 import { CreativeAgentChat } from "@/components/chat/creative-agent-chat"
+import { NewChatButton } from "@/components/chat/new-chat-button"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/server"
@@ -77,11 +78,9 @@ export async function ChatPageShell({
                 <p className="text-sm font-semibold">Chat History</p>
                 <p className="text-xs text-muted-foreground">Your recent creative threads</p>
               </div>
-              <Button asChild variant="outline" size="icon-sm">
-                <Link href="/chat" aria-label="New chat">
-                  <NotePencil className="h-4 w-4" />
-                </Link>
-              </Button>
+              <NewChatButton variant="outline" size="icon-sm" aria-label="New chat">
+                <NotePencil className="h-4 w-4" />
+              </NewChatButton>
             </div>
           </div>
 

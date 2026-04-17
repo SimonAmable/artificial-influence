@@ -3,6 +3,10 @@ import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe/server';
 import { createClient } from '@supabase/supabase-js';
+import {
+  ensureAffiliateReferral,
+  recordAffiliateCommissionFromInvoice,
+} from '@/lib/affiliate/webhook';
 
 // Initialize Supabase with service role for webhook operations
 const supabaseAdmin = createClient(
@@ -205,6 +209,11 @@ async function handleCheckoutSessionCompleted(
     });
   }
 
+  await ensureAffiliateReferral(supabaseAdmin, {
+    referredUserId: userId,
+    affiliateCodeRaw: session.metadata?.affiliateCode,
+  });
+
   console.log('Checkout session completed for user:', userId);
 }
 
@@ -240,6 +249,15 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   if (priceId) {
     await grantMonthlyCredits(userId, subscriptionId, priceId);
   }
+
+  await ensureAffiliateReferral(supabaseAdmin, {
+    referredUserId: userId,
+    affiliateCodeRaw: subscription.metadata?.affiliateCode,
+  });
+  await recordAffiliateCommissionFromInvoice(supabaseAdmin, {
+    invoice,
+    subscription,
+  });
 
   console.log('Invoice paid for subscription:', subscriptionId);
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getStoredAffiliateRef } from '@/hooks/use-affiliate-ref';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -175,7 +176,7 @@ const yearlyPlans: PricingPlan[] = [
 ];
 
 const ENTERPRISE_CONTACT_EMAIL =
-  process.env.NEXT_PUBLIC_ENTERPRISE_CONTACT_EMAIL ?? 'support@unican.ai';
+  process.env.NEXT_PUBLIC_ENTERPRISE_CONTACT_EMAIL ?? 'support@synthetichumanlabs.com';
 
 function formatPlanCurrency(amount: number, currency: 'USD' | 'CAD') {
   const prefix = currency === 'CAD' ? 'CA$' : '$';
@@ -284,12 +285,16 @@ export default function PricingPage() {
       }
 
       // Call checkout API
+      const affiliateCode = getStoredAffiliateRef();
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({
+          priceId,
+          ...(affiliateCode ? { affiliateCode } : {}),
+        }),
       });
 
       const data = await response.json();

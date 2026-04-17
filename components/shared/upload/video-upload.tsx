@@ -90,12 +90,15 @@ export function VideoUpload({
 
   return (
     <Card className={cn("relative bg-muted border-dashed border-2 border-muted-foreground/40 rounded-lg h-full py-0", className)}>
-      <CardContent className={cn("p-1.5 sm:p-2 h-full flex items-center justify-center", minHeight)}>
+      <CardContent className={cn("p-1.5 sm:p-2 h-full min-h-0 flex items-center justify-center", minHeight)}>
         {value?.url ? (
-          <div className="relative group flex items-center justify-center w-full h-full min-h-[45px] p-1">
+          <div className="relative group flex h-full min-h-0 w-full items-center justify-center p-1">
             <video
               src={value.url}
-              className={cn("max-w-full w-auto h-auto object-contain rounded-xl", maxHeight)}
+              className={cn(
+                "w-full max-w-full object-contain object-center rounded-xl",
+                maxHeight
+              )}
               controls
               preload="metadata"
             >

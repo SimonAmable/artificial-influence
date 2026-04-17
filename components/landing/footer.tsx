@@ -9,7 +9,7 @@ export function Footer() {
             UniCan
           </p>
           <p className="mt-4 max-w-md text-sm text-muted-foreground">
-            A cinematic AI workflow for creators and teams producing modern brand content.
+            Image, video, audio, social automation, and agents in one place for creators and teams shipping content in 2026.
           </p>
         </div>
 

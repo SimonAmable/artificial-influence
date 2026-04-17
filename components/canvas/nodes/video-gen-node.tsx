@@ -731,6 +731,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     const isKlingV3 = modelIdentifier === "kwaivgi/kling-v3-video"
     const isKlingV3Omni = modelIdentifier === "kwaivgi/kling-v3-omni-video"
     const isSeedance2 = modelIdentifier === "bytedance/seedance-2.0"
+    const isWan27 = modelIdentifier === "wan-video/wan-2.7"
 
     if (isMotionCopy && (!finalImageUrl || !finalVideoUrl)) {
       nodeData.onDataChange?.(id, { error: "Image and video are required" })
@@ -762,6 +763,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       !isLipsync &&
       modelSupportsImage &&
       !isSeedance2 &&
+      !isWan27 &&
       !finalImageUrl &&
       !chipSlots.startImageChipUrl
     ) {
@@ -781,7 +783,8 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       !chipSlots.lastFrameChipUrl &&
       !chipSlots.referenceVideoChipUrl &&
       chipSlots.omniStyleImageChipUrls.length === 0 &&
-      !(isSeedance2 && (finalImageUrl || finalLastFrameUrl || finalVideoUrl))
+      !(isSeedance2 && (finalImageUrl || finalLastFrameUrl || finalVideoUrl)) &&
+      !(isWan27 && (finalImageUrl || finalLastFrameUrl || finalAudioUrl))
     ) {
       nodeData.onDataChange?.(id, { error: "Prompt is required" })
       return
@@ -1012,6 +1015,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         if (isSeedance2 && audioUpload?.url) {
           requestBody.reference_audios = [audioUpload.url]
         }
+        if (isWan27 && audioUpload?.url) {
+          requestBody.audio = audioUpload.url
+        }
         if (
           modelIdentifier === "xai/grok-imagine-video" &&
           !requestBody.video &&
@@ -1075,9 +1081,10 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   )
 
   const isSeedance2Node = selectedModel?.identifier === "bytedance/seedance-2.0"
+  const isWan27Node = selectedModel?.identifier === "wan-video/wan-2.7"
   const showImageUpload = !!(modelSupportsImage || isMotionCopyModel || isLipsyncModel)
   const showVideoUpload = !!isMotionCopyModel || isSeedance2Node
-  const showAudioUpload = !!isLipsyncModel || isSeedance2Node
+  const showAudioUpload = !!isLipsyncModel || isSeedance2Node || isWan27Node
   const showLastFrameUpload = !!modelSupportsLastFrame
   const hasUploadOptions = showImageUpload || showVideoUpload || showAudioUpload || showLastFrameUpload
   const showDualFrameHandles =

@@ -11,6 +11,14 @@ import {
   persistGeneratedBase64Images,
   runReplicatePollingImageGeneration,
 } from "@/lib/server/replicate-image-generation"
+import {
+  aspectRatioToQwenImageSize,
+  buildQwenFalInput,
+  QWEN_IMAGE2_CANONICAL_ID,
+  resolveQwenImage2Route,
+  submitQwenImage2Queue,
+  type QwenUnifiedParams,
+} from "@/lib/server/fal-qwen-image-2"
 import { aspectRatioToDimensions, modelUsesDimensions } from "@/lib/utils/model-parameters"
 import type {
   AvailableChatImageReference,
@@ -329,6 +337,12 @@ export function createGenerateImageTool({
         .max(MAX_REFERENCE_IMAGES)
         .optional()
         .describe("Legacy ref_1 style IDs from older chats only when listThreadMedia UUIDs are unavailable."),
+      useLatestUserImages: z
+        .boolean()
+        .optional()
+        .describe(
+          "When true, include image files attached on the latest user message as references. Defaults to false. Ignored when mediaIds/referenceIds are provided.",
+        ),
       assetIds: z
         .array(z.string().uuid())
         .max(MAX_REFERENCE_IMAGES)
@@ -350,6 +364,7 @@ export function createGenerateImageTool({
       prompt,
       mediaIds = [],
       referenceIds = [],
+      useLatestUserImages = false,
       variantCount = 1,
     }) => {
       const resolvedFromThread =
@@ -367,11 +382,22 @@ export function createGenerateImageTool({
         return reference
       })
 
+      const explicitReferences = dedupeReferences([
+        ...resolvedFromThread,
+        ...resolvedReferenceIds,
+      ]).slice(0, MAX_REFERENCE_IMAGES)
+      const referenceCandidates =
+        explicitReferences.length > 0
+          ? explicitReferences
+          : useLatestUserImages
+            ? dedupeReferences(latestUserImages).slice(0, MAX_REFERENCE_IMAGES)
+            : []
+
       const [uploadedReferences, assetReferences, modelResponse] = await Promise.all([
         Promise.all(
-          dedupeReferences([...latestUserImages, ...resolvedFromThread, ...resolvedReferenceIds])
-            .slice(0, MAX_REFERENCE_IMAGES)
-            .map((reference, index) => uploadReferenceImage(reference, index, supabase, userId)),
+          referenceCandidates.map((reference, index) =>
+            uploadReferenceImage(reference, index, supabase, userId),
+          ),
         ),
         loadAssetReferences(assetIds, supabase, userId),
         supabase
@@ -513,6 +539,73 @@ export function createGenerateImageTool({
           usedReferenceCount: referenceImageUrls.length,
           variantCount: persisted.images.length,
         }
+      }
+
+      if (provider === "fal" && modelIdentifier === QWEN_IMAGE2_CANONICAL_ID) {
+        const hasCredits = await checkUserHasCredits(userId, requiredCredits, supabase)
+        if (!hasCredits) {
+          throw new Error(`Insufficient credits. This generation requires ${requiredCredits} credits.`)
+        }
+
+        if (!process.env.FAL_KEY) {
+          throw new Error("FAL_KEY environment variable is not set.")
+        }
+
+        const { endpointId } = resolveQwenImage2Route(referenceImageUrls)
+        const resolvedAspectRatio =
+          aspectRatio ?? (referenceImageUrls.length > 0 ? "match_input_image" : "1:1")
+        const qwenParams: QwenUnifiedParams = {
+          prompt: finalPrompt,
+          negativePrompt: null,
+          numImages: effectiveVariantCount,
+          seed: null,
+          outputFormat: "png",
+          enablePromptExpansion: true,
+          enableSafetyChecker: false,
+          imageSize: aspectRatioToQwenImageSize(resolvedAspectRatio),
+        }
+        const input = buildQwenFalInput(endpointId, qwenParams, referenceImageUrls)
+        const { requestId, endpointId: falEndpoint } = await submitQwenImage2Queue(endpointId, input)
+
+        const { data: pendingGeneration, error: saveError } = await supabase
+          .from("generations")
+          .insert({
+            user_id: userId,
+            prompt: finalPrompt,
+            supabase_storage_path: null,
+            reference_images_supabase_storage_path:
+              referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+            aspect_ratio: resolvedAspectRatio,
+            model: modelIdentifier,
+            type: "image",
+            is_public: true,
+            tool: "chat-generate-image",
+            status: "pending",
+            replicate_prediction_id: requestId,
+            fal_endpoint_id: falEndpoint,
+          })
+          .select("id")
+          .single()
+
+        if (saveError || !pendingGeneration) {
+          console.error("[chat/generate-image] Failed to save Fal pending generation:", saveError)
+          throw new Error("Failed to create pending image generation.")
+        }
+
+        return {
+          aspectRatio: resolvedAspectRatio,
+          generationId: pendingGeneration.id,
+          message: `Started an image generation with ${modelIdentifier}.`,
+          model: modelIdentifier,
+          predictionId: requestId,
+          status: "pending" as const,
+          usedReferenceCount: referenceImageUrls.length,
+          variantCount: effectiveVariantCount,
+        }
+      }
+
+      if (provider === "fal") {
+        throw new Error(`Unsupported Fal image model: ${modelIdentifier}`)
       }
 
       const usesDimensions = modelUsesDimensions(modelData.parameters)

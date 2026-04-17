@@ -117,6 +117,57 @@ export async function listThreadMediaPage(
   return (data ?? []) as ChatThreadMediaRow[]
 }
 
+export type ComposeThreadMediaRow = {
+  id: string
+  mime_type: string
+  public_url: string
+  label: string | null
+}
+
+/**
+ * Load thread media rows for timeline composition. Preserves the order of `mediaIds`.
+ */
+export async function resolveThreadMediaRowsForTimelineCompose(
+  supabase: SupabaseClient,
+  userId: string,
+  threadId: string,
+  mediaIds: string[],
+): Promise<ComposeThreadMediaRow[]> {
+  if (mediaIds.length === 0) {
+    throw new Error("At least one media segment is required.")
+  }
+
+  const unique = new Set(mediaIds)
+  if (unique.size !== mediaIds.length) {
+    throw new Error("Duplicate media IDs in segments are not allowed.")
+  }
+
+  const { data, error } = await supabase
+    .from("chat_thread_media")
+    .select("id, mime_type, public_url, label")
+    .eq("user_id", userId)
+    .eq("chat_thread_id", threadId)
+    .in("id", mediaIds)
+
+  if (error) {
+    throw new Error(`Failed to load thread media: ${error.message}`)
+  }
+
+  const rows = (data ?? []) as ComposeThreadMediaRow[]
+  if (rows.length !== mediaIds.length) {
+    throw new Error("One or more media IDs were not found on this thread or are inaccessible.")
+  }
+
+  const byId = new Map(rows.map((row) => [row.id, row]))
+  return mediaIds.map((id) => {
+    const row = byId.get(id)
+    if (!row) {
+      throw new Error(`Missing thread media row for id ${id}.`)
+    }
+    return row
+  })
+}
+
 export async function resolveThreadMediaIdsToImageReferences(
   supabase: SupabaseClient,
   userId: string,
@@ -162,6 +213,51 @@ export async function resolveThreadMediaIdsToImageReferences(
   }
 
   return imageRefs
+}
+
+export async function resolveThreadMediaIdToFrameExtractReference(
+  supabase: SupabaseClient,
+  userId: string,
+  threadId: string,
+  mediaId: string,
+): Promise<{ url: string; mediaType: string; filename?: string }> {
+  const { data, error } = await supabase
+    .from("chat_thread_media")
+    .select("id, mime_type, public_url, label")
+    .eq("user_id", userId)
+    .eq("chat_thread_id", threadId)
+    .eq("id", mediaId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to load thread media: ${error.message}`)
+  }
+
+  const row = data as
+    | {
+        id: string
+        mime_type: string
+        public_url: string
+        label: string | null
+      }
+    | null
+
+  if (!row) {
+    throw new Error("That media id was not found on this thread or is inaccessible.")
+  }
+
+  const normalizedMime = row.mime_type.toLowerCase()
+  if (!normalizedMime.startsWith("video/") && normalizedMime !== "image/gif") {
+    throw new Error(
+      `Media ${row.id} is not a video or GIF (${row.mime_type}). Use listThreadMedia to pick a video/GIF row, or attach one in this message.`,
+    )
+  }
+
+  return {
+    url: row.public_url,
+    mediaType: row.mime_type,
+    filename: row.label ?? undefined,
+  }
 }
 
 /**

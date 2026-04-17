@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { tryCompleteFalPendingImage } from '@/lib/server/fal-image-completion';
 
 function inferImageMimeType(storagePath: string) {
   const lower = storagePath.toLowerCase();
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'predictionId is required' }, { status: 400 });
     }
 
-    const { data: generations, error } = await supabase
+    const { data: generationsInitial, error } = await supabase
       .from('generations')
       .select('id, status, supabase_storage_path, error_message, created_at')
       .eq('replicate_prediction_id', predictionId)
@@ -38,8 +39,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch status' }, { status: 500 });
     }
 
+    let generations = generationsInitial;
+
     if (!generations || generations.length === 0) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    if (generations.some((g) => g.status === 'pending')) {
+      await tryCompleteFalPendingImage(supabase, user.id, predictionId);
+      const { data: refreshed, error: refreshError } = await supabase
+        .from('generations')
+        .select('id, status, supabase_storage_path, error_message, created_at')
+        .eq('replicate_prediction_id', predictionId)
+        .eq('user_id', user.id)
+        .eq('type', 'image')
+        .order('created_at', { ascending: true });
+      if (!refreshError && refreshed && refreshed.length > 0) {
+        generations = refreshed;
+      }
     }
 
     const pendingGeneration = generations.find((generation) => generation.status === 'pending');

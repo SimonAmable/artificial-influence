@@ -261,12 +261,19 @@ export function createGenerateImageWithNanoBananaTool({
         .max(MAX_REFERENCE_IMAGES)
         .optional()
         .describe("Legacy ref_1 style IDs when mediaIds are unavailable."),
+      useLatestUserImages: z
+        .boolean()
+        .optional()
+        .describe(
+          "When true, include image files attached on the latest user message as references. Defaults to false. Ignored when mediaIds/referenceIds are provided.",
+        ),
     }),
     execute: async ({
       aspectRatio,
       prompt,
       mediaIds = [],
       referenceIds = [],
+      useLatestUserImages = false,
       variantCount = 1,
     }) => {
       if (!process.env.REPLICATE_API_TOKEN) {
@@ -288,11 +295,16 @@ export function createGenerateImageWithNanoBananaTool({
         return reference
       })
 
-      const referenceImages = dedupeReferences([
-        ...latestUserImages,
+      const explicitReferences = dedupeReferences([
         ...resolvedFromThread,
         ...resolvedReferenceIds,
       ]).slice(0, MAX_REFERENCE_IMAGES)
+      const referenceImages =
+        explicitReferences.length > 0
+          ? explicitReferences
+          : useLatestUserImages
+            ? dedupeReferences(latestUserImages).slice(0, MAX_REFERENCE_IMAGES)
+            : []
       const uploadedReferences = await Promise.all(
         referenceImages.map((reference, index) =>
           uploadReferenceImage(reference, index, supabase, userId),

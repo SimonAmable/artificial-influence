@@ -1,0 +1,8 @@
+export const DEFAULT_FPS = 30
+export const DEFAULT_WIDTH = 1920
+export const DEFAULT_HEIGHT = 1080
+export const DEFAULT_DURATION_FRAMES = 30 * 10 // 10s
+export const MAX_HISTORY = 80
+export const DEFAULT_IMAGE_DURATION_FRAMES = 90
+export const DEFAULT_TEXT_DURATION_FRAMES = 90
+export const DEFAULT_SOLID_DURATION_FRAMES = 90

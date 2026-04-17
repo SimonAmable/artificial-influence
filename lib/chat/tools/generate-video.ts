@@ -3,6 +3,7 @@ import { tool } from "ai"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { inferStoragePathFromUrl } from "@/lib/assets/library"
+import { resolveWan27Replicate } from "@/lib/server/wan-2.7-replicate"
 import { checkUserHasCredits } from "@/lib/credits"
 import type { AvailableChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
 import { resolveThreadMediaIdsToImageReferences } from "@/lib/chat/thread-media/server"
@@ -463,9 +464,10 @@ export function createGenerateVideoTool({
         throw new Error("REPLICATE_WEBHOOK_BASE_URL is not configured for async video generation.")
       }
 
-      const replicateInput: Record<string, unknown> = {
+      let replicateInput: Record<string, unknown> = {
         prompt: isMotionCopy ? normalizedPrompt : normalizedPrompt,
       }
+      let replicateApiModel: string = resolvedModel
 
       switch (resolvedModel) {
         case "minimax/hailuo-2.3-fast":
@@ -551,6 +553,26 @@ export function createGenerateVideoTool({
           if (referenceAudioUrls.length > 0) replicateInput.reference_audios = referenceAudioUrls
           break
         }
+        case "wan-video/wan-2.7": {
+          const wan = resolveWan27Replicate(
+            {
+              prompt: normalizedPrompt,
+              image: primaryImage,
+              first_frame_image: primaryImage,
+              last_frame: secondaryImage,
+              negative_prompt: negativePrompt,
+              audio: referenceAudioUrls[0],
+            },
+            {
+              duration: duration ?? undefined,
+              aspect_ratio: aspectRatio,
+              negative_prompt: negativePrompt,
+            },
+          )
+          replicateInput = wan.replicateInput
+          replicateApiModel = wan.replicateModel
+          break
+        }
         default:
           throw new Error(`Unsupported video model: ${resolvedModel}`)
       }
@@ -560,7 +582,7 @@ export function createGenerateVideoTool({
       })
 
       const webhookUrl = `${webhookBase}/api/webhooks/replicate`
-      const replicateModelMatch = resolvedModel.match(/^([^/]+\/[^:]+):(.+)$/)
+      const replicateModelMatch = replicateApiModel.match(/^([^/]+\/[^:]+):(.+)$/)
       const prediction = await replicate.predictions.create(
         replicateModelMatch
           ? {
@@ -570,7 +592,7 @@ export function createGenerateVideoTool({
               webhook_events_filter: ["completed"],
             }
           : {
-              model: resolvedModel as `${string}/${string}`,
+              model: replicateApiModel as `${string}/${string}`,
               input: replicateInput,
               webhook: webhookUrl,
               webhook_events_filter: ["completed"],

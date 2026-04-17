@@ -9,6 +9,14 @@ import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 import { modelUsesDimensions, aspectRatioToDimensions } from '@/lib/utils/model-parameters';
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from '@/lib/constants/models';
 import { runReplicatePollingImageGeneration } from '@/lib/server/replicate-image-generation';
+import {
+  QWEN_IMAGE2_CANONICAL_ID,
+  aspectRatioToQwenImageSize,
+  buildQwenFalInput,
+  resolveQwenImage2Route,
+  submitQwenImage2Queue,
+  type QwenUnifiedParams,
+} from '@/lib/server/fal-qwen-image-2';
 
 const STALE_PENDING_MINUTES = 30;
 const FREE_CONCURRENCY_LIMIT = 1;
@@ -19,15 +27,7 @@ export async function POST(request: NextRequest) {
   console.log('[generate-image] ===== Request started =====');
   
   try {
-    // Check for API tokens (Replicate for most models, xAI for Grok Imagine)
-    if (!process.env.REPLICATE_API_TOKEN) {
-      console.error('[generate-image] REPLICATE_API_TOKEN not set');
-      return NextResponse.json(
-        { error: 'REPLICATE_API_TOKEN environment variable is not set' },
-        { status: 500 }
-      );
-    }
-    console.log('[generate-image] ✓ REPLICATE_API_TOKEN found');
+    // Provider-specific API keys are validated after the model is selected (Replicate, Fal, xAI).
 
     // Get authenticated user
     console.log('[generate-image] Authenticating user...');
@@ -167,6 +167,25 @@ export async function POST(request: NextRequest) {
       );
     }
     console.log('[generate-image] ✓ Model found:', modelData.name);
+
+    const modelProvider = String(modelData.provider ?? '').toLowerCase();
+    if (modelIdentifier === QWEN_IMAGE2_CANONICAL_ID && modelProvider === 'fal') {
+      if (!process.env.FAL_KEY) {
+        console.error('[generate-image] FAL_KEY not set for Fal model');
+        return NextResponse.json(
+          { error: 'FAL_KEY environment variable is not set' },
+          { status: 500 },
+        );
+      }
+    } else if (modelProvider !== 'xai') {
+      if (!process.env.REPLICATE_API_TOKEN) {
+        console.error('[generate-image] REPLICATE_API_TOKEN not set');
+        return NextResponse.json(
+          { error: 'REPLICATE_API_TOKEN environment variable is not set' },
+          { status: 500 },
+        );
+      }
+    }
 
     // Validate and clamp n against model's max_images
     const maxImages = modelData.max_images != null ? Number(modelData.max_images) : 1;
@@ -364,6 +383,76 @@ export async function POST(request: NextRequest) {
       console.log('[generate-image] Prompt enhancement skipped');
     }
 
+    if (modelProvider === 'fal' && modelIdentifier === QWEN_IMAGE2_CANONICAL_ID) {
+      const { endpointId } = resolveQwenImage2Route(referenceImageUrls);
+      const aspectForQwen = aspectRatio || aspect_ratio || null;
+      const negativePromptField = formData.get('negative_prompt') as string | null;
+      const enablePromptExpansion = formData.get('enable_prompt_expansion') !== 'false';
+      const enableSafetyChecker = formData.get('enable_safety_checker') === 'true';
+      const rawFormat = (output_format || 'png').toLowerCase();
+      const outputFormatResolved: 'png' | 'jpeg' | 'webp' =
+        rawFormat === 'jpeg' || rawFormat === 'jpg'
+          ? 'jpeg'
+          : rawFormat === 'webp'
+            ? 'webp'
+            : 'png';
+      const imageSize = aspectRatioToQwenImageSize(aspectForQwen);
+      const qwenParams: QwenUnifiedParams = {
+        prompt: finalPrompt,
+        negativePrompt: negativePromptField?.trim() ? negativePromptField : null,
+        numImages: effectiveN,
+        seed: seed != null && !Number.isNaN(seed) ? seed : null,
+        outputFormat: outputFormatResolved,
+        enablePromptExpansion,
+        enableSafetyChecker,
+        imageSize,
+      };
+      const input = buildQwenFalInput(endpointId, qwenParams, referenceImageUrls);
+      const { requestId, endpointId: falEndpoint } = await submitQwenImage2Queue(endpointId, input);
+
+      const { data: pendingGeneration, error: insertError } = await supabase
+        .from('generations')
+        .insert({
+          user_id: user.id,
+          prompt: finalPrompt,
+          supabase_storage_path: null,
+          reference_images_supabase_storage_path:
+            referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+          aspect_ratio: aspectRatio || aspect_ratio || null,
+          model: modelIdentifier,
+          type: 'image',
+          is_public: true,
+          tool: tool || null,
+          status: 'pending',
+          replicate_prediction_id: requestId,
+          fal_endpoint_id: falEndpoint,
+        })
+        .select('id')
+        .single();
+
+      if (insertError || !pendingGeneration) {
+        console.error('[generate-image] Failed to insert pending Fal generation:', insertError);
+        return NextResponse.json({ error: 'Failed to create pending generation' }, { status: 500 });
+      }
+
+      return NextResponse.json(
+        {
+          status: 'pending',
+          predictionId: requestId,
+          generationId: pendingGeneration.id,
+          message: 'Generation started. Poll GET /api/generate-image/status?predictionId=' + requestId,
+        },
+        { status: 202 },
+      );
+    }
+
+    if (modelProvider === 'fal') {
+      return NextResponse.json(
+        { error: `Unsupported Fal image model: ${modelIdentifier}` },
+        { status: 400 },
+      );
+    }
+
     // Prepare generateImage options
     console.log('[generate-image] Preparing generation options...');
     const isNanoBananaFamily = ['google/nano-banana', 'google/nano-banana-pro', 'google/nano-banana-2'].includes(modelIdentifier);
@@ -376,7 +465,7 @@ export async function POST(request: NextRequest) {
     
     // Initialize model based on provider
     let imageModel;
-    const provider = modelData.provider?.toLowerCase();
+    const provider = modelProvider;
     
     if (provider === 'xai') {
       // xAI Grok model
@@ -898,9 +987,11 @@ export async function GET() {
     message: 'Image Generation API',
     defaultModel: DEFAULT_IMAGE_MODEL_IDENTIFIER,
     asyncWebhooks: !!process.env.REPLICATE_WEBHOOK_BASE_URL,
-    note: process.env.REPLICATE_WEBHOOK_BASE_URL
-      ? 'Async mode: POST returns 202 with predictionId; poll GET /api/generate-image/status?predictionId=...'
-      : undefined,
+    asyncFalQwen: !!process.env.FAL_KEY,
+    note:
+      process.env.REPLICATE_WEBHOOK_BASE_URL || process.env.FAL_KEY
+        ? 'Async mode: POST may return 202 with predictionId; poll GET /api/generate-image/status?predictionId=... (Replicate webhooks and/or Fal Qwen Image 2 queue).'
+        : undefined,
     usage: {
       method: 'POST',
       contentType: 'multipart/form-data',

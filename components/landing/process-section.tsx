@@ -5,10 +5,7 @@ export function ProcessSection() {
     <section id="process" className="w-full bg-background py-16 sm:py-24">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Production Velocity
-          </p>
-          <h2 className="mt-3 text-3xl font-semibold text-foreground sm:text-4xl">
+          <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
             Creative momentum that feels instant
           </h2>
           <p className="mt-4 text-muted-foreground">

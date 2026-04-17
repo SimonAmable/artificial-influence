@@ -35,7 +35,7 @@ export function FeatureSection() {
             cta="Try Image Generation"
             Icon={ImageIcon}
             background={
-              <div className="absolute inset-0">
+              <div className="relative h-full min-h-full w-full">
                 <Image
                   src="/hero_showcase_images/image_generation.png"
                   alt="Image Generation"
@@ -43,7 +43,6 @@ export function FeatureSection() {
                   className="object-cover"
                   sizes="(max-width: 768px) 100vw, 50vw"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/40 to-transparent" />
               </div>
             }
           />
@@ -55,7 +54,7 @@ export function FeatureSection() {
             cta="Try Motion Copy"
             Icon={Video}
             background={
-              <div className="absolute inset-0">
+              <div className="relative h-full min-h-full w-full">
                 <video
                   src="/hero_showcase_images/motion_copy.mp4"
                   autoPlay
@@ -64,7 +63,6 @@ export function FeatureSection() {
                   playsInline
                   className="h-full w-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/40 to-transparent" />
               </div>
             }
           />
@@ -76,7 +74,7 @@ export function FeatureSection() {
             cta="Try Lip Sync"
             Icon={Microphone}
             background={
-              <div className="absolute inset-0">
+              <div className="relative h-full min-h-full w-full">
                 <video
                   src="/hero_showcase_images/lipsync_final.mp4"
                   autoPlay
@@ -85,7 +83,6 @@ export function FeatureSection() {
                   playsInline
                   className="h-full w-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/40 to-transparent" />
               </div>
             }
           />
@@ -97,7 +94,7 @@ export function FeatureSection() {
             cta="Try Image Editing"
             Icon={PaintBrush}
             background={
-              <div className="absolute inset-0">
+              <div className="relative h-full min-h-full w-full">
                 <Image
                   src="/hero_showcase_images/image_editing.png"
                   alt="Image Editing"
@@ -105,7 +102,6 @@ export function FeatureSection() {
                   className="object-cover"
                   sizes="(max-width: 768px) 100vw, 50vw"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/40 to-transparent" />
               </div>
             }
           />

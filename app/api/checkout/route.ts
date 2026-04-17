@@ -4,7 +4,7 @@ import { createCheckoutSession, createCustomer } from '@/lib/stripe/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { priceId } = await request.json();
+    const { priceId, affiliateCode: affiliateCodeRaw } = await request.json();
 
     if (!priceId) {
       return NextResponse.json(
@@ -63,6 +63,17 @@ export async function POST(request: NextRequest) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+    let affiliateCode: string | undefined;
+    if (
+      typeof affiliateCodeRaw === 'string' &&
+      affiliateCodeRaw.trim().length > 0
+    ) {
+      const normalized = affiliateCodeRaw.trim().toLowerCase();
+      if (/^[a-z0-9]{4,20}$/.test(normalized)) {
+        affiliateCode = normalized;
+      }
+    }
+
     let session: Awaited<ReturnType<typeof createCheckoutSession>>;
     try {
       await ensureCustomer();
@@ -70,6 +81,7 @@ export async function POST(request: NextRequest) {
         priceId,
         customerId: customerId!,
         userId: user.id,
+        affiliateCode,
         successUrl: `${appUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${appUrl}/pricing`,
       });
@@ -97,6 +109,7 @@ export async function POST(request: NextRequest) {
         priceId,
         customerId: customerId!,
         userId: user.id,
+        affiliateCode,
         successUrl: `${appUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${appUrl}/pricing`,
       });

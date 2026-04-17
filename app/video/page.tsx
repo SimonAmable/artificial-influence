@@ -38,6 +38,9 @@ const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
   "kling-v3-video": "kwaivgi/kling-v3-video",
   "seedance-2": "bytedance/seedance-2.0",
   "seedance-2.0": "bytedance/seedance-2.0",
+  "wan-2.7": "wan-video/wan-2.7",
+  "wan2.7": "wan-video/wan-2.7",
+  "wan-27": "wan-video/wan-2.7",
 }
 
 function VideoPageContent() {
@@ -207,6 +210,7 @@ function VideoPageContent() {
     const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
     const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
     const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
+    const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
     const isLipsync =
       selectedModel.identifier.includes('lipsync') ||
       selectedModel.identifier.includes('wav2lip') ||
@@ -296,7 +300,13 @@ function VideoPageContent() {
             !!chipSlots.startImageChipUrl ||
             !!chipSlots.lastFrameChipUrl ||
             !!chipSlots.referenceVideoChipUrl ||
-            chipSlots.omniStyleImageChipUrls.length > 0))
+            chipSlots.omniStyleImageChipUrls.length > 0)) ||
+        (isWan27 &&
+          (!!inputImage ||
+            !!lastFrameImage ||
+            !!inputAudio ||
+            !!chipSlots.startImageChipUrl ||
+            !!chipSlots.lastFrameChipUrl))
       if (!allowNoPrompt) {
         setError("Please enter a prompt")
         return
@@ -397,7 +407,7 @@ function VideoPageContent() {
 
       if (
         lastFrameImage?.file &&
-        (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni || isSeedance2)
+        (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni || isSeedance2 || isWan27)
       ) {
         const lastFrameUpload = await uploadImageToSupabase(lastFrameImage.file, user.id, 'video-gen-last-frames')
         requestBody.last_frame = lastFrameUpload.url
@@ -410,17 +420,20 @@ function VideoPageContent() {
       if (lastFrameImage?.url && isSeedance2) {
         requestBody.last_frame_image = lastFrameImage.url
       }
+      if (lastFrameImage?.url && isWan27) {
+        requestBody.last_frame = lastFrameImage.url
+      }
       if (
         !requestBody.last_frame &&
         chipSlots.lastFrameChipUrl &&
-        (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni || isSeedance2)
+        (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni || isSeedance2 || isWan27)
       ) {
         requestBody.last_frame = chipSlots.lastFrameChipUrl
         if (isSeedance2) requestBody.last_frame_image = chipSlots.lastFrameChipUrl
         if (isKlingV3 || isKlingV3Omni) requestBody.end_image = chipSlots.lastFrameChipUrl
       }
 
-      if (negativePrompt && (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni)) {
+      if (negativePrompt && (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni || isWan27)) {
         requestBody.negative_prompt = negativePrompt
       }
 
@@ -459,6 +472,14 @@ function VideoPageContent() {
       }
       if (isSeedance2 && inputAudio?.url) {
         requestBody.reference_audios = [inputAudio.url]
+      }
+
+      if (isWan27 && inputAudio?.file) {
+        const audioUpload = await uploadImageToSupabase(inputAudio.file, user.id, 'video-gen-wan-audio')
+        requestBody.audio = audioUpload.url
+      }
+      if (isWan27 && inputAudio?.url) {
+        requestBody.audio = inputAudio.url
       }
 
       // Kling v3 Omni / Seedance 2.0: extra reference images

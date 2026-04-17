@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { User, SignOut, CaretDownIcon, ChatCircleDots, ClockCounterClockwise } from "@phosphor-icons/react"
+import { User, SignOut, CaretDownIcon, ChatCircleDots, ClockCounterClockwise, HandCoins } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -388,6 +388,10 @@ export function Header() {
                     {credits !== null ? `${credits} credits available` : "— credits"}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push("/affiliate")}>
+                    <HandCoins className="mr-2 h-4 w-4" />
+                    <span>Affiliate program</span>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setFeedbackOpen(true)}>
                     <ChatCircleDots className="mr-2 h-4 w-4" />
                     <span>Send Feedback</span>

@@ -1,3 +1,5 @@
+// FAQ copy: no em dash; use commas, periods, or "to" for ranges.
+
 import {
   Accordion,
   AccordionContent,
@@ -7,29 +9,54 @@ import {
 
 const faqData = [
   {
-    question: "What can I build with UniCan?",
+    question: "What can UniCan do for my Instagram workflow?",
     answer:
-      "You can generate image sets, motion assets, lip-synced videos, and influencer-style campaign creatives from one workspace.",
+      "Make stills, Reels, and lip sync clips in one place, then post on your schedule. Save prompts and references so you can repeat what works.",
   },
   {
-    question: "Do I need design experience to use it?",
+    question: "Do I need design or video experience?",
     answer:
-      "No. You can begin with references and prompts, then iterate visually through guided workflows and templates.",
+      "No. Start from references and short prompts, then edit on the canvas. New to Reels? Try Motion Copy and Lip Sync first.",
   },
   {
     question: "Can I start free?",
     answer:
-      "Yes. You can create an account and explore core features before upgrading to higher-volume plans.",
+      "Yes. Sign up and try the main flows. Plans and limits are on the pricing page.",
   },
   {
-    question: "Are outputs usable for commercial projects?",
+    question: "How do I cancel my subscription?",
     answer:
-      "Yes, based on your selected plan and usage terms. Pricing and rights details are listed in the pricing page.",
+      "In the app, open your profile, go to billing or account settings, and cancel there. You keep access through the end of your paid period per your plan.",
   },
   {
-    question: "How quickly can teams ship content?",
+    question: "Are outputs usable for commercial Instagram campaigns?",
     answer:
-      "Most teams use the workflow system to move from concept to campaign-ready assets in significantly fewer revision cycles.",
+      "Yes, if your plan allows it. Read the terms at checkout and on pricing. Match your tier to how you use assets for ads or client work.",
+  },
+  {
+    question: "How should I warm up a new Instagram account before leaning on automation?",
+    answer:
+      "Use it like a normal account first. Scroll, save, and engage in your niche for 20 to 30 minutes a day for a few days before you post a lot. Then post about once or twice a day and keep browsing daily. If reach drops hard, pause posts, use the account normally again, then ramp back slowly.",
+  },
+  {
+    question: "What posting rhythm works best when I am automating creative?",
+    answer:
+      "Often one or two posts a day until reach looks steady, then add more if it holds. Steady beats random spikes.",
+  },
+  {
+    question: "What content formats tend to work on Instagram with AI-assisted production?",
+    answer:
+      "Carousels and list posts get saves. Reels need motion. In UniCan, use image flows for carousels and Motion Copy for Reels. Copy hooks that work in other niches, then rewrite for your crowd.",
+  },
+  {
+    question: "Can I repurpose Instagram assets to TikTok, Shorts, or elsewhere?",
+    answer:
+      "Yes. Export and resize or recrop per app. Change the hook and pace for each platform.",
+  },
+  {
+    question: "How fast can a team ship with UniCan compared to manual creation?",
+    answer:
+      "You generate and compare on the canvas instead of long back and forth. That cuts rounds when you test new hooks each week.",
   },
 ]
 

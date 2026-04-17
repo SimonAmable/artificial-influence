@@ -24,6 +24,8 @@ export function getModelIconPath(identifier: string): string | null {
       return '/ai_icons/grok.svg'
     case 'kwaivgi':
       return '/ai_icons/kling-color.svg'
+    case 'fal-ai':
+      return '/ai_icons/qwen.svg'
     default:
       return null
   }

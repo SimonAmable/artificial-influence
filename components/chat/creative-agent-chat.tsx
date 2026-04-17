@@ -6,7 +6,7 @@ import Link from "next/link"
 import type { UIMessage } from "ai"
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai"
 import { Chat, useChat } from "@ai-sdk/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowUp,
   CircleNotch,
@@ -226,7 +226,6 @@ type SearchModelsToolPart = {
   toolCallId: string
   state: "input-streaming" | "input-available" | "output-available" | "output-error"
   input?: {
-    query?: string
     type?: "image" | "video" | "audio" | "upscale"
   }
   output?: {
@@ -246,7 +245,6 @@ type SearchModelsToolPart = {
       supportsReferenceVideo?: boolean
       type: "image" | "video" | "audio" | "upscale"
     }>
-    query?: string | null
     total?: number
     type?: "image" | "video" | "audio" | "upscale" | null
   }
@@ -339,6 +337,71 @@ type ListThreadMediaToolPart = {
       publicUrl: string
       createdAt: string
     }>
+  }
+  errorText?: string
+}
+
+type ExtractVideoFramesToolPart = {
+  type: "tool-extractVideoFrames"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    assetId?: string
+    evenlySpacedInteriorCount?: number
+    extraTimestampsSec?: number[]
+    includeFirst?: boolean
+    includeLast?: boolean
+    maxEdgePx?: number
+    mediaId?: string
+    outputFormat?: "jpeg" | "png"
+    persistToThread?: boolean
+  }
+  output?: {
+    frameCount?: number
+    frames?: Array<{
+      kind: string
+      label: string
+      mediaId?: string
+      mimeType: string
+      publicUrl: string
+      timestampSec: number
+    }>
+    note?: string
+    persistedToThread?: boolean
+    videoDurationSec?: number
+  }
+  errorText?: string
+}
+
+type ComposeTimelineVideoToolPart = {
+  type: "tool-composeTimelineVideo"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    fps?: number
+    outputPreset?: string
+    segments?: Array<{
+      durationSeconds?: number
+      mediaId: string
+      trimEndSeconds?: number
+      trimStartSeconds?: number
+    }>
+  }
+  output?: {
+    creditsUsed?: number
+    fps?: number
+    height?: number
+    message?: string
+    outputPreset?: string
+    segmentCount?: number
+    status?: "completed"
+    video?: {
+      mimeType?: string
+      storagePath?: string | null
+      url: string
+    }
+    videoDurationSec?: number
+    width?: number
   }
   errorText?: string
 }
@@ -768,7 +831,7 @@ async function filesToMessageParts(attachments: ComposerAttachment[] | undefined
 
           const { file, uploadedUrl } = attachment
 
-          if (uploadedUrl && file.type.startsWith("image/")) {
+          if (uploadedUrl) {
             resolve({
               type: "file",
               url: uploadedUrl,
@@ -1479,6 +1542,145 @@ function MessageParts({
           return <VideoGenerationResultCard key={`${message.id}-${index}`} messageId={`${message.id}-${index}`} part={toolPart} />
         }
 
+        if (part.type === "tool-extractVideoFrames") {
+          const toolPart = part as ExtractVideoFramesToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Extracting video frames</p>
+                    <p className="truncate text-xs text-muted-foreground">Sampling your clip with ffmpeg</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Frame extraction failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const frames = toolPart.output?.frames ?? []
+          const imageGridImages = frames.map((frame) => ({
+            id: frame.mediaId,
+            url: frame.publicUrl,
+            model: "extractVideoFrames",
+            prompt: frame.label,
+            tool: "extractVideoFrames",
+            aspectRatio: null as string | null,
+          }))
+
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Video frames</Badge>
+                  {typeof toolPart.output?.frameCount === "number" ? (
+                    <Badge variant="outline">
+                      {toolPart.output.frameCount} frame{toolPart.output.frameCount === 1 ? "" : "s"}
+                    </Badge>
+                  ) : null}
+                  {typeof toolPart.output?.videoDurationSec === "number" ? (
+                    <Badge variant="outline">{toolPart.output.videoDurationSec.toFixed(2)}s clip</Badge>
+                  ) : null}
+                  {toolPart.output?.persistedToThread ? (
+                    <Badge variant="outline">On thread</Badge>
+                  ) : (
+                    <Badge variant="outline">Ephemeral</Badge>
+                  )}
+                </div>
+                {toolPart.output?.note ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.note}</p>
+                ) : null}
+                {imageGridImages.length > 0 ? (
+                  <div className="overflow-hidden rounded-2xl border border-border/60 bg-background">
+                    <ImageGrid images={imageGridImages} className="h-auto" basicActionsOnly initialColumnCount={1} />
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No frames returned.</p>
+                )}
+              </CardContent>
+            </Card>
+          )
+        }
+
+        if (part.type === "tool-composeTimelineVideo") {
+          const toolPart = part as ComposeTimelineVideoToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Composing timeline video</p>
+                    <p className="truncate text-xs text-muted-foreground">Stitching segments with ffmpeg</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Timeline composition failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const v = toolPart.output?.video
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Composed video</Badge>
+                  {toolPart.output?.outputPreset ? (
+                    <Badge variant="outline">{toolPart.output.outputPreset}</Badge>
+                  ) : null}
+                  {typeof toolPart.output?.segmentCount === "number" ? (
+                    <Badge variant="outline">
+                      {toolPart.output.segmentCount} segment{toolPart.output.segmentCount === 1 ? "" : "s"}
+                    </Badge>
+                  ) : null}
+                  {typeof toolPart.output?.videoDurationSec === "number" ? (
+                    <Badge variant="outline">{toolPart.output.videoDurationSec.toFixed(2)}s</Badge>
+                  ) : null}
+                  {typeof toolPart.output?.creditsUsed === "number" ? (
+                    <Badge variant="outline">{toolPart.output.creditsUsed} credits</Badge>
+                  ) : null}
+                </div>
+                {toolPart.output?.message ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
+                ) : null}
+                {v?.url ? (
+                  <video
+                    src={v.url}
+                    controls
+                    playsInline
+                    className="max-h-[420px] w-full rounded-2xl border border-border/60 bg-black"
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">No video URL returned.</p>
+                )}
+              </CardContent>
+            </Card>
+          )
+        }
+
         if (part.type === "tool-listInstagramConnections") {
           const toolPart = part as unknown as ListInstagramConnectionsToolPart
 
@@ -1710,11 +1912,11 @@ function MessageParts({
                 <CardContent className="flex items-center gap-3 p-4">
                   <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium">Searching models</p>
+                    <p className="text-sm font-medium">Loading models</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {toolPart.input?.query
-                        ? `Looking for ${toolPart.input.query}`
-                        : `Loading ${toolPart.input?.type || "active"} models`}
+                      {toolPart.input?.type
+                        ? `Listing ${toolPart.input.type} models`
+                        : "Listing all active models"}
                     </p>
                   </div>
                 </CardContent>
@@ -1726,7 +1928,7 @@ function MessageParts({
             return (
               <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
                 <CardContent className="space-y-2 p-4 text-sm text-destructive">
-                  <p className="font-medium">Model search failed</p>
+                  <p className="font-medium">Model list failed</p>
                   <p>{toolPart.errorText || "Unknown tool error."}</p>
                 </CardContent>
               </Card>
@@ -1752,7 +1954,7 @@ function MessageParts({
                     <AccordionItem value="model-results" className="border border-border/60 rounded-xl bg-background/70 px-3">
                       <AccordionTrigger className="py-3 text-sm hover:no-underline">
                         <span className="flex flex-wrap items-center gap-2 text-left">
-                          <span className="font-medium">Show matching models</span>
+                          <span className="font-medium">Show models</span>
                           <Badge variant="outline">{models.length} total</Badge>
                         </span>
                       </AccordionTrigger>
@@ -2360,6 +2562,7 @@ export function CreativeAgentChat({
   syncUrlOnThreadCreate?: boolean
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
   const [assetModalOpen, setAssetModalOpen] = React.useState(false)
   const [composerDropActive, setComposerDropActive] = React.useState(false)
@@ -2548,6 +2751,7 @@ export function CreativeAgentChat({
   )
 
   const hasPendingUploads = attachedFiles.some((attachment) => attachment.isUploading)
+  const newChatToken = searchParams.get("new")
 
   React.useEffect(() => {
     setThreadId(initialThreadId)
@@ -2562,6 +2766,26 @@ export function CreativeAgentChat({
     setMessages(initialMessages)
   }, [enablePersistence, initialMessages, setMessages])
 
+  React.useEffect(() => {
+    if (!newChatToken) {
+      return
+    }
+
+    setMessages([])
+    setComposerValue("")
+    setAttachedFiles([])
+    setAttachedRefs([])
+    setThreadId(undefined)
+    threadIdRef.current = undefined
+    onThreadIdChange?.(undefined)
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+
+    router.replace("/chat")
+  }, [newChatToken, onThreadIdChange, router, setMessages])
+
   const handleAttachFiles = React.useCallback(async (files: File[]) => {
     if (files.length === 0) return
 
@@ -2571,7 +2795,7 @@ export function CreativeAgentChat({
         typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
           ? crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-      isUploading: file.type.startsWith("image/"),
+      isUploading: inferMediaTypeFromFile(file) !== "other",
       source: "upload",
     }))
 
@@ -2579,7 +2803,7 @@ export function CreativeAgentChat({
 
     await Promise.all(
       nextAttachments.map(async (attachment) => {
-        if (!attachment.file.type.startsWith("image/")) {
+        if (!attachment.isUploading) {
           return
         }
 

@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 
 // Initialize Stripe with the secret key
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-12-15.clover',
+  apiVersion: '2026-02-25.clover',
   typescript: true,
 });
 
@@ -14,6 +14,7 @@ export async function createCheckoutSession({
   customerId,
   customerEmail,
   userId,
+  affiliateCode,
   successUrl,
   cancelUrl,
 }: {
@@ -21,9 +22,24 @@ export async function createCheckoutSession({
   customerId?: string;
   customerEmail?: string;
   userId: string;
+  affiliateCode?: string;
   successUrl: string;
   cancelUrl: string;
 }) {
+  const metadata: Record<string, string> = {
+    userId,
+  }
+  if (affiliateCode) {
+    metadata.affiliateCode = affiliateCode
+  }
+
+  const subscriptionMetadata: Record<string, string> = {
+    userId,
+  }
+  if (affiliateCode) {
+    subscriptionMetadata.affiliateCode = affiliateCode
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: ['card'],
@@ -38,13 +54,9 @@ export async function createCheckoutSession({
     success_url: successUrl,
     cancel_url: cancelUrl,
     allow_promotion_codes: true,
-    metadata: {
-      userId,
-    },
+    metadata,
     subscription_data: {
-      metadata: {
-        userId,
-      },
+      metadata: subscriptionMetadata,
     },
   });
 

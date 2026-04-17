@@ -20,15 +20,26 @@ export interface MotionCopyInputBoxProps {
   photoUploadProps?: {
     title?: string
     description?: string
+    /** Override preview tile sizing (defaults are old 45px cap + ~27–31px). */
+    maxHeight?: string
+    minHeight?: string
   }
   videoUploadProps?: {
     title?: string
     description?: string
     /** Motion copy: 10 for image orientation, 30 for video orientation */
     maxDurationSeconds?: number
+    maxHeight?: string
+    minHeight?: string
   }
   extraControls?: React.ReactNode
 }
+
+/** Old shared upload default was max-h-[45px]; motion copy uses a modest bump only (+27..+31px). */
+const MOTION_COPY_PREVIEW = {
+  maxHeight: "max-h-[72px] sm:max-h-[76px]",
+  minHeight: "min-h-[52px] sm:min-h-[58px]",
+} as const
 
 export function MotionCopyInputBox({
   className,
@@ -96,6 +107,8 @@ export function MotionCopyInputBox({
             onChange={handleImageChange}
             title={photoUploadProps?.title || "Upload Image"}
             description={photoUploadProps?.description || "Click to upload image"}
+            maxHeight={photoUploadProps?.maxHeight ?? MOTION_COPY_PREVIEW.maxHeight}
+            minHeight={photoUploadProps?.minHeight ?? MOTION_COPY_PREVIEW.minHeight}
           />
         </div>
 
@@ -109,6 +122,8 @@ export function MotionCopyInputBox({
             title={videoUploadProps?.title || "Upload Video"}
             description={videoUploadProps?.description || "Click to upload video"}
             maxDurationSeconds={videoUploadProps?.maxDurationSeconds ?? 10}
+            maxHeight={videoUploadProps?.maxHeight ?? MOTION_COPY_PREVIEW.maxHeight}
+            minHeight={videoUploadProps?.minHeight ?? MOTION_COPY_PREVIEW.minHeight}
           />
         </div>
 

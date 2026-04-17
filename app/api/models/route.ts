@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { filterPublicCatalogModels } from '@/lib/server/model-catalog-visibility';
 import { Model } from '@/lib/types/models';
 
 export async function GET(request: NextRequest) {
@@ -32,8 +33,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const visible = filterPublicCatalogModels((models ?? []) as Model[]);
+
     return NextResponse.json({
-      models: models as Model[],
+      models: visible,
     });
   } catch (error) {
     console.error('[models] Error:', error);

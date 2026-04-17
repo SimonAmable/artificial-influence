@@ -168,6 +168,7 @@ export function VideoInputBox({
   const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
   const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
   const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
+  const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
   const isKlingV3OrOmni = isKlingV3 || isKlingV3Omni
   const usesRefImageGallery = isKlingV3Omni || isSeedance2
   const totalDuration = Number(parameters.duration) || 5
@@ -234,9 +235,9 @@ export function VideoInputBox({
   ])
 
   const canAddSeedanceReferenceAudio = React.useMemo(() => {
-    if (!isSeedance2) return false
+    if (!isSeedance2 && !isWan27) return false
     return !(inputAudio?.file || inputAudio?.url)
-  }, [isSeedance2, inputAudio])
+  }, [isSeedance2, isWan27, inputAudio])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'input' | 'lastFrame') => {
     const file = e.target.files?.[0]
@@ -312,12 +313,12 @@ export function VideoInputBox({
     if (isKlingV3OrOmni && !multiShotMode) {
       return mergedPromptForReady.length > 0 || !!inputImage || hasRefChips
     }
-    if (isSeedance2) {
+    if (isSeedance2 || isWan27) {
       return (
         mergedPromptForReady.length > 0 ||
         !!inputImage ||
         !!lastFrameImage ||
-        !!inputVideo ||
+        (!!inputVideo && isSeedance2) ||
         !!inputAudio ||
         referenceImages.length > 0 ||
         hasRefChips
@@ -345,6 +346,7 @@ export function VideoInputBox({
     modelSupportsLastFrame,
     lastFrameImage,
     isSeedance2,
+    isWan27,
     inputVideo,
     referenceImages.length,
   ])
@@ -1068,7 +1070,7 @@ export function VideoInputBox({
                       ) : null}
                     </DropdownMenuItem>
                   )}
-                  {isSeedance2 && (
+                  {(isSeedance2 || isWan27) && (
                     <DropdownMenuItem
                       disabled={!canAddSeedanceReferenceAudio}
                       onClick={() => referenceAudioRef.current?.click()}
@@ -1076,10 +1078,12 @@ export function VideoInputBox({
                     >
                       <span className="flex items-center text-sm font-medium">
                         <Waveform className="mr-2 size-4 shrink-0" weight="duotone" />
-                        Reference audio
+                        {isWan27 ? "Optional audio" : "Reference audio"}
                       </span>
                       <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
-                        .wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a frame or reference video.
+                        {isWan27
+                          ? ".wav / .mp3 — optional sync audio for Wan 2.7 (3–30s per model docs)."
+                          : ".wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a frame or reference video."}
                       </span>
                     </DropdownMenuItem>
                   )}
@@ -1108,6 +1112,16 @@ export function VideoInputBox({
                 onChange={handleVideoUpload}
                 className="hidden"
               />
+              {isWan27 ? (
+                <input
+                  ref={referenceAudioRef}
+                  type="file"
+                  accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac"
+                  onChange={handleReferenceAudioAdd}
+                  className="hidden"
+                  aria-hidden
+                />
+              ) : null}
             </>
           )}
 

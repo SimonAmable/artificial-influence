@@ -19,7 +19,7 @@ export function createListThreadMediaTool({
 }: CreateListThreadMediaToolOptions) {
   return tool({
     description:
-      "List media for this chat thread (uploads + completed generations). Each item has a stable `id`—use those as `mediaIds` on generation tools. **Required** whenever the user refers to visuals from earlier in the thread (not only current attachments): e.g. last image, previous generation, that render, edit the poster, same as before. Call before generateImage / generateImageWithNanoBanana / generateVideo when you need those ids. Never use `generationId` from an old tool output as `mediaIds`. Results are newest first.",
+      "List media for this chat thread (uploads + completed generations). Each item has a stable `id`—use those as `mediaIds` on generation tools, or pass a **video** row's `id` as **mediaId** to **extractVideoFrames**. **Required** whenever the user refers to visuals from earlier in the thread (not only current attachments): e.g. last image, previous generation, that render, edit the poster, same as before. Call before generateImage / generateImageWithNanoBanana / generateVideo when you need those ids. Never use `generationId` from an old tool output as `mediaIds`. Results are newest first.",
     inputSchema: z.object({
       limit: z
         .number()

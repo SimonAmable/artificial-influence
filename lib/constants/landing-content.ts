@@ -1,14 +1,17 @@
 import type {
   LandingCanvasNodeSeed,
   LandingModelCard,
+  LandingPlatformSurfaceCard,
   LandingProcessStep,
   LandingWorkflowItem,
 } from "@/lib/types/landing"
 
 export const landingHero = {
-  eyebrow: "Creative workflows",
-  title: "Create winning ads with AI",
-  description: "Choose top AI actors and video templates, then dial in the details with our creative tools.",
+  eyebrow: "For creators",
+  titlePrefix: "Scale content with AI",
+  morphingTexts: ["images", "videos", "audio", "automations"],
+  description:
+    "Unlock unlimited scale with automations. State-of-the-art AI tools for images, video, and audio. Post on your terms, or use our Instagram automation so your pipeline keeps shipping on autopilot.",
   primaryCtaLabel: "Get Started Free",
   primaryCtaHref: "/login?mode=signup",
   secondaryCtaLabel: "See Workflows",
@@ -83,6 +86,53 @@ export const workflowItems: LandingWorkflowItem[] = [
     backgroundSrc: "/canvas_landing_page_assets/influencer_workflows.png",
     backgroundType: "image",
     href: "/inpaint",
+  },
+]
+
+/** Bento row: generator + agent wide, then workflow + automation. */
+export const platformSurfaceCards: LandingPlatformSurfaceCard[] = [
+  {
+    kind: "image",
+    id: "generator",
+    name: "Generator UI",
+    description: "20+ SOTA models for images and video.",
+    href: "/image",
+    cta: "Open",
+    imageSrc: "/page_screenshots_or_screenrecordings/generator.png",
+    imageAlt: "UniCan generator UI screenshot",
+    layoutClass: "lg:col-span-8 lg:min-h-[300px]",
+  },
+  {
+    kind: "image",
+    id: "agent",
+    name: "Agent UI",
+    description:
+      "Plain-language chat for images, video, edits, and multi-step projects. No canvas.",
+    href: "/chat",
+    cta: "Open",
+    imageSrc: "/page_screenshots_or_screenrecordings/agent.png",
+    imageAlt: "UniCan agent UI screenshot",
+    layoutClass: "lg:col-span-4 lg:min-h-[300px]",
+  },
+  {
+    kind: "image",
+    id: "workflow",
+    name: "Workflow UI",
+    description: "Reusable node flows you edit, group, and rerun.",
+    href: "/canvas",
+    cta: "Open",
+    imageSrc: "/page_screenshots_or_screenrecordings/workflow.png",
+    imageAlt: "UniCan workflow UI screenshot",
+    layoutClass: "lg:col-span-6 lg:min-h-[280px]",
+  },
+  {
+    kind: "automation",
+    id: "automation",
+    name: "Automation",
+    description: "Connect Instagram and publish on your schedule.",
+    href: "/autopost",
+    cta: "Open",
+    layoutClass: "lg:col-span-6 lg:min-h-[280px]",
   },
 ]
 

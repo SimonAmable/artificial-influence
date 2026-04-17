@@ -16,6 +16,8 @@ import { createPrepareInstagramPostTool } from "@/lib/chat/tools/prepare-instagr
 import { createSearchAssetsTool } from "@/lib/chat/tools/search-assets"
 import { createSearchModelsTool } from "@/lib/chat/tools/search-models"
 import { createActivateSkillTool, createSaveSkillTool } from "@/lib/chat/tools/skills"
+import { createExtractVideoFramesTool } from "@/lib/chat/tools/extract-video-frames"
+import { createComposeTimelineVideoTool } from "@/lib/chat/tools/compose-timeline-video"
 import { createListThreadMediaTool } from "@/lib/chat/tools/list-thread-media"
 
 interface CreateCreativeChatToolsOptions {
@@ -53,8 +55,13 @@ export function createCreativeChatTools({
     ? createListThreadMediaTool({ supabase, threadId, userId })
     : null
 
+  const composeTimelineVideoTool = threadId
+    ? createComposeTimelineVideoTool({ supabase, threadId, userId })
+    : null
+
   return {
     ...(listThreadMediaTool ? { listThreadMedia: listThreadMediaTool } : {}),
+    ...(composeTimelineVideoTool ? { composeTimelineVideo: composeTimelineVideoTool } : {}),
     listInstagramConnections: createListInstagramConnectionsTool({
       supabase,
       userId,
@@ -82,6 +89,13 @@ export function createCreativeChatTools({
       latestUserImages,
       latestUserVideos,
       latestUserAudios,
+      supabase,
+      threadId,
+      userId,
+    }),
+    extractVideoFrames: createExtractVideoFramesTool({
+      latestUserVideos,
+      latestUserImages,
       supabase,
       threadId,
       userId,

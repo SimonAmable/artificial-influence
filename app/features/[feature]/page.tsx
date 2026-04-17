@@ -24,10 +24,7 @@ export default async function FeaturePage({ params }: FeaturePageProps) {
         <div className="flex flex-col gap-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-                Feature Spotlight
-              </p>
-              <h1 className="mt-2 text-3xl font-semibold md:text-4xl">{feature.title}</h1>
+              <h1 className="text-3xl font-semibold md:text-4xl">{feature.title}</h1>
               <p className="mt-3 text-sm text-muted-foreground md:text-base">
                 {feature.description}
               </p>

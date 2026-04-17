@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { DM_Sans, Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/app/theme-provider"
 import { Header } from "@/components/app/header"
@@ -6,11 +7,22 @@ import { LayoutModeProviderWrapper } from "@/components/shared/layout/layout-mod
 import { Toaster } from "@/components/ui/sonner"
 import { AIChat } from "@/components/ai-chat"
 import { Analytics } from "@vercel/analytics/next"
+import { AffiliateRefCapture } from "@/components/affiliate/affiliate-ref-capture"
 
 export const metadata: Metadata = {
   title: "UniCan",
   description: "Create and manage AI-powered content with uncanny AI generation tools",
-};
+}
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+})
+
+const dmSansDisplay = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-display",
+})
 
 export default function RootLayout({
   children,
@@ -18,8 +30,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="antialiased">
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${inter.variable} ${dmSansDisplay.variable}`}
+    >
+      <body className="font-sans antialiased">
         <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
         <ThemeProvider
           attribute="class"
@@ -28,6 +44,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <LayoutModeProviderWrapper>
+            <AffiliateRefCapture />
             <Header />
             {children}
           </LayoutModeProviderWrapper>

@@ -66,62 +66,8 @@ function createClientRequestId() {
   return `pending-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
-function getPendingRequestKey(request: PendingImageRequest) {
-  if (request.generationId) return `generation-${request.generationId}`
-  if (request.predictionId) return `prediction-${request.predictionId}`
-  return `client-${request.clientRequestId}`
-}
-
-function isSamePendingRequest(a: PendingImageRequest, b: PendingImageRequest) {
-  return (
-    (Boolean(a.generationId) && a.generationId === b.generationId) ||
-    (Boolean(a.predictionId) && a.predictionId === b.predictionId) ||
-    a.clientRequestId === b.clientRequestId
-  )
-}
-
-function sortPendingRequests(requests: PendingImageRequest[]) {
-  return [...requests].sort((a, b) => {
-    const aTime = Date.parse(a.startedAt)
-    const bTime = Date.parse(b.startedAt)
-    return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime)
-  })
-}
-
-function mergePendingRequests(
-  existing: PendingImageRequest[],
-  incoming: PendingImageRequest[]
-) {
-  const mergedIncoming = incoming.map((incomingRequest) => {
-    const existingMatch = existing.find((request) => isSamePendingRequest(request, incomingRequest))
-
-    if (!existingMatch) {
-      return incomingRequest
-    }
-
-    return {
-      ...existingMatch,
-      ...incomingRequest,
-      clientRequestId: existingMatch.clientRequestId,
-    }
-  })
-
-  const unresolvedOptimistic = existing.filter((request) => {
-    if (request.generationId || request.predictionId) {
-      return false
-    }
-
-    return !mergedIncoming.some((mergedRequest) => mergedRequest.clientRequestId === request.clientRequestId)
-  })
-
-  return sortPendingRequests([...mergedIncoming, ...unresolvedOptimistic])
-}
-
-function removePendingRequest(
-  requests: PendingImageRequest[],
-  target: PendingImageRequest
-) {
-  return requests.filter((request) => !isSamePendingRequest(request, target))
+function removeSlotByClientId(requests: PendingImageRequest[], clientRequestId: string) {
+  return requests.filter((request) => request.clientRequestId !== clientRequestId)
 }
 
 function prependUniqueHistoryItems(
@@ -138,6 +84,23 @@ function prependUniqueHistoryItems(
     seenUrls.add(item.url)
     return true
   })
+}
+
+/** Avoid wiping client-prepended rows when a refetch returns before the DB lists the new URL (queued generations). */
+function mergeRemoteHistoryWithLocal(
+  previous: ImageHistoryItem[],
+  serverRows: ImageHistoryItem[]
+): ImageHistoryItem[] {
+  const serverUrls = new Set(serverRows.map((row) => row.url))
+  const aheadOfServer = previous.filter((row) => !serverUrls.has(row.url))
+  const seen = new Set<string>()
+  const out: ImageHistoryItem[] = []
+  for (const row of [...aheadOfServer, ...serverRows]) {
+    if (seen.has(row.url)) continue
+    seen.add(row.url)
+    out.push(row)
+  }
+  return out
 }
 
 const CHARACTER_SWAP_UI_MODEL_IDENTIFIER = "custom/character-swap"
@@ -237,6 +200,9 @@ function ImagePageContent() {
     }
   }, [effectiveImageModels, selectedModel])
 
+  // Apply `?model=` from the URL when the param or catalog changes — not when the user
+  // changes the selector (including `selectedModel` here re-ran the effect and reset
+  // the choice back to the URL on every pick).
   React.useEffect(() => {
     if (effectiveImageModels.length === 0) return
 
@@ -250,11 +216,11 @@ function ImagePageContent() {
     )
 
     if (!resolvedModel) return
-    if (selectedModel === resolvedModel.identifier) return
 
-    setSelectedModel(resolvedModel.identifier)
-    setSelectedAspectRatio(getDefaultAspectRatioForModel(resolvedModel))
-  }, [searchParams, effectiveImageModels, selectedModel])
+    setSelectedModel((prev) =>
+      prev === resolvedModel.identifier ? prev : resolvedModel.identifier
+    )
+  }, [searchParams, effectiveImageModels])
 
   // Update aspect ratio and clamp numImages when model changes
   React.useEffect(() => {
@@ -268,17 +234,24 @@ function ImagePageContent() {
     }
   }, [selectedModel, effectiveImageModels])
 
-  const fetchImageHistory = React.useCallback(async (limit = 20) => {
+  type FetchHistoryOptions = { silent?: boolean; replace?: boolean }
+
+  const fetchImageHistory = React.useCallback(async (limit = 20, opts?: FetchHistoryOptions) => {
+    const silent = opts?.silent === true
+    const replace = opts?.replace !== false
+
     historyAbortRef.current?.abort()
     const controller = new AbortController()
     historyAbortRef.current = controller
     const requestId = ++historyRequestIdRef.current
 
-    setIsHistoryLoading(true)
-    setHistoryError(null)
+    if (!silent) {
+      setIsHistoryLoading(true)
+      setHistoryError(null)
+    }
 
     try {
-      const response = await fetch(`/api/generations?type=image&limit=${limit}&includePending=true`, {
+      const response = await fetch(`/api/generations?type=image&limit=${limit}`, {
         signal: controller.signal,
       })
 
@@ -298,8 +271,6 @@ function ImagePageContent() {
             type?: string | null
             created_at?: string | null
             reference_image_urls?: string[]
-            status?: string | null
-            replicate_prediction_id?: string | null
           }>
         : []
 
@@ -323,28 +294,12 @@ function ImagePageContent() {
         return items
       }, [])
 
-      const serverPendingRequests = generations
-        .filter((generation) => generation.status === "pending")
-        .map((generation) => ({
-          clientRequestId:
-            generation.id
-              ? `server-${generation.id}`
-              : generation.replicate_prediction_id
-                ? `prediction-${generation.replicate_prediction_id}`
-                : `pending-${generation.created_at ?? generation.model ?? "unknown"}`,
-          startedAt: generation.created_at ?? new Date().toISOString(),
-          prompt: generation.prompt ?? null,
-          model: generation.model ?? "",
-          tool: generation.tool ?? "image",
-          aspectRatio: generation.aspect_ratio ?? null,
-          referenceImageUrls: generation.reference_image_urls ?? [],
-          generationId: generation.id ?? null,
-          predictionId: generation.replicate_prediction_id ?? null,
-        }))
-
       if (requestId === historyRequestIdRef.current) {
-        setHistoryImages(imageRows)
-        setPendingRequests((currentRequests) => mergePendingRequests(currentRequests, serverPendingRequests))
+        if (replace) {
+          setHistoryImages(imageRows)
+        } else {
+          setHistoryImages((prev) => mergeRemoteHistoryWithLocal(prev, imageRows))
+        }
       }
     } catch (err) {
       if (controller.signal.aborted) {
@@ -353,11 +308,11 @@ function ImagePageContent() {
 
       console.error("Error fetching image history:", err)
 
-      if (requestId === historyRequestIdRef.current) {
+      if (requestId === historyRequestIdRef.current && !silent) {
         setHistoryError(err instanceof Error ? err.message : "Failed to fetch image history")
       }
     } finally {
-      if (requestId === historyRequestIdRef.current) {
+      if (requestId === historyRequestIdRef.current && !silent) {
         setIsHistoryLoading(false)
       }
     }
@@ -370,20 +325,6 @@ function ImagePageContent() {
       historyAbortRef.current?.abort()
     }
   }, [fetchImageHistory])
-
-  React.useEffect(() => {
-    if (pendingRequests.length === 0) {
-      return
-    }
-
-    const intervalId = window.setInterval(() => {
-      void fetchImageHistory(20)
-    }, 2500)
-
-    return () => {
-      window.clearInterval(intervalId)
-    }
-  }, [fetchImageHistory, pendingRequests.length])
 
   // Handle image generation
   const handleGenerate = async () => {
@@ -475,7 +416,7 @@ function ImagePageContent() {
       referenceImageUrls: capturedRefUrls,
     }
 
-    setPendingRequests((currentRequests) => sortPendingRequests([optimisticPendingRequest, ...currentRequests]))
+    setPendingRequests((prev) => [optimisticPendingRequest, ...prev])
 
     try {
 
@@ -554,21 +495,17 @@ function ImagePageContent() {
         formData,
         undefined,
         ({ generationId, predictionId }: GenerateImageAcceptedPayload) => {
-          setPendingRequests((currentRequests) =>
-            sortPendingRequests(
-              currentRequests.map((request) =>
-                request.clientRequestId === clientRequestId
-                  ? {
-                      ...request,
-                      generationId: generationId ?? request.generationId ?? null,
-                      predictionId,
-                    }
-                  : request
-              )
+          setPendingRequests((prev) =>
+            prev.map((request) =>
+              request.clientRequestId === clientRequestId
+                ? {
+                    ...request,
+                    generationId: generationId ?? request.generationId ?? null,
+                    predictionId,
+                  }
+                : request
             )
           )
-
-          void fetchImageHistory(20)
         }
       )
 
@@ -582,9 +519,9 @@ function ImagePageContent() {
             aspectRatio: capturedAspectRatio,
             reference_image_urls: capturedRefUrls,
           }))
-      setPendingRequests((currentRequests) => removePendingRequest(currentRequests, optimisticPendingRequest))
+      setPendingRequests((currentRequests) => removeSlotByClientId(currentRequests, clientRequestId))
       setHistoryImages((currentImages) => prependUniqueHistoryItems(currentImages, newItems))
-      void fetchImageHistory(20)
+      void fetchImageHistory(20, { silent: true, replace: false })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate image'
       const isCredits =
@@ -592,7 +529,7 @@ function ImagePageContent() {
       if (!isCredits) {
         console.error('Error generating image:', err)
       }
-      setPendingRequests((currentRequests) => removePendingRequest(currentRequests, optimisticPendingRequest))
+      setPendingRequests((currentRequests) => removeSlotByClientId(currentRequests, clientRequestId))
       if (isCredits) {
         toast.error(message, {
           description: 'Upgrade your plan to continue generating images',
@@ -604,7 +541,7 @@ function ImagePageContent() {
         })
       }
       setError(message)
-      void fetchImageHistory(20)
+      void fetchImageHistory(20, { silent: true, replace: false })
     }
   }
 
@@ -755,7 +692,7 @@ function ImagePageContent() {
     } finally {
       setUpscalingImageUrl(null)
     }
-  }, [fetchImageHistory])
+  }, [])
 
   // Grid order: generating (at front) → filled (newest) → older
   // Grid order: pending requests (newest first) followed by completed history.
@@ -766,7 +703,8 @@ function ImagePageContent() {
     })
     const generating = pendingRequests.map((request) => ({
       type: "generating" as const,
-      id: getPendingRequestKey(request),
+      // Stable key for the lifetime of this request (do not switch to predictionId — avoids remount/flicker).
+      id: `slot-${request.clientRequestId}`,
     }))
     const completed = historyImages.map((img) => ({ type: "image" as const, data: toImageData(img) }))
     return [...generating, ...completed]

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 import { inferStoragePathFromUrl } from '@/lib/assets/library';
+import { resolveWan27Replicate } from '@/lib/server/wan-2.7-replicate';
 
 function collectStoragePaths(values: unknown[]): string[] {
   const paths = values.flatMap((value) => {
@@ -127,9 +128,11 @@ export async function POST(request: NextRequest) {
 
     // Build input based on model (motion copy allows empty prompt)
     const effectivePrompt = hasMotionCopyInputs ? (prompt ?? '') : prompt;
-    const replicateInput: Record<string, unknown> = {
+    let replicateInput: Record<string, unknown> = {
       prompt: typeof effectivePrompt === 'string' ? effectivePrompt : '',
     };
+
+    let replicateApiModel: string = model;
 
     // Add model-specific parameters
     switch (model) {
@@ -314,6 +317,24 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case 'wan-video/wan-2.7': {
+        const audioRaw = typeof body.audio === 'string' ? body.audio : undefined;
+        const resolved = resolveWan27Replicate(
+          {
+            prompt: effectivePrompt,
+            image,
+            first_frame_image,
+            last_frame,
+            negative_prompt,
+            audio: audioRaw,
+          },
+          otherParams as Record<string, unknown>,
+        );
+        replicateInput = resolved.replicateInput;
+        replicateApiModel = resolved.replicateModel;
+        break;
+      }
+
       default:
         return NextResponse.json(
           { error: `Unsupported model: ${model}` },
@@ -323,17 +344,20 @@ export async function POST(request: NextRequest) {
 
     console.log('[generate-video-test] Replicate input:', {
       model,
+      replicateApiModel,
       inputKeys: Object.keys(replicateInput),
     });
 
     const referenceImageStoragePaths = collectStoragePaths([
       replicateInput.image,
+      replicateInput.first_frame,
       replicateInput.first_frame_image,
       replicateInput.start_image,
       replicateInput.last_frame,
       replicateInput.last_frame_image,
       replicateInput.end_image,
       replicateInput.reference_images,
+      replicateInput.audio,
     ]);
     const referenceVideoStoragePaths = collectStoragePaths([
       replicateInput.video,
@@ -344,7 +368,7 @@ export async function POST(request: NextRequest) {
     const webhookBase = process.env.REPLICATE_WEBHOOK_BASE_URL?.replace(/\/$/, '');
     if (webhookBase) {
       const webhookUrl = `${webhookBase}/api/webhooks/replicate`;
-      const replicateModelMatch = model.match(/^([^/]+\/[^:]+):(.+)$/);
+      const replicateModelMatch = replicateApiModel.match(/^([^/]+\/[^:]+):(.+)$/);
       const prediction = await replicate.predictions.create(
         replicateModelMatch
           ? {
@@ -354,7 +378,7 @@ export async function POST(request: NextRequest) {
               webhook_events_filter: ['completed'],
             }
           : {
-              model: model as `${string}/${string}`,
+              model: replicateApiModel as `${string}/${string}`,
               input: replicateInput,
               webhook: webhookUrl,
               webhook_events_filter: ['completed'],
@@ -399,7 +423,7 @@ export async function POST(request: NextRequest) {
 
     // Call Replicate API
     const generationStartTime = Date.now();
-    const output = await replicate.run(model as `${string}/${string}`, {
+    const output = await replicate.run(replicateApiModel as `${string}/${string}`, {
       input: replicateInput,
     });
     const generationTime = Date.now() - generationStartTime;

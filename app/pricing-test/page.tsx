@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getStoredAffiliateRef } from '@/hooks/use-affiliate-ref';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Sparkle, Info } from '@phosphor-icons/react';
@@ -98,10 +99,14 @@ export default function PricingTestPage() {
         return;
       }
 
+      const affiliateCode = getStoredAffiliateRef();
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({
+          priceId,
+          ...(affiliateCode ? { affiliateCode } : {}),
+        }),
       });
 
       const data = await response.json();
