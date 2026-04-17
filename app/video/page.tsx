@@ -199,6 +199,28 @@ function VideoPageContent() {
     return { url: urlData.publicUrl, storagePath }
   }
 
+  /** Replicate requires http(s) URLs; blob/data previews must be uploaded first. */
+  const resolveBlobOrDataImageUrlForReplicate = async (
+    url: string,
+    file: File | undefined,
+    userId: string,
+    prefix: string,
+  ): Promise<string> => {
+    const u = url.trim()
+    if (!u.startsWith("blob:") && !u.startsWith("data:")) {
+      return u
+    }
+    if (file) {
+      const r = await uploadImageToSupabase(file, userId, prefix)
+      return r.url
+    }
+    const res = await fetch(u)
+    const blob = await res.blob()
+    const f = new File([blob], "last-frame.png", { type: blob.type || "image/png" })
+    const r = await uploadImageToSupabase(f, userId, prefix)
+    return r.url
+  }
+
   // Handle generation
   const handleGenerate = async () => {
     if (!selectedModel) {
@@ -376,16 +398,25 @@ function VideoPageContent() {
       }
       // Handle pre-loaded images from URL (no file to upload)
       else if (inputImage?.url) {
+        const firstUrl =
+          isWan27
+            ? await resolveBlobOrDataImageUrlForReplicate(
+                inputImage.url,
+                inputImage.file,
+                user.id,
+                "video-gen-input-images",
+              )
+            : inputImage.url
         if (selectedModel.identifier === 'kwaivgi/kling-v2.6') {
-          requestBody.start_image = inputImage.url
+          requestBody.start_image = firstUrl
         } else if (isKlingV3 || isKlingV3Omni) {
-          requestBody.start_image = inputImage.url
+          requestBody.start_image = firstUrl
         } else {
-          requestBody.image = inputImage.url
+          requestBody.image = firstUrl
         }
         // For first_frame_image parameter (Hailuo)
         if (selectedModel.identifier === 'minimax/hailuo-2.3-fast') {
-          requestBody.first_frame_image = inputImage.url
+          requestBody.first_frame_image = firstUrl
         }
       }
 
@@ -420,8 +451,13 @@ function VideoPageContent() {
       if (lastFrameImage?.url && isSeedance2) {
         requestBody.last_frame_image = lastFrameImage.url
       }
-      if (lastFrameImage?.url && isWan27) {
-        requestBody.last_frame = lastFrameImage.url
+      if (lastFrameImage?.url && isWan27 && !requestBody.last_frame) {
+        requestBody.last_frame = await resolveBlobOrDataImageUrlForReplicate(
+          lastFrameImage.url,
+          lastFrameImage.file,
+          user.id,
+          "video-gen-last-frames",
+        )
       }
       if (
         !requestBody.last_frame &&

@@ -14,6 +14,26 @@ function pickString(...vals: unknown[]): string | undefined {
   return undefined
 }
 
+/**
+ * Replicate Wan 2.7 image inputs must be `http(s):` URIs. Blob/data URLs and
+ * non-URLs (e.g. `"0"`) fail API validation.
+ */
+export function normalizeReplicateHttpUri(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined
+  const t = value.trim()
+  if (t.length === 0) return undefined
+  const lower = t.toLowerCase()
+  if (lower.startsWith("blob:") || lower.startsWith("data:")) return undefined
+  if (!/^https?:\/\//i.test(t)) return undefined
+  try {
+    const u = new URL(t)
+    if (u.protocol !== "http:" && u.protocol !== "https:") return undefined
+    return u.href
+  } catch {
+    return undefined
+  }
+}
+
 export interface Wan27BodySlice {
   prompt?: unknown
   image?: unknown
@@ -32,22 +52,37 @@ export function resolveWan27Replicate(
   otherParams: Record<string, unknown>,
 ): { replicateModel: string; replicateInput: Record<string, unknown> } {
   const prompt = typeof body.prompt === "string" ? body.prompt : ""
-  const firstFrame = pickString(
+  const rawFirstFrame = pickString(
     body.image,
     body.first_frame_image,
     otherParams.start_image,
     otherParams.first_frame,
     otherParams.image,
   )
-  const lastFrame = pickString(
+  const firstFrame = normalizeReplicateHttpUri(rawFirstFrame)
+  if (rawFirstFrame && !firstFrame) {
+    throw new Error(
+      "Invalid first frame URL: use a public http(s) image URL (upload so blob previews are not sent to Replicate).",
+    )
+  }
+
+  const rawLastFrame = pickString(
     body.last_frame,
     body.last_frame_image,
     otherParams.last_frame,
     otherParams.last_frame_image,
     otherParams.end_image,
   )
+  const lastFrame = normalizeReplicateHttpUri(rawLastFrame)
+
   const negativePrompt = pickString(body.negative_prompt, otherParams.negative_prompt)
-  const audio = pickString(body.audio, otherParams.audio)
+  const rawAudio = pickString(body.audio, otherParams.audio)
+  const audio = normalizeReplicateHttpUri(rawAudio)
+  if (rawAudio && !audio) {
+    throw new Error(
+      "Invalid audio URL: use a public http(s) URL (upload audio instead of a blob preview).",
+    )
+  }
 
   const resolution = pickString(otherParams.resolution) ?? "1080p"
   const durationRaw = otherParams.duration
