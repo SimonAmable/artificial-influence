@@ -254,8 +254,8 @@ export function ImageGrid({
     6: 'grid-cols-6',
   }[columnCount] || 'grid-cols-2'
 
-  // Gap class mapping - use larger gap for single column, no gap for multi-column
-  const gapClass = isOneColumn ? 'gap-4' : 'gap-0'
+  // Keep a small gap in multi-column mode so identical generating cards stay visually distinct.
+  const gapClass = isOneColumn ? 'gap-4' : 'gap-1'
 
   return (
     <div className={cn("w-full h-full flex flex-col py-0", className)}>
@@ -313,8 +313,8 @@ export function ImageGrid({
                 <div
                   key={item.id}
                   className={cn(
-                    "relative w-full overflow-hidden bg-zinc-900 rounded-lg",
-                    "aspect-square"
+                    "relative isolate w-full overflow-hidden rounded-lg border border-white/10 bg-zinc-900",
+                    isOneColumn ? "min-h-[50vh]" : "aspect-square min-h-[180px]"
                   )}
                 >
                   {/* White fading line animation - 20 second infinite duration */}
@@ -328,6 +328,9 @@ export function ImageGrid({
                   />
                   {/* Overlay gradient for depth */}
                   <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30 pointer-events-none" />
+                  <div className="absolute bottom-2 left-2 z-10 rounded-md bg-black/50 px-2 py-1 text-[10px] font-medium text-white/90">
+                    Generating...
+                  </div>
                 </div>
               ) : (
             <div

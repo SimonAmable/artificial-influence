@@ -91,15 +91,24 @@ function mergeRemoteHistoryWithLocal(
   previous: ImageHistoryItem[],
   serverRows: ImageHistoryItem[]
 ): ImageHistoryItem[] {
-  const serverUrls = new Set(serverRows.map((row) => row.url))
-  const aheadOfServer = previous.filter((row) => !serverUrls.has(row.url))
+  const serverByUrl = new Map(serverRows.map((row) => [row.url, row]))
   const seen = new Set<string>()
   const out: ImageHistoryItem[] = []
-  for (const row of [...aheadOfServer, ...serverRows]) {
-    if (seen.has(row.url)) continue
-    seen.add(row.url)
-    out.push(row)
+
+  // Preserve current UI order so just-completed images stay pinned at the front.
+  for (const localRow of previous) {
+    if (seen.has(localRow.url)) continue
+    seen.add(localRow.url)
+    out.push(serverByUrl.get(localRow.url) ?? localRow)
   }
+
+  // Append any server rows that are new to the client.
+  for (const serverRow of serverRows) {
+    if (seen.has(serverRow.url)) continue
+    seen.add(serverRow.url)
+    out.push(serverRow)
+  }
+
   return out
 }
 
