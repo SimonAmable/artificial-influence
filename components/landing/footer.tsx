@@ -3,7 +3,7 @@ import Link from "next/link"
 export function Footer() {
   return (
     <footer className="w-full bg-background py-12">
-      <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-4 lg:px-8">
+      <div className="grid w-full gap-10 px-4 sm:px-6 lg:grid-cols-4 lg:px-8">
         <div className="lg:col-span-2">
           <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
             UniCan
@@ -59,7 +59,7 @@ export function Footer() {
         </div>
       </div>
 
-      <div className="mx-auto mt-10 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mt-10 w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-2 border-t pt-6 pb-4">
           <span className="text-xs text-muted-foreground">
             Chat with AI to learn more
