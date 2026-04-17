@@ -19,6 +19,8 @@ export const AI_VENDOR_ICON_BY_SLUG: Record<string, string> = {
   /** Alibaba / Qwen family models */
   alibaba: "/ai_icons/qwen.svg",
   qwen: "/ai_icons/qwen.svg",
+  /** Wan video (Wan 2.x) — Qwen family */
+  "wan-video": "/ai_icons/qwen.svg",
 }
 
 export function aiVendorIconSrc(vendorSlug: string): string {

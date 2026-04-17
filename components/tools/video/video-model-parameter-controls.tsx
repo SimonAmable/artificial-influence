@@ -16,6 +16,12 @@ import {
 } from "@/components/shared/selectors/aspect-ratio-selector"
 import { SpeakerHigh } from "@phosphor-icons/react"
 
+/** -1 = model-chosen length; show "Auto" instead of "-1s" in the UI. */
+function formatDurationEnumLabel(option: number, unit: string): string {
+  if (unit === "s" && option === -1) return "Auto"
+  return `${option}${unit}`
+}
+
 interface VideoModelParameterControlsProps {
   videoModels: Model[]
   selectedModel: Model
@@ -24,7 +30,7 @@ interface VideoModelParameterControlsProps {
   onParametersChange: (params: Record<string, unknown>) => void
   disabled?: boolean
   className?: string
-  variant?: "page" | "toolbar"
+  variant?: "page" | "toolbar" | "image"
   /** When true, show "Keep original sound" (e.g. Omni with reference video) */
   referenceVideoProvided?: boolean
 }
@@ -41,6 +47,8 @@ export function VideoModelParameterControls({
   referenceVideoProvided = false,
 }: VideoModelParameterControlsProps) {
   const isToolbar = variant === "toolbar"
+  const isImage = variant === "image"
+  const rowH = isImage ? "!h-7" : "h-8"
 
   const modelMap = React.useMemo(() => {
     const map = new Map<string, Model>()
@@ -84,7 +92,7 @@ export function VideoModelParameterControls({
             <SelectTrigger
               id={param.name}
               size="sm"
-              className={cn("h-8 text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")}
+              className={cn(rowH, "text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")}
             >
               <SelectValue placeholder={param.label} />
             </SelectTrigger>
@@ -125,7 +133,7 @@ export function VideoModelParameterControls({
             <SelectTrigger
               id={param.name}
               size="sm"
-              className={cn("h-8 text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")}
+              className={cn(rowH, "text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")}
             >
               <SelectValue placeholder={param.label}>
                 {aspectVal ? (
@@ -163,7 +171,7 @@ export function VideoModelParameterControls({
           <SelectTrigger
             id={param.name}
             size="sm"
-            className={cn("h-8 text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")}
+            className={cn(rowH, "text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")}
           >
             <SelectValue placeholder={param.label} />
           </SelectTrigger>
@@ -188,7 +196,7 @@ export function VideoModelParameterControls({
       return (
         <div
           key={param.name}
-          className="h-8 flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20"
+          className={cn(rowH, "flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20")}
         >
           <Switch
             id={param.name}
@@ -229,7 +237,8 @@ export function VideoModelParameterControls({
             id={param.name}
             size="sm"
             className={cn(
-              "h-8 text-xs w-fit px-2",
+              rowH,
+              "text-xs w-fit px-2",
               compactDurationToolbar
                 ? "min-w-fit shrink-0 gap-1 px-1.5 tabular-nums [&_svg:not([class*='size-'])]:size-3.5"
                 : "min-w-[80px]",
@@ -237,14 +246,15 @@ export function VideoModelParameterControls({
             )}
           >
             <SelectValue placeholder={param.label}>
-              {value != null ? `${value}${unit}` : param.label}
+              {value != null
+                ? formatDurationEnumLabel(Number(value), unit)
+                : param.label}
             </SelectValue>
           </SelectTrigger>
           <SelectContent side="top">
             {param.enum.map((option) => (
               <SelectItem key={option} value={String(option)} className="text-xs">
-                {option}
-                {unit}
+                {formatDurationEnumLabel(option, unit)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -257,7 +267,7 @@ export function VideoModelParameterControls({
       return (
         <div
           key={param.name}
-          className="h-8 flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20 min-w-[100px]"
+          className={cn(rowH, "flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20 min-w-[100px]")}
         >
           <Slider
             id={param.name}
@@ -282,7 +292,7 @@ export function VideoModelParameterControls({
       return (
         <div
           key={param.name}
-          className="h-8 flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20"
+          className={cn(rowH, "flex items-center gap-1.5 px-2 rounded-md border border-border bg-muted/20")}
         >
           <Input
             id={param.name}
@@ -304,7 +314,7 @@ export function VideoModelParameterControls({
   }
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
+    <div className={cn("flex flex-wrap items-center", isImage ? "gap-1" : "gap-1.5", className)}>
       <Select
         value={selectedModel.identifier}
         onValueChange={(val) => {
@@ -313,7 +323,10 @@ export function VideoModelParameterControls({
         }}
         disabled={disabled}
       >
-        <SelectTrigger size="sm" className={cn("h-8 text-xs w-fit min-w-[140px]", isToolbar && "min-w-[120px]")}>
+        <SelectTrigger
+          size="sm"
+          className={cn(rowH, "text-xs w-fit min-w-[140px]", isToolbar && "min-w-[120px]", isImage && "min-w-0")}
+        >
           <SelectValue placeholder="Select model">
             {selectedModel && (
               <div className="flex items-center gap-2">

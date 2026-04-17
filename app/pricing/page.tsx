@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { getStoredAffiliateRef } from '@/hooks/use-affiliate-ref';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Sparkle, Info } from '@phosphor-icons/react';
+import { CaretLeft, CaretRight, Sparkle, Info } from '@phosphor-icons/react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   Tooltip,
   TooltipContent,
@@ -60,6 +61,10 @@ const monthlyPlans: PricingPlan[] = [
         name: 'Commercial license',
         info: 'Use generated content for commercial purposes without attribution requirements',
       },
+      {
+        name: '1 Instagram connection',
+        info: 'Connect one Instagram account for publishing and related workflows',
+      },
     ],
     popular: true,
   },
@@ -97,6 +102,10 @@ const monthlyPlans: PricingPlan[] = [
         name: 'Priority processing',
         info: 'Your generations are processed with higher priority for faster results',
       },
+      {
+        name: '10 Instagram connections',
+        info: 'Connect up to ten Instagram accounts for teams, brands, or clients',
+      },
     ],
   },
 ];
@@ -132,6 +141,10 @@ const yearlyPlans: PricingPlan[] = [
       {
         name: 'Commercial license',
         info: 'Use generated content for commercial purposes without attribution requirements',
+      },
+      {
+        name: '1 Instagram connection',
+        info: 'Connect one Instagram account for publishing and related workflows',
       },
     ],
     popular: true,
@@ -171,6 +184,10 @@ const yearlyPlans: PricingPlan[] = [
         name: 'Priority processing',
         info: 'Your generations are processed with higher priority for faster results',
       },
+      {
+        name: '10 Instagram connections',
+        info: 'Connect up to ten Instagram accounts for teams, brands, or clients',
+      },
     ],
   },
 ];
@@ -184,6 +201,7 @@ function formatPlanCurrency(amount: number, currency: 'USD' | 'CAD') {
   return `${prefix}${body}`;
 }
 
+/* Experiment: hide Free tier — restore block + Free jump button + freeCardRef + xl:grid-cols-4
 const freeFeatures: { name: string; info: string }[] = [
   {
     name: 'Sign up at no cost',
@@ -202,6 +220,7 @@ const freeFeatures: { name: string; info: string }[] = [
     info: 'Standard queue times; upgrade when you need more volume or priority',
   },
 ];
+*/
 
 const enterpriseFeatures: { name: string; info: string }[] = [
   {
@@ -220,11 +239,15 @@ const enterpriseFeatures: { name: string; info: string }[] = [
     name: 'Invoicing & terms',
     info: 'Net payment terms and contracts where your finance team needs them',
   },
+  {
+    name: 'Unlimited or custom Instagram connections',
+    info: 'Typically unlimited Instagram accounts; we can also set a custom limit to match procurement or policy',
+  },
 ];
 
-function PlanFeatureList({ features }: { features: { name: string; info: string }[] }) {
+function PlanFeatureList({ features, className }: { features: { name: string; info: string }[]; className?: string }) {
   return (
-    <ul className="space-y-3 mb-8">
+    <ul className={cn('space-y-3 mb-8', className)}>
       {features.map((feature, index) => (
         <li key={index} className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2 flex-1">
@@ -261,13 +284,28 @@ function PlanFeatureList({ features }: { features: { name: string; info: string 
   );
 }
 
+function scrollCardIntoView(el: HTMLElement | null) {
+  el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+}
+
 export default function PricingPage() {
   const [loading, setLoading] = useState<string | null>(null);
   const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
   const router = useRouter();
   const supabase = createClient();
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const proCardRef = useRef<HTMLDivElement>(null);
+  const maxCardRef = useRef<HTMLDivElement>(null);
+  const enterpriseCardRef = useRef<HTMLDivElement>(null);
 
   const pricingPlans = billingInterval === 'month' ? monthlyPlans : yearlyPlans;
+
+  const scrollCarouselBy = (direction: 'prev' | 'next') => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const delta = Math.max(280, Math.floor(el.clientWidth * 0.75));
+    el.scrollBy({ left: direction === 'next' ? delta : -delta, behavior: 'smooth' });
+  };
 
   const handleSubscribe = async (priceId: string, planId: string) => {
     setLoading(planId);
@@ -354,48 +392,98 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* Pricing Cards: Free | Pro | Max | Enterprise */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8 max-w-7xl mx-auto items-stretch">
-          {/* Free */}
-          <div className="relative bg-card rounded-lg border-2 border-border p-8 shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full">
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold mb-2">Free</h2>
-              <p className="text-muted-foreground mb-4">Explore the platform</p>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="text-5xl font-bold">$0</span>
-                <span className="text-sm text-muted-foreground">Forever</span>
-              </div>
+        {/* Plan navigation — jump + carousel arrows on small screens */}
+        <div className="mb-4 flex flex-col items-center gap-3 sm:mb-6">
+          <p className="text-sm text-muted-foreground sm:hidden">Jump to a plan</p>
+          <div className="flex w-full max-w-lg flex-wrap items-center justify-center gap-2 sm:max-w-none">
+            <div className="flex shrink-0 items-center gap-1 sm:hidden">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="rounded-full"
+                aria-label="Scroll plans left"
+                onClick={() => scrollCarouselBy('prev')}
+              >
+                <CaretLeft className="size-4" weight="bold" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="rounded-full"
+                aria-label="Scroll plans right"
+                onClick={() => scrollCarouselBy('next')}
+              >
+                <CaretRight className="size-4" weight="bold" />
+              </Button>
             </div>
-            <Link
-              href="/login?redirect=/pricing"
-              className="w-full py-3 px-6 rounded-lg font-semibold transition-colors mb-6 text-center bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            <div
+              className="flex flex-wrap justify-center gap-2"
+              role="tablist"
+              aria-label="Choose plan to scroll into view"
             >
-              Get started
-            </Link>
-            <div className="flex flex-col items-center gap-2 mb-6">
-              <p className="text-sm text-muted-foreground text-center">
-                Limited free usage — upgrade for full credits
-              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                onClick={() => scrollCardIntoView(proCardRef.current)}
+              >
+                Pro
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                onClick={() => scrollCardIntoView(maxCardRef.current)}
+              >
+                Max
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                onClick={() => scrollCardIntoView(enterpriseCardRef.current)}
+              >
+                Enterprise
+              </Button>
             </div>
-            <PlanFeatureList features={freeFeatures} />
           </div>
+        </div>
+
+        {/* Pricing Cards: Pro | Max | Enterprise — mobile: snap carousel, one centered + peek */}
+        <div
+          ref={carouselRef}
+          className={[
+            'flex max-w-7xl mx-auto items-stretch',
+            '-mx-4 flex-row gap-3 overflow-x-auto overscroll-x-contain pb-4 px-[calc((100vw-85vw)/2)] pt-1',
+            'snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+            'sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:overscroll-auto sm:pb-0 sm:px-0 sm:pt-0',
+            'sm:snap-none lg:gap-8 xl:grid-cols-3',
+          ].join(' ')}
+        >
+          {/* Free tier — commented out for experiment; see freeFeatures + freeCardRef above */}
 
           {pricingPlans.map((plan) => {
             const listMonthly = monthlyPlans.find((p) => p.name === plan.name)?.price;
             return (
             <div
               key={plan.id}
-              className={`relative bg-card rounded-lg border-2 p-8 shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full ${
-                plan.popular ? 'border-primary xl:scale-[1.02] z-10' : 'border-border'
+              ref={plan.name === 'Pro' ? proCardRef : maxCardRef}
+              className={`relative flex h-full min-h-0 max-sm:snap-center max-sm:shrink-0 max-sm:w-[85vw] max-sm:max-w-md flex-col bg-card rounded-lg border-2 p-8 shadow-lg transition-shadow hover:shadow-xl sm:w-auto sm:max-w-none ${
+                plan.popular ? 'z-10 border-primary ring-2 ring-primary/20' : 'border-border'
               }`}
             >
-              {plan.popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold">
+              {plan.popular ? (
+                <div className="mb-4 flex justify-center">
+                  <span className="rounded-full bg-primary px-4 py-1 text-sm font-semibold text-primary-foreground">
                     Most Popular
                   </span>
                 </div>
-              )}
+              ) : null}
 
               <div className="text-center mb-6">
                 <h2 className="text-2xl font-bold mb-2">{plan.name}</h2>
@@ -525,13 +613,18 @@ export default function PricingPage() {
                 </Tooltip>
               </div>
 
-              <PlanFeatureList features={plan.features} />
+              <div className="mt-auto">
+                <PlanFeatureList features={plan.features} className="mb-0" />
+              </div>
             </div>
             );
           })}
 
           {/* Enterprise */}
-          <div className="relative bg-card rounded-lg border-2 border-border p-8 shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full">
+          <div
+            ref={enterpriseCardRef}
+            className="relative flex h-full min-h-0 max-sm:snap-center max-sm:shrink-0 max-sm:w-[85vw] max-sm:max-w-md flex-col bg-card rounded-lg border-2 border-border p-8 shadow-lg transition-shadow hover:shadow-xl sm:w-auto sm:max-w-none"
+          >
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold mb-2">Enterprise</h2>
               <p className="text-muted-foreground mb-4">For organizations at scale</p>
@@ -551,14 +644,16 @@ export default function PricingPage() {
                 Volume pricing, security reviews, and tailored terms
               </p>
             </div>
-            <PlanFeatureList features={enterpriseFeatures} />
+            <div className="mt-auto">
+              <PlanFeatureList features={enterpriseFeatures} className="mb-0" />
+            </div>
           </div>
         </div>
 
         {/* Footer Note */}
         <div className="text-center mt-12">
           <p className="text-sm text-muted-foreground">
-            Cancel anytime. No long-term commitments. All plans include full access to features.
+            Cancel anytime. No long-term commitments. Higher tiers add more credits, priority, and integrations such as Instagram connections.
           </p>
         </div>
       </div>

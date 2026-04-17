@@ -17,6 +17,9 @@ export interface NavigationItem {
 
 export type MegaNavBadge = "new" | "popular"
 
+/** Phosphor icons for feature rows — clearer than generic brand SVGs for create/edit flows */
+export type MegaNavPhosphorIcon = "image" | "video" | "paint-brush"
+
 export interface MegaNavItem {
   path: string
   label: string
@@ -24,6 +27,8 @@ export interface MegaNavItem {
   badge?: MegaNavBadge
   iconSrc?: string
   iconText?: string
+  /** When set, header renders this Phosphor icon instead of iconSrc */
+  iconPhosphor?: MegaNavPhosphorIcon
   /** Replicate-style model id, surfaced on menu items as data-model-identifier */
   modelIdentifier?: string
 }
@@ -125,7 +130,7 @@ export const megaNavGroups: MegaNavGroup[] = [
             label: "Create Image",
             description: "Generate AI images",
             badge: "new",
-            iconSrc: "/ai_icons/openai.svg",
+            iconPhosphor: "image",
           },
           {
             path: "/character-swap",
@@ -138,7 +143,7 @@ export const megaNavGroups: MegaNavGroup[] = [
             path: "/inpaint",
             label: "Image Editing",
             description: "Select area and edit",
-            iconSrc: "/swap-icon.svg",
+            iconPhosphor: "paint-brush",
           },
         ],
       },
@@ -191,6 +196,12 @@ export const megaNavGroups: MegaNavGroup[] = [
       {
         title: "Features",
         items: [
+          {
+            path: "/video",
+            label: "Create Video",
+            description: "Text or image to video generation",
+            iconPhosphor: "video",
+          },
           {
             path: "/editor",
             label: "Video Editor",

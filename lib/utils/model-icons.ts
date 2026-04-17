@@ -25,6 +25,8 @@ export function getModelIconPath(identifier: string): string | null {
     case 'kwaivgi':
       return '/ai_icons/kling-color.svg'
     case 'fal-ai':
+    case 'wan-video':
+      // Wan (Wan 2.x) — Alibaba Qwen family; same mark as fal-ai/qwen-image-2
       return '/ai_icons/qwen.svg'
     default:
       return null

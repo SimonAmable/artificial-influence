@@ -4,15 +4,25 @@ import { Instagram } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+type AutomationLogoConnectionProps = {
+  className?: string
+  /** Fill a parent with defined height (e.g. Safari viewport) instead of a fixed min height */
+  fillContainer?: boolean
+}
+
 /**
  * Animated link between the UniCan mark and the standard Instagram mark (automation / social posting).
  */
-export function AutomationLogoConnection({ className }: { className?: string }) {
+export function AutomationLogoConnection({
+  className,
+  fillContainer = false,
+}: AutomationLogoConnectionProps) {
   return (
     <div
       className={cn(
-        "relative flex h-full min-h-[220px] w-full items-center justify-center gap-2 overflow-hidden bg-neutral-950 px-3 py-6 sm:gap-4 sm:px-5",
+        "relative flex w-full items-center justify-center gap-2 overflow-hidden bg-neutral-950 px-3 py-6 sm:gap-4 sm:px-5",
         "bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.06)_1px,transparent_0)] bg-[length:20px_20px]",
+        fillContainer ? "h-full min-h-0 flex-1" : "h-full min-h-[220px]",
         className
       )}
     >

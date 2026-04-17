@@ -27,7 +27,13 @@ function modelBentoColSpans(total: number): number[] {
   return [8, 4, ...modelBentoColSpans(total - 2)]
 }
 
-function modelBentoLayoutClass(index: number, total: number): string {
+/** Kling + Grok: keep each tile at one-third width so the row reads lighter than the default 8/4 split. */
+const NARROW_VENDOR_SLUGS = new Set(["kwaivgi", "xai"])
+
+function modelBentoLayoutClass(index: number, total: number, vendorSlug: string): string {
+  if (NARROW_VENDOR_SLUGS.has(vendorSlug)) {
+    return cn("lg:col-span-4", BENTO_MIN_H)
+  }
   const spans = modelBentoColSpans(total)
   const span = spans[index]
   if (span === undefined) {
@@ -48,8 +54,8 @@ function modelBentoLayoutClass(index: number, total: number): string {
 }
 
 function BentoMediaBackground({ media }: { media: LandingBentoCardMedia }) {
-  if (media.mediaType === "video") {
-    return (
+  const mediaNode =
+    media.mediaType === "video" ? (
       <video
         src={encodeURI(media.src)}
         autoPlay
@@ -58,15 +64,28 @@ function BentoMediaBackground({ media }: { media: LandingBentoCardMedia }) {
         playsInline
         className="h-full min-h-full w-full object-cover"
       />
+    ) : (
+      // eslint-disable-next-line @next/next/no-img-element -- dynamic public paths
+      <img
+        src={encodeURI(media.src)}
+        alt=""
+        className="h-full w-full bg-neutral-950 object-cover object-center"
+      />
     )
-  }
+
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- dynamic public paths
-    <img
-      src={encodeURI(media.src)}
-      alt=""
-      className="h-full w-full bg-neutral-950 object-cover object-center"
-    />
+    <>
+      {mediaNode}
+      {/*
+        Depth overlay: carries the custom --shadow-l (inset top highlight + drop shadows)
+        on top of the media so the highlight paints over the image instead of behind it.
+        rounded-3xl matches the card so the highlight tracks the corner radius.
+      */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-3xl shadow-lg"
+      />
+    </>
   )
 }
 
@@ -76,34 +95,24 @@ export function ModelsBentoSection() {
   const totalGroups = groups.length
 
   return (
-    <section
-      id="models-bento"
-      className="dark w-full border-t border-white/5 bg-neutral-950 bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.06)_1px,transparent_0)] bg-[length:20px_20px] py-16 text-neutral-50 sm:py-24"
-    >
+    <section id="models-bento" className="w-full bg-background py-16 sm:py-24">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-          <div className="max-w-xl">
-            <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-              {modelsBentoCopy.title}
-            </h2>
-            <p className="mt-2 text-sm text-neutral-400">{modelsBentoCopy.description}</p>
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">{modelsBentoCopy.title}</h2>
+            <p className="mt-4 text-muted-foreground">{modelsBentoCopy.description}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-white/15 bg-transparent text-white hover:bg-white/10"
-              asChild
-            >
+          <div className="flex flex-wrap items-center gap-2 md:shrink-0">
+            <Button variant="outline" asChild>
               <Link href={modelsBentoCopy.secondaryCtaHref}>{modelsBentoCopy.secondaryCtaLabel}</Link>
             </Button>
-            <Button size="sm" className="bg-white text-neutral-950 hover:bg-neutral-200" asChild>
+            <Button asChild>
               <Link href={modelsBentoCopy.primaryCtaHref}>{modelsBentoCopy.primaryCtaLabel}</Link>
             </Button>
           </div>
         </div>
 
-        <BentoGrid className="mt-10 auto-rows-[minmax(26rem,_auto)] grid-cols-1 md:grid-cols-2 md:auto-rows-[minmax(28rem,_auto)] lg:auto-rows-[minmax(30rem,_auto)] lg:grid-cols-12 lg:gap-4">
+        <BentoGrid className="mt-10 auto-rows-[minmax(26rem,_auto)] grid-cols-1 md:grid-cols-2 md:auto-rows-[minmax(28rem,_auto)] lg:auto-rows-[minmax(26rem,_auto)] lg:grid-cols-12 lg:gap-4">
           {groups.map((group, index) => {
             const first = group.models[0]
             const href = first
@@ -122,7 +131,7 @@ export function ModelsBentoSection() {
                 cta="Open"
                 className={cn(
                   "!aspect-auto min-h-[280px] border-white/10 md:aspect-auto",
-                  modelBentoLayoutClass(index, totalGroups)
+                  modelBentoLayoutClass(index, totalGroups, group.vendorSlug)
                 )}
                 background={<BentoMediaBackground media={media} />}
               />

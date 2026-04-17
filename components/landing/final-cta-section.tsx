@@ -18,7 +18,7 @@ export function FinalCTASection() {
           Custom support for teams and small businesses. Talk to us when you need onboarding help,
           billing questions, or a tailored setup.
         </p>
-        <div className="mt-8 flex flex-col flex-wrap items-center justify-center gap-3 sm:flex-row">
+        <div className="mt-8 flex flex-row flex-wrap items-center justify-center gap-3">
           <Link href="/login?mode=signup">
             <Button size="lg">Get Started Free</Button>
           </Link>

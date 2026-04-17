@@ -556,6 +556,199 @@ export function VideoInputBox({
     )
     : "Describe the video you want to generate..."
 
+  const generateButtonEl = (
+    <div className="shrink-0">
+      <div
+        className={cn(
+          "relative inline-block transition-all duration-300",
+          isReady &&
+            "before:content-[''] before:absolute before:inset-[-12px] before:bg-primary before:rounded-full before:blur-[15px] before:opacity-50 before:-z-10"
+        )}
+      >
+        <Button
+          onClick={onGenerate}
+          disabled={!isReady || isGenerating}
+          className={cn(
+            "bg-primary hover:bg-primary/80 text-primary-foreground font-semibold h-10 min-w-[100px] text-sm px-4 py-6 transition-all duration-300 relative z-0",
+            !isReady && "opacity-50 cursor-not-allowed"
+          )}
+        >
+          {isGenerating ? (
+            <>
+              <CircleNotch className="size-3 mr-1.5 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-sm font-semibold">Generate</span>
+              <div className="flex items-center gap-0.5">
+                <Sparkle size={8} weight="fill" />
+                <span className="text-[10px]">
+                  {selectedModel.model_cost != null ? selectedModel.model_cost : "—"}
+                </span>
+              </div>
+            </div>
+          )}
+        </Button>
+      </div>
+    </div>
+  )
+
+  const videoToolbarRow = (
+    <div className="flex items-center gap-1 flex-wrap px-2">
+      {(modelSupportsImage || modelSupportsLastFrame || isReferenceVideoSupported) &&
+        !isMotionCopyModel &&
+        !isLipsyncModel && (
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full bg-muted hover:bg-muted/80"
+                  aria-label={
+                    isSeedance2
+                      ? "Add image, video, or reference (image/audio)"
+                      : "Add image or video"
+                  }
+                >
+                  <Plus className="size-3.5" weight="bold" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {modelSupportsImage && (
+                  <DropdownMenuItem
+                    onClick={() => inputRef.current?.click()}
+                    disabled={!!inputImage || chipSlotInfo.inputSlotFromChip}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span className="flex items-center">
+                      <FilePlus className="size-4 mr-2 shrink-0" />
+                      {selectedModel.identifier === "minimax/hailuo-2.3-fast"
+                        ? "Upload First Frame"
+                        : "Upload Input Image"}
+                    </span>
+                    {(chipSlotInfo.inputSlotFromChip || inputImage) && (
+                      <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {modelSupportsLastFrame && (
+                  <DropdownMenuItem
+                    onClick={() => lastFrameRef.current?.click()}
+                    disabled={!!lastFrameImage || chipSlotInfo.lastFrameSlotFromChip}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span className="flex items-center">
+                      <FilePlus className="size-4 mr-2 shrink-0" />
+                      Upload Last Frame
+                    </span>
+                    {(chipSlotInfo.lastFrameSlotFromChip || lastFrameImage) && (
+                      <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {isReferenceVideoSupported && (
+                  <DropdownMenuItem
+                    onClick={() => videoRef.current?.click()}
+                    disabled={!!inputVideo || chipSlotInfo.referenceVideoSlotFromChip}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span className="flex items-center">
+                      <FilePlus className="size-4 mr-2 shrink-0" />
+                      Upload Reference Video
+                    </span>
+                    {(chipSlotInfo.referenceVideoSlotFromChip || inputVideo) && (
+                      <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {usesRefImageGallery && onReferenceImagesChange && (
+                  <DropdownMenuItem
+                    disabled={!canAddReferenceImage}
+                    onClick={() => referenceImagesRef.current?.click()}
+                    className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
+                  >
+                    <span className="flex items-center text-sm font-medium">
+                      <FilePlus className="mr-2 size-4 shrink-0" />
+                      {isSeedance2 ? "Reference image" : "Add reference image"}
+                    </span>
+                    {isSeedance2 ? (
+                      <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                        JPEG or PNG, up to {maxReferenceImages}. Use [Image1] in your prompt.
+                      </span>
+                    ) : null}
+                  </DropdownMenuItem>
+                )}
+                {(isSeedance2 || isWan27) && (
+                  <DropdownMenuItem
+                    disabled={!canAddSeedanceReferenceAudio}
+                    onClick={() => referenceAudioRef.current?.click()}
+                    className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
+                  >
+                    <span className="flex items-center text-sm font-medium">
+                      <Waveform className="mr-2 size-4 shrink-0" weight="duotone" />
+                      {isWan27 ? "Optional audio" : "Reference audio"}
+                    </span>
+                    <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                      {isWan27
+                        ? ".wav / .mp3 — optional sync audio for Wan 2.7 (3–30s per model docs)."
+                        : ".wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a frame or reference video."}
+                    </span>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleImageUpload(e, "input")}
+              className="hidden"
+            />
+            <input
+              ref={lastFrameRef}
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleImageUpload(e, "lastFrame")}
+              className="hidden"
+            />
+            <input
+              ref={videoRef}
+              type="file"
+              accept="video/*"
+              onChange={handleVideoUpload}
+              className="hidden"
+            />
+            {isWan27 ? (
+              <input
+                ref={referenceAudioRef}
+                type="file"
+                accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac"
+                onChange={handleReferenceAudioAdd}
+                className="hidden"
+                aria-hidden
+              />
+            ) : null}
+          </>
+        )}
+
+      <VideoModelParameterControls
+        videoModels={videoModels}
+        selectedModel={selectedModel}
+        onModelChange={onModelChange}
+        parameters={parameters}
+        onParametersChange={onParametersChange}
+        disabled={isGenerating}
+        variant="image"
+        referenceVideoProvided={!!inputVideo || chipSlotInfo.referenceVideoSlotFromChip}
+      />
+
+      {!needsPrompt && generateButtonEl}
+    </div>
+  )
+
   // Unified interface structure
   return (
     <Card
@@ -765,26 +958,32 @@ export function VideoInputBox({
           </div>
         )}
 
-        {/* 1. PROMPT AT TOP (when needed) */}
+        {/* Prompt + Generate (same row as /image); model row below */}
         {needsPrompt && (
-          <div className="flex items-start gap-2 pt-1 px-2">
-            <VideoPromptFields
-              promptValue={promptValue}
-              onPromptChange={onPromptChange}
-              negativePromptValue={negativePromptValue}
-              onNegativePromptChange={onNegativePromptChange}
-              showNegativePrompt={modelSupportsNegativePrompt}
-              placeholder={promptPlaceholderText}
-              variant="page"
-              onPromptKeyDown={handleTextInputKeyDown}
-              onPasteImage={canAcceptImageDrop ? handlePromptImageFile : undefined}
-              attachedRefs={attachedRefs}
-              onRefsChange={setAttachedRefs}
-              allowedAssetTypes={allowedAssetTypes}
-              slashCommands={VIDEO_PRESET_COMMANDS}
-              onSlashUiAction={handleSlashUiAction}
-            />
-          </div>
+          <>
+            <div className="flex items-start gap-2 pt-1 px-2">
+              <div className="min-w-0 flex-1">
+                <VideoPromptFields
+                  promptValue={promptValue}
+                  onPromptChange={onPromptChange}
+                  negativePromptValue={negativePromptValue}
+                  onNegativePromptChange={onNegativePromptChange}
+                  showNegativePrompt={modelSupportsNegativePrompt}
+                  placeholder={promptPlaceholderText}
+                  variant="page"
+                  onPromptKeyDown={handleTextInputKeyDown}
+                  onPasteImage={canAcceptImageDrop ? handlePromptImageFile : undefined}
+                  attachedRefs={attachedRefs}
+                  onRefsChange={setAttachedRefs}
+                  allowedAssetTypes={allowedAssetTypes}
+                  slashCommands={VIDEO_PRESET_COMMANDS}
+                  onSlashUiAction={handleSlashUiAction}
+                />
+              </div>
+              {generateButtonEl}
+            </div>
+            {videoToolbarRow}
+          </>
         )}
 
         {/* Kling v3 / Omni: Multishot */}
@@ -985,189 +1184,8 @@ export function VideoInputBox({
           </div>
         )}
 
-        {/* 3. BOTTOM ROW: Plus button + Model Selector + Parameters + Generate (for upload models) */}
-        <div className="flex flex-wrap items-center gap-1.5 px-2">
-          {/* Plus button for first frame / last frame / reference video (only for models that need it, not motion/lipsync) */}
-          {(modelSupportsImage || modelSupportsLastFrame || isReferenceVideoSupported) && !isMotionCopyModel && !isLipsyncModel && (
-            <>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-md bg-muted/20 hover:bg-muted/40 border border-border"
-                    aria-label={
-                      isSeedance2
-                        ? "Add image, video, or reference (image/audio)"
-                        : "Add image or video"
-                    }
-                  >
-                    <Plus className="size-3.5" weight="bold" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  {modelSupportsImage && (
-                    <DropdownMenuItem
-                      onClick={() => inputRef.current?.click()}
-                      disabled={!!inputImage || chipSlotInfo.inputSlotFromChip}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="flex items-center">
-                        <FilePlus className="size-4 mr-2 shrink-0" />
-                        {selectedModel.identifier === "minimax/hailuo-2.3-fast"
-                          ? "Upload First Frame"
-                          : "Upload Input Image"}
-                      </span>
-                      {(chipSlotInfo.inputSlotFromChip || inputImage) && (
-                        <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
-                      )}
-                    </DropdownMenuItem>
-                  )}
-                  {modelSupportsLastFrame && (
-                    <DropdownMenuItem
-                      onClick={() => lastFrameRef.current?.click()}
-                      disabled={!!lastFrameImage || chipSlotInfo.lastFrameSlotFromChip}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="flex items-center">
-                        <FilePlus className="size-4 mr-2 shrink-0" />
-                        Upload Last Frame
-                      </span>
-                      {(chipSlotInfo.lastFrameSlotFromChip || lastFrameImage) && (
-                        <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
-                      )}
-                    </DropdownMenuItem>
-                  )}
-                  {isReferenceVideoSupported && (
-                    <DropdownMenuItem
-                      onClick={() => videoRef.current?.click()}
-                      disabled={!!inputVideo || chipSlotInfo.referenceVideoSlotFromChip}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="flex items-center">
-                        <FilePlus className="size-4 mr-2 shrink-0" />
-                        Upload Reference Video
-                      </span>
-                      {(chipSlotInfo.referenceVideoSlotFromChip || inputVideo) && (
-                        <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
-                      )}
-                    </DropdownMenuItem>
-                  )}
-                  {usesRefImageGallery && onReferenceImagesChange && (
-                    <DropdownMenuItem
-                      disabled={!canAddReferenceImage}
-                      onClick={() => referenceImagesRef.current?.click()}
-                      className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
-                    >
-                      <span className="flex items-center text-sm font-medium">
-                        <FilePlus className="mr-2 size-4 shrink-0" />
-                        {isSeedance2 ? "Reference image" : "Add reference image"}
-                      </span>
-                      {isSeedance2 ? (
-                        <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
-                          JPEG or PNG, up to {maxReferenceImages}. Use [Image1] in your prompt.
-                        </span>
-                      ) : null}
-                    </DropdownMenuItem>
-                  )}
-                  {(isSeedance2 || isWan27) && (
-                    <DropdownMenuItem
-                      disabled={!canAddSeedanceReferenceAudio}
-                      onClick={() => referenceAudioRef.current?.click()}
-                      className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
-                    >
-                      <span className="flex items-center text-sm font-medium">
-                        <Waveform className="mr-2 size-4 shrink-0" weight="duotone" />
-                        {isWan27 ? "Optional audio" : "Reference audio"}
-                      </span>
-                      <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
-                        {isWan27
-                          ? ".wav / .mp3 — optional sync audio for Wan 2.7 (3–30s per model docs)."
-                          : ".wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a frame or reference video."}
-                      </span>
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Hidden file inputs */}
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleImageUpload(e, 'input')}
-                className="hidden"
-              />
-              <input
-                ref={lastFrameRef}
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleImageUpload(e, 'lastFrame')}
-                className="hidden"
-              />
-              <input
-                ref={videoRef}
-                type="file"
-                accept="video/*"
-                onChange={handleVideoUpload}
-                className="hidden"
-              />
-              {isWan27 ? (
-                <input
-                  ref={referenceAudioRef}
-                  type="file"
-                  accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac"
-                  onChange={handleReferenceAudioAdd}
-                  className="hidden"
-                  aria-hidden
-                />
-              ) : null}
-            </>
-          )}
-
-          <VideoModelParameterControls
-            videoModels={videoModels}
-            selectedModel={selectedModel}
-            onModelChange={onModelChange}
-            parameters={parameters}
-            onParametersChange={onParametersChange}
-            disabled={isGenerating}
-            variant="page"
-            referenceVideoProvided={!!inputVideo || chipSlotInfo.referenceVideoSlotFromChip}
-          />
-
-          <div className="flex-1" />
-
-          {/* Generate Button - always on right */}
-          <Button
-            onClick={onGenerate}
-            disabled={!isReady || isGenerating}
-            size="sm"
-            className={cn(
-              "shrink-0 px-4 text-sm font-semibold h-8",
-              !isReady && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            {isGenerating ? (
-              <>
-                <CircleNotch className="size-3 mr-1.5 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-sm font-semibold">Generate</span>
-                <div className="flex items-center gap-0.5">
-                  <Sparkle size={8} weight="fill" />
-                  <span className="text-[10px]">
-                    {selectedModel.model_cost != null
-                      ? selectedModel.model_cost
-                      : "—"}
-                  </span>
-                </div>
-              </div>
-            )}
-          </Button>
-        </div>
+        {/* Motion / lipsync: model row + Generate (same toolbar as /image bottom row) */}
+        {!needsPrompt && videoToolbarRow}
 
         <input
           ref={slashCreateAssetFileRef}

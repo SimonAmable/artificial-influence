@@ -193,7 +193,8 @@
   html, body {
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
+    /* clip avoids clipping box-shadows on fixed UI (e.g. header) like overflow-x: hidden can */
+    overflow-x: clip;
     overflow-y: auto;
     scrollbar-gutter: stable;
     -webkit-overflow-scrolling: touch;
@@ -351,6 +352,15 @@
 /* Primary buttons get slightly more depth */
 [data-slot="button"][data-variant="default"] {
   box-shadow: var(--shadow-s);
+}
+
+/* FAB / floating icon buttons — large depth (same tier as popovers; beats default button shadow-s) */
+[data-slot="button"].shadow-depth-l {
+  box-shadow: var(--shadow-l);
+}
+
+[data-slot="button"].shadow-depth-l:hover:not(:disabled) {
+  box-shadow: var(--shadow-l);
 }
 
 /* Outline and ghost buttons - minimal or no shadow */

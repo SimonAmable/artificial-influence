@@ -55,6 +55,8 @@ export type LandingPlatformSurfaceCard =
       cta: string
       imageSrc: string
       imageAlt: string
+      /** Shown in the Safari chrome address bar */
+      safariUrl?: string
       layoutClass: string
     }
   | {
@@ -64,5 +66,6 @@ export type LandingPlatformSurfaceCard =
       description: string
       href: string
       cta: string
+      safariUrl?: string
       layoutClass: string
     }

@@ -214,7 +214,7 @@ export function AIChat() {
       {!hideFabOnChatRoute && !open ? (
         <Button
           onClick={() => setOpen(true)}
-          className="fixed right-6 bottom-6 z-60 h-14 w-14 rounded-full shadow-lg"
+          className="fixed right-6 bottom-6 z-60 h-14 w-14 rounded-full shadow-depth-l"
           size="icon"
         >
           <Image src="/logo.svg" alt="" width={22} height={22} className="dark:invert" />

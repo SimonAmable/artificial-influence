@@ -4,7 +4,17 @@ import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { User, SignOut, CaretDownIcon, ChatCircleDots, ClockCounterClockwise, HandCoins } from "@phosphor-icons/react"
+import {
+  User,
+  SignOut,
+  CaretDownIcon,
+  ChatCircleDots,
+  ClockCounterClockwise,
+  HandCoins,
+  Image as ImageIcon,
+  Video as VideoIcon,
+  PaintBrush as PaintBrushIcon,
+} from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -19,7 +29,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { megaNavGroups, navigationItems, type MegaNavBadge, type MegaNavGroup, type MegaNavItem } from "@/lib/constants/navigation"
+import {
+  megaNavGroups,
+  navigationItems,
+  type MegaNavBadge,
+  type MegaNavGroup,
+  type MegaNavItem,
+  type MegaNavPhosphorIcon,
+} from "@/lib/constants/navigation"
+
+const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
+  image: ImageIcon,
+  video: VideoIcon,
+  "paint-brush": PaintBrushIcon,
+}
 import { FeedbackDialog } from "@/components/app/feedback-dialog"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
 import { clearOnboardingCompletedLocal } from "@/lib/onboarding/client-storage"
@@ -63,6 +86,7 @@ function isGroupActive(pathname: string, group: MegaNavGroup) {
 
 function HeaderMenuItem({ item, onSelect }: { item: MegaNavItem; onSelect: (path: string) => void }) {
   const classes = item.badge ? getBadgeClasses(item.badge) : null
+  const PhosphorIcon = item.iconPhosphor ? MEGA_NAV_PHOSPHOR[item.iconPhosphor] : null
   return (
     <DropdownMenuItem
       onClick={() => onSelect(item.path)}
@@ -79,6 +103,8 @@ function HeaderMenuItem({ item, onSelect }: { item: MegaNavItem; onSelect: (path
           >
             {item.path === "/history" ? (
               <ClockCounterClockwise className="h-[18px] w-[18px] text-foreground" weight="duotone" />
+            ) : PhosphorIcon ? (
+              <PhosphorIcon className="h-[18px] w-[18px] text-foreground" weight="duotone" />
             ) : item.iconSrc ? (
               <Image
                 src={item.iconSrc}
@@ -237,24 +263,31 @@ export function Header() {
 
   return (
     <header className={cn(
-      "fixed z-50 flex flex-col rounded-none bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 pointer-events-auto",
+      "fixed z-50 flex flex-col overflow-visible rounded-none bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 pointer-events-auto",
       "transition-all duration-300 ease-in-out",
       isScrolled ? "shadow-lg" : "",
       isAuthPage ? "top-0 left-0 right-0 rounded-none" : isScrolled ? "top-4 left-4 right-4" : "top-0 left-0 right-0"
     )}>
-      <div className="flex h-[44px] min-w-0 items-center justify-between gap-2 px-4">
-        <div className="flex min-w-0 shrink items-center gap-4 lg:gap-6 overflow-hidden">
-          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity shrink-0">
-            <Image 
-              src="/logo.svg" 
-              alt="Logo" 
-              width={50} 
-              height={50}
-              className="h-8 w-8 dark:invert"
+      <div className="flex h-[52px] min-w-0 items-center justify-between gap-2 overflow-visible px-4">
+        <div className="flex min-w-0 shrink items-center gap-4 lg:gap-6">
+          <Link
+            href="/"
+            className="relative flex shrink-0 items-center justify-center rounded-full p-0.5 transition-opacity hover:opacity-80"
+          >
+            <span
+              aria-hidden
+              className="pointer-events-none absolute left-1/2 top-1/2 h-11 w-11 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/5 shadow-lg dark:bg-white/6"
+            />
+            <Image
+              src="/logo.svg"
+              alt="Logo"
+              width={24}
+              height={24}
+              className="relative z-10 h-6 w-6 dark:invert"
             />
           </Link>
           {/* Desktop Navigation - hidden on tablet and smaller */}
-          <nav className="hidden lg:flex items-center gap-2 whitespace-nowrap overflow-hidden">
+          <nav className="hidden min-w-0 lg:flex items-center gap-2 whitespace-nowrap">
             {megaNavGroups.map((group) => {
               const active = isGroupActive(pathname, group)
 
@@ -344,7 +377,10 @@ export function Header() {
           <div className="lg:hidden">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="justify-between gap-2">
+                <Button
+                  variant="outline"
+                  className="justify-between gap-2 shadow-md"
+                >
                   <span>
                     {isPageInDropdown 
                       ? navigationItems.find(item => item.path === currentPage)?.label || "Select a page"

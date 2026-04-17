@@ -77,11 +77,11 @@ export default async function Page() {
   return (
     <>
       <CanvasHeroSection />
+      <ProofSection />
       {/* <WorkflowShowcaseSection /> */}
       <PlatformSurfacesSection />
       {/* <ProcessSection /> */}
       <ModelsBentoSection />
-      <ProofSection />
       <FAQSection />
       <FinalCTASection />
       <Footer />

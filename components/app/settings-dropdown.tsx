@@ -4,6 +4,7 @@ import * as React from "react"
 import { GearIcon, SunIcon, MoonIcon, MonitorIcon, Columns, Rows } from "@phosphor-icons/react"
 import { useTheme } from "next-themes"
 
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -33,7 +34,11 @@ export function SettingsDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className={className}>
+        <Button
+          variant="outline"
+          size="icon"
+          className={cn("shadow-md", className)}
+        >
           <GearIcon className="h-[1.2rem] w-[1.2rem]" />
           <span className="sr-only">Settings</span>
         </Button>

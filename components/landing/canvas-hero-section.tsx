@@ -80,21 +80,21 @@ export function CanvasHeroSection() {
           <HeroHeadline layout="mobile" />
           <motion.p
             variants={heroFadeUp}
-            className="mx-auto -mt-2 w-full max-w-2xl text-pretty text-center text-sm text-muted-foreground sm:text-base"
+            className="mx-auto mt-5 w-full max-w-2xl text-pretty text-center text-sm text-muted-foreground sm:mt-4 sm:text-base md:mt-3"
           >
             {landingHero.description}
           </motion.p>
           <motion.div
             variants={heroFadeUp}
-            className="mt-8 flex w-full max-w-3xl flex-col items-center justify-center gap-3 sm:flex-row"
+            className="mt-8 flex w-full max-w-3xl flex-row flex-wrap items-center justify-center gap-3"
           >
             <Link href={landingHero.primaryCtaHref}>
-              <Button size="lg" className="w-full sm:w-auto">
+              <Button size="lg" className="w-auto">
                 {landingHero.primaryCtaLabel}
               </Button>
             </Link>
             <Link href={landingHero.secondaryCtaHref}>
-              <Button variant="outline" size="lg" className="w-full sm:w-auto">
+              <Button variant="outline" size="lg" className="w-auto">
                 {landingHero.secondaryCtaLabel}
               </Button>
             </Link>
@@ -124,7 +124,7 @@ export function CanvasHeroSection() {
               <HeroHeadline layout="desktop" />
               <motion.p
                 variants={heroFadeUp}
-                className="mx-auto -mt-2 max-w-xl text-pretty text-sm text-muted-foreground sm:text-base"
+                className="mx-auto mt-3 max-w-xl text-pretty text-sm text-muted-foreground sm:mt-4 sm:text-base"
               >
                 {landingHero.description}
               </motion.p>

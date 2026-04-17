@@ -364,7 +364,7 @@ export default function AssetsPage() {
         </Tabs>
 
         <Tabs value={category} onValueChange={(value) => setCategory(value as AssetCategory | "all")}>
-          <TabsList className="mb-6 flex flex-wrap h-auto">
+          <TabsList className="mb-6 flex max-w-full flex-wrap gap-1">
             <TabsTrigger value="all">All</TabsTrigger>
             {ASSET_CATEGORIES.map((item) => (
               <TabsTrigger key={item} value={item}>
