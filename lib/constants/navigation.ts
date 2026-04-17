@@ -18,7 +18,13 @@ export interface NavigationItem {
 export type MegaNavBadge = "new" | "popular"
 
 /** Phosphor icons for feature rows — clearer than generic brand SVGs for create/edit flows */
-export type MegaNavPhosphorIcon = "image" | "video" | "paint-brush"
+export type MegaNavPhosphorIcon =
+  | "image"
+  | "video"
+  | "paint-brush"
+  | "film-strip"
+  | "flow-arrow"
+  | "microphone"
 
 export interface MegaNavItem {
   path: string
@@ -207,20 +213,20 @@ export const megaNavGroups: MegaNavGroup[] = [
             label: "Video Editor",
             description: "Remotion timeline and canvas",
             badge: "new",
-            iconSrc: "/ai_icons/kling-color.svg",
+            iconPhosphor: "film-strip",
           },
           {
             path: "/motion-copy",
             label: "Motion Copy",
             description: "Transfer movement patterns",
             badge: "popular",
-            iconSrc: "/ai_icons/kling-color.svg",
+            iconPhosphor: "flow-arrow",
           },
           {
             path: "/lipsync",
             label: "Lipsync",
             description: "Sync voice with character",
-            iconSrc: "/ai_icons/openai.svg",
+            iconPhosphor: "microphone",
           },
         ],
       },

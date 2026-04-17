@@ -14,6 +14,9 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   PaintBrush as PaintBrushIcon,
+  FilmStrip,
+  FlowArrow,
+  Microphone as MicrophoneIcon,
 } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
@@ -37,15 +40,18 @@ import {
   type MegaNavItem,
   type MegaNavPhosphorIcon,
 } from "@/lib/constants/navigation"
+import { FeedbackDialog } from "@/components/app/feedback-dialog"
+import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
+import { clearOnboardingCompletedLocal } from "@/lib/onboarding/client-storage"
 
 const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
   image: ImageIcon,
   video: VideoIcon,
   "paint-brush": PaintBrushIcon,
+  "film-strip": FilmStrip,
+  "flow-arrow": FlowArrow,
+  microphone: MicrophoneIcon,
 }
-import { FeedbackDialog } from "@/components/app/feedback-dialog"
-import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
-import { clearOnboardingCompletedLocal } from "@/lib/onboarding/client-storage"
 
 function getBadgeClasses(badge: MegaNavBadge) {
   if (badge === "new") {
