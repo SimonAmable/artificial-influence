@@ -279,6 +279,58 @@ export const megaNavGroups: MegaNavGroup[] = [
   { label: "Pricing", path: "/pricing" },
 ]
 
+/** Minimal link shape for footer columns (mirrors mega menu). */
+export interface FooterMegaNavLink {
+  path: string
+  label: string
+}
+
+/**
+ * Footer columns aligned with the desktop mega menu: Image tools, Video tools,
+ * Other tools (Assets + top-level links), and split Image / Video models.
+ */
+export function getFooterMegaNavColumns(): {
+  imageTools: FooterMegaNavLink[]
+  videoTools: FooterMegaNavLink[]
+  otherTools: FooterMegaNavLink[]
+  imageModels: FooterMegaNavLink[]
+  videoModels: FooterMegaNavLink[]
+} {
+  const toLinks = (items: MegaNavItem[]): FooterMegaNavLink[] =>
+    items.map((i) => ({ path: i.path, label: i.label }))
+
+  const imageGroup = megaNavGroups.find((g) => g.label === "Image")
+  const videoGroup = megaNavGroups.find((g) => g.label === "Video")
+  const assetsGroup = megaNavGroups.find((g) => g.label === "Assets")
+
+  const imageTools = toLinks(
+    imageGroup?.sections?.find((s) => s.title === "Features")?.items ?? [],
+  )
+  const videoTools = toLinks(
+    videoGroup?.sections?.find((s) => s.title === "Features")?.items ?? [],
+  )
+  const imageModels = toLinks(
+    imageGroup?.sections?.find((s) => s.title === "Models")?.items ?? [],
+  )
+  const videoModels = toLinks(
+    videoGroup?.sections?.find((s) => s.title === "Models")?.items ?? [],
+  )
+
+  const otherTools: FooterMegaNavLink[] = []
+  if (assetsGroup?.simpleItems?.length) {
+    for (const item of assetsGroup.simpleItems) {
+      otherTools.push({ path: item.path, label: item.label })
+    }
+  }
+  for (const g of megaNavGroups) {
+    if (g.path && !g.sections?.length && !g.simpleItems?.length) {
+      otherTools.push({ path: g.path, label: g.label })
+    }
+  }
+
+  return { imageTools, videoTools, otherTools, imageModels, videoModels }
+}
+
 /**
  * Dashboard quick-action tools.
  * Keep this alongside navigation constants so dashboard and nav stay aligned.

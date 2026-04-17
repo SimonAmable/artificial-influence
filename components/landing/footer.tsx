@@ -1,6 +1,39 @@
 import Link from "next/link"
 
+import {
+  getFooterMegaNavColumns,
+  type FooterMegaNavLink,
+} from "@/lib/constants/navigation"
+import { cn } from "@/lib/utils"
+
+function FooterLinkList({
+  links,
+  listClassName,
+}: {
+  links: FooterMegaNavLink[]
+  /** Default: top margin for column lists */
+  listClassName?: string
+}) {
+  return (
+    <ul className={cn("space-y-2", listClassName ?? "mt-4")}>
+      {links.map((item) => (
+        <li key={`${item.path}-${item.label}`}>
+          <Link
+            href={item.path}
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {item.label}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function Footer() {
+  const { imageTools, videoTools, otherTools, imageModels, videoModels } =
+    getFooterMegaNavColumns()
+
   return (
     <footer className="relative w-full overflow-hidden bg-background py-12">
       <div
@@ -8,8 +41,8 @@ export function Footer() {
         className="pointer-events-none absolute inset-0 bg-[url('/logo.svg')] bg-cover bg-center bg-no-repeat opacity-[0.05] dark:opacity-[0.06]"
       />
       <div className="relative z-10">
-        <div className="grid w-full gap-10 px-4 sm:px-6 lg:grid-cols-4 lg:px-8">
-          <div className="lg:col-span-2">
+        <div className="grid w-full gap-10 px-4 sm:px-6 lg:grid-cols-12 lg:gap-x-8 lg:px-8">
+          <div className="lg:col-span-3">
             <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
               UniCan
             </p>
@@ -18,28 +51,46 @@ export function Footer() {
             </p>
           </div>
 
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">Explore</p>
-            <ul className="mt-4 space-y-2">
-              <li>
-                <Link href="/image" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-                  Image
-                </Link>
-              </li>
-              <li>
-                <Link href="/video" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-                  Video
-                </Link>
-              </li>
-              <li>
-                <Link href="/pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-                  Pricing
-                </Link>
-              </li>
-            </ul>
+          <div className="lg:col-span-2">
+            <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
+              Image tools
+            </p>
+            <FooterLinkList links={imageTools} />
           </div>
 
-          <div>
+          <div className="lg:col-span-2">
+            <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
+              Video tools
+            </p>
+            <FooterLinkList links={videoTools} />
+          </div>
+
+          <div className="lg:col-span-2">
+            <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
+              Other tools
+            </p>
+            <FooterLinkList links={otherTools} />
+          </div>
+
+          <div className="lg:col-span-2">
+            <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">Models</p>
+            <div className="mt-4 space-y-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Image
+                </p>
+                <FooterLinkList links={imageModels} listClassName="mt-2" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Video
+                </p>
+                <FooterLinkList links={videoModels} listClassName="mt-2" />
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-1">
             <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">Legal</p>
             <ul className="mt-4 space-y-2">
               <li>

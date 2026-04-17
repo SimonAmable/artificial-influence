@@ -3,7 +3,7 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { motion } from "motion/react"
+import { AnimatePresence, motion } from "motion/react"
 
 import { platformSurfaceCards } from "@/lib/constants/landing-content"
 import type { LandingPlatformSurfaceCard } from "@/lib/types/landing"
@@ -109,6 +109,9 @@ export function PlatformSurfacesSection() {
   const transitionDuration =
     reduceMotion ? 0.01 : indexDelta === 0 ? 0 : Math.min(1.1, 0.28 + indexDelta * 0.22)
 
+  const activeCard = platformSurfaceCards[activeIndex]
+  const blurbTransition = { duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] as const }
+
   return (
     <section className="w-full bg-background py-16 sm:py-24">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -116,6 +119,22 @@ export function PlatformSurfacesSection() {
           <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
             Every tool in one place
           </h2>
+          {activeCard ? (
+            <div className="mt-4" aria-live="polite">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.p
+                  key={tab}
+                  className="text-muted-foreground"
+                  initial={reduceMotion ? false : { opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                  transition={blurbTransition}
+                >
+                  {activeCard.sectionBlurb}
+                </motion.p>
+              </AnimatePresence>
+            </div>
+          ) : null}
         </div>
 
         <div className="relative mt-10 sm:mt-12">

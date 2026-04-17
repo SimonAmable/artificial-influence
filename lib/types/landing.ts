@@ -50,6 +50,8 @@ export type LandingPlatformSurfaceCard =
       kind: "image"
       id: string
       name: string
+      /** One line under the section title; updates with the active tab */
+      sectionBlurb: string
       description: string
       href: string
       cta: string
@@ -63,6 +65,7 @@ export type LandingPlatformSurfaceCard =
       kind: "automation"
       id: string
       name: string
+      sectionBlurb: string
       description: string
       href: string
       cta: string
