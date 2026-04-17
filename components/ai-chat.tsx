@@ -290,7 +290,7 @@ export function AIChat() {
                 </Tooltip>
               </div>
             </div>
-            <SheetDescription>Creative chat for Website AI</SheetDescription>
+            <SheetDescription>Your AI helper for website tasks.</SheetDescription>
           </SheetHeader>
           <div className="min-h-0 flex-1 overflow-hidden">
             {!authReady || isHydratingThread ? (

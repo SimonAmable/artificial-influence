@@ -182,7 +182,8 @@
 
 /* Overlay scrollbars on .container when it's the scroll host */
 .container {
-  overflow-y: overlay;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 @layer base {
@@ -194,7 +195,7 @@
     padding: 0;
     overflow-x: hidden;
     overflow-y: auto;
-    overflow-y: overlay;
+    scrollbar-gutter: stable;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
     height: 100%;

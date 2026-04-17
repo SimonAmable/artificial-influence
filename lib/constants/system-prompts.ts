@@ -4,7 +4,7 @@
  */
 
 /** In-app chat guide name (header, empty state, and system prompt). */
-export const UNICAN_ASSISTANT_NAME = "Uni" as const
+export const UNICAN_ASSISTANT_NAME = "UNI AGENT" as const
 
 /**
  * Chatbot system prompt for Uni (in-app guide)
