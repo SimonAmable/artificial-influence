@@ -212,7 +212,6 @@ export function AutomationsPage() {
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
   const [isPublicAutomation, setIsPublicAutomation] = React.useState(false)
   const [cloningId, setCloningId] = React.useState<string | null>(null)
-  const [openingPreviewId, setOpeningPreviewId] = React.useState<string | null>(null)
   const [settingPreviewRunId, setSettingPreviewRunId] = React.useState<string | null>(null)
   const [previewRunModal, setPreviewRunModal] = React.useState<{
     runId: string
@@ -221,6 +220,7 @@ export function AutomationsPage() {
     runTrigger: "manual" | "scheduled"
     error: string | null
   } | null>(null)
+  const [communityPreviewOpen, setCommunityPreviewOpen] = React.useState(false)
   const [pendingManualRunPreview, setPendingManualRunPreview] = React.useState<{
     automationId: string
     runId: string
@@ -286,12 +286,14 @@ export function AutomationsPage() {
   const goToCommunity = React.useCallback(() => {
     setSelectedId(null)
     lastHydratedId.current = null
+    setCommunityPreviewOpen(false)
     setScope("community")
   }, [])
 
   const goToMine = React.useCallback(() => {
     setSelectedId(null)
     lastHydratedId.current = null
+    setCommunityPreviewOpen(false)
     setScope("mine")
   }, [])
 
@@ -494,6 +496,7 @@ export function AutomationsPage() {
     }
     hydrateFromAutomation(selected)
     lastHydratedId.current = selectedId
+    setCommunityPreviewOpen(false)
   }, [selectedId, selected, hydrateFromAutomation])
 
   const save = async () => {
@@ -682,22 +685,12 @@ export function AutomationsPage() {
     }
   }
 
-  const openCommunityPreview = async (a: AutomationApi) => {
-    setOpeningPreviewId(a.id)
-    try {
-      const res = await fetch(`/api/automations/${a.id}/preview/open`, { method: "POST" })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(typeof j?.error === "string" ? j.error : "Could not open preview")
-      }
-      if (typeof j?.threadId === "string") {
-        window.open(`/chat/${j.threadId}`, "_blank", "noopener,noreferrer")
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not open preview")
-    } finally {
-      setOpeningPreviewId(null)
+  const openCommunityPreview = (a: AutomationApi) => {
+    if (!a.hasPreview) {
+      toast.error("No preview available yet")
+      return
     }
+    setCommunityPreviewOpen(true)
   }
 
   const setCommunityPreviewRun = async (automationId: string, runId: string) => {
@@ -1256,12 +1249,10 @@ export function AutomationsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={!selected.hasPreview || openingPreviewId === selected.id}
-                      onClick={() => void openCommunityPreview(selected)}
+                      disabled={!selected.hasPreview}
+                      onClick={() => openCommunityPreview(selected)}
                     >
-                      {openingPreviewId === selected.id ? (
-                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                      ) : null}
+                      <Eye className="mr-1 h-4 w-4" />
                       Open preview
                     </Button>
                   </>
@@ -1549,6 +1540,21 @@ export function AutomationsPage() {
           promptPreview={prompt.trim() || null}
           runTrigger={previewRunModal.runTrigger}
           initialRunError={previewRunModal.error}
+        />
+      ) : null}
+
+      {selected && isCommunityScope && communityPreviewOpen ? (
+        <AutomationRunPreviewModal
+          key={`community-${selected.id}`}
+          open
+          onOpenChange={(o) => {
+            if (!o) setCommunityPreviewOpen(false)
+          }}
+          automationId={selected.id}
+          automationName={selected.name}
+          runId=""
+          source="community"
+          promptPreview={prompt.trim() || null}
         />
       ) : null}
 

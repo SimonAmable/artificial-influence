@@ -53,6 +53,12 @@ export type AutomationRunPreviewModalProps = {
   promptPreview?: string | null
   runTrigger?: "manual" | "scheduled"
   initialRunError?: string | null
+  /**
+   * When "community", fetches the captured preview thread from
+   * `/api/automations/{id}/preview` instead of polling a run. The run-specific
+   * props (runId, initialThreadId, runTrigger, etc.) are ignored in this mode.
+   */
+  source?: "run" | "community"
 }
 
 function firstUserTextPreview(messages: UIMessage[]): string | null {
@@ -87,9 +93,15 @@ export function AutomationRunPreviewModal({
   promptPreview: promptPreviewProp = null,
   runTrigger = "scheduled",
   initialRunError = null,
+  source = "run",
 }: AutomationRunPreviewModalProps) {
-  const [runStatus, setRunStatus] = React.useState<RunRow["status"]>(initialStatus)
-  const [threadId, setThreadId] = React.useState<string | null>(initialThreadId)
+  const isCommunity = source === "community"
+  const [runStatus, setRunStatus] = React.useState<RunRow["status"]>(
+    isCommunity ? "completed" : initialStatus,
+  )
+  const [threadId, setThreadId] = React.useState<string | null>(
+    isCommunity ? null : initialThreadId,
+  )
   const [runError, setRunError] = React.useState<string | null>(null)
   const [messages, setMessages] = React.useState<UIMessage[]>([])
   const [loadingThread, setLoadingThread] = React.useState(false)
@@ -107,17 +119,18 @@ export function AutomationRunPreviewModal({
       abortRef.current = null
       return
     }
-    setRunStatus(initialStatus)
-    setThreadId(initialThreadId)
-    setRunError(initialRunError)
+    setRunStatus(isCommunity ? "completed" : initialStatus)
+    setThreadId(isCommunity ? null : initialThreadId)
+    setRunError(isCommunity ? null : initialRunError)
     setMessages([])
     setLoadError(null)
     setUserPromptPreview(null)
     setPollExhausted(false)
-  }, [open, runId, initialThreadId, initialStatus, initialRunError])
+  }, [open, runId, initialThreadId, initialStatus, initialRunError, isCommunity])
 
   React.useEffect(() => {
-    if (!open || !runId) return
+    if (!open) return
+    if (!isCommunity && !runId) return
 
     const ac = new AbortController()
     abortRef.current = ac
@@ -139,6 +152,32 @@ export function AutomationRunPreviewModal({
       } catch (e) {
         if (cancelled || (e instanceof Error && e.name === "AbortError")) return
         setLoadError(e instanceof Error ? e.message : "Failed to load messages")
+      } finally {
+        if (!cancelled) setLoadingThread(false)
+      }
+    }
+
+    const loadCommunityPreview = async () => {
+      setLoadingThread(true)
+      setLoadError(null)
+      try {
+        const res = await fetch(`/api/automations/${automationId}/preview`, { signal })
+        const j = (await res.json().catch(() => ({}))) as {
+          messages?: UIMessage[]
+          error?: string
+        }
+        if (cancelled) return
+        if (!res.ok) {
+          setLoadError(typeof j?.error === "string" ? j.error : "Failed to load preview")
+          return
+        }
+        const msgs = Array.isArray(j.messages) ? j.messages : []
+        setMessages(msgs)
+        const preview = firstUserTextPreview(msgs)
+        if (preview) setUserPromptPreview(preview)
+      } catch (e) {
+        if (cancelled || (e instanceof Error && e.name === "AbortError")) return
+        setLoadError(e instanceof Error ? e.message : "Failed to load preview")
       } finally {
         if (!cancelled) setLoadingThread(false)
       }
@@ -175,6 +214,10 @@ export function AutomationRunPreviewModal({
     }
 
     void (async () => {
+      if (isCommunity) {
+        await loadCommunityPreview()
+        return
+      }
       if (initialStatus === "completed" && initialThreadId) {
         await loadMessagesForThread(initialThreadId)
         return
@@ -210,11 +253,15 @@ export function AutomationRunPreviewModal({
       if (timer) clearTimeout(timer)
       ac.abort()
     }
-  }, [open, runId, automationId, initialStatus, initialThreadId])
+  }, [open, runId, automationId, initialStatus, initialThreadId, isCommunity])
 
   const triggerLabel = runTrigger === "manual" ? "Manual" : "Scheduled"
 
-  const statusBadge = (
+  const statusBadge = isCommunity ? (
+    <Badge variant="secondary" className="text-xs">
+      Community preview
+    </Badge>
+  ) : (
     <Badge
       variant={
         runStatus === "completed" ? "default" : runStatus === "failed" ? "destructive" : "secondary"
@@ -232,14 +279,18 @@ export function AutomationRunPreviewModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85dvh] min-h-0 max-w-3xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b border-border/60 px-6 py-4 text-left">
-          <DialogTitle className="pr-8">Run preview</DialogTitle>
+          <DialogTitle className="pr-8">
+            {isCommunity ? "Community preview" : "Run preview"}
+          </DialogTitle>
           <DialogDescription asChild>
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <span className="font-medium text-foreground">{automationName}</span>
               {statusBadge}
-              <Badge variant="outline" className="text-[10px]">
-                {triggerLabel}
-              </Badge>
+              {!isCommunity ? (
+                <Badge variant="outline" className="text-[10px]">
+                  {triggerLabel}
+                </Badge>
+              ) : null}
             </div>
           </DialogDescription>
         </DialogHeader>
@@ -337,7 +388,7 @@ export function AutomationRunPreviewModal({
         </div>
 
         <DialogFooter className="shrink-0 border-t border-border/60 px-6 py-3 sm:justify-between">
-          {threadId ? (
+          {threadId && !isCommunity ? (
             <Button type="button" variant="outline" size="sm" asChild>
               <Link href={`/chat/${threadId}`} target="_blank" rel="noopener noreferrer">
                 Open full thread
