@@ -141,7 +141,7 @@ export function AffiliateDashboard({
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="rounded-2xl border border-border bg-card p-5">
-            <p className="text-sm text-muted-foreground">Total referrals</p>
+            <p className="text-sm text-muted-foreground">Total converted referrals</p>
             <p className="text-2xl font-semibold mt-1">{referrals.length}</p>
           </div>
           <div className="rounded-2xl border border-border bg-card p-5">
