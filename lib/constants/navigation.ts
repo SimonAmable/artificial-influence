@@ -65,6 +65,7 @@ export type DashboardToolIcon =
   | "pencil-simple"
   | "squares-four"
   | "chat-circle-dots"
+  | "robot"
 
 export interface DashboardToolNavItem {
   label: string
@@ -244,7 +245,7 @@ export const megaNavGroups: MegaNavGroup[] = [
             label: "Motion Copy",
             description: "Transfer movement patterns",
             badge: "popular",
-            iconPhosphor: "flow-arrow",
+            iconSrc: "/users-icon.svg",
           },
           {
             path: "/lipsync",
@@ -382,7 +383,7 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
   {
     label: "Automations",
     href: "/automations",
-    icon: "flow-arrow",
+    icon: "robot",
     hint: "Set up automated creation and posting workflows.",
   },
   {
@@ -406,7 +407,7 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
   {
     label: "Motion Copy",
     href: "/motion-copy",
-    icon: "flow-arrow",
+    icon: "arrows-left-right",
     hint: "Copy motion from ads or dance clips onto your character-animate a still with prompts.",
   },
   {

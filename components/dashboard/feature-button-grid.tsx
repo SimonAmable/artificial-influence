@@ -17,6 +17,7 @@ import {
   Palette,
   SquaresFour,
   ChatCircleDots,
+  Robot,
 } from "@phosphor-icons/react"
 
 const toolIconMap: Record<DashboardToolIcon, typeof ImageIcon> = {
@@ -30,6 +31,7 @@ const toolIconMap: Record<DashboardToolIcon, typeof ImageIcon> = {
   "pencil-simple": PencilSimpleIcon,
   "squares-four": SquaresFour,
   "chat-circle-dots": ChatCircleDots,
+  robot: Robot,
 }
 
 export function FeatureButtonGrid() {
