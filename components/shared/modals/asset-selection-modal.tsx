@@ -280,7 +280,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                   onValueChange={(value) => setCategory(value as AssetCategory | "all")}
                 >
                   <div
-                    className="-mx-1 flex max-w-full overflow-x-auto overscroll-x-contain px-1 pb-0.5 [scrollbar-gutter:stable]"
+                    className="-mx-1 flex max-w-full overflow-x-auto overscroll-x-contain px-1 pb-0.5"
                     role="presentation"
                   >
                     <TabsList className="inline-flex h-auto min-h-9 w-max max-w-none flex-nowrap justify-start">

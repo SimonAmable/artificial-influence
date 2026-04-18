@@ -3051,7 +3051,7 @@ export function CreativeAgentChat({
                 type="button"
                 variant="outline"
                 size="icon-sm"
-                className="shrink-0"
+                className="shrink-0 shadow-depth-l"
                 aria-label="Chat history"
               >
                 <ClockCounterClockwise className="h-4 w-4" aria-hidden />
@@ -3094,7 +3094,7 @@ export function CreativeAgentChat({
             type="button"
             variant="outline"
             size="icon-sm"
-            className="shrink-0"
+            className="shrink-0 shadow-depth-l"
             aria-label="New chat"
             onClick={clearChat}
           >
