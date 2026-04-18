@@ -15,7 +15,7 @@ export interface NavigationItem {
   className?: string
 }
 
-export type MegaNavBadge = "new" | "popular"
+export type MegaNavBadge = "new" | "popular" | "beta"
 
 /** Phosphor icons for feature rows — clearer than generic brand SVGs for create/edit flows */
 export type MegaNavPhosphorIcon =
@@ -25,6 +25,8 @@ export type MegaNavPhosphorIcon =
   | "film-strip"
   | "flow-arrow"
   | "microphone"
+  | "chat-circle-dots"
+  | "robot"
 
 export interface MegaNavItem {
   path: string
@@ -125,6 +127,27 @@ export const navigationItems = getNavigationItems()
  * Keep this separate so existing navigationItems consumers are unaffected.
  */
 export const megaNavGroups: MegaNavGroup[] = [
+  {
+    label: "Agent",
+    path: "/chat",
+    badge: "beta",
+    simpleItems: [
+      {
+        path: "/chat",
+        label: "Agent",
+        description: "Open AI chat to plan and create faster",
+        badge: "beta",
+        iconPhosphor: "chat-circle-dots",
+      },
+      {
+        path: "/automations",
+        label: "Automations",
+        description: "Easily set up automated creation and posting to Instagram",
+        badge: "beta",
+        iconPhosphor: "robot",
+      },
+    ],
+  },
   {
     label: "Image",
     path: "/image",
@@ -280,7 +303,7 @@ export const megaNavGroups: MegaNavGroup[] = [
       {
         path: "/automations",
         label: "Automations",
-        description: "Cron-scheduled agent prompts",
+        description: "Easily set up automated creation and posting to Instagram",
         iconSrc: "/globe.svg",
       },
       { path: "/brand", label: "Brand", description: "Manage brand settings", iconSrc: "/logo.svg", badge: "new" },
@@ -288,9 +311,8 @@ export const megaNavGroups: MegaNavGroup[] = [
   },
   { label: "Canvas", path: "/canvases" },
   { label: "Apps", path: "/apps", badge: "new" },
-  { label: "Agent", path: "/chat", badge: "new" },
   { label: "Autopost", path: "/autopost", badge: "new" },
-  { label: "Automations", path: "/automations", badge: "new" },
+  { label: "Automations", path: "/automations", badge: "beta" },
   { label: "Pricing", path: "/pricing" },
 ]
 

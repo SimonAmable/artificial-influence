@@ -17,6 +17,7 @@ import {
   FilmStrip,
   FlowArrow,
   Microphone as MicrophoneIcon,
+  Robot as RobotIcon,
 } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
@@ -51,19 +52,38 @@ const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
   "film-strip": FilmStrip,
   "flow-arrow": FlowArrow,
   microphone: MicrophoneIcon,
+  "chat-circle-dots": ChatCircleDots,
+  robot: RobotIcon,
 }
 
 function getBadgeClasses(badge: MegaNavBadge) {
-  if (badge === "new") {
-    return {
-      pill: "bg-primary text-primary-foreground",
-      ring: "ring-1 ring-primary/70 border-primary/60",
-    }
+  switch (badge) {
+    case "new":
+      return {
+        pill: "bg-primary text-primary-foreground",
+        ring: "ring-1 ring-primary/70 border-primary/60",
+      }
+    case "popular":
+      return {
+        pill: "bg-destructive text-destructive-foreground",
+        ring: "ring-1 ring-destructive/70 border-destructive/60",
+      }
+    case "beta":
+      return {
+        pill: "bg-amber-500 text-white dark:bg-amber-400 dark:text-black",
+        ring: "ring-1 ring-amber-500/70 border-amber-500/60 dark:ring-amber-400/70 dark:border-amber-400/60",
+      }
   }
+}
 
-  return {
-      pill: "bg-destructive text-destructive-foreground",
-      ring: "ring-1 ring-destructive/70 border-destructive/60",
+function getBadgeLabel(badge: MegaNavBadge) {
+  switch (badge) {
+    case "new":
+      return "New"
+    case "popular":
+      return "Top"
+    case "beta":
+      return "Beta"
   }
 }
 
@@ -76,7 +96,7 @@ function MenuBadge({ badge }: { badge: MegaNavBadge }) {
         classes.pill
       )}
     >
-      {badge === "new" ? "New" : "Top"}
+      {getBadgeLabel(badge)}
     </span>
   )
 }
@@ -133,7 +153,7 @@ function HeaderMenuItem({ item, onSelect }: { item: MegaNavItem; onSelect: (path
                 classes?.pill
               )}
             >
-              {item.badge === "new" ? "New" : "Top"}
+              {getBadgeLabel(item.badge)}
             </span>
           ) : null}
         </div>
