@@ -1,0 +1,22 @@
+# UniCan
+
+> UniCan is an AI content platform for creators. Generate images, video, lip sync, and scheduled automations from one workspace.
+
+## Core pages
+
+- [Automations](https://unican.app/automations): Schedule AI agents to generate, post, or iterate on a cron schedule.
+- [Image generation](https://unican.app/image): Multiple image models with style and composition control.
+- [Video](https://unican.app/video): Text-to-video and image-to-video.
+- [Lip sync](https://unican.app/lipsync): Match audio to a face with timing control.
+- [Motion copy](https://unican.app/motion-copy): Transfer motion from a reference video to a still.
+- [Image editing](https://unican.app/inpaint): Inpaint and regional edits.
+- [Canvas](https://unican.app/canvases): Node-based workflows you can rerun.
+- [Autopost](https://unican.app/autopost): Connect Instagram and publish on schedule.
+- [Pricing](https://unican.app/pricing): Plans and limits.
+
+## About
+
+Type: WebApplication
+Category: AI content creation
+Audience: Creators, marketers, small teams
+Language: en

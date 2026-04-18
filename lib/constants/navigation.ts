@@ -62,6 +62,7 @@ export type DashboardToolIcon =
   | "video"
   | "paint-brush"
   | "arrows-left-right"
+  | "users"
   | "pencil-simple"
   | "squares-four"
   | "chat-circle-dots"
@@ -407,7 +408,7 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
   {
     label: "Motion Copy",
     href: "/motion-copy",
-    icon: "arrows-left-right",
+    icon: "users",
     hint: "Copy motion from ads or dance clips onto your character-animate a still with prompts.",
   },
   {

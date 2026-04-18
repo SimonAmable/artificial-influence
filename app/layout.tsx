@@ -8,10 +8,27 @@ import { Toaster } from "@/components/ui/sonner"
 import { AIChat } from "@/components/ai-chat"
 import { Analytics } from "@vercel/analytics/next"
 import { AffiliateRefCapture } from "@/components/affiliate/affiliate-ref-capture"
+import { SitewideJsonLd } from "@/components/seo/sitewide-jsonld"
+import { getSiteBaseUrl } from "@/lib/seo/site-url"
+
+const siteBase = getSiteBaseUrl()
 
 export const metadata: Metadata = {
-  title: "UniCan",
+  metadataBase: new URL(siteBase),
+  title: {
+    default: "UniCan",
+    template: "%s | UniCan",
+  },
   description: "Create and manage AI-powered content with uncanny AI generation tools",
+  openGraph: {
+    siteName: "UniCan",
+    type: "website",
+    locale: "en_US",
+    url: siteBase,
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 }
 
 const inter = Inter({
@@ -46,12 +63,13 @@ export default function RootLayout({
           <LayoutModeProviderWrapper>
             <AffiliateRefCapture />
             <Header />
-            {children}
+            <main>{children}</main>
           </LayoutModeProviderWrapper>
           <Toaster />
           <AIChat />
         </ThemeProvider>
         <Analytics />
+        <SitewideJsonLd />
       </body>
     </html>
   )

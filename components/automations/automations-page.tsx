@@ -750,29 +750,29 @@ export function AutomationsPage() {
           id={`${idPrefix}-name`}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Morning asset batch"
+          placeholder="Daily caption ideas"
           disabled={readOnly}
         />
       </div>
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-description`}>Description</Label>
-        <p className="text-xs text-muted-foreground">Optional — for your reference only; not sent to the agent.</p>
+        <p className="text-xs text-muted-foreground">Just a note for you — helps you remember what this one does.</p>
         <Textarea
           id={`${idPrefix}-description`}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="What this automation is for…"
+          placeholder="e.g. Fresh Instagram caption ideas every morning"
           rows={2}
           className="min-h-[72px] resize-y"
           disabled={readOnly}
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-prompt`}>Prompt</Label>
+        <Label htmlFor={`${idPrefix}-prompt`}>What should it do?</Label>
         <p className="text-xs text-muted-foreground">
-          Press <kbd className="rounded border bg-muted px-1">/</kbd> to browse prompt templates,{" "}
-          <kbd className="rounded border bg-muted px-1">@</kbd> to drop in brand kits or saved assets, and{" "}
-          <kbd className="rounded border bg-muted px-1">+</kbd> to upload your own files.
+          Write it like you're chatting. Type <kbd className="rounded border bg-muted px-1">/</kbd> for
+          ready-made templates, <kbd className="rounded border bg-muted px-1">@</kbd> to pull in your brand
+          or saved assets, or <kbd className="rounded border bg-muted px-1">+</kbd> to attach files.
         </p>
         {(savedAttachments.length > 0 || uploadQueue.length > 0) && (
           <div className="flex flex-row flex-wrap gap-2">
@@ -840,7 +840,7 @@ export function AutomationsPage() {
             onRefsChange={setAttachedRefs}
             rows={6}
             className="min-h-[120px] max-h-[220px] flex-1 px-3 py-2 font-mono text-sm"
-            placeholder="Instructions for the agent. Type / for templates, @ for brands and assets."
+            placeholder="Describe what you want done each time this runs. Type / for templates, @ for brands and assets."
             slashCommands={AUTOMATION_SLASH_COMMANDS}
             slashCommandsContext="Automation"
             onPasteImage={(file) => void handleAttachFiles([file])}
@@ -919,10 +919,10 @@ export function AutomationsPage() {
           <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2">
             <div className="space-y-0.5">
               <Label htmlFor={`${idPrefix}-is-public`} className="text-sm">
-                Public in Community
+                Share with the community
               </Label>
               <p className="text-xs text-muted-foreground">
-                When on, others can browse, preview, and clone this automation.
+                Let other creators find this and save a copy to their own account. Your chats stay private.
               </p>
             </div>
             <Switch
@@ -934,18 +934,18 @@ export function AutomationsPage() {
           </div>
           {isPublicAutomation ? (
             <p className="text-xs text-muted-foreground">
-              First successful run will be snapshotted so others can preview this automation in Community.
+              Once you run it successfully, you can pick which run shows up as the preview.
             </p>
           ) : null}
         </div>
       ) : null}
 
       <div className="space-y-3">
-        <Label>Schedule</Label>
+        <Label>When should it run?</Label>
         <Tabs value={presetTab} onValueChange={(v) => setPresetTab(v as "presets" | "custom")}>
           <TabsList>
-            <TabsTrigger value="presets">Presets</TabsTrigger>
-            <TabsTrigger value="custom">Custom cron</TabsTrigger>
+            <TabsTrigger value="presets">Common times</TabsTrigger>
+            <TabsTrigger value="custom">Custom timing</TabsTrigger>
           </TabsList>
           <TabsContent value="presets" className="space-y-4 pt-4">
             <div className="flex flex-wrap gap-2">
@@ -1040,7 +1040,8 @@ export function AutomationsPage() {
               placeholder="0 0 * * * *"
             />
             <p className="mt-2 text-xs text-muted-foreground">
-              Six fields: second minute hour day month weekday. Example hourly: <code>0 0 * * * *</code>
+              For power users — cron format with 6 fields (second, minute, hour, day, month, weekday).
+              E.g. <code>0 0 * * * *</code> runs every hour on the hour.
             </p>
           </TabsContent>
         </Tabs>
@@ -1048,10 +1049,10 @@ export function AutomationsPage() {
           <Clock className="h-3.5 w-3.5" />
           {nextPreview ? (
             <span>
-              Next run (approx): <strong className="text-foreground">{nextPreview}</strong>
+              Next run: <strong className="text-foreground">{nextPreview}</strong>
             </span>
           ) : (
-            <span>Enter a valid schedule to preview next run.</span>
+            <span>Pick a schedule to see when it'll run next.</span>
           )}
         </div>
       </div>
@@ -1072,7 +1073,7 @@ export function AutomationsPage() {
     return (
       <div className="mx-auto max-w-lg px-4 pt-24 text-center">
         <h1 className="text-2xl font-semibold">Automations</h1>
-        <p className="mt-2 text-muted-foreground">Sign in to schedule agent prompts on a cron.</p>
+        <p className="mt-2 text-muted-foreground">Your session expired. Sign in to manage automations.</p>
         <Button asChild className="mt-6">
           <Link href="/login">Sign in</Link>
         </Button>
@@ -1135,8 +1136,8 @@ export function AutomationsPage() {
           ) : automations.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {scope === "community"
-                ? "No public automations from other users yet."
-                : "No automations yet. Create one to run your agent on a schedule."}
+                ? "Nothing shared here yet. Check back soon."
+                : "Nothing on autopilot yet. Hit New to set up a recurring task."}
             </p>
           ) : (
             <ul className="space-y-2">
@@ -1206,9 +1207,10 @@ export function AutomationsPage() {
         {!selectedId || !selected ? (
           <Card className="border-dashed py-4">
             <CardHeader>
-              <CardTitle>Select or create</CardTitle>
+              <CardTitle>Pick one or start fresh</CardTitle>
               <CardDescription>
-                Pick an automation from the list or use <strong>New</strong> to add a scheduled prompt.
+                Open an automation from the list to edit it, or hit <strong>New</strong> to set up a task
+                that runs on its own — daily ideas, weekly reports, hourly scans, whatever you need.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -1221,14 +1223,14 @@ export function AutomationsPage() {
                   <p className="mt-1 text-sm leading-snug text-muted-foreground">{selected.description.trim()}</p>
                 ) : null}
                 <CardDescription>
-                  Put your creative work on autopilot. Every run kicks off a fresh conversation you can open
-                  anytime to review results or keep iterating.
+                  Runs on its own, on the schedule you pick. Each run becomes a chat you can open to see
+                  the results, tweak the prompt, or run it again right away.
                 </CardDescription>
                 {isCommunityScope ? (
                   <p className="mt-2 text-xs text-muted-foreground">
                     {selected.hasPreview
-                      ? "Preview available — open to see an example run in chat."
-                      : "No preview yet — the owner has not completed a successful public run."}
+                      ? "Preview available — open it to see what a run actually looks like."
+                      : "No preview yet — this automation hasn't shared a sample run."}
                   </p>
                 ) : null}
               </div>
@@ -1406,7 +1408,8 @@ export function AutomationsPage() {
                   </p>
                 ) : null}
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Cron: <code className="rounded bg-muted px-1">{selected.cron_schedule}</code>
+                  Schedule:{" "}
+                  <code className="rounded bg-muted px-1">{selected.cron_schedule}</code>
                 </p>
               </div>
 
@@ -1531,8 +1534,8 @@ export function AutomationsPage() {
           <DialogHeader>
             <DialogTitle>New automation</DialogTitle>
             <DialogDescription>
-              Put your creative work on autopilot. Every run kicks off a fresh conversation you can open
-              anytime to review results or keep iterating.
+              Set up a task once and it'll run on its own. Every run becomes a chat you can open to
+              review the results or take them further.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
@@ -1588,8 +1591,8 @@ export function AutomationsPage() {
       <AlertDialog open={Boolean(deleteId)} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete automation?</AlertDialogTitle>
-            <AlertDialogDescription>This cannot be undone. Scheduled runs will stop.</AlertDialogDescription>
+            <AlertDialogTitle>Delete this automation?</AlertDialogTitle>
+            <AlertDialogDescription>It'll stop running from now on. You can't undo this.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
