@@ -30,6 +30,7 @@ interface CreateCreativeChatToolsOptions {
   threadId?: string
   userId: string
   skillsCatalog?: SkillCatalogEntry[]
+  source?: "chat" | "automation"
 }
 
 export function createCreativeChatTools({
@@ -40,6 +41,7 @@ export function createCreativeChatTools({
   threadId,
   userId,
   skillsCatalog = [],
+  source = "chat",
 }: CreateCreativeChatToolsOptions) {
   const skillSlugs = skillsCatalog.map((entry) => entry.slug).filter(Boolean) as string[]
   const activateSkillTool =
@@ -69,6 +71,7 @@ export function createCreativeChatTools({
     prepareInstagramPost: createPrepareInstagramPostTool({
       supabase,
       userId,
+      requireApproval: source !== "automation",
     }),
     generateImage: createGenerateImageTool({
       availableReferences,

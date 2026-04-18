@@ -116,6 +116,7 @@ export async function runAutomation(
     threadId,
     userId,
     skillsCatalog,
+    source: "automation",
   }) as NonNullable<Parameters<typeof validateUIMessages>[0]["tools"]>
 
   let validatedMessages: UIMessage[]
@@ -163,6 +164,7 @@ export async function runAutomation(
     supabase: admin,
     threadId,
     userId,
+    source: "automation",
   })
   type CreativeAgentUIMessage = InferAgentUIMessage<typeof creativeAgent>
   const creativeAgentMessages = validatedMessages as CreativeAgentUIMessage[]

@@ -311,7 +311,9 @@ export function AutopostPage() {
   const [actionJobId, setActionJobId] = React.useState<string | null>(null)
 
   const [disconnectTargetId, setDisconnectTargetId] = React.useState<string | null>(null)
+  const [composerCardHeight, setComposerCardHeight] = React.useState<number | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const composerCardRef = React.useRef<HTMLDivElement>(null)
   const searchParams = useSearchParams()
   const hasHandledAuthParams = React.useRef(false)
 
@@ -320,6 +322,22 @@ export function AutopostPage() {
       previewUrls.forEach((u) => URL.revokeObjectURL(u))
     }
   }, [previewUrls])
+
+  React.useEffect(() => {
+    const composerCard = composerCardRef.current
+    if (!composerCard || typeof ResizeObserver === "undefined") {
+      return
+    }
+
+    const syncHeight = () => {
+      setComposerCardHeight(composerCard.getBoundingClientRect().height)
+    }
+
+    syncHeight()
+    const observer = new ResizeObserver(syncHeight)
+    observer.observe(composerCard)
+    return () => observer.disconnect()
+  }, [])
 
   React.useEffect(() => {
     setSelectedFiles([])
@@ -1014,8 +1032,15 @@ export function AutopostPage() {
           </CardFooter>
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card className="py-4 sm:py-6">
+        <div
+          className="grid gap-6 lg:grid-cols-2 lg:items-start"
+          style={
+            composerCardHeight
+              ? ({ "--composer-card-height": `${composerCardHeight}px` } as React.CSSProperties)
+              : undefined
+          }
+        >
+          <Card ref={composerCardRef} className="py-4 sm:py-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" />
@@ -1348,7 +1373,7 @@ export function AutopostPage() {
             </CardContent>
           </Card>
 
-          <Card className="flex max-h-[min(720px,85vh)] flex-col py-4 sm:py-6 lg:max-h-none lg:h-full">
+          <Card className="flex max-h-[min(720px,85vh)] flex-col py-4 sm:py-6 lg:h-(--composer-card-height) lg:max-h-none">
             <CardHeader className="shrink-0">
               <CardTitle className="flex items-center gap-2">
                 <LayoutList className="h-4 w-4" />

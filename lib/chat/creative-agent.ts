@@ -128,6 +128,7 @@ interface CreateCreativeAgentOptions {
   supabase: SupabaseClient
   threadId?: string
   userId: string
+  source?: "chat" | "automation"
 }
 
 export function createCreativeAgent({
@@ -140,6 +141,7 @@ export function createCreativeAgent({
   supabase,
   threadId,
   userId,
+  source = "chat",
 }: CreateCreativeAgentOptions) {
   const gateway = createGateway({
     apiKey: process.env.AI_GATEWAY_API_KEY,
@@ -175,6 +177,7 @@ export function createCreativeAgent({
       threadId,
       userId,
       skillsCatalog,
+      source,
     }),
   })
 }

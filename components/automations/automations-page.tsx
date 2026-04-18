@@ -221,6 +221,18 @@ export function AutomationsPage() {
     runTrigger: "manual" | "scheduled"
     error: string | null
   } | null>(null)
+  const [pendingManualRunPreview, setPendingManualRunPreview] = React.useState<{
+    automationId: string
+    runId: string
+    threadId: string | null
+    status: "completed" | "failed"
+    error: string | null
+  } | null>(null)
+  const [activeRunInfo, setActiveRunInfo] = React.useState<{
+    automationId: string
+    runId: string
+    threadId: string | null
+  } | null>(null)
 
   const selected = automations.find((a) => a.id === selectedId) ?? null
   const isCommunityScope = scope === "community"
@@ -590,6 +602,36 @@ export function AutomationsPage() {
 
   const runNow = async (a: AutomationApi) => {
     setRunningId(a.id)
+    setActiveRunInfo(null)
+    setPendingManualRunPreview((prev) => (prev?.automationId === a.id ? null : prev))
+
+    const pollState = { cancelled: false }
+    void (async () => {
+      const deadline = Date.now() + 60_000
+      while (!pollState.cancelled && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 800))
+        if (pollState.cancelled) return
+        try {
+          const res = await fetch(`/api/automations/${a.id}/runs`)
+          if (!res.ok) continue
+          const data = (await res.json()) as { runs: AutomationRunApi[] }
+          const active = data.runs.find(
+            (run) => run.status === "running" && (run.run_trigger ?? "scheduled") === "manual",
+          )
+          if (active && !pollState.cancelled) {
+            setActiveRunInfo({
+              automationId: a.id,
+              runId: active.id,
+              threadId: active.thread_id,
+            })
+            return
+          }
+        } catch {
+          // keep polling
+        }
+      }
+    })()
+
     try {
       const res = await fetch(`/api/automations/${a.id}/run`, { method: "POST" })
       const j = await res.json().catch(() => ({}))
@@ -598,11 +640,11 @@ export function AutomationsPage() {
       }
       toast.success("Automation run finished")
       if (typeof j?.runId === "string") {
-        setPreviewRunModal({
+        setPendingManualRunPreview({
+          automationId: a.id,
           runId: j.runId,
           threadId: typeof j.threadId === "string" ? j.threadId : null,
           status: "completed",
-          runTrigger: "manual",
           error: null,
         })
       }
@@ -611,7 +653,9 @@ export function AutomationsPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Run failed")
     } finally {
+      pollState.cancelled = true
       setRunningId(null)
+      setActiveRunInfo(null)
     }
   }
 
@@ -1043,6 +1087,23 @@ export function AutomationsPage() {
     )
   }
 
+  const canShowViewSetPreview =
+    !isCommunityScope &&
+    Boolean(selected?.is_public) &&
+    Boolean(selected?.hasPreview) &&
+    typeof selected?.preview_run_id === "string"
+
+  const pendingManualForSelected =
+    !isCommunityScope && pendingManualRunPreview?.automationId === selected?.id
+      ? pendingManualRunPreview
+      : null
+
+  const showViewLastManualBtn =
+    Boolean(pendingManualForSelected) &&
+    (!canShowViewSetPreview ||
+      !selected ||
+      pendingManualForSelected.runId !== selected.preview_run_id)
+
   return (
     <div className="mx-auto flex min-h-dvh max-w-6xl flex-col gap-4 px-4 pb-12 pt-20 md:flex-row md:gap-6">
       <aside className="w-full shrink-0 md:w-80">
@@ -1216,19 +1277,86 @@ export function AutomationsPage() {
                         Active
                       </Label>
                     </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={runningId === selected.id}
-                      onClick={() => void runNow(selected)}
-                    >
-                      {runningId === selected.id ? (
-                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                      ) : (
+                    {canShowViewSetPreview && selected.preview_run_id ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const row = runs.find((r) => r.id === selected.preview_run_id)
+                          const st = row?.status
+                          const status: "running" | "completed" | "failed" =
+                            st === "failed" ? "failed" : st === "running" ? "running" : "completed"
+                          setPreviewRunModal({
+                            runId: selected.preview_run_id,
+                            threadId: row?.thread_id ?? null,
+                            status,
+                            runTrigger: (row?.run_trigger ?? "scheduled") as "manual" | "scheduled",
+                            error: row?.error ?? null,
+                          })
+                        }}
+                      >
+                        <Eye className="mr-1 h-4 w-4" />
+                        View preview
+                      </Button>
+                    ) : null}
+                    {showViewLastManualBtn && pendingManualForSelected ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setPreviewRunModal({
+                            runId: pendingManualForSelected.runId,
+                            threadId: pendingManualForSelected.threadId,
+                            status: pendingManualForSelected.status,
+                            runTrigger: "manual",
+                            error: pendingManualForSelected.error,
+                          })
+                        }
+                      >
+                        <Eye className="mr-1 h-4 w-4" />
+                        View last run
+                      </Button>
+                    ) : null}
+                    {runningId === selected.id ? (
+                      (() => {
+                        const activeForSelected =
+                          activeRunInfo?.automationId === selected.id ? activeRunInfo : null
+                        const viewReady = Boolean(activeForSelected)
+                        return (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={!viewReady}
+                            onClick={() => {
+                              if (!activeForSelected) return
+                              setPreviewRunModal({
+                                runId: activeForSelected.runId,
+                                threadId: activeForSelected.threadId,
+                                status: "running",
+                                runTrigger: "manual",
+                                error: null,
+                              })
+                            }}
+                          >
+                            {viewReady ? (
+                              <Eye className="mr-1 h-4 w-4" />
+                            ) : (
+                              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                            )}
+                            {viewReady ? "View current run" : "Starting…"}
+                          </Button>
+                        )
+                      })()
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void runNow(selected)}
+                      >
                         <Play className="mr-1 h-4 w-4" />
-                      )}
-                      Run now
-                    </Button>
+                        Run now
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={() => setDeleteId(selected.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>

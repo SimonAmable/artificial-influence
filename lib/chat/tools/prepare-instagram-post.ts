@@ -6,11 +6,13 @@ import { createInstagramPostJob } from "@/lib/autopost/create-instagram-post-job
 interface CreatePrepareInstagramPostToolOptions {
   supabase: SupabaseClient
   userId: string
+  requireApproval?: boolean
 }
 
 export function createPrepareInstagramPostTool({
   supabase,
   userId,
+  requireApproval = true,
 }: CreatePrepareInstagramPostToolOptions) {
   return tool({
     description:
@@ -59,7 +61,7 @@ export function createPrepareInstagramPostTool({
         .describe("Optional reels trial parameters."),
     }),
     strict: true,
-    needsApproval: true,
+    needsApproval: requireApproval,
     execute: async (input) => {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
       if (!supabaseUrl) {
