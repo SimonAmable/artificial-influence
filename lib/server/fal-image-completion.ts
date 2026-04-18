@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
-import { syncChatThreadMediaForPrediction } from "@/lib/chat/thread-media/server"
 import { configureFal } from "./fal-qwen-image-2"
 
 const supabaseAdmin = createClient(
@@ -82,7 +81,11 @@ export async function tryCompleteFalPendingImage(
   if (queueStatus.status !== "COMPLETED") {
     await supabaseAdmin
       .from("generations")
-      .update({ status: "failed", error_message: `Fal queue status: ${queueStatus.status}` })
+      .update({
+        status: "failed",
+        error_message: `Fal queue status: ${queueStatus.status}`,
+        finished_at: new Date().toISOString(),
+      })
       .eq("id", row.id)
     await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
     return { status: "failed", error: "Fal generation failed" }
@@ -93,7 +96,10 @@ export async function tryCompleteFalPendingImage(
     result = await fal.queue.result(endpointId, { requestId })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Fal result error"
-    await supabaseAdmin.from("generations").update({ status: "failed", error_message: msg }).eq("id", row.id)
+    await supabaseAdmin
+      .from("generations")
+      .update({ status: "failed", error_message: msg, finished_at: new Date().toISOString() })
+      .eq("id", row.id)
     await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
     return { status: "failed", error: msg }
   }
@@ -106,7 +112,11 @@ export async function tryCompleteFalPendingImage(
   if (urls.length === 0) {
     await supabaseAdmin
       .from("generations")
-      .update({ status: "failed", error_message: "Fal returned no image URLs" })
+      .update({
+        status: "failed",
+        error_message: "Fal returned no image URLs",
+        finished_at: new Date().toISOString(),
+      })
       .eq("id", row.id)
     await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
     return { status: "failed", error: "No image URLs" }
@@ -126,7 +136,11 @@ export async function tryCompleteFalPendingImage(
   if (!hasCredits) {
     await supabaseAdmin
       .from("generations")
-      .update({ status: "failed", error_message: "Insufficient credits when processing Fal result" })
+      .update({
+        status: "failed",
+        error_message: "Insufficient credits when processing Fal result",
+        finished_at: new Date().toISOString(),
+      })
       .eq("id", row.id)
     await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
     return { status: "failed", error: "Insufficient credits" }
@@ -140,7 +154,11 @@ export async function tryCompleteFalPendingImage(
     if (!response.ok) {
       await supabaseAdmin
         .from("generations")
-        .update({ status: "failed", error_message: `Failed to download Fal output (${response.status})` })
+        .update({
+          status: "failed",
+          error_message: `Failed to download Fal output (${response.status})`,
+          finished_at: new Date().toISOString(),
+        })
         .eq("id", row.id)
       await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
       return { status: "failed", error: "Download failed" }
@@ -163,7 +181,11 @@ export async function tryCompleteFalPendingImage(
     if (uploadError) {
       await supabaseAdmin
         .from("generations")
-        .update({ status: "failed", error_message: uploadError.message })
+        .update({
+          status: "failed",
+          error_message: uploadError.message,
+          finished_at: new Date().toISOString(),
+        })
         .eq("id", row.id)
       await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
       return { status: "failed", error: "Upload failed" }
@@ -173,12 +195,14 @@ export async function tryCompleteFalPendingImage(
     persistedOutputs.push({ storagePath, url: urlData.publicUrl })
   }
 
+  const completedAt = new Date().toISOString()
   await supabaseAdmin
     .from("generations")
     .update({
       supabase_storage_path: persistedOutputs[0]?.storagePath ?? null,
       status: "completed",
       error_message: null,
+      finished_at: completedAt,
     })
     .eq("id", row.id)
 
@@ -199,12 +223,12 @@ export async function tryCompleteFalPendingImage(
       tool: row.tool ?? null,
       status: "completed",
       replicate_prediction_id: predictionId,
+      finished_at: completedAt,
     }))
     await supabaseAdmin.from("generations").insert(extraRows)
   }
 
   await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
-  await syncChatThreadMediaForPrediction(supabaseAdmin, predictionId)
   await deductUserCredits(row.user_id, requiredCredits, supabaseAdmin)
 
   return { status: "completed" }

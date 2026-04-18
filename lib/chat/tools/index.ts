@@ -1,12 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { SkillCatalogEntry } from "@/lib/chat/skills/catalog"
-import type {
-  AvailableChatImageReference,
-  ChatImageReference,
-} from "@/lib/chat/tools/generate-image-with-nano-banana"
+import type { AvailableChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
 import { createGenerateImageTool } from "@/lib/chat/tools/generate-image"
 import { createGenerateImageWithNanoBananaTool } from "@/lib/chat/tools/generate-image-with-nano-banana"
-import type { ChatAudioReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
+import type {
+  AvailableChatAudioReference,
+  AvailableChatVideoReference,
+} from "@/lib/chat/tools/generate-video"
 import { createGenerateVideoTool } from "@/lib/chat/tools/generate-video"
 import { createGetBrandContextTool } from "@/lib/chat/tools/get-brand-context"
 import { createListInstagramConnectionsTool } from "@/lib/chat/tools/list-instagram-connections"
@@ -18,13 +18,14 @@ import { createSearchModelsTool } from "@/lib/chat/tools/search-models"
 import { createActivateSkillTool, createSaveSkillTool } from "@/lib/chat/tools/skills"
 import { createExtractVideoFramesTool } from "@/lib/chat/tools/extract-video-frames"
 import { createComposeTimelineVideoTool } from "@/lib/chat/tools/compose-timeline-video"
+import { createAwaitGenerationTool } from "@/lib/chat/tools/await-generation"
+import { createEstimateModelLatencyTool } from "@/lib/chat/tools/estimate-model-latency"
 import { createListThreadMediaTool } from "@/lib/chat/tools/list-thread-media"
 
 interface CreateCreativeChatToolsOptions {
   availableReferences: AvailableChatImageReference[]
-  latestUserImages: ChatImageReference[]
-  latestUserVideos: ChatVideoReference[]
-  latestUserAudios: ChatAudioReference[]
+  availableVideoReferences: AvailableChatVideoReference[]
+  availableAudioReferences: AvailableChatAudioReference[]
   supabase: SupabaseClient
   threadId?: string
   userId: string
@@ -33,9 +34,8 @@ interface CreateCreativeChatToolsOptions {
 
 export function createCreativeChatTools({
   availableReferences,
-  latestUserImages,
-  latestUserVideos,
-  latestUserAudios,
+  availableVideoReferences,
+  availableAudioReferences,
   supabase,
   threadId,
   userId,
@@ -72,30 +72,27 @@ export function createCreativeChatTools({
     }),
     generateImage: createGenerateImageTool({
       availableReferences,
-      latestUserImages,
       supabase,
       threadId,
       userId,
     }),
     generateImageWithNanoBanana: createGenerateImageWithNanoBananaTool({
       availableReferences,
-      latestUserImages,
       supabase,
       threadId,
       userId,
     }),
     generateVideo: createGenerateVideoTool({
       availableReferences,
-      latestUserImages,
-      latestUserVideos,
-      latestUserAudios,
+      availableVideoReferences,
+      availableAudioReferences,
       supabase,
       threadId,
       userId,
     }),
     extractVideoFrames: createExtractVideoFramesTool({
-      latestUserVideos,
-      latestUserImages,
+      availableImageReferences: availableReferences,
+      availableVideoReferences,
       supabase,
       threadId,
       userId,
@@ -119,6 +116,8 @@ export function createCreativeChatTools({
     searchModels: createSearchModelsTool({
       supabase,
     }),
+    awaitGeneration: createAwaitGenerationTool({ supabase, userId }),
+    estimateModelLatency: createEstimateModelLatencyTool({ supabase, userId }),
     saveSkill: createSaveSkillTool({
       supabase,
       userId,

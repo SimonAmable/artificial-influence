@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
-import { syncChatThreadMediaForPrediction } from "@/lib/chat/thread-media/server"
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -155,11 +154,16 @@ export async function POST(request: NextRequest) {
     }
 
     const pendingGeneration = generation as PendingGenerationRow
+    const finishedAt = new Date().toISOString()
 
     if (status !== "succeeded" || output == null) {
       await supabaseAdmin
         .from("generations")
-        .update({ status: "failed", error_message: error || `Prediction ${status}` })
+        .update({
+          status: "failed",
+          error_message: error || `Prediction ${status}`,
+          finished_at: finishedAt,
+        })
         .eq("id", pendingGeneration.id)
       await syncGenerationResultToPersistedChat({
         predictionId,
@@ -173,7 +177,11 @@ export async function POST(request: NextRequest) {
     if (outputUrls.length === 0) {
       await supabaseAdmin
         .from("generations")
-        .update({ status: "failed", error_message: "Replicate returned no output URLs" })
+        .update({
+          status: "failed",
+          error_message: "Replicate returned no output URLs",
+          finished_at: finishedAt,
+        })
         .eq("id", pendingGeneration.id)
       await syncGenerationResultToPersistedChat({
         predictionId,
@@ -218,7 +226,11 @@ export async function POST(request: NextRequest) {
     if (!hasCredits) {
       await supabaseAdmin
         .from("generations")
-        .update({ status: "failed", error_message: "Insufficient credits when processing result" })
+        .update({
+          status: "failed",
+          error_message: "Insufficient credits when processing result",
+          finished_at: finishedAt,
+        })
         .eq("id", pendingGeneration.id)
       await syncGenerationResultToPersistedChat({
         predictionId,
@@ -233,6 +245,7 @@ export async function POST(request: NextRequest) {
         supabase_storage_path: persistedOutputs[0]?.storagePath ?? null,
         status: "completed",
         error_message: null,
+        finished_at: finishedAt,
       })
       .eq("id", pendingGeneration.id)
 
@@ -253,6 +266,7 @@ export async function POST(request: NextRequest) {
         tool: pendingGeneration.tool ?? null,
         status: "completed",
         replicate_prediction_id: predictionId,
+        finished_at: finishedAt,
       }))
 
       if (extraRows.length > 0) {
@@ -264,8 +278,6 @@ export async function POST(request: NextRequest) {
       predictionId,
       supabase: supabaseAdmin,
     })
-
-    await syncChatThreadMediaForPrediction(supabaseAdmin, predictionId)
 
     await deductUserCredits(pendingGeneration.user_id, requiredCredits, supabaseAdmin)
     console.log(

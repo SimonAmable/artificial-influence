@@ -420,7 +420,7 @@ export function Header() {
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon">
+                  <Button variant="outline" size="icon" className="shadow-md">
                     <User className="h-[1.2rem] w-[1.2rem]" />
                     <span className="sr-only">User menu</span>
                   </Button>

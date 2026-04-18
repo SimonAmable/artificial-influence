@@ -24,7 +24,8 @@ import type {
   AvailableChatImageReference,
   ChatImageReference,
 } from "@/lib/chat/tools/generate-image-with-nano-banana"
-import { resolveThreadMediaIdsToImageReferences } from "@/lib/chat/thread-media/server"
+import { mediaIdStringSchema } from "@/lib/chat/media-id"
+import { resolveToolImageReferences } from "@/lib/chat/resolve-tool-references"
 
 const DEFAULT_IMAGE_MODEL = "google/nano-banana-2" as const
 const MAX_REFERENCE_IMAGES = 4
@@ -38,7 +39,6 @@ const JSON_SUPPORTED_MODELS = new Set([
 
 interface CreateGenerateImageToolOptions {
   availableReferences: AvailableChatImageReference[]
-  latestUserImages: ChatImageReference[]
   supabase: SupabaseClient
   threadId?: string
   userId: string
@@ -287,7 +287,6 @@ async function maybeEnhancePrompt({
 
 export function createGenerateImageTool({
   availableReferences,
-  latestUserImages,
   supabase,
   threadId,
   userId,
@@ -298,7 +297,7 @@ export function createGenerateImageTool({
 
   return tool({
     description:
-      "Generate or edit an image using any active UniCan image model. Use this when the user explicitly wants an image created now, especially if they name a model, ask for non-Nano output, or want you to use saved asset references. For earlier thread images, use listThreadMedia + mediaIds (UUIDs).",
+      "Generate or edit an image using any active UniCan image model. Use this when the user explicitly wants an image created now, especially if they name a model, ask for non-Nano output, or want you to use saved asset references. Pass reference images via **referenceIds** (`ref_1`…`ref_N` from the transcript manifest, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or **mediaId** from listRecentGenerations). Deprecated alias: **mediaIds**. Attachments are not auto-included.",
     inputSchema: z.object({
       prompt: z
         .string()
@@ -325,24 +324,18 @@ export function createGenerateImageTool({
         .max(4)
         .optional()
         .describe("How many image variations to generate. Keep this low unless the user explicitly asks for multiple options."),
-      mediaIds: z
-        .array(z.string().uuid())
-        .max(MAX_REFERENCE_IMAGES)
-        .optional()
-        .describe(
-          "UUIDs from listThreadMedia for earlier thread images or generated images (same thread). Prefer this over legacy referenceIds.",
-        ),
       referenceIds: z
         .array(z.string().min(1))
         .max(MAX_REFERENCE_IMAGES)
         .optional()
-        .describe("Legacy ref_1 style IDs from older chats only when listThreadMedia UUIDs are unavailable."),
-      useLatestUserImages: z
-        .boolean()
-        .optional()
         .describe(
-          "When true, include image files attached on the latest user message as references. Defaults to false. Ignored when mediaIds/referenceIds are provided.",
+          "Reference images: `ref_1`…`ref_N`, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or mediaId from listRecentGenerations.",
         ),
+      mediaIds: z
+        .array(mediaIdStringSchema)
+        .max(MAX_REFERENCE_IMAGES)
+        .optional()
+        .describe("Deprecated alias for referenceIds."),
       assetIds: z
         .array(z.string().uuid())
         .max(MAX_REFERENCE_IMAGES)
@@ -364,34 +357,22 @@ export function createGenerateImageTool({
       prompt,
       mediaIds = [],
       referenceIds = [],
-      useLatestUserImages = false,
       variantCount = 1,
     }) => {
-      const resolvedFromThread =
-        threadId && mediaIds.length > 0
-          ? await resolveThreadMediaIdsToImageReferences(supabase, userId, threadId, mediaIds)
-          : []
+      const { references: resolvedFromIds, warnings: referenceWarnings } =
+        referenceIds.length > 0 || mediaIds.length > 0
+          ? await resolveToolImageReferences({
+              supabase,
+              userId,
+              threadId,
+              referenceIds,
+              mediaIds,
+              availableReferenceMap: availableReferenceMap,
+              allowCrossThread: true,
+            })
+          : { references: [] as ChatImageReference[], warnings: [] as string[] }
 
-      const resolvedReferenceIds = referenceIds.map((referenceId) => {
-        const reference = availableReferenceMap.get(referenceId)
-
-        if (!reference) {
-          throw new Error(`Unknown reference ID: ${referenceId}`)
-        }
-
-        return reference
-      })
-
-      const explicitReferences = dedupeReferences([
-        ...resolvedFromThread,
-        ...resolvedReferenceIds,
-      ]).slice(0, MAX_REFERENCE_IMAGES)
-      const referenceCandidates =
-        explicitReferences.length > 0
-          ? explicitReferences
-          : useLatestUserImages
-            ? dedupeReferences(latestUserImages).slice(0, MAX_REFERENCE_IMAGES)
-            : []
+      const referenceCandidates = dedupeReferences(resolvedFromIds).slice(0, MAX_REFERENCE_IMAGES)
 
       const [uploadedReferences, assetReferences, modelResponse] = await Promise.all([
         Promise.all(
@@ -538,6 +519,7 @@ export function createGenerateImageTool({
           status: "completed" as const,
           usedReferenceCount: referenceImageUrls.length,
           variantCount: persisted.images.length,
+          ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
         }
       }
 
@@ -601,6 +583,7 @@ export function createGenerateImageTool({
           status: "pending" as const,
           usedReferenceCount: referenceImageUrls.length,
           variantCount: effectiveVariantCount,
+          ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
         }
       }
 
@@ -694,6 +677,7 @@ export function createGenerateImageTool({
           status: "pending" as const,
           usedReferenceCount: referenceImageUrls.length,
           variantCount: effectiveVariantCount,
+          ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
         }
       }
 
@@ -725,6 +709,7 @@ export function createGenerateImageTool({
         status: "completed" as const,
         usedReferenceCount: referenceImageUrls.length,
         variantCount: persisted.images.length,
+        ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
       }
     },
   })

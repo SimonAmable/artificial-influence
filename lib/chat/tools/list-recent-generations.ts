@@ -1,6 +1,7 @@
 import { tool } from "ai"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
+import { formatGenerationMediaId } from "@/lib/chat/media-id"
 
 interface CreateListRecentGenerationsToolOptions {
   supabase: SupabaseClient
@@ -59,7 +60,7 @@ export function createListRecentGenerationsTool({
 }: CreateListRecentGenerationsToolOptions) {
   return tool({
     description:
-      "List the user's recent generations from chat and history. Use this when the user refers to a past render, wants to reuse or save an earlier output, asks about their last generation, or when you need a generation id before saving it as an asset.",
+      "List the user's recent generations from chat and history. Use this when the user refers to a past render, wants to reuse or save an earlier output, asks about their last generation, or when you need a generation id before saving it as an asset. Each row has `id` (raw UUID for save-as-asset / credits) and `mediaId` (`gen_<uuid>`) to pass as **referenceIds** on generateImage / generateVideo / generateImageWithNanoBanana.",
     inputSchema: z.object({
       query: z
         .string()
@@ -114,6 +115,7 @@ export function createListRecentGenerationsTool({
         errorMessage:
           typeof generation.error_message === "string" ? generation.error_message : null,
         id: String(generation.id),
+        mediaId: formatGenerationMediaId(String(generation.id)),
         model: typeof generation.model === "string" ? generation.model : null,
         predictionId:
           typeof generation.replicate_prediction_id === "string"

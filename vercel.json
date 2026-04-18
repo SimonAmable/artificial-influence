@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/autopost-queue",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/automations",
+      "schedule": "* * * * *"
     }
   ]
 }

@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { UIMessage } from "ai"
 import { inferStoragePathFromUrl } from "@/lib/assets/library"
+import { formatGenerationMediaId, formatUploadMediaId } from "@/lib/chat/media-id"
+import {
+  resolveMediaIdToFrameExtractReference as resolveMediaIdToFrameExtractReferenceImpl,
+  resolveMediaIdsToImageReferences as resolveMediaIdsToImageReferencesImpl,
+  resolveMediaRowsForTimelineCompose as resolveMediaRowsForTimelineComposeImpl,
+} from "@/lib/chat/resolve-media-ref"
 import type { ChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
 
 export type ChatThreadMediaKind = "user_upload" | "generation"
@@ -32,8 +38,8 @@ function inferMimeFromStoragePath(path: string, fallback: string) {
   return fallback
 }
 
-function getPublicUrlForPath(supabase: SupabaseClient, storagePath: string) {
-  const { data } = supabase.storage.from("public-bucket").getPublicUrl(storagePath)
+function getPublicUrlForPath(supabase: SupabaseClient, bucket: string, storagePath: string) {
+  const { data } = supabase.storage.from(bucket).getPublicUrl(storagePath)
   return data.publicUrl
 }
 
@@ -43,7 +49,7 @@ function isHttpSupabasePublicUrl(url: string) {
 }
 
 /**
- * Register file parts from an incoming user message as thread media (idempotent on URL).
+ * Register file parts from an incoming user message as uploads (idempotent on storage path).
  */
 export async function registerThreadMediaFromUserMessageParts(
   supabase: SupabaseClient,
@@ -68,19 +74,18 @@ export async function registerThreadMediaFromUserMessageParts(
     const label =
       filename && filename.length > 0 ? `Uploaded: ${filename}` : "User upload"
 
-    const { error } = await supabase.from("chat_thread_media").insert({
+    const { error } = await supabase.from("uploads").insert({
       user_id: userId,
       chat_thread_id: threadId,
-      media_kind: "user_upload",
+      source: "chat",
+      bucket: "public-bucket",
       mime_type: mimeType,
-      public_url: url,
       storage_path: storagePath,
       label,
-      generation_id: null,
     })
 
     if (error && error.code !== "23505") {
-      console.error("[chat_thread_media] Failed to register upload:", error.message)
+      console.error("[uploads] Failed to register upload:", error.message)
     }
   }
 }
@@ -93,28 +98,106 @@ export async function listThreadMediaPage(
 ) {
   const limit = Math.min(Math.max(options?.limit ?? 50, 1), 100)
   const kind = options?.mediaKind ?? "all"
+  const fetchCap = Math.min(limit * 3, 200)
 
-  let query = supabase
-    .from("chat_thread_media")
-    .select(
-      "id, user_id, chat_thread_id, media_kind, mime_type, public_url, storage_path, label, generation_id, created_at",
-    )
-    .eq("user_id", userId)
-    .eq("chat_thread_id", threadId)
-    .order("created_at", { ascending: false })
-    .limit(limit)
+  const uploadRows: ChatThreadMediaRow[] = []
+  const generationRows: ChatThreadMediaRow[] = []
 
-  if (kind !== "all") {
-    query = query.eq("media_kind", kind)
+  if (kind === "all" || kind === "user_upload") {
+    const { data, error } = await supabase
+      .from("uploads")
+      .select("id, user_id, chat_thread_id, bucket, storage_path, mime_type, label, created_at")
+      .eq("user_id", userId)
+      .eq("chat_thread_id", threadId)
+      .order("created_at", { ascending: false })
+      .limit(fetchCap)
+
+    if (error) {
+      throw new Error(`Failed to list uploads: ${error.message}`)
+    }
+
+    for (const row of data ?? []) {
+      const r = row as {
+        id: string
+        user_id: string
+        chat_thread_id: string | null
+        bucket: string
+        storage_path: string
+        mime_type: string
+        label: string | null
+        created_at: string
+      }
+      if (!r.chat_thread_id) continue
+      uploadRows.push({
+        id: formatUploadMediaId(r.id),
+        user_id: r.user_id,
+        chat_thread_id: r.chat_thread_id,
+        media_kind: "user_upload",
+        mime_type: r.mime_type,
+        public_url: getPublicUrlForPath(supabase, r.bucket, r.storage_path),
+        storage_path: r.storage_path,
+        label: r.label,
+        generation_id: null,
+        created_at: r.created_at,
+      })
+    }
   }
 
-  const { data, error } = await query
+  if (kind === "all" || kind === "generation") {
+    const { data, error } = await supabase
+      .from("generations")
+      .select("id, user_id, chat_thread_id, supabase_storage_path, type, model, created_at")
+      .eq("user_id", userId)
+      .eq("chat_thread_id", threadId)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(fetchCap)
 
-  if (error) {
-    throw new Error(`Failed to list thread media: ${error.message}`)
+    if (error) {
+      throw new Error(`Failed to list generations: ${error.message}`)
+    }
+
+    for (const row of data ?? []) {
+      const r = row as {
+        id: string
+        user_id: string
+        chat_thread_id: string | null
+        supabase_storage_path: string | null
+        type: "image" | "video"
+        model: string | null
+        created_at: string
+      }
+      if (!r.chat_thread_id || !r.supabase_storage_path) continue
+
+      const mimeType = inferMimeFromStoragePath(
+        r.supabase_storage_path,
+        r.type === "video" ? "video/mp4" : "image/png",
+      )
+      const label =
+        r.type === "video"
+          ? `Generated video (${r.model ?? "video"})`
+          : `Generated image (${r.model ?? "image"})`
+
+      generationRows.push({
+        id: formatGenerationMediaId(r.id),
+        user_id: r.user_id,
+        chat_thread_id: r.chat_thread_id,
+        media_kind: "generation",
+        mime_type: mimeType,
+        public_url: getPublicUrlForPath(supabase, "public-bucket", r.supabase_storage_path),
+        storage_path: r.supabase_storage_path,
+        label,
+        generation_id: r.id,
+        created_at: r.created_at,
+      })
+    }
   }
 
-  return (data ?? []) as ChatThreadMediaRow[]
+  const merged = [...uploadRows, ...generationRows].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at),
+  )
+
+  return merged.slice(0, limit)
 }
 
 export type ComposeThreadMediaRow = {
@@ -124,48 +207,13 @@ export type ComposeThreadMediaRow = {
   label: string | null
 }
 
-/**
- * Load thread media rows for timeline composition. Preserves the order of `mediaIds`.
- */
 export async function resolveThreadMediaRowsForTimelineCompose(
   supabase: SupabaseClient,
   userId: string,
   threadId: string,
   mediaIds: string[],
 ): Promise<ComposeThreadMediaRow[]> {
-  if (mediaIds.length === 0) {
-    throw new Error("At least one media segment is required.")
-  }
-
-  const unique = new Set(mediaIds)
-  if (unique.size !== mediaIds.length) {
-    throw new Error("Duplicate media IDs in segments are not allowed.")
-  }
-
-  const { data, error } = await supabase
-    .from("chat_thread_media")
-    .select("id, mime_type, public_url, label")
-    .eq("user_id", userId)
-    .eq("chat_thread_id", threadId)
-    .in("id", mediaIds)
-
-  if (error) {
-    throw new Error(`Failed to load thread media: ${error.message}`)
-  }
-
-  const rows = (data ?? []) as ComposeThreadMediaRow[]
-  if (rows.length !== mediaIds.length) {
-    throw new Error("One or more media IDs were not found on this thread or are inaccessible.")
-  }
-
-  const byId = new Map(rows.map((row) => [row.id, row]))
-  return mediaIds.map((id) => {
-    const row = byId.get(id)
-    if (!row) {
-      throw new Error(`Missing thread media row for id ${id}.`)
-    }
-    return row
-  })
+  return resolveMediaRowsForTimelineComposeImpl(supabase, userId, threadId, mediaIds)
 }
 
 export async function resolveThreadMediaIdsToImageReferences(
@@ -174,45 +222,7 @@ export async function resolveThreadMediaIdsToImageReferences(
   threadId: string,
   mediaIds: string[],
 ): Promise<ChatImageReference[]> {
-  if (mediaIds.length === 0) return []
-
-  const { data, error } = await supabase
-    .from("chat_thread_media")
-    .select("id, mime_type, public_url, label")
-    .eq("user_id", userId)
-    .eq("chat_thread_id", threadId)
-    .in("id", mediaIds)
-
-  if (error) {
-    throw new Error(`Failed to load thread media: ${error.message}`)
-  }
-
-  const rows = (data ?? []) as Array<{
-    id: string
-    mime_type: string
-    public_url: string
-    label: string | null
-  }>
-
-  if (rows.length !== mediaIds.length) {
-    throw new Error("One or more media IDs were not found on this thread or are inaccessible.")
-  }
-
-  const imageRefs: ChatImageReference[] = []
-  for (const row of rows) {
-    if (!row.mime_type.startsWith("image/")) {
-      throw new Error(
-        `Media ${row.id} is not an image (${row.mime_type}). Use listThreadMedia to pick image items.`,
-      )
-    }
-    imageRefs.push({
-      url: row.public_url,
-      mediaType: row.mime_type,
-      filename: row.label ?? undefined,
-    })
-  }
-
-  return imageRefs
+  return resolveMediaIdsToImageReferencesImpl(supabase, userId, threadId, mediaIds)
 }
 
 export async function resolveThreadMediaIdToFrameExtractReference(
@@ -221,167 +231,5 @@ export async function resolveThreadMediaIdToFrameExtractReference(
   threadId: string,
   mediaId: string,
 ): Promise<{ url: string; mediaType: string; filename?: string }> {
-  const { data, error } = await supabase
-    .from("chat_thread_media")
-    .select("id, mime_type, public_url, label")
-    .eq("user_id", userId)
-    .eq("chat_thread_id", threadId)
-    .eq("id", mediaId)
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(`Failed to load thread media: ${error.message}`)
-  }
-
-  const row = data as
-    | {
-        id: string
-        mime_type: string
-        public_url: string
-        label: string | null
-      }
-    | null
-
-  if (!row) {
-    throw new Error("That media id was not found on this thread or is inaccessible.")
-  }
-
-  const normalizedMime = row.mime_type.toLowerCase()
-  if (!normalizedMime.startsWith("video/") && normalizedMime !== "image/gif") {
-    throw new Error(
-      `Media ${row.id} is not a video or GIF (${row.mime_type}). Use listThreadMedia to pick a video/GIF row, or attach one in this message.`,
-    )
-  }
-
-  return {
-    url: row.public_url,
-    mediaType: row.mime_type,
-    filename: row.label ?? undefined,
-  }
-}
-
-/**
- * Sync `chat_thread_media` rows for all completed generation outputs tied to a Replicate prediction.
- */
-export async function syncChatThreadMediaForPrediction(
-  supabase: SupabaseClient,
-  predictionId: string,
-) {
-  const { data: rows, error } = await supabase
-    .from("generations")
-    .select("id, user_id, chat_thread_id, type, tool, model, supabase_storage_path, status")
-    .eq("replicate_prediction_id", predictionId)
-    .eq("status", "completed")
-
-  if (error) {
-    console.error("[chat_thread_media] Failed to load generations for sync:", error.message)
-    return
-  }
-
-  const list = (rows ?? []) as Array<{
-    id: string
-    user_id: string
-    chat_thread_id: string | null
-    type: "image" | "video"
-    tool: string | null
-    model: string | null
-    supabase_storage_path: string | null
-  }>
-
-  for (const row of list) {
-    if (!row.chat_thread_id || !row.supabase_storage_path) continue
-
-    const publicUrl = getPublicUrlForPath(supabase, row.supabase_storage_path)
-    const mimeType = inferMimeFromStoragePath(
-      row.supabase_storage_path,
-      row.type === "video" ? "video/mp4" : "image/png",
-    )
-    const label =
-      row.type === "video"
-        ? `Generated video (${row.model ?? "video"})`
-        : `Generated image (${row.model ?? "image"})`
-
-    const { error: insertError } = await supabase.from("chat_thread_media").insert({
-      user_id: row.user_id,
-      chat_thread_id: row.chat_thread_id,
-      media_kind: "generation",
-      mime_type: mimeType,
-      public_url: publicUrl,
-      storage_path: row.supabase_storage_path,
-      label,
-      generation_id: row.id,
-    })
-
-    if (insertError && insertError.code !== "23505") {
-      console.error("[chat_thread_media] Insert failed:", insertError.message)
-    }
-  }
-}
-
-/**
- * Ensures every completed chat-bound generation on this thread has a `chat_thread_media` row.
- * Covers synchronous/polling completions and webhook/bind races.
- */
-export async function syncMissingChatThreadMediaForThread(
-  supabase: SupabaseClient,
-  userId: string,
-  threadId: string,
-) {
-  const { data: rows, error } = await supabase
-    .from("generations")
-    .select("id, user_id, chat_thread_id, type, model, supabase_storage_path, status")
-    .eq("user_id", userId)
-    .eq("chat_thread_id", threadId)
-    .eq("status", "completed")
-
-  if (error) {
-    console.error("[chat_thread_media] Failed to load generations for backfill:", error.message)
-    return
-  }
-
-  const list = (rows ?? []).filter((row) => {
-    const path = (row as { supabase_storage_path?: string | null }).supabase_storage_path
-    return typeof path === "string" && path.length > 0
-  }) as Array<{
-    id: string
-    user_id: string
-    type: "image" | "video"
-    model: string | null
-    supabase_storage_path: string
-  }>
-
-  for (const row of list) {
-    const { data: existing } = await supabase
-      .from("chat_thread_media")
-      .select("id")
-      .eq("generation_id", row.id)
-      .maybeSingle()
-
-    if (existing) continue
-
-    const publicUrl = getPublicUrlForPath(supabase, row.supabase_storage_path)
-    const mimeType = inferMimeFromStoragePath(
-      row.supabase_storage_path,
-      row.type === "video" ? "video/mp4" : "image/png",
-    )
-    const label =
-      row.type === "video"
-        ? `Generated video (${row.model ?? "video"})`
-        : `Generated image (${row.model ?? "image"})`
-
-    const { error: insertError } = await supabase.from("chat_thread_media").insert({
-      user_id: row.user_id,
-      chat_thread_id: threadId,
-      media_kind: "generation",
-      mime_type: mimeType,
-      public_url: publicUrl,
-      storage_path: row.supabase_storage_path,
-      label,
-      generation_id: row.id,
-    })
-
-    if (insertError && insertError.code !== "23505") {
-      console.error("[chat_thread_media] Backfill insert failed:", insertError.message)
-    }
-  }
+  return resolveMediaIdToFrameExtractReferenceImpl(supabase, userId, threadId, mediaId)
 }

@@ -40,6 +40,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { getModelMetadataCost } from "@/lib/constants/model-metadata"
 import {
   Select,
   SelectContent,
@@ -69,6 +71,7 @@ type MobileChatThreadListItem = {
   id: string
   title: string
   updated_at: string
+  source?: "user" | "automation"
 }
 
 function formatThreadUpdatedAt(value: string) {
@@ -112,6 +115,11 @@ const STARTER_PROMPTS: { label: string; prompt: string }[] = [
     label: "Visual traits as JSON",
     prompt:
       "I’ll attach an image. Extract detailed visual traits as JSON for a Nano Banana prompt.",
+  },
+  {
+    label: "Verbose JSON from image (Nano Banana)",
+    prompt:
+      "Turn this image into a detailed JSON prompt. Use the full verbose Nano Banana blueprint: top-level keys prompt (with main_subject, scene, style object with art_style/lighting/color_palette/camera/mood, details array, text_in_image, characters, products, background, negative_prompts), technical, references, workflow, notes_for_model. Be exhaustive—rich strings, many detail bullets, thorough negative_prompts, and concrete notes_for_model like the reference examples. Output one pretty-printed JSON code block only after a short preamble.",
   },
   {
     label: "Notes → client brief",
@@ -905,6 +913,63 @@ function ChatBrandPills({
   )
 }
 
+function formatCredits(value: number): string {
+  if (!Number.isFinite(value)) return "0"
+  if (value === 0) return "0"
+  if (value >= 1) return value % 1 === 0 ? value.toFixed(0) : value.toFixed(2)
+  if (value >= 0.01) return value.toFixed(3)
+  return value.toFixed(4)
+}
+
+function CreditCostBadge({
+  modelIdentifier,
+  variantCount = 1,
+  actualCredits,
+}: {
+  modelIdentifier?: string | null
+  variantCount?: number | null
+  actualCredits?: number | null
+}) {
+  if (typeof actualCredits === "number" && actualCredits > 0) {
+    return <Badge variant="outline">{formatCredits(actualCredits)} credits</Badge>
+  }
+  if (!modelIdentifier) return null
+  const perImageCost = getModelMetadataCost(modelIdentifier)
+  if (!perImageCost) return null
+  const variants = variantCount && variantCount > 0 ? variantCount : 1
+  const estimated = perImageCost * variants
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="outline" className="cursor-help">
+          ~{formatCredits(estimated)} credits
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs text-left">
+        Estimated cost: {formatCredits(perImageCost)} credits per image × {variants} variation
+        {variants === 1 ? "" : "s"}. Final cost shown once generation completes.
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function PromptLengthBadge({ prompt }: { prompt?: string | null }) {
+  if (!prompt) return null
+  const length = prompt.length
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="outline" className="cursor-help">
+          prompt: {length} {length === 1 ? "char" : "chars"}
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-sm whitespace-pre-wrap wrap-break-word text-left">
+        {prompt}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 function ImageGenerationResultCard({
   badgeLabel,
   messageId,
@@ -1050,6 +1115,10 @@ function ImageGenerationResultCard({
               {part.input?.variantCount || 1} variation
               {(part.input?.variantCount || 1) > 1 ? "s" : ""}
             </Badge>
+            <CreditCostBadge
+              modelIdentifier={part.input?.modelIdentifier ?? modelFallback}
+              variantCount={part.input?.variantCount ?? 1}
+            />
           </div>
         </CardContent>
       </Card>
@@ -1099,6 +1168,11 @@ function ImageGenerationResultCard({
                 {part.output?.usedReferenceCount || 0} reference
                 {(part.output?.usedReferenceCount || 0) === 1 ? "" : "s"}
               </Badge>
+              <CreditCostBadge
+                modelIdentifier={part.input?.modelIdentifier ?? part.output?.model ?? modelFallback}
+                variantCount={part.input?.variantCount ?? 1}
+              />
+              <PromptLengthBadge prompt={part.input?.prompt} />
             </div>
             {part.output?.message ? (
               <p className="text-sm text-muted-foreground">{part.output.message}</p>
@@ -1132,9 +1206,12 @@ function ImageGenerationResultCard({
               {part.output?.usedReferenceCount || 0} reference
               {(part.output?.usedReferenceCount || 0) === 1 ? "" : "s"}
             </Badge>
-            {creditsUsed ? (
-              <Badge variant="outline">{creditsUsed} credits</Badge>
-            ) : null}
+            <CreditCostBadge
+              modelIdentifier={part.input?.modelIdentifier ?? part.output?.model ?? modelFallback}
+              variantCount={part.input?.variantCount ?? 1}
+              actualCredits={creditsUsed}
+            />
+            <PromptLengthBadge prompt={part.input?.prompt} />
           </div>
           {part.output?.message ? (
             <p className="text-sm text-muted-foreground">{part.output.message}</p>
@@ -3077,8 +3154,13 @@ export function CreativeAgentChat({
                           isActive && "bg-accent/50",
                         )}
                       >
-                        <span className="line-clamp-2 w-full text-left text-sm font-medium">
-                          {thread.title}
+                        <span className="flex w-full flex-wrap items-center gap-1.5 text-left">
+                          <span className="line-clamp-2 flex-1 text-sm font-medium">{thread.title}</span>
+                          {thread.source === "automation" ? (
+                            <span className="shrink-0 rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">
+                              Automation
+                            </span>
+                          ) : null}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {formatThreadUpdatedAt(thread.updated_at)}

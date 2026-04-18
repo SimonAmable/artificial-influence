@@ -11,9 +11,13 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 
 import { inferStoragePathFromUrl } from "@/lib/assets/library"
+import { formatUploadMediaId, mediaIdStringSchema } from "@/lib/chat/media-id"
 import { resolveThreadMediaIdToFrameExtractReference } from "@/lib/chat/thread-media/server"
-import type { ChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
-import type { ChatVideoReference } from "@/lib/chat/tools/generate-video"
+import type {
+  AvailableChatImageReference,
+  ChatImageReference,
+} from "@/lib/chat/tools/generate-image-with-nano-banana"
+import type { AvailableChatVideoReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
 
 const MAX_SOURCE_BYTES = 50 * 1024 * 1024
 const MAX_FRAME_COUNT = 24
@@ -63,8 +67,8 @@ function resolveFfprobeBinaryPath(): string | null {
 }
 
 interface CreateExtractVideoFramesToolOptions {
-  latestUserVideos: ChatVideoReference[]
-  latestUserImages: ChatImageReference[]
+  availableImageReferences: AvailableChatImageReference[]
+  availableVideoReferences: AvailableChatVideoReference[]
   supabase: SupabaseClient
   threadId?: string
   userId: string
@@ -157,6 +161,55 @@ function isGifReference(reference: { mediaType?: string; url: string }) {
   } catch {
     return false
   }
+}
+
+const TRANSCRIPT_IMAGE_REF_RE = /^ref_\d+$/
+const TRANSCRIPT_VIDEO_REF_RE = /^refv_\d+$/
+
+function resolveTranscriptRefForFrameExtract({
+  referenceId,
+  imageMap,
+  videoMap,
+}: {
+  referenceId: string
+  imageMap: Map<string, AvailableChatImageReference>
+  videoMap: Map<string, AvailableChatVideoReference>
+}): ChatVideoReference | ChatImageReference {
+  const trimmed = referenceId.trim()
+  if (TRANSCRIPT_VIDEO_REF_RE.test(trimmed)) {
+    const video = videoMap.get(trimmed)
+    if (!video) {
+      throw new Error(
+        `Video reference "${trimmed}" is not in this conversation's transcript (refv_1, refv_2, …). Use listThreadMedia or attach a video.`,
+      )
+    }
+    return {
+      url: video.url,
+      mediaType: video.mediaType,
+      filename: video.filename,
+    }
+  }
+  if (TRANSCRIPT_IMAGE_REF_RE.test(trimmed)) {
+    const image = imageMap.get(trimmed)
+    if (!image) {
+      throw new Error(
+        `Image reference "${trimmed}" is not in this conversation's transcript (ref_1, ref_2, …). Use listThreadMedia or attach a GIF.`,
+      )
+    }
+    if (!isGifReference(image)) {
+      throw new Error(
+        `ref_N for frame extraction must be a GIF (image/gif). For video files use refv_N or mediaId.`,
+      )
+    }
+    return {
+      url: image.url,
+      mediaType: image.mediaType,
+      filename: image.filename,
+    }
+  }
+  throw new Error(
+    `Invalid referenceId "${referenceId}". Expected refv_N for video or ref_N for an attached GIF.`,
+  )
 }
 
 async function downloadSourceToBuffer(url: string): Promise<Buffer> {
@@ -523,29 +576,36 @@ async function extractFrameToBuffer(options: {
 }
 
 export function createExtractVideoFramesTool({
-  latestUserVideos,
-  latestUserImages,
+  availableImageReferences,
+  availableVideoReferences,
   supabase,
   threadId,
   userId,
 }: CreateExtractVideoFramesToolOptions) {
-  const latestUserGifs = latestUserImages.filter((reference) => isGifReference(reference))
-  const latestSources = [...latestUserVideos, ...latestUserGifs]
+  const imageMap = new Map(availableImageReferences.map((r) => [r.id, r] as const))
+  const videoMap = new Map(availableVideoReferences.map((r) => [r.id, r] as const))
 
   return tool({
     description:
-      "Extract still frames from a user-owned video or animated GIF (first and last frame by default, optional interior samples and explicit timestamps). Uses ffmpeg. Current-turn video/GIF attachments work without ids; for earlier thread media call listThreadMedia first, then pass that row's id as mediaId. For saved library media, pass assetId from searchAssets. Uploaded frames are registered on the thread when threadId exists so their ids can be used as mediaIds on image tools.",
+      "Extract still frames from a user-owned video or animated GIF (first and last frame by default, optional interior samples and explicit timestamps). Uses ffmpeg. Pass **referenceId** `refv_N` for a video or `ref_N` for an attached GIF (transcript manifest), **mediaId** from listThreadMedia (`upl_`/`gen_`), or **assetId** from searchAssets. Uploaded frames are registered on the thread when threadId exists so their ids can be used as mediaIds on image tools.",
     inputSchema: z.object({
-      mediaId: z
+      referenceId: z
         .string()
-        .uuid()
+        .min(1)
         .optional()
-        .describe("chat_thread_media id for a video or GIF row from listThreadMedia. Requires a persisted thread."),
+        .describe(
+          "Transcript ref: refv_N for video, ref_N for GIF. Mutually exclusive with mediaId and assetId.",
+        ),
+      mediaId: mediaIdStringSchema
+        .optional()
+        .describe(
+          "Media id from listThreadMedia for a video or GIF row (`upl_`/`gen_` or legacy UUID). Requires a persisted thread.",
+        ),
       assetId: z
         .string()
         .uuid()
         .optional()
-        .describe("Saved video/GIF asset id from searchAssets. Do not pass both assetId and mediaId."),
+        .describe("Saved video/GIF asset id from searchAssets. Pass only one of referenceId, mediaId, or assetId."),
       includeFirst: z.boolean().optional().describe("Include the first frame (default true)."),
       includeLast: z.boolean().optional().describe("Include a frame near the end (default true)."),
       evenlySpacedInteriorCount: z
@@ -577,11 +637,12 @@ export function createExtractVideoFramesTool({
         .boolean()
         .optional()
         .describe(
-          "When true (default) and the chat thread is persisted, register each frame in chat_thread_media for mediaIds. Set false for one-off previews.",
+          "When true (default) and the chat thread is persisted, register each frame in uploads for mediaIds. Set false for one-off previews.",
         ),
     }),
     strict: true,
     execute: async ({
+      referenceId,
       mediaId,
       assetId,
       includeFirst = true,
@@ -601,28 +662,29 @@ export function createExtractVideoFramesTool({
         )
       }
 
-      if (mediaId && assetId) {
-        throw new Error("Pass only one of mediaId or assetId, not both.")
+      const sourceSelectors = [referenceId, mediaId, assetId].filter(Boolean)
+      if (sourceSelectors.length > 1) {
+        throw new Error("Pass only one of referenceId, mediaId, or assetId.")
       }
 
       let source: ChatVideoReference | ChatImageReference
 
-      if (mediaId) {
+      if (referenceId) {
+        source = resolveTranscriptRefForFrameExtract({
+          referenceId,
+          imageMap,
+          videoMap,
+        })
+      } else if (mediaId) {
         if (!threadId) {
           throw new Error("mediaId requires a persisted chat thread. Ask the user to continue in a saved thread.")
         }
         source = await resolveThreadMediaIdToFrameExtractReference(supabase, userId, threadId, mediaId)
       } else if (assetId) {
         source = await loadFrameExtractAssetById(assetId, supabase, userId)
-      } else if (latestSources.length === 1) {
-        source = latestSources[0]!
-      } else if (latestSources.length === 0) {
-        throw new Error(
-          "No video or GIF on this message. Attach one, pass mediaId from listThreadMedia, or pass assetId from searchAssets.",
-        )
       } else {
         throw new Error(
-          "Multiple videos/GIFs are attached; pass mediaId (thread) or assetId (library) to choose which one to sample.",
+          "Pass referenceId (refv_N or ref_N for GIF), mediaId from listThreadMedia, or assetId from searchAssets.",
         )
       }
 
@@ -720,28 +782,27 @@ export function createExtractVideoFramesTool({
             return {
               user_id: userId,
               chat_thread_id: threadId!,
-              media_kind: "user_upload" as const,
+              source: "frame-extraction" as const,
+              bucket: "public-bucket" as const,
               mime_type: item.mimeType,
-              public_url: item.url,
               storage_path: storagePath,
               label: item.label,
-              generation_id: null as null,
             }
           })
 
           const { data: inserted, error: insertError } = await supabase
-            .from("chat_thread_media")
+            .from("uploads")
             .insert(insertPayload)
-            .select("id, public_url, label")
+            .select("id, storage_path, label")
 
           if (insertError) {
             throw new Error(`Failed to register extracted frames on thread: ${insertError.message}`)
           }
 
-          const rows = (inserted ?? []) as Array<{ id: string; public_url: string; label: string | null }>
+          const rows = (inserted ?? []) as Array<{ id: string; storage_path: string; label: string | null }>
           mediaRows = rows.map((row, index) => ({
-            id: row.id,
-            publicUrl: row.public_url,
+            id: formatUploadMediaId(row.id),
+            publicUrl: supabase.storage.from("public-bucket").getPublicUrl(row.storage_path).data.publicUrl,
             label: row.label ?? uploaded[index]!.label,
             timestampSec: uploaded[index]!.timestampSec,
           }))
@@ -761,7 +822,7 @@ export function createExtractVideoFramesTool({
           persistedToThread: shouldPersist,
           note: shouldPersist
             ? "Use listThreadMedia if you need refreshed ids; new rows are appended for these frames."
-            : "Frames were not written to chat_thread_media (no thread or persistToThread was false). Use publicUrl directly where allowed.",
+            : "Frames were not written to uploads (no thread or persistToThread was false). Use publicUrl directly where allowed.",
         }
       } finally {
         await rm(workDir, { recursive: true, force: true })

@@ -1,10 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { UIMessage } from "ai"
 import { replaceChatThreadMessages } from "@/lib/chat/database-server"
-import {
-  syncChatThreadMediaForPrediction,
-  syncMissingChatThreadMediaForThread,
-} from "@/lib/chat/thread-media/server"
 
 type PendingMediaToolPart =
   | {
@@ -346,10 +342,7 @@ export async function bindPendingGenerationsToChatMessages({
       userId,
     })
 
-    await syncChatThreadMediaForPrediction(supabase, binding.predictionId)
   }
-
-  await syncMissingChatThreadMediaForThread(supabase, userId, threadId)
 }
 
 export async function syncGenerationResultToPersistedChat({

@@ -5,8 +5,14 @@ import { z } from "zod"
 import { inferStoragePathFromUrl } from "@/lib/assets/library"
 import { resolveWan27Replicate } from "@/lib/server/wan-2.7-replicate"
 import { checkUserHasCredits } from "@/lib/credits"
-import type { AvailableChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
-import { resolveThreadMediaIdsToImageReferences } from "@/lib/chat/thread-media/server"
+import type {
+  AvailableChatImageReference,
+  ChatImageReference,
+} from "@/lib/chat/tools/generate-image-with-nano-banana"
+import { mediaIdStringSchema } from "@/lib/chat/media-id"
+import { resolveToolAudioReferences } from "@/lib/chat/resolve-tool-audio-references"
+import { resolveToolImageReferences } from "@/lib/chat/resolve-tool-references"
+import { resolveToolVideoReferences } from "@/lib/chat/resolve-tool-video-references"
 
 const DEFAULT_TEXT_TO_VIDEO_MODEL = "kwaivgi/kling-v2.6" as const
 const DEFAULT_MOTION_COPY_MODEL = "kwaivgi/kling-v2.6-motion-control" as const
@@ -21,18 +27,25 @@ export interface ChatVideoReference {
   url: string
 }
 
-/** Same shape as {@link ChatVideoReference}; used for current-turn user audio attachments. */
+/** Same shape as {@link ChatVideoReference}; used for user audio attachments. */
 export type ChatAudioReference = ChatVideoReference
+
+/** Transcript id `refv_N` → user-uploaded video in this conversation. */
+export interface AvailableChatVideoReference extends ChatVideoReference {
+  id: string
+  label: string
+}
+
+/** Transcript id `refa_N` → user-uploaded audio in this conversation. */
+export interface AvailableChatAudioReference extends ChatAudioReference {
+  id: string
+  label: string
+}
 
 interface CreateGenerateVideoToolOptions {
   availableReferences: AvailableChatImageReference[]
-  latestUserImages: Array<{
-    filename?: string
-    mediaType?: string
-    url: string
-  }>
-  latestUserVideos: ChatVideoReference[]
-  latestUserAudios: ChatAudioReference[]
+  availableVideoReferences: AvailableChatVideoReference[]
+  availableAudioReferences: AvailableChatAudioReference[]
   supabase: SupabaseClient
   threadId?: string
   userId: string
@@ -249,9 +262,8 @@ async function loadAssetReferences(assetIds: string[], supabase: SupabaseClient,
 
 export function createGenerateVideoTool({
   availableReferences,
-  latestUserImages,
-  latestUserVideos,
-  latestUserAudios,
+  availableVideoReferences,
+  availableAudioReferences,
   supabase,
   threadId,
   userId,
@@ -259,10 +271,16 @@ export function createGenerateVideoTool({
   const availableReferenceMap = new Map(
     availableReferences.map((reference) => [reference.id, reference] as const),
   )
+  const availableVideoReferenceMap = new Map(
+    availableVideoReferences.map((reference) => [reference.id, reference] as const),
+  )
+  const availableAudioReferenceMap = new Map(
+    availableAudioReferences.map((reference) => [reference.id, reference] as const),
+  )
 
   return tool({
     description:
-      "Generate a video using UniCan's active video models. Current-turn image and video attachments are passed automatically. For earlier chat images, use listThreadMedia + mediaIds. Use assetIds only for saved library assets.",
+      "Generate a video using UniCan's active video models. Pass **reference images** via **referenceIds** (`ref_1`…`ref_N`, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or **mediaId** from listRecentGenerations). Pass **videos** via **referenceVideoIds** (`refv_1`…, same upl_/gen_ shapes). Pass **audio** via **referenceAudioIds** (`refa_1`…, same upl_/gen_ shapes). Deprecated alias for image refs: **mediaIds**. Use assetIds only for saved library assets. Nothing is auto-included from attachments—use the transcript manifest or listThreadMedia.",
     inputSchema: z.object({
       prompt: z
         .string()
@@ -284,16 +302,32 @@ export function createGenerateVideoTool({
         .describe(
           "Saved asset UUIDs from searchAssets. Mixed image, video, and audio assets are allowed (e.g. reference audio for Seedance 2.0). Do not pass URLs or storage paths here.",
         ),
-      mediaIds: z
-        .array(z.string().uuid())
-        .max(MAX_REFERENCE_IMAGES)
-        .optional()
-        .describe("UUIDs from listThreadMedia for earlier thread images (not video rows)."),
       referenceIds: z
         .array(z.string().min(1))
         .max(MAX_REFERENCE_IMAGES)
         .optional()
-        .describe("Legacy ref_1 style IDs for earlier chat images."),
+        .describe(
+          "Reference images: ref_1…ref_N, upl_/gen_ prefixed, raw UUID, or mediaId from listRecentGenerations.",
+        ),
+      referenceVideoIds: z
+        .array(z.string().min(1))
+        .max(MAX_REFERENCE_VIDEOS)
+        .optional()
+        .describe(
+          "Reference videos: refv_1…ref_N, upl_/gen_ prefixed, raw UUID, or mediaId from listThreadMedia / listRecentGenerations.",
+        ),
+      referenceAudioIds: z
+        .array(z.string().min(1))
+        .max(MAX_REFERENCE_AUDIOS)
+        .optional()
+        .describe(
+          "Reference audio: refa_1…, upl_/gen_ prefixed, raw UUID, or mediaId from listThreadMedia / listRecentGenerations.",
+        ),
+      mediaIds: z
+        .array(mediaIdStringSchema)
+        .max(MAX_REFERENCE_IMAGES)
+        .optional()
+        .describe("Deprecated alias for referenceIds."),
       aspectRatio: z.string().min(1).max(32).optional(),
       duration: z.number().int().min(1).max(15).optional(),
       negativePrompt: z.string().max(1000).optional(),
@@ -309,6 +343,8 @@ export function createGenerateVideoTool({
       assetIds = [],
       mediaIds = [],
       referenceIds = [],
+      referenceVideoIds = [],
+      referenceAudioIds = [],
       aspectRatio,
       duration,
       negativePrompt,
@@ -317,20 +353,44 @@ export function createGenerateVideoTool({
       mode,
       characterOrientation,
     }) => {
-      const resolvedFromThread =
-        threadId && mediaIds.length > 0
-          ? await resolveThreadMediaIdsToImageReferences(supabase, userId, threadId, mediaIds)
-          : []
+      const { references: resolvedFromIds, warnings: imageRefWarnings } =
+        referenceIds.length > 0 || mediaIds.length > 0
+          ? await resolveToolImageReferences({
+              supabase,
+              userId,
+              threadId,
+              referenceIds,
+              mediaIds,
+              availableReferenceMap: availableReferenceMap,
+              allowCrossThread: true,
+            })
+          : { references: [] as ChatImageReference[], warnings: [] as string[] }
 
-      const resolvedReferenceIds = referenceIds.map((referenceId) => {
-        const reference = availableReferenceMap.get(referenceId)
+      const { references: resolvedVideoFromIds, warnings: videoRefWarnings } =
+        referenceVideoIds.length > 0
+          ? await resolveToolVideoReferences({
+              supabase,
+              userId,
+              threadId,
+              referenceIds: referenceVideoIds,
+              availableReferenceMap: availableVideoReferenceMap,
+              allowCrossThread: true,
+            })
+          : { references: [] as ChatVideoReference[], warnings: [] as string[] }
 
-        if (!reference) {
-          throw new Error(`Unknown reference ID: ${referenceId}`)
-        }
+      const { references: resolvedAudioFromIds, warnings: audioRefWarnings } =
+        referenceAudioIds.length > 0
+          ? await resolveToolAudioReferences({
+              supabase,
+              userId,
+              threadId,
+              referenceIds: referenceAudioIds,
+              availableReferenceMap: availableAudioReferenceMap,
+              allowCrossThread: true,
+            })
+          : { references: [] as ChatAudioReference[], warnings: [] as string[] }
 
-        return reference
-      })
+      const referenceWarnings = [...imageRefWarnings, ...videoRefWarnings, ...audioRefWarnings]
 
       if (!process.env.REPLICATE_API_TOKEN) {
         throw new Error("REPLICATE_API_TOKEN is not configured.")
@@ -338,9 +398,7 @@ export function createGenerateVideoTool({
 
       const assetReferences = await loadAssetReferences(assetIds, supabase, userId)
       const imageReferences = dedupeReferences([
-        ...latestUserImages,
-        ...resolvedFromThread,
-        ...resolvedReferenceIds,
+        ...resolvedFromIds,
         ...assetReferences
           .filter((asset) => asset.assetType === "image")
           .map((asset) => ({
@@ -350,7 +408,7 @@ export function createGenerateVideoTool({
           })),
       ]).slice(0, MAX_REFERENCE_IMAGES)
       const videoReferences = dedupeReferences([
-        ...latestUserVideos,
+        ...resolvedVideoFromIds,
         ...assetReferences
           .filter((asset) => asset.assetType === "video")
           .map((asset) => ({
@@ -360,7 +418,7 @@ export function createGenerateVideoTool({
           })),
       ]).slice(0, MAX_REFERENCE_VIDEOS)
       const audioReferences = dedupeReferences([
-        ...latestUserAudios,
+        ...resolvedAudioFromIds,
         ...assetReferences
           .filter((asset) => asset.assetType === "audio")
           .map((asset) => ({
@@ -640,6 +698,7 @@ export function createGenerateVideoTool({
         usedImageReferenceCount: uploadedImages.length,
         usedVideoReferenceCount: uploadedVideos.length,
         usedAudioReferenceCount: uploadedAudios.length,
+        ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
       }
     },
   })

@@ -7,7 +7,8 @@ import {
   runReplicatePollingImageGeneration,
 } from "@/lib/server/replicate-image-generation"
 import { checkUserHasCredits } from "@/lib/credits"
-import { resolveThreadMediaIdsToImageReferences } from "@/lib/chat/thread-media/server"
+import { mediaIdStringSchema } from "@/lib/chat/media-id"
+import { resolveToolImageReferences } from "@/lib/chat/resolve-tool-references"
 
 const NANO_BANANA_MODEL = "google/nano-banana-2" as const
 const MAX_REFERENCE_IMAGES = 4
@@ -36,7 +37,6 @@ export interface AvailableChatImageReference extends ChatImageReference {
 
 interface CreateGenerateImageWithNanoBananaToolOptions {
   availableReferences: AvailableChatImageReference[]
-  latestUserImages: ChatImageReference[]
   supabase: SupabaseClient
   threadId?: string
   userId: string
@@ -222,7 +222,6 @@ async function uploadReferenceImage(
 
 export function createGenerateImageWithNanoBananaTool({
   availableReferences,
-  latestUserImages,
   supabase,
   threadId,
   userId,
@@ -233,17 +232,28 @@ export function createGenerateImageWithNanoBananaTool({
 
   return tool({
     description:
-      "Generate or edit an image with Nano Banana 2 (google/nano-banana-2). The Replicate `prompt` input must be a JSON string whose **content** describes the scene or edit: include a rich `image_description` object (text-to-image) **or** a rich `edit_description` object (edits), plus `prompt` and `negative_constraints` as needed. Do **not** embed `recommended_model` or `output_specs` here—the tool is always Nano Banana 2; set aspectRatio and variantCount on the tool instead. Current-turn image attachments are passed automatically; use listThreadMedia + mediaIds for earlier thread images when needed.",
+      "Generate or edit an image with Nano Banana 2 (google/nano-banana-2). Nano Banana accepts **either** plain prose **or** a JSON creative brief in the `prompt` field—pick based on the user's intent, not a blanket rule.\n\n" +
+      "Decide the mode before calling:\n" +
+      "- **Literal mode** (set `rawPrompt: true`): pass the user's exact wording as `prompt`. Use when the user supplied a quoted prompt, labeled it (`prompt:` / `\"prompt\": \"...\"`), said exact/verbatim/literal/as-written/copy-paste/don't rewrite, pasted a finished prompt, or issued a short edit command paired with reference images (e.g. \"merge these\", \"swap outfits\", \"make it night\"). Do **not** wrap their text in JSON, do **not** add image_description/edit_description/negative_constraints, do **not** \"polish\" it. Short is fine.\n" +
+      "- **Expand mode** (leave `rawPrompt` unset): the user gave a vague idea and expects you to compose a production-ready prompt. Build a JSON string with a rich `image_description` object (new images) **or** `edit_description` object (edits), a fluent master `prompt` field, and `negative_constraints` when useful. Omit `recommended_model` and `output_specs`—set `aspectRatio` and `variantCount` as tool args instead.\n\n" +
+      "When in doubt between Literal and Expand, prefer Literal. Silently rewriting a user's prompt is worse than a terser result they can iterate on.\n\n" +
+      "For reference images from earlier in the chat or from listRecentGenerations, pass **referenceIds**: `ref_1`…`ref_N` (transcript), `upl_<uuid>` / `gen_<uuid>`, or raw UUID (`mediaId` from listRecentGenerations). Deprecated alias: **mediaIds** (same values).",
     inputSchema: z.object({
       prompt: z
         .string()
         .min(2)
         .describe(
-          "JSON string sent to the model: structured brief only. Use either (1) `image_description` { ... } for new images, or (2) `edit_description` { ... } for edits (what to preserve vs change, target outcome). Always include a fluent master `prompt` and `negative_constraints` when useful. Omit `recommended_model` and `output_specs`. Do not pass prose-only when a structured package was composed.",
+          "Text sent to google/nano-banana-2. Content depends on mode: (Literal, with rawPrompt=true) the user's exact wording, no wrapper, no added fields; (Expand, rawPrompt omitted) a JSON string with `image_description` OR `edit_description`, a fluent master `prompt`, and `negative_constraints` when useful—omit `recommended_model` and `output_specs`. Never silently expand a user's verbatim prompt.",
+        ),
+      rawPrompt: z
+        .boolean()
+        .optional()
+        .describe(
+          "Set true for Literal mode: the `prompt` string is the user's exact wording and must be passed through without wrapping in JSON or adding creative fields. Triggers: quoted prompt, explicit requests for exact/verbatim/literal/as-written/copy-paste/don't-rewrite, pasted finished prompts, or short edit commands with references (e.g. \"merge these\"). Defaults to false (Expand mode: agent-composed JSON brief).",
         ),
       aspectRatio: aspectRatioSchema
         .optional()
-        .describe("Preferred aspect ratio. Use match_input_image when editing or recreating from a reference image."),
+        .describe("Preferred aspect ratio. Use match_input_image when editing or recreating from a reference image. Omit when the user didn't specify—the tool defaults sensibly based on references."),
       variantCount: z
         .number()
         .int()
@@ -251,60 +261,45 @@ export function createGenerateImageWithNanoBananaTool({
         .max(4)
         .optional()
         .describe("How many image variations to generate. Keep this low unless the user explicitly asks for multiple options."),
-      mediaIds: z
-        .array(z.string().uuid())
-        .max(MAX_REFERENCE_IMAGES)
-        .optional()
-        .describe("UUIDs from listThreadMedia for earlier thread images or generations."),
       referenceIds: z
         .array(z.string().min(1))
         .max(MAX_REFERENCE_IMAGES)
         .optional()
-        .describe("Legacy ref_1 style IDs when mediaIds are unavailable."),
-      useLatestUserImages: z
-        .boolean()
-        .optional()
         .describe(
-          "When true, include image files attached on the latest user message as references. Defaults to false. Ignored when mediaIds/referenceIds are provided.",
+          "Reference images: `ref_1`…`ref_N` (transcript), `upl_<uuid>` / `gen_<uuid>` or raw UUID from listThreadMedia / listRecentGenerations (mediaId).",
         ),
+      mediaIds: z
+        .array(mediaIdStringSchema)
+        .max(MAX_REFERENCE_IMAGES)
+        .optional()
+        .describe("Deprecated alias for referenceIds (same accepted shapes)."),
     }),
     execute: async ({
       aspectRatio,
       prompt,
+      rawPrompt = false,
       mediaIds = [],
       referenceIds = [],
-      useLatestUserImages = false,
       variantCount = 1,
     }) => {
       if (!process.env.REPLICATE_API_TOKEN) {
         throw new Error("REPLICATE_API_TOKEN is not configured.")
       }
 
-      const resolvedFromThread =
-        threadId && mediaIds.length > 0
-          ? await resolveThreadMediaIdsToImageReferences(supabase, userId, threadId, mediaIds)
-          : []
+      const { references: resolvedFromIds, warnings: referenceWarnings } =
+        referenceIds.length > 0 || mediaIds.length > 0
+          ? await resolveToolImageReferences({
+              supabase,
+              userId,
+              threadId,
+              referenceIds,
+              mediaIds,
+              availableReferenceMap: availableReferenceMap,
+              allowCrossThread: true,
+            })
+          : { references: [] as ChatImageReference[], warnings: [] as string[] }
 
-      const resolvedReferenceIds = referenceIds.map((referenceId) => {
-        const reference = availableReferenceMap.get(referenceId)
-
-        if (!reference) {
-          throw new Error(`Unknown reference ID: ${referenceId}`)
-        }
-
-        return reference
-      })
-
-      const explicitReferences = dedupeReferences([
-        ...resolvedFromThread,
-        ...resolvedReferenceIds,
-      ]).slice(0, MAX_REFERENCE_IMAGES)
-      const referenceImages =
-        explicitReferences.length > 0
-          ? explicitReferences
-          : useLatestUserImages
-            ? dedupeReferences(latestUserImages).slice(0, MAX_REFERENCE_IMAGES)
-            : []
+      const referenceImages = dedupeReferences(resolvedFromIds).slice(0, MAX_REFERENCE_IMAGES)
       const uploadedReferences = await Promise.all(
         referenceImages.map((reference, index) =>
           uploadReferenceImage(reference, index, supabase, userId),
@@ -388,9 +383,11 @@ export function createGenerateImageWithNanoBananaTool({
           message: `Started an image generation with ${NANO_BANANA_MODEL}.`,
           model: NANO_BANANA_MODEL,
           predictionId: prediction.id,
+          promptMode: rawPrompt ? ("literal" as const) : ("expanded" as const),
           status: "pending" as const,
           usedReferenceCount: referenceUrls.length,
           variantCount: effectiveVariantCount,
+          ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
         }
       }
 
@@ -426,9 +423,11 @@ export function createGenerateImageWithNanoBananaTool({
             ? "Generated 1 image with Nano Banana 2."
             : `Generated ${result.images.length} images with Nano Banana 2.`,
         model: NANO_BANANA_MODEL,
+        promptMode: rawPrompt ? ("literal" as const) : ("expanded" as const),
         status: "completed" as const,
         usedReferenceCount: referenceUrls.length,
         variantCount: result.images.length,
+        ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
       }
     },
   })

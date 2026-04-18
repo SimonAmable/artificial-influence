@@ -10,12 +10,17 @@ export interface ChatThread {
   messages: UIMessage[]
   created_at: string
   updated_at: string
+  source?: "user" | "automation"
+  automation_id?: string | null
 }
 
 export interface ChatThreadListItem {
   id: string
   title: string
   updated_at: string
+  /** Present after migration `20260419000000_automations`; defaults to `user` in UI if missing. */
+  source?: "user" | "automation"
+  automation_id?: string | null
 }
 
 function normalizeMessages(messages: UIMessage[] | null | undefined): UIMessage[] {
@@ -112,7 +117,7 @@ export async function listUserChatThreads(userId: string): Promise<ChatThreadLis
 
   const { data, error } = await supabase
     .from("chat_threads")
-    .select("id, title, updated_at")
+    .select("id, title, updated_at, source, automation_id")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
 

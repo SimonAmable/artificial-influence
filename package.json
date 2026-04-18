@@ -46,6 +46,7 @@
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cron-parser": "^5.5.0",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "fabric": "^6.9.1",

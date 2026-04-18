@@ -84,6 +84,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/apps", label: "Apps" },
   { path: "/assets", label: "Assets" },
   { path: "/autopost", label: "Autopost" },
+  { path: "/automations", label: "Automations" },
   { path: "/brand", label: "Brand" },
   { path: "/chat", label: "Agent" },
   { path: "/history", label: "History" },
@@ -276,6 +277,12 @@ export const megaNavGroups: MegaNavGroup[] = [
     simpleItems: [
       { path: "/assets", label: "Assets", description: "Store and sort your generated assets", iconSrc: "/window.svg", badge: "new" },
       { path: "/history", label: "History", description: "Past generations and edits", iconSrc: "/file.svg" },
+      {
+        path: "/automations",
+        label: "Automations",
+        description: "Cron-scheduled agent prompts",
+        iconSrc: "/globe.svg",
+      },
       { path: "/brand", label: "Brand", description: "Manage brand settings", iconSrc: "/logo.svg", badge: "new" },
     ],
   },

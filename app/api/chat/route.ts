@@ -18,268 +18,17 @@ import { loadSkillsCatalog } from "@/lib/chat/skills/catalog"
 import { bindPendingGenerationsToChatMessages } from "@/lib/chat/media-persistence"
 import { sanitizeToolErrorPartsInMessages } from "@/lib/chat/sanitize-ui-messages"
 import { createCreativeChatTools } from "@/lib/chat/tools"
-import { getSelectedReferencesFromMessage } from "@/lib/chat/reference-metadata"
-import { brandKitFromRow } from "@/lib/brand-kit/database-server"
+import {
+  getAvailableConversationAudioReferences,
+  getAvailableConversationImageReferences,
+  getAvailableConversationVideoReferences,
+} from "@/lib/chat/conversation-references"
 import { resolveChatGatewayModel } from "@/lib/constants/chat-llm-models"
-import { formatBrandKitForPrompt } from "@/lib/brand-kit/format-for-prompt"
-import type {
-  AvailableChatImageReference,
-  ChatImageReference,
-} from "@/lib/chat/tools/generate-image-with-nano-banana"
-import type { ChatAudioReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
+import { buildSelectedReferenceContext } from "@/lib/chat/selected-reference-context"
 import { registerThreadMediaFromUserMessageParts } from "@/lib/chat/thread-media/server"
 
-type GenerateImageToolPart = {
-  type: "tool-generateImageWithNanoBanana"
-  state: "input-streaming" | "input-available" | "output-available" | "output-error"
-  output?: {
-    images?: Array<{
-      mimeType?: string
-      url: string
-    }>
-  }
-}
-
-type UniversalGenerateImageToolPart = {
-  type: "tool-generateImage"
-  state: "input-streaming" | "input-available" | "output-available" | "output-error"
-  output?: {
-    images?: Array<{
-      mimeType?: string
-      url: string
-    }>
-  }
-}
-
-function getLatestUserImageAttachments(messages: UIMessage[]): ChatImageReference[] {
-  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user")
-
-  if (!latestUserMessage) {
-    return []
-  }
-
-  return latestUserMessage.parts.flatMap((part) => {
-    if (part.type !== "file") {
-      return []
-    }
-
-    if (!part.mediaType?.startsWith("image/")) {
-      return []
-    }
-
-    return [
-      {
-        filename: part.filename,
-        mediaType: part.mediaType,
-        url: part.url,
-      },
-    ]
-  })
-}
-
-function getLatestUserVideoAttachments(messages: UIMessage[]): ChatVideoReference[] {
-  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user")
-
-  if (!latestUserMessage) {
-    return []
-  }
-
-  return latestUserMessage.parts.flatMap((part) => {
-    if (part.type !== "file") {
-      return []
-    }
-
-    if (!part.mediaType?.startsWith("video/")) {
-      return []
-    }
-
-    return [
-      {
-        filename: part.filename,
-        mediaType: part.mediaType,
-        url: part.url,
-      },
-    ]
-  })
-}
-
-function getLatestUserAudioAttachments(messages: UIMessage[]): ChatAudioReference[] {
-  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user")
-
-  if (!latestUserMessage) {
-    return []
-  }
-
-  return latestUserMessage.parts.flatMap((part) => {
-    if (part.type !== "file") {
-      return []
-    }
-
-    if (!part.mediaType?.startsWith("audio/")) {
-      return []
-    }
-
-    return [
-      {
-        filename: part.filename,
-        mediaType: part.mediaType,
-        url: part.url,
-      },
-    ]
-  })
-}
-
-function getAvailableConversationImageReferences(messages: UIMessage[]): AvailableChatImageReference[] {
-  const latestUserMessageIndex = (() => {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      if (messages[index]?.role === "user") {
-        return index
-      }
-    }
-
-    return -1
-  })()
-
-  const references: AvailableChatImageReference[] = []
-  let referenceCount = 0
-
-  for (const [messageIndex, message] of messages.entries()) {
-    if (message.role === "user") {
-      if (messageIndex === latestUserMessageIndex) {
-        continue
-      }
-
-      for (const part of message.parts) {
-        if (part.type !== "file" || !part.mediaType?.startsWith("image/")) {
-          continue
-        }
-
-        referenceCount += 1
-        references.push({
-          id: `ref_${referenceCount}`,
-          filename: part.filename,
-          label: `uploaded image${part.filename ? ` "${part.filename}"` : ""}`,
-          mediaType: part.mediaType,
-          source: "user-upload",
-          url: part.url,
-        })
-      }
-    }
-
-    for (const part of message.parts) {
-      if (
-        part.type !== "tool-generateImageWithNanoBanana" &&
-        part.type !== "tool-generateImage"
-      ) {
-        continue
-      }
-
-      const toolPart = part as unknown as GenerateImageToolPart | UniversalGenerateImageToolPart
-
-      if (toolPart.state !== "output-available") {
-        continue
-      }
-
-      for (const image of toolPart.output?.images ?? []) {
-        referenceCount += 1
-        references.push({
-          id: `ref_${referenceCount}`,
-          label:
-            part.type === "tool-generateImageWithNanoBanana"
-              ? "generated Nano Banana image"
-              : "generated image",
-          mediaType: image.mimeType,
-          source: "generated",
-          url: image.url,
-        })
-      }
-    }
-  }
-
-  return references
-}
-
-function extractDatabaseId(prefixedId: string, prefix: "brand:" | "asset:") {
-  if (!prefixedId.startsWith(prefix)) return null
-  const value = prefixedId.slice(prefix.length).trim()
-  return value || null
-}
-
-async function buildSelectedReferenceContext(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  messages: UIMessage[],
-) {
-  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user")
-  const selectedRefs = latestUserMessage ? getSelectedReferencesFromMessage(latestUserMessage) : []
-
-  if (selectedRefs.length === 0) {
-    return ""
-  }
-
-  const brandIds = selectedRefs
-    .filter((ref) => ref.category === "brand")
-    .map((ref) => extractDatabaseId(ref.id, "brand:"))
-    .filter((value): value is string => Boolean(value))
-
-  const assetIds = selectedRefs
-    .filter((ref) => ref.category === "asset")
-    .map((ref) => extractDatabaseId(ref.id, "asset:"))
-    .filter((value): value is string => Boolean(value))
-
-  const sections: string[] = []
-
-  if (brandIds.length > 0) {
-    const { data: brandRows, error: brandError } = await supabase
-      .from("brand_kits")
-      .select("*")
-      .eq("user_id", userId)
-      .in("id", brandIds)
-
-    if (brandError) {
-      throw new Error(`Failed to load selected brand kits: ${brandError.message}`)
-    }
-
-    const brands = (brandRows ?? []).map((row) => brandKitFromRow(row as Record<string, unknown>))
-    if (brands.length > 0) {
-      sections.push(
-        `User-selected brand context for this turn:\n${brands
-          .map((brand) => `---\n${formatBrandKitForPrompt(brand)}`)
-          .join("\n")}`,
-      )
-    }
-  }
-
-  if (assetIds.length > 0) {
-    const { data: assetRows, error: assetError } = await supabase
-      .from("assets")
-      .select("id, title, asset_type, category, asset_url")
-      .eq("user_id", userId)
-      .in("id", assetIds)
-
-    if (assetError) {
-      throw new Error(`Failed to load selected assets: ${assetError.message}`)
-    }
-
-    if ((assetRows ?? []).length > 0) {
-      sections.push(
-        `User-selected asset references for this turn:\n${(assetRows ?? [])
-          .map((row) => {
-            const asset = row as {
-              asset_type: string
-              asset_url: string
-              category: string
-              title: string
-            }
-            return `- ${asset.title} (${asset.asset_type}, ${asset.category}): ${asset.asset_url}`
-          })
-          .join("\n")}`,
-      )
-    }
-  }
-
-  return sections.join("\n\n").trim()
-}
+/** Allows long chained tool turns (e.g. awaitGeneration + follow-up tools) on Vercel Pro (max 300s). */
+export const maxDuration = 300
 
 export async function POST(req: Request) {
   try {
@@ -355,9 +104,8 @@ export async function POST(req: Request) {
 
     const validationTools = createCreativeChatTools({
       availableReferences: [],
-      latestUserImages: [],
-      latestUserVideos: [],
-      latestUserAudios: [],
+      availableVideoReferences: [],
+      availableAudioReferences: [],
       supabase,
       threadId,
       userId: user.id,
@@ -445,9 +193,8 @@ export async function POST(req: Request) {
 
     const creativeAgent = createCreativeAgent({
       availableReferences: getAvailableConversationImageReferences(validatedMessages),
-      latestUserImages: getLatestUserImageAttachments(validatedMessages),
-      latestUserVideos: getLatestUserVideoAttachments(validatedMessages),
-      latestUserAudios: getLatestUserAudioAttachments(validatedMessages),
+      availableVideoReferences: getAvailableConversationVideoReferences(validatedMessages),
+      availableAudioReferences: getAvailableConversationAudioReferences(validatedMessages),
       model,
       selectedReferenceContext,
       skillsCatalog,

@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ClockCounterClockwise, NotePencil } from "@phosphor-icons/react/dist/ssr"
 import { CreativeAgentChat } from "@/components/chat/creative-agent-chat"
 import { NewChatButton } from "@/components/chat/new-chat-button"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/server"
 import { listUserChatThreads, type ChatThreadListItem } from "@/lib/chat/database-server"
@@ -48,7 +48,14 @@ function SidebarThreadItem({
           : "border-border/60 bg-background hover:bg-muted/40",
       )}
     >
-      <p className="line-clamp-2 text-sm font-medium text-foreground">{thread.title}</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <p className="line-clamp-2 text-sm font-medium text-foreground">{thread.title}</p>
+        {thread.source === "automation" ? (
+          <Badge variant="secondary" className="shrink-0 text-[10px] font-normal">
+            Automation
+          </Badge>
+        ) : null}
+      </div>
       <p className="mt-1 text-xs text-muted-foreground">{formatUpdatedAt(thread.updated_at)}</p>
     </Link>
   )

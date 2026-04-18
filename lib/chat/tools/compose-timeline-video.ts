@@ -11,6 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
+import { mediaIdStringSchema } from "@/lib/chat/media-id"
 import { resolveThreadMediaRowsForTimelineCompose } from "@/lib/chat/thread-media/server"
 import { COMPOSITION_ASPECT_PRESETS } from "@/lib/video-editor/composition-presets"
 
@@ -297,7 +298,7 @@ export function createComposeTimelineVideoTool({
       segments: z
         .array(
           z.object({
-            mediaId: z.string().uuid(),
+            mediaId: mediaIdStringSchema,
             durationSeconds: z
               .number()
               .min(0.5)
@@ -518,19 +519,19 @@ export function createComposeTimelineVideoTool({
           throw new Error("Failed to deduct credits after composition.")
         }
 
-        const { error: insertError } = await supabase.from("chat_thread_media").insert({
+        const { error: insertError } = await supabase.from("uploads").insert({
           user_id: userId,
           chat_thread_id: threadId,
-          media_kind: "generation",
+          source: "compose",
+          bucket: "public-bucket",
           mime_type: "video/mp4",
-          public_url: publicUrl,
           storage_path: storagePath,
           label: `Composed timeline (${preset.label})`,
-          generation_id: null,
+          duration_seconds: probeDur,
         })
 
         if (insertError && insertError.code !== "23505") {
-          console.error("[composeTimelineVideo] chat_thread_media insert failed:", insertError.message)
+          console.error("[composeTimelineVideo] uploads insert failed:", insertError.message)
         }
 
         return {
