@@ -1099,7 +1099,7 @@ export function AutomationsPage() {
       : null
 
   const showViewLastManualBtn =
-    Boolean(pendingManualForSelected) &&
+    pendingManualForSelected != null &&
     (!canShowViewSetPreview ||
       !selected ||
       pendingManualForSelected.runId !== selected.preview_run_id)
@@ -1282,12 +1282,14 @@ export function AutomationsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const row = runs.find((r) => r.id === selected.preview_run_id)
+                          const previewRunId = selected.preview_run_id
+                          if (!previewRunId) return
+                          const row = runs.find((r) => r.id === previewRunId)
                           const st = row?.status
                           const status: "running" | "completed" | "failed" =
                             st === "failed" ? "failed" : st === "running" ? "running" : "completed"
                           setPreviewRunModal({
-                            runId: selected.preview_run_id,
+                            runId: previewRunId,
                             threadId: row?.thread_id ?? null,
                             status,
                             runTrigger: (row?.run_trigger ?? "scheduled") as "manual" | "scheduled",
