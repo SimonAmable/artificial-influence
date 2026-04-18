@@ -55,6 +55,16 @@ function SidebarThreadItem({
             Automation
           </Badge>
         ) : null}
+        {thread.source === "automation" && thread.automation_trigger === "manual" ? (
+          <Badge variant="outline" className="shrink-0 text-[10px] font-normal">
+            Manual
+          </Badge>
+        ) : null}
+        {thread.source === "automation" && thread.automation_trigger === "scheduled" ? (
+          <Badge variant="secondary" className="shrink-0 text-[10px] font-normal">
+            Scheduled
+          </Badge>
+        ) : null}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">{formatUpdatedAt(thread.updated_at)}</p>
     </Link>

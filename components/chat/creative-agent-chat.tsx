@@ -72,6 +72,7 @@ type MobileChatThreadListItem = {
   title: string
   updated_at: string
   source?: "user" | "automation"
+  automation_trigger?: "manual" | "scheduled" | null
 }
 
 function formatThreadUpdatedAt(value: string) {
@@ -474,7 +475,7 @@ type GetBrandContextToolPart = {
   errorText?: string
 }
 
-type InstagramConnectionToolSummary = {
+export type InstagramConnectionToolSummary = {
   accountType?: string | null
   id: string
   instagramUserId?: string | null
@@ -1519,7 +1520,7 @@ function InstagramMediaPreview({
   )
 }
 
-function MessageParts({
+export function MessageParts({
   message,
   instagramConnectionsById,
   onToolApprovalResponse,
@@ -3159,6 +3160,16 @@ export function CreativeAgentChat({
                           {thread.source === "automation" ? (
                             <span className="shrink-0 rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">
                               Automation
+                            </span>
+                          ) : null}
+                          {thread.source === "automation" && thread.automation_trigger === "manual" ? (
+                            <span className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-[10px] font-medium">
+                              Manual
+                            </span>
+                          ) : null}
+                          {thread.source === "automation" && thread.automation_trigger === "scheduled" ? (
+                            <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                              Scheduled
                             </span>
                           ) : null}
                         </span>

@@ -33,6 +33,7 @@ import {
 } from "@/lib/assets/library"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 
 function formatDate(dateString: string): string {
@@ -64,8 +65,25 @@ export default function AssetsPage() {
   const [editingAsset, setEditingAsset] = React.useState<AssetRecord | null>(null)
   const [editDialogOpen, setEditDialogOpen] = React.useState(false)
   const [isDraggingOver, setIsDraggingOver] = React.useState(false)
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const dragCounter = React.useRef(0)
+
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!cancelled) {
+        setCurrentUserId(user?.id ?? null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const refreshAssets = React.useCallback(async () => {
     setLoading(true)
@@ -215,6 +233,7 @@ export default function AssetsPage() {
 
   const renderAssetCard = (asset: AssetRecord) => {
     const TypeIcon = asset.assetType === "image" ? ImageIcon : asset.assetType === "video" ? Video : MusicNote
+    const isOwner = currentUserId !== null && asset.userId === currentUserId
 
     return (
       <div key={asset.id} className="group">
@@ -255,18 +274,22 @@ export default function AssetsPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleEdit(asset)}>
-                  <PencilSimple className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
+                {isOwner && (
+                  <DropdownMenuItem onClick={() => handleEdit(asset)}>
+                    <PencilSimple className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => handleDownload(asset)}>
                   <Download className="mr-2 h-4 w-4" />
                   Download
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleDelete(asset)} className="text-destructive focus:text-destructive">
-                  <Trash className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
+                {isOwner && (
+                  <DropdownMenuItem onClick={() => handleDelete(asset)} className="text-destructive focus:text-destructive">
+                    <Trash className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

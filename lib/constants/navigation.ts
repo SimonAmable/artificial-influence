@@ -289,6 +289,8 @@ export const megaNavGroups: MegaNavGroup[] = [
   { label: "Canvas", path: "/canvases" },
   { label: "Apps", path: "/apps", badge: "new" },
   { label: "Agent", path: "/chat", badge: "new" },
+  { label: "Autopost", path: "/autopost", badge: "new" },
+  { label: "Automations", path: "/automations", badge: "new" },
   { label: "Pricing", path: "/pricing" },
 ]
 

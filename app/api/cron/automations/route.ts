@@ -75,7 +75,7 @@ export async function GET(request: Request) {
       continue
     }
 
-    const runResult = await runAutomation(admin, claimed as AutomationRow)
+    const runResult = await runAutomation(admin, claimed as AutomationRow, { trigger: "scheduled" })
     results.push({
       automationId: automation.id,
       ok: runResult.ok,

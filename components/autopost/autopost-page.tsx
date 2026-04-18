@@ -810,14 +810,25 @@ export function AutopostPage() {
   return (
     <div className="min-h-screen bg-background px-4 pb-6 pt-20 md:pt-24">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Autopost</h1>
-          <p className="text-sm text-muted-foreground">
-            Connect Instagram, publish immediately, or schedule posts. All activity appears in your post history.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight">Autopost</h1>
+            <p className="text-sm text-muted-foreground">
+              Connect Instagram, publish immediately, or schedule posts. All activity appears in your post history.
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={handleConnect}
+            variant="outline"
+            className="shrink-0"
+          >
+            <Link2 className="mr-2 h-4 w-4" />
+            Connect Instagram
+          </Button>
         </div>
 
-        <Card className="py-4 sm:py-6">
+        <Card className="py-4 sm:py-6 order-last" data-instagram-connection-card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Link2 className="h-4 w-4" />
@@ -1337,7 +1348,7 @@ export function AutopostPage() {
             </CardContent>
           </Card>
 
-          <Card className="flex max-h-[min(720px,85vh)] flex-col py-4 sm:py-6">
+          <Card className="flex max-h-[min(720px,85vh)] flex-col py-4 sm:py-6 lg:max-h-none lg:h-full">
             <CardHeader className="shrink-0">
               <CardTitle className="flex items-center gap-2">
                 <LayoutList className="h-4 w-4" />
@@ -1347,7 +1358,7 @@ export function AutopostPage() {
                 Drafts through failed attempts. The account badge on each row is where that post will go (or went).
               </CardDescription>
             </CardHeader>
-            <CardContent className="min-h-0 flex-1 px-2 sm:px-6">
+            <CardContent className="flex min-h-0 flex-1 flex-col px-2 sm:px-6">
               {isLoadingJobs ? (
                 <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1358,7 +1369,7 @@ export function AutopostPage() {
                   No posts yet. Create one from the composer.
                 </p>
               ) : (
-                <ScrollArea className="h-[min(560px,calc(85vh-12rem))] pr-3">
+                <ScrollArea className="h-[min(560px,calc(85vh-12rem))] pr-3 lg:h-full lg:min-h-0 lg:flex-1">
                   <ul className="flex flex-col gap-3">
                     {jobs.map((job) => {
                       const busy = actionJobId === job.id

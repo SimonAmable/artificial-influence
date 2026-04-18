@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { FilePlus, FolderOpen, Plus as PlusPhosphor } from "@phosphor-icons/react"
-import { Clock, Loader2, Play, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { ArrowLeft, Clock, Eye, Globe, Loader2, Play, Plus, RefreshCw, Star, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
@@ -69,21 +69,28 @@ import {
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { AutomationRunPreviewModal } from "@/components/automations/automation-run-preview-modal"
 
 type AutomationApi = {
   id: string
+  user_id?: string
   name: string
+  description?: string | null
   prompt: string
   prompt_payload?: AutomationPromptPayload | null
   cron_schedule: string
   timezone: string
   model: string | null
   is_active: boolean
-  last_run_at: string | null
-  next_run_at: string
-  run_count: number
-  last_error: string | null
-  latestRun: AutomationRunApi | null
+  last_run_at?: string | null
+  next_run_at?: string
+  run_count?: number
+  last_error?: string | null
+  latestRun?: AutomationRunApi | null
+  is_public?: boolean
+  hasPreview?: boolean
+  preview_captured_at?: string | null
+  preview_run_id?: string | null
 }
 
 type AutomationRunApi = {
@@ -95,6 +102,7 @@ type AutomationRunApi = {
   finished_at: string | null
   error: string | null
   created_at: string
+  run_trigger?: "manual" | "scheduled"
 }
 
 const WEEKDAYS = [
@@ -169,6 +177,7 @@ function attachedRefFromAssetUrl(url: string, assetType: "audio" | "image" | "vi
 }
 
 export function AutomationsPage() {
+  const [scope, setScope] = React.useState<"mine" | "community">("mine")
   const [userId, setUserId] = React.useState<string | null>(null)
   const [loadingAuth, setLoadingAuth] = React.useState(true)
   const [loadingList, setLoadingList] = React.useState(true)
@@ -179,6 +188,7 @@ export function AutomationsPage() {
   const [loadingRuns, setLoadingRuns] = React.useState(false)
 
   const [name, setName] = React.useState("")
+  const [description, setDescription] = React.useState("")
   const [prompt, setPrompt] = React.useState("")
   const [attachedRefs, setAttachedRefs] = React.useState<AttachedRef[]>([])
   const [savedAttachments, setSavedAttachments] = React.useState<AutomationPromptAttachment[]>([])
@@ -200,8 +210,20 @@ export function AutomationsPage() {
   const [saving, setSaving] = React.useState(false)
   const [runningId, setRunningId] = React.useState<string | null>(null)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
+  const [isPublicAutomation, setIsPublicAutomation] = React.useState(false)
+  const [cloningId, setCloningId] = React.useState<string | null>(null)
+  const [openingPreviewId, setOpeningPreviewId] = React.useState<string | null>(null)
+  const [settingPreviewRunId, setSettingPreviewRunId] = React.useState<string | null>(null)
+  const [previewRunModal, setPreviewRunModal] = React.useState<{
+    runId: string
+    threadId: string | null
+    status: "running" | "completed" | "failed"
+    runTrigger: "manual" | "scheduled"
+    error: string | null
+  } | null>(null)
 
   const selected = automations.find((a) => a.id === selectedId) ?? null
+  const isCommunityScope = scope === "community"
   const lastHydratedId = React.useRef<string | null>(null)
 
   React.useEffect(() => {
@@ -221,10 +243,12 @@ export function AutomationsPage() {
     }
   }, [])
 
-  const loadAutomations = React.useCallback(async () => {
+  const loadAutomations = React.useCallback(async (scopeOverride?: "mine" | "community") => {
     setLoadingList(true)
     try {
-      const res = await fetch("/api/automations")
+      const resolvedScope = scopeOverride ?? scope
+      const q = resolvedScope === "community" ? "?scope=community" : "?scope=mine"
+      const res = await fetch(`/api/automations${q}`)
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
         throw new Error(typeof j?.error === "string" ? j.error : "Failed to load")
@@ -236,7 +260,7 @@ export function AutomationsPage() {
     } finally {
       setLoadingList(false)
     }
-  }, [])
+  }, [scope])
 
   // Load list when auth resolves (fetch-on-mount pattern).
   /* eslint-disable react-hooks/set-state-in-effect -- intentional data fetch after userId */
@@ -246,6 +270,24 @@ export function AutomationsPage() {
     }
   }, [userId, loadAutomations])
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  const goToCommunity = React.useCallback(() => {
+    setSelectedId(null)
+    lastHydratedId.current = null
+    setScope("community")
+  }, [])
+
+  const goToMine = React.useCallback(() => {
+    setSelectedId(null)
+    lastHydratedId.current = null
+    setScope("mine")
+  }, [])
+
+  React.useEffect(() => {
+    if (scope === "community") {
+      setNewDialogOpen(false)
+    }
+  }, [scope])
 
   const loadRuns = React.useCallback(async (automationId: string) => {
     setLoadingRuns(true)
@@ -263,12 +305,12 @@ export function AutomationsPage() {
 
   /* eslint-disable react-hooks/set-state-in-effect -- fetch runs when selection changes */
   React.useEffect(() => {
-    if (selectedId) {
+    if (selectedId && !isCommunityScope) {
       void loadRuns(selectedId)
     } else {
       setRuns([])
     }
-  }, [selectedId, loadRuns])
+  }, [selectedId, loadRuns, isCommunityScope])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const effectiveCron = React.useMemo(() => {
@@ -327,6 +369,7 @@ export function AutomationsPage() {
     lastHydratedId.current = null
     setSelectedId(null)
     setName("")
+    setDescription("")
     setPrompt("")
     setAttachedRefs([])
     setSavedAttachments([])
@@ -341,11 +384,13 @@ export function AutomationsPage() {
     setWeeklyHour(9)
     setWeeklyMinute(0)
     setCustomCron(CRON_PRESET_HOURLY)
+    setIsPublicAutomation(false)
     setNewDialogOpen(true)
   }, [])
 
   const hydrateFromAutomation = React.useCallback((a: AutomationApi) => {
     setName(a.name)
+    setDescription(typeof a.description === "string" ? a.description : "")
     const payload = a.prompt_payload
     if (payload && typeof payload.text === "string") {
       setPrompt(payload.text)
@@ -359,6 +404,7 @@ export function AutomationsPage() {
     setUploadQueue([])
     setTimezone(a.timezone || getDefaultTimeZone())
     setModel(a.model ?? DEFAULT_CHAT_GATEWAY_MODEL)
+    setIsPublicAutomation(a.is_public === true)
     const inferred = inferPresetFromCron(a.cron_schedule)
     switch (inferred.kind) {
       case "hourly":
@@ -439,6 +485,7 @@ export function AutomationsPage() {
   }, [selectedId, selected, hydrateFromAutomation])
 
   const save = async () => {
+    if (isCommunityScope) return
     if (!name.trim() || !prompt.trim()) {
       toast.error("Name and prompt are required")
       return
@@ -474,11 +521,13 @@ export function AutomationsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: name.trim(),
+            description: description.trim() || null,
             promptPayload,
             cronSchedule: cron,
             timezone,
             model: model || null,
             isActive: true,
+            isPublic: isPublicAutomation,
           }),
         })
         const j = await res.json().catch(() => ({}))
@@ -499,10 +548,12 @@ export function AutomationsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: name.trim(),
+            description: description.trim() || null,
             promptPayload,
             cronSchedule: cron,
             timezone,
             model: model || null,
+            isPublic: isPublicAutomation,
           }),
         })
         const j = await res.json().catch(() => ({}))
@@ -545,9 +596,15 @@ export function AutomationsPage() {
       if (!res.ok) {
         throw new Error(typeof j?.error === "string" ? j.error : "Run failed")
       }
-      toast.success("Automation run started — opening chat thread")
-      if (typeof j?.threadId === "string") {
-        window.open(`/chat/${j.threadId}`, "_blank", "noopener,noreferrer")
+      toast.success("Automation run finished")
+      if (typeof j?.runId === "string") {
+        setPreviewRunModal({
+          runId: j.runId,
+          threadId: typeof j.threadId === "string" ? j.threadId : null,
+          status: "completed",
+          runTrigger: "manual",
+          error: null,
+        })
       }
       await loadAutomations()
       await loadRuns(a.id)
@@ -555,6 +612,69 @@ export function AutomationsPage() {
       toast.error(e instanceof Error ? e.message : "Run failed")
     } finally {
       setRunningId(null)
+    }
+  }
+
+  const cloneFromCommunity = async (a: AutomationApi) => {
+    setCloningId(a.id)
+    try {
+      const res = await fetch(`/api/automations/${a.id}/clone`, { method: "POST" })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(typeof j?.error === "string" ? j.error : "Clone failed")
+      }
+      toast.success("Saved — edit and run from Mine")
+      setScope("mine")
+      const created = j.automation as AutomationApi | undefined
+      await loadAutomations("mine")
+      if (created?.id) {
+        lastHydratedId.current = null
+        setSelectedId(created.id)
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Clone failed")
+    } finally {
+      setCloningId(null)
+    }
+  }
+
+  const openCommunityPreview = async (a: AutomationApi) => {
+    setOpeningPreviewId(a.id)
+    try {
+      const res = await fetch(`/api/automations/${a.id}/preview/open`, { method: "POST" })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(typeof j?.error === "string" ? j.error : "Could not open preview")
+      }
+      if (typeof j?.threadId === "string") {
+        window.open(`/chat/${j.threadId}`, "_blank", "noopener,noreferrer")
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not open preview")
+    } finally {
+      setOpeningPreviewId(null)
+    }
+  }
+
+  const setCommunityPreviewRun = async (automationId: string, runId: string) => {
+    setSettingPreviewRunId(runId)
+    try {
+      const res = await fetch(`/api/automations/${automationId}/preview/set`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(typeof j?.error === "string" ? j.error : "Failed to set preview")
+      }
+      toast.success("Preview updated")
+      lastHydratedId.current = null
+      await loadAutomations()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to set preview")
+    } finally {
+      setSettingPreviewRunId(null)
     }
   }
 
@@ -578,9 +698,15 @@ export function AutomationsPage() {
     }
   }
 
-  function renderAutomationFormFields(idPrefix: string) {
+  function renderAutomationFormFields(
+    idPrefix: string,
+    opts: { readOnly?: boolean; showVisibility?: boolean } = {},
+  ) {
+    const readOnly = opts.readOnly ?? false
+    const showVisibility = opts.showVisibility ?? false
     return (
       <>
+      <fieldset disabled={readOnly} className="min-w-0 space-y-6 border-0 p-0 disabled:opacity-[0.92]">
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-name`}>Name</Label>
         <Input
@@ -588,14 +714,28 @@ export function AutomationsPage() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Morning asset batch"
+          disabled={readOnly}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={`${idPrefix}-description`}>Description</Label>
+        <p className="text-xs text-muted-foreground">Optional — for your reference only; not sent to the agent.</p>
+        <Textarea
+          id={`${idPrefix}-description`}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="What this automation is for…"
+          rows={2}
+          className="min-h-[72px] resize-y"
+          disabled={readOnly}
         />
       </div>
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-prompt`}>Prompt</Label>
         <p className="text-xs text-muted-foreground">
-          Type <kbd className="rounded border bg-muted px-1">/</kbd> for automation templates,{" "}
-          <kbd className="rounded border bg-muted px-1">@</kbd> to attach brand or library assets. Use the + button to upload
-          files.
+          Press <kbd className="rounded border bg-muted px-1">/</kbd> to browse prompt templates,{" "}
+          <kbd className="rounded border bg-muted px-1">@</kbd> to drop in brand kits or saved assets, and{" "}
+          <kbd className="rounded border bg-muted px-1">+</kbd> to upload your own files.
         </p>
         {(savedAttachments.length > 0 || uploadQueue.length > 0) && (
           <div className="flex flex-row flex-wrap gap-2">
@@ -622,7 +762,8 @@ export function AutomationsPage() {
                   )}
                   <button
                     type="button"
-                    className="absolute -top-1.5 -right-1.5 z-10 rounded-full border border-border bg-background p-1 shadow-sm hover:bg-destructive hover:text-destructive-foreground"
+                    disabled={readOnly}
+                    className="absolute -top-1.5 -right-1.5 z-10 rounded-full border border-border bg-background p-1 shadow-sm hover:bg-destructive hover:text-destructive-foreground disabled:pointer-events-none disabled:opacity-50"
                     aria-label="Remove attachment"
                     onClick={() => setSavedAttachments((prev) => prev.filter((x) => x.url !== att.url))}
                   >
@@ -641,7 +782,8 @@ export function AutomationsPage() {
                 ) : null}
                 <button
                   type="button"
-                  className="absolute -top-1.5 -right-1.5 z-10 rounded-full border border-border bg-background p-1 shadow-sm hover:bg-destructive hover:text-destructive-foreground"
+                  disabled={readOnly}
+                  className="absolute -top-1.5 -right-1.5 z-10 rounded-full border border-border bg-background p-1 shadow-sm hover:bg-destructive hover:text-destructive-foreground disabled:pointer-events-none disabled:opacity-50"
                   aria-label="Remove upload"
                   onClick={() => {
                     setUploadQueue((prev) => prev.filter((x) => x.id !== u.id))
@@ -705,7 +847,7 @@ export function AutomationsPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-tz`}>Timezone</Label>
-          <Select value={timezone} onValueChange={setTimezone}>
+          <Select value={timezone} onValueChange={setTimezone} disabled={readOnly}>
             <SelectTrigger id={`${idPrefix}-tz`} className="w-full font-mono text-xs">
               <SelectValue placeholder="Select timezone" />
             </SelectTrigger>
@@ -720,7 +862,7 @@ export function AutomationsPage() {
         </div>
         <div className="space-y-2">
           <Label>Model</Label>
-          <Select value={model} onValueChange={setModel}>
+          <Select value={model} onValueChange={setModel} disabled={readOnly}>
             <SelectTrigger id={`${idPrefix}-model`}>
               <SelectValue />
             </SelectTrigger>
@@ -734,6 +876,32 @@ export function AutomationsPage() {
           </Select>
         </div>
       </div>
+
+      {showVisibility ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2">
+            <div className="space-y-0.5">
+              <Label htmlFor={`${idPrefix}-is-public`} className="text-sm">
+                Public in Community
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                When on, others can browse, preview, and clone this automation.
+              </p>
+            </div>
+            <Switch
+              id={`${idPrefix}-is-public`}
+              checked={isPublicAutomation}
+              onCheckedChange={setIsPublicAutomation}
+              disabled={readOnly}
+            />
+          </div>
+          {isPublicAutomation ? (
+            <p className="text-xs text-muted-foreground">
+              First successful run will be snapshotted so others can preview this automation in Community.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="space-y-3">
         <Label>Schedule</Label>
@@ -850,6 +1018,7 @@ export function AutomationsPage() {
           )}
         </div>
       </div>
+      </fieldset>
       </>
     )
   }
@@ -877,16 +1046,31 @@ export function AutomationsPage() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-6xl flex-col gap-4 px-4 pb-12 pt-20 md:flex-row md:gap-6">
       <aside className="w-full shrink-0 md:w-80">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="text-lg font-semibold">Automations</h1>
-          <div className="flex gap-1">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-lg font-semibold">
+            {scope === "community" ? "Community Automations" : "My Automations"}
+          </h1>
+          <div className="flex flex-wrap justify-start gap-1">
             <Button variant="outline" size="icon-sm" onClick={() => void loadAutomations()} aria-label="Refresh">
               <RefreshCw className="h-4 w-4" />
             </Button>
-            <Button size="sm" onClick={resetFormForNew}>
-              <Plus className="mr-1 h-4 w-4" />
-              New
-            </Button>
+            {scope === "mine" ? (
+              <>
+                <Button variant="outline" size="sm" onClick={goToCommunity}>
+                  <Globe className="mr-1 h-4 w-4" />
+                  View Community
+                </Button>
+                <Button size="sm" onClick={resetFormForNew}>
+                  <Plus className="mr-1 h-4 w-4" />
+                  New
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="sm" onClick={goToMine}>
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Mine
+              </Button>
+            )}
           </div>
         </div>
         <ScrollArea className="mt-4 h-[calc(100dvh-10rem)] pr-2">
@@ -895,7 +1079,11 @@ export function AutomationsPage() {
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : automations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No automations yet. Create one to run your agent on a schedule.</p>
+            <p className="text-sm text-muted-foreground">
+              {scope === "community"
+                ? "No public automations from other users yet."
+                : "No automations yet. Create one to run your agent on a schedule."}
+            </p>
           ) : (
             <ul className="space-y-2">
               {automations.map((a) => (
@@ -915,14 +1103,34 @@ export function AutomationsPage() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="line-clamp-2 font-medium">{a.name}</span>
-                      <Badge variant={a.is_active ? "default" : "secondary"} className="shrink-0 text-[10px]">
-                        {a.is_active ? "On" : "Off"}
-                      </Badge>
+                      <div className="flex shrink-0 flex-col items-end gap-0.5">
+                        {scope === "community" ? (
+                          a.hasPreview ? (
+                            <Badge variant="outline" className="text-[10px]">
+                              Preview
+                            </Badge>
+                          ) : null
+                        ) : (
+                          <>
+                            {a.is_public === true ? (
+                              <Badge variant="outline" className="text-[10px]">
+                                Public
+                              </Badge>
+                            ) : null}
+                            <Badge variant={a.is_active ? "default" : "secondary"} className="text-[10px]">
+                              {a.is_active ? "On" : "Off"}
+                            </Badge>
+                          </>
+                        )}
+                      </div>
                     </div>
+                    {a.description?.trim() ? (
+                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{a.description.trim()}</p>
+                    ) : null}
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                       {describeCronHumanSummary(a.cron_schedule)}
                     </p>
-                    {a.last_error ? (
+                    {scope === "mine" && a.last_error ? (
                       <p className="mt-1 truncate text-xs text-destructive">{a.last_error}</p>
                     ) : null}
                   </button>
@@ -935,7 +1143,7 @@ export function AutomationsPage() {
 
       <main className="min-w-0 flex-1">
         {!selectedId || !selected ? (
-          <Card className="border-dashed">
+          <Card className="border-dashed py-4">
             <CardHeader>
               <CardTitle>Select or create</CardTitle>
               <CardDescription>
@@ -944,51 +1152,105 @@ export function AutomationsPage() {
             </CardHeader>
           </Card>
         ) : (
-          <Card>
+          <Card className="py-4">
             <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4 space-y-0">
               <div>
                 <CardTitle>{selected.name}</CardTitle>
+                {selected.description?.trim() ? (
+                  <p className="mt-1 text-sm leading-snug text-muted-foreground">{selected.description.trim()}</p>
+                ) : null}
                 <CardDescription>
-                  Runs the same creative agent as chat (tools + skills). Each run opens a new thread tagged as Automation.
+                  Put your creative work on autopilot. Every run kicks off a fresh conversation you can open
+                  anytime to review results or keep iterating.
                 </CardDescription>
+                {isCommunityScope ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {selected.hasPreview
+                      ? "Preview available — open to see an example run in chat."
+                      : "No preview yet — the owner has not completed a successful public run."}
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={selected.is_active}
-                    onCheckedChange={(v) => void toggleActive(selected, v)}
-                    id="active-switch"
-                  />
-                  <Label htmlFor="active-switch" className="text-sm">
-                    Active
-                  </Label>
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={runningId === selected.id}
-                  onClick={() => void runNow(selected)}
-                >
-                  {runningId === selected.id ? (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Play className="mr-1 h-4 w-4" />
-                  )}
-                  Run now
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setDeleteId(selected.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {isCommunityScope ? (
+                  <>
+                    <Badge variant="outline" className="text-xs">
+                      Public
+                    </Badge>
+                    {selected.hasPreview ? (
+                      <Badge variant="secondary" className="text-xs">
+                        Preview
+                      </Badge>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      disabled={cloningId === selected.id}
+                      onClick={() => void cloneFromCommunity(selected)}
+                    >
+                      {cloningId === selected.id ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : null}
+                      Save to my automations
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!selected.hasPreview || openingPreviewId === selected.id}
+                      onClick={() => void openCommunityPreview(selected)}
+                    >
+                      {openingPreviewId === selected.id ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : null}
+                      Open preview
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={selected.is_active}
+                        onCheckedChange={(v) => void toggleActive(selected, v)}
+                        id="active-switch"
+                      />
+                      <Label htmlFor="active-switch" className="text-sm">
+                        Active
+                      </Label>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={runningId === selected.id}
+                      onClick={() => void runNow(selected)}
+                    >
+                      {runningId === selected.id ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Play className="mr-1 h-4 w-4" />
+                      )}
+                      Run now
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDeleteId(selected.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-6">{renderAutomationFormFields("edit")}</div>
+              <div className="space-y-6">
+                {renderAutomationFormFields("edit", {
+                  readOnly: isCommunityScope,
+                  showVisibility: !isCommunityScope,
+                })}
+              </div>
 
               <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
-                <p>
-                  <span className="text-muted-foreground">Next scheduled:</span>{" "}
-                  {new Date(selected.next_run_at).toLocaleString()}
-                </p>
+                {selected.next_run_at ? (
+                  <p>
+                    <span className="text-muted-foreground">Next scheduled:</span>{" "}
+                    {new Date(selected.next_run_at).toLocaleString()}
+                  </p>
+                ) : null}
                 {selected.last_run_at ? (
                   <p className="mt-1">
                     <span className="text-muted-foreground">Last run:</span>{" "}
@@ -1000,13 +1262,16 @@ export function AutomationsPage() {
                 </p>
               </div>
 
-              <div className="flex gap-2">
-                <Button onClick={() => void save()} disabled={saving}>
-                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Save
-                </Button>
-              </div>
+              {!isCommunityScope ? (
+                <div className="flex gap-2">
+                  <Button onClick={() => void save()} disabled={saving}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Save
+                  </Button>
+                </div>
+              ) : null}
 
+              {!isCommunityScope ? (
               <div className="space-y-2 border-t pt-6">
                 <h3 className="text-sm font-semibold">Recent runs</h3>
                 {loadingRuns ? (
@@ -1015,30 +1280,91 @@ export function AutomationsPage() {
                   <p className="text-sm text-muted-foreground">No runs yet.</p>
                 ) : (
                   <ul className="space-y-2">
-                    {runs.map((r) => (
-                      <li
-                        key={r.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 px-3 py-2 text-sm"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant={r.status === "completed" ? "default" : r.status === "failed" ? "destructive" : "secondary"}>
-                            {r.status}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(r.started_at).toLocaleString()}
-                          </span>
-                        </div>
-                        {r.thread_id ? (
-                          <Link href={`/chat/${r.thread_id}`} className="text-xs font-medium text-primary hover:underline">
-                            Open thread
-                          </Link>
-                        ) : null}
-                        {r.error ? <p className="w-full text-xs text-destructive">{r.error}</p> : null}
-                      </li>
-                    ))}
+                    {runs.map((r) => {
+                      const isCurrentPreview =
+                        selected.is_public === true && selected.preview_run_id === r.id
+                      const canSetAsPreview =
+                        selected.is_public === true &&
+                        r.status === "completed" &&
+                        Boolean(r.thread_id) &&
+                        !isCurrentPreview
+                      const isSettingThis = settingPreviewRunId === r.id
+                      return (
+                        <li
+                          key={r.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 px-3 py-2 text-sm"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant={r.status === "completed" ? "default" : r.status === "failed" ? "destructive" : "secondary"}>
+                              {r.status}
+                            </Badge>
+                            <Badge
+                              variant={(r.run_trigger ?? "scheduled") === "manual" ? "outline" : "secondary"}
+                              className="text-[10px]"
+                            >
+                              {(r.run_trigger ?? "scheduled") === "manual" ? "Manual" : "Scheduled"}
+                            </Badge>
+                            {isCurrentPreview ? (
+                              <Badge variant="outline" className="gap-1 text-[10px]">
+                                <Star className="h-3 w-3 fill-current" />
+                                Current preview
+                              </Badge>
+                            ) : null}
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(r.started_at).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-xs"
+                              onClick={() =>
+                                setPreviewRunModal({
+                                  runId: r.id,
+                                  threadId: r.thread_id,
+                                  status: r.status as "running" | "completed" | "failed",
+                                  runTrigger: (r.run_trigger ?? "scheduled") as "manual" | "scheduled",
+                                  error: r.error,
+                                })
+                              }
+                            >
+                              <Eye className="mr-1 h-3.5 w-3.5" />
+                              Preview
+                            </Button>
+                            {r.thread_id ? (
+                              <Link
+                                href={`/chat/${r.thread_id}`}
+                                className="text-xs font-medium text-primary hover:underline"
+                              >
+                                Open thread
+                              </Link>
+                            ) : null}
+                            {canSetAsPreview ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isSettingThis || settingPreviewRunId !== null}
+                                onClick={() => void setCommunityPreviewRun(selected.id, r.id)}
+                              >
+                                {isSettingThis ? (
+                                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Star className="mr-1 h-3.5 w-3.5" />
+                                )}
+                                Set as preview
+                              </Button>
+                            ) : null}
+                          </div>
+                          {r.error ? <p className="w-full text-xs text-destructive">{r.error}</p> : null}
+                        </li>
+                      )
+                    })}
                   </ul>
                 )}
               </div>
+              ) : null}
             </CardContent>
           </Card>
         )}
@@ -1057,10 +1383,13 @@ export function AutomationsPage() {
           <DialogHeader>
             <DialogTitle>New automation</DialogTitle>
             <DialogDescription>
-              Runs the same creative agent as chat (tools + skills). Each run opens a new thread tagged as Automation.
+              Put your creative work on autopilot. Every run kicks off a fresh conversation you can open
+              anytime to review results or keep iterating.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-6 py-4">{renderAutomationFormFields("new")}</div>
+          <div className="space-y-6 py-4">
+            {renderAutomationFormFields("new", { readOnly: false, showVisibility: true })}
+          </div>
           <DialogFooter className="gap-2 border-t border-border/60 pt-4 sm:justify-end">
             <Button type="button" variant="outline" onClick={() => setNewDialogOpen(false)}>
               Cancel
@@ -1074,6 +1403,24 @@ export function AutomationsPage() {
       </Dialog>
 
       <AssetSelectionModal open={assetModalOpen} onOpenChange={setAssetModalOpen} onSelect={handleAssetLibrarySelect} />
+
+      {selected && previewRunModal ? (
+        <AutomationRunPreviewModal
+          key={previewRunModal.runId}
+          open
+          onOpenChange={(o) => {
+            if (!o) setPreviewRunModal(null)
+          }}
+          automationId={selected.id}
+          automationName={selected.name}
+          runId={previewRunModal.runId}
+          initialThreadId={previewRunModal.threadId}
+          initialStatus={previewRunModal.status}
+          promptPreview={prompt.trim() || null}
+          runTrigger={previewRunModal.runTrigger}
+          initialRunError={previewRunModal.error}
+        />
+      ) : null}
 
       <AlertDialog open={Boolean(deleteId)} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>

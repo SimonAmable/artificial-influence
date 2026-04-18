@@ -104,6 +104,20 @@ export async function PATCH(req: Request, context: RouteContext) {
       updates.is_active = body.isActive
     }
 
+    if (body.description !== undefined) {
+      updates.description =
+        typeof body.description === "string" ? body.description.trim() || null : null
+    }
+
+    if (typeof body?.isPublic === "boolean") {
+      updates.is_public = body.isPublic
+      const wasPublic = (existing as AutomationRow).is_public === true
+      if (wasPublic && body.isPublic === false) {
+        updates.preview_thread = null
+        updates.preview_captured_at = null
+      }
+    }
+
     const { data: row, error } = await supabase
       .from("automations")
       .update(updates)

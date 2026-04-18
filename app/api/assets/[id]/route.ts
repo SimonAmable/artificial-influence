@@ -6,6 +6,7 @@ import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/typ
 function mapAssetRow(row: Record<string, unknown>) {
   return {
     id: row.id as string,
+    userId: row.user_id as string,
     title: (row.title as string) || "Untitled Asset",
     description: (row.description as string | null) || null,
     assetType: row.asset_type as AssetType,

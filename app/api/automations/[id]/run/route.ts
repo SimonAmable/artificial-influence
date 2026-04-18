@@ -42,7 +42,7 @@ export async function POST(_req: Request, context: RouteContext) {
       return NextResponse.json({ error: "Server configuration error" }, { status: 500 })
     }
 
-    const result = await runAutomation(admin, row as AutomationRow)
+    const result = await runAutomation(admin, row as AutomationRow, { trigger: "manual" })
 
     if (!result.ok) {
       return NextResponse.json({ error: result.error, runId: result.runId }, { status: 500 })

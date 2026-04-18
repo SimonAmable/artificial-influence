@@ -14,6 +14,7 @@ export type AssetType = "image" | "video" | "audio"
 
 export interface AssetRecord {
   id: string
+  userId: string
   title: string
   description?: string | null
   assetType: AssetType

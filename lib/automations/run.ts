@@ -26,7 +26,12 @@ import { buildSelectedReferenceContext } from "@/lib/chat/selected-reference-con
 import { registerThreadMediaFromUserMessageParts } from "@/lib/chat/thread-media/server"
 import { createCreativeChatTools } from "@/lib/chat/tools"
 import { resolveChatGatewayModel } from "@/lib/constants/chat-llm-models"
-import type { AutomationRow } from "@/lib/automations/types"
+import { captureAutomationPreview } from "@/lib/automations/preview"
+import type { AutomationRow, AutomationRunTrigger } from "@/lib/automations/types"
+
+export type RunAutomationOptions = {
+  trigger: AutomationRunTrigger
+}
 
 function truncateError(error: unknown): string {
   const s = error instanceof Error ? error.message : String(error)
@@ -44,7 +49,9 @@ export type RunAutomationResult =
 export async function runAutomation(
   admin: SupabaseClient,
   automation: AutomationRow,
+  options: RunAutomationOptions,
 ): Promise<RunAutomationResult> {
+  const { trigger } = options
   const userId = automation.user_id
   const model = resolveChatGatewayModel(automation.model ?? undefined)
   const genId = createIdGenerator({ prefix: "msg", size: 16 })
@@ -59,6 +66,7 @@ export async function runAutomation(
       messages: [],
       source: "automation",
       automation_id: automation.id,
+      automation_trigger: trigger,
     })
     .select("id")
     .single()
@@ -77,6 +85,7 @@ export async function runAutomation(
       user_id: userId,
       thread_id: threadId,
       status: "running",
+      run_trigger: trigger,
     })
     .select("id")
     .single()
@@ -176,6 +185,9 @@ export async function runAutomation(
             threadId,
             userId,
           })
+          if (automation.is_public === true) {
+            await captureAutomationPreview(admin, automation.id, runId, responseMessages as UIMessage[])
+          }
         } catch (persistError) {
           console.error("[automations/run] persist failed:", persistError)
         }
