@@ -1159,11 +1159,18 @@ export function AutomationsPage() {
                       <span className="line-clamp-2 font-medium">{a.name}</span>
                       <div className="flex shrink-0 flex-col items-end gap-0.5">
                         {scope === "community" ? (
-                          a.hasPreview ? (
-                            <Badge variant="outline" className="text-[10px]">
-                              Preview
-                            </Badge>
-                          ) : null
+                          <>
+                            {a.user_id === userId ? (
+                              <Badge variant="default" className="text-[10px]">
+                                Yours
+                              </Badge>
+                            ) : null}
+                            {a.hasPreview ? (
+                              <Badge variant="outline" className="text-[10px]">
+                                Preview
+                              </Badge>
+                            ) : null}
+                          </>
                         ) : (
                           <>
                             {a.is_public === true ? (
@@ -1231,21 +1238,41 @@ export function AutomationsPage() {
                     <Badge variant="outline" className="text-xs">
                       Public
                     </Badge>
+                    {selected.user_id === userId ? (
+                      <Badge variant="default" className="text-xs">
+                        Yours
+                      </Badge>
+                    ) : null}
                     {selected.hasPreview ? (
                       <Badge variant="secondary" className="text-xs">
                         Preview
                       </Badge>
                     ) : null}
-                    <Button
-                      size="sm"
-                      disabled={cloningId === selected.id}
-                      onClick={() => void cloneFromCommunity(selected)}
-                    >
-                      {cloningId === selected.id ? (
-                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                      ) : null}
-                      Save to my automations
-                    </Button>
+                    {selected.user_id === userId ? (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const id = selected.id
+                          setScope("mine")
+                          lastHydratedId.current = null
+                          setSelectedId(id)
+                          setCommunityPreviewOpen(false)
+                        }}
+                      >
+                        Edit in Mine
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        disabled={cloningId === selected.id}
+                        onClick={() => void cloneFromCommunity(selected)}
+                      >
+                        {cloningId === selected.id ? (
+                          <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                        ) : null}
+                        Save to my automations
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"

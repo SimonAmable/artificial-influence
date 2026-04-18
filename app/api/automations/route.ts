@@ -39,7 +39,6 @@ export async function GET(req: Request) {
         .from("automations")
         .select("*")
         .eq("is_public", true)
-        .neq("user_id", user.id)
         .order("updated_at", { ascending: false })
 
       if (error) {
