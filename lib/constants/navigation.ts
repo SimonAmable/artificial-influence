@@ -75,23 +75,23 @@ export interface DashboardToolNavItem {
 
 const baseNavigationItems: NavigationItem[] = [
   { path: "/", label: "Home" },
-  { path: "/canvases", label: "Canvas" },
+  { path: "/chat", label: "Agent" },
+  { path: "/automations", label: "Automations" },
   { path: "/image", label: "Image" },
   { path: "/video", label: "Video" },
-  { path: "/editor", label: "Editor" },
-  { path: "/inpaint", label: "Image Editing" },
-  { path: "/character-swap", label: "Character Swap" },
+  { path: "/brand", label: "Brand" },
   { path: "/motion-copy", label: "Motion Copy" },
   { path: "/lipsync", label: "Lipsync" },
+  { path: "/inpaint", label: "Image Editing" },
+  { path: "/character-swap", label: "Character Swap" },
+  { path: "/canvases", label: "Canvas" },
   { path: "/apps", label: "Apps" },
-  { path: "/assets", label: "Assets" },
+  { path: "/editor", label: "Editor" },
   { path: "/autopost", label: "Autopost" },
-  { path: "/automations", label: "Automations" },
-  { path: "/brand", label: "Brand" },
-  { path: "/chat", label: "Agent" },
   { path: "/history", label: "History" },
-  { path: "/pricing", label: "Pricing" },
+  { path: "/assets", label: "Assets" },
   { path: "/pricing-test", label: "Pricing (Test)", devOnly: true },
+  { path: "/pricing", label: "Pricing" },
 ]
 
 /**
@@ -374,6 +374,30 @@ export function getFooterMegaNavColumns(): {
  */
 export const dashboardToolNavItems: DashboardToolNavItem[] = [
   {
+    label: "Agent",
+    href: "/chat",
+    icon: "chat-circle-dots",
+    hint: "Open AI chat to plan and create faster.",
+  },
+  {
+    label: "Automations",
+    href: "/automations",
+    icon: "flow-arrow",
+    hint: "Set up automated creation and posting workflows.",
+  },
+  {
+    label: "Image Studio",
+    href: "/image",
+    icon: "image",
+    hint: "Generate images from text and references.",
+  },
+  {
+    label: "Video Studio",
+    href: "/video",
+    icon: "video",
+    hint: "Text or image to video generation.",
+  },
+  {
     label: "Brand kit",
     href: "/brand",
     icon: "palette",
@@ -390,18 +414,6 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     href: "/lipsync",
     icon: "microphone",
     hint: "Sync speech to a face in an image or clip.",
-  },
-  {
-    label: "Image Studio",
-    href: "/image",
-    icon: "image",
-    hint: "Generate images from text and references.",
-  },
-  {
-    label: "Video Studio",
-    href: "/video",
-    icon: "video",
-    hint: "Text or image to video generation.",
   },
   {
     label: "Image Editing",
@@ -428,9 +440,27 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     hint: "Explore ready-made AI apps and tools.",
   },
   {
-    label: "Agent",
-    href: "/chat",
-    icon: "chat-circle-dots",
-    hint: "Open AI chat to plan and create faster.",
+    label: "Video Editor",
+    href: "/editor",
+    icon: "video",
+    hint: "Edit and assemble AI videos on a timeline.",
+  },
+  {
+    label: "Autopost",
+    href: "/autopost",
+    icon: "palette",
+    hint: "Schedule and publish your generated content.",
+  },
+  {
+    label: "History",
+    href: "/history",
+    icon: "pencil-simple",
+    hint: "Review past generations and edits.",
+  },
+  {
+    label: "Assets",
+    href: "/assets",
+    icon: "squares-four",
+    hint: "Browse and manage your saved assets.",
   },
 ]
