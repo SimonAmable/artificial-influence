@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
         if (motionCopyVideo) replicateInput.video = motionCopyVideo;
         if (otherParams.mode) replicateInput.mode = otherParams.mode;
         if (otherParams.keep_original_sound !== undefined) replicateInput.keep_original_sound = otherParams.keep_original_sound;
-        if (otherParams.character_orientation) replicateInput.character_orientation = otherParams.character_orientation;
+        replicateInput.character_orientation = otherParams.character_orientation ?? 'video';
         break;
 
       case 'veed/fabric-1.0':
@@ -458,7 +458,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[generate-video-test] Generated video URL (Replicate):', generatedVideoUrl);
 
-    // Persist to Supabase — Replicate delivery URLs expire; canvas save/load needs a stable URL (same as generate-image / generate-video).
+    // Persist to Supabase, Replicate delivery URLs expire; canvas save/load needs a stable URL (same as generate-image / generate-video).
     console.log('[generate-video-test] Downloading generated video from Replicate...');
     const downloadStartTime = Date.now();
     const videoResponse = await fetch(generatedVideoUrl);

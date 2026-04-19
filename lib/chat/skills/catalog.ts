@@ -89,13 +89,13 @@ export function buildSkillsCatalogAppendix(entries: SkillCatalogEntry[]) {
 
   return `
 
-## Agent Skills (tier 1 — catalog only)
+## Agent Skills (tier 1, catalog only)
 
 You have specialized **Agent Skills** (portable instruction packs). Each entry below is only a summary. When the user's task matches a skill's description, call **activateSkill** with that skill's \`slug\` **before** improvising from general knowledge, so you load the full instructions for that turn.
 
 Available skills:
 ${lines.join("\n")}
 
-Do not paste full skill bodies from memory — use **activateSkill** to load the canonical instructions. To create or overwrite a skill, use **saveSkill** (stores valid SKILL.md with frontmatter \`name\` matching \`slug\`).
+Do not paste full skill bodies from memory, use **activateSkill** to load the canonical instructions. To create or overwrite a skill, use **saveSkill** (stores valid SKILL.md with frontmatter \`name\` matching \`slug\`).
 `.trimEnd()
 }

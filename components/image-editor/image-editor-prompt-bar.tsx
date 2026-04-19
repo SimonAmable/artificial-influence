@@ -259,7 +259,7 @@ export function ImageEditorPromptBar({
           const hasMask = Boolean(exports?.hadMask && exports.maskDataUrl)
 
           const finalPrompt = hasMask
-            ? `${prompt.trim()}\n\nInpaint: Image order is (1) base scene, (2) optional reference images for style or content only, (3) mask as the last image — white/light marks the region to edit. Edit only that masked region; keep everything outside identical.`
+            ? `${prompt.trim()}\n\nInpaint: Image order is (1) base scene, (2) optional reference images for style or content only, (3) mask as the last image, white/light marks the region to edit. Edit only that masked region; keep everything outside identical.`
             : `${prompt.trim()}\n\nImage editing: The first image is the scene to edit. Any additional images are optional style or content references only. Apply the described changes to the full image (no mask supplied).`
 
           formData.append("hasMask", hasMask ? "true" : "false")
@@ -464,7 +464,7 @@ export function ImageEditorPromptBar({
           aria-label="Add reference images"
         />
 
-        {/* Reference images preview (extra refs — same as /image page) */}
+        {/* Reference images preview (extra refs, same as /image page) */}
         {referenceFiles.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {referenceFiles.map((file, index) => (
@@ -496,7 +496,7 @@ export function ImageEditorPromptBar({
               onKeyDown={handleKeyDown}
               placeholder={
                 isInpaint
-                  ? "Describe your edit — paint a mask to change a region, or skip the mask to edit the whole image…"
+                  ? "Describe your edit, paint a mask to change a region, or skip the mask to edit the whole image…"
                   : "Enter prompt for image editing..."
               }
               className="w-full border-none outline-none resize-none bg-transparent text-sm min-h-[60px] max-h-[120px] overflow-y-auto"
@@ -534,7 +534,7 @@ export function ImageEditorPromptBar({
                       <span className="text-[10px]">
                         {displayModelObject?.model_cost != null
                           ? displayModelObject.model_cost
-                          : "—"}
+                          : "-"}
                       </span>
                     </div>
                   </div>

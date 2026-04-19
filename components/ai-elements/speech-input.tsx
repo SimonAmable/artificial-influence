@@ -63,7 +63,7 @@ export type SpeechInputProps = ComponentProps<typeof Button> & {
   onTranscriptionChange?: (text: string) => void;
   /**
    * When true and `onAudioRecorded` is set, always use MediaRecorder + server transcription
-   * (e.g. Groq Whisper) even if the Web Speech API is available — consistent quality and billing.
+   * (e.g. Groq Whisper) even if the Web Speech API is available, consistent quality and billing.
    */
   forceServerTranscription?: boolean;
   /**

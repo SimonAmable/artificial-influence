@@ -64,11 +64,11 @@ export type BrandKit = {
 
   fontFamily?: string | null
 
-  /** DB: `reference_images` — URL list. */
+  /** DB: `reference_images`: URL list. */
 
   referenceImages: string[]
 
-  /** DB: `reference_videos` — URL list. */
+  /** DB: `reference_videos`: URL list. */
 
   referenceVideos: string[]
 

@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     if (currentText) {
       userContent.push({
         type: 'text' as const,
-        text: `CURRENT TEXT TO EDIT:\n${currentText}\n\nEDITING REQUEST: ${processedPrompt}\n\nFollow your system instructions: return the complete updated text in natural language unless the user explicitly asked for JSON / a structured Nano Banana package—in that case follow the JSON package rules.`
+        text: `CURRENT TEXT TO EDIT:\n${currentText}\n\nEDITING REQUEST: ${processedPrompt}\n\nFollow your system instructions: return the complete updated text in natural language unless the user explicitly asked for JSON / a structured Nano Banana package; in that case follow the JSON package rules.`
       });
     } else {
       userContent.push({

@@ -565,6 +565,7 @@ export function createGenerateImageTool({
             status: "pending",
             replicate_prediction_id: requestId,
             fal_endpoint_id: falEndpoint,
+            ...(threadId ? { chat_thread_id: threadId } : {}),
           })
           .select("id")
           .single()
@@ -659,6 +660,7 @@ export function createGenerateImageTool({
             tool: "chat-generate-image",
             status: "pending",
             replicate_prediction_id: prediction.id,
+            ...(threadId ? { chat_thread_id: threadId } : {}),
           })
           .select("id")
           .single()

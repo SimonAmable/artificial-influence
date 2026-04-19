@@ -1,5 +1,5 @@
 /**
- * Wan 2.7 — single product id `wan-video/wan-2.7` routes to Replicate
+ * Wan 2.7, single product id `wan-video/wan-2.7` routes to Replicate
  * `wan-video/wan-2.7-t2v` or `wan-video/wan-2.7-i2v`.
  */
 

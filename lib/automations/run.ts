@@ -56,7 +56,7 @@ export async function runAutomation(
   const model = resolveChatGatewayModel(automation.model ?? undefined)
   const genId = createIdGenerator({ prefix: "msg", size: 16 })
 
-  const title = `${automation.name} — ${new Date().toISOString()}`
+  const title = `${automation.name}, ${new Date().toISOString()}`
 
   const { data: threadRow, error: threadError } = await admin
     .from("chat_threads")

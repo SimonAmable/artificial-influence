@@ -1,4 +1,4 @@
-// Previous grid section (model capability tiles). Replaced by `PlatformSurfacesSection` — kept for reference.
+// Previous grid section (model capability tiles). Replaced by `PlatformSurfacesSection`, kept for reference.
 //
 // import Link from "next/link"
 // import { modelCards } from "@/lib/constants/landing-content"

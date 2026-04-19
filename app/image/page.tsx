@@ -131,7 +131,7 @@ const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
     "Identity-only face transfer using two reference images. First image is the identity source (face to transfer). " +
     "Second image is the reference person/scene (clothes, pose, body, and setting to keep). " +
     "Transfer ONLY the facial identity from the first image onto the person in the second image. " +
-    "From the first image preserve ONLY: face shape, eyes, nose, mouth, bone structure, and facial features—nothing else. " +
+    "From the first image preserve ONLY: face shape, eyes, nose, mouth, bone structure, and facial features; nothing else. " +
     "From the second image preserve: the exact clothing, outfit, and accessories; body proportions and pose; hairstyle and hair; skin tone; scene composition; camera angle; environment; and lighting. " +
     "The result must show the person from image two wearing their own clothes in their own pose and setting, but with the face from image one. " +
     "Adjust the transferred face to match the reference's lighting direction, color temperature, perspective, and scale. Blend seamlessly with no visible seams.",
@@ -209,7 +209,7 @@ function ImagePageContent() {
     }
   }, [effectiveImageModels, selectedModel])
 
-  // Apply `?model=` from the URL when the param or catalog changes — not when the user
+  // Apply `?model=` from the URL when the param or catalog changes, not when the user
   // changes the selector (including `selectedModel` here re-ran the effect and reset
   // the choice back to the URL on every pick).
   React.useEffect(() => {
@@ -712,7 +712,7 @@ function ImagePageContent() {
     })
     const generating = pendingRequests.map((request) => ({
       type: "generating" as const,
-      // Stable key for the lifetime of this request (do not switch to predictionId — avoids remount/flicker).
+      // Stable key for the lifetime of this request (do not switch to predictionId, avoids remount/flicker).
       id: `slot-${request.clientRequestId}`,
     }))
     const completed = historyImages.map((img) => ({ type: "image" as const, data: toImageData(img) }))

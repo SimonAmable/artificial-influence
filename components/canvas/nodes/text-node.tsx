@@ -752,7 +752,7 @@ const AITextInput = ({ nodeId, nodeData }: AITextInputProps) => {
                 }
               }}
               onPaste={handlePaste}
-              placeholder="Write, edit, or ask anything—natural language by default. Say you want JSON or a structured Nano Banana pack if you need that. Connect images for context…"
+              placeholder="Write, edit, or ask anything. Natural language by default. Say you want JSON or a structured Nano Banana pack if you need that. Connect images for context…"
               rows={4}
               disabled={isGenerating}
               className="w-full min-h-28 max-h-80 rounded-md bg-transparent px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none resize-y disabled:opacity-50"

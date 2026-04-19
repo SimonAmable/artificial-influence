@@ -171,7 +171,7 @@ export function CommandPalette({
       aria-label={
         mode === "slash"
           ? slashCommandsContext
-            ? `Commands — ${slashCommandsContext}`
+            ? `Commands, ${slashCommandsContext}`
             : "Commands"
           : "References"
       }

@@ -102,7 +102,7 @@ export function InfluencerInputBox({
   onEnhancePromptChange,
   isGenerating = false,
   forceRowLayout: _forceRowLayout = false,
-  placeholder = "Describe your image — use / for presets and @ for brand kits & assets.",
+  placeholder = "Describe your image, use / for presets and @ for brand kits & assets.",
   selectedModel,
   onModelChange,
   showModelSelector = false,
@@ -473,7 +473,7 @@ export function InfluencerInputBox({
     )
   }, [isReadyOverride, localPrompt, attachedRefs])
 
-  // Manually uploaded reference(s) — same row as @-attached image assets below
+  // Manually uploaded reference(s), same row as @-attached image assets below
   const manualDisplayImages = onReferenceImagesChange
     ? localReferenceImages
     : localReferenceImage
@@ -621,7 +621,7 @@ export function InfluencerInputBox({
                       <span className="text-[10px]">
                         {selectedModelObject?.model_cost != null
                           ? selectedModelObject.model_cost * selectedNumImages
-                          : "—"}
+                          : "-"}
                       </span>
                     </div>
                   </div>

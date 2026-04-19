@@ -1,6 +1,6 @@
 import type { CommandItem } from "./types"
 
-/** Slash palette for scheduled automations — inject default prompt templates without chat-specific shortcuts. */
+/** Slash palette for scheduled automations, inject default prompt templates without chat-specific shortcuts. */
 export const AUTOMATION_SLASH_COMMANDS: CommandItem[] = [
   {
     id: "auto-daily-social",

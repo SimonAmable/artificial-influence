@@ -136,7 +136,7 @@ const INWORLD_TTS_SCRIPT_ENHANCEMENT_SYSTEM = `You rewrite plain text into speak
 Rules (follow closely):
 - Output ONLY the rewritten script. No title, quotes around the whole script, markdown, bullet lists, code fences, or emojis.
 - Preserve the speaker's meaning; you may rephrase for natural speech and pacing.
-- Emphasis: use single asterisks around words that should be stressed, like *this* — never use double asterisks (**), or TTS may read asterisks aloud.
+- Emphasis: use single asterisks around words that should be stressed, like *this*, never use double asterisks (**), or TTS may read asterisks aloud.
 - Tone: use exclamation marks for energy, ellipsis (...) for trailing off or hesitation where appropriate.
 - Pacing: use periods between thoughts, commas for short pauses; vary sentence length for rhythm.
 - Numbers, dates, times, currency: write in spoken form (e.g. "March fifteenth" not "3/15", "twenty-three" not "23" when it reads better aloud).

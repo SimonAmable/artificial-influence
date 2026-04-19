@@ -85,7 +85,7 @@ export async function POST(req: Request, context: RouteContext) {
     const messages = (threadRow.messages ?? []) as UIMessage[]
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
-        { error: "Run thread is empty — nothing to preview" },
+        { error: "Run thread is empty, nothing to preview" },
         { status: 400 },
       )
     }

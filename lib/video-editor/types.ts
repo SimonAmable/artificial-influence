@@ -40,7 +40,7 @@ export type VideoItem = BaseItemFields & {
   fileName?: string
   /** Trim from start of source media (frames) */
   trimStartFrames: number
-  /** Trim from end of source — frames counted from start of source after trimStart */
+  /** Trim from end of source, frames counted from start of source after trimStart */
   trimEndFrames: number
   /** Source duration in frames (for max trim UI) */
   sourceDurationFrames: number

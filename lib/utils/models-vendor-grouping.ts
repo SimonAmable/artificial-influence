@@ -39,7 +39,7 @@ export function vendorDisplayName(slug: string): string {
     .join(" ")
 }
 
-/** Background media for a vendor tile — uses named files in `AI_MATERIALS_SHOWCASES` per slug. */
+/** Background media for a vendor tile, uses named files in `AI_MATERIALS_SHOWCASES` per slug. */
 export function pickBentoCardMedia(vendorSlug: string): LandingBentoCardMedia {
   const override = modelsBentoVendorMediaOverrides[vendorSlug]
   if (override) return override

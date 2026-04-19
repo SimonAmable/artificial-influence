@@ -1,6 +1,7 @@
 import { type ComponentPropsWithoutRef, type CSSProperties, type ReactNode } from "react"
 import { ArrowRightIcon } from "@radix-ui/react-icons"
 
+import { isAiMonochromeIconPath } from "@/lib/constants/ai-vendor-icons"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -72,7 +73,10 @@ const BentoCard = ({
           <img
             src={logoSrc}
             alt={logoAlt ?? ""}
-            className="h-10 w-auto max-w-[9rem] origin-left object-contain object-left drop-shadow-md transition-all duration-300 ease-in-out group-hover:scale-95"
+            className={cn(
+              "h-10 w-auto max-w-[9rem] origin-left object-contain object-left drop-shadow-md transition-all duration-300 ease-in-out group-hover:scale-95",
+              isAiMonochromeIconPath(logoSrc) && "brightness-0 invert"
+            )}
           />
         ) : Icon ? (
           <Icon className="h-10 w-10 origin-left transform-gpu text-white/90 transition-all duration-300 ease-in-out group-hover:scale-75" />

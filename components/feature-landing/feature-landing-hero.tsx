@@ -4,18 +4,18 @@ import Link from "next/link"
 import type { AnswerCapsule, FeatureLandingConfig } from "@/lib/types/feature-landing"
 import { FeatureLandingAnswerCapsules } from "@/components/feature-landing/feature-landing-answer-capsules"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
 type HeroProps = {
   hero: FeatureLandingConfig["hero"]
   answerCapsules: AnswerCapsule[]
+  answerCapsulesSectionTitle?: string
 }
 
 const heroSurfaceClass =
   "bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.06)_1px,transparent_0)] bg-[length:20px_20px]"
 
-export function FeatureLandingHero({ hero, answerCapsules }: HeroProps) {
+export function FeatureLandingHero({ hero, answerCapsules, answerCapsulesSectionTitle }: HeroProps) {
   return (
     <section className="relative overflow-hidden border-b border-border/60">
       <div
@@ -45,14 +45,9 @@ export function FeatureLandingHero({ hero, answerCapsules }: HeroProps) {
             {hero.tagline}
           </p>
 
-          <Card
-            className="mt-8 w-full max-w-3xl border-border/70 bg-card/85 text-left shadow-[0_24px_48px_-12px_rgba(0,0,0,0.35)] ring-1 ring-border/50 backdrop-blur-md dark:bg-card/70 dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.55)]"
-            size="sm"
-          >
-            <CardContent className="px-5 py-5 sm:px-6 sm:py-6">
-              <p className="text-pretty text-sm leading-relaxed text-muted-foreground sm:text-base">{hero.tldr}</p>
-            </CardContent>
-          </Card>
+          <p className="mt-8 max-w-3xl text-pretty text-center text-sm leading-relaxed text-muted-foreground sm:text-base">
+            {hero.tldr}
+          </p>
 
           <div className="mt-8 flex w-full max-w-xl flex-col items-stretch gap-3 sm:flex-row sm:justify-center sm:gap-4">
             <Button asChild size="lg" className="w-full sm:w-auto">
@@ -98,7 +93,7 @@ export function FeatureLandingHero({ hero, answerCapsules }: HeroProps) {
 
         <FeatureLandingAnswerCapsules
           capsules={answerCapsules}
-          sectionTitle="How automations work"
+          sectionTitle={answerCapsulesSectionTitle ?? "At a glance"}
           className="mt-16 md:mt-20"
         />
       </div>

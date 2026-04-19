@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
         cancelUrl: `${appUrl}/pricing`,
       });
     } catch (checkoutError: unknown) {
-      // Stored customer ID may be from test mode or deleted in Stripe — recreate and retry once
+      // Stored customer ID may be from test mode or deleted in Stripe, recreate and retry once
       const isMissingCustomer =
         checkoutError &&
         typeof checkoutError === 'object' &&

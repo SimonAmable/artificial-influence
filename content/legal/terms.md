@@ -24,7 +24,7 @@ You agree not to misuse the Services, including by attempting to access non-publ
 
 ## User content
 
-You retain rights in content you submit, subject to the rights you grant us to operate the Services—for example, to host, process, transmit, display, and create derivative works as needed to provide features you request (such as AI generation). You represent you have the rights needed to submit your content.
+You retain rights in content you submit, subject to the rights you grant us to operate the Services, for example to host, process, transmit, display, and create derivative works as needed to provide features you request (such as AI generation). You represent you have the rights needed to submit your content.
 
 ## AI outputs
 

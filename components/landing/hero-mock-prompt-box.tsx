@@ -148,7 +148,7 @@ export function HeroMockPromptBox({ className, sendHref = DEFAULT_SEND_HREF }: H
                     "shadow-[0_0_28px_hsl(var(--primary)/0.55)] ring-2 ring-primary/35 ring-offset-2 ring-offset-background dark:ring-offset-background"
                 )}
               >
-                <Link href={sendHref} aria-label="Send — opens sign-in">
+                <Link href={sendHref} aria-label="Send, opens sign-in">
                   <PaperPlaneTilt className="size-5" weight="fill" />
                 </Link>
               </Button>

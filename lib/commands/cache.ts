@@ -24,7 +24,7 @@ async function fetchBrandKits(): Promise<BrandKit[]> {
   return data.kits ?? []
 }
 
-/** Brand kits are small — prefetch on mount so @ palette is ready. */
+/** Brand kits are small, prefetch on mount so @ palette is ready. */
 export async function getCachedBrandKits(): Promise<BrandKit[]> {
   if (brandKitsCache) return brandKitsCache
   if (!brandKitsPromise) {
@@ -40,7 +40,7 @@ export function prefetchBrandKits(): void {
   void getCachedBrandKits().catch(() => {})
 }
 
-/** Assets may be large — lazy on first @. */
+/** Assets may be large, lazy on first @. */
 export async function getCachedAssets(): Promise<AssetRecord[]> {
   if (assetsCache) return assetsCache
   if (!assetsPromise) {

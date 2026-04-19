@@ -1,4 +1,4 @@
-/** Common output sizes — width × height in pixels. */
+/** Common output sizes, width × height in pixels. */
 export const COMPOSITION_ASPECT_PRESETS = [
   { id: "16:9-1080", label: "16:9 · 1920×1080", width: 1920, height: 1080 },
   { id: "16:9-720", label: "16:9 · 1280×720", width: 1280, height: 720 },

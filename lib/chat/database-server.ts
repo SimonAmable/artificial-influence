@@ -115,6 +115,44 @@ export async function getChatThreadById(threadId: string, userId: string): Promi
   }
 }
 
+/** Load messages for a thread using any Supabase client (e.g. service role in webhooks). */
+export async function loadChatThreadMessagesForServiceRole(
+  supabase: SupabaseClient,
+  threadId: string,
+  userId: string,
+): Promise<UIMessage[]> {
+  const { data, error } = await supabase
+    .from("chat_threads")
+    .select("*")
+    .eq("id", threadId)
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+  if (!data) {
+    throw new Error("Chat thread not found")
+  }
+
+  const { data: messageRows, error: messagesError } = await supabase
+    .from("chat_messages")
+    .select("message")
+    .eq("thread_id", threadId)
+    .order("sort_order", { ascending: true })
+
+  if (messagesError) {
+    throw new Error(messagesError.message)
+  }
+
+  const fromRows = (messageRows as { message: UIMessage }[] | null)?.map((row) => row.message)
+  if (fromRows && fromRows.length > 0) {
+    return fromRows
+  }
+
+  return normalizeMessages((data as { messages?: UIMessage[] | null }).messages)
+}
+
 export async function listUserChatThreads(userId: string): Promise<ChatThreadListItem[]> {
   const supabase = await createClient()
 

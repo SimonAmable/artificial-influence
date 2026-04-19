@@ -36,7 +36,7 @@ export const CHAT_AGENT_COMMANDS: CommandItem[] = [
     id: "agent-realistic-upscale",
     label: "Realistic upscale",
     description: "Use a high-fidelity identity-safe upscale direction",
-    inject: `For each attached video/GIF: extract the last frame. Run exactly ONE generation per frame, sequentially (one frame at a time; exactly ONE image reference per generation—the current frame only; do not batch).
+    inject: `For each attached video/GIF: extract the last frame. Run exactly ONE generation per frame, sequentially (one frame at a time; exactly ONE image reference per generation (the current frame only); do not batch).
 
 NB2 exact prompting: use the following prompt verbatim for each generation:
 

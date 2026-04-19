@@ -21,7 +21,7 @@ export type ReferenceItem = {
   subtitle?: string
   category: "brand" | "asset"
   assetType?: AssetType
-  /** Public URL for asset refs — used to send image assets as reference files, not only prompt text */
+  /** Public URL for asset refs, used to send image assets as reference files, not only prompt text */
   assetUrl?: string
   /** Logo/icon (brand) or thumbnail (asset) for @ palette previews */
   previewUrl?: string | null

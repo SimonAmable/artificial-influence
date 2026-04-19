@@ -1,6 +1,6 @@
 import type { AttachedRef } from "./types"
 
-/** Prompt text: brand kits only — image assets are sent as reference files, not duplicated in Context. */
+/** Prompt text: brand kits only, image assets are sent as reference files, not duplicated in Context. */
 export function brandRefsOnly(refs: AttachedRef[]): AttachedRef[] {
   return refs.filter((r) => r.category === "brand")
 }

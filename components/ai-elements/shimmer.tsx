@@ -26,7 +26,7 @@ export const Shimmer = <T extends ElementType = "p">({
   const shimmerStyle = {
     ...style,
     animation: "ai-elements-shimmer var(--shimmer-duration) linear infinite",
-    // Theme tokens are full colors (e.g. oklch(...)), not HSL components — use them directly.
+    // Theme tokens are full colors (e.g. oklch(...)), not HSL components, use them directly.
     backgroundImage:
       "linear-gradient(110deg, color-mix(in oklch, var(--muted-foreground) 55%, var(--background)) 38%, var(--foreground) 50%, color-mix(in oklch, var(--muted-foreground) 55%, var(--background)) 62%)",
     backgroundSize: "var(--shimmer-spread) 100%",

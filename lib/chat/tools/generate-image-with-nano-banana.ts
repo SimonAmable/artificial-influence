@@ -232,10 +232,10 @@ export function createGenerateImageWithNanoBananaTool({
 
   return tool({
     description:
-      "Generate or edit an image with Nano Banana 2 (google/nano-banana-2). Nano Banana accepts **either** plain prose **or** a JSON creative brief in the `prompt` field—pick based on the user's intent, not a blanket rule.\n\n" +
+      "Generate or edit an image with Nano Banana 2 (google/nano-banana-2). Nano Banana accepts **either** plain prose **or** a JSON creative brief in the `prompt` field. Pick based on the user's intent, not a blanket rule.\n\n" +
       "Decide the mode before calling:\n" +
       "- **Literal mode** (set `rawPrompt: true`): pass the user's exact wording as `prompt`. Use when the user supplied a quoted prompt, labeled it (`prompt:` / `\"prompt\": \"...\"`), said exact/verbatim/literal/as-written/copy-paste/don't rewrite, pasted a finished prompt, or issued a short edit command paired with reference images (e.g. \"merge these\", \"swap outfits\", \"make it night\"). Do **not** wrap their text in JSON, do **not** add image_description/edit_description/negative_constraints, do **not** \"polish\" it. Short is fine.\n" +
-      "- **Expand mode** (leave `rawPrompt` unset): the user gave a vague idea and expects you to compose a production-ready prompt. Build a JSON string with a rich `image_description` object (new images) **or** `edit_description` object (edits), a fluent master `prompt` field, and `negative_constraints` when useful. Omit `recommended_model` and `output_specs`—set `aspectRatio` and `variantCount` as tool args instead.\n\n" +
+      "- **Expand mode** (leave `rawPrompt` unset): the user gave a vague idea and expects you to compose a production-ready prompt. Build a JSON string with a rich `image_description` object (new images) **or** `edit_description` object (edits), a fluent master `prompt` field, and `negative_constraints` when useful. Omit `recommended_model` and `output_specs`; set `aspectRatio` and `variantCount` as tool args instead.\n\n" +
       "When in doubt between Literal and Expand, prefer Literal. Silently rewriting a user's prompt is worse than a terser result they can iterate on.\n\n" +
       "For reference images from earlier in the chat or from listRecentGenerations, pass **referenceIds**: `ref_1`…`ref_N` (transcript), `upl_<uuid>` / `gen_<uuid>`, or raw UUID (`mediaId` from listRecentGenerations). Deprecated alias: **mediaIds** (same values).",
     inputSchema: z.object({
@@ -243,7 +243,7 @@ export function createGenerateImageWithNanoBananaTool({
         .string()
         .min(2)
         .describe(
-          "Text sent to google/nano-banana-2. Content depends on mode: (Literal, with rawPrompt=true) the user's exact wording, no wrapper, no added fields; (Expand, rawPrompt omitted) a JSON string with `image_description` OR `edit_description`, a fluent master `prompt`, and `negative_constraints` when useful—omit `recommended_model` and `output_specs`. Never silently expand a user's verbatim prompt.",
+          "Text sent to google/nano-banana-2. Content depends on mode: (Literal, with rawPrompt=true) the user's exact wording, no wrapper, no added fields; (Expand, rawPrompt omitted) a JSON string with `image_description` OR `edit_description`, a fluent master `prompt`, and `negative_constraints` when useful. Omit `recommended_model` and `output_specs`. Never silently expand a user's verbatim prompt.",
         ),
       rawPrompt: z
         .boolean()
@@ -253,7 +253,7 @@ export function createGenerateImageWithNanoBananaTool({
         ),
       aspectRatio: aspectRatioSchema
         .optional()
-        .describe("Preferred aspect ratio. Use match_input_image when editing or recreating from a reference image. Omit when the user didn't specify—the tool defaults sensibly based on references."),
+        .describe("Preferred aspect ratio. Use match_input_image when editing or recreating from a reference image. Omit when the user didn't specify. The tool defaults sensibly based on references."),
       variantCount: z
         .number()
         .int()
@@ -368,6 +368,7 @@ export function createGenerateImageWithNanoBananaTool({
             tool: "chat-nano-banana",
             status: "pending",
             replicate_prediction_id: prediction.id,
+            ...(threadId ? { chat_thread_id: threadId } : {}),
           })
           .select("id")
           .single()

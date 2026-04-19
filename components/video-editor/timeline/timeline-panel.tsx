@@ -81,7 +81,7 @@ export function TimelinePanel({ className }: { className?: string }) {
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1">
-        {/* Track names + controls — time grid starts in the scroll area so it lines up with clips */}
+        {/* Track names + controls, time grid starts in the scroll area so it lines up with clips */}
         <div
           className="flex w-[120px] shrink-0 flex-col border-r border-border bg-muted/25"
           style={{ minWidth: GUTTER_PX }}
@@ -193,7 +193,7 @@ export function TimelinePanel({ className }: { className?: string }) {
           className="relative min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden scroll-smooth"
         >
           <div className="relative select-none" style={{ width: totalWidth, minHeight: contentHeight }}>
-            {/* Vertical grid — aligned with time (same origin as ruler + clips) */}
+            {/* Vertical grid, aligned with time (same origin as ruler + clips) */}
             <div
               className="pointer-events-none absolute inset-0 z-0"
               aria-hidden
@@ -211,7 +211,7 @@ export function TimelinePanel({ className }: { className?: string }) {
               })}
             </div>
 
-            {/* Playhead — spans ruler + tracks */}
+            {/* Playhead, spans ruler + tracks */}
             <div
               className="pointer-events-none absolute top-0 z-30 w-px bg-primary shadow-[0_0_6px_hsl(var(--primary))]"
               style={{
@@ -219,7 +219,7 @@ export function TimelinePanel({ className }: { className?: string }) {
                 height: contentHeight,
               }}
             />
-            {/* Ruler — same width & origin as track rows */}
+            {/* Ruler, same width & origin as track rows */}
             <div
               className="sticky top-0 z-20 flex h-8 cursor-pointer items-end border-b border-border bg-background/95 backdrop-blur-sm"
               style={{ width: totalWidth }}
@@ -281,7 +281,7 @@ export function TimelinePanel({ className }: { className?: string }) {
 
       <div className="shrink-0 border-t border-border px-2 py-1 text-[10px] text-muted-foreground">
         Frame {currentFrame} / {durationInFrames - 1} · {isPlaying ? "Playing" : "Paused"} · active:{" "}
-        {project.tracks.find((t) => t.id === activeTrackId)?.label ?? "—"} · drag clips between tracks · trim
+        {project.tracks.find((t) => t.id === activeTrackId)?.label ?? "-"} · drag clips between tracks · trim
         edges
       </div>
     </div>

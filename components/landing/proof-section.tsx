@@ -29,20 +29,20 @@ export function ProofSection() {
       id="proof"
       className="relative w-full overflow-x-hidden bg-background py-0"
     >
-      <div className="relative aspect-9/18 w-full overflow-x-hidden [--proof-img-w:min(122vw,760px)] md:aspect-9/10 md:[--proof-img-w:min(72vw,480px)] lg:aspect-9/9">
+      <div className="relative aspect-9/18 w-full overflow-x-hidden [--proof-img-w:min(122vw,760px)] md:aspect-9/10 md:[--proof-img-w:min(72vw,480px)] lg:aspect-auto lg:flex lg:min-h-0 lg:flex-row lg:items-center">
         {PROOF_IMAGES.map((imageSrc, index) => {
           const innerAnchor =
             index === 0
-              ? "left-0 w-[var(--proof-img-w)] max-w-none -translate-x-1/2"
-              : "left-full w-[var(--proof-img-w)] max-w-none -translate-x-1/2"
+              ? "left-0 w-[var(--proof-img-w)] max-w-none -translate-x-1/2 lg:left-auto lg:w-full lg:max-w-none lg:translate-x-0"
+              : "left-full w-[var(--proof-img-w)] max-w-none -translate-x-1/2 lg:left-auto lg:w-full lg:max-w-none lg:translate-x-0"
           const fromX = index === 0 ? -56 : 56
           return (
             <div
               key={imageSrc}
               className={
                 index === 1
-                  ? "absolute inset-x-0 top-1/2 z-10 w-full -translate-y-1/2 overflow-x-hidden"
-                  : "absolute inset-x-0 top-1/2 z-0 w-full -translate-y-1/2 overflow-x-hidden"
+                  ? "absolute inset-x-0 top-1/2 z-10 w-full -translate-y-1/2 overflow-x-hidden lg:static lg:inset-auto lg:z-0 lg:w-1/2 lg:translate-y-0 lg:shrink-0"
+                  : "absolute inset-x-0 top-1/2 z-0 w-full -translate-y-1/2 overflow-x-hidden lg:static lg:inset-auto lg:w-1/2 lg:translate-y-0 lg:shrink-0"
               }
             >
               <div className={`relative ${innerAnchor}`}>
@@ -62,7 +62,7 @@ export function ProofSection() {
                     width={900}
                     height={1800}
                     className="h-auto w-full object-contain object-center drop-shadow-[0_24px_48px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_24px_48px_rgba(0,0,0,0.35)]"
-                    sizes="(min-width: 768px) 480px, 100vw"
+                    sizes="(min-width: 1024px) 50vw, (min-width: 768px) 480px, 100vw"
                     priority={index === 0}
                   />
                 </motion.div>

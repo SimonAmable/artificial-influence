@@ -118,7 +118,7 @@ export function CreateAssetDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-fit sm:max-w-2xl">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{mode === "edit" ? "Edit Asset" : "Create Asset"}</DialogTitle>
           <DialogDescription>

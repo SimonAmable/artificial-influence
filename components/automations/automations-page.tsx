@@ -670,7 +670,7 @@ export function AutomationsPage() {
       if (!res.ok) {
         throw new Error(typeof j?.error === "string" ? j.error : "Clone failed")
       }
-      toast.success("Saved — edit and run from Mine")
+      toast.success("Saved. Edit and run from Mine")
       setScope("mine")
       const created = j.automation as AutomationApi | undefined
       await loadAutomations("mine")
@@ -756,7 +756,7 @@ export function AutomationsPage() {
       </div>
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-description`}>Description</Label>
-        <p className="text-xs text-muted-foreground">Just a note for you — helps you remember what this one does.</p>
+        <p className="text-xs text-muted-foreground">Just a note for you; helps you remember what this one does.</p>
         <Textarea
           id={`${idPrefix}-description`}
           value={description}
@@ -1040,7 +1040,7 @@ export function AutomationsPage() {
               placeholder="0 0 * * * *"
             />
             <p className="mt-2 text-xs text-muted-foreground">
-              For power users — cron format with 6 fields (second, minute, hour, day, month, weekday).
+              For power users: cron format with 6 fields (second, minute, hour, day, month, weekday).
               E.g. <code>0 0 * * * *</code> runs every hour on the hour.
             </p>
           </TabsContent>
@@ -1210,7 +1210,7 @@ export function AutomationsPage() {
               <CardTitle>Pick one or start fresh</CardTitle>
               <CardDescription>
                 Open an automation from the list to edit it, or hit <strong>New</strong> to set up a task
-                that runs on its own — daily ideas, weekly reports, hourly scans, whatever you need.
+                that runs on its own: daily ideas, weekly reports, hourly scans, whatever you need.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -1229,8 +1229,8 @@ export function AutomationsPage() {
                 {isCommunityScope ? (
                   <p className="mt-2 text-xs text-muted-foreground">
                     {selected.hasPreview
-                      ? "Preview available — open it to see what a run actually looks like."
-                      : "No preview yet — this automation hasn't shared a sample run."}
+                      ? "Preview available. Open it to see what a run actually looks like."
+                      : "No preview yet. This automation hasn't shared a sample run."}
                   </p>
                 ) : null}
               </div>

@@ -33,6 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { isAiMonochromeIconPath } from "@/lib/constants/ai-vendor-icons"
 import {
   megaNavGroups,
   navigationItems,
@@ -138,7 +139,8 @@ function HeaderMenuItem({ item, onSelect }: { item: MegaNavItem; onSelect: (path
                 width={18}
                 height={18}
                 className={cn(
-                  "h-[18px] w-[18px] object-contain brightness-0 dark:invert",
+                  "h-[18px] w-[18px] object-contain",
+                  isAiMonochromeIconPath(item.iconSrc) && "brightness-0 dark:invert",
                   item.path === "/brand" && "invert"
                 )}
               />
@@ -447,7 +449,7 @@ export function Header() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="font-normal">
-                    {credits !== null ? `${credits} credits available` : "— credits"}
+                    {credits !== null ? `${credits} credits available` : "Credits unavailable"}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => router.push("/affiliate")}>

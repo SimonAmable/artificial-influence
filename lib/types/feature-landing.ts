@@ -52,6 +52,8 @@ export interface FeatureLandingConfig {
   datePublished: string
   /** ISO 8601; visible “Last updated” + schema dateModified + sitemap */
   lastUpdated: string
+  /** Heading above the answer-capsule grid in the hero */
+  answerCapsulesSectionTitle?: string
   hero: {
     eyebrow?: string
     title: string

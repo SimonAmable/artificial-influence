@@ -21,6 +21,7 @@ import { createComposeTimelineVideoTool } from "@/lib/chat/tools/compose-timelin
 import { createAwaitGenerationTool } from "@/lib/chat/tools/await-generation"
 import { createEstimateModelLatencyTool } from "@/lib/chat/tools/estimate-model-latency"
 import { createListThreadMediaTool } from "@/lib/chat/tools/list-thread-media"
+import { createScheduleGenerationFollowUpTool } from "@/lib/chat/tools/schedule-generation-follow-up"
 
 interface CreateCreativeChatToolsOptions {
   availableReferences: AvailableChatImageReference[]
@@ -30,7 +31,8 @@ interface CreateCreativeChatToolsOptions {
   threadId?: string
   userId: string
   skillsCatalog?: SkillCatalogEntry[]
-  source?: "chat" | "automation"
+  /** `resume`: webhook follow-up turn — Instagram draft etc. runs without interactive tool approval. */
+  source?: "chat" | "automation" | "resume"
 }
 
 export function createCreativeChatTools({
@@ -61,9 +63,16 @@ export function createCreativeChatTools({
     ? createComposeTimelineVideoTool({ supabase, threadId, userId })
     : null
 
+  const scheduleGenerationFollowUpTool = threadId
+    ? createScheduleGenerationFollowUpTool({ supabase, threadId, userId })
+    : null
+
   return {
     ...(listThreadMediaTool ? { listThreadMedia: listThreadMediaTool } : {}),
     ...(composeTimelineVideoTool ? { composeTimelineVideo: composeTimelineVideoTool } : {}),
+    ...(scheduleGenerationFollowUpTool
+      ? { scheduleGenerationFollowUp: scheduleGenerationFollowUpTool }
+      : {}),
     listInstagramConnections: createListInstagramConnectionsTool({
       supabase,
       userId,
@@ -71,7 +80,7 @@ export function createCreativeChatTools({
     prepareInstagramPost: createPrepareInstagramPostTool({
       supabase,
       userId,
-      requireApproval: source !== "automation",
+      requireApproval: source === "chat",
     }),
     generateImage: createGenerateImageTool({
       availableReferences,

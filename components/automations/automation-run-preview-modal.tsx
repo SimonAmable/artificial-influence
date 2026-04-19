@@ -299,7 +299,7 @@ export function AutomationRunPreviewModal({
           <div className="px-4 py-4">
             {pollExhausted ? (
               <p className="text-sm text-muted-foreground">
-                Still running — open the thread from Recent runs when it finishes, or try again later.
+                Still running, open the thread from Recent runs when it finishes, or try again later.
               </p>
             ) : null}
 

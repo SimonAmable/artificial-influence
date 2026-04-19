@@ -17,7 +17,7 @@ export interface NavigationItem {
 
 export type MegaNavBadge = "new" | "popular" | "beta"
 
-/** Phosphor icons for feature rows — clearer than generic brand SVGs for create/edit flows */
+/** Phosphor icons for feature rows, clearer than generic brand SVGs for create/edit flows */
 export type MegaNavPhosphorIcon =
   | "image"
   | "video"

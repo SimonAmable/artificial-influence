@@ -25,11 +25,11 @@ python scripts/create_motion_assets.py path/to/videos --no-llm -o motion_assets.
 ### Output
 
 JSON array of assets, each with:
-- `title` — LLM-inferred or sanitized name
-- `filePath` — full path to file
-- `fileName` — basename
-- `category` — always `"motion"`
-- `assetType` — always `"video"`
+- `title`, LLM-inferred or sanitized name
+- `filePath`, full path to file
+- `fileName`, basename
+- `category`, always `"motion"`
+- `assetType`, always `"video"`
 
 Import the output into your asset library or use it for bulk upload workflows.
 

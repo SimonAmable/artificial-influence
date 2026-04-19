@@ -45,7 +45,7 @@ export function AutomationLogoConnection({
           preserveAspectRatio="none"
           aria-hidden
         >
-          {/* Dash period 6+6=12px — must match globals.css automation-dash keyframes offset */}
+          {/* Dash period 6+6=12px, must match globals.css automation-dash keyframes offset */}
           <path
             d="M 10 36 L 210 36"
             stroke="rgb(255 255 255)"

@@ -290,8 +290,8 @@ function PayoutDialog({
               {formatMoney(accruedCents, 'usd')}{' '}
               <span className="text-xs text-muted-foreground font-normal">
                 {eligible
-                  ? '— eligible for payout'
-                  : `— $${(
+                  ? "Eligible for payout"
+                  : `$${(
                       (MIN_PAYOUT_USD * 100 - accruedCents) /
                       100
                     ).toFixed(2)} to go`}

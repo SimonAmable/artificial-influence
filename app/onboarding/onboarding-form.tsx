@@ -127,7 +127,7 @@ function ThemeMiniPreview({ variant }: { variant: "light" | "dark" }) {
   )
 }
 
-/** Moving primary glow — shared layoutId per step so selection animates between options. */
+/** Moving primary glow, shared layoutId per step so selection animates between options. */
 function choiceGlowLayoutId(step: number) {
   return `onboarding-choice-glow-step-${step}`
 }

@@ -1,7 +1,7 @@
 import type { EditorItem, EditorProject } from "./types"
 
 export type SnapTimelineOptions = {
-  /** Pixels per timeline frame — used to turn a pixel radius into a frame radius. */
+  /** Pixels per timeline frame, used to turn a pixel radius into a frame radius. */
   pxPerFrame: number
   /** When snapping is on, these frames attract the value if within range (playhead, clip edges). */
   snapFrames?: readonly number[]
@@ -12,7 +12,7 @@ export type SnapTimelineOptions = {
 /**
  * Quantizes to whole frames. When `snappingEnabled`, pulls toward the nearest
  * candidate in `snapFrames` if within a small pixel radius (magnetic snap).
- * Never snaps to whole-second grids — always frame-accurate.
+ * Never snaps to whole-second grids, always frame-accurate.
  */
 export function snapTimelineFrame(
   frame: number,

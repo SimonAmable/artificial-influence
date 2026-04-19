@@ -42,7 +42,7 @@ export default function BrandHubPage() {
             <div className="max-w-xl">
               <h1 className="font-serif text-2xl italic tracking-tight text-foreground md:text-3xl">Brand kits</h1>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Logos, colors, type, and voice in one place. Open a kit to edit it, or create a new one—blank or from a website.
+                Logos, colors, type, and voice in one place. Open a kit to edit it, or create a new one (blank or from a website).
               </p>
             </div>
             <Button
@@ -65,7 +65,7 @@ export default function BrandHubPage() {
                 ))
               : kits.length === 0 ? (
                   <p className="col-span-full rounded-2xl border border-dashed border-border bg-muted/30 px-6 py-12 text-center text-sm text-muted-foreground">
-                    No kits yet. Create a brand kit to get started—manually or from a website.
+                    No kits yet. Create a brand kit to get started (manually or from a website).
                   </p>
                 )
               : kits.map((kit) => (

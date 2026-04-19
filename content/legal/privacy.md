@@ -10,10 +10,10 @@ This Privacy Policy describes how UniCan (“we,” “us,” or “our”) hand
 
 ## Information we may collect
 
-- **Account information** — such as email address and authentication details you provide when you create or access an account.
-- **Usage data** — such as pages or features used, approximate timestamps, and diagnostic or performance data.
-- **Content you submit** — such as prompts, uploads, generated outputs, and other materials you choose to send through the Services, subject to how the product is built and configured.
-- **Technical data** — such as device or browser type, IP address, and cookies or similar technologies where applicable.
+- **Account information**, such as email address and authentication details you provide when you create or access an account.
+- **Usage data**, such as pages or features used, approximate timestamps, and diagnostic or performance data.
+- **Content you submit**, such as prompts, uploads, generated outputs, and other materials you choose to send through the Services, subject to how the product is built and configured.
+- **Technical data**, such as device or browser type, IP address, and cookies or similar technologies where applicable.
 
 ## How we use information
 

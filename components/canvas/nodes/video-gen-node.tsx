@@ -1115,10 +1115,10 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           {/* Input status indicators */}
           <div className="flex items-center gap-2 text-[10px] px-1">
             <span className={cn(nodeData.imageUrl ? "text-blue-400" : "text-zinc-500")}>
-              Image {nodeData.imageUrl ? "✓" : "—"}
+              Image {nodeData.imageUrl ? "✓" : "-"}
             </span>
             <span className={cn(nodeData.videoUrl ? "text-blue-400" : "text-zinc-500")}>
-              Video {nodeData.videoUrl ? "✓" : "—"}
+              Video {nodeData.videoUrl ? "✓" : "-"}
             </span>
           </div>
 
@@ -1505,7 +1505,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
               negativePromptValue={nodeData.negativePrompt || ""}
               onNegativePromptChange={(value) => nodeData.onDataChange?.(id, { negativePrompt: value })}
               showNegativePrompt={!!modelSupportsNegativePrompt}
-              placeholder="Describe the video — / for presets, @ for brand kits & assets."
+              placeholder="Describe the video, / for presets, @ for brand kits & assets."
               variant="toolbar"
               attachedRefs={promptAttachedRefs}
               onRefsChange={setPromptAttachedRefs}

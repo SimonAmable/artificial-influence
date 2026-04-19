@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
+import { runGenerationFollowUpResume } from "@/lib/chat/generation-follow-up-resume"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
+
+/** Agent follow-up resume can run a full tool loop after upload (same budget as /api/chat). */
+export const maxDuration = 300
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -86,6 +90,14 @@ function getGenerationFolder(type: PendingGenerationRow["type"]) {
   return type === "video" ? "video-generations" : "image-generations"
 }
 
+async function cancelPendingGenerationFollowUps(generationId: string) {
+  await supabaseAdmin
+    .from("generation_follow_ups")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("generation_id", generationId)
+    .eq("status", "pending")
+}
+
 async function uploadReplicateOutput(
   generation: PendingGenerationRow,
   outputUrl: string,
@@ -165,6 +177,7 @@ export async function POST(request: NextRequest) {
           finished_at: finishedAt,
         })
         .eq("id", pendingGeneration.id)
+      await cancelPendingGenerationFollowUps(pendingGeneration.id)
       await syncGenerationResultToPersistedChat({
         predictionId,
         supabase: supabaseAdmin,
@@ -183,6 +196,7 @@ export async function POST(request: NextRequest) {
           finished_at: finishedAt,
         })
         .eq("id", pendingGeneration.id)
+      await cancelPendingGenerationFollowUps(pendingGeneration.id)
       await syncGenerationResultToPersistedChat({
         predictionId,
         supabase: supabaseAdmin,
@@ -232,6 +246,7 @@ export async function POST(request: NextRequest) {
           finished_at: finishedAt,
         })
         .eq("id", pendingGeneration.id)
+      await cancelPendingGenerationFollowUps(pendingGeneration.id)
       await syncGenerationResultToPersistedChat({
         predictionId,
         supabase: supabaseAdmin,
@@ -288,6 +303,17 @@ export async function POST(request: NextRequest) {
       "type",
       pendingGeneration.type,
     )
+
+    if (pendingGeneration.chat_thread_id) {
+      try {
+        await runGenerationFollowUpResume({
+          supabase: supabaseAdmin,
+          generationId: pendingGeneration.id,
+        })
+      } catch (followUpError) {
+        console.error("[webhooks/replicate] generation follow-up resume failed:", followUpError)
+      }
+    }
 
     return NextResponse.json({ received: true })
   } catch (error) {

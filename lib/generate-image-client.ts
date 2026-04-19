@@ -6,7 +6,7 @@
 const POLL_INTERVAL_MS = 2500;
 const POLL_MAX_ATTEMPTS = 240; // ~10 min
 
-/** POST /api/generate-image 402 — plain Error so devtools don’t surface a custom class name. */
+/** POST /api/generate-image 402, plain Error so devtools don’t surface a custom class name. */
 function makeInsufficientCreditsError(message: string): Error {
   const err = new Error(message);
   err.name = 'InsufficientCreditsError';
@@ -24,7 +24,7 @@ export function isInsufficientCreditsMessage(message: string): boolean {
   return false;
 }
 
-/** Prefer over `instanceof` — safe across chunk splits; 402 errors use `name === 'InsufficientCreditsError'`. */
+/** Prefer over `instanceof`, safe across chunk splits; 402 errors use `name === 'InsufficientCreditsError'`. */
 export function isInsufficientCreditsError(err: unknown): boolean {
   return err instanceof Error && err.name === 'InsufficientCreditsError';
 }

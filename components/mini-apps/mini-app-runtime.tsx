@@ -46,7 +46,7 @@ function getNodeLabelDisplay(node: Node): string {
 function getPromptPlaceholder(node: Node, required: boolean): string {
   const label = getNodeLabelDisplay(node)
   const hint = required ? "REQUIRED" : "OPTIONAL"
-  return `${label} — ENTER YOUR INSTRUCTIONS (${hint})`
+  return `${label}, ENTER YOUR INSTRUCTIONS (${hint})`
 }
 
 function getUploadButtonText(): string {

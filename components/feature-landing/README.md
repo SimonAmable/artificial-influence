@@ -13,9 +13,9 @@ Server-rendered landings for logged-out visitors, tuned for SEO and GEO (generat
 
 Pass optional `slots` for custom sections without forking the template:
 
-- `afterHero` — e.g. `AutomationLogoConnection` on `/automations`
-- `beforeShowcase` / `afterShowcase` — around the bento block
-- `beforeFAQ` / `afterFAQ` — around the FAQ accordion
+- `afterHero`, e.g. `AutomationLogoConnection` on `/automations`
+- `beforeShowcase` / `afterShowcase`, around the bento block
+- `beforeFAQ` / `afterFAQ`, around the FAQ accordion
 
 ## Copy rules (GEO)
 
@@ -26,8 +26,8 @@ Pass optional `slots` for custom sections without forking the template:
 
 ## Files
 
-- `feature-landing.tsx` — composition and section order
-- `feature-landing-jsonld.tsx` — `WebPage`, `BreadcrumbList`, `FAQPage`, optional `SoftwareApplication` / `HowTo`
-- `feature-landing-hero.tsx` — landing-style hero (gradient, dot grid, uppercase headline, card TL;DR, media) plus answer-capsule **card grid** in the same section
-- `feature-landing-answer-capsules.tsx` — responsive `Card` grid (shadowed, site-aligned); `sectionTitle` prop for the heading above the grid
-- Bento (**client** — Phosphor icons use React context), comparison table, feature list, FAQ (client accordion), CTA, last updated
+- `feature-landing.tsx`, composition and section order
+- `feature-landing-jsonld.tsx`, `WebPage`, `BreadcrumbList`, `FAQPage`, optional `SoftwareApplication` / `HowTo`
+- `feature-landing-hero.tsx`, landing-style hero (gradient, dot grid, uppercase headline, card TL;DR, media) plus answer-capsule **card grid** in the same section
+- `feature-landing-answer-capsules.tsx`, responsive `Card` grid (shadowed, site-aligned); `sectionTitle` prop for the heading above the grid
+- Bento (**client**, Phosphor icons use React context), comparison table, feature list, FAQ (client accordion), CTA, last updated

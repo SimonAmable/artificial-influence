@@ -120,7 +120,7 @@ const STARTER_PROMPTS: { label: string; prompt: string }[] = [
   {
     label: "Verbose JSON from image (Nano Banana)",
     prompt:
-      "Turn this image into a detailed JSON prompt. Use the full verbose Nano Banana blueprint: top-level keys prompt (with main_subject, scene, style object with art_style/lighting/color_palette/camera/mood, details array, text_in_image, characters, products, background, negative_prompts), technical, references, workflow, notes_for_model. Be exhaustive—rich strings, many detail bullets, thorough negative_prompts, and concrete notes_for_model like the reference examples. Output one pretty-printed JSON code block only after a short preamble.",
+      "Turn this image into a detailed JSON prompt. Use the full verbose Nano Banana blueprint: top-level keys prompt (with main_subject, scene, style object with art_style/lighting/color_palette/camera/mood, details array, text_in_image, characters, products, background, negative_prompts), technical, references, workflow, notes_for_model. Be exhaustive: rich strings, many detail bullets, thorough negative_prompts, and concrete notes_for_model like the reference examples. Output one pretty-printed JSON code block only after a short preamble.",
   },
   {
     label: "Notes → client brief",
@@ -596,6 +596,47 @@ type ActivateSkillToolPart = {
     slug?: string
     status?: "not-found" | "ok" | "parse-error"
     title?: string | null
+  }
+  errorText?: string
+}
+
+type AwaitGenerationToolPart = {
+  type: "tool-awaitGeneration"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    generationId?: string
+    maxWaitSeconds?: number
+    pollIntervalSeconds?: number
+    predictionId?: string
+  }
+  output?: {
+    error?: string
+    generationId?: string
+    kind?: "image" | "video"
+    lastStatus?: "completed" | "failed" | "pending"
+    mediaId?: string
+    message?: string
+    mimeType?: string
+    status?: "completed" | "failed" | "timeout"
+    url?: string
+  }
+  errorText?: string
+}
+
+type ScheduleGenerationFollowUpToolPart = {
+  type: "tool-scheduleGenerationFollowUp"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    generationId?: string
+    plan?: string
+  }
+  output?: {
+    error?: string
+    generationId?: string
+    message?: string
+    status?: "failed" | "scheduled"
   }
   errorText?: string
 }
@@ -2609,6 +2650,131 @@ export function MessageParts({
                     </p>
                   ) : null}
                   {output?.message ? <p className="text-muted-foreground">{output.message}</p> : null}
+                </CardContent>
+              </Card>
+            )
+          }
+        }
+
+        if (part.type === "tool-scheduleGenerationFollowUp") {
+          const toolPart = part as ScheduleGenerationFollowUpToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+                  <CircleNotch className="h-4 w-4 animate-spin" />
+                  Scheduling automatic follow-up when generation finishes…
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card
+                key={`${message.id}-${index}`}
+                className="border-destructive/30 bg-destructive/5"
+              >
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Could not schedule follow-up</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-available") {
+            const output = toolPart.output
+            const ok = output?.status === "scheduled"
+            return (
+              <Card
+                key={`${message.id}-${index}`}
+                className={
+                  ok ? "border-border/60 bg-muted/10" : "border-destructive/30 bg-destructive/5"
+                }
+              >
+                <CardContent className="space-y-1 p-4 text-sm">
+                  <p className="font-medium">
+                    {ok ? "Follow-up scheduled" : "Follow-up not scheduled"}
+                  </p>
+                  {output?.generationId ? (
+                    <p className="font-mono text-xs text-muted-foreground">{output.generationId}</p>
+                  ) : null}
+                  {output?.message ? <p className="text-muted-foreground">{output.message}</p> : null}
+                  {output?.error ? <p className="text-destructive">{output.error}</p> : null}
+                </CardContent>
+              </Card>
+            )
+          }
+        }
+
+        if (part.type === "tool-awaitGeneration") {
+          const toolPart = part as AwaitGenerationToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            const waitSeconds = toolPart.input?.maxWaitSeconds
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+                  <CircleNotch className="h-4 w-4 animate-spin" />
+                  Waiting for generation to finish
+                  {typeof waitSeconds === "number" ? ` (up to ${waitSeconds}s)` : ""}…
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card
+                key={`${message.id}-${index}`}
+                className="border-destructive/30 bg-destructive/5"
+              >
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Wait failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-available") {
+            const output = toolPart.output
+            const status = output?.status
+            if (status === "completed") {
+              return (
+                <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+                  <CardContent className="space-y-1 p-4 text-sm">
+                    <p className="font-medium">
+                      {output?.kind === "video" ? "Video" : "Image"} ready
+                    </p>
+                    <p className="text-muted-foreground">Generation finished successfully.</p>
+                  </CardContent>
+                </Card>
+              )
+            }
+            if (status === "timeout") {
+              return (
+                <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                  <CardContent className="space-y-1 p-4 text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">Still generating…</p>
+                    <p>
+                      {output?.message ||
+                        "The chat UI will update when it completes. Feel free to keep going."}
+                    </p>
+                  </CardContent>
+                </Card>
+              )
+            }
+            return (
+              <Card
+                key={`${message.id}-${index}`}
+                className="border-destructive/30 bg-destructive/5"
+              >
+                <CardContent className="space-y-1 p-4 text-sm text-destructive">
+                  <p className="font-medium">Generation failed</p>
+                  <p>{output?.error || "Generation did not complete."}</p>
                 </CardContent>
               </Card>
             )

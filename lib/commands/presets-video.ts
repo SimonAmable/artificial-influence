@@ -1,6 +1,6 @@
 import type { CommandItem } from "./types"
 
-/** Slash palette for video prompts — same UI actions as image, plus short motion/camera presets. */
+/** Slash palette for video prompts, same UI actions as image, plus short motion/camera presets. */
 export const VIDEO_PRESET_COMMANDS: CommandItem[] = [
   {
     id: "action-create-asset",

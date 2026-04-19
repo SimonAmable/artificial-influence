@@ -80,7 +80,7 @@ export async function GET(request: Request) {
   return handleAutopostCron(request)
 }
 
-/** Same as GET — useful for manual curl with POST. */
+/** Same as GET, useful for manual curl with POST. */
 export async function POST(request: Request) {
   return handleAutopostCron(request)
 }

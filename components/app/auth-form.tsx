@@ -54,7 +54,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
   const [password, setPassword] = React.useState("")
   const [loading, setLoading] = React.useState(false)
   const [googleLoading, setGoogleLoading] = React.useState(false)
-  const [showEmailForm, setShowEmailForm] = React.useState(defaultMode === "signup")
+  const [showEmailForm, setShowEmailForm] = React.useState(false)
   const [activeShowcase, setActiveShowcase] = React.useState(0)
   const [error, setError] = React.useState<string | null>(null)
   const [message, setMessage] = React.useState<string | null>(null)
@@ -65,7 +65,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
 
   React.useEffect(() => {
     setMode(defaultMode)
-    setShowEmailForm(defaultMode === "signup")
+    setShowEmailForm(false)
     setError(null)
     setMessage(null)
   }, [defaultMode])
@@ -198,7 +198,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
   const activeItem = showcaseItems[activeShowcase]
 
   return (
-    <main className="h-svh overflow-hidden bg-[#060a0f] pt-14 text-white">
+    <main className="h-svh overflow-hidden bg-background pt-14 text-foreground">
       <div className="mx-auto grid h-full w-full max-w-[1800px] grid-cols-1 lg:grid-cols-2">
         <section className="flex items-center justify-center px-4 py-6 sm:px-6">
           <div className="flex w-full max-w-md flex-col">
@@ -211,7 +211,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                   <h1 className="text-3xl font-semibold tracking-tight ">
                     {mode === "login" ? "Log in to" : "Sign up for"} UniCan
                   </h1>
-                  <p className="text-base text-white/65">Sign in to continue</p>
+                  <p className="text-base text-muted-foreground">Sign in to continue</p>
                 </div>
               </div>
 
@@ -220,7 +220,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-14 w-full justify-center rounded-xl border-white/15 bg-white/[0.02] text-base text-white hover:bg-white/[0.06]"
+                    className="h-14 w-full justify-center rounded-xl border-border bg-muted/40 text-base text-foreground hover:bg-muted/70"
                     onClick={handleGoogleSignIn}
                     disabled={loading || googleLoading}
                   >
@@ -248,7 +248,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-14 w-full justify-center rounded-xl border-white/15 bg-white/[0.02] text-base text-white hover:bg-white/[0.06]"
+                    className="h-14 w-full justify-center rounded-xl border-border bg-muted/40 text-base text-foreground hover:bg-muted/70"
                     onClick={() => setShowEmailForm(true)}
                     disabled={loading || googleLoading}
                   >
@@ -267,7 +267,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={loading || googleLoading}
-                  className="h-14 rounded-xl border-white/15 bg-white/[0.02] text-base text-white placeholder:text-white/55 focus-visible:ring-primary/60"
+                  className="h-14 rounded-xl border-input bg-background text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/60"
                 />
                 <Input
                   id="password"
@@ -278,11 +278,11 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                   required
                   disabled={loading || googleLoading}
                   minLength={6}
-                  className="h-14 rounded-xl border-white/15 bg-white/[0.02] text-base text-white placeholder:text-white/55 focus-visible:ring-primary/60"
+                  className="h-14 rounded-xl border-input bg-background text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/60"
                 />
 
                 {error && (
-                  <p className="rounded-xl border border-red-400/25 bg-red-400/10 px-3 py-2 text-sm text-red-200">
+                  <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                     {error}
                   </p>
                 )}
@@ -295,7 +295,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
 
                 <Button
                   type="submit"
-                  className="h-14 w-full rounded-xl bg-white/[0.08] text-2xl font-semibold text-white hover:bg-white/[0.14]"
+                  className="h-14 w-full rounded-xl bg-primary text-2xl font-semibold text-primary-foreground hover:bg-primary/90"
                   disabled={loading || googleLoading}
                 >
                   {loading ? "Loading..." : mode === "login" ? "Log in" : "Sign up"}
@@ -305,7 +305,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                   <button
                     type="button"
                     onClick={handleBack}
-                    className="inline-flex items-center gap-1 text-sm font-semibold text-white/80 hover:text-white"
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground"
                   >
                     <ArrowLeftIcon className="size-4" />
                     Back
@@ -314,7 +314,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                     <button
                       type="button"
                       onClick={() => toast.info("Enter your email to receive a reset link.")}
-                      className="text-sm font-semibold text-white/80 hover:text-white"
+                      className="text-sm font-semibold text-muted-foreground hover:text-foreground"
                     >
                       Forgot password?
                     </button>
@@ -322,28 +322,28 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                 </div>
               </form>
 
-              <p className="text-center text-xl text-white/85">
-                {mode === "login" ? "Don\'t have an account? " : "Already have an account? "}
+              <p className="text-center text-xl text-foreground">
+                {mode === "login" ? "Don't have an account? " : "Already have an account? "}
                 <button
                   type="button"
                   onClick={toggleMode}
-                  className="font-semibold text-white underline underline-offset-4 hover:text-primary"
+                  className="font-semibold text-primary underline underline-offset-4 hover:text-primary/90"
                 >
                   {mode === "login" ? "Sign up" : "Sign in"}
                 </button>
               </p>
             </div>
 
-            <p className="mt-16 text-center text-xs text-white/55 sm:mt-24">
+            <p className="mt-16 text-center text-xs text-muted-foreground sm:mt-24">
               By continuing, I acknowledge the
               {" "}
-              <Link href="/privacy" className="underline underline-offset-2 hover:text-white">
+              <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
                 Privacy Policy
               </Link>
               {" "}
               and agree to the
               {" "}
-              <Link href="/terms" className="underline underline-offset-2 hover:text-white">
+              <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">
                 Terms of Use
               </Link>
               . I also confirm that I am at least 18 years old.
@@ -352,7 +352,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
         </section>
 
         <section className="hidden py-3 pr-3 pl-1 lg:flex lg:items-center lg:justify-center">
-          <div className="relative h-[calc(100vh-5rem)] w-full max-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-white/10 bg-black">
+          <div className="relative h-[calc(100vh-5rem)] w-full max-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-border bg-muted">
             {activeItem.media.type === "image" ? (
               <Image
                 src={activeItem.media.src}
@@ -374,7 +374,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
               </video>
             )}
 
-            <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black via-black/70 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-background via-background/70 to-transparent" />
 
             <div className="absolute inset-x-0 bottom-0 p-6">
               <div className="flex items-center gap-2">
@@ -384,7 +384,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                     type="button"
                     onClick={() => setActiveShowcase(index)}
                     aria-label={`Go to slide ${index + 1}`}
-                    className="group relative h-2.5 flex-1 overflow-hidden rounded-full bg-white/20 transition hover:bg-white/30"
+                    className="group relative h-2.5 flex-1 overflow-hidden rounded-full bg-foreground/20 transition hover:bg-foreground/30"
                   >
                     {index === activeShowcase ? (
                       <span

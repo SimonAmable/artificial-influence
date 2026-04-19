@@ -201,7 +201,7 @@ export function BrandKitNewFlowDialog({ open, onOpenChange }: BrandKitNewFlowDia
               </h2>
               <p className="mx-auto mt-3 max-w-md text-center text-[13px] leading-relaxed text-muted-foreground">
                 <span className="text-foreground">Business DNA</span> is your brand snapshot for AI and campaigns. Enter your
-                URL—we&apos;ll pull what&apos;s public and draft your kit (may take a few minutes).
+                URL. We&apos;ll pull what&apos;s public and draft your kit (may take a few minutes).
               </p>
 
               <div className="mt-6 space-y-3">
@@ -219,7 +219,7 @@ export function BrandKitNewFlowDialog({ open, onOpenChange }: BrandKitNewFlowDia
                   <span key={busy ? analysisStatusIndex : "idle"} className="text-center">
                     {busy
                       ? ANALYSIS_STATUS_MESSAGES[analysisStatusIndex]
-                      : "Enter your website URL — we'll analyze it next"}
+                      : "Enter your website URL. We'll analyze it next"}
                   </span>
                 </div>
 
@@ -254,7 +254,7 @@ export function BrandKitNewFlowDialog({ open, onOpenChange }: BrandKitNewFlowDia
               <p className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-primary/70">
                 <Circle className="h-3 w-3 shrink-0 text-primary/70" weight="regular" aria-hidden />
                 {busy
-                  ? "Hang tight — status above updates as we work through your site"
+                  ? "Hang tight: status above updates as we work through your site"
                   : "Analysis usually takes one to several minutes depending on the page"}
               </p>
             </div>

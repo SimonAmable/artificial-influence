@@ -34,7 +34,7 @@ export function ImagePromptFields({
   attachedRefs = [],
   onRefsChange = () => {},
   connectedPrompt,
-  placeholder = "Describe your image — use / for presets and @ for brand kits & assets.",
+  placeholder = "Describe your image, use / for presets and @ for brand kits & assets.",
   className,
   variant = "page",
   onPromptKeyDown,
@@ -49,9 +49,9 @@ export function ImagePromptFields({
 
   const placeholderResolved =
     isToolbar && connectedPrompt
-      ? "Add more — / for presets, @ for brand kits & assets."
+      ? "Add more, / for presets, @ for brand kits & assets."
       : isToolbar
-        ? "Type a prompt — / for presets, @ for brand kits & assets."
+        ? "Type a prompt, / for presets, @ for brand kits & assets."
         : placeholder
 
   const textareaClassName = cn(

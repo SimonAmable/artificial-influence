@@ -63,7 +63,7 @@
     opacity: 0;
     }
   }
-  /* Offset must equal dash+gap (one full pattern) or loops jump — see AutomationLogoConnection stroke-dasharray */
+  /* Offset must equal dash+gap (one full pattern) or loops jump, see AutomationLogoConnection stroke-dasharray */
   @keyframes automation-dash {
     from {
       stroke-dashoffset: 0;
@@ -213,7 +213,7 @@
 }
 
 /*
- * Scrollbars on nested scrollers only — not html/body.
+ * Scrollbars on nested scrollers only, not html/body.
  * Styling the page scroll with fixed width + buttons forces a classic scrollbar that
  * always eats layout width; the OS default on the document is usually overlay or slimmer.
  * Firefox: scrollbar-color thumb + transparent track.
@@ -354,7 +354,7 @@
   box-shadow: var(--shadow-s);
 }
 
-/* FAB / floating icon buttons — large depth (same tier as popovers; beats default button shadow-s) */
+/* FAB / floating icon buttons, large depth (same tier as popovers; beats default button shadow-s) */
 [data-slot="button"].shadow-depth-l {
   box-shadow: var(--shadow-l);
 }
@@ -379,7 +379,7 @@
   box-shadow: var(--shadow-s);
 }
 
-/* Outline/ghost + shadow-depth-l — explicit large depth (e.g. mobile floating toolbar) */
+/* Outline/ghost + shadow-depth-l, explicit large depth (e.g. mobile floating toolbar) */
 [data-slot="button"][data-variant="outline"].shadow-depth-l,
 [data-slot="button"][data-variant="ghost"].shadow-depth-l {
   box-shadow: var(--shadow-l);

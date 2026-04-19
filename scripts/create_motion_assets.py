@@ -2,7 +2,7 @@
 """
 Create motion asset records from a folder of video files.
 Uses an LLM to infer a short name from each filename.
-Output: JSON with title only (no description, no tags) — all assets are motion category.
+Output: JSON with title only (no description, no tags), all assets are motion category.
 
 Usage:
   python scripts/create_motion_assets.py <folder_path> [-o output.json]

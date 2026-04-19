@@ -29,7 +29,7 @@ type PricingPlan = {
   priceNote?: string;
 };
 
-// Stripe live Price IDs — Pro / Max only
+// Stripe live Price IDs, Pro / Max only
 const monthlyPlans: PricingPlan[] = [
   {
     id: 'pro-monthly',
@@ -64,6 +64,10 @@ const monthlyPlans: PricingPlan[] = [
       {
         name: '1 Instagram connection',
         info: 'Connect one Instagram account for publishing and related workflows',
+      },
+      {
+        name: 'Unlimited automations',
+        info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
       },
     ],
     popular: true,
@@ -106,6 +110,10 @@ const monthlyPlans: PricingPlan[] = [
         name: '10 Instagram connections',
         info: 'Connect up to ten Instagram accounts for teams, brands, or clients',
       },
+      {
+        name: 'Unlimited automations',
+        info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
+      },
     ],
   },
 ];
@@ -145,6 +153,10 @@ const yearlyPlans: PricingPlan[] = [
       {
         name: '1 Instagram connection',
         info: 'Connect one Instagram account for publishing and related workflows',
+      },
+      {
+        name: 'Unlimited automations',
+        info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
       },
     ],
     popular: true,
@@ -188,6 +200,10 @@ const yearlyPlans: PricingPlan[] = [
         name: '10 Instagram connections',
         info: 'Connect up to ten Instagram accounts for teams, brands, or clients',
       },
+      {
+        name: 'Unlimited automations',
+        info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
+      },
     ],
   },
 ];
@@ -201,7 +217,7 @@ function formatPlanCurrency(amount: number, currency: 'USD' | 'CAD') {
   return `${prefix}${body}`;
 }
 
-/* Experiment: hide Free tier — restore block + Free jump button + freeCardRef + xl:grid-cols-4
+/* Experiment: hide Free tier, restore block + Free jump button + freeCardRef + xl:grid-cols-4
 const freeFeatures: { name: string; info: string }[] = [
   {
     name: 'Sign up at no cost',
@@ -242,6 +258,10 @@ const enterpriseFeatures: { name: string; info: string }[] = [
   {
     name: 'Unlimited or custom Instagram connections',
     info: 'Typically unlimited Instagram accounts; we can also set a custom limit to match procurement or policy',
+  },
+  {
+    name: 'Unlimited automations',
+    info: 'No caps on autopost or workflow automations, scale scheduled jobs across your organization',
   },
 ];
 
@@ -392,7 +412,7 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* Plan navigation — jump + carousel arrows on small screens */}
+        {/* Plan navigation, jump + carousel arrows on small screens */}
         <div className="mb-4 flex flex-col items-center gap-3 sm:mb-6">
           <p className="text-sm text-muted-foreground sm:hidden">Jump to a plan</p>
           <div className="flex w-full max-w-lg flex-wrap items-center justify-center gap-2 sm:max-w-none">
@@ -454,7 +474,7 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* Pricing Cards: Pro | Max | Enterprise — mobile: snap carousel, one centered + peek */}
+        {/* Pricing Cards: Pro | Max | Enterprise, mobile: snap carousel, one centered + peek */}
         <div
           ref={carouselRef}
           className={[
@@ -465,7 +485,7 @@ export default function PricingPage() {
             'sm:snap-none lg:gap-8 xl:grid-cols-3',
           ].join(' ')}
         >
-          {/* Free tier — commented out for experiment; see freeFeatures + freeCardRef above */}
+          {/* Free tier, commented out for experiment; see freeFeatures + freeCardRef above */}
 
           {pricingPlans.map((plan) => {
             const listMonthly = monthlyPlans.find((p) => p.name === plan.name)?.price;

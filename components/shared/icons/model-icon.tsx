@@ -2,17 +2,12 @@
 
 import * as React from "react"
 import Image from "next/image"
+import { isAiMonochromeIconPath } from "@/lib/constants/ai-vendor-icons"
 import { getModelIconPath } from "@/lib/utils/model-icons"
 import { cn } from "@/lib/utils"
 
 /** Shown when no vendor icon exists for a model (same asset as `custom/character-swap`). */
 const FALLBACK_ICON_PATH = "/logo.svg"
-
-// Icons that are monochrome black and need inversion in dark mode
-const DARK_MODE_INVERT_ICONS = new Set([
-  "/ai_icons/grok.svg",
-  "/ai_icons/openai.svg",
-])
 
 interface ModelIconProps {
   identifier: string
@@ -30,14 +25,18 @@ export function ModelIcon({ identifier, size = 16, className }: ModelIconProps) 
         alt=""
         width={size}
         height={size}
-        className={cn("object-contain dark:invert", className)}
+        className={cn(
+          "object-contain",
+          isAiMonochromeIconPath(FALLBACK_ICON_PATH) && "brightness-0 dark:invert",
+          className
+        )}
         unoptimized
         aria-hidden
       />
     )
   }
-  
-  const needsInvert = DARK_MODE_INVERT_ICONS.has(iconPath)
+
+  const needsDarkContrast = isAiMonochromeIconPath(iconPath)
 
   return (
     <Image
@@ -45,7 +44,11 @@ export function ModelIcon({ identifier, size = 16, className }: ModelIconProps) 
       alt={`${identifier} icon`}
       width={size}
       height={size}
-      className={cn("object-contain", needsInvert && "dark:invert", className)}
+      className={cn(
+        "object-contain",
+        needsDarkContrast && "brightness-0 dark:invert",
+        className
+      )}
       unoptimized
     />
   )

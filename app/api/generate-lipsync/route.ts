@@ -303,7 +303,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     message:
-      'Lip Sync API — veed/fabric-1.0 (image + audio) or pixverse/lipsync (video + audio)',
+      'Lip Sync API, veed/fabric-1.0 (image + audio) or pixverse/lipsync (video + audio)',
     models: ['veed/fabric-1.0', 'pixverse/lipsync'],
     usage: {
       method: 'POST',

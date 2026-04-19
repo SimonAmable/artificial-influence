@@ -82,7 +82,7 @@ The Persona component responds to five distinct states, each triggering differen
 
 The Persona component uses WebGL2 for rendering. Browsers limit the number of active WebGL2 contexts (~8–16), and React Strict Mode (enabled by default in Vite dev) double-mounts components, which can exhaust that limit and crash the page.
 
-The component includes a built-in guard that defers WebGL2 initialization by one frame, preventing context creation during Strict Mode's throw-away mount. This means the component works in Vite dev mode out of the box — no configuration needed.
+The component includes a built-in guard that defers WebGL2 initialization by one frame, preventing context creation during Strict Mode's throw-away mount. This means the component works in Vite dev mode out of the box, no configuration needed.
 
 If you still experience crashes (for example, when rendering many Persona instances simultaneously), reduce the number of concurrent Persona components on screen.
 

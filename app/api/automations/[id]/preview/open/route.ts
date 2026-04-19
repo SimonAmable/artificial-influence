@@ -35,7 +35,7 @@ export async function POST(_req: Request, context: RouteContext) {
     }
 
     const messages = a.preview_thread as UIMessage[]
-    const title = `${a.name} — community preview`
+    const title = `${a.name}, community preview`
 
     const { data: threadRow, error: insErr } = await supabase
       .from("chat_threads")

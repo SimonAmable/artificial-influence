@@ -20,6 +20,7 @@ import {
   MusicNote,
   Images,
   UploadSimple,
+  ClockCounterClockwise,
 } from "@phosphor-icons/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -351,18 +352,12 @@ export default function AssetsPage() {
       </AnimatePresence>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold">Asset Library</h1>
-            <p className="text-muted-foreground mt-1">
-              Save references for characters, scenes, textures, thumbnails, motion clips, and audio.
+            <p className="text-muted-foreground mt-1 max-w-2xl">
+              Your saved library of reusable references, characters, scenes, textures, thumbnails, motion clips, and audio to drop into any project.
             </p>
-            <Link
-              href="/history"
-              className="text-sm font-medium text-primary hover:underline mt-2 inline-block"
-            >
-              Generation history
-            </Link>
           </div>
           <input
             ref={fileInputRef}
@@ -372,10 +367,18 @@ export default function AssetsPage() {
             aria-hidden
             onChange={handleFileSelect}
           />
-          <Button onClick={() => fileInputRef.current?.click()} className="gap-2">
-            <UploadSimple className="h-4 w-4" />
-            Upload
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" className="gap-2">
+              <Link href="/history">
+                <ClockCounterClockwise className="h-4 w-4" />
+                View full history
+              </Link>
+            </Button>
+            <Button onClick={() => fileInputRef.current?.click()} className="gap-2">
+              <UploadSimple className="h-4 w-4" />
+              Upload
+            </Button>
+          </div>
         </div>
 
         <Tabs value={visibility} onValueChange={(value) => setVisibility(value as AssetVisibility | "all")}>

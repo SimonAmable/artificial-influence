@@ -1298,7 +1298,7 @@ export const KLING_V3_OMNI_VIDEO_MODEL: Model = {
 };
 
 /**
- * ByteDance Seedance 2.0 — multimodal video with native audio
+ * ByteDance Seedance 2.0, multimodal video with native audio
  */
 export const SEEDANCE_2_0_VIDEO_MODEL: Model = {
   id: 'model-bytedance-seedance-2.0',

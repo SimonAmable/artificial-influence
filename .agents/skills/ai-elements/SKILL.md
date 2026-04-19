@@ -1,6 +1,6 @@
 ---
 name: ai-elements
-description: Build AI chat interfaces using ai-elements components — conversations, messages, tool displays, prompt inputs, and more. Use when the user wants to build a chatbot, AI assistant UI, or any AI-powered chat interface.
+description: Build AI chat interfaces using ai-elements components, conversations, messages, tool displays, prompt inputs, and more. Use when the user wants to build a chatbot, AI assistant UI, or any AI-powered chat interface.
 ---
 
 # AI Elements
@@ -9,7 +9,7 @@ description: Build AI chat interfaces using ai-elements components — conversat
 
 Installing AI Elements is straightforward and can be done in a couple of ways. You can use the dedicated CLI command for the fastest setup, or integrate via the standard shadcn/ui CLI if you've already adopted shadcn's workflow.
 
-> **IMPORTANT:** Run all CLI commands using the project's package runner: `npx ai-elements@latest`, `pnpm dlx ai-elements@latest`, or `bunx --bun ai-elements@latest` — based on the project's `packageManager`. Examples below use `npx ai-elements@latest` but substitute the correct runner for the project.
+> **IMPORTANT:** Run all CLI commands using the project's package runner: `npx ai-elements@latest`, `pnpm dlx ai-elements@latest`, or `bunx --bun ai-elements@latest`, based on the project's `packageManager`. Examples below use `npx ai-elements@latest` but substitute the correct runner for the project.
 
 ## Prerequisites
 
@@ -125,7 +125,7 @@ npx ai-elements@latest
 
 If all else fails, feel free to open an [issue on GitHub](https://github.com/vercel/ai-elements/issues).
 
-### Theme switching doesn’t work — my app stays in light mode
+### Theme switching doesn’t work, my app stays in light mode
 
 Ensure your app is using the same data-theme system that shadcn/ui and AI Elements expect. The default implementation toggles a data-theme attribute on the `<html>` element. Make sure your tailwind.config.js is using class or data- selectors accordingly.
 

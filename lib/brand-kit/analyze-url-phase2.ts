@@ -1,6 +1,6 @@
 /**
  * Optional Phase 2: swap in a hosted reader (Firecrawl, Jina Reader, etc.) when
- * Phase 1 returns empty or low-quality HTML. Not wired by default — set env and
+ * Phase 1 returns empty or low-quality HTML. Not wired by default; set env and
  * implement the fetcher for your vendor of choice.
  */
 export async function maybeFetchReaderMarkdown(_url: string): Promise<string | null> {

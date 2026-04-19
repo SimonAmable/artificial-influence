@@ -33,7 +33,7 @@ export function VideoPromptFields({
   negativePromptValue,
   onNegativePromptChange,
   showNegativePrompt = false,
-  placeholder = "Describe the video you want to generate — use / for presets and @ for brand kits & assets.",
+  placeholder = "Describe the video you want to generate, use / for presets and @ for brand kits & assets.",
   className,
   variant = "page",
   onPromptKeyDown,

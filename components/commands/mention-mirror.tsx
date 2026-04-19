@@ -9,7 +9,7 @@ import { valueToParts, type MentionPart } from "@/lib/commands/mention-segments"
 /** Re-export for callers that already imported from here */
 export { valueToParts, type MentionPart } from "@/lib/commands/mention-segments"
 
-/** Button size (px) — keep in sync with MentionRemoveOverlay button */
+/** Button size (px), keep in sync with MentionRemoveOverlay button */
 export const MENTION_REMOVE_BTN_PX = 14
 
 export type MentionControlLayout = {
@@ -33,7 +33,7 @@ function MentionTokenSpan({
   hoveredKey,
 }: {
   refItem: AttachedRef
-  /** Exact substring from the textarea (token + layout NBSP) — must match textarea width for caret alignment */
+  /** Exact substring from the textarea (token + layout NBSP), must match textarea width for caret alignment */
   segment: string
   mentionKey: string
   start: number

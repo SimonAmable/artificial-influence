@@ -1209,7 +1209,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           selectedNumImages={1}
           onNumImagesChange={() => {}}
           showNumImagesSelector={false}
-          placeholder="Describe your image — use / for presets and @ for brand kits & assets."
+          placeholder="Describe your image, use / for presets and @ for brand kits & assets."
           allowedAssetTypes={["image"]}
           isReadyOverride={
             [nodeData.connectedPrompt, nodeData.prompt].filter((p) => p?.trim()).join(" ").trim().length > 0 ||

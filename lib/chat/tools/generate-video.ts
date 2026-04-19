@@ -15,7 +15,7 @@ import { resolveToolImageReferences } from "@/lib/chat/resolve-tool-references"
 import { resolveToolVideoReferences } from "@/lib/chat/resolve-tool-video-references"
 
 const DEFAULT_TEXT_TO_VIDEO_MODEL = "kwaivgi/kling-v2.6" as const
-const DEFAULT_MOTION_COPY_MODEL = "kwaivgi/kling-v2.6-motion-control" as const
+const DEFAULT_MOTION_COPY_MODEL = "kwaivgi/kling-v3-motion-control" as const
 const MAX_REFERENCE_IMAGES = 4
 const MAX_REFERENCE_VIDEOS = 2
 const MAX_REFERENCE_AUDIOS = 3
@@ -280,7 +280,7 @@ export function createGenerateVideoTool({
 
   return tool({
     description:
-      "Generate a video using UniCan's active video models. Pass **reference images** via **referenceIds** (`ref_1`…`ref_N`, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or **mediaId** from listRecentGenerations). Pass **videos** via **referenceVideoIds** (`refv_1`…, same upl_/gen_ shapes). Pass **audio** via **referenceAudioIds** (`refa_1`…, same upl_/gen_ shapes). Deprecated alias for image refs: **mediaIds**. Use assetIds only for saved library assets. Nothing is auto-included from attachments—use the transcript manifest or listThreadMedia.",
+      "Generate a video using UniCan's active video models. Pass **reference images** via **referenceIds** (`ref_1`…`ref_N`, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or **mediaId** from listRecentGenerations). Pass **videos** via **referenceVideoIds** (`refv_1`…, same upl_/gen_ shapes). Pass **audio** via **referenceAudioIds** (`refa_1`…, same upl_/gen_ shapes). Deprecated alias for image refs: **mediaIds**. Use assetIds only for saved library assets. Nothing is auto-included from attachments. Use the transcript manifest or listThreadMedia.",
     inputSchema: z.object({
       prompt: z
         .string()
@@ -294,7 +294,7 @@ export function createGenerateVideoTool({
         .min(1)
         .max(120)
         .optional()
-        .describe("Active video model identifier. Defaults to kling-v2.6, or motion-control when both image and video references are present."),
+        .describe("Active video model identifier. Defaults to kling-v2.6, or kwaivgi/kling-v3-motion-control (Kling 3.0 motion copy) when both image and video references are present."),
       assetIds: z
         .array(z.string().uuid())
         .max(6)
@@ -334,7 +334,12 @@ export function createGenerateVideoTool({
       generateAudio: z.boolean().optional(),
       keepOriginalSound: z.boolean().optional(),
       mode: z.enum(["pro", "std"]).optional(),
-      characterOrientation: z.enum(["image", "video"]).optional(),
+      characterOrientation: z
+        .enum(["image", "video"])
+        .optional()
+        .describe(
+          "Kling motion-control only. 'video' (default) matches the reference video's orientation and allows reference videos up to 30s. 'image' keeps the still-image orientation but caps the reference video at 10s. Only pass 'image' if the user explicitly wants the character locked to the still image.",
+        ),
     }),
     strict: true,
     execute: async ({
@@ -561,7 +566,7 @@ export function createGenerateVideoTool({
           if (primaryVideo) replicateInput.video = primaryVideo
           if (mode) replicateInput.mode = mode
           if (keepOriginalSound !== undefined) replicateInput.keep_original_sound = keepOriginalSound
-          if (characterOrientation) replicateInput.character_orientation = characterOrientation
+          replicateInput.character_orientation = characterOrientation ?? "video"
           break
         case "veed/fabric-1.0":
           if (duration != null) replicateInput.duration = duration
@@ -680,6 +685,7 @@ export function createGenerateVideoTool({
           tool: "chat-generate-video",
           status: "pending",
           replicate_prediction_id: prediction.id,
+          ...(threadId ? { chat_thread_id: threadId } : {}),
         })
         .select("id")
         .single()

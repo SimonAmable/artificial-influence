@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
     const draft = await draftBrandFromPage(extraction, finalUrl, extraction.logoCandidates)
 
-    // Use `responseBody` (not `body`) — request JSON already uses `requestBody` above.
+    // Use `responseBody` (not `body`); request JSON already uses `requestBody` above.
     const responseBody = {
       draft,
       logoCandidates: extraction.logoCandidates,

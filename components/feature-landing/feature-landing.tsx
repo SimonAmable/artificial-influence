@@ -18,7 +18,11 @@ export function FeatureLanding({ config, slots }: Props) {
   return (
     <>
       <article className="min-h-dvh bg-background">
-        <FeatureLandingHero hero={config.hero} answerCapsules={config.answerCapsules} />
+        <FeatureLandingHero
+          hero={config.hero}
+          answerCapsules={config.answerCapsules}
+          answerCapsulesSectionTitle={config.answerCapsulesSectionTitle}
+        />
         {slots?.afterHero}
         {slots?.beforeShowcase}
         {config.bento ? <FeatureLandingBento bento={config.bento} /> : null}

@@ -1,4 +1,4 @@
--- ByteDance Seedance 2.0 (Replicate) — video model, 20 credits per generation
+-- ByteDance Seedance 2.0 (Replicate), video model, 20 credits per generation
 -- https://replicate.com/bytedance/seedance-2.0
 
 INSERT INTO public.models (

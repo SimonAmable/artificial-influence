@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { DotsThreeVertical, Download, Trash, Image as ImageIcon, Video, MusicNote } from "@phosphor-icons/react"
+import { DotsThreeVertical, Download, Trash, Image as ImageIcon, Video, MusicNote, FolderSimple } from "@phosphor-icons/react"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -265,17 +265,21 @@ export default function HistoryPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 pt-24 min-h-screen">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Generation History</h1>
-        <p className="text-muted-foreground mt-1">
-          Everything generated in the app — images, video, and audio.
-        </p>
-        <Link
-          href="/assets"
-          className="text-sm font-medium text-primary hover:underline mt-2 inline-block"
-        >
-          Asset library
-        </Link>
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-bold">Generation History</h1>
+          <p className="text-muted-foreground mt-1 max-w-2xl">
+            A complete timeline of everything you&apos;ve generated, images, video, and audio. Download what you want to keep, or save favorites to your asset library.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" className="gap-2">
+            <Link href="/assets">
+              <FolderSimple className="h-4 w-4" />
+              Go to asset library
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as GenerationType)}>

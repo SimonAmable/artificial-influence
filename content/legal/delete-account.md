@@ -26,7 +26,7 @@ If in-app self-service deletion is added later, this page should be updated to d
 
 ## What we delete
 
-Subject to applicable law and legitimate business needs, we will delete or anonymize personal information associated with your account. Some information may be retained where required—for example:
+Subject to applicable law and legitimate business needs, we will delete or anonymize personal information associated with your account. Some information may be retained where required, for example:
 
 - **Legal and security:** Records needed to comply with law, resolve disputes, or detect abuse.
 - **Backups:** Residual copies in backups may persist for a limited period until those backups rotate.

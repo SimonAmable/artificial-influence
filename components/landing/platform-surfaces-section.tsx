@@ -10,7 +10,7 @@ import type { LandingPlatformSurfaceCard } from "@/lib/types/landing"
 import { AutomationLogoConnection } from "@/components/landing/automation-logo-connection"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-/** Full-bleed layer on top of media — uses design-system largest depth (`--shadow-l` via `shadow-lg` in globals.css). */
+/** Full-bleed layer on top of media, uses design-system largest depth (`--shadow-l` via `shadow-lg` in globals.css). */
 const mediaSurfaceOverlayClass =
   "pointer-events-none absolute inset-0 z-10 rounded-xl shadow-lg"
 

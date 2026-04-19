@@ -392,7 +392,7 @@ export function BrandKitEditor({
           const err = await res.json().catch(() => ({}))
           throw new Error((err as { error?: string }).error || "Save failed")
         }
-        toast.success("Looks good — saved")
+        toast.success("Looks good. Saved.")
       }
       invalidateCommandCache()
       await load()
@@ -723,7 +723,7 @@ export function BrandKitEditor({
             </div>
           </div>
 
-          {/* Right column — reference images & videos */}
+          {/* Right column: reference images & videos */}
           <div className={cn(CARD, "relative flex min-h-[320px] flex-col lg:min-h-[480px]")}>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
               Images &amp; videos

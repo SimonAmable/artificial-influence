@@ -1,5 +1,5 @@
 /**
- * Pull literal colors from raw HTML (inline & <style> blocks) — no extra network.
+ * Pull literal colors from raw HTML (inline & <style> blocks); no extra network.
  * Returns normalized #RRGGBB values, deduped, order preserved.
  */
 
@@ -68,7 +68,7 @@ const BRANDISH_VAR = /brand|primary|accent|theme/i
 const TAILWIND_PALETTE_VAR =
   /(?:^|[-])(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|grey|zinc|neutral|stone)-(?:50|100|200|300|400|500|600|700|800|900|950)(?:\b|$)/i
 
-/** Broader semantic hints — still excludes TAILWIND_PALETTE_VAR via isLikelyDesignTokenVar. */
+/** Broader semantic hints; still excludes TAILWIND_PALETTE_VAR via isLikelyDesignTokenVar. */
 const SEMANTIC_VAR_HINT =
   /(?:^|[-])(?:brand|primary|secondary|accent|theme|foreground|background|muted|destructive|ring|border|card|popover|surface|chart|sidebar|link|heading|body|text|logo|main|canvas|inverse|selection|placeholder|focus|stroke|fill|icon|overlay|elevated|base|subtle|emphasis|highlight|ink|paint|header|footer|nav|menu|action|danger|success|warning|info|button|input|label|title|subtitle|caption|display|prose)(?:\b|[-_])/i
 
@@ -146,7 +146,7 @@ function mergeDedupedLists(lists: string[][]): string[] {
 }
 
 /**
- * Colors from `<style>` and inline `style=""` only — not raw HTML (SVG, ads, JSON).
+ * Colors from `<style>` and inline `style=""` only; not raw HTML (SVG, ads, JSON).
  * `<style>` may contain a full Tailwind build: only semantic custom properties there.
  * Arbitrary `#hex` / `rgb()` is limited to **inline attributes** (short, usually intentional).
  */

@@ -8,7 +8,7 @@ Migrate video components and canvas nodes to pull model data from the database (
 
 ## Phase 1: Video Components
 
-### 1.1 Video Model Parameters — Single Function (Refactor, Don't Duplicate)
+### 1.1 Video Model Parameters, Single Function (Refactor, Don't Duplicate)
 
 **File:** `lib/utils/video-model-parameters.ts`
 
@@ -24,9 +24,9 @@ Migrate video components and canvas nodes to pull model data from the database (
 - Base params: `input.parameters?.parameters ?? getModelParameters(input.identifier)`
 - Add first_frame, last_frame, negative_prompt if missing and flags set
 - Remove `ModelMetadata` import; use `Model` from `@/lib/types/models`
-- **One function** — no `buildVideoModelParametersFromModel` duplicate
+- **One function**, no `buildVideoModelParametersFromModel` duplicate
 
-### 1.2 VideoModelParameterControls — Require `videoModels`, Remove Fallback
+### 1.2 VideoModelParameterControls, Require `videoModels`, Remove Fallback
 
 **File:** `components/tools/video/video-model-parameter-controls.tsx`
 
@@ -36,7 +36,7 @@ Migrate video components and canvas nodes to pull model data from the database (
 - For each model, ensure params: `parameters: { parameters: buildVideoModelParameters(m) }` (in case DB has incomplete params)
 - Simpler: no conversion logic, no metadata
 
-### 1.3 VideoInputBox — Pass-Through Only
+### 1.3 VideoInputBox, Pass-Through Only
 
 **File:** `components/tools/video/video-input-box.tsx`
 
@@ -56,13 +56,13 @@ Migrate video components and canvas nodes to pull model data from the database (
 
 ## Phase 2: Canvas Nodes
 
-### 2.1 useModels Cache — Avoid Duplicate Fetches
+### 2.1 useModels Cache, Avoid Duplicate Fetches
 
 **File:** `hooks/use-models.ts`
 
 - Add module-level cache: `Map<ModelType | undefined, { models, timestamp }>`
 - On fetch success: cache by type; return cached if < 5 min old
-- Ensures multiple nodes (e.g. 2 video-gen nodes) share one fetch — no context needed
+- Ensures multiple nodes (e.g. 2 video-gen nodes) share one fetch, no context needed
 
 ### 2.2 Video Gen Node
 
@@ -108,11 +108,11 @@ Migrate video components and canvas nodes to pull model data from the database (
 
 ## Order of Execution
 
-1. **video-model-parameters.ts** — Refactor to accept Model-compatible input
-2. **use-models.ts** — Add cache
-3. **VideoModelParameterControls** — Require videoModels, remove metadata
-4. **VideoInputBox** — Add videoModels prop
-5. **Video page** — useModels, wire
-6. **video-gen-node** — useModels, remove metadata
-7. **image-gen-node** — useModels, remove image-models
-8. **Cleanup** — Delete image-models.ts, trim model-metadata.ts
+1. **video-model-parameters.ts**, Refactor to accept Model-compatible input
+2. **use-models.ts**, Add cache
+3. **VideoModelParameterControls**, Require videoModels, remove metadata
+4. **VideoInputBox**, Add videoModels prop
+5. **Video page**, useModels, wire
+6. **video-gen-node**, useModels, remove metadata
+7. **image-gen-node**, useModels, remove image-models
+8. **Cleanup**, Delete image-models.ts, trim model-metadata.ts

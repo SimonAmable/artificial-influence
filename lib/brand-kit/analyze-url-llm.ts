@@ -57,7 +57,7 @@ export async function draftBrandFromPage(
 ): Promise<BrandOnboardingObject> {
   const candidateBlock = logoCandidates.length
     ? logoCandidates.map((u, i) => `${i + 1}. ${u}`).join("\n")
-    : "(none — leave selectedLogoUrl null)"
+    : "(none: leave selectedLogoUrl null)"
 
   const themeLine = extraction.themeColorHint
     ? `HTML meta theme-color (use as a strong hint; expand to a full palette): ${extraction.themeColorHint}`
@@ -66,7 +66,7 @@ export async function draftBrandFromPage(
   const cssColorsBlock =
     extraction.extractedColorCandidates?.length
       ? extraction.extractedColorCandidates.join(", ")
-      : "(none — infer palette from title, description, and visible text only)"
+      : "(none: infer palette from title, description, and visible text only)"
 
   const prompt = `You are helping fill a brand kit from a public web page. Infer concrete, usable values for a design system.
 
@@ -76,10 +76,10 @@ Page title: ${extraction.title ?? "(unknown)"}
 Meta description: ${extraction.description ?? "(unknown)"}
 ${themeLine}
 
-Design-token and inline-style color candidates (from CSS variables like --primary / --brand and short inline styles — NOT an exhaustive dump of every color on the page). Prefer these #RRGGBB values when they clearly match the brand; otherwise infer from copy and theme-color:
+Design-token and inline-style color candidates (from CSS variables like --primary / --brand and short inline styles; NOT an exhaustive dump of every color on the page). Prefer these #RRGGBB values when they clearly match the brand; otherwise infer from copy and theme-color:
 ${cssColorsBlock}
 
-Logo / image candidates (you MUST NOT invent URLs — only pick selectedLogoUrl from this list or null):
+Logo / image candidates (you MUST NOT invent URLs; only pick selectedLogoUrl from this list or null):
 ${candidateBlock}
 
 Visible text (truncated):

@@ -106,7 +106,7 @@ export async function assertUrlSafeForFetch(href: string): Promise<URL> {
   }
 
   // Only treat *literal* IPs as IPs. Domain names (e.g. example.com) contain dots but
-  // must not go through isBlockedIp — that would mis-parse labels as octets and block everything.
+  // must not go through isBlockedIp; that would mis-parse labels as octets and block everything.
   if (net.isIP(u.hostname) !== 0 && isBlockedIp(u.hostname)) {
     throw new Error("Address not allowed")
   }

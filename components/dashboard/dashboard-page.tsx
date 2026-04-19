@@ -16,7 +16,7 @@ export function DashboardPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <div className="flex-1 px-4 pt-4">
-        {/* Hero Section with Carousel — hidden until showcase assets are updated */}
+        {/* Hero Section with Carousel, hidden until showcase assets are updated */}
         {/* <section className="mx-auto w-full pt-[60px]">
         <FeatureShowcaseCarousel />
       </section> */}

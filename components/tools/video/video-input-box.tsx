@@ -584,7 +584,7 @@ export function VideoInputBox({
               <div className="flex items-center gap-0.5">
                 <Sparkle size={8} weight="fill" />
                 <span className="text-[10px]">
-                  {selectedModel.model_cost != null ? selectedModel.model_cost : "—"}
+                  {selectedModel.model_cost != null ? selectedModel.model_cost : "-"}
                 </span>
               </div>
             </div>
@@ -692,7 +692,7 @@ export function VideoInputBox({
                     </span>
                     <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
                       {isWan27
-                        ? ".wav / .mp3 — optional sync audio for Wan 2.7 (3–30s per model docs)."
+                        ? ".wav / .mp3, optional sync audio for Wan 2.7 (3–30s per model docs)."
                         : ".wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a frame or reference video."}
                     </span>
                   </DropdownMenuItem>
@@ -765,7 +765,7 @@ export function VideoInputBox({
         <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] border-2 border-dashed border-primary bg-primary/20" />
       )}
       <CardContent className="p-2 flex flex-col gap-1.5">
-        {/* Image/Video Previews — manual uploads + @ library slots (same API fields) */}
+        {/* Image/Video Previews, manual uploads + @ library slots (same API fields) */}
         {((!isMotionCopyModel &&
           !isLipsyncModel &&
           (inputImage ||
@@ -1023,7 +1023,7 @@ export function VideoInputBox({
           <div className="px-2 space-y-1.5 border-t border-border/50 pt-2 mt-1">
             <p className="text-[11px] text-muted-foreground">
               {isSeedance2
-                ? `Seedance multimodal references — This row: extra stills as .jpg / .jpeg / .png (up to ${maxReferenceImages}; use [Image1], … in the prompt). Reference audio: add via either + as .wav / .mp3 / .m4a / .aac (~15s combined with other media; use [Audio1], …). Frames & reference video: use the bottom + for input/start image, last frame, or reference video (e.g. .mp4, .webm, .mov). Reference audio needs at least one of those image or video references.`
+                ? `Seedance multimodal references, This row: extra stills as .jpg / .jpeg / .png (up to ${maxReferenceImages}; use [Image1], … in the prompt). Reference audio: add via either + as .wav / .mp3 / .m4a / .aac (~15s combined with other media; use [Audio1], …). Frames & reference video: use the bottom + for input/start image, last frame, or reference video (e.g. .mp4, .webm, .mov). Reference audio needs at least one of those image or video references.`
                 : `Reference images for elements, scenes, or styles. Supports .jpg/.jpeg/.png. Max ${maxReferenceImages} without video, 4 with video.`}
             </p>
             <div className="flex flex-wrap items-center gap-2">
