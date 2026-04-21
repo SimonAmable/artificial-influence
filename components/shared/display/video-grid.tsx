@@ -3,8 +3,9 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
-import { Download } from "lucide-react"
+import { ArrowsOutSimple, DownloadSimple, FilmStrip, Plus } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 
 /** Row shape for completed videos (API + optimistic). */
 export interface VideoHistoryItem {
@@ -43,6 +44,8 @@ interface VideoGridProps {
    * Coarse pointer / no-hover devices keep controls always available.
    */
   showNativeControlsOnHoverOnly?: boolean
+  onUseVideoAsReference?: (videoUrl: string, index: number) => void
+  onSaveVideoAsAsset?: (videoUrl: string, index: number) => void
 }
 
 function displayTime(item: VideoHistoryItem): number {
@@ -67,13 +70,79 @@ function useFinePointerHoverDevice() {
   return React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 }
 
+async function downloadVideoFile(videoUrl: string) {
+  try {
+    const response = await fetch(videoUrl)
+    if (!response.ok) {
+      throw new Error("Failed to fetch video for download")
+    }
+    const blob = await response.blob()
+    const blobUrl = window.URL.createObjectURL(blob)
+    const ext =
+      blob.type.includes("webm") ? "webm" : blob.type.includes("quicktime") ? "mov" : "mp4"
+    const anchor = document.createElement("a")
+    anchor.href = blobUrl
+    anchor.download = `generated-video-${Date.now()}.${ext}`
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    window.URL.revokeObjectURL(blobUrl)
+  } catch {
+    const anchor = document.createElement("a")
+    anchor.href = videoUrl
+    anchor.download = `generated-video-${Date.now()}.mp4`
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+  }
+}
+
+function tryEnterVideoFullscreen(video: HTMLVideoElement) {
+  const v = video as HTMLVideoElement & {
+    webkitRequestFullscreen?: () => void
+    webkitEnterFullscreen?: () => void
+  }
+  const fallbackWebKit = () => {
+    if (typeof v.webkitEnterFullscreen === "function") {
+      v.webkitEnterFullscreen()
+      return true
+    }
+    if (typeof v.webkitRequestFullscreen === "function") {
+      v.webkitRequestFullscreen()
+      return true
+    }
+    return false
+  }
+  const run = async () => {
+    if (typeof video.requestFullscreen === "function") {
+      await video.requestFullscreen()
+      return
+    }
+    if (!fallbackWebKit()) {
+      toast.error("Fullscreen not supported in this browser")
+    }
+  }
+  void run().catch(() => {
+    if (!fallbackWebKit()) {
+      toast.error("Could not enter fullscreen")
+    }
+  })
+}
+
 function VideoHistoryTile({
   item,
+  index,
   showNativeControlsOnHoverOnly,
+  onUseVideoAsReference,
+  onSaveVideoAsAsset,
 }: {
   item: VideoHistoryItem
+  index: number
   showNativeControlsOnHoverOnly: boolean
+  onUseVideoAsReference?: (videoUrl: string, index: number) => void
+  onSaveVideoAsAsset?: (videoUrl: string, index: number) => void
 }) {
+  const videoRef = React.useRef<HTMLVideoElement>(null)
   const [hovered, setHovered] = React.useState(false)
   const [clientReady, setClientReady] = React.useState(false)
   const finePointer = useFinePointerHoverDevice()
@@ -96,6 +165,7 @@ function VideoHistoryTile({
     >
       <div className="absolute inset-0 z-0 overflow-hidden">
         <video
+          ref={videoRef}
           src={item.url}
           controls={nativeControlsVisible}
           className="block h-full w-full object-contain"
@@ -103,18 +173,71 @@ function VideoHistoryTile({
           preload="metadata"
         />
       </div>
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 to-transparent p-2 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 to-transparent p-2 pr-14 pt-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
         <p className="truncate text-xs font-medium text-white">{item.model ?? ""}</p>
         <p className="text-xs text-white/70">
           {displayTime(item) ? new Date(displayTime(item)).toLocaleString() : ""}
         </p>
       </div>
-      <div className="absolute bottom-2 right-2 z-10 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
-        <Button size="sm" variant="ghost" className="pointer-events-auto h-8 px-2 text-white hover:bg-white/20" asChild>
-          <a href={item.url} download>
-            <Download className="h-4 w-4" />
-          </a>
+
+      <div className="absolute right-2 top-2 z-20 flex flex-col items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100">
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+          onClick={(event) => {
+            event.stopPropagation()
+            const v = videoRef.current
+            if (v) tryEnterVideoFullscreen(v)
+          }}
+          aria-label="Fullscreen"
+        >
+          <ArrowsOutSimple className="size-3.5" />
         </Button>
+        {onSaveVideoAsAsset && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+            onClick={(event) => {
+              event.stopPropagation()
+              onSaveVideoAsAsset(item.url, index)
+            }}
+            aria-label="Save to asset library"
+          >
+            <Plus className="size-3.5" weight="bold" />
+          </Button>
+        )}
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+          onClick={(event) => {
+            event.stopPropagation()
+            void downloadVideoFile(item.url)
+          }}
+          aria-label="Download video"
+        >
+          <DownloadSimple className="size-3.5" />
+        </Button>
+        {onUseVideoAsReference && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+            onClick={(event) => {
+              event.stopPropagation()
+              onUseVideoAsReference(item.url, index)
+            }}
+            aria-label="Use as reference video"
+          >
+            <FilmStrip className="size-3.5" />
+          </Button>
+        )}
       </div>
     </div>
   )
@@ -146,6 +269,8 @@ export function VideoGrid({
   isLoadingSkeleton = false,
   className,
   showNativeControlsOnHoverOnly = false,
+  onUseVideoAsReference,
+  onSaveVideoAsAsset,
 }: VideoGridProps) {
   const [columnCount, setColumnCount] = React.useState(3)
 
@@ -234,7 +359,7 @@ export function VideoGrid({
             ))}
 
           {!showSkeletonOnly &&
-            items.map((item) =>
+            items.map((item, index) =>
               item.type === "generating" ? (
                 <div key={item.id} className="min-w-0 shrink-0">
                   <GeneratingCell />
@@ -246,7 +371,10 @@ export function VideoGrid({
                 >
                   <VideoHistoryTile
                     item={item.data}
+                    index={index}
                     showNativeControlsOnHoverOnly={showNativeControlsOnHoverOnly}
+                    onUseVideoAsReference={onUseVideoAsReference}
+                    onSaveVideoAsAsset={onSaveVideoAsAsset}
                   />
                 </div>
               ),

@@ -439,6 +439,7 @@ function VoicePresetCard({
   onPreviewToggle,
   compact = false,
   showPreviewButton = true,
+  minimalist = false,
 }: {
   provider: AudioProvider
   voice: AudioVoice | null
@@ -447,6 +448,7 @@ function VoicePresetCard({
   onPreviewToggle: () => void
   compact?: boolean
   showPreviewButton?: boolean
+  minimalist?: boolean
 }) {
   const name = voice?.displayName || voiceId || getDefaultAudioVoiceId(provider)
   const subtitle =
@@ -462,25 +464,30 @@ function VoicePresetCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/34">
-            Voice Preset
-          </p>
+          {!minimalist && (
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/34">
+              Voice Preset
+            </p>
+          )}
           <p
             className={cn(
-              "mt-1 truncate font-display font-bold uppercase tracking-tight text-primary",
-              compact ? "text-xl" : "text-2xl"
+              "truncate font-display font-bold uppercase tracking-tight text-primary",
+              minimalist ? "text-lg" : compact ? "text-xl" : "text-2xl",
+              !minimalist && "mt-1"
             )}
           >
             {name}
           </p>
-          <p
-            className={cn(
-              "mt-1 text-[11px] text-white/42",
-              compact ? "line-clamp-1" : "line-clamp-2"
-            )}
-          >
-            {subtitle}
-          </p>
+          {!minimalist && (
+            <p
+              className={cn(
+                "mt-1 text-[11px] text-white/42",
+                compact ? "line-clamp-1" : "line-clamp-2"
+              )}
+            >
+              {subtitle}
+            </p>
+          )}
         </div>
         {showPreviewButton ? (
           <button
@@ -506,13 +513,13 @@ function VoicePresetCard({
           </button>
         ) : null}
       </div>
-      <div className={cn("flex items-end gap-1", compact ? "mt-3" : "mt-4")}>
+      <div className={cn("flex items-end gap-1", minimalist ? "mt-2" : compact ? "mt-3" : "mt-4")}>
         {EQ_BARS.map((height, index) => (
           <span
             key={`${height}-${index}`}
             className="audio-eq-bar w-1 rounded-full bg-white/70"
             style={{
-              height: compact ? Math.max(8, Math.round(height * 0.55)) : height,
+              height: minimalist ? Math.max(4, Math.round(height * 0.35)) : compact ? Math.max(8, Math.round(height * 0.55)) : height,
               animationDelay: `${index * 70}ms`,
             }}
           />
@@ -1002,12 +1009,11 @@ export function AudioStudioPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 sm:px-6 md:px-8 md:pb-6">
         <div className="mx-auto max-w-[1180px]">
-          <div className="mb-2 px-1">
-            <ModeSelector mode={mode} onChange={setMode} />
-          </div>
           <div className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(29,31,35,0.96),rgba(21,23,27,0.96))] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
-              <div className="min-w-0 flex-1">
+            {/* Mobile: 3-row layout, Desktop: horizontal layout */}
+            <div className="flex flex-col gap-3 md:gap-3">
+              {/* Row 1: Prompt Box (full width on mobile, flex-1 on desktop) */}
+              <div className="min-w-0 md:flex-1">
                 <div className="rounded-[24px] border border-white/8 bg-black/14 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                   <DockPromptPanel
                     mode={mode}
@@ -1046,18 +1052,24 @@ export function AudioStudioPage() {
                 </div>
               </div>
 
+              {/* Desktop: Reference Video Chip */}
               {mode === "change-voice" ? (
-                <div className="lg:w-[220px] lg:shrink-0">
+                <div className="hidden md:block md:w-[220px] md:shrink-0">
                   <ReferenceVideoChip
                     value={referenceVideo}
-                    onChange={onReferenceVideoChange}
+                    onChange={(video) => {
+                      setReferenceVideo(video)
+                      if (error) setError(null)
+                    }}
                     disabled={isGenerating}
                   />
                 </div>
               ) : null}
 
-              <div className="lg:w-[220px] lg:shrink-0">
-                <div className="flex items-stretch">
+              {/* Row 2 (Mobile): Voice Selector + Mode Selector (stacked column) */}
+              <div className="flex flex-col gap-2 md:hidden">
+                {/* Voice Selector */}
+                <div className="min-w-0">
                   <AudioVoiceSelector
                     provider={provider}
                     className="min-w-0 flex-1"
@@ -1084,29 +1096,103 @@ export function AudioStudioPage() {
                             void handlePreviewToggle()
                           }}
                           compact
+                          minimalist
                         />
                       </div>
                     )}
                   />
                 </div>
+
+                {/* Mode Selector */}
+                <div>
+                  <ModeSelector mode={mode} onChange={setMode} />
+                </div>
               </div>
 
+              {/* Desktop layout: Voice + Mode + Reference Video + Generate */}
+              <div className="hidden md:flex md:flex-row md:items-stretch md:gap-3">
+                {/* Voice Selector */}
+                <div className="md:w-[220px] md:shrink-0">
+                  <div className="flex items-stretch">
+                    <AudioVoiceSelector
+                      provider={provider}
+                      className="min-w-0 flex-1"
+                      value={voiceId}
+                      onSelectedVoiceChange={setSelectedVoice}
+                      onValueChange={(nextVoiceId) => {
+                        setVoiceId(nextVoiceId)
+                        if (error) setError(null)
+                      }}
+                      renderTrigger={({ disabled }) => (
+                        <div
+                          aria-disabled={disabled}
+                          className={cn(
+                            "w-full text-left",
+                            disabled ? "cursor-not-allowed opacity-70" : undefined
+                          )}
+                        >
+                          <VoicePresetCard
+                            provider={provider}
+                            voice={selectedVoice}
+                            voiceId={voiceId}
+                            previewing={isVoicePreviewPlaying}
+                            onPreviewToggle={() => {
+                              void handlePreviewToggle()
+                            }}
+                            compact
+                          />
+                        </div>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Mode Selector (Desktop) */}
+                <div className="md:w-auto md:shrink-0 md:flex md:items-center">
+                  <div className="px-2">
+                    <ModeSelector mode={mode} onChange={setMode} />
+                  </div>
+                </div>
+
+                {/* Generate Button */}
+                <Button
+                  onClick={() => {
+                    void handleGenerate()
+                  }}
+                  disabled={!canGenerate || isGenerating || isEnhancing}
+                  className="md:min-h-[112px] md:w-[160px] md:shrink-0 rounded-[22px] bg-primary px-6 py-6 font-display text-lg font-bold uppercase tracking-[0.08em] text-primary-foreground shadow-lg transition-transform hover:translate-y-[-1px] hover:bg-primary/90 disabled:translate-y-0 disabled:bg-primary/55 disabled:text-primary-foreground/60"
+                >
+                  {isGenerating ? (
+                    <>
+                      <CircleNotch className="mr-2 size-5 animate-spin" />
+                      {mode === "voiceover" ? "Generating" : "Processing"}
+                    </>
+                  ) : (
+                    <>
+                      Generate
+                      <Sparkle className="ml-2 size-5" weight="fill" />
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Row 3 (Mobile): Generate Button (smaller, full width) */}
               <Button
                 onClick={() => {
                   void handleGenerate()
                 }}
                 disabled={!canGenerate || isGenerating || isEnhancing}
-                className="min-h-[92px] rounded-[22px] bg-primary px-6 py-6 font-display text-lg font-bold uppercase tracking-[0.08em] text-primary-foreground shadow-lg transition-transform hover:translate-y-[-1px] hover:bg-primary/90 disabled:translate-y-0 disabled:bg-primary/55 disabled:text-primary-foreground/60 lg:min-h-[112px] lg:w-[160px] lg:shrink-0"
+                className="md:hidden rounded-[20px] bg-primary px-4 py-3 font-display font-bold uppercase tracking-[0.08em] text-primary-foreground shadow-lg transition-transform hover:translate-y-[-1px] hover:bg-primary/90 disabled:translate-y-0 disabled:bg-primary/55 disabled:text-primary-foreground/60 text-sm"
               >
                 {isGenerating ? (
                   <>
-                    <CircleNotch className="mr-2 size-5 animate-spin" />
+                    <CircleNotch className="mr-2 size-4 animate-spin inline" />
                     {mode === "voiceover" ? "Generating" : "Processing"}
                   </>
                 ) : (
                   <>
                     Generate
-                    <Sparkle className="ml-2 size-5" weight="fill" />
+                    <Sparkle className="ml-2 size-4 inline" weight="fill" />
                   </>
                 )}
               </Button>

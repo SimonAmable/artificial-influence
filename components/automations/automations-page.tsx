@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns"
 import { FilePlus, FolderOpen, Plus as PlusPhosphor } from "@phosphor-icons/react"
 import {
   ArrowLeft,
+  CalendarClock,
   ChevronDown,
   Clock,
   Eye,
@@ -64,9 +65,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { InputGroup, InputGroupAddon } from "@/components/ui/input-group"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { VariablesEditor } from "@/components/automations/variables-editor"
@@ -143,6 +145,123 @@ const WEEKDAYS = [
   { value: "5", label: "Friday" },
   { value: "6", label: "Saturday" },
 ]
+
+const SCHEDULE_HOURS = Array.from({ length: 24 }, (_, i) => i)
+const SCHEDULE_MINUTES = Array.from({ length: 60 }, (_, i) => i)
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0")
+}
+
+function formatScheduleTime(hour: number, minute: number): string {
+  const normalizedHour = hour % 12 || 12
+  const suffix = hour >= 12 ? "PM" : "AM"
+  return `${normalizedHour}:${pad2(minute)} ${suffix}`
+}
+
+function describeScheduleControlLabel(input: {
+  presetTab: "presets" | "custom"
+  presetKind: InferredPreset["kind"]
+  dailyHour: number
+  dailyMinute: number
+  weeklyDow: number
+  weeklyHour: number
+  weeklyMinute: number
+}): string {
+  if (input.presetTab === "custom" || input.presetKind === "custom") {
+    return "Custom schedule"
+  }
+  switch (input.presetKind) {
+    case "hourly":
+      return "Hourly"
+    case "daily":
+      return `Daily at ${formatScheduleTime(input.dailyHour, input.dailyMinute)}`
+    case "weekly":
+      return `Weekly on ${WEEKDAYS.find((day) => Number(day.value) === input.weeklyDow)?.label ?? "Day"} at ${formatScheduleTime(
+        input.weeklyHour,
+        input.weeklyMinute,
+      )}`
+    default:
+      return "Schedule"
+  }
+}
+
+function slugifyAutomationVariableId(name: string): string {
+  const trimmed = name.trim()
+  const base = trimmed.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "")
+  let id = base.length > 0 ? base : "var"
+  if (!/^[a-zA-Z]/.test(id)) {
+    id = `v_${id}`
+  }
+  id = id.replace(/[^a-zA-Z0-9_-]/g, "")
+  if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(id)) {
+    id = "var"
+  }
+  return id
+}
+
+function makeNewAutomationVariable(existing: AutomationPromptVariable[]): AutomationPromptVariable {
+  const label = `Variable ${existing.length + 1}`
+  const base = slugifyAutomationVariableId(label)
+  const taken = new Set(existing.map((variable) => variable.id))
+
+  let id = base
+  let suffix = 1
+  while (taken.has(id)) {
+    id = `${base}_${suffix}`
+    suffix += 1
+  }
+
+  return {
+    id,
+    name: label,
+    mode: "random",
+    items: [],
+  }
+}
+
+function buildAutomationDescriptionPrompt(input: {
+  name: string
+  scheduleSummary: string
+  prompt: string
+}): string {
+  return [
+    "Write a short automation description for a product UI.",
+    "Return exactly 2 short lines.",
+    "Line 1 should say what the automation does.",
+    "Line 2 should mention cadence or output style.",
+    "Do not use bullets, numbering, labels, quotes, markdown, or emojis.",
+    "",
+    `Title: ${input.name}`,
+    `Schedule: ${input.scheduleSummary}`,
+    "Prompt:",
+    input.prompt,
+  ].join("\n")
+}
+
+function normalizeAutomationDescription(text: string): string {
+  const cleanedLines = text
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim().replace(/^[-*]\s*/, ""))
+    .filter(Boolean)
+
+  if (cleanedLines.length >= 2) {
+    return cleanedLines.slice(0, 2).join("\n")
+  }
+
+  const sentenceParts = cleanedLines
+    .join(" ")
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  if (sentenceParts.length >= 2) {
+    return sentenceParts.slice(0, 2).join("\n")
+  }
+
+  return cleanedLines.join(" ").trim()
+}
 
 function buildCronFromPreset(
   preset: InferredPreset["kind"],
@@ -264,6 +383,7 @@ export function AutomationsPage() {
   const [customCron, setCustomCron] = React.useState(CRON_PRESET_HOURLY)
   const [nextPreview, setNextPreview] = React.useState<string | null>(null)
   const [saving, setSaving] = React.useState(false)
+  const [variablesDialogOpen, setVariablesDialogOpen] = React.useState(false)
   const [editBaselineSnapshot, setEditBaselineSnapshot] = React.useState("")
   const needsEditBaselineCaptureRef = React.useRef(false)
   const [runningId, setRunningId] = React.useState<string | null>(null)
@@ -477,6 +597,7 @@ export function AutomationsPage() {
     setWeeklyMinute(0)
     setCustomCron(CRON_PRESET_HOURLY)
     setIsPublicAutomation(false)
+    setVariablesDialogOpen(false)
     setNewDialogOpen(true)
   }, [])
 
@@ -500,6 +621,7 @@ export function AutomationsPage() {
     setTimezone(a.timezone || getDefaultTimeZone())
     setModel(a.model ?? DEFAULT_CHAT_GATEWAY_MODEL)
     setIsPublicAutomation(a.is_public === true)
+    setVariablesDialogOpen(false)
     const inferred = inferPresetFromCron(a.cron_schedule)
     switch (inferred.kind) {
       case "hourly":
@@ -607,6 +729,32 @@ export function AutomationsPage() {
     })
   }, [])
 
+  const generateAutomationDescription = React.useCallback(
+    async (input: { name: string; prompt: string; scheduleSummary: string }) => {
+      const res = await fetch("/api/generate-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: buildAutomationDescriptionPrompt(input),
+        }),
+      })
+
+      const data = (await res.json().catch(() => ({}))) as { text?: string; error?: string }
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to generate description")
+      }
+
+      const descriptionText =
+        typeof data.text === "string" ? normalizeAutomationDescription(data.text) : ""
+      if (!descriptionText) {
+        throw new Error("Failed to generate description")
+      }
+
+      return descriptionText
+    },
+    [],
+  )
+
   const currentPromptPayload = React.useMemo((): AutomationPromptPayload => {
     const attachments: AutomationPromptAttachment[] = [
       ...savedAttachments,
@@ -699,7 +847,7 @@ export function AutomationsPage() {
   const save = async () => {
     if (isCommunityScope) return
     if (!name.trim() || !prompt.trim()) {
-      toast.error("Name and prompt are required")
+      toast.error("Title and prompt are required")
       return
     }
     if (uploadQueue.some((u) => u.isUploading)) {
@@ -727,15 +875,23 @@ export function AutomationsPage() {
       ],
       ...(vars.length > 0 ? { variables: vars } : {}),
     }
+    const scheduleSummary = describeCronHumanSummary(cron)
     setSaving(true)
     try {
+      const generatedDescription = await generateAutomationDescription({
+        name: name.trim(),
+        prompt: promptPayload.text,
+        scheduleSummary,
+      })
+      setDescription(generatedDescription)
+
       if (newDialogOpen) {
         const res = await fetch("/api/automations", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: name.trim(),
-            description: description.trim() || null,
+            description: generatedDescription,
             promptPayload,
             cronSchedule: cron,
             timezone,
@@ -762,7 +918,7 @@ export function AutomationsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: name.trim(),
-            description: description.trim() || null,
+            description: generatedDescription,
             promptPayload,
             cronSchedule: cron,
             timezone,
@@ -940,39 +1096,38 @@ export function AutomationsPage() {
   ) {
     const readOnly = opts.readOnly ?? false
     const showVisibility = opts.showVisibility ?? false
+    const scheduleModeValue = presetTab === "custom" ? "custom" : presetKind
+    const scheduleControlLabel = describeScheduleControlLabel({
+      presetTab,
+      presetKind,
+      dailyHour,
+      dailyMinute,
+      weeklyDow,
+      weeklyHour,
+      weeklyMinute,
+    })
+    const showVariableControls = !readOnly || automationVariables.length > 0
     return (
       <>
-      <fieldset disabled={readOnly} className="min-w-0 space-y-6 border-0 p-0 disabled:opacity-[0.92]">
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-name`}>Name</Label>
-        <Input
-          id={`${idPrefix}-name`}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Daily caption ideas"
-          disabled={readOnly}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-description`}>Description</Label>
-        <p className="text-xs text-muted-foreground">Just a note for you; helps you remember what this one does.</p>
-        <Textarea
-          id={`${idPrefix}-description`}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="e.g. Fresh Instagram caption ideas every morning"
-          rows={2}
-          className="min-h-[72px] resize-y"
-          disabled={readOnly}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-prompt`}>What should it do?</Label>
-        <p className="text-xs text-muted-foreground">
-          Write it like you're chatting. Type <kbd className="rounded border bg-muted px-1">/</kbd> for
-          ready-made templates, <kbd className="rounded border bg-muted px-1">@</kbd> to pull in your brand
-          or saved assets, or <kbd className="rounded border bg-muted px-1">+</kbd> to attach files.
-        </p>
+      <fieldset disabled={readOnly} className="min-w-0 border-0 p-0 disabled:opacity-[0.92]">
+      <div className="overflow-hidden rounded-[30px] border border-border/60 bg-background/95 shadow-[0_28px_80px_-40px_rgba(0,0,0,0.7)]">
+      <div className="space-y-4 px-5 pt-5 sm:px-6 sm:pt-6">
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-name`} className="sr-only">
+            Automation title
+          </Label>
+          <Input
+            id={`${idPrefix}-name`}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Automation title"
+            disabled={readOnly}
+            className="h-auto border-0 bg-transparent px-0 text-lg font-semibold shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-0 md:text-xl"
+          />
+          <p className="text-xs text-muted-foreground">
+            Keep the title short. The prompt does the heavy lifting.
+          </p>
+        </div>
         {(savedAttachments.length > 0 || uploadQueue.length > 0) && (
           <div className="flex flex-row flex-wrap gap-2">
             {savedAttachments.map((att) => {
@@ -980,19 +1135,19 @@ export function AutomationsPage() {
               return (
                 <div key={att.url} className="relative">
                   {kind === "image" ? (
-                    <div className="relative h-16 w-16 overflow-hidden rounded-lg border border-border bg-muted/40">
+                    <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-border bg-muted/40">
                       <img src={att.url} alt="" className="h-full w-full object-cover" />
                     </div>
                   ) : kind === "video" ? (
-                    <div className="relative h-16 w-16 overflow-hidden rounded-lg border border-border bg-muted/40">
+                    <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-border bg-muted/40">
                       <video src={att.url} muted playsInline className="h-full w-full object-cover" />
                     </div>
                   ) : kind === "audio" ? (
-                    <div className="flex h-16 min-w-[160px] max-w-[200px] items-center rounded-lg border border-border bg-muted/40 px-2">
+                    <div className="flex h-16 min-w-[180px] max-w-[220px] items-center rounded-2xl border border-border bg-muted/40 px-2">
                       <audio src={att.url} controls className="h-8 w-full" />
                     </div>
                   ) : (
-                    <Badge variant="outline" className="max-w-[200px] truncate">
+                    <Badge variant="outline" className="max-w-[220px] rounded-full px-3 py-1.5">
                       {att.filename ?? "File"}
                     </Badge>
                   )}
@@ -1009,7 +1164,10 @@ export function AutomationsPage() {
               )
             })}
             {uploadQueue.map((u) => (
-              <div key={u.id} className="relative inline-flex max-w-[220px] items-center gap-1 rounded-lg border border-border bg-muted/30 px-2 py-1.5 pr-7 text-xs">
+              <div
+                key={u.id}
+                className="relative inline-flex max-w-[240px] items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-1.5 pr-8 text-xs"
+              >
                 <span className="truncate" title={u.file.name}>
                   {u.file.name}
                 </span>
@@ -1019,7 +1177,7 @@ export function AutomationsPage() {
                 <button
                   type="button"
                   disabled={readOnly}
-                  className="absolute -top-1.5 -right-1.5 z-10 rounded-full border border-border bg-background p-1 shadow-sm hover:bg-destructive hover:text-destructive-foreground disabled:pointer-events-none disabled:opacity-50"
+                  className="absolute top-1/2 right-1 -translate-y-1/2 rounded-full p-1 hover:bg-destructive hover:text-destructive-foreground disabled:pointer-events-none disabled:opacity-50"
                   aria-label="Remove upload"
                   onClick={() => {
                     setUploadQueue((prev) => prev.filter((x) => x.id !== u.id))
@@ -1031,115 +1189,404 @@ export function AutomationsPage() {
             ))}
           </div>
         )}
-        <InputGroup className="items-end rounded-[22px] border-border/60 bg-background/95 p-1 shadow-sm has-[textarea]:rounded-[22px]">
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-prompt`} className="sr-only">
+            Prompt
+          </Label>
           <CommandTextarea
             value={prompt}
             onChange={setPrompt}
             refs={attachedRefs}
             onRefsChange={setAttachedRefs}
-            rows={6}
-            className="min-h-[120px] max-h-[220px] flex-1 px-3 py-2 font-mono text-sm"
-            placeholder="Describe what you want done each time this runs. Type / for templates, @ for brands and assets."
+            rows={10}
+            className="min-h-[240px] max-h-[420px] rounded-none border-0 bg-transparent px-0 py-0 font-mono text-sm leading-6 shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
+            placeholder="Add prompt e.g. create tomorrow's post ideas, captions, and image directions. Type / for templates, @ for brands and assets."
             slashCommands={AUTOMATION_SLASH_COMMANDS}
             slashCommandsContext="Automation"
             onPasteImage={(file) => void handleAttachFiles([file])}
           />
-          <InputGroupAddon align="block-end" className="justify-start gap-2 border-t border-border/40 pt-1.5">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(event) => {
-                const files = Array.from(event.target.files ?? [])
-                void handleAttachFiles(files)
-                if (fileInputRef.current) {
-                  fileInputRef.current.value = ""
-                }
-              }}
-            />
+        </div>
+      </div>
+
+      <div className="border-t border-border/50 px-4 py-3 sm:px-6">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? [])
+            void handleAttachFiles(files)
+            if (fileInputRef.current) {
+              fileInputRef.current.value = ""
+            }
+          }}
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="sm" aria-label="Attach files or assets">
+                <PlusPhosphor className="h-4 w-4" />
+                Attach
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" side="top" sideOffset={6}>
+              <DropdownMenuItem
+                onClick={() => {
+                  setAssetPickerForVariable(null)
+                  fileInputRef.current?.click()
+                }}
+              >
+                <FilePlus className="mr-2 size-4" />
+                Upload files
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setAssetPickerForVariable(null)
+                  setAssetModalOpen(true)
+                }}
+              >
+                <FolderOpen className="mr-2 size-4" />
+                Select asset
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {showVariableControls ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button type="button" variant="ghost" size="icon" aria-label="Attach files or assets">
-                  <PlusPhosphor className="h-4 w-4" />
-                  <span className="sr-only">Attach</span>
+                <Button type="button" variant="outline" size="sm">
+                  <Plus className="h-4 w-4" />
+                  {readOnly ? "Variables" : "Add variable"}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top" sideOffset={4}>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setAssetPickerForVariable(null)
-                    fileInputRef.current?.click()
-                  }}
-                >
-                  <FilePlus className="mr-2 size-4" />
-                  Upload files
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setAssetPickerForVariable(null)
-                    setAssetModalOpen(true)
-                  }}
-                >
-                  <FolderOpen className="mr-2 size-4" />
-                  Select asset
+              <DropdownMenuContent align="start" side="top" sideOffset={6}>
+                {!readOnly ? (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setAutomationVariables((prev) => [...prev, makeNewAutomationVariable(prev)])
+                      setVariablesDialogOpen(true)
+                    }}
+                  >
+                    <Plus className="mr-2 size-4" />
+                    New variable
+                  </DropdownMenuItem>
+                ) : null}
+                {automationVariables.length > 0 ? (
+                  <>
+                    <DropdownMenuLabel>{readOnly ? "Saved variables" : "Insert token"}</DropdownMenuLabel>
+                    {automationVariables.map((variable) => (
+                      <DropdownMenuItem
+                        key={variable.id}
+                        onClick={() => {
+                          if (readOnly) {
+                            setVariablesDialogOpen(true)
+                            return
+                          }
+                          insertVariableToken(`{{${variable.id}}}`)
+                        }}
+                      >
+                        <span className="truncate">{variable.name}</span>
+                        <span className="ml-auto font-mono text-[11px] text-muted-foreground">
+                          {`{{${variable.id}}}`}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                ) : null}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setVariablesDialogOpen(true)}>
+                  {readOnly ? "View variables" : "Manage variables"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Select value={model} onValueChange={setModel} disabled={readOnly}>
-              <SelectTrigger
-                id={`${idPrefix}-model`}
-                className="h-7 w-fit min-w-0 gap-1.5 px-2 text-xs"
-              >
-                <SelectValue placeholder="Select model">
-                  {(() => {
-                    const opt = CHAT_GATEWAY_MODEL_OPTIONS.find((o) => o.id === model)
-                    return (
-                      <div className="flex items-center gap-2">
-                        <ModelIcon identifier={model} size={14} />
-                        <span>{opt?.label ?? model}</span>
-                      </div>
-                    )
-                  })()}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent position="popper" side="top" sideOffset={4}>
-                {CHAT_GATEWAY_MODEL_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.id} value={opt.id}>
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-md border border-border bg-muted/30 p-1.5 shrink-0">
-                        <ModelIcon identifier={opt.id} size={18} />
-                      </div>
-                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="text-sm font-semibold">{opt.label}</span>
-                        <span className="text-xs text-muted-foreground">{opt.description}</span>
-                      </div>
+          ) : null}
+
+          <Select value={model} onValueChange={setModel} disabled={readOnly}>
+            <SelectTrigger id={`${idPrefix}-model`} className="min-w-[190px] bg-background/80">
+              <SelectValue placeholder="Select model">
+                {(() => {
+                  const opt = CHAT_GATEWAY_MODEL_OPTIONS.find((option) => option.id === model)
+                  return (
+                    <div className="flex items-center gap-2">
+                      <ModelIcon identifier={model} size={14} />
+                      <span>{opt?.label ?? model}</span>
                     </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </InputGroupAddon>
-        </InputGroup>
-        {!readOnly || automationVariables.length > 0 ? (
-          <VariablesEditor
-            variables={automationVariables}
-            onChange={readOnly ? () => {} : setAutomationVariables}
-            onInsertToken={insertVariableToken}
-            onRequestPickRef={(variableId, itemIndex) => {
-              if (readOnly) return
-              setAssetPickerForVariable({ variableId, itemIndex })
-              setAssetModalOpen(true)
-            }}
-            extraRefs={attachedRefs}
-            promptContext={prompt}
-            disabled={readOnly}
-            className="pt-2"
-          />
-        ) : null}
+                  )
+                })()}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent position="popper" side="top" sideOffset={6}>
+              {CHAT_GATEWAY_MODEL_OPTIONS.map((opt) => (
+                <SelectItem key={opt.id} value={opt.id}>
+                  <div className="flex items-center gap-3">
+                    <div className="shrink-0 rounded-md border border-border bg-muted/30 p-1.5">
+                      <ModelIcon identifier={opt.id} size={18} />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="text-sm font-semibold">{opt.label}</span>
+                      <span className="text-xs text-muted-foreground">{opt.description}</span>
+                    </div>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="min-w-[190px] justify-start">
+                <CalendarClock className="h-4 w-4" />
+                <span className="truncate">{scheduleControlLabel}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[min(92vw,360px)] space-y-4 p-4">
+              <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}-schedule-mode`} className="text-xs">
+                  Repeat
+                </Label>
+                <Select
+                  value={scheduleModeValue}
+                  onValueChange={(value) => {
+                    if (value === "custom") {
+                      setPresetTab("custom")
+                      return
+                    }
+                    setPresetTab("presets")
+                    setPresetKind(value as InferredPreset["kind"])
+                  }}
+                  disabled={readOnly}
+                >
+                  <SelectTrigger id={`${idPrefix}-schedule-mode`} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hourly">Hourly</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    {presetTab === "custom" ? <SelectItem value="custom">Custom cron</SelectItem> : null}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {presetTab === "custom" ? (
+                <div className="space-y-2">
+                  <Label htmlFor={`${idPrefix}-custom-cron`} className="text-xs">
+                    Custom cron
+                  </Label>
+                  <Textarea
+                    id={`${idPrefix}-custom-cron`}
+                    value={customCron}
+                    onChange={(e) => setCustomCron(e.target.value)}
+                    rows={3}
+                    className="font-mono text-xs"
+                    placeholder="0 0 * * * *"
+                    disabled={readOnly}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Power-user mode. Choose a preset above anytime to simplify this automation again.
+                  </p>
+                </div>
+              ) : null}
+
+              {presetTab !== "custom" && presetKind === "hourly" ? (
+                <p className="rounded-2xl border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                  Runs every hour on the hour.
+                </p>
+              ) : null}
+
+              {presetTab !== "custom" && presetKind === "daily" ? (
+                <div className="space-y-2">
+                  <Label className="text-xs">Time</Label>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={String(dailyHour)}
+                      onValueChange={(value) => setDailyHour(Number(value))}
+                      disabled={readOnly}
+                    >
+                      <SelectTrigger size="sm" className="w-[92px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="max-h-48">
+                        {SCHEDULE_HOURS.map((hour) => (
+                          <SelectItem key={hour} value={String(hour)}>
+                            {pad2(hour)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span className="text-muted-foreground">:</span>
+                    <Select
+                      value={String(dailyMinute)}
+                      onValueChange={(value) => setDailyMinute(Number(value))}
+                      disabled={readOnly}
+                    >
+                      <SelectTrigger size="sm" className="w-[92px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="max-h-48">
+                        {SCHEDULE_MINUTES.map((minute) => (
+                          <SelectItem key={minute} value={String(minute)}>
+                            {pad2(minute)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : null}
+
+              {presetTab !== "custom" && presetKind === "weekly" ? (
+                <div className="space-y-2">
+                  <Label className="text-xs">Weekly schedule</Label>
+                  <div className="grid gap-2 sm:grid-cols-[1.3fr_1fr_1fr]">
+                    <Select
+                      value={String(weeklyDow)}
+                      onValueChange={(value) => setWeeklyDow(Number(value))}
+                      disabled={readOnly}
+                    >
+                      <SelectTrigger size="sm" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WEEKDAYS.map((day) => (
+                          <SelectItem key={day.value} value={day.value}>
+                            {day.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={String(weeklyHour)}
+                      onValueChange={(value) => setWeeklyHour(Number(value))}
+                      disabled={readOnly}
+                    >
+                      <SelectTrigger size="sm" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="max-h-48">
+                        {SCHEDULE_HOURS.map((hour) => (
+                          <SelectItem key={hour} value={String(hour)}>
+                            {pad2(hour)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={String(weeklyMinute)}
+                      onValueChange={(value) => setWeeklyMinute(Number(value))}
+                      disabled={readOnly}
+                    >
+                      <SelectTrigger size="sm" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="max-h-48">
+                        {SCHEDULE_MINUTES.map((minute) => (
+                          <SelectItem key={minute} value={String(minute)}>
+                            {pad2(minute)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}-tz-popover`} className="text-xs">
+                  Timezone
+                </Label>
+                <Select value={timezone} onValueChange={setTimezone} disabled={readOnly}>
+                  <SelectTrigger id={`${idPrefix}-tz-popover`} className="w-full font-mono text-xs">
+                    <SelectValue placeholder="Select timezone" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[min(60dvh,320px)]">
+                    {ianaZones.map((tz) => (
+                      <SelectItem key={tz} value={tz} className="font-mono text-xs">
+                        {tz}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {showVisibility ? (
+            <div className="ml-auto flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1.5">
+              <Globe className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor={`${idPrefix}-is-public`} className="cursor-pointer text-sm">
+                Public
+              </Label>
+              <Switch
+                id={`${idPrefix}-is-public`}
+                checked={isPublicAutomation}
+                onCheckedChange={setIsPublicAutomation}
+                disabled={readOnly}
+              />
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5" />
+            {nextPreview ? (
+              <span>
+                Next run: <strong className="text-foreground">{nextPreview}</strong>
+              </span>
+            ) : (
+              <span>Pick a schedule to see when it will run next.</span>
+            )}
+          </div>
+          <span className="font-mono">{timezone}</span>
+          {automationVariables.length > 0 ? (
+            <span>
+              {automationVariables.length} variable{automationVariables.length === 1 ? "" : "s"} ready
+            </span>
+          ) : null}
+          {showVisibility && isPublicAutomation ? <span>Visible in Community</span> : null}
+        </div>
       </div>
+      </div>
+      </fieldset>
 
+      {showVariableControls ? (
+        <Dialog open={variablesDialogOpen} onOpenChange={setVariablesDialogOpen}>
+          <DialogContent className="max-h-[min(88dvh,900px)] overflow-y-auto sm:max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>{readOnly ? "Variables" : "Manage variables"}</DialogTitle>
+              <DialogDescription>
+                Keep the main automation UI focused on the prompt. Use this panel when you want to add,
+                rotate, or inspect variable values.
+              </DialogDescription>
+            </DialogHeader>
+            <VariablesEditor
+              variables={automationVariables}
+              onChange={readOnly ? () => {} : setAutomationVariables}
+              onInsertToken={insertVariableToken}
+              onRequestPickRef={(variableId, itemIndex) => {
+                if (readOnly) return
+                setAssetPickerForVariable({ variableId, itemIndex })
+                setAssetModalOpen(true)
+              }}
+              extraRefs={attachedRefs}
+              promptContext={prompt}
+              disabled={readOnly}
+            />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setVariablesDialogOpen(false)}>
+                Done
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
+      {false ? (
+        <>
+          <fieldset disabled={readOnly} className="min-w-0 space-y-6 border-0 p-0 disabled:opacity-[0.92]">
       {showVisibility ? (
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2">
@@ -1330,6 +1777,8 @@ export function AutomationsPage() {
         </div>
       </div>
       </fieldset>
+        </>
+      ) : null}
       </>
     )
   }
@@ -1460,7 +1909,9 @@ export function AutomationsPage() {
                       </div>
                     </div>
                     {a.description?.trim() ? (
-                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{a.description.trim()}</p>
+                      <p className="mt-0.5 line-clamp-2 whitespace-pre-line text-xs text-muted-foreground">
+                        {a.description.trim()}
+                      </p>
                     ) : null}
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                       {describeCronHumanSummary(a.cron_schedule)}
@@ -1494,7 +1945,9 @@ export function AutomationsPage() {
               <div>
                 <CardTitle>{selected.name}</CardTitle>
                 {selected.description?.trim() ? (
-                  <p className="mt-1 text-sm leading-snug text-muted-foreground">{selected.description.trim()}</p>
+                  <p className="mt-1 whitespace-pre-line text-sm leading-snug text-muted-foreground">
+                    {selected.description.trim()}
+                  </p>
                 ) : null}
                 <CardDescription>
                   Runs on its own, on the schedule you pick. Each run becomes a chat you can open to see
@@ -1931,11 +2384,12 @@ export function AutomationsPage() {
           setNewDialogOpen(open)
           if (!open) {
             lastHydratedId.current = null
+            setVariablesDialogOpen(false)
           }
         }}
       >
-        <DialogContent className="max-h-[min(90dvh,900px)] gap-0 overflow-y-auto sm:max-w-xl">
-          <DialogHeader>
+        <DialogContent className="max-h-[min(90dvh,900px)] gap-0 overflow-y-auto sm:max-w-4xl">
+          <DialogHeader className="sr-only">
             <DialogTitle>New automation</DialogTitle>
             <DialogDescription>
               Set up a task once and it'll run on its own. Every run becomes a chat you can open to

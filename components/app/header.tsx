@@ -199,6 +199,23 @@ function HeaderMenuItem({ item, onSelect }: { item: MegaNavItem; onSelect: (path
   )
 }
 
+function useFinePointerHoverDevice() {
+  const subscribe = React.useCallback((onStoreChange: () => void) => {
+    const mq = window.matchMedia("(hover: hover) and (pointer: fine)")
+    mq.addEventListener("change", onStoreChange)
+    return () => mq.removeEventListener("change", onStoreChange)
+  }, [])
+
+  const getSnapshot = React.useCallback(
+    () => window.matchMedia("(hover: hover) and (pointer: fine)").matches,
+    [],
+  )
+
+  const getServerSnapshot = React.useCallback(() => false, [])
+
+  return React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+}
+
 export function Header() {
   const pathname = usePathname()
   const router = useRouter()
@@ -225,6 +242,7 @@ export function Header() {
   const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const [assetsMenuOpen, setAssetsMenuOpen] = React.useState(false)
   const assetsCloseTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const supportsHoverDropdowns = useFinePointerHoverDevice()
 
   const assetsMegaGroup = React.useMemo(
     () => megaNavGroups.find((group) => group.label === "Assets"),
@@ -406,36 +424,56 @@ export function Header() {
                   key={group.label}
                   open={isOpen}
                   onOpenChange={(open) => {
-                    if (!open && isOpen) setOpenGroupLabel(null)
+                    clearCloseTimer()
+                    setOpenGroupLabel(open ? group.label : isOpen ? null : openGroupLabel)
                   }}
                 >
                   <DropdownMenuTrigger asChild>
-                    <div
-                      onPointerEnter={() => {
-                        clearCloseTimer()
-                        setOpenGroupLabel(group.label)
-                      }}
-                      onPointerLeave={scheduleClose}
-                      className={cn(
-                        "inline-flex h-8 items-center gap-1 rounded-md px-3 text-sm font-bold text-foreground transition-colors hover:text-primary",
-                        active && "text-primary"
-                      )}
-                    >
-                      <Link href={groupPath} className="inline-flex items-center gap-2">
+                    {supportsHoverDropdowns ? (
+                      <div
+                        onPointerEnter={() => {
+                          clearCloseTimer()
+                          setOpenGroupLabel(group.label)
+                        }}
+                        onPointerLeave={scheduleClose}
+                        className={cn(
+                          "inline-flex h-8 items-center gap-1 rounded-md px-3 text-sm font-bold text-foreground transition-colors hover:text-primary",
+                          active && "text-primary"
+                        )}
+                      >
+                        <Link href={groupPath} className="inline-flex items-center gap-2">
+                          <span>{group.label}</span>
+                          {group.badge ? <MenuBadge badge={group.badge} /> : null}
+                        </Link>
+                        <CaretDownIcon className="h-3.5 w-3.5 opacity-60" />
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        aria-expanded={isOpen}
+                        className={cn(
+                          "inline-flex h-8 items-center gap-1 rounded-md px-3 text-sm font-bold text-foreground transition-colors hover:text-primary",
+                          active && "text-primary"
+                        )}
+                      >
                         <span>{group.label}</span>
                         {group.badge ? <MenuBadge badge={group.badge} /> : null}
-                      </Link>
-                      <CaretDownIcon className="h-3.5 w-3.5 opacity-60" />
-                    </div>
+                        <CaretDownIcon className="h-3.5 w-3.5 opacity-60" />
+                      </button>
+                    )}
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="start"
                     className={cn("p-3", widthClass)}
                     onPointerEnter={() => {
+                      if (!supportsHoverDropdowns) return
                       clearCloseTimer()
                       setOpenGroupLabel(group.label)
                     }}
-                    onPointerLeave={scheduleClose}
+                    onPointerLeave={() => {
+                      if (!supportsHoverDropdowns) return
+                      scheduleClose()
+                    }}
                   >
                     {isSimple ? (
                       <div className="space-y-1">
@@ -536,44 +574,34 @@ export function Header() {
                 }}
               >
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="secondary"
-                    asChild
-                    onPointerEnter={(e) => {
-                      if (e.pointerType === "touch") return
-                      clearAssetsCloseTimer()
-                      setAssetsMenuOpen(true)
-                    }}
-                    onPointerLeave={(e) => {
-                      if (e.pointerType === "touch") return
-                      scheduleAssetsClose()
-                    }}
-                  >
-                    <Link
-                      href="/assets"
-                      onClick={(e) => {
-                        const native = e.nativeEvent as PointerEvent
-                        const pointerType =
-                          typeof native.pointerType === "string" ? native.pointerType : ""
-                        if (pointerType === "touch" || pointerType === "pen") {
-                          e.preventDefault()
-                          setAssetsMenuOpen((prev) => !prev)
-                        }
+                  {supportsHoverDropdowns ? (
+                    <Button
+                      variant="secondary"
+                      asChild
+                      onPointerEnter={() => {
+                        clearAssetsCloseTimer()
+                        setAssetsMenuOpen(true)
                       }}
+                      onPointerLeave={scheduleAssetsClose}
                     >
+                      <Link href="/assets">Assets</Link>
+                    </Button>
+                  ) : (
+                    <Button type="button" variant="secondary" aria-expanded={assetsMenuOpen}>
                       Assets
-                    </Link>
-                  </Button>
+                    </Button>
+                  )}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
                   className="w-80 p-3"
                   onPointerEnter={() => {
+                    if (!supportsHoverDropdowns) return
                     clearAssetsCloseTimer()
                     setAssetsMenuOpen(true)
                   }}
-                  onPointerLeave={(e) => {
-                    if (e.pointerType === "touch") return
+                  onPointerLeave={() => {
+                    if (!supportsHoverDropdowns) return
                     scheduleAssetsClose()
                   }}
                 >

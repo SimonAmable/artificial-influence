@@ -123,8 +123,9 @@ const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
 const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
   full_character:
     "Character swap task using two reference images. First image is the reference character. " +
-    "Second image is the reference scene. Place the character from the first image into the scene from the second image. " +
-    "Preserve the character's facial identity, hairstyle, body shape, and skin tone from the first image. " +
+    "Second image is the reference scene and pose. Place the character from the first image into the scene from the second image. " +
+    "Preserve the character's facial identity, hairstyle, body shape, skin tone, clothing, outfit, and accessories from the first image. " +
+    "Strictly preserve the exact pose, body positioning, limb placement, gesture, and overall stance from the second image. " +
     "Preserve scene composition, camera angle, environment layout, and lighting mood from the second image. " +
     "Blend naturally with correct perspective, realistic scale, contact shadows, reflections, and occlusion.",
   identity_only:

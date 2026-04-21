@@ -142,13 +142,13 @@ export function CharacterSwapInputBox({
             value={characterImage}
             onChange={onCharacterImageChange}
             title="Reference Character"
-            description="Upload character image"
+            description="Upload character, outfit, and identity image"
           />
           <PhotoUpload
             value={sceneImage}
             onChange={onSceneImageChange}
-            title="Reference Scene"
-            description="Upload scene image"
+            title="Reference Scene / Pose"
+            description="Upload scene, framing, and pose image"
           />
 
           <AnimatePresence>

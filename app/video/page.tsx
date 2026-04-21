@@ -27,6 +27,7 @@ import { getVideoChipSlotInfo } from "@/lib/commands/video-chip-slots"
 import { generateVideoAndWait } from "@/lib/generate-video-client"
 import type { VideoGridItem, VideoHistoryItem } from "@/components/shared/display/video-grid"
 import { toast } from "sonner"
+import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 
 interface PendingVideoRequest {
   clientRequestId: string
@@ -156,6 +157,10 @@ function VideoPageContent() {
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
   const [, setHistoryError] = React.useState<string | null>(null)
   const [attachedCommandRefs, setAttachedCommandRefs] = React.useState<AttachedRef[]>([])
+  const [createAssetDialogOpen, setCreateAssetDialogOpen] = React.useState(false)
+  const [selectedVideoForAsset, setSelectedVideoForAsset] = React.useState<{ url: string; index: number } | null>(
+    null,
+  )
   const historyAbortRef = React.useRef<AbortController | null>(null)
   const historyRequestIdRef = React.useRef(0)
   const isGenerating = pendingRequests.length > 0
@@ -814,6 +819,17 @@ function VideoPageContent() {
     })()
   }
 
+  const handleUseVideoAsReference = React.useCallback((videoUrl: string) => {
+    setInputVideo({ url: videoUrl })
+    setError(null)
+    toast.success("Reference video set")
+  }, [])
+
+  const handleSaveVideoAsAsset = React.useCallback((videoUrl: string, index: number) => {
+    setSelectedVideoForAsset({ url: videoUrl, index })
+    setCreateAssetDialogOpen(true)
+  }, [])
+
   // Render showcase
   const renderShowcase = () => {
     const hasItems = gridItems.length > 0
@@ -826,6 +842,8 @@ function VideoPageContent() {
             isHistoryLoading && historyVideos.length === 0 && pendingRequests.length === 0
           }
           showNativeControlsOnHoverOnly
+          onUseVideoAsReference={handleUseVideoAsReference}
+          onSaveVideoAsAsset={handleSaveVideoAsAsset}
         />
       )
     }
@@ -1029,6 +1047,26 @@ function VideoPageContent() {
           )}
         </GeneratorLayout>
       </div>
+
+      {selectedVideoForAsset && (
+        <CreateAssetDialog
+          open={createAssetDialogOpen}
+          onOpenChange={(open) => {
+            setCreateAssetDialogOpen(open)
+            if (!open) {
+              setSelectedVideoForAsset(null)
+            }
+          }}
+          initial={{
+            title: `Generated Video ${selectedVideoForAsset.index + 1}`,
+            url: selectedVideoForAsset.url,
+            assetType: "video",
+          }}
+          onSaved={() => {
+            setSelectedVideoForAsset(null)
+          }}
+        />
+      )}
     </div>
   )
 }
