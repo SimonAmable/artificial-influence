@@ -9,6 +9,7 @@ import { Chat, useChat } from "@ai-sdk/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowUp,
+  Books,
   CircleNotch,
   ClockCounterClockwise,
   FilePlus,
@@ -17,6 +18,7 @@ import {
   NotePencil,
   Palette,
   Plus,
+  Sparkle,
   X,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
@@ -26,7 +28,12 @@ import { Message, MessageContent, MessageResponse } from "@/components/ai-elemen
 import { Shimmer } from "@/components/ai-elements/shimmer"
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion"
 import { ImageGrid } from "@/components/shared/display/image-grid"
-import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
+import {
+  AssetSelectionModal,
+  type AssetSelectionPick,
+} from "@/components/shared/modals/asset-selection-modal"
+import { SkillLoadModal } from "@/components/chat/skill-load-modal"
+import { countUniqueSkillsLoadedInMessages } from "@/lib/chat/skills/loaded-in-messages"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
@@ -2809,6 +2816,7 @@ export function CreativeAgentChat({
   const searchParams = useSearchParams()
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
   const [assetModalOpen, setAssetModalOpen] = React.useState(false)
+  const [skillLoadModalOpen, setSkillLoadModalOpen] = React.useState(false)
   const [composerDropActive, setComposerDropActive] = React.useState(false)
   const [userId, setUserId] = React.useState<string | null>(null)
   const [authReady, setAuthReady] = React.useState(false)
@@ -2818,6 +2826,7 @@ export function CreativeAgentChat({
   const [instagramConnections, setInstagramConnections] = React.useState<InstagramConnectionToolSummary[]>([])
   const [threadId, setThreadId] = React.useState<string | undefined>(initialThreadId)
   const [isCreatingThread, setIsCreatingThread] = React.useState(false)
+  const [isEnhancingComposer, setIsEnhancingComposer] = React.useState(false)
   const initialChatId = React.useMemo(() => initialThreadId ?? "creative-chat-draft", [initialThreadId])
   const threadIdRef = React.useRef<string | undefined>(initialThreadId)
   const chatGatewayModelRef = React.useRef<string>(DEFAULT_CHAT_GATEWAY_MODEL)
@@ -2881,6 +2890,11 @@ export function CreativeAgentChat({
     chat,
     experimental_throttle: 50,
   })
+
+  const loadedSkillsCount = React.useMemo(
+    () => countUniqueSkillsLoadedInMessages(messages),
+    [messages],
+  )
 
   React.useEffect(() => {
     const supabase = createSupabaseClient()
@@ -3068,8 +3082,8 @@ export function CreativeAgentChat({
     )
   }, [])
 
-  const handleAssetLibrarySelect = React.useCallback((imageUrl: string) => {
-    setAttachedRefs((prev) => [...prev, attachedRefFromDroppedMediaUrl(imageUrl, "image")])
+  const handleAssetLibrarySelect = React.useCallback((pick: AssetSelectionPick) => {
+    setAttachedRefs((prev) => [...prev, attachedRefFromDroppedMediaUrl(pick.url, pick.assetType)])
     setAssetModalOpen(false)
   }, [])
 
@@ -3180,38 +3194,67 @@ export function CreativeAgentChat({
     toast.error(message)
   }, [])
 
-  const handleSendMessage = React.useCallback(async () => {
-    if (!userId) return
-    if (!composerValue.trim() && composerAttachments.length === 0) return
-    if (hasPendingUploads) return
-    if (isCreatingThread) return
-
-    const parts: UIMessage["parts"] = []
-    if (composerValue.trim()) {
-      parts.push({ type: "text", text: composerValue.trim() })
+  const handleEnhanceComposerInstructions = React.useCallback(async () => {
+    const trimmed = composerValue.trim()
+    if (!trimmed) {
+      toast.message("Add a message to enhance")
+      return
     }
-    parts.push(...(await filesToMessageParts(composerAttachments)))
 
-    let nextThreadId = threadId
+    setIsEnhancingComposer(true)
+    try {
+      const response = await fetch("/api/enhance-agent-instructions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: trimmed }),
+      })
+      const data = (await response.json().catch(() => ({}))) as { error?: string; text?: string }
 
-    if (enablePersistence && !nextThreadId) {
+      if (!response.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : "Could not enhance instructions",
+        )
+      }
+
+      const next = typeof data.text === "string" ? data.text : ""
+      if (!next.trim()) {
+        throw new Error("The enhancer returned empty text.")
+      }
+
+      setComposerValue(next)
+    } catch (enhanceError) {
+      toast.error(
+        enhanceError instanceof Error ? enhanceError.message : "Could not enhance instructions",
+      )
+    } finally {
+      setIsEnhancingComposer(false)
+    }
+  }, [composerValue])
+
+  const ensurePersistedThread = React.useCallback(
+    async (title: string): Promise<string | undefined> => {
+      let nextThreadId = threadId
+
+      if (!enablePersistence) {
+        if (nextThreadId) {
+          threadIdRef.current = nextThreadId
+        }
+        return nextThreadId
+      }
+
+      if (nextThreadId) {
+        threadIdRef.current = nextThreadId
+        return nextThreadId
+      }
+
       setIsCreatingThread(true)
-
       try {
         const response = await fetch("/api/chat/threads", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            title:
-              composerValue.trim() ||
-              (composerAttachments[0]?.source === "upload"
-                ? composerAttachments[0].file.name
-                : composerAttachments[0]?.title) ||
-              attachedRefs[0]?.label ||
-              "New Chat",
-          }),
+          body: JSON.stringify({ title }),
         })
 
         if (!response.ok) {
@@ -3232,10 +3275,36 @@ export function CreativeAgentChat({
         if (syncUrlOnThreadCreate && window.location.pathname !== `/chat/${nextThreadId}`) {
           window.history.replaceState(window.history.state, "", `/chat/${nextThreadId}`)
         }
+
+        return nextThreadId
       } finally {
         setIsCreatingThread(false)
       }
+    },
+    [enablePersistence, onThreadIdChange, syncUrlOnThreadCreate, threadId],
+  )
+
+  const handleSendMessage = React.useCallback(async () => {
+    if (!userId) return
+    if (!composerValue.trim() && composerAttachments.length === 0) return
+    if (hasPendingUploads) return
+    if (isCreatingThread) return
+
+    const parts: UIMessage["parts"] = []
+    if (composerValue.trim()) {
+      parts.push({ type: "text", text: composerValue.trim() })
     }
+    parts.push(...(await filesToMessageParts(composerAttachments)))
+
+    const title =
+      composerValue.trim() ||
+      (composerAttachments[0]?.source === "upload"
+        ? composerAttachments[0].file.name
+        : composerAttachments[0]?.title) ||
+      attachedRefs[0]?.label ||
+      "New Chat"
+
+    const nextThreadId = await ensurePersistedThread(title)
 
     if (nextThreadId) {
       threadIdRef.current = nextThreadId
@@ -3253,7 +3322,61 @@ export function CreativeAgentChat({
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
-  }, [attachedRefs, composerAttachments, composerValue, enablePersistence, hasPendingUploads, isCreatingThread, onThreadIdChange, sendMessage, syncUrlOnThreadCreate, threadId, userId])
+  }, [
+    attachedRefs,
+    composerAttachments,
+    composerValue,
+    ensurePersistedThread,
+    hasPendingUploads,
+    isCreatingThread,
+    sendMessage,
+    userId,
+  ])
+
+  const handleRequestSkillLoad = React.useCallback(
+    async (slug: string) => {
+      if (!userId) {
+        toast.error("Sign in to load skills.")
+        return
+      }
+      if (hasPendingUploads) {
+        toast.message("Wait for uploads to finish.")
+        return
+      }
+      if (isCreatingThread) {
+        return
+      }
+      if (status === "submitted" || status === "streaming") {
+        toast.message("Wait for the current reply to finish.")
+        return
+      }
+
+      const text = `Please use the activateSkill tool with slug \`${slug}\` so you load that skill's instructions before continuing.`
+
+      try {
+        const nextThreadId = await ensurePersistedThread(`Skill: ${slug}`)
+        if (nextThreadId) {
+          threadIdRef.current = nextThreadId
+        }
+
+        sendMessage({
+          role: "user",
+          parts: [{ type: "text", text }],
+        })
+      } catch (loadError) {
+        toast.error(loadError instanceof Error ? loadError.message : "Could not start chat.")
+        throw loadError
+      }
+    },
+    [
+      ensurePersistedThread,
+      hasPendingUploads,
+      isCreatingThread,
+      sendMessage,
+      status,
+      userId,
+    ],
+  )
 
   const clearChat = React.useCallback(() => {
     const shouldNavigateToDraft = enablePersistence && Boolean(threadId)
@@ -3713,6 +3836,65 @@ export function CreativeAgentChat({
                           ))}
                         </SelectContent>
                       </Select>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 shrink-0 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                            aria-label={`Skills loaded in this chat: ${loadedSkillsCount}. Open skill picker.`}
+                            disabled={
+                              isCreatingThread ||
+                              status === "submitted" ||
+                              status === "streaming"
+                            }
+                            onClick={() => setSkillLoadModalOpen(true)}
+                          >
+                            <Books className="size-4" weight="duotone" />
+                            <Badge
+                              variant="secondary"
+                              className="h-5 min-w-5 rounded-full px-1.5 text-[10px] font-medium tabular-nums"
+                            >
+                              {loadedSkillsCount}
+                            </Badge>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-56">
+                          Unique skills successfully loaded in this chat (via activateSkill). Click to ask the
+                          agent to load one.
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 shrink-0 gap-1 px-2 text-muted-foreground hover:text-foreground"
+                            aria-label="Enhance instructions"
+                            onClick={() => void handleEnhanceComposerInstructions()}
+                            disabled={
+                              isCreatingThread ||
+                              hasPendingUploads ||
+                              isEnhancingComposer ||
+                              status === "submitted" ||
+                              status === "streaming" ||
+                              !composerValue.trim()
+                            }
+                          >
+                            {isEnhancingComposer ? (
+                              <CircleNotch className="h-4 w-4 shrink-0 animate-spin" />
+                            ) : (
+                              <Sparkle className="h-4 w-4 shrink-0" />
+                            )}
+                            <span className="hidden sm:inline">Enhance</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[240px]">
+                          Rewrite your draft into clearer, more explicit instructions for the agent (concise).
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <SpeechInput
@@ -3755,6 +3937,17 @@ export function CreativeAgentChat({
                 open={assetModalOpen}
                 onOpenChange={setAssetModalOpen}
                 onSelect={handleAssetLibrarySelect}
+              />
+              <SkillLoadModal
+                open={skillLoadModalOpen}
+                onOpenChange={setSkillLoadModalOpen}
+                onRequestLoad={handleRequestSkillLoad}
+                disabled={
+                  isCreatingThread ||
+                  hasPendingUploads ||
+                  status === "submitted" ||
+                  status === "streaming"
+                }
               />
               </>
             ) : null}

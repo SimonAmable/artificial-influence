@@ -26,7 +26,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
+import {
+  AssetSelectionModal,
+  type AssetSelectionPick,
+} from "@/components/shared/modals/asset-selection-modal"
 import { useImageEditor } from "./image-editor-provider"
 import { MODEL_IDENTIFIERS } from "@/lib/constants/models"
 import { useModels } from "@/hooks/use-models"
@@ -412,9 +415,13 @@ export function ImageEditorPromptBar({
     }
   }, [])
 
-  const handleAssetSelect = React.useCallback(async (imageUrl: string) => {
+  const handleAssetSelect = React.useCallback(async ({ url, assetType }: AssetSelectionPick) => {
+    if (assetType !== "image") {
+      toast.error("Selected item must be an image")
+      return
+    }
     try {
-      const response = await fetch(imageUrl)
+      const response = await fetch(url)
       if (!response.ok) throw new Error("Failed to fetch")
       const blob = await response.blob()
       if (!blob.type.startsWith("image/")) {

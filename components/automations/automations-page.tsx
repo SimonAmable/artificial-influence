@@ -21,7 +21,10 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
+import {
+  AssetSelectionModal,
+  type AssetSelectionPick,
+} from "@/components/shared/modals/asset-selection-modal"
 import { CommandTextarea } from "@/components/commands/command-textarea"
 import {
   AlertDialog,
@@ -562,9 +565,9 @@ export function AutomationsPage() {
   }, [])
 
   const handleAssetLibrarySelect = React.useCallback(
-    (imageUrl: string) => {
+    ({ url, assetType }: AssetSelectionPick) => {
       if (assetPickerForVariable) {
-        const base = attachedRefFromAssetUrl(imageUrl, "image")
+        const base = attachedRefFromAssetUrl(url, assetType)
         const taken = new Set<string>()
         for (const r of attachedRefs) {
           if (r.mentionToken) taken.add(r.mentionToken)
@@ -591,7 +594,7 @@ export function AutomationsPage() {
         setAssetModalOpen(false)
         return
       }
-      setAttachedRefs((prev) => [...prev, attachedRefFromAssetUrl(imageUrl, "image")])
+      setAttachedRefs((prev) => [...prev, attachedRefFromAssetUrl(url, assetType)])
       setAssetModalOpen(false)
     },
     [assetPickerForVariable, attachedRefs, automationVariables],

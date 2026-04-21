@@ -38,6 +38,11 @@ interface VideoGridProps {
   isGenerating?: boolean
   isLoadingSkeleton?: boolean
   className?: string
+  /**
+   * When true, native playback controls only appear while the pointer hovers the tile.
+   * Coarse pointer / no-hover devices keep controls always available.
+   */
+  showNativeControlsOnHoverOnly?: boolean
 }
 
 function displayTime(item: VideoHistoryItem): number {
@@ -46,6 +51,73 @@ function displayTime(item: VideoHistoryItem): number {
     if (!Number.isNaN(t)) return t
   }
   return item.timestamp ?? 0
+}
+
+function useFinePointerHoverDevice() {
+  const subscribe = React.useCallback((onStoreChange: () => void) => {
+    const mq = window.matchMedia("(hover: hover) and (pointer: fine)")
+    mq.addEventListener("change", onStoreChange)
+    return () => mq.removeEventListener("change", onStoreChange)
+  }, [])
+  const getSnapshot = React.useCallback(
+    () => window.matchMedia("(hover: hover) and (pointer: fine)").matches,
+    [],
+  )
+  const getServerSnapshot = React.useCallback(() => false, [])
+  return React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+}
+
+function VideoHistoryTile({
+  item,
+  showNativeControlsOnHoverOnly,
+}: {
+  item: VideoHistoryItem
+  showNativeControlsOnHoverOnly: boolean
+}) {
+  const [hovered, setHovered] = React.useState(false)
+  const [clientReady, setClientReady] = React.useState(false)
+  const finePointer = useFinePointerHoverDevice()
+
+  React.useEffect(() => {
+    setClientReady(true)
+  }, [])
+
+  const nativeControlsVisible =
+    !showNativeControlsOnHoverOnly ||
+    !clientReady ||
+    !finePointer ||
+    hovered
+
+  return (
+    <div
+      className="group relative isolate aspect-square w-full min-h-0 min-w-0 shrink-0 overflow-hidden rounded-lg bg-black/60"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        <video
+          src={item.url}
+          controls={nativeControlsVisible}
+          className="block h-full w-full object-contain"
+          playsInline
+          preload="metadata"
+        />
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 to-transparent p-2 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
+        <p className="truncate text-xs font-medium text-white">{item.model ?? ""}</p>
+        <p className="text-xs text-white/70">
+          {displayTime(item) ? new Date(displayTime(item)).toLocaleString() : ""}
+        </p>
+      </div>
+      <div className="absolute bottom-2 right-2 z-10 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+        <Button size="sm" variant="ghost" className="pointer-events-auto h-8 px-2 text-white hover:bg-white/20" asChild>
+          <a href={item.url} download>
+            <Download className="h-4 w-4" />
+          </a>
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 function GeneratingCell() {
@@ -73,6 +145,7 @@ export function VideoGrid({
   isGenerating = false,
   isLoadingSkeleton = false,
   className,
+  showNativeControlsOnHoverOnly = false,
 }: VideoGridProps) {
   const [columnCount, setColumnCount] = React.useState(3)
 
@@ -169,35 +242,12 @@ export function VideoGrid({
               ) : (
                 <div
                   key={item.data.id ?? `video-${item.data.url}-${displayTime(item.data)}`}
-                  className="group relative isolate aspect-square w-full min-h-0 min-w-0 shrink-0 overflow-hidden rounded-lg bg-black/60"
+                  className="min-w-0 shrink-0"
                 >
-                  {/* Inner clip so native video controls stay visually inside the tile */}
-                  <div className="absolute inset-0 z-0 overflow-hidden">
-                    <video
-                      src={item.data.url}
-                      controls
-                      className="block h-full w-full object-contain"
-                      playsInline
-                      preload="metadata"
-                    />
-                  </div>
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-medium text-white">{item.data.model ?? ""}</p>
-                        <p className="text-xs text-white/70">
-                          {displayTime(item.data)
-                            ? new Date(displayTime(item.data)).toLocaleString()
-                            : ""}
-                        </p>
-                      </div>
-                      <Button size="sm" variant="ghost" className="pointer-events-auto h-8 px-2 text-white hover:bg-white/20" asChild>
-                        <a href={item.data.url} download>
-                          <Download className="h-4 w-4" />
-                        </a>
-                      </Button>
-                    </div>
-                  </div>
+                  <VideoHistoryTile
+                    item={item.data}
+                    showNativeControlsOnHoverOnly={showNativeControlsOnHoverOnly}
+                  />
                 </div>
               ),
             )}

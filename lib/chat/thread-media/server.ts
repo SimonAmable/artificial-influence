@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { UIMessage } from "ai"
 import { inferStoragePathFromUrl } from "@/lib/assets/library"
+import { DEFAULT_UPLOAD_BUCKET } from "@/lib/uploads/shared"
+import { extractStorageObjectRef } from "@/lib/uploads/storage-ref"
 import { formatGenerationMediaId, formatUploadMediaId } from "@/lib/chat/media-id"
 import {
   resolveMediaIdToFrameExtractReference as resolveMediaIdToFrameExtractReferenceImpl,
@@ -62,8 +64,10 @@ export async function registerThreadMediaFromUserMessageParts(
     const url = part.url
     if (typeof url !== "string" || !isHttpSupabasePublicUrl(url)) continue
 
-    const storagePath = inferStoragePathFromUrl(url)
+    const storageRef = extractStorageObjectRef(url)
+    const storagePath = storageRef?.storagePath ?? inferStoragePathFromUrl(url)
     if (!storagePath) continue
+    const bucket = storageRef?.bucket ?? DEFAULT_UPLOAD_BUCKET
 
     const mimeType =
       typeof part.mediaType === "string" && part.mediaType.length > 0
@@ -78,15 +82,29 @@ export async function registerThreadMediaFromUserMessageParts(
       user_id: userId,
       chat_thread_id: threadId,
       source: "chat",
-      bucket: "public-bucket",
+      bucket,
       mime_type: mimeType,
       storage_path: storagePath,
       label,
     })
 
-    if (error && error.code !== "23505") {
-      console.error("[uploads] Failed to register upload:", error.message)
+    if (!error) continue
+
+    // finalizeUploadedObject often inserts the row first without chat_thread_id; linking it here hits 23505.
+    if (error.code === "23505") {
+      const { error: patchError } = await supabase
+        .from("uploads")
+        .update({ chat_thread_id: threadId, source: "chat", label })
+        .eq("user_id", userId)
+        .eq("storage_path", storagePath)
+
+      if (patchError) {
+        console.error("[uploads] Failed to attach upload to thread:", patchError.message)
+      }
+      continue
     }
+
+    console.error("[uploads] Failed to register upload:", error.message)
   }
 }
 

@@ -4,7 +4,10 @@ import * as React from "react"
 import { UploadSimple, FolderOpen } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
+import {
+  AssetSelectionModal,
+  type AssetSelectionPick,
+} from "@/components/shared/modals/asset-selection-modal"
 import { toast } from "sonner"
 import { useImageEditor } from "./image-editor-provider"
 
@@ -75,9 +78,13 @@ export function ImageEditorEmptyState({ className }: ImageEditorEmptyStateProps)
     }
   }
 
-  const handleAssetSelect = async (imageUrl: string) => {
+  const handleAssetSelect = async ({ url, assetType }: AssetSelectionPick) => {
+    if (assetType !== "image") {
+      toast.error("Selected item must be an image")
+      return
+    }
     try {
-      const response = await fetch(imageUrl)
+      const response = await fetch(url)
       if (!response.ok) throw new Error("Failed to fetch")
       const blob = await response.blob()
       if (!blob.type.startsWith("image/")) {
@@ -85,7 +92,7 @@ export function ImageEditorEmptyState({ className }: ImageEditorEmptyStateProps)
         return
       }
       // Use the canonical URL for canvas + state so currentImage stays valid for export/generate (same as /image references).
-      await loadImage(imageUrl)
+      await loadImage(url)
       setAssetModalOpen(false)
     } catch {
       toast.error("Could not load image from library")

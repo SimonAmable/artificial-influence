@@ -65,6 +65,34 @@ export async function enhancePrompt(
   return text;
 }
 
+const AGENT_COMPOSER_INSTRUCTIONS_SYSTEM = `You rewrite user drafts into clearer instructions for a creative AI agent that uses tools (image/video generation, research, etc.).
+
+Rules:
+- Output ONLY the improved instruction text. No preamble ("Here is…"), no markdown fences, no bullet meta-commentary about what you changed.
+- Make the request more explicit: goals, constraints, deliverables, style, and references—while staying concise. Prefer short paragraphs or tight bullets only when the user already used bullets; otherwise use compact prose.
+- Preserve the user's intent, named entities, @ mentions, slash commands, URLs, and attachment references; do not invent new facts or assets.
+- If the draft is already precise, tighten wording rather than expanding. Never pad with generic filler.
+- Keep total length similar or shorter unless critical details were missing.`
+
+/**
+ * Rewrites composer text into explicit, concise agent-facing instructions (no tool execution).
+ */
+export async function enhanceAgentComposerInstructions(text: string): Promise<string> {
+  const trimmed = text.trim()
+  if (!trimmed) {
+    return ''
+  }
+
+  const { text: out } = await generateText({
+    model: enhancementLanguageModel(),
+    system: AGENT_COMPOSER_INSTRUCTIONS_SYSTEM,
+    prompt: `Rewrite this draft into stronger agent instructions:\n\n${trimmed}`,
+    temperature: 0.45,
+  })
+
+  return out.trim()
+}
+
 export type EnhancePromptForJSONModelsOptions = {
   /** Public URLs of reference images (e.g. after upload). When non-empty, vision model is used. */
   imageUrls?: string[];

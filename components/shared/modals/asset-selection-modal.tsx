@@ -9,7 +9,16 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { X, ClockCounterClockwise, FolderOpen, CircleNotch, Copy, Check, Plus } from "@phosphor-icons/react"
+import {
+  X,
+  ClockCounterClockwise,
+  FolderOpen,
+  CircleNotch,
+  Copy,
+  Check,
+  Plus,
+  SpeakerHigh,
+} from "@phosphor-icons/react"
 import Image from "next/image"
 import type {
   AssetCategory,
@@ -37,10 +46,15 @@ interface Generation {
   url: string
 }
 
+export type AssetSelectionPick = {
+  url: string
+  assetType: AssetType
+}
+
 interface AssetSelectionModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSelect: (imageUrl: string) => void
+  onSelect: (pick: AssetSelectionPick) => void
 }
 
 // Helper function to format date (relative)
@@ -131,8 +145,8 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
     void fetchAssets()
   }, [open, activeTab, fetchAssets])
 
-  const handleSelect = (url: string) => {
-    onSelect(url)
+  const handleSelect = (pick: AssetSelectionPick) => {
+    onSelect(pick)
     onOpenChange(false)
   }
 
@@ -336,18 +350,39 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                   >
                     <div 
                       className="group/image relative aspect-square cursor-pointer hover:ring-2 hover:ring-primary transition-all rounded-md"
-                      onClick={() => handleSelect(asset.url)}
+                      onClick={() => handleSelect({ url: asset.url, assetType: asset.assetType })}
                       role="button"
                       tabIndex={0}
-                      aria-label="Select image"
+                      aria-label={`Select ${asset.assetType} asset`}
                     >
-                      <Image
-                        src={asset.thumbnailUrl || asset.url}
-                        alt={asset.title}
-                        fill
-                        className="object-cover rounded-md"
-                        unoptimized
-                      />
+                      {asset.assetType === "image" && (
+                        <Image
+                          src={asset.thumbnailUrl || asset.url}
+                          alt={asset.title}
+                          fill
+                          className="object-cover rounded-md"
+                          unoptimized
+                        />
+                      )}
+                      {asset.assetType === "video" && (
+                        <video
+                          src={asset.url}
+                          poster={asset.thumbnailUrl ?? undefined}
+                          className="absolute inset-0 h-full w-full object-cover rounded-md"
+                          preload="metadata"
+                          muted
+                          playsInline
+                        />
+                      )}
+                      {asset.assetType === "audio" && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-md bg-muted">
+                          <SpeakerHigh
+                            className="h-12 w-12 text-muted-foreground"
+                            weight="duotone"
+                            aria-hidden
+                          />
+                        </div>
+                      )}
                       {/* Overlay on hover */}
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center rounded-md">
                         <span className="text-white text-sm font-medium">Select</span>
@@ -401,10 +436,12 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                   >
                     <div 
                       className="group/image relative aspect-square cursor-pointer hover:ring-2 hover:ring-primary transition-all rounded-md"
-                      onClick={() => handleSelect(generation.url)}
+                      onClick={() =>
+                        handleSelect({ url: generation.url, assetType: generation.type })
+                      }
                       role="button"
                       tabIndex={0}
-                      aria-label="Select image"
+                      aria-label={`Select ${generation.type}`}
                     >
                       <Image
                         src={generation.url}

@@ -36,7 +36,10 @@ import {
 import { getConstrainedSize, loadImageSize, loadVideoSize } from "@/lib/canvas/media-sizing"
 import { ImageEditorDialog } from "@/components/image-editor"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
-import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
+import {
+  AssetSelectionModal,
+  type AssetSelectionPick,
+} from "@/components/shared/modals/asset-selection-modal"
 import type { AssetType } from "@/lib/assets/types"
 import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
 
@@ -439,7 +442,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
     }
   }
 
-  const handleAssetSelectFromModal = async (assetUrl: string) => {
+  const handleAssetSelectFromModal = async ({ url: assetUrl }: AssetSelectionPick) => {
     try {
       const response = await fetch(assetUrl)
       if (!response.ok) throw new Error("Failed to fetch")

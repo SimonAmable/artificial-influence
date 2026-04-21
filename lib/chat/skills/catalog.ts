@@ -7,11 +7,18 @@ export type SkillCatalogEntry = {
   description: string
 }
 
+/** Catalog row for UI pickers (manual skill load, etc.). */
+export type SkillPickerEntry = SkillCatalogEntry & {
+  isMine: boolean
+  isPublic: boolean
+}
+
 type SkillRow = {
   slug: string
   title: string | null
   skill_document: string
   user_id: string
+  is_public: boolean
 }
 
 function sortRowsUserFirst(rows: SkillRow[], userId: string) {
@@ -42,7 +49,7 @@ export async function loadSkillsCatalog(
 ): Promise<SkillCatalogEntry[]> {
   const { data, error } = await supabase
     .from("skills")
-    .select("slug, title, skill_document, user_id")
+    .select("slug, title, skill_document, user_id, is_public")
     .order("updated_at", { ascending: false })
 
   if (error) {
@@ -70,6 +77,55 @@ export async function loadSkillsCatalog(
         slug: row.slug,
         title: row.title,
         description: "(Could not parse skill document.)",
+      })
+    }
+  }
+
+  return entries
+}
+
+/**
+ * Same visibility and slug dedupe rules as {@link loadSkillsCatalog}, plus ownership
+ * and visibility flags for chat UI (manual load modal).
+ */
+export async function loadSkillsCatalogForPicker(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<SkillPickerEntry[]> {
+  const { data, error } = await supabase
+    .from("skills")
+    .select("slug, title, skill_document, user_id, is_public")
+    .order("updated_at", { ascending: false })
+
+  if (error) {
+    console.error("[skills] loadSkillsCatalogForPicker:", error.message)
+    return []
+  }
+
+  const rows = (data ?? []) as SkillRow[]
+  const uniqueRows = dedupeBySlug(rows, userId)
+
+  const entries: SkillPickerEntry[] = []
+  for (const row of uniqueRows) {
+    try {
+      const parsed = parseSkillDocument(row.skill_document)
+      const description =
+        parsed.description.trim() ||
+        "(Skill has no description in frontmatter; still call activateSkill to read instructions.)"
+      entries.push({
+        slug: row.slug,
+        title: row.title,
+        description,
+        isMine: row.user_id === userId,
+        isPublic: row.is_public === true,
+      })
+    } catch {
+      entries.push({
+        slug: row.slug,
+        title: row.title,
+        description: "(Could not parse skill document.)",
+        isMine: row.user_id === userId,
+        isPublic: row.is_public === true,
       })
     }
   }

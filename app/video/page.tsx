@@ -825,6 +825,7 @@ function VideoPageContent() {
           isLoadingSkeleton={
             isHistoryLoading && historyVideos.length === 0 && pendingRequests.length === 0
           }
+          showNativeControlsOnHoverOnly
         />
       )
     }

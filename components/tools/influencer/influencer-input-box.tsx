@@ -30,7 +30,10 @@ import { Model } from "@/lib/types/models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { AspectRatioSelector } from "@/components/shared/selectors/aspect-ratio-selector"
 import { getActiveModelMetadata, type ModelMetadata } from "@/lib/constants/model-metadata"
-import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
+import {
+  AssetSelectionModal,
+  type AssetSelectionPick,
+} from "@/components/shared/modals/asset-selection-modal"
 import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { BrandKitNewFlowDialog } from "@/components/brand-kit/brand-kit-new-flow-dialog"
@@ -401,8 +404,12 @@ export function InfluencerInputBox({
     setIsFullScreenPreviewOpen(true)
   }
 
-  const handleAssetSelect = (imageUrl: string) => {
-    const newImage = { url: imageUrl }
+  const handleAssetSelect = ({ url, assetType }: AssetSelectionPick) => {
+    if (assetType !== "image") {
+      toast.error("Reference images only — pick an image asset")
+      return
+    }
+    const newImage = { url }
     
     // Support both single and multiple reference images
     if (onReferenceImagesChange) {
