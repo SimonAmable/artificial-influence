@@ -38,6 +38,13 @@ interface InworldVoiceSelectorProps {
   /** Merged onto the trigger button (e.g. min width in tight flex toolbars). */
   triggerClassName?: string
   placeholder?: string
+  renderTrigger?: (args: {
+    selectedVoice: InworldVoice | null
+    triggerLabel: string
+    triggerId: string
+    isLoading: boolean
+    disabled: boolean
+  }) => React.ReactNode
 }
 
 function groupVoicesBySource(voices: InworldVoice[]) {
@@ -78,6 +85,7 @@ export function InworldVoiceSelector({
   className,
   triggerClassName,
   placeholder = "Search voices...",
+  renderTrigger,
 }: InworldVoiceSelectorProps) {
   const [voices, setVoices] = React.useState<InworldVoice[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -262,19 +270,31 @@ export function InworldVoiceSelector({
         value={value}
       >
         <VoiceSelectorTrigger asChild>
-          <Button
-            className={cn(
-              "h-8 w-full justify-between gap-2 rounded-lg border-white/10 bg-zinc-800/80 px-2.5 text-left text-xs hover:bg-zinc-900",
-              triggerClassName
-            )}
-            disabled={disabled || isLoading}
-            title={!isLoading ? triggerId : undefined}
-            variant="outline"
-          >
-            <span className="min-w-0 flex-1 truncate text-zinc-100">
-              {isLoading ? "Loading voices..." : triggerLabel}
-            </span>
-          </Button>
+          {renderTrigger ? (
+            <div>
+              {renderTrigger({
+                selectedVoice,
+                triggerLabel,
+                triggerId,
+                isLoading,
+                disabled: disabled || isLoading,
+              })}
+            </div>
+          ) : (
+            <Button
+              className={cn(
+                "h-8 w-full justify-between gap-2 rounded-lg border-white/10 bg-zinc-800/80 px-2.5 text-left text-xs hover:bg-zinc-900",
+                triggerClassName
+              )}
+              disabled={disabled || isLoading}
+              title={!isLoading ? triggerId : undefined}
+              variant="outline"
+            >
+              <span className="min-w-0 flex-1 truncate text-zinc-100">
+                {isLoading ? "Loading voices..." : triggerLabel}
+              </span>
+            </Button>
+          )}
         </VoiceSelectorTrigger>
         <VoiceSelectorContent title="Select Inworld voice">
           <VoiceSelectorInput

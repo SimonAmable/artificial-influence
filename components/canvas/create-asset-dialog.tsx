@@ -39,6 +39,8 @@ interface CreateAssetDialogProps {
     title?: string
     url: string
     assetType: AssetType
+    uploadId?: string
+    supabaseStoragePath?: string
     visibility?: AssetVisibility
     category?: AssetCategory
     tags?: string[]
@@ -92,6 +94,8 @@ export function CreateAssetDialog({
           visibility,
           tags,
           url: initial.url,
+          uploadId: initial.uploadId,
+          supabaseStoragePath: initial.supabaseStoragePath,
           sourceNodeType: initial.sourceNodeType,
         })
         toast.success("Asset updated")
@@ -104,6 +108,8 @@ export function CreateAssetDialog({
           visibility,
           tags,
           url: initial.url,
+          uploadId: initial.uploadId,
+          supabaseStoragePath: initial.supabaseStoragePath,
           sourceNodeType: initial.sourceNodeType,
         })
         toast.success("Asset saved")

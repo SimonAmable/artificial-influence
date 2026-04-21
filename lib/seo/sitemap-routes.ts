@@ -18,6 +18,7 @@ export function getSitemapEntries(): Array<{
     { path: "/", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 1 },
     { path: "/image", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.9 },
     { path: "/video", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.9 },
+    { path: "/audio", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
     { path: "/lipsync", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
     { path: "/motion-copy", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
     { path: "/inpaint", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },

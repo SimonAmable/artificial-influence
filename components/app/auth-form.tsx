@@ -335,18 +335,18 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
             </div>
 
             <p className="mt-16 text-center text-xs text-muted-foreground sm:mt-24">
-              By continuing, I acknowledge the
+              By creating an account, you acknowledge the
               {" "}
               <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
                 Privacy Policy
               </Link>
-              {" "}
-              and agree to the
+              . Full app access requires accepting the current
               {" "}
               <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">
                 Terms of Use
               </Link>
-              . I also confirm that I am at least 18 years old.
+              {" "}
+              during onboarding. You must be at least 18 years old.
             </p>
           </div>
         </section>

@@ -1,5 +1,7 @@
 import type { Node, Edge } from "@xyflow/react"
 import { createClient } from "@/lib/supabase/server"
+import { DEFAULT_UPLOAD_BUCKET } from "@/lib/uploads/shared"
+import { storeUploadedFileFromServer } from "@/lib/uploads/server"
 
 // ===== Types =====
 
@@ -9,6 +11,7 @@ export interface Workflow {
   name: string
   description: string | null
   thumbnail_url: string | null
+  thumbnail_upload_id?: string | null
   nodes: Node[]
   edges: Edge[]
   is_public: boolean
@@ -20,6 +23,7 @@ export interface CreateWorkflowInput {
   name: string
   description?: string
   thumbnail_url?: string
+  thumbnail_upload_id?: string
   nodes: Node[]
   edges: Edge[]
   is_public?: boolean
@@ -29,6 +33,7 @@ export interface UpdateWorkflowInput {
   name?: string
   description?: string
   thumbnail_url?: string
+  thumbnail_upload_id?: string | null
   is_public?: boolean
 }
 
@@ -50,6 +55,7 @@ export async function createWorkflow(
       name: input.name,
       description: input.description || null,
       thumbnail_url: input.thumbnail_url || null,
+      thumbnail_upload_id: input.thumbnail_upload_id || null,
       nodes: normalizeWorkflowAssetUrls(input.nodes),
       edges: input.edges,
       is_public: input.is_public || false,
@@ -131,6 +137,7 @@ export async function updateWorkflow(
   if (input.name !== undefined) updates.name = input.name
   if (input.description !== undefined) updates.description = input.description
   if (input.thumbnail_url !== undefined) updates.thumbnail_url = input.thumbnail_url
+  if (input.thumbnail_upload_id !== undefined) updates.thumbnail_upload_id = input.thumbnail_upload_id
   if (input.is_public !== undefined) updates.is_public = input.is_public
 
   const { data, error } = await supabase
@@ -193,26 +200,22 @@ export async function uploadWorkflowThumbnail(
   userId: string,
   workflowId: string,
   file: File
-): Promise<string> {
-  const supabase = await createClient()
+): Promise<{ thumbnailUrl: string; uploadId: string }> {
+  void userId
+  void workflowId
 
-  const fileExt = file.name.split(".").pop()
-  const fileName = `${userId}/workflow-thumbnails/${workflowId}.${fileExt}`
+  const result = await storeUploadedFileFromServer({
+    bucket: DEFAULT_UPLOAD_BUCKET,
+    source: "workflow-thumbnails",
+    fileName: file.name,
+    mimeType: file.type || "image/png",
+    bytes: await file.arrayBuffer(),
+  })
 
-  const { error: uploadError } = await supabase.storage
-    .from("public-bucket")
-    .upload(fileName, file, { upsert: true })
-
-  if (uploadError) {
-    console.error("Error uploading thumbnail:", uploadError)
-    throw new Error(`Failed to upload thumbnail: ${uploadError.message}`)
+  return {
+    thumbnailUrl: result.url,
+    uploadId: result.uploadId,
   }
-
-  const { data } = supabase.storage
-    .from("public-bucket")
-    .getPublicUrl(fileName)
-
-  return data.publicUrl
 }
 
 // ===== Helper Functions =====

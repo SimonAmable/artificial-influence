@@ -61,6 +61,8 @@ export default function AssetsPage() {
   const [loading, setLoading] = React.useState(true)
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [uploadedFileUrl, setUploadedFileUrl] = React.useState<string | null>(null)
+  const [uploadedUploadId, setUploadedUploadId] = React.useState<string | null>(null)
+  const [uploadedStoragePath, setUploadedStoragePath] = React.useState<string | null>(null)
   const [uploadedAssetType, setUploadedAssetType] = React.useState<AssetType | null>(null)
   const [uploadedFileName, setUploadedFileName] = React.useState<string>("")
   const [editingAsset, setEditingAsset] = React.useState<AssetRecord | null>(null)
@@ -133,6 +135,8 @@ export default function AssetsPage() {
       return
     }
     setUploadedFileUrl(result.url)
+    setUploadedUploadId(result.uploadId)
+    setUploadedStoragePath(result.storagePath)
     setUploadedAssetType(result.fileType)
     setUploadedFileName(result.fileName)
     setCreateDialogOpen(true)
@@ -434,12 +438,16 @@ export default function AssetsPage() {
             setCreateDialogOpen(open)
             if (!open) {
               setUploadedFileUrl(null)
+              setUploadedUploadId(null)
+              setUploadedStoragePath(null)
               setUploadedAssetType(null)
               setUploadedFileName("")
             }
           }}
           initial={{
             url: uploadedFileUrl,
+            uploadId: uploadedUploadId || undefined,
+            supabaseStoragePath: uploadedStoragePath || undefined,
             assetType: uploadedAssetType,
             title: uploadedFileName,
             ...(category !== "all" ? { category } : {}),
@@ -462,6 +470,7 @@ export default function AssetsPage() {
           assetId={editingAsset.id}
           initial={{
             url: editingAsset.url,
+            uploadId: editingAsset.uploadId || undefined,
             assetType: editingAsset.assetType,
             title: editingAsset.title,
             visibility: editingAsset.visibility,

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
+import { getCurrentTermsDocument, setTermsVersionCookie } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
 import {
@@ -24,6 +25,7 @@ export async function completeOnboarding(
   }
   const data = parsed.data
   const completedAt = new Date().toISOString()
+  const currentTerms = getCurrentTermsDocument()
   const onboardingJsonData: OnboardingJsonData = {
     ...data,
     completedAt,
@@ -43,6 +45,10 @@ export async function completeOnboarding(
       onboarding_completed_at: completedAt,
       full_name: data.fullName,
       onboarding_json_data: onboardingJsonData,
+      terms_accepted_at: completedAt,
+      terms_version: currentTerms.version,
+      terms_text_snapshot: currentTerms.content,
+      terms_acceptance_source: "onboarding",
     })
     .eq("id", user.id)
 
@@ -59,6 +65,7 @@ export async function completeOnboarding(
     secure: process.env.NODE_ENV === "production",
     httpOnly: false,
   })
+  await setTermsVersionCookie(currentTerms.version)
 
   revalidatePath("/", "layout")
   return { ok: true }

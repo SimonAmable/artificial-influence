@@ -77,6 +77,8 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
     url: string
     assetType: AssetType
     title?: string
+    uploadId?: string
+    supabaseStoragePath?: string
   } | null>(null)
   const [createAssetUploading, setCreateAssetUploading] = React.useState(false)
   const createAssetFileInputRef = React.useRef<HTMLInputElement>(null)
@@ -169,6 +171,8 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
         url: result.url,
         assetType: result.fileType,
         title: result.fileName,
+        uploadId: result.uploadId,
+        supabaseStoragePath: result.storagePath,
       })
       setActiveTab("assets")
       setCreateAssetOpen(true)
@@ -454,6 +458,8 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
             }}
             initial={{
               url: createAssetInitial.url,
+              uploadId: createAssetInitial.uploadId,
+              supabaseStoragePath: createAssetInitial.supabaseStoragePath,
               assetType: createAssetInitial.assetType,
               title: createAssetInitial.title,
               sourceNodeType: "asset-selection",

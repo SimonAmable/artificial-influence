@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { useModels } from "@/hooks/use-models"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition } from "@/lib/types/models"
@@ -24,12 +25,62 @@ import { brandRefsOnly } from "@/lib/commands/ref-image-pipeline"
 import { validateVideoAttachedRefs } from "@/lib/commands/validate-video-refs"
 import { getVideoChipSlotInfo } from "@/lib/commands/video-chip-slots"
 import { generateVideoAndWait } from "@/lib/generate-video-client"
+import type { VideoGridItem, VideoHistoryItem } from "@/components/shared/display/video-grid"
+import { toast } from "sonner"
 
-interface GeneratedVideo {
-  url: string
+interface PendingVideoRequest {
+  clientRequestId: string
+  startedAt: string
+  prompt: string | null
   model: string
-  timestamp: number
-  parameters: Record<string, unknown>
+  modelDisplayName: string
+  generationId?: string | null
+  predictionId?: string | null
+}
+
+function createClientRequestId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID()
+  }
+  return `pending-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function removeSlotByClientId(requests: PendingVideoRequest[], clientRequestId: string) {
+  return requests.filter((request) => request.clientRequestId !== clientRequestId)
+}
+
+function prependUniqueHistoryItems(currentItems: VideoHistoryItem[], newItems: VideoHistoryItem[]) {
+  const seenUrls = new Set<string>()
+  return [...newItems, ...currentItems].filter((item) => {
+    if (!item.url || seenUrls.has(item.url)) {
+      return false
+    }
+    seenUrls.add(item.url)
+    return true
+  })
+}
+
+function mergeRemoteHistoryWithLocal(
+  previous: VideoHistoryItem[],
+  serverRows: VideoHistoryItem[],
+): VideoHistoryItem[] {
+  const serverByUrl = new Map(serverRows.map((row) => [row.url, row]))
+  const seen = new Set<string>()
+  const out: VideoHistoryItem[] = []
+
+  for (const localRow of previous) {
+    if (!localRow.url || seen.has(localRow.url)) continue
+    seen.add(localRow.url)
+    out.push(serverByUrl.get(localRow.url) ?? localRow)
+  }
+
+  for (const serverRow of serverRows) {
+    if (!serverRow.url || seen.has(serverRow.url)) continue
+    seen.add(serverRow.url)
+    out.push(serverRow)
+  }
+
+  return out
 }
 
 const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
@@ -99,10 +150,15 @@ function VideoPageContent() {
   const [multiShotMode, setMultiShotMode] = React.useState(false)
   const [multiShotShots, setMultiShotShots] = React.useState<MultiShotItem[]>([])
   const [referenceImages, setReferenceImages] = React.useState<ImageUpload[]>([])
-  const [isGenerating, setIsGenerating] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  const [generatedVideos, setGeneratedVideos] = React.useState<GeneratedVideo[]>([])
+  const [historyVideos, setHistoryVideos] = React.useState<VideoHistoryItem[]>([])
+  const [pendingRequests, setPendingRequests] = React.useState<PendingVideoRequest[]>([])
+  const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
+  const [, setHistoryError] = React.useState<string | null>(null)
   const [attachedCommandRefs, setAttachedCommandRefs] = React.useState<AttachedRef[]>([])
+  const historyAbortRef = React.useRef<AbortController | null>(null)
+  const historyRequestIdRef = React.useRef(0)
+  const isGenerating = pendingRequests.length > 0
 
   // Handle pre-loaded start frame from URL parameter (only load once)
   const hasLoadedFromUrl = React.useRef(false)
@@ -174,29 +230,13 @@ function VideoPageContent() {
     userId: string,
     prefix: string
   ): Promise<{ url: string; storagePath: string }> => {
-    const supabase = createClient()
-    const fileExtension = file.name.split('.').pop() || 'jpg'
-    const timestamp = Date.now()
-    const randomStr = Math.random().toString(36).substring(7)
-    const filename = `${timestamp}-${randomStr}.${fileExtension}`
-    const storagePath = `${userId}/${prefix}/${filename}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('public-bucket')
-      .upload(storagePath, file, {
-        contentType: file.type,
-        upsert: false,
-      })
-
-    if (uploadError) {
-      throw new Error(`Failed to upload image: ${uploadError.message}`)
+    void userId
+    const uploaded = await uploadFileToSupabase(file, prefix)
+    if (!uploaded) {
+      throw new Error("Failed to upload file")
     }
 
-    const { data: urlData } = supabase.storage
-      .from('public-bucket')
-      .getPublicUrl(storagePath)
-
-    return { url: urlData.publicUrl, storagePath }
+    return { url: uploaded.url, storagePath: uploaded.storagePath }
   }
 
   /** Replicate requires http(s) URLs; blob/data previews must be uploaded first. */
@@ -220,6 +260,98 @@ function VideoPageContent() {
     const r = await uploadImageToSupabase(f, userId, prefix)
     return r.url
   }
+
+  type FetchHistoryOptions = { silent?: boolean; replace?: boolean }
+
+  const fetchVideoHistory = React.useCallback(async (limit = 20, opts?: FetchHistoryOptions) => {
+    const silent = opts?.silent === true
+    const replace = opts?.replace !== false
+
+    historyAbortRef.current?.abort()
+    const controller = new AbortController()
+    historyAbortRef.current = controller
+    const requestId = ++historyRequestIdRef.current
+
+    if (!silent) {
+      setIsHistoryLoading(true)
+      setHistoryError(null)
+    }
+
+    try {
+      const response = await fetch(`/api/generations?type=video&limit=${limit}`, {
+        signal: controller.signal,
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch video history")
+      }
+
+      const data = await response.json()
+      const generations = Array.isArray(data.generations)
+        ? (data.generations as Array<{
+            url?: string | null
+            model?: string | null
+            prompt?: string | null
+            id?: string
+            tool?: string | null
+            created_at?: string | null
+          }>)
+        : []
+
+      const rows = generations.reduce<VideoHistoryItem[]>((items, generation) => {
+        if (typeof generation.url !== "string" || generation.url.length === 0) {
+          return items
+        }
+        items.push({
+          id: generation.id,
+          url: generation.url,
+          model: generation.model ?? null,
+          prompt: generation.prompt ?? null,
+          tool: generation.tool ?? null,
+          createdAt: generation.created_at ?? null,
+        })
+        return items
+      }, [])
+
+      if (requestId === historyRequestIdRef.current) {
+        if (replace) {
+          setHistoryVideos(rows)
+        } else {
+          setHistoryVideos((prev) => mergeRemoteHistoryWithLocal(prev, rows))
+        }
+      }
+    } catch (err) {
+      if (controller.signal.aborted) {
+        return
+      }
+      console.error("Error fetching video history:", err)
+      if (requestId === historyRequestIdRef.current && !silent) {
+        setHistoryError(err instanceof Error ? err.message : "Failed to fetch video history")
+      }
+    } finally {
+      if (requestId === historyRequestIdRef.current && !silent) {
+        setIsHistoryLoading(false)
+      }
+    }
+  }, [])
+
+  React.useEffect(() => {
+    void fetchVideoHistory(20)
+    return () => {
+      historyAbortRef.current?.abort()
+    }
+  }, [fetchVideoHistory])
+
+  const gridItems = React.useMemo((): VideoGridItem[] => {
+    const generating = pendingRequests.map((request) => ({
+      type: "generating" as const,
+      id: `slot-${request.clientRequestId}`,
+    }))
+    const completed = historyVideos
+      .filter((v) => v.url)
+      .map((v) => ({ type: "video" as const, data: v }))
+    return [...generating, ...completed]
+  }, [historyVideos, pendingRequests])
 
   // Handle generation
   const handleGenerate = async () => {
@@ -335,10 +467,65 @@ function VideoPageContent() {
       }
     }
 
-    setIsGenerating(true)
+    const clientRequestId = createClientRequestId()
+    const capture = {
+      model: selectedModel,
+      mergedPrompt,
+      parameters: { ...parameters },
+      negativePrompt,
+      inputImage,
+      lastFrameImage,
+      inputVideo,
+      inputAudio,
+      referenceImages: [...referenceImages],
+      attachedCommandRefs: [...attachedCommandRefs],
+      chipSlots,
+      multiShotMode,
+      multiShotShots: multiShotShots.map((s) => ({ ...s })),
+      promptForMultiShot: prompt,
+      isMotionCopy,
+      isKlingV3,
+      isKlingV3Omni,
+      isSeedance2,
+      isWan27,
+      isLipsync,
+    }
+
+    setPendingRequests((prev) => [
+      {
+        clientRequestId,
+        startedAt: new Date().toISOString(),
+        prompt: mergedPrompt || null,
+        model: selectedModel.identifier,
+        modelDisplayName: selectedModel.name,
+      },
+      ...prev,
+    ])
     setError(null)
 
-    try {
+    void (async () => {
+      const selectedModel = capture.model
+      const mergedPrompt = capture.mergedPrompt
+      const parameters = capture.parameters
+      const negativePrompt = capture.negativePrompt
+      const inputImage = capture.inputImage
+      const lastFrameImage = capture.lastFrameImage
+      const inputVideo = capture.inputVideo
+      const inputAudio = capture.inputAudio
+      const referenceImages = capture.referenceImages
+      const attachedCommandRefs = capture.attachedCommandRefs
+      const chipSlots = capture.chipSlots
+      const multiShotMode = capture.multiShotMode
+      const multiShotShots = capture.multiShotShots
+      const prompt = capture.promptForMultiShot
+      const isMotionCopy = capture.isMotionCopy
+      const isKlingV3 = capture.isKlingV3
+      const isKlingV3Omni = capture.isKlingV3Omni
+      const isSeedance2 = capture.isSeedance2
+      const isWan27 = capture.isWan27
+      const isLipsync = capture.isLipsync
+
+      try {
       const supabase = createClient()
       const { data: { user }, error: authError } = await supabase.auth.getUser()
 
@@ -574,7 +761,21 @@ function VideoPageContent() {
 
             return response.json()
           })()
-        : await generateVideoAndWait(endpoint, requestBody)
+        : await generateVideoAndWait(endpoint, requestBody, {
+            onAccepted: ({ generationId, predictionId }) => {
+              setPendingRequests((prev) =>
+                prev.map((request) =>
+                  request.clientRequestId === clientRequestId
+                    ? {
+                        ...request,
+                        generationId: generationId ?? request.generationId ?? null,
+                        predictionId: predictionId ?? request.predictionId ?? null,
+                      }
+                    : request,
+                ),
+              )
+            },
+          })
 
       const resultVideoUrl =
         typeof data.video?.url === "string"
@@ -582,30 +783,52 @@ function VideoPageContent() {
           : undefined
 
       if (resultVideoUrl) {
-        const newVideo: GeneratedVideo = {
+        const newItem: VideoHistoryItem = {
           url: resultVideoUrl,
           model: selectedModel.name,
+          prompt: mergedPrompt || null,
+          tool: isLipsync ? "lipsync" : "video",
+          createdAt: new Date().toISOString(),
           timestamp: Date.now(),
           parameters: { ...parameters, prompt: mergedPrompt },
         }
-        setGeneratedVideos(prev => [newVideo, ...prev])
+        setPendingRequests((current) => removeSlotByClientId(current, clientRequestId))
+        setHistoryVideos((current) => prependUniqueHistoryItems(current, [newItem]))
+        void fetchVideoHistory(20, { silent: true, replace: false })
+      } else {
+        setPendingRequests((current) => removeSlotByClientId(current, clientRequestId))
+        setError("No video URL returned")
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      console.error('Generation error:', err)
-    } finally {
-      setIsGenerating(false)
-    }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "An error occurred"
+        console.error("Generation error:", err)
+        setPendingRequests((current) => removeSlotByClientId(current, clientRequestId))
+        if (message.includes("Concurrency limit reached")) {
+          toast.error("Too many active generations", {
+            description: `${message} Wait for one to finish, then try again.`,
+          })
+        }
+        setError(message)
+        void fetchVideoHistory(20, { silent: true, replace: false })
+      }
+    })()
   }
 
   // Render showcase
   const renderShowcase = () => {
-    // Always show grid if we have videos OR are generating
-    if (generatedVideos.length > 0 || isGenerating) {
-      return <VideoGrid videos={generatedVideos} isGenerating={isGenerating} />
+    const hasItems = gridItems.length > 0
+
+    if (hasItems || isHistoryLoading) {
+      return (
+        <VideoGrid
+          items={gridItems}
+          isLoadingSkeleton={
+            isHistoryLoading && historyVideos.length === 0 && pendingRequests.length === 0
+          }
+        />
+      )
     }
 
-    // Show error state if there's an error and no videos
     if (error) {
       return (
         <Card className="w-full h-full flex flex-col">
@@ -619,7 +842,6 @@ function VideoPageContent() {
       )
     }
 
-    // Show showcase card when no videos and not generating
     return (
       <VideoShowcaseCard
         tool_title=""
@@ -700,6 +922,8 @@ function VideoPageContent() {
                     onParametersChange={setParameters}
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
+                    allowConcurrent={true}
+                    allowOptionsDuringGeneration={true}
                     multiShotMode={multiShotMode}
                     onMultiShotModeChange={setMultiShotMode}
                     multiShotShots={multiShotShots}
@@ -742,6 +966,8 @@ function VideoPageContent() {
                         onParametersChange={setParameters}
                         isGenerating={isGenerating}
                         onGenerate={handleGenerate}
+                        allowConcurrent={true}
+                        allowOptionsDuringGeneration={true}
                         multiShotMode={multiShotMode}
                         onMultiShotModeChange={setMultiShotMode}
                         multiShotShots={multiShotShots}
@@ -785,6 +1011,8 @@ function VideoPageContent() {
                     onParametersChange={setParameters}
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
+                    allowConcurrent={true}
+                    allowOptionsDuringGeneration={true}
                     multiShotMode={multiShotMode}
                     onMultiShotModeChange={setMultiShotMode}
                     multiShotShots={multiShotShots}

@@ -55,6 +55,10 @@ interface VideoInputBoxProps {
   onParametersChange: (params: Record<string, unknown>) => void
   isGenerating: boolean
   onGenerate: () => void
+  /** When true, Generate stays enabled while jobs are running (queue concurrent requests). */
+  allowConcurrent?: boolean
+  /** When true, model and multi-shot controls stay enabled during generation. */
+  allowOptionsDuringGeneration?: boolean
   /** Kling v3 multi-shot: when true, show multi-shot editor */
   multiShotMode?: boolean
   onMultiShotModeChange?: (enabled: boolean) => void
@@ -89,6 +93,8 @@ export function VideoInputBox({
   onParametersChange,
   isGenerating,
   onGenerate,
+  allowConcurrent = false,
+  allowOptionsDuringGeneration = false,
   multiShotMode = false,
   onMultiShotModeChange,
   multiShotShots = [],
@@ -567,28 +573,30 @@ export function VideoInputBox({
       >
         <Button
           onClick={onGenerate}
-          disabled={!isReady || isGenerating}
+          disabled={!isReady || (isGenerating && !allowConcurrent)}
           className={cn(
             "bg-primary hover:bg-primary/80 text-primary-foreground font-semibold h-10 min-w-[100px] text-sm px-4 py-6 transition-all duration-300 relative z-0",
             !isReady && "opacity-50 cursor-not-allowed"
           )}
         >
-          {isGenerating ? (
-            <>
-              <CircleNotch className="size-3 mr-1.5 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <div className="flex flex-col items-center gap-0.5">
-              <span className="text-sm font-semibold">Generate</span>
-              <div className="flex items-center gap-0.5">
-                <Sparkle size={8} weight="fill" />
-                <span className="text-[10px]">
-                  {selectedModel.model_cost != null ? selectedModel.model_cost : "-"}
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-sm font-semibold">
+              {isGenerating && !allowConcurrent ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <CircleNotch className="size-3 animate-spin" />
+                  Generating...
                 </span>
-              </div>
+              ) : (
+                "Generate"
+              )}
+            </span>
+            <div className="flex items-center gap-0.5">
+              <Sparkle size={8} weight="fill" />
+              <span className="text-[10px]">
+                {selectedModel.model_cost != null ? selectedModel.model_cost : "-"}
+              </span>
             </div>
-          )}
+          </div>
         </Button>
       </div>
     </div>
@@ -740,7 +748,7 @@ export function VideoInputBox({
         onModelChange={onModelChange}
         parameters={parameters}
         onParametersChange={onParametersChange}
-        disabled={isGenerating}
+        disabled={!allowOptionsDuringGeneration && isGenerating}
         variant="image"
         referenceVideoProvided={!!inputVideo || chipSlotInfo.referenceVideoSlotFromChip}
       />
@@ -994,7 +1002,7 @@ export function VideoInputBox({
                 id="multi-shot-mode"
                 checked={multiShotMode}
                 onCheckedChange={onMultiShotModeChange}
-                disabled={isGenerating}
+                disabled={!allowOptionsDuringGeneration && isGenerating}
               />
               <Label htmlFor="multi-shot-mode" className="text-xs font-medium cursor-pointer">
                 Multishot
@@ -1011,7 +1019,7 @@ export function VideoInputBox({
                   totalDuration={totalDuration}
                   maxShots={6}
                   minDurationPerShot={1}
-                  disabled={isGenerating}
+                  disabled={!allowOptionsDuringGeneration && isGenerating}
                 />
               </>
             )}
@@ -1070,7 +1078,7 @@ export function VideoInputBox({
                       variant="outline"
                       size="sm"
                       className="h-12 w-12 rounded-md border-dashed p-0"
-                      disabled={isGenerating}
+                      disabled={!allowOptionsDuringGeneration && isGenerating}
                       aria-label="Add reference image or audio"
                     >
                       <Plus className="size-5" weight="bold" />
@@ -1112,7 +1120,7 @@ export function VideoInputBox({
                   size="sm"
                   className="h-12 w-12 rounded-md border-dashed p-0"
                   onClick={() => referenceImagesRef.current?.click()}
-                  disabled={isGenerating}
+                  disabled={!allowOptionsDuringGeneration && isGenerating}
                   aria-label="Add reference image"
                 >
                   <Plus className="size-5" weight="bold" />

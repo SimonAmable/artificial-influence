@@ -4,7 +4,21 @@ import * as React from "react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { FilePlus, FolderOpen, Plus as PlusPhosphor } from "@phosphor-icons/react"
-import { ArrowLeft, Clock, Eye, Globe, Loader2, Play, Plus, RefreshCw, Star, Trash2 } from "lucide-react"
+import {
+  ArrowLeft,
+  ChevronDown,
+  Clock,
+  Eye,
+  Globe,
+  Loader2,
+  Pencil,
+  Play,
+  Plus,
+  RefreshCw,
+  Save,
+  Star,
+  Trash2,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { AssetSelectionModal } from "@/components/shared/modals/asset-selection-modal"
@@ -50,9 +64,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ModelIcon } from "@/components/shared/icons/model-icon"
+import { VariablesEditor } from "@/components/automations/variables-editor"
 import { AUTOMATION_SLASH_COMMANDS } from "@/lib/commands/presets-automation"
 import type { AttachedRef } from "@/lib/commands/types"
-import type { AutomationPromptAttachment, AutomationPromptPayload } from "@/lib/automations/prompt-payload"
+import { makeMentionToken } from "@/lib/commands/mention-token"
+import {
+  normalizeAutomationPromptPayload,
+  sanitizeAutomationVariables,
+  type AutomationPromptAttachment,
+  type AutomationPromptPayload,
+  type AutomationPromptVariable,
+} from "@/lib/automations/prompt-payload"
 import {
   CHAT_GATEWAY_MODEL_OPTIONS,
   DEFAULT_CHAT_GATEWAY_MODEL,
@@ -69,7 +93,9 @@ import {
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { Collapsible as CollapsiblePrimitive } from "radix-ui"
 import { AutomationRunPreviewModal } from "@/components/automations/automation-run-preview-modal"
+import { Shimmer } from "@/components/ai-elements/shimmer"
 
 type AutomationApi = {
   id: string
@@ -156,6 +182,27 @@ function mediaKindFromMime(mime: string): "audio" | "image" | "other" | "video" 
   return "other"
 }
 
+/** Canonical JSON for PATCH body fields — used to detect unsaved edits vs last hydrated baseline. */
+function buildPersistSnapshot(input: {
+  name: string
+  description: string
+  promptPayload: AutomationPromptPayload
+  cronSchedule: string
+  timezone: string
+  model: string
+  isPublic: boolean
+}): string {
+  return JSON.stringify({
+    name: input.name.trim(),
+    description: input.description.trim() || null,
+    promptPayload: input.promptPayload,
+    cronSchedule: input.cronSchedule.trim(),
+    timezone: input.timezone,
+    model: input.model || null,
+    isPublic: input.isPublic,
+  })
+}
+
 function attachedRefFromAssetUrl(url: string, assetType: "audio" | "image" | "video"): AttachedRef {
   const chipId =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -186,6 +233,7 @@ export function AutomationsPage() {
   const [newDialogOpen, setNewDialogOpen] = React.useState(false)
   const [runs, setRuns] = React.useState<AutomationRunApi[]>([])
   const [loadingRuns, setLoadingRuns] = React.useState(false)
+  const [editDetailsOpen, setEditDetailsOpen] = React.useState(false)
 
   const [name, setName] = React.useState("")
   const [description, setDescription] = React.useState("")
@@ -193,13 +241,18 @@ export function AutomationsPage() {
   const [attachedRefs, setAttachedRefs] = React.useState<AttachedRef[]>([])
   const [savedAttachments, setSavedAttachments] = React.useState<AutomationPromptAttachment[]>([])
   const [uploadQueue, setUploadQueue] = React.useState<AutomationPendingUpload[]>([])
+  const [automationVariables, setAutomationVariables] = React.useState<AutomationPromptVariable[]>([])
+  const [assetPickerForVariable, setAssetPickerForVariable] = React.useState<{
+    variableId: string
+    itemIndex: number
+  } | null>(null)
   const [assetModalOpen, setAssetModalOpen] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [timezone, setTimezone] = React.useState(() => getDefaultTimeZone())
   const ianaZones = React.useMemo(() => listIanaTimeZones(), [])
   const [model, setModel] = React.useState<string>(DEFAULT_CHAT_GATEWAY_MODEL)
   const [presetTab, setPresetTab] = React.useState<"presets" | "custom">("presets")
-  const [presetKind, setPresetKind] = React.useState<InferredPreset["kind"]>("hourly")
+  const [presetKind, setPresetKind] = React.useState<InferredPreset["kind"]>("daily")
   const [dailyHour, setDailyHour] = React.useState(9)
   const [dailyMinute, setDailyMinute] = React.useState(0)
   const [weeklyDow, setWeeklyDow] = React.useState(1)
@@ -208,6 +261,8 @@ export function AutomationsPage() {
   const [customCron, setCustomCron] = React.useState(CRON_PRESET_HOURLY)
   const [nextPreview, setNextPreview] = React.useState<string | null>(null)
   const [saving, setSaving] = React.useState(false)
+  const [editBaselineSnapshot, setEditBaselineSnapshot] = React.useState("")
+  const needsEditBaselineCaptureRef = React.useRef(false)
   const [runningId, setRunningId] = React.useState<string | null>(null)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
   const [isPublicAutomation, setIsPublicAutomation] = React.useState(false)
@@ -237,6 +292,20 @@ export function AutomationsPage() {
   const selected = automations.find((a) => a.id === selectedId) ?? null
   const isCommunityScope = scope === "community"
   const lastHydratedId = React.useRef<string | null>(null)
+  const autoOpenedRunIdRef = React.useRef<string | null>(null)
+
+  React.useEffect(() => {
+    if (!activeRunInfo) return
+    if (autoOpenedRunIdRef.current === activeRunInfo.runId) return
+    autoOpenedRunIdRef.current = activeRunInfo.runId
+    setPreviewRunModal({
+      runId: activeRunInfo.runId,
+      threadId: activeRunInfo.threadId,
+      status: "running",
+      runTrigger: "manual",
+      error: null,
+    })
+  }, [activeRunInfo])
 
   React.useEffect(() => {
     let cancelled = false
@@ -327,6 +396,10 @@ export function AutomationsPage() {
   }, [selectedId, loadRuns, isCommunityScope])
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  React.useEffect(() => {
+    setEditDetailsOpen(false)
+  }, [selectedId])
+
   const effectiveCron = React.useMemo(() => {
     if (presetTab === "custom") {
       return customCron.trim()
@@ -388,10 +461,12 @@ export function AutomationsPage() {
     setAttachedRefs([])
     setSavedAttachments([])
     setUploadQueue([])
+    setAutomationVariables([])
+    setAssetPickerForVariable(null)
     setTimezone(getDefaultTimeZone())
     setModel(DEFAULT_CHAT_GATEWAY_MODEL)
     setPresetTab("presets")
-    setPresetKind("hourly")
+    setPresetKind("daily")
     setDailyHour(9)
     setDailyMinute(0)
     setWeeklyDow(1)
@@ -410,10 +485,13 @@ export function AutomationsPage() {
       setPrompt(payload.text)
       setAttachedRefs(Array.isArray(payload.refs) ? (payload.refs as AttachedRef[]) : [])
       setSavedAttachments(Array.isArray(payload.attachments) ? payload.attachments : [])
+      const norm = normalizeAutomationPromptPayload(a.prompt, a.prompt_payload)
+      setAutomationVariables(norm.variables ?? [])
     } else {
       setPrompt(a.prompt)
       setAttachedRefs([])
       setSavedAttachments([])
+      setAutomationVariables([])
     }
     setUploadQueue([])
     setTimezone(a.timezone || getDefaultTimeZone())
@@ -450,6 +528,7 @@ export function AutomationsPage() {
         void _e
       }
     }
+    needsEditBaselineCaptureRef.current = true
   }, [])
 
   const handleAttachFiles = React.useCallback(async (files: File[]) => {
@@ -482,10 +561,125 @@ export function AutomationsPage() {
     )
   }, [])
 
-  const handleAssetLibrarySelect = React.useCallback((imageUrl: string) => {
-    setAttachedRefs((prev) => [...prev, attachedRefFromAssetUrl(imageUrl, "image")])
-    setAssetModalOpen(false)
+  const handleAssetLibrarySelect = React.useCallback(
+    (imageUrl: string) => {
+      if (assetPickerForVariable) {
+        const base = attachedRefFromAssetUrl(imageUrl, "image")
+        const taken = new Set<string>()
+        for (const r of attachedRefs) {
+          if (r.mentionToken) taken.add(r.mentionToken)
+        }
+        for (const v of automationVariables) {
+          for (const it of v.items) {
+            if (it.kind === "ref" && it.ref.mentionToken) taken.add(it.ref.mentionToken)
+          }
+        }
+        const mentionToken = makeMentionToken(base, taken)
+        const ref: AttachedRef = { ...base, mentionToken }
+        const target = assetPickerForVariable
+        setAutomationVariables((prev) =>
+          prev.map((v) => {
+            if (v.id !== target.variableId) return v
+            const items = v.items.map((it, i) => {
+              if (i !== target.itemIndex || it.kind !== "ref") return it
+              return { kind: "ref" as const, ref }
+            })
+            return { ...v, items }
+          }),
+        )
+        setAssetPickerForVariable(null)
+        setAssetModalOpen(false)
+        return
+      }
+      setAttachedRefs((prev) => [...prev, attachedRefFromAssetUrl(imageUrl, "image")])
+      setAssetModalOpen(false)
+    },
+    [assetPickerForVariable, attachedRefs, automationVariables],
+  )
+
+  const insertVariableToken = React.useCallback((token: string) => {
+    setPrompt((prev) => {
+      if (!prev) return token
+      return prev.endsWith(" ") || prev.endsWith("\n") ? `${prev}${token}` : `${prev} ${token}`
+    })
   }, [])
+
+  const currentPromptPayload = React.useMemo((): AutomationPromptPayload => {
+    const attachments: AutomationPromptAttachment[] = [
+      ...savedAttachments,
+      ...uploadQueue
+        .filter((u) => u.uploadedUrl)
+        .map((u) => ({
+          url: u.uploadedUrl!,
+          mediaType: u.file.type || "application/octet-stream",
+          filename: u.file.name,
+        })),
+    ]
+    const vars = sanitizeAutomationVariables(automationVariables)
+    return {
+      text: prompt.trim(),
+      refs: attachedRefs,
+      attachments,
+      ...(vars.length > 0 ? { variables: vars } : {}),
+    }
+  }, [prompt, attachedRefs, savedAttachments, uploadQueue, automationVariables])
+
+  const persistSnapshot = React.useMemo(() => {
+    if (!selected || newDialogOpen || isCommunityScope) return ""
+    const cron = presetTab === "custom" ? customCron.trim() : effectiveCron
+    return buildPersistSnapshot({
+      name,
+      description,
+      promptPayload: currentPromptPayload,
+      cronSchedule: cron,
+      timezone,
+      model,
+      isPublic: isPublicAutomation,
+    })
+  }, [
+    selected,
+    newDialogOpen,
+    isCommunityScope,
+    name,
+    description,
+    currentPromptPayload,
+    presetTab,
+    customCron,
+    effectiveCron,
+    timezone,
+    model,
+    isPublicAutomation,
+  ])
+
+  React.useLayoutEffect(() => {
+    if (!needsEditBaselineCaptureRef.current || !selectedId) return
+    setEditBaselineSnapshot(persistSnapshot)
+    needsEditBaselineCaptureRef.current = false
+  }, [persistSnapshot, selectedId])
+
+  React.useEffect(() => {
+    setEditBaselineSnapshot("")
+  }, [selectedId])
+
+  const isEditHydrationPending = Boolean(
+    selected && selectedId && lastHydratedId.current !== selectedId,
+  )
+  const hasUnsavedFormEdits =
+    !isCommunityScope &&
+    Boolean(selected) &&
+    !newDialogOpen &&
+    !isEditHydrationPending &&
+    persistSnapshot.length > 0 &&
+    editBaselineSnapshot.length > 0 &&
+    persistSnapshot !== editBaselineSnapshot
+
+  const previewTemplatePayload = React.useMemo((): AutomationPromptPayload | null => {
+    if (!selected) return null
+    if (scope === "community") {
+      return normalizeAutomationPromptPayload(selected.prompt, selected.prompt_payload)
+    }
+    return currentPromptPayload
+  }, [selected, scope, currentPromptPayload])
 
   React.useEffect(() => {
     if (!selectedId || !selected) {
@@ -514,6 +708,7 @@ export function AutomationsPage() {
       toast.error("Schedule is required")
       return
     }
+    const vars = sanitizeAutomationVariables(automationVariables)
     const promptPayload: AutomationPromptPayload = {
       text: prompt.trim(),
       refs: attachedRefs,
@@ -527,6 +722,7 @@ export function AutomationsPage() {
             filename: u.file.name,
           })),
       ],
+      ...(vars.length > 0 ? { variables: vars } : {}),
     }
     setSaving(true)
     try {
@@ -867,52 +1063,79 @@ export function AutomationsPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="top" sideOffset={4}>
-                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setAssetPickerForVariable(null)
+                    fileInputRef.current?.click()
+                  }}
+                >
                   <FilePlus className="mr-2 size-4" />
                   Upload files
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setAssetModalOpen(true)}>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setAssetPickerForVariable(null)
+                    setAssetModalOpen(true)
+                  }}
+                >
                   <FolderOpen className="mr-2 size-4" />
                   Select asset
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Select value={model} onValueChange={setModel} disabled={readOnly}>
+              <SelectTrigger
+                id={`${idPrefix}-model`}
+                className="h-7 w-fit min-w-0 gap-1.5 px-2 text-xs"
+              >
+                <SelectValue placeholder="Select model">
+                  {(() => {
+                    const opt = CHAT_GATEWAY_MODEL_OPTIONS.find((o) => o.id === model)
+                    return (
+                      <div className="flex items-center gap-2">
+                        <ModelIcon identifier={model} size={14} />
+                        <span>{opt?.label ?? model}</span>
+                      </div>
+                    )
+                  })()}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent position="popper" side="top" sideOffset={4}>
+                {CHAT_GATEWAY_MODEL_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id}>
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-md border border-border bg-muted/30 p-1.5 shrink-0">
+                        <ModelIcon identifier={opt.id} size={18} />
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="text-sm font-semibold">{opt.label}</span>
+                        <span className="text-xs text-muted-foreground">{opt.description}</span>
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </InputGroupAddon>
         </InputGroup>
+        {!readOnly || automationVariables.length > 0 ? (
+          <VariablesEditor
+            variables={automationVariables}
+            onChange={readOnly ? () => {} : setAutomationVariables}
+            onInsertToken={insertVariableToken}
+            onRequestPickRef={(variableId, itemIndex) => {
+              if (readOnly) return
+              setAssetPickerForVariable({ variableId, itemIndex })
+              setAssetModalOpen(true)
+            }}
+            extraRefs={attachedRefs}
+            promptContext={prompt}
+            disabled={readOnly}
+            className="pt-2"
+          />
+        ) : null}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor={`${idPrefix}-tz`}>Timezone</Label>
-          <Select value={timezone} onValueChange={setTimezone} disabled={readOnly}>
-            <SelectTrigger id={`${idPrefix}-tz`} className="w-full font-mono text-xs">
-              <SelectValue placeholder="Select timezone" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[min(60dvh,320px)]">
-              {ianaZones.map((tz) => (
-                <SelectItem key={tz} value={tz} className="font-mono text-xs">
-                  {tz}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Model</Label>
-          <Select value={model} onValueChange={setModel} disabled={readOnly}>
-            <SelectTrigger id={`${idPrefix}-model`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CHAT_GATEWAY_MODEL_OPTIONS.map((opt) => (
-                <SelectItem key={opt.id} value={opt.id}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
 
       {showVisibility ? (
         <div className="space-y-2">
@@ -1045,15 +1268,62 @@ export function AutomationsPage() {
             </p>
           </TabsContent>
         </Tabs>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock className="h-3.5 w-3.5" />
-          {nextPreview ? (
-            <span>
-              Next run: <strong className="text-foreground">{nextPreview}</strong>
-            </span>
-          ) : (
-            <span>Pick a schedule to see when it'll run next.</span>
-          )}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5" />
+            {nextPreview ? (
+              <span>
+                Next run: <strong className="text-foreground">{nextPreview}</strong>
+              </span>
+            ) : (
+              <span>Pick a schedule to see when it'll run next.</span>
+            )}
+          </div>
+          <span className="inline-flex items-center gap-1">
+            <span>Timezone:</span>
+            <span className="font-mono text-foreground/80">{timezone}</span>
+            {!readOnly ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-primary underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+                    >
+                      Change
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-[280px] p-3">
+                    <div className="space-y-2">
+                      <Label htmlFor={`${idPrefix}-tz-popover`} className="text-xs">
+                        Timezone
+                      </Label>
+                      <Select value={timezone} onValueChange={setTimezone}>
+                        <SelectTrigger
+                          id={`${idPrefix}-tz-popover`}
+                          className="w-full font-mono text-xs"
+                        >
+                          <SelectValue placeholder="Select timezone" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[min(60dvh,320px)]">
+                          {ianaZones.map((tz) => (
+                            <SelectItem
+                              key={tz}
+                              value={tz}
+                              className="font-mono text-xs"
+                            >
+                              {tz}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </>
+            ) : null}
+          </span>
         </div>
       </div>
       </fieldset>
@@ -1203,7 +1473,7 @@ export function AutomationsPage() {
         </ScrollArea>
       </aside>
 
-      <main className="min-w-0 flex-1">
+      <main className="flex min-w-0 flex-1 flex-col gap-4">
         {!selectedId || !selected ? (
           <Card className="border-dashed py-4">
             <CardHeader>
@@ -1215,7 +1485,8 @@ export function AutomationsPage() {
             </CardHeader>
           </Card>
         ) : (
-          <Card className="py-4">
+          <>
+            <Card className="py-4">
             <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4 space-y-0">
               <div>
                 <CardTitle>{selected.name}</CardTitle>
@@ -1237,6 +1508,18 @@ export function AutomationsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 {isCommunityScope ? (
                   <>
+                    <Button
+                      variant={editDetailsOpen ? "secondary" : "outline"}
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => setEditDetailsOpen((o) => !o)}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      {editDetailsOpen ? "Hide details" : "Details"}
+                      <ChevronDown
+                        className={cn("h-3.5 w-3.5 transition-transform", editDetailsOpen && "rotate-180")}
+                      />
+                    </Button>
                     <Badge variant="outline" className="text-xs">
                       Public
                     </Badge>
@@ -1287,6 +1570,34 @@ export function AutomationsPage() {
                   </>
                 ) : (
                   <>
+                    <Button
+                      variant={editDetailsOpen ? "secondary" : "outline"}
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => setEditDetailsOpen((o) => !o)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      {editDetailsOpen ? "Hide edit" : "Edit"}
+                      <ChevronDown
+                        className={cn("h-3.5 w-3.5 transition-transform", editDetailsOpen && "rotate-180")}
+                      />
+                    </Button>
+                    {hasUnsavedFormEdits ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="gap-1.5 shadow-sm"
+                        disabled={saving}
+                        onClick={() => void save()}
+                      >
+                        {saving ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Save className="h-3.5 w-3.5" />
+                        )}
+                        Save edits
+                      </Button>
+                    ) : null}
                     <div className="flex items-center gap-2">
                       <Switch
                         checked={selected.is_active}
@@ -1365,7 +1676,13 @@ export function AutomationsPage() {
                             ) : (
                               <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                             )}
-                            {viewReady ? "View current run" : "Starting…"}
+                            {viewReady ? (
+                              <Shimmer as="span" duration={2} spread={3}>
+                                View current run
+                              </Shimmer>
+                            ) : (
+                              "Starting…"
+                            )}
                           </Button>
                         )
                       })()
@@ -1386,138 +1703,222 @@ export function AutomationsPage() {
                 )}
               </div>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-6">
-                {renderAutomationFormFields("edit", {
-                  readOnly: isCommunityScope,
-                  showVisibility: !isCommunityScope,
-                })}
-              </div>
+            <CardContent className="pt-0">
+              <CollapsiblePrimitive.Root open={editDetailsOpen} onOpenChange={setEditDetailsOpen}>
+                <CollapsiblePrimitive.Content
+                  className={cn(
+                    "overflow-hidden text-sm transition-all data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-top-1 data-[state=open]:slide-in-from-top-1",
+                    "data-[state=closed]:hidden",
+                  )}
+                >
+                  <div className="space-y-6 border-t border-border/40 pt-6">
+                    <div className="space-y-6">
+                      {renderAutomationFormFields("edit", {
+                        readOnly: isCommunityScope,
+                        showVisibility: !isCommunityScope,
+                      })}
+                    </div>
 
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
-                {selected.next_run_at ? (
-                  <p>
-                    <span className="text-muted-foreground">Next scheduled:</span>{" "}
-                    {new Date(selected.next_run_at).toLocaleString()}
-                  </p>
-                ) : null}
-                {selected.last_run_at ? (
-                  <p className="mt-1">
-                    <span className="text-muted-foreground">Last run:</span>{" "}
-                    {formatDistanceToNow(new Date(selected.last_run_at), { addSuffix: true })}
-                  </p>
-                ) : null}
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Schedule:{" "}
-                  <code className="rounded bg-muted px-1">{selected.cron_schedule}</code>
-                </p>
-              </div>
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
+                      {selected.next_run_at ? (
+                        <p>
+                          <span className="text-muted-foreground">Next scheduled:</span>{" "}
+                          {new Date(selected.next_run_at).toLocaleString(undefined, {
+                            timeZone: timezone,
+                          })}
+                        </p>
+                      ) : null}
+                      {selected.last_run_at ? (
+                        <p className="mt-1">
+                          <span className="text-muted-foreground">Last run:</span>{" "}
+                          {formatDistanceToNow(new Date(selected.last_run_at), { addSuffix: true })}
+                        </p>
+                      ) : null}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Schedule:{" "}
+                        <code className="rounded bg-muted px-1">{selected.cron_schedule}</code>
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Timezone:{" "}
+                        <span className="font-mono text-foreground/80">{timezone}</span>
+                        {!isCommunityScope ? (
+                          <>
+                            {" · "}
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="text-primary underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+                                >
+                                  Change
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent align="start" className="w-[280px] p-3">
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit-tz-popover" className="text-xs">
+                                    Timezone
+                                  </Label>
+                                  <Select value={timezone} onValueChange={setTimezone}>
+                                    <SelectTrigger
+                                      id="edit-tz-popover"
+                                      className="w-full font-mono text-xs"
+                                    >
+                                      <SelectValue placeholder="Select timezone" />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-[min(60dvh,320px)]">
+                                      {ianaZones.map((tz) => (
+                                        <SelectItem
+                                          key={tz}
+                                          value={tz}
+                                          className="font-mono text-xs"
+                                        >
+                                          {tz}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </>
+                        ) : null}
+                      </p>
+                    </div>
 
-              {!isCommunityScope ? (
-                <div className="flex gap-2">
-                  <Button onClick={() => void save()} disabled={saving}>
-                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Save
-                  </Button>
-                </div>
-              ) : null}
-
-              {!isCommunityScope ? (
-              <div className="space-y-2 border-t pt-6">
-                <h3 className="text-sm font-semibold">Recent runs</h3>
-                {loadingRuns ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                ) : runs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No runs yet.</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {runs.map((r) => {
-                      const isCurrentPreview =
-                        selected.is_public === true && selected.preview_run_id === r.id
-                      const canSetAsPreview =
-                        selected.is_public === true &&
-                        r.status === "completed" &&
-                        Boolean(r.thread_id) &&
-                        !isCurrentPreview
-                      const isSettingThis = settingPreviewRunId === r.id
-                      return (
-                        <li
-                          key={r.id}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 px-3 py-2 text-sm"
+                    {!isCommunityScope ? (
+                      <div className="flex flex-col gap-3 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                        <p className="text-sm text-muted-foreground">
+                          Changes are kept only after you save.
+                        </p>
+                        <Button
+                          type="button"
+                          size="lg"
+                          className="w-full shadow-sm sm:w-auto"
+                          onClick={() => void save()}
+                          disabled={saving}
                         >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant={r.status === "completed" ? "default" : r.status === "failed" ? "destructive" : "secondary"}>
-                              {r.status}
-                            </Badge>
-                            <Badge
-                              variant={(r.run_trigger ?? "scheduled") === "manual" ? "outline" : "secondary"}
-                              className="text-[10px]"
-                            >
-                              {(r.run_trigger ?? "scheduled") === "manual" ? "Manual" : "Scheduled"}
-                            </Badge>
-                            {isCurrentPreview ? (
-                              <Badge variant="outline" className="gap-1 text-[10px]">
-                                <Star className="h-3 w-3 fill-current" />
-                                Current preview
-                              </Badge>
-                            ) : null}
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(r.started_at).toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 px-2 text-xs"
-                              onClick={() =>
-                                setPreviewRunModal({
-                                  runId: r.id,
-                                  threadId: r.thread_id,
-                                  status: r.status as "running" | "completed" | "failed",
-                                  runTrigger: (r.run_trigger ?? "scheduled") as "manual" | "scheduled",
-                                  error: r.error,
-                                })
-                              }
-                            >
-                              <Eye className="mr-1 h-3.5 w-3.5" />
-                              Preview
-                            </Button>
-                            {r.thread_id ? (
-                              <Link
-                                href={`/chat/${r.thread_id}`}
-                                className="text-xs font-medium text-primary hover:underline"
-                              >
-                                Open thread
-                              </Link>
-                            ) : null}
-                            {canSetAsPreview ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={isSettingThis || settingPreviewRunId !== null}
-                                onClick={() => void setCommunityPreviewRun(selected.id, r.id)}
-                              >
-                                {isSettingThis ? (
-                                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <Star className="mr-1 h-3.5 w-3.5" />
-                                )}
-                                Set as preview
-                              </Button>
-                            ) : null}
-                          </div>
-                          {r.error ? <p className="w-full text-xs text-destructive">{r.error}</p> : null}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </div>
-              ) : null}
+                          {saving ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="mr-2 h-4 w-4" />
+                          )}
+                          Save changes
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                </CollapsiblePrimitive.Content>
+              </CollapsiblePrimitive.Root>
             </CardContent>
-          </Card>
+            </Card>
+
+            {!isCommunityScope ? (
+              <Card className="py-4">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Recent runs</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {loadingRuns ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  ) : runs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No runs yet.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {runs.map((r) => {
+                        const isCurrentPreview =
+                          selected.is_public === true && selected.preview_run_id === r.id
+                        const canSetAsPreview =
+                          selected.is_public === true &&
+                          r.status === "completed" &&
+                          Boolean(r.thread_id) &&
+                          !isCurrentPreview
+                        const isSettingThis = settingPreviewRunId === r.id
+                        return (
+                          <li
+                            key={r.id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 px-3 py-2 text-sm"
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge
+                                variant={
+                                  r.status === "completed"
+                                    ? "default"
+                                    : r.status === "failed"
+                                      ? "destructive"
+                                      : "secondary"
+                                }
+                              >
+                                {r.status}
+                              </Badge>
+                              <Badge
+                                variant={(r.run_trigger ?? "scheduled") === "manual" ? "outline" : "secondary"}
+                                className="text-[10px]"
+                              >
+                                {(r.run_trigger ?? "scheduled") === "manual" ? "Manual" : "Scheduled"}
+                              </Badge>
+                              {isCurrentPreview ? (
+                                <Badge variant="outline" className="gap-1 text-[10px]">
+                                  <Star className="h-3 w-3 fill-current" />
+                                  Current preview
+                                </Badge>
+                              ) : null}
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(r.started_at).toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-xs"
+                                onClick={() =>
+                                  setPreviewRunModal({
+                                    runId: r.id,
+                                    threadId: r.thread_id,
+                                    status: r.status as "running" | "completed" | "failed",
+                                    runTrigger: (r.run_trigger ?? "scheduled") as "manual" | "scheduled",
+                                    error: r.error,
+                                  })
+                                }
+                              >
+                                <Eye className="mr-1 h-3.5 w-3.5" />
+                                Preview
+                              </Button>
+                              {r.thread_id ? (
+                                <Link
+                                  href={`/chat/${r.thread_id}`}
+                                  className="text-xs font-medium text-primary hover:underline"
+                                >
+                                  Open thread
+                                </Link>
+                              ) : null}
+                              {canSetAsPreview ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isSettingThis || settingPreviewRunId !== null}
+                                  onClick={() => void setCommunityPreviewRun(selected.id, r.id)}
+                                >
+                                  {isSettingThis ? (
+                                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Star className="mr-1 h-3.5 w-3.5" />
+                                  )}
+                                  Set as preview
+                                </Button>
+                              ) : null}
+                            </div>
+                            {r.error ? <p className="w-full text-xs text-destructive">{r.error}</p> : null}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            ) : null}
+          </>
         )}
       </main>
 
@@ -1553,7 +1954,14 @@ export function AutomationsPage() {
         </DialogContent>
       </Dialog>
 
-      <AssetSelectionModal open={assetModalOpen} onOpenChange={setAssetModalOpen} onSelect={handleAssetLibrarySelect} />
+      <AssetSelectionModal
+        open={assetModalOpen}
+        onOpenChange={(open) => {
+          setAssetModalOpen(open)
+          if (!open) setAssetPickerForVariable(null)
+        }}
+        onSelect={handleAssetLibrarySelect}
+      />
 
       {selected && previewRunModal ? (
         <AutomationRunPreviewModal
@@ -1568,6 +1976,7 @@ export function AutomationsPage() {
           initialThreadId={previewRunModal.threadId}
           initialStatus={previewRunModal.status}
           promptPreview={prompt.trim() || null}
+          templatePayload={previewTemplatePayload}
           runTrigger={previewRunModal.runTrigger}
           initialRunError={previewRunModal.error}
         />
@@ -1584,7 +1993,8 @@ export function AutomationsPage() {
           automationName={selected.name}
           runId=""
           source="community"
-          promptPreview={prompt.trim() || null}
+          promptPreview={selected.prompt.trim() || null}
+          templatePayload={previewTemplatePayload}
         />
       ) : null}
 

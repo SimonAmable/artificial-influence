@@ -15,6 +15,7 @@ export type AssetType = "image" | "video" | "audio"
 export interface AssetRecord {
   id: string
   userId: string
+  uploadId?: string | null
   title: string
   description?: string | null
   assetType: AssetType
@@ -37,6 +38,8 @@ export interface CreateAssetInput {
   visibility: AssetVisibility
   tags?: string[]
   url: string
+  uploadId?: string
+  supabaseStoragePath?: string
   thumbnailUrl?: string
   sourceNodeType?: string
   sourceGenerationId?: string

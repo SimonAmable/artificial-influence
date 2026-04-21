@@ -38,7 +38,7 @@ interface CreateAwaitGenerationToolOptions {
 export function createAwaitGenerationTool({ supabase, userId }: CreateAwaitGenerationToolOptions) {
   return tool({
     description:
-      "Wait (poll) until a pending Replicate generation completes or fails, up to a bounded time. Use only when the next tool call needs the finished file (e.g. chain image → video). Requires predictionId from generateImage/generateVideo pending output, or a generations table id. Do not call twice for the same prediction. If this returns timeout, tell the user the UI will keep updating.",
+      "Wait (poll) until a pending Replicate generation completes or fails, up to a bounded time (image cap: 60s, video cap: 90s). **Only** when a **chain** needs the finished file in the **same** turn (otherwise skip — UI updates alone). **Images:** this is the correct wait path when chaining (e.g. image then video/draft/tools); never use scheduleGenerationFollowUp for images. **Video:** use when the next tool needs the file and the job can plausibly complete within ~90s; for long models (e.g. Kling Motion Control, Seedance 2.0) that need a chained next step after many minutes, use scheduleGenerationFollowUp instead. Requires predictionId from generateImage/generateVideo pending output, or a generations table id. Do not call twice for the same prediction. If this returns timeout, tell the user the UI will keep updating.",
     inputSchema: z
       .object({
         predictionId: z

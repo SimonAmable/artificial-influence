@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { ASSET_CATEGORIES, inferStoragePathFromUrl, normalizeTags } from "@/lib/assets/library"
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
+import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
+import { createServiceRoleClient } from "@/lib/supabase/service-role"
+import { resolveStoredObjectUrl } from "@/lib/uploads/server"
 
 function mapAssetRow(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     userId: row.user_id as string,
+    uploadId: (row.upload_id as string | null) || null,
     title: (row.title as string) || "Untitled Asset",
     description: (row.description as string | null) || null,
     assetType: row.asset_type as AssetType,
@@ -85,6 +89,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 })
     }
 
+    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
+    if (termsResponse) {
+      return termsResponse
+    }
+
     const body = await request.json()
     const title = String(body.title || "").trim()
     const url = String(body.url || "").trim()
@@ -105,10 +114,33 @@ export async function POST(request: NextRequest) {
     }
 
     const tags = normalizeTags(Array.isArray(body.tags) ? (body.tags as string[]) : [])
-    const supabaseStoragePath =
+    let assetUrl = url
+    let uploadId: string | null = null
+    let supabaseStoragePath =
       typeof body.supabaseStoragePath === "string" && body.supabaseStoragePath.length > 0
         ? body.supabaseStoragePath
         : inferStoragePathFromUrl(url)
+
+    if (typeof body.uploadId === "string" && body.uploadId.trim().length > 0) {
+      const { data: uploadRow, error: uploadError } = await supabase
+        .from("uploads")
+        .select("id, bucket, storage_path")
+        .eq("id", body.uploadId.trim())
+        .eq("user_id", user.id)
+        .maybeSingle()
+
+      if (uploadError || !uploadRow) {
+        return NextResponse.json({ error: "Referenced upload not found" }, { status: 400 })
+      }
+
+      uploadId = uploadRow.id as string
+      supabaseStoragePath = uploadRow.storage_path as string
+      assetUrl = await resolveStoredObjectUrl(
+        createServiceRoleClient() ?? supabase,
+        uploadRow.bucket as string,
+        uploadRow.storage_path as string,
+      )
+    }
 
     const insertData = {
       user_id: user.id,
@@ -118,8 +150,9 @@ export async function POST(request: NextRequest) {
       category,
       visibility,
       tags,
-      asset_url: url,
+      asset_url: assetUrl,
       thumbnail_url: typeof body.thumbnailUrl === "string" ? body.thumbnailUrl : null,
+      upload_id: uploadId,
       supabase_storage_path: supabaseStoragePath,
       source_node_type: typeof body.sourceNodeType === "string" ? body.sourceNodeType : null,
       source_generation_id: typeof body.sourceGenerationId === "string" ? body.sourceGenerationId : null,

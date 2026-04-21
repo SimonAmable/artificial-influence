@@ -3,6 +3,7 @@ import { DM_Sans, Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/app/theme-provider"
 import { Header } from "@/components/app/header"
+import { TermsAcceptanceGate } from "@/components/app/terms-acceptance-gate"
 import { LayoutModeProviderWrapper } from "@/components/shared/layout/layout-mode-provider-wrapper"
 import { Toaster } from "@/components/ui/sonner"
 import { AIChat } from "@/components/ai-chat"
@@ -67,6 +68,7 @@ export default function RootLayout({
           </LayoutModeProviderWrapper>
           <Toaster />
           <AIChat />
+          <TermsAcceptanceGate />
         </ThemeProvider>
         <Analytics />
         <SitewideJsonLd />

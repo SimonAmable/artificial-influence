@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { assertAcceptedCurrentTerms } from '@/lib/legal/terms-acceptance';
 import { createClient } from '@/lib/supabase/server';
 import { createCheckoutSession, createCustomer } from '@/lib/stripe/server';
 
@@ -25,6 +26,11 @@ export async function POST(request: NextRequest) {
         { error: 'Unauthorized' },
         { status: 401 }
       );
+    }
+
+    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id);
+    if (termsResponse) {
+      return termsResponse;
     }
 
     // Get user profile for email

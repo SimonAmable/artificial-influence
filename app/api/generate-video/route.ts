@@ -1,5 +1,6 @@
 import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
+import { assertAcceptedCurrentTerms } from '@/lib/legal/terms-acceptance';
 import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 
@@ -31,6 +32,11 @@ export async function POST(request: NextRequest) {
       );
     }
     console.log('[generate-video] ✓ User authenticated:', { userId: user.id, email: user.email });
+
+    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id);
+    if (termsResponse) {
+      return termsResponse;
+    }
 
     // Parse JSON body (both canvas and motion copy upload client-side now)
     console.log('[generate-video] Parsing JSON body...');

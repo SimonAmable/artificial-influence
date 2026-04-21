@@ -13,6 +13,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
@@ -125,15 +126,18 @@ export function VoiceSelectorTrigger({
 
 export function VoiceSelectorContent({
   title = "Voice selector",
+  description = "Choose a voice and optionally play its preview clip.",
   className,
   children,
   ...props
 }: React.ComponentProps<typeof DialogContent> & {
   title?: React.ReactNode
+  description?: React.ReactNode
 }) {
   return (
     <DialogContent className={cn("max-w-md p-0 overflow-hidden", className)} {...props}>
       <DialogTitle className="sr-only">{title}</DialogTitle>
+      <DialogDescription className="sr-only">{description}</DialogDescription>
       <div className="flex max-h-[70vh] min-w-0 flex-col">{children}</div>
     </DialogContent>
   )

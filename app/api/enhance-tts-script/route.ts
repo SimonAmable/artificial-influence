@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
-import { enhanceScriptForInworldTts } from "@/lib/prompt-enhancement"
+import { resolveAudioProvider } from "@/lib/server/audio-tts"
+import { enhanceScriptForTts } from "@/lib/prompt-enhancement"
 import { createClient } from "@/lib/supabase/server"
 
 const MAX_CHARS = 12_000
@@ -29,6 +30,15 @@ export async function POST(req: Request) {
 
     const body = await req.json()
     const text = typeof body.text === "string" ? body.text.trim() : ""
+    const provider = resolveAudioProvider(
+      typeof body.provider === "string" ? body.provider : null,
+      typeof body.model === "string" ? body.model : null
+    )
+    const voiceId = typeof body.voice === "string" ? body.voice : null
+    const languageCode =
+      typeof body.languageCode === "string" ? body.languageCode : null
+    const stylePrompt =
+      typeof body.stylePrompt === "string" ? body.stylePrompt : null
 
     if (!text) {
       return NextResponse.json(
@@ -44,16 +54,22 @@ export async function POST(req: Request) {
       )
     }
 
-    const enhanced = await enhanceScriptForInworldTts(text)
+    const enhanced = await enhanceScriptForTts({
+      provider,
+      script: text,
+      voiceId,
+      languageCode,
+      stylePrompt,
+    })
 
-    if (!enhanced) {
+    if (!enhanced.text.trim()) {
       return NextResponse.json(
         { error: "Enhancement returned empty text" },
         { status: 502 }
       )
     }
 
-    return NextResponse.json({ text: enhanced })
+    return NextResponse.json(enhanced)
   } catch (e) {
     console.error("[enhance-tts-script]", e)
     const message = e instanceof Error ? e.message : "Enhancement failed"

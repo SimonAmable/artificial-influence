@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { createClient } from "@/lib/supabase/client"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { generateVideoAndWait } from "@/lib/generate-video-client"
 
 const MOTION_COPY_MODEL = 'kwaivgi/kling-v3-motion-control' as const
@@ -117,62 +117,24 @@ export default function MotionCopyPage() {
         return
       }
 
-      // Get authenticated user for Supabase upload
-      const supabase = createClient()
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      
-      if (authError || !user) {
-        throw new Error('Please log in to generate videos')
-      }
-
       // Upload image to Supabase Storage
       console.log('Uploading image to Supabase...')
-      const imageExtension = inputImage.file.name.split('.').pop() || 'png'
-      const imageTimestamp = Date.now()
-      const imageRandomStr = Math.random().toString(36).substring(7)
-      const imageFilename = `${imageTimestamp}-${imageRandomStr}.${imageExtension}`
-      const imageStoragePath = `${user.id}/reference-images/${imageFilename}`
-
-      const { error: imageUploadError } = await supabase.storage
-        .from('public-bucket')
-        .upload(imageStoragePath, inputImage.file, {
-          contentType: inputImage.file.type,
-          upsert: false,
-        })
-
-      if (imageUploadError) {
-        throw new Error(`Failed to upload image: ${imageUploadError.message}`)
+      const uploadedImage = await uploadFileToSupabase(inputImage.file, 'reference-images')
+      if (!uploadedImage) {
+        throw new Error('Failed to upload image')
       }
-
-      const { data: imageUrlData } = supabase.storage
-        .from('public-bucket')
-        .getPublicUrl(imageStoragePath)
-      const imagePublicUrl = imageUrlData.publicUrl
+      const imageStoragePath = uploadedImage.storagePath
+      const imagePublicUrl = uploadedImage.url
       console.log('✓ Image uploaded:', imagePublicUrl)
 
       // Upload video to Supabase Storage
       console.log('Uploading video to Supabase...')
-      const videoExtension = inputVideo.file.name.split('.').pop() || 'mp4'
-      const videoTimestamp = Date.now()
-      const videoRandomStr = Math.random().toString(36).substring(7)
-      const videoFilename = `${videoTimestamp}-${videoRandomStr}.${videoExtension}`
-      const videoStoragePath = `${user.id}/reference-videos/${videoFilename}`
-
-      const { error: videoUploadError } = await supabase.storage
-        .from('public-bucket')
-        .upload(videoStoragePath, inputVideo.file, {
-          contentType: inputVideo.file.type,
-          upsert: false,
-        })
-
-      if (videoUploadError) {
-        throw new Error(`Failed to upload video: ${videoUploadError.message}`)
+      const uploadedVideo = await uploadFileToSupabase(inputVideo.file, 'reference-videos')
+      if (!uploadedVideo) {
+        throw new Error('Failed to upload video')
       }
-
-      const { data: videoUrlData } = supabase.storage
-        .from('public-bucket')
-        .getPublicUrl(videoStoragePath)
-      const videoPublicUrl = videoUrlData.publicUrl
+      const videoStoragePath = uploadedVideo.storagePath
+      const videoPublicUrl = uploadedVideo.url
       console.log('✓ Video uploaded:', videoPublicUrl)
 
       // Send URLs to API route

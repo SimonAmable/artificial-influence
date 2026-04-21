@@ -531,6 +531,37 @@ export const SEEDANCE_2_0_META: ModelMetadata = {
   ],
 };
 
+export const GOOGLE_GEMINI_3_1_FLASH_TTS_META: ModelMetadata = {
+  id: 'google-gemini-3.1-flash-tts-meta',
+  identifier: 'google/gemini-3.1-flash-tts',
+  name: 'Gemini 3.1 Flash TTS',
+  description:
+    "Google's expressive text-to-speech model with style prompting and inline delivery tags",
+  type: 'audio',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 0.001,
+  supports_reference_image: false,
+  supports_reference_video: false,
+  aspect_ratios: [],
+  customParameters: [
+    {
+      name: 'voice',
+      label: 'Voice',
+      options: ['Kore'],
+      default: 'Kore',
+      description: 'Gemini voice preset',
+    },
+    {
+      name: 'language_code',
+      label: 'Language Code',
+      options: ['en-US'],
+      default: 'en-US',
+      description: 'BCP-47 language code',
+    },
+  ],
+};
+
 // ============================================================================
 // ORGANIZED COLLECTIONS
 // ============================================================================
@@ -563,6 +594,10 @@ export const VIDEO_MODELS_METADATA: ModelMetadata[] = [
   SEEDANCE_2_0_META,
 ];
 
+export const AUDIO_MODELS_METADATA: ModelMetadata[] = [
+  GOOGLE_GEMINI_3_1_FLASH_TTS_META,
+];
+
 /**
  * Motion control models (reference video + character image → motion transfer).
  * Excludes other reference-video models (e.g. Grok). Use for motion-copy page and defaults.
@@ -583,6 +618,7 @@ export const DEFAULT_MOTION_CONTROL_MODEL_IDENTIFIER: string =
 export const ALL_MODELS_METADATA: ModelMetadata[] = [
   ...IMAGE_MODELS_METADATA,
   ...VIDEO_MODELS_METADATA,
+  ...AUDIO_MODELS_METADATA,
 ];
 
 /**
@@ -605,6 +641,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     KLING_V2_6_PRO_META,
     HAILUO_2_3_FAST_META,
     SEEDANCE_2_0_META,
+    GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
   xai: [GROK_IMAGINE_META],
 };

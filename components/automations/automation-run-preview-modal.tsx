@@ -22,6 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import type { AutomationPromptPayload } from "@/lib/automations/prompt-payload"
+import { resolveAutomationVariables } from "@/lib/automations/resolve-variables"
 import { cn } from "@/lib/utils"
 
 const EMPTY_INSTAGRAM_MAP = new Map<string, InstagramConnectionToolSummary>()
@@ -51,6 +53,8 @@ export type AutomationRunPreviewModalProps = {
   initialStatus?: "running" | "completed" | "failed"
   /** Shown while run is in progress (thread transcript may not exist until completion). */
   promptPreview?: string | null
+  /** When set, prompt preview can show a resolved sample (variables substituted). Re-roll picks again. */
+  templatePayload?: AutomationPromptPayload | null
   runTrigger?: "manual" | "scheduled"
   initialRunError?: string | null
   /**
@@ -91,6 +95,7 @@ export function AutomationRunPreviewModal({
   initialThreadId = null,
   initialStatus = "running",
   promptPreview: promptPreviewProp = null,
+  templatePayload = null,
   runTrigger = "scheduled",
   initialRunError = null,
   source = "run",
@@ -108,10 +113,19 @@ export function AutomationRunPreviewModal({
   const [loadError, setLoadError] = React.useState<string | null>(null)
   const [userPromptPreview, setUserPromptPreview] = React.useState<string | null>(null)
   const [pollExhausted, setPollExhausted] = React.useState(false)
+  const [variablePreviewRoll, setVariablePreviewRoll] = React.useState(0)
 
   const abortRef = React.useRef<AbortController | null>(null)
 
-  const effectivePromptPreview = userPromptPreview ?? promptPreviewProp
+  const resolvedTemplatePreview = React.useMemo(() => {
+    if (!templatePayload?.variables?.length) return null
+    const { resolved } = resolveAutomationVariables(templatePayload, Math.random)
+    const t = resolved.text.trim()
+    return t.length > 0 ? t : null
+  }, [templatePayload, variablePreviewRoll])
+
+  const effectivePromptPreview =
+    userPromptPreview ?? resolvedTemplatePreview ?? promptPreviewProp
 
   React.useEffect(() => {
     if (!open) {
@@ -126,6 +140,7 @@ export function AutomationRunPreviewModal({
     setLoadError(null)
     setUserPromptPreview(null)
     setPollExhausted(false)
+    setVariablePreviewRoll(0)
   }, [open, runId, initialThreadId, initialStatus, initialRunError, isCommunity])
 
   React.useEffect(() => {
@@ -311,7 +326,20 @@ export function AutomationRunPreviewModal({
                 </div>
                 {effectivePromptPreview ? (
                   <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-sm">
-                    <p className="text-xs font-medium text-muted-foreground">Prompt</p>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-muted-foreground">Prompt</p>
+                      {templatePayload?.variables?.length ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setVariablePreviewRoll((n) => n + 1)}
+                        >
+                          Re-roll sample
+                        </Button>
+                      ) : null}
+                    </div>
                     <p className="mt-1 whitespace-pre-wrap text-foreground">{effectivePromptPreview}</p>
                   </div>
                 ) : (

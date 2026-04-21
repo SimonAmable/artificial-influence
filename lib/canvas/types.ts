@@ -1,9 +1,12 @@
 import type { Node, Edge } from "@xyflow/react"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import {
-  DEFAULT_INWORLD_TTS_MODEL,
-  DEFAULT_INWORLD_VOICE_ID,
-} from "@/lib/constants/inworld-tts"
+  DEFAULT_AUDIO_PROVIDER,
+  DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE,
+  getDefaultAudioModel,
+  getDefaultAudioVoiceId,
+  type AudioProvider,
+} from "@/lib/constants/audio"
 
 // ===== Node Type Identifiers =====
 export type CanvasNodeType = "image-gen" | "video-gen" | "text" | "audio" | "upload" | "group"
@@ -74,8 +77,11 @@ export interface AudioNodeData extends Record<string, unknown> {
   /** Text from connected text nodes (toolbar preview, merged into TTS input). */
   connectedPrompt: string
   text: string
+  provider: AudioProvider
   voice: string
   model: string
+  stylePrompt: string
+  languageCode: string
   generatedAudioUrl: string | null
   isGenerating: boolean
   error: string | null
@@ -182,8 +188,11 @@ export function createAudioNodeData(): AudioNodeData {
     label: "Audio Generation",
     connectedPrompt: "",
     text: "",
-    voice: DEFAULT_INWORLD_VOICE_ID,
-    model: DEFAULT_INWORLD_TTS_MODEL,
+    provider: DEFAULT_AUDIO_PROVIDER,
+    voice: getDefaultAudioVoiceId(DEFAULT_AUDIO_PROVIDER),
+    model: getDefaultAudioModel(DEFAULT_AUDIO_PROVIDER),
+    stylePrompt: "",
+    languageCode: DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE,
     generatedAudioUrl: null,
     isGenerating: false,
     error: null,

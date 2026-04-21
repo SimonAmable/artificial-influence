@@ -1,18 +1,21 @@
 "use client"
 
 import * as React from "react"
+import { CircleNotch, Sparkle } from "@phosphor-icons/react"
+
+import { AudioVoiceSelector } from "@/components/audio/voice-selector"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogClose,
 } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -23,15 +26,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { InworldVoiceSelector } from "@/components/audio/inworld-voice-selector"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  AUDIO_PROVIDER_OPTIONS,
+  DEFAULT_AUDIO_PROVIDER,
+  DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE,
+  GOOGLE_GEMINI_TTS_MODEL_LABEL,
+  getDefaultAudioModel,
+  getDefaultAudioVoiceId,
+  type AudioProvider,
+  type AudioVoice,
+} from "@/lib/constants/audio"
 import {
   DEFAULT_INWORLD_TTS_MODEL,
-  DEFAULT_INWORLD_VOICE_ID,
   INWORLD_TTS_MODEL_OPTIONS,
   getInworldTtsModelOption,
-  type InworldVoice,
 } from "@/lib/constants/inworld-tts"
-import { CircleNotch } from "@phosphor-icons/react"
 
 export interface GenerateVoiceDialogProps {
   open: boolean
@@ -39,70 +49,161 @@ export interface GenerateVoiceDialogProps {
   onSuccess: (audio: { url: string }) => void
 }
 
+const GOOGLE_TAGS_HELPER =
+  "Gemini supports inline tags like [laughing], [whispering], [shouting], [short pause], and [medium pause]."
+
 export function GenerateVoiceDialog({
   open,
   onOpenChange,
   onSuccess,
 }: GenerateVoiceDialogProps) {
   const [text, setText] = React.useState("")
-  const [voiceId, setVoiceId] = React.useState(DEFAULT_INWORLD_VOICE_ID)
+  const [provider, setProvider] =
+    React.useState<AudioProvider>(DEFAULT_AUDIO_PROVIDER)
+  const [voiceId, setVoiceId] = React.useState(getDefaultAudioVoiceId(DEFAULT_AUDIO_PROVIDER))
   const [model, setModel] = React.useState<string>(DEFAULT_INWORLD_TTS_MODEL)
-  const [selectedVoice, setSelectedVoice] = React.useState<InworldVoice | null>(null)
+  const [stylePrompt, setStylePrompt] = React.useState("")
+  const [languageCode, setLanguageCode] = React.useState<string>(
+    DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE
+  )
+  const [selectedVoice, setSelectedVoice] = React.useState<AudioVoice | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [isGenerating, setIsGenerating] = React.useState(false)
-  const [generatedAudio, setGeneratedAudio] = React.useState<{ url: string } | null>(null)
+  const [isEnhancing, setIsEnhancing] = React.useState(false)
+  const [generatedAudio, setGeneratedAudio] = React.useState<{ url: string } | null>(
+    null
+  )
 
-  // Reset form when dialog opens
   React.useEffect(() => {
-    if (open) {
-      setText("")
-      setVoiceId(DEFAULT_INWORLD_VOICE_ID)
-      setModel(DEFAULT_INWORLD_TTS_MODEL)
-      setSelectedVoice(null)
-      setError(null)
-      setGeneratedAudio(null)
-    }
+    if (!open) return
+
+    setText("")
+    setProvider(DEFAULT_AUDIO_PROVIDER)
+    setVoiceId(getDefaultAudioVoiceId(DEFAULT_AUDIO_PROVIDER))
+    setModel(getDefaultAudioModel(DEFAULT_AUDIO_PROVIDER))
+    setStylePrompt("")
+    setLanguageCode(DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE)
+    setSelectedVoice(null)
+    setError(null)
+    setGeneratedAudio(null)
+    setIsEnhancing(false)
+    setIsGenerating(false)
   }, [open])
 
-  const canGenerate =
-    text.trim() !== "" && voiceId.trim() !== ""
-
-  const handleGenerate = async () => {
-    if (!canGenerate || isGenerating) return
+  React.useEffect(() => {
+    setVoiceId(getDefaultAudioVoiceId(provider))
+    setModel(getDefaultAudioModel(provider))
+    setSelectedVoice(null)
     setError(null)
-    setIsGenerating(true)
+    if (provider === "inworld") {
+      setStylePrompt("")
+    } else if (!languageCode.trim()) {
+      setLanguageCode(DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE)
+    }
+  }, [provider, languageCode])
+
+  const canGenerate = text.trim() !== "" && voiceId.trim() !== ""
+
+  const handleEnhance = async () => {
+    if (!text.trim() || isEnhancing || isGenerating) return
+
+    setError(null)
+    setIsEnhancing(true)
+
     try {
-      const res = await fetch("/api/generate-audio", {
+      const response = await fetch("/api/enhance-tts-script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          provider,
+          model,
+          text: text.trim(),
+          voice: voiceId,
+          stylePrompt,
+          languageCode,
+        }),
+      })
+
+      const data = (await response.json().catch(() => ({}))) as {
+        text?: string
+        stylePrompt?: string
+        error?: string
+        message?: string
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Failed to enhance audio script")
+      }
+
+      if (!data.text?.trim()) {
+        throw new Error("The enhancer returned empty text.")
+      }
+
+      setText(data.text)
+      if (provider === "google" && typeof data.stylePrompt === "string") {
+        setStylePrompt(data.stylePrompt)
+      }
+    } catch (enhanceError) {
+      setError(
+        enhanceError instanceof Error
+          ? enhanceError.message
+          : "Failed to enhance audio script"
+      )
+    } finally {
+      setIsEnhancing(false)
+    }
+  }
+
+  const handleGenerate = async () => {
+    if (!canGenerate || isGenerating) return
+
+    setError(null)
+    setIsGenerating(true)
+
+    try {
+      const response = await fetch("/api/generate-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider,
           text: text.trim(),
           voice: voiceId,
           model,
+          stylePrompt: provider === "google" ? stylePrompt : undefined,
+          languageCode: provider === "google" ? languageCode : undefined,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error || data.message || "Failed to generate audio")
-        return
+
+      const data = (await response.json().catch(() => ({}))) as {
+        audio?: { url?: string }
+        error?: string
+        message?: string
       }
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Failed to generate audio")
+      }
+
       if (data.audio?.url) {
         setGeneratedAudio({ url: data.audio.url })
       } else {
-        setError("No audio URL in response")
+        throw new Error("No audio URL in response")
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate audio")
+    } catch (generationError) {
+      setError(
+        generationError instanceof Error
+          ? generationError.message
+          : "Failed to generate audio"
+      )
     } finally {
       setIsGenerating(false)
     }
   }
 
   const handleSave = () => {
-    if (generatedAudio) {
-      onSuccess(generatedAudio)
-      onOpenChange(false)
-    }
+    if (!generatedAudio) return
+    onSuccess(generatedAudio)
+    onOpenChange(false)
   }
 
   return (
@@ -142,27 +243,51 @@ export function GenerateVoiceDialog({
             <DialogHeader>
               <DialogTitle>Generate voice line</DialogTitle>
               <DialogDescription>
-                Generate speech with Inworld. Enter text, search voices, and choose a model.
+                Generate speech with Inworld or Google Gemini TTS.
               </DialogDescription>
             </DialogHeader>
+
             <div className="grid gap-4 py-2">
+              <div className="grid gap-2">
+                <Label>Provider</Label>
+                <Select
+                  value={provider}
+                  onValueChange={(nextProvider) =>
+                    setProvider(nextProvider as AudioProvider)
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AUDIO_PROVIDER_OPTIONS.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="generate-voice-text">Text</Label>
                 <Textarea
                   id="generate-voice-text"
                   placeholder="Text to speak"
                   value={text}
-                  onChange={(e) => {
-                    setText(e.target.value)
+                  onChange={(event) => {
+                    setText(event.target.value)
                     setError(null)
                   }}
                   rows={3}
                   className="resize-none"
                 />
               </div>
+
               <div className="grid gap-2">
                 <Label>Voice</Label>
-                <InworldVoiceSelector
+                <AudioVoiceSelector
+                  provider={provider}
                   value={voiceId}
                   onSelectedVoiceChange={setSelectedVoice}
                   onValueChange={(nextVoiceId) => {
@@ -171,65 +296,121 @@ export function GenerateVoiceDialog({
                   }}
                 />
                 <p className="text-xs text-zinc-500">
-                  Default voice ID: {selectedVoice?.voiceId ?? voiceId}
+                  Selected voice: {selectedVoice?.displayName ?? voiceId}
                 </p>
               </div>
-              <div className="grid gap-2">
-                <Label>Model</Label>
-                <Select
-                  value={model}
-                  onValueChange={(nextModel) => {
-                    setModel(nextModel)
-                    setError(null)
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue
-                      placeholder="Select a model"
+
+              {provider === "inworld" ? (
+                <div className="grid gap-2">
+                  <Label>Model</Label>
+                  <Select
+                    value={model}
+                    onValueChange={(nextModel) => {
+                      setModel(nextModel)
+                      setError(null)
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Current</SelectLabel>
+                        {INWORLD_TTS_MODEL_OPTIONS.filter(
+                          (option) => option.group === "Current"
+                        ).map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectSeparator />
+                      <SelectGroup>
+                        <SelectLabel>Legacy</SelectLabel>
+                        {INWORLD_TTS_MODEL_OPTIONS.filter(
+                          (option) => option.group === "Legacy"
+                        ).map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-zinc-500">
+                    {getInworldTtsModelOption(model)?.description ??
+                      "Choose the Inworld TTS model that fits your latency and quality needs."}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-2">
+                    <Label>Model</Label>
+                    <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-foreground">
+                      {GOOGLE_GEMINI_TTS_MODEL_LABEL}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="generate-voice-language">Language Code</Label>
+                    <Input
+                      id="generate-voice-language"
+                      value={languageCode}
+                      onChange={(event) => {
+                        setLanguageCode(event.target.value)
+                        setError(null)
+                      }}
+                      placeholder={DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE}
                     />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Current</SelectLabel>
-                      {INWORLD_TTS_MODEL_OPTIONS.filter(
-                        (option) => option.group === "Current"
-                      ).map((option) => (
-                        <SelectItem key={option.id} value={option.id}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    <SelectSeparator />
-                    <SelectGroup>
-                      <SelectLabel>Legacy</SelectLabel>
-                      {INWORLD_TTS_MODEL_OPTIONS.filter(
-                        (option) => option.group === "Legacy"
-                      ).map((option) => (
-                        <SelectItem key={option.id} value={option.id}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-zinc-500">
-                  {getInworldTtsModelOption(model)?.description ??
-                    "Choose the Inworld TTS model that fits your latency and quality needs."}
-                </p>
-              </div>
-              {error && (
-                <p className="text-destructive text-sm">{error}</p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="generate-voice-style">Style Prompt</Label>
+                    <Textarea
+                      id="generate-voice-style"
+                      value={stylePrompt}
+                      onChange={(event) => {
+                        setStylePrompt(event.target.value)
+                        setError(null)
+                      }}
+                      placeholder="Describe the tone, pace, accent, or delivery..."
+                      rows={3}
+                      className="resize-none"
+                    />
+                    <p className="text-xs text-zinc-500">{GOOGLE_TAGS_HELPER}</p>
+                  </div>
+                </>
               )}
+
+              {error ? <p className="text-destructive text-sm">{error}</p> : null}
             </div>
-            <DialogFooter>
+
+            <DialogFooter className="gap-2">
               <DialogClose>Cancel</DialogClose>
               <Button
-                onClick={handleGenerate}
-                disabled={!canGenerate || isGenerating}
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  void handleEnhance()
+                }}
+                disabled={!text.trim() || isEnhancing || isGenerating}
               >
+                {isEnhancing ? (
+                  <>
+                    <CircleNotch className="mr-2 size-4 animate-spin" />
+                    Enhancing...
+                  </>
+                ) : (
+                  <>
+                    Enhance
+                    <Sparkle className="ml-2 size-4" weight="fill" />
+                  </>
+                )}
+              </Button>
+              <Button onClick={handleGenerate} disabled={!canGenerate || isGenerating}>
                 {isGenerating ? (
                   <>
-                    <CircleNotch className="size-4 mr-2 animate-spin" />
+                    <CircleNotch className="mr-2 size-4 animate-spin" />
                     Generating...
                   </>
                 ) : (

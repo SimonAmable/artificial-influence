@@ -1,8 +1,8 @@
 import type { Edge, Node } from "@xyflow/react"
 import {
-  DEFAULT_INWORLD_TTS_MODEL,
-  DEFAULT_INWORLD_VOICE_ID,
-} from "@/lib/constants/inworld-tts"
+  getDefaultAudioModel,
+  getDefaultAudioVoiceId,
+} from "@/lib/constants/audio"
 import {
   executeWorkflowWithRuntime,
   type WorkflowExecutionOptions,
@@ -100,14 +100,17 @@ function createBrowserRuntime(): WorkflowExecutionRuntime {
       return { videoUrl: result.video.url as string }
     },
 
-    async generateAudio({ text, voice, model }) {
+    async generateAudio({ text, provider, voice, model, stylePrompt, languageCode }) {
       const response = await fetch("/api/generate-audio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text,
-          voice: voice || DEFAULT_INWORLD_VOICE_ID,
-          model: model || DEFAULT_INWORLD_TTS_MODEL,
+          provider,
+          voice: voice || getDefaultAudioVoiceId(provider === "google" ? "google" : "inworld"),
+          model: model || getDefaultAudioModel(provider === "google" ? "google" : "inworld"),
+          stylePrompt,
+          languageCode,
         }),
       })
 

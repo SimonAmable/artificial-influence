@@ -1,5 +1,6 @@
 import { generateText, createGateway } from 'ai';
 import { createClient } from '@/lib/supabase/server';
+import { assertAcceptedCurrentTerms } from '@/lib/legal/terms-acceptance';
 import { NextResponse } from 'next/server';
 import { TEXT_GENERATION_SYSTEM_PROMPT } from '@/lib/constants/system-prompts';
 import { enhancePrompt } from '@/lib/prompt-enhancement';
@@ -27,6 +28,11 @@ export async function POST(req: Request) {
         { error: 'Unauthorized. Please log in to use text generation.' },
         { status: 401 }
       );
+    }
+
+    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id);
+    if (termsResponse) {
+      return termsResponse;
     }
 
     // Parse request body

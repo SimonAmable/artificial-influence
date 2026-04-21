@@ -1,5 +1,6 @@
 import type { Node, Edge } from "@xyflow/react"
 import { createClient } from "@/lib/supabase/server"
+import { buildPublicObjectUrl, extractStorageObjectRef, inferStoragePathFromUrl } from "@/lib/uploads/storage-ref"
 
 // ===== Types =====
 
@@ -424,14 +425,7 @@ function normalizeUrl(url: string | null): string | null {
   // If already a path (no protocol), return as-is
   if (!url.startsWith("http")) return url
   
-  try {
-    const urlObj = new URL(url)
-    // Extract path after /public-bucket/
-    const match = urlObj.pathname.match(/\/public-bucket\/(.+)/)
-    return match ? match[1] : url
-  } catch {
-    return url
-  }
+  return inferStoragePathFromUrl(url) ?? url
 }
 
 /**
@@ -447,7 +441,7 @@ function denormalizeUrl(path: string | null): string | null {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   if (!supabaseUrl) return path
   
-  return `${supabaseUrl}/storage/v1/object/public/public-bucket/${path}`
+  return buildPublicObjectUrl(supabaseUrl, "public-bucket", path)
 }
 
 /**
@@ -455,12 +449,6 @@ function denormalizeUrl(path: string | null): string | null {
  */
 function extractStoragePath(url: string): string | null {
   if (!url) return null
-  
-  try {
-    const urlObj = new URL(url)
-    const match = urlObj.pathname.match(/\/public-bucket\/(.+)/)
-    return match ? match[1] : null
-  } catch {
-    return null
-  }
+
+  return extractStorageObjectRef(url)?.storagePath ?? null
 }

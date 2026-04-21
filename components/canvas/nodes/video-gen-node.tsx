@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { Handle, Position, NodeToolbar, type NodeProps, useNodes, useEdges, getIncomers, useReactFlow, useUpdateNodeInternals, type Node, useStore } from "@xyflow/react"
-import { createClient } from "@/lib/supabase/client"
 import {
   VideoCamera,
   CircleNotch,
@@ -793,63 +792,30 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     nodeData.onDataChange?.(id, { isGenerating: true, error: null })
 
     try {
-      const supabase = createClient()
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      
-      if (authError || !user) {
-        throw new Error("Please log in to generate videos")
-      }
-
       const uploadFileToSupabase = async (file: File, prefix: string) => {
-        const fileExtension = file.name.split(".").pop() || "bin"
-        const timestamp = Date.now()
-        const randomStr = Math.random().toString(36).substring(7)
-        const filename = `${timestamp}-${randomStr}.${fileExtension}`
-        const storagePath = `${user.id}/${prefix}/${filename}`
-
-        const { error: uploadError } = await supabase.storage
-          .from("public-bucket")
-          .upload(storagePath, file, {
-            contentType: file.type,
-            upsert: false,
-          })
-
-        if (uploadError) {
-          throw new Error(`Failed to upload file: ${uploadError.message}`)
+        const uploaded = await uploadAssetFileToSupabase(file, prefix)
+        if (!uploaded) {
+          throw new Error("Failed to upload file")
         }
 
-        const { data: urlData } = supabase.storage
-          .from("public-bucket")
-          .getPublicUrl(storagePath)
-
-        return { url: urlData.publicUrl, storagePath }
+        return { url: uploaded.url, storagePath: uploaded.storagePath }
       }
 
       const uploadUrlToSupabase = async (url: string, prefix: string) => {
         const response = await fetch(url)
         const blob = await response.blob()
         const extension = blob.type.split("/")[1] || "bin"
-        const timestamp = Date.now()
-        const randomStr = Math.random().toString(36).substring(7)
-        const filename = `${timestamp}-${randomStr}.${extension}`
-        const storagePath = `${user.id}/${prefix}/${filename}`
-
-        const { error: uploadError } = await supabase.storage
-          .from("public-bucket")
-          .upload(storagePath, blob, {
-            contentType: blob.type,
-            upsert: false,
-          })
-
-        if (uploadError) {
-          throw new Error(`Failed to upload file: ${uploadError.message}`)
+        const uploaded = await uploadAssetFileToSupabase(
+          new File([blob], `remote-upload.${extension}`, {
+            type: blob.type || "application/octet-stream",
+          }),
+          prefix,
+        )
+        if (!uploaded) {
+          throw new Error("Failed to upload file")
         }
 
-        const { data: urlData } = supabase.storage
-          .from("public-bucket")
-          .getPublicUrl(storagePath)
-
-        return { url: urlData.publicUrl, storagePath }
+        return { url: uploaded.url, storagePath: uploaded.storagePath }
       }
 
       let imageUpload: { url: string; storagePath: string } | null = null

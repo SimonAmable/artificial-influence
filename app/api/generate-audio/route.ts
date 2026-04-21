@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import {
-  DEFAULT_INWORLD_TTS_MODEL,
-  DEFAULT_INWORLD_VOICE_ID,
-} from "@/lib/constants/inworld-tts"
-import { synthesizeInworldSpeech } from "@/lib/server/inworld-tts"
+  DEFAULT_AUDIO_PROVIDER,
+  getDefaultAudioModel,
+  getDefaultAudioVoiceId,
+} from "@/lib/constants/audio"
+import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
+import { resolveAudioProvider, synthesizeSpeech } from "@/lib/server/audio-tts"
 import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
@@ -12,14 +14,6 @@ export async function POST(request: NextRequest) {
   console.log("[generate-audio] ===== Request started =====")
 
   try {
-    if (!process.env.INWORLD_API_KEY_BASE64) {
-      console.error("[generate-audio] INWORLD_API_KEY_BASE64 not set")
-      return NextResponse.json(
-        { error: "INWORLD_API_KEY_BASE64 environment variable is not set" },
-        { status: 500 }
-      )
-    }
-
     const supabase = await createClient()
     const {
       data: { user },
@@ -37,35 +31,54 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
+    if (termsResponse) {
+      return termsResponse
+    }
+
     const body = await request.json()
     const text = (body.text as string) ?? ""
-    const voice = ((body.voice as string) || DEFAULT_INWORLD_VOICE_ID).trim()
-    const model = (body.model as string) || DEFAULT_INWORLD_TTS_MODEL
+    const provider = resolveAudioProvider(
+      typeof body.provider === "string" ? body.provider : null,
+      typeof body.model === "string" ? body.model : null
+    )
+    const voice = ((body.voice as string) || getDefaultAudioVoiceId(provider)).trim()
+    const model = ((body.model as string) || getDefaultAudioModel(provider)).trim()
+    const stylePrompt =
+      typeof body.stylePrompt === "string" ? body.stylePrompt.trim() : ""
+    const languageCode =
+      typeof body.languageCode === "string" ? body.languageCode.trim() : ""
 
     if (!text || typeof text !== "string") {
       return NextResponse.json(
-        { error: "text and voice are required" },
+        { error: "text is required" },
         { status: 400 }
       )
     }
 
-    if (!voice || typeof voice !== "string") {
+    if (!voice) {
       return NextResponse.json(
-        { error: "text and voice are required" },
+        { error: "voice is required" },
         { status: 400 }
       )
     }
 
-    console.log("[generate-audio] Generating speech with Inworld...", {
+    console.log("[generate-audio] Generating speech...", {
+      provider,
       textLength: text.length,
       voice: voice.substring(0, 16),
       model,
+      hasStylePrompt: stylePrompt.length > 0,
+      languageCode,
     })
 
-    const result = await synthesizeInworldSpeech({
+    const result = await synthesizeSpeech({
+      provider,
       text,
       voiceId: voice,
       modelId: model,
+      stylePrompt,
+      languageCode,
     })
 
     const timestamp = Date.now()
@@ -134,7 +147,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       audio: { url, mimeType: result.mimeType },
-      usage: result.usage ?? null,
+      usage: result.usage
+        ? {
+            ...result.usage,
+            provider,
+            modelId: result.modelId,
+          }
+        : {
+            provider,
+            modelId: result.modelId,
+          },
     })
   } catch (error) {
     const totalTime = Date.now() - requestStartTime
@@ -154,24 +176,26 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   return NextResponse.json({
-    message: "Audio Generation API - Inworld TTS",
+    message: "Audio Generation API",
     usage: {
       method: "POST",
       contentType: "application/json",
       body: {
         text: "string (required) - Text to convert to speech",
-        voice: "string (required) - Inworld voice ID from your workspace voice library",
-        model: `string (optional) - defaults to ${DEFAULT_INWORLD_TTS_MODEL}`,
+        provider: `string (optional) - defaults to ${DEFAULT_AUDIO_PROVIDER}`,
+        voice: "string (required) - Voice ID from your workspace voice library",
+        model: "string (optional) - defaults to the provider's default model",
+        stylePrompt:
+          "string (optional) - Google Gemini style prompt / delivery instructions",
+        languageCode:
+          "string (optional) - BCP-47 language code for Google Gemini TTS",
       },
       response: {
         audio: {
           url: "string - Public URL of the generated audio",
-          mimeType: "string - e.g. audio/wav",
+          mimeType: "string - e.g. audio/wav or audio/mpeg",
         },
-        usage: {
-          processedCharactersCount: "number",
-          modelId: "string",
-        },
+        usage: "object - provider-specific usage plus provider/modelId",
       },
     },
   })

@@ -35,6 +35,9 @@ export const MODEL_IDENTIFIERS = {
   MINIMAX_HAILUO_2_3_FAST: 'minimax/hailuo-2.3-fast',
   GOOGLE_VEO_3_1_FAST: 'google/veo-3.1-fast',
   BYTEDANCE_SEEDANCE_2_0: 'bytedance/seedance-2.0',
+
+  // Audio Models
+  GOOGLE_GEMINI_3_1_FLASH_TTS: 'google/gemini-3.1-flash-tts',
 } as const;
 
 /** Default model for image generation (used when no model is specified). */
@@ -1122,6 +1125,36 @@ const Z_IMAGE_TURBO_PARAMS: ParameterDefinition[] = [
   },
 ];
 
+const GOOGLE_GEMINI_3_1_FLASH_TTS_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'voice',
+    type: 'string',
+    label: 'Voice',
+    description: 'Gemini voice preset to use for speech synthesis',
+    required: true,
+    default: 'Kore',
+    ui_type: 'text',
+  },
+  {
+    name: 'prompt',
+    type: 'string',
+    label: 'Style Prompt',
+    description: 'Delivery instructions for tone, pace, emotion, or character context',
+    required: false,
+    default: 'Say the following naturally.',
+    ui_type: 'textarea',
+  },
+  {
+    name: 'language_code',
+    type: 'string',
+    label: 'Language Code',
+    description: 'BCP-47 language code for the spoken output',
+    required: false,
+    default: 'en-US',
+    ui_type: 'text',
+  },
+];
+
 // ============================================================================
 // MODEL DEFINITIONS
 // ============================================================================
@@ -1452,6 +1485,23 @@ export const Z_IMAGE_TURBO_MODEL: Model = {
   updated_at: new Date().toISOString(),
 };
 
+export const GOOGLE_GEMINI_3_1_FLASH_TTS_MODEL: Model = {
+  id: 'model-google-gemini-3.1-flash-tts',
+  identifier: MODEL_IDENTIFIERS.GOOGLE_GEMINI_3_1_FLASH_TTS,
+  name: 'Gemini 3.1 Flash TTS',
+  description:
+    "Google's fast, expressive text-to-speech model with style prompting and inline delivery tags",
+  type: 'audio',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 0.001,
+  parameters: {
+    parameters: GOOGLE_GEMINI_3_1_FLASH_TTS_PARAMS,
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 // ============================================================================
 // MODEL COLLECTIONS
 // ============================================================================
@@ -1482,7 +1532,7 @@ export const VIDEO_MODELS = [
   SEEDANCE_2_0_VIDEO_MODEL,
 ] as const;
 
-export const AUDIO_MODELS = [] as const;
+export const AUDIO_MODELS = [GOOGLE_GEMINI_3_1_FLASH_TTS_MODEL] as const;
 
 /**
  * All available models in a single array
@@ -1520,6 +1570,7 @@ const VIDEO_MODELS_FIXED = [
 const ALL_MODELS_FIXED = [
   ...IMAGE_MODELS_FIXED,
   ...VIDEO_MODELS_FIXED,
+  ...AUDIO_MODELS,
 ] as const;
 
 // Export corrected collections

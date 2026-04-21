@@ -33,11 +33,12 @@ export async function POST(
     }
 
     // Upload thumbnail to storage
-    const thumbnailUrl = await uploadWorkflowThumbnail(user.id, id, file)
+    const { thumbnailUrl, uploadId } = await uploadWorkflowThumbnail(user.id, id, file)
 
     // Update workflow with new thumbnail URL
     const workflow = await updateWorkflow(id, user.id, {
       thumbnail_url: thumbnailUrl,
+      thumbnail_upload_id: uploadId,
     })
 
     return NextResponse.json({ thumbnail_url: thumbnailUrl, workflow })

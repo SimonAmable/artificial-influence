@@ -18,6 +18,7 @@ import { Switch } from "@/components/ui/switch"
 import type { Workflow } from "@/lib/workflows/database-server"
 import { Loader2, Upload } from "lucide-react"
 import Image from "next/image"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 
 interface EditWorkflowDialogProps {
   workflow: Workflow | null
@@ -83,30 +84,26 @@ export function EditWorkflowDialog({
       // Upload thumbnail if a new file was selected
       if (thumbnailFile) {
         setIsUploading(true)
-        const formData = new FormData()
-        formData.append("file", thumbnailFile)
+        const uploaded = await uploadFileToSupabase(thumbnailFile, "workflow-thumbnails")
+        if (!uploaded) {
+          toast.error("Failed to upload thumbnail")
+          return
+        }
+        setThumbnailUrl(uploaded.url)
+        setIsUploading(false)
 
-        const uploadResponse = await fetch(`/api/workflows/${workflow.id}/thumbnail`, {
-          method: "POST",
-          body: formData,
+        const workflowResponse = await fetch(`/api/workflows/${workflow.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            thumbnail_url: uploaded.url,
+            thumbnail_upload_id: uploaded.uploadId,
+          }),
         })
 
-        if (uploadResponse.ok) {
-          const { thumbnail_url } = await uploadResponse.json()
-          setThumbnailUrl(thumbnail_url)
-        } else {
-          let message = "Failed to upload thumbnail"
-          try {
-            const errorBody = await uploadResponse.json()
-            if (typeof errorBody?.error === "string" && errorBody.error.trim().length > 0) {
-              message = errorBody.error
-            }
-          } catch {
-            // Ignore JSON parse errors and keep fallback message
-          }
-          toast.error(message)
+        if (!workflowResponse.ok) {
+          throw new Error("Failed to update workflow thumbnail")
         }
-        setIsUploading(false)
       }
 
       // Update workflow metadata

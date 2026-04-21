@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getWorkflow, updateWorkflow, deleteWorkflow, uploadWorkflowThumbnail } from "@/lib/workflows/database-server"
+import { getWorkflow, updateWorkflow, deleteWorkflow } from "@/lib/workflows/database-server"
 
 /**
  * GET /api/workflows/[id]
@@ -59,6 +59,10 @@ export async function PATCH(
       name: body.name,
       description: body.description,
       thumbnail_url: body.thumbnail_url,
+      thumbnail_upload_id:
+        typeof body.thumbnail_upload_id === "string" || body.thumbnail_upload_id === null
+          ? body.thumbnail_upload_id
+          : undefined,
       is_public: body.is_public,
     })
 

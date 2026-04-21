@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { clearTermsVersionCookie, getCurrentTermsDocument, setTermsVersionCookie } from "@/lib/legal/terms-acceptance"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
 import { NextResponse } from "next/server"
 
@@ -36,9 +37,10 @@ export async function GET(request: Request) {
 
     if (data.session) {
       const userId = data.session.user.id
+      const currentTerms = getCurrentTermsDocument()
       const { data: profile } = await supabase
         .from("profiles")
-        .select("onboarding_completed_at")
+        .select("onboarding_completed_at, terms_accepted_at, terms_version")
         .eq("id", userId)
         .maybeSingle()
 
@@ -65,6 +67,17 @@ export async function GET(request: Request) {
           secure: process.env.NODE_ENV === "production",
           httpOnly: false,
         })
+
+        const acceptedVersion =
+          typeof profile?.terms_version === "string" ? profile.terms_version : null
+        const acceptedAt =
+          typeof profile?.terms_accepted_at === "string" ? profile.terms_accepted_at : null
+
+        if (acceptedAt && acceptedVersion === currentTerms.version) {
+          await setTermsVersionCookie(currentTerms.version)
+        } else {
+          await clearTermsVersionCookie()
+        }
       }
 
       return response

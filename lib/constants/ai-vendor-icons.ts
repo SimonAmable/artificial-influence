@@ -10,6 +10,7 @@ export const AI_MONOCHROME_ICON_PATHS = new Set<string>([
   "/ai_icons/minimax.svg",
   "/ai_icons/flux.svg",
   "/logo.svg",
+  "/users-icon.svg",
 ])
 
 export function isAiMonochromeIconPath(src: string): boolean {

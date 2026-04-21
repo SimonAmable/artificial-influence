@@ -33,22 +33,31 @@ JSON array of assets, each with:
 
 Import the output into your asset library or use it for bulk upload workflows.
 
-## sync_inworld_voices.py
+## sync_voices.py
 
-Seeds missing Inworld voices into the shared `voices` table in Supabase. The script loads the same env file as the app by default, fetches the current Inworld catalog, checks which `provider_voice_id` values already exist for `provider = 'inworld'`, and inserts only the missing rows.
-It also synthesizes and uploads preview audio for voices that do not already have a stored preview.
+Seeds missing voices into the shared `voices` table in Supabase. The script loads the same env file as the app by default, checks which `provider_voice_id` values already exist for the selected provider, and inserts only the missing rows.
+
+- `--provider inworld`: fetches the current Inworld catalog and can synthesize preview audio.
+- `--provider google`: seeds the built-in Gemini 3.1 Flash TTS voice catalog (30 voices) and can generate preview audio through Replicate.
 
 ### Usage
 
 ```bash
-python scripts/sync_inworld_voices.py
-python scripts/sync_inworld_voices.py --dry-run
-python scripts/sync_inworld_voices.py --model inworld-tts-1.5-max
-python scripts/sync_inworld_voices.py --preview-model inworld-tts-1.5-max
+python scripts/sync_voices.py --provider inworld
+python scripts/sync_voices.py --provider inworld --dry-run
+python scripts/sync_voices.py --provider inworld --model inworld-tts-1.5-max
+python scripts/sync_voices.py --provider inworld --preview-model inworld-tts-1.5-max
+python scripts/sync_voices.py --provider google --dry-run
+python scripts/sync_voices.py --provider google
 ```
 
 ### Required env vars
 
-- `INWORLD_API_KEY_BASE64`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `INWORLD_API_KEY_BASE64` for `--provider inworld`
+- `REPLICATE_API_TOKEN` for `--provider google` when preview generation is enabled
+
+## sync_inworld_voices.py
+
+Compatibility wrapper that forwards to `sync_voices.py --provider inworld`.

@@ -261,6 +261,21 @@
   width: 12px;
 }
 
+.mobile-nav-scrollless {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.mobile-nav-scrollless::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.mobile-nav-scrollless::-webkit-scrollbar-button {
+  display: none;
+}
+
 /* Shadow Utility Classes - Can be used with Tailwind */
 .shadow-s,
 .shadow-depth-s {
@@ -431,6 +446,24 @@
     opacity: 1;
     transform: translate(-50%, -40%) scale(1);
   }
+}
+
+@keyframes audioEqPulse {
+  0%,
+  100% {
+    transform: scaleY(0.55);
+    opacity: 0.22;
+  }
+
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.audio-eq-bar {
+  transform-origin: bottom center;
+  animation: audioEqPulse 1.6s ease-in-out infinite;
 }
 
 /* Easy connect: make the whole node an easy drop target */

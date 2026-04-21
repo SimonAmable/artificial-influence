@@ -9,15 +9,24 @@ import {
   SignOut,
   CaretDownIcon,
   ChatCircleDots,
+  CurrencyDollar,
   ClockCounterClockwise,
   HandCoins,
   Image as ImageIcon,
   Video as VideoIcon,
   PaintBrush as PaintBrushIcon,
   FilmStrip,
+  FolderSimple,
   FlowArrow,
+  House,
   Microphone as MicrophoneIcon,
+  Palette,
+  PaperPlaneTilt,
+  PencilSimple,
   Robot as RobotIcon,
+  SquaresFour,
+  Users,
+  ArrowsLeftRight,
 } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
@@ -55,6 +64,28 @@ const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
   microphone: MicrophoneIcon,
   "chat-circle-dots": ChatCircleDots,
   robot: RobotIcon,
+}
+
+const MOBILE_NAV_ICON_MAP: Record<string, typeof ImageIcon> = {
+  "/": House,
+  "/chat": ChatCircleDots,
+  "/automations": RobotIcon,
+  "/image": ImageIcon,
+  "/video": VideoIcon,
+  "/audio": MicrophoneIcon,
+  "/brand": Palette,
+  "/motion-copy": Users,
+  "/lipsync": MicrophoneIcon,
+  "/inpaint": PaintBrushIcon,
+  "/character-swap": ArrowsLeftRight,
+  "/canvases": FlowArrow,
+  "/apps": SquaresFour,
+  "/editor": FilmStrip,
+  "/autopost": PaperPlaneTilt,
+  "/history": ClockCounterClockwise,
+  "/assets": FolderSimple,
+  "/pricing": CurrencyDollar,
+  "/pricing-test": CurrencyDollar,
 }
 
 function getBadgeClasses(badge: MegaNavBadge) {
@@ -192,6 +223,14 @@ export function Header() {
   const [feedbackOpen, setFeedbackOpen] = React.useState(false)
   const [openGroupLabel, setOpenGroupLabel] = React.useState<string | null>(null)
   const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [assetsMenuOpen, setAssetsMenuOpen] = React.useState(false)
+  const assetsCloseTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const assetsMegaGroup = React.useMemo(
+    () => megaNavGroups.find((group) => group.label === "Assets"),
+    []
+  )
+  const assetsMenuItems = assetsMegaGroup?.simpleItems ?? []
 
   const currentPage = navigationItems.find(item => item.path === pathname)?.path || pathname
   const isPageInDropdown = navigationItems.some(item => item.path === pathname)
@@ -283,6 +322,28 @@ export function Header() {
     return () => {
       if (closeTimeoutRef.current) {
         clearTimeout(closeTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const clearAssetsCloseTimer = React.useCallback(() => {
+    if (!assetsCloseTimeoutRef.current) return
+    clearTimeout(assetsCloseTimeoutRef.current)
+    assetsCloseTimeoutRef.current = null
+  }, [])
+
+  const scheduleAssetsClose = React.useCallback(() => {
+    clearAssetsCloseTimer()
+    assetsCloseTimeoutRef.current = setTimeout(() => {
+      setAssetsMenuOpen(false)
+      assetsCloseTimeoutRef.current = null
+    }, 180)
+  }, [clearAssetsCloseTimer])
+
+  React.useEffect(() => {
+    return () => {
+      if (assetsCloseTimeoutRef.current) {
+        clearTimeout(assetsCloseTimeoutRef.current)
       }
     }
   }, [])
@@ -403,11 +464,11 @@ export function Header() {
           </nav>
           {/* Mobile/Tablet Dropdown - visible on tablet and smaller */}
           <div className="lg:hidden">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="justify-between gap-2 shadow-md"
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="justify-between gap-2 shadow-md"
                 >
                   <span>
                     {isPageInDropdown 
@@ -415,31 +476,122 @@ export function Header() {
                       : "Tools"}
                   </span>
                   <CaretDownIcon className="h-4 w-4 opacity-50" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {navigationItems.map((item) => (
-                  <DropdownMenuItem 
-                    key={item.path} 
-                    onClick={() => router.push(item.path)}
-                    className={cn(
-                      pathname === item.path && "bg-accent",
-                      item.className
-                    )}
-                  >
-                    {item.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  className="mobile-nav-scrollless relative isolate z-[70] w-80 overflow-x-hidden overflow-y-auto border border-border/70 bg-popover/98 p-3 shadow-[inset_0_1px_2px_rgba(255,255,255,0.8),0_18px_40px_rgba(0,0,0,0.38),0_6px_18px_rgba(0,0,0,0.24)] backdrop-blur-sm"
+                >
+                  <div className="relative z-0 space-y-1">
+                    {navigationItems.map((item) => {
+                      const Icon = MOBILE_NAV_ICON_MAP[item.path] ?? PencilSimple
+
+                      return (
+                        <DropdownMenuItem
+                          key={item.path}
+                          onClick={() => router.push(item.path)}
+                          className={cn(
+                            "rounded-[22px] bg-transparent px-0 py-0 shadow-none data-[highlighted]:bg-transparent data-[highlighted]:shadow-none",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "flex w-full items-center gap-3 rounded-[20px] border border-border/60 bg-background/92 px-2 py-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.24),0_2px_8px_rgba(0,0,0,0.14)] transition-[box-shadow,border-color,background-color]",
+                              "group-data-[highlighted]/dropdown-menu-item:border-border/80 group-data-[highlighted]/dropdown-menu-item:bg-accent/90 group-data-[highlighted]/dropdown-menu-item:shadow-[0_14px_28px_rgba(0,0,0,0.3),0_4px_12px_rgba(0,0,0,0.18)]",
+                              pathname === item.path && "border-border/80 bg-accent/85 shadow-[0_14px_28px_rgba(0,0,0,0.32),0_4px_12px_rgba(0,0,0,0.2)]"
+                            )}
+                          >
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[24px] bg-muted text-foreground shadow-sm">
+                              <Icon size={20} weight="duotone" className="shrink-0" />
+                            </div>
+                            <span
+                              className={cn(
+                                "min-w-0 flex-1 text-sm font-semibold text-foreground",
+                                item.className
+                              )}
+                            >
+                              {item.label}
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      )
+                    })}
+                  </div>
+                </DropdownMenuContent>
+             </DropdownMenu>
+           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {loading ? null : user ? (
             <>
-              <Button variant="secondary" asChild>
-                <Link href="/assets">Assets</Link>
-              </Button>
+              <DropdownMenu
+                open={assetsMenuOpen}
+                onOpenChange={(open) => {
+                  if (!open) {
+                    clearAssetsCloseTimer()
+                    setAssetsMenuOpen(false)
+                  } else {
+                    setAssetsMenuOpen(true)
+                  }
+                }}
+              >
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    asChild
+                    onPointerEnter={(e) => {
+                      if (e.pointerType === "touch") return
+                      clearAssetsCloseTimer()
+                      setAssetsMenuOpen(true)
+                    }}
+                    onPointerLeave={(e) => {
+                      if (e.pointerType === "touch") return
+                      scheduleAssetsClose()
+                    }}
+                  >
+                    <Link
+                      href="/assets"
+                      onClick={(e) => {
+                        const native = e.nativeEvent as PointerEvent
+                        const pointerType =
+                          typeof native.pointerType === "string" ? native.pointerType : ""
+                        if (pointerType === "touch" || pointerType === "pen") {
+                          e.preventDefault()
+                          setAssetsMenuOpen((prev) => !prev)
+                        }
+                      }}
+                    >
+                      Assets
+                    </Link>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-80 p-3"
+                  onPointerEnter={() => {
+                    clearAssetsCloseTimer()
+                    setAssetsMenuOpen(true)
+                  }}
+                  onPointerLeave={(e) => {
+                    if (e.pointerType === "touch") return
+                    scheduleAssetsClose()
+                  }}
+                >
+                  <div className="space-y-1">
+                    {assetsMenuItems.map((item) => (
+                      <HeaderMenuItem
+                        key={item.path}
+                        item={item}
+                        onSelect={(path) => {
+                          clearAssetsCloseTimer()
+                          setAssetsMenuOpen(false)
+                          router.push(path)
+                        }}
+                      />
+                    ))}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" className="shadow-md">

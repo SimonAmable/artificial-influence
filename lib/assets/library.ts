@@ -5,6 +5,7 @@ import type {
   AssetVisibility,
   CreateAssetInput,
 } from "@/lib/assets/types"
+import { inferStoragePathFromUrl as inferStoragePathFromObjectUrl } from "@/lib/uploads/storage-ref"
 
 export const ASSET_CATEGORIES: AssetCategory[] = [
   "character",
@@ -132,15 +133,5 @@ export function normalizeTags(tags: string[] | undefined) {
 }
 
 export function inferStoragePathFromUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url)
-    const marker = "/storage/v1/object/public/public-bucket/"
-    const markerIndex = parsed.pathname.indexOf(marker)
-    if (markerIndex < 0) return null
-    const startIndex = markerIndex + marker.length
-    const candidate = parsed.pathname.slice(startIndex)
-    return candidate || null
-  } catch {
-    return null
-  }
+  return inferStoragePathFromObjectUrl(url)
 }

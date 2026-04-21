@@ -32,8 +32,11 @@ export interface WorkflowExecutionRuntime {
   }): Promise<{ videoUrl: string }>
   generateAudio(input: {
     text: string
+    provider: string
     voice: string
     model: string
+    stylePrompt?: string
+    languageCode?: string
   }): Promise<{ audioUrl: string }>
 }
 
@@ -313,8 +316,11 @@ async function executeNode(
 
       const result = await runtime.generateAudio({
         text: text.trim(),
+        provider: (data.provider as string) || "inworld",
         voice: (data.voice as string) || "",
         model: (data.model as string) || "",
+        stylePrompt: (data.stylePrompt as string) || "",
+        languageCode: (data.languageCode as string) || "",
       })
 
       return { audioUrl: result.audioUrl }

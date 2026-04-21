@@ -1,5 +1,12 @@
-import { createGateway, generateText } from 'ai';
+import { createGateway, generateObject, generateText, zodSchema } from 'ai';
+import { z } from 'zod';
 import { NANO_BANANA_PRO_ENHANCEMENT_PROMPT } from './constants/system-prompts';
+import {
+  DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE,
+  DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT,
+  DEFAULT_GOOGLE_GEMINI_VOICE_ID,
+  type AudioProvider,
+} from "@/lib/constants/audio"
 
 /** Must match AI Gateway model ids (see @ai-sdk/gateway), not legacy `x-ai/...` strings. */
 const PROMPT_ENHANCEMENT_MODEL = 'xai/grok-4.1-fast-non-reasoning' as const;
@@ -146,6 +153,51 @@ Rules (follow closely):
 - Conversational naturalness: light filler (uh, um, well, you know) only when the script is casual; omit for formal or dry content.
 - Keep length reasonable: avoid huge bloat; if the input is long, keep the enhanced version similarly scoped unless shortening improves listenability.`
 
+const GOOGLE_GEMINI_TTS_SCRIPT_ENHANCEMENT_SYSTEM = `You prepare text for Google's Gemini 3.1 Flash TTS model.
+
+Return three fields:
+- text: the rewritten spoken script
+- languageCode: a BCP-47 language code such as en-US, en-GB, es-ES, fr-FR
+- stylePrompt: concise delivery instructions for the model
+
+Rules for text:
+- Preserve meaning while improving pacing and spoken naturalness.
+- Output speakable prose only, not markdown, not bullet lists, not code fences.
+- Use Gemini-compatible inline tags only when they clearly help performance, such as [laughing], [whispering], [shouting], [short pause], [medium pause], [long pause], or other plain-language emotion tags.
+- Never use Inworld-only tokens such as [breathe], [clear_throat], [cough], [yawn].
+- Never use *asterisk emphasis* markup.
+- Prefer spoken numbers, dates, times, and currency where that improves delivery.
+- Do not over-tag every sentence; use inline tags sparingly.
+
+Rules for stylePrompt:
+- Keep it concise, specific, and production-friendly.
+- Describe tone, pace, delivery, and speaker framing.
+- Refine the user's existing style prompt when one is provided instead of ignoring it.
+- Do not repeat the full script.
+- Do not mention JSON, formatting rules, or implementation details.
+
+Rules for languageCode:
+- Return only a valid BCP-47 code.
+- If user text does not imply a specific language, keep the existing language code.
+- Prefer region-specific codes when clear from context.`
+
+const GOOGLE_GEMINI_TTS_ENHANCEMENT_SCHEMA = z.object({
+  text: z.string().min(1),
+  languageCode: z.string().min(2),
+  stylePrompt: z.string().min(1),
+})
+
+function stripWrappingQuotes(value: string): string {
+  const trimmed = value.trim()
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim()
+  }
+  return trimmed
+}
+
 /**
  * Rewrites user script for natural Inworld TTS delivery.
  */
@@ -170,4 +222,84 @@ export async function enhanceScriptForInworldTts(script: string): Promise<string
     out = out.slice(1, -1).trim()
   }
   return out
+}
+
+export interface EnhanceTtsScriptResult {
+  text: string
+  languageCode?: string
+  stylePrompt?: string
+}
+
+export interface EnhanceTtsScriptInput {
+  provider: AudioProvider
+  script: string
+  voiceId?: string | null
+  languageCode?: string | null
+  stylePrompt?: string | null
+}
+
+export async function enhanceScriptForGoogleGeminiTts({
+  script,
+  voiceId,
+  languageCode,
+  stylePrompt,
+}: Omit<EnhanceTtsScriptInput, "provider">): Promise<EnhanceTtsScriptResult> {
+  const trimmed = script.trim()
+  if (!trimmed) {
+    return {
+      text: "",
+      stylePrompt:
+        stylePrompt?.trim() || DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT,
+    }
+  }
+
+  const resolvedVoiceId = voiceId?.trim() || DEFAULT_GOOGLE_GEMINI_VOICE_ID
+  const resolvedLanguageCode =
+    languageCode?.trim() || DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE
+  const existingStylePrompt = stylePrompt?.trim() || ""
+
+  const { object } = await generateObject({
+    model: enhancementLanguageModel(),
+    schema: zodSchema(GOOGLE_GEMINI_TTS_ENHANCEMENT_SCHEMA),
+    system: GOOGLE_GEMINI_TTS_SCRIPT_ENHANCEMENT_SYSTEM,
+    prompt: `Voice: ${resolvedVoiceId}
+Language code: ${resolvedLanguageCode}
+Existing style prompt: ${existingStylePrompt || "(none)"}
+
+Rewrite this script for Gemini TTS and produce a concise style prompt:
+
+${trimmed}`,
+    temperature: 0.65,
+  })
+
+  return {
+    text: stripWrappingQuotes(object.text),
+    languageCode:
+      stripWrappingQuotes(object.languageCode) || resolvedLanguageCode,
+    stylePrompt:
+      stripWrappingQuotes(object.stylePrompt) ||
+      existingStylePrompt ||
+      DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT,
+  }
+}
+
+export async function enhanceScriptForTts({
+  provider,
+  script,
+  voiceId,
+  languageCode,
+  stylePrompt,
+}: EnhanceTtsScriptInput): Promise<EnhanceTtsScriptResult> {
+  if (provider === "google") {
+    return enhanceScriptForGoogleGeminiTts({
+      script,
+      voiceId,
+      languageCode,
+      stylePrompt,
+    })
+  }
+
+  return {
+    text: await enhanceScriptForInworldTts(script),
+  }
 }

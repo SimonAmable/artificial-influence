@@ -81,6 +81,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/automations", label: "Automations" },
   { path: "/image", label: "Image" },
   { path: "/video", label: "Video" },
+  { path: "/audio", label: "Audio" },
   { path: "/brand", label: "Brand" },
   { path: "/motion-copy", label: "Motion Copy" },
   { path: "/lipsync", label: "Lipsync" },
@@ -297,6 +298,11 @@ export const megaNavGroups: MegaNavGroup[] = [
     ],
   },
   {
+    label: "Audio",
+    path: "/audio",
+    badge: "new",
+  },
+  {
     label: "Assets",
     path: "/assets",
     simpleItems: [
@@ -398,6 +404,12 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     href: "/video",
     icon: "video",
     hint: "Text or image to video generation.",
+  },
+  {
+    label: "Audio Studio",
+    href: "/audio",
+    icon: "microphone",
+    hint: "Voiceovers and change-voice video generation in one dock.",
   },
   {
     label: "Brand kit",

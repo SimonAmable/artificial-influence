@@ -12,6 +12,7 @@ import {
   buildAutomationUserMessage,
   normalizeAutomationPromptPayload,
 } from "@/lib/automations/prompt-payload"
+import { mergeVariableCursors, resolveAutomationVariables } from "@/lib/automations/resolve-variables"
 import { bindPendingGenerationsToChatMessages } from "@/lib/chat/media-persistence"
 import { replaceChatThreadMessages } from "@/lib/chat/database-server"
 import { createCreativeAgent } from "@/lib/chat/creative-agent"
@@ -101,7 +102,8 @@ export async function runAutomation(
     automation.prompt,
     automation.prompt_payload,
   )
-  const userMessage = buildAutomationUserMessage(promptPayload, genId)
+  const { resolved: resolvedPayload, cursorUpdates } = resolveAutomationVariables(promptPayload)
+  const userMessage = buildAutomationUserMessage(resolvedPayload, genId)
 
   const sanitized = sanitizeToolErrorPartsInMessages([userMessage])
   const requestMessages = sanitized.messages
@@ -217,15 +219,23 @@ export async function runAutomation(
     })
     .eq("id", runId)
 
-  await admin
-    .from("automations")
-    .update({
-      last_run_at: nowIso,
-      run_count: automation.run_count + 1,
-      last_error: null,
-      updated_at: nowIso,
-    })
-    .eq("id", automation.id)
+  const mergedVariables = mergeVariableCursors(promptPayload.variables, cursorUpdates)
+  const automationUpdate: Record<string, unknown> = {
+    last_run_at: nowIso,
+    run_count: automation.run_count + 1,
+    last_error: null,
+    updated_at: nowIso,
+  }
+  if (mergedVariables && mergedVariables.length > 0 && Object.keys(cursorUpdates).length > 0) {
+    automationUpdate.prompt_payload = {
+      text: promptPayload.text,
+      refs: promptPayload.refs,
+      attachments: promptPayload.attachments,
+      variables: mergedVariables,
+    }
+  }
+
+  await admin.from("automations").update(automationUpdate).eq("id", automation.id)
 
   return { ok: true, threadId, runId }
 }

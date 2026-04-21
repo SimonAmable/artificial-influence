@@ -11,7 +11,7 @@ import { AudioUploadValue } from "@/components/shared/upload/audio-upload"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { createClient } from "@/lib/supabase/client"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 
 export default function LipsyncPage() {
   const layoutModeContext = useLayoutMode()
@@ -85,13 +85,6 @@ export default function LipsyncPage() {
       }
 
       // Get authenticated user for Supabase upload
-      const supabase = createClient()
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      
-      if (authError || !user) {
-        throw new Error('Please log in to generate lipsync videos')
-      }
-
       let imagePublicUrl: string | undefined
       let imageStoragePath: string | undefined
       let videoPublicUrl: string | undefined
@@ -99,77 +92,32 @@ export default function LipsyncPage() {
 
       if (isRefImage) {
         console.log('Uploading reference image to Supabase...')
-        const imageExtension = inputImage.file.name.split('.').pop() || 'png'
-        const imageTimestamp = Date.now()
-        const imageRandomStr = Math.random().toString(36).substring(7)
-        const imageFilename = `${imageTimestamp}-${imageRandomStr}.${imageExtension}`
-        imageStoragePath = `${user.id}/lipsync-images/${imageFilename}`
-
-        const { error: imageUploadError } = await supabase.storage
-          .from('public-bucket')
-          .upload(imageStoragePath, inputImage.file, {
-            contentType: inputImage.file.type,
-            upsert: false,
-          })
-
-        if (imageUploadError) {
-          throw new Error(`Failed to upload image: ${imageUploadError.message}`)
+        const uploadedImage = await uploadFileToSupabase(inputImage.file, 'lipsync-images')
+        if (!uploadedImage) {
+          throw new Error('Failed to upload image')
         }
-
-        const { data: imageUrlData } = supabase.storage
-          .from('public-bucket')
-          .getPublicUrl(imageStoragePath)
-        imagePublicUrl = imageUrlData.publicUrl
+        imageStoragePath = uploadedImage.storagePath
+        imagePublicUrl = uploadedImage.url
         console.log('✓ Image uploaded:', imagePublicUrl)
       } else {
         console.log('Uploading reference video to Supabase...')
-        const videoExtension = inputImage.file.name.split('.').pop() || 'mp4'
-        const videoTimestamp = Date.now()
-        const videoRandomStr = Math.random().toString(36).substring(7)
-        const videoFilename = `${videoTimestamp}-${videoRandomStr}.${videoExtension}`
-        videoStoragePath = `${user.id}/lipsync-videos/${videoFilename}`
-
-        const { error: videoUploadError } = await supabase.storage
-          .from('public-bucket')
-          .upload(videoStoragePath, inputImage.file, {
-            contentType: inputImage.file.type,
-            upsert: false,
-          })
-
-        if (videoUploadError) {
-          throw new Error(`Failed to upload video: ${videoUploadError.message}`)
+        const uploadedVideo = await uploadFileToSupabase(inputImage.file, 'lipsync-videos')
+        if (!uploadedVideo) {
+          throw new Error('Failed to upload video')
         }
-
-        const { data: videoUrlData } = supabase.storage
-          .from('public-bucket')
-          .getPublicUrl(videoStoragePath)
-        videoPublicUrl = videoUrlData.publicUrl
+        videoStoragePath = uploadedVideo.storagePath
+        videoPublicUrl = uploadedVideo.url
         console.log('✓ Video uploaded:', videoPublicUrl)
       }
 
       // Upload audio to Supabase Storage
       console.log('Uploading audio to Supabase...')
-      const audioExtension = inputAudio.file.name.split('.').pop() || 'mp3'
-      const audioTimestamp = Date.now()
-      const audioRandomStr = Math.random().toString(36).substring(7)
-      const audioFilename = `${audioTimestamp}-${audioRandomStr}.${audioExtension}`
-      const audioStoragePath = `${user.id}/lipsync-audio/${audioFilename}`
-
-      const { error: audioUploadError } = await supabase.storage
-        .from('public-bucket')
-        .upload(audioStoragePath, inputAudio.file, {
-          contentType: inputAudio.file.type,
-          upsert: false,
-        })
-
-      if (audioUploadError) {
-        throw new Error(`Failed to upload audio: ${audioUploadError.message}`)
+      const uploadedAudio = await uploadFileToSupabase(inputAudio.file, 'lipsync-audio')
+      if (!uploadedAudio) {
+        throw new Error('Failed to upload audio')
       }
-
-      const { data: audioUrlData } = supabase.storage
-        .from('public-bucket')
-        .getPublicUrl(audioStoragePath)
-      const audioPublicUrl = audioUrlData.publicUrl
+      const audioStoragePath = uploadedAudio.storagePath
+      const audioPublicUrl = uploadedAudio.url
       console.log('✓ Audio uploaded:', audioPublicUrl)
 
       console.log('Sending lipsync request with reference media and audio URLs')

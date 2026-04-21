@@ -14,6 +14,7 @@ export type LegalFrontmatter = {
   title: string
   description: string
   lastUpdated?: string
+  version?: string
 }
 
 const LEGAL_DIR = path.join(process.cwd(), "content/legal")

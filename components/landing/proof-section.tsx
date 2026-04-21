@@ -56,15 +56,17 @@ export function ProofSection() {
                     delay: baseDelay + index * staggerStep,
                   }}
                 >
-                  <Image
-                    src={encodeURI(imageSrc)}
-                    alt={`Instagram profile proof ${index + 1}`}
-                    width={900}
-                    height={1800}
-                    className="h-auto w-full object-contain object-center drop-shadow-[0_24px_48px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_24px_48px_rgba(0,0,0,0.35)]"
-                    sizes="(min-width: 1024px) 50vw, (min-width: 768px) 480px, 100vw"
-                    priority={index === 0}
-                  />
+                  <div className="mx-auto aspect-[10/13] w-[72%] overflow-hidden sm:w-[58%] md:w-[52%] lg:w-[78%]">
+                    <Image
+                      src={encodeURI(imageSrc)}
+                      alt={`Instagram profile proof ${index + 1}`}
+                      width={600}
+                      height={600}
+                      className="h-full w-full object-cover object-center drop-shadow-[0_24px_48px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_24px_48px_rgba(0,0,0,0.35)]"
+                      sizes="(min-width: 1024px) 50vw, (min-width: 768px) 480px, 100vw"
+                      priority={index === 0}
+                    />
+                  </div>
                 </motion.div>
               </div>
             </div>
