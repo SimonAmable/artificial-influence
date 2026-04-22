@@ -117,7 +117,8 @@ const CHARACTER_SWAP_BASE_MODEL_IDENTIFIER = "google/nano-banana-pro"
 const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
   "nano-banana": "google/nano-banana-2",
   flux2: "prunaai/flux-kontext-fast",
-  "gpt-image": "openai/gpt-image-1.5",
+  "gpt-image": "openai/gpt-image-2",
+  "gpt-image-2": "openai/gpt-image-2",
   "grok-imagine": "xai/grok-imagine-image",
 }
 const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {

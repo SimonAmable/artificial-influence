@@ -260,6 +260,36 @@ export const GPT_IMAGE_1_5_META: ModelMetadata = {
   aspect_ratios: ['1:1',"2:3","3:2"],
 };
 
+export const GPT_IMAGE_2_META: ModelMetadata = {
+  id: 'f44f56d5-4ad4-4a16-8a8a-0b2ab8e3b482',
+  identifier: 'openai/gpt-image-2',
+  name: 'GPT Image 2',
+  description: 'OpenAI image generation on Fal with strong prompt following and reference-guided edits.',
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 4.0,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+  customParameters: [
+    {
+      name: 'quality',
+      label: 'Quality',
+      options: ['low', 'medium', 'high'],
+      default: 'high',
+      description: 'Generation quality preset',
+    },
+    {
+      name: 'output_format',
+      label: 'Output Format',
+      options: ['png', 'jpeg', 'webp'],
+      default: 'png',
+      description: 'Image file format',
+    },
+  ],
+};
+
 export const FLUX_KONTEXT_FAST_META: ModelMetadata = {
   id: 'b3a0e0b8-ae8f-4f0b-b692-150ecabefd19',
   identifier: 'prunaai/flux-kontext-fast',
@@ -577,6 +607,7 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
   SEEDREAM_5_LITE_META,
   GROK_IMAGINE_META,
   GPT_IMAGE_1_5_META,
+  GPT_IMAGE_2_META,
   Z_IMAGE_TURBO_META,
   FLUX_KONTEXT_FAST_META,
 ];
@@ -643,6 +674,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     SEEDANCE_2_0_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
+  fal: [GPT_IMAGE_2_META],
   xai: [GROK_IMAGINE_META],
 };
 

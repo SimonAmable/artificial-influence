@@ -325,20 +325,22 @@ function buildPersistSnapshot(input: {
   })
 }
 
-function attachedRefFromAssetUrl(url: string, assetType: "audio" | "image" | "video"): AttachedRef {
+function attachedRefFromAssetPick(pick: AssetSelectionPick): AttachedRef {
+  const { assetType, id, previewUrl, title, url } = pick
   const chipId =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
   const label =
-    assetType === "image" ? "Reference image" : assetType === "video" ? "Reference video" : "Reference audio"
+    title?.trim() ||
+    (assetType === "image" ? "Reference image" : assetType === "video" ? "Reference video" : "Reference audio")
   return {
-    id: chipId,
+    id: id ? `asset:${id}` : chipId,
     label,
     category: "asset",
     assetType,
     assetUrl: url,
-    previewUrl: url,
+    previewUrl: previewUrl ?? url,
     serialized: `Reference (${assetType}) "${label}": ${url}`,
     chipId,
     mentionToken: "",
@@ -356,6 +358,8 @@ export function AutomationsPage() {
   const [runs, setRuns] = React.useState<AutomationRunApi[]>([])
   const [loadingRuns, setLoadingRuns] = React.useState(false)
   const [editDetailsOpen, setEditDetailsOpen] = React.useState(false)
+  const [autoSaveStatus, setAutoSaveStatus] = React.useState<'saving' | 'saved'>('saved')
+  const autoSaveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
 
   const [name, setName] = React.useState("")
   const [description, setDescription] = React.useState("")
@@ -382,7 +386,6 @@ export function AutomationsPage() {
   const [weeklyMinute, setWeeklyMinute] = React.useState(0)
   const [customCron, setCustomCron] = React.useState(CRON_PRESET_HOURLY)
   const [nextPreview, setNextPreview] = React.useState<string | null>(null)
-  const [saving, setSaving] = React.useState(false)
   const [variablesDialogOpen, setVariablesDialogOpen] = React.useState(false)
   const [editBaselineSnapshot, setEditBaselineSnapshot] = React.useState("")
   const needsEditBaselineCaptureRef = React.useRef(false)
@@ -416,6 +419,17 @@ export function AutomationsPage() {
   const isCommunityScope = scope === "community"
   const lastHydratedId = React.useRef<string | null>(null)
   const autoOpenedRunIdRef = React.useRef<string | null>(null)
+  const selectedAssetRefs = React.useMemo(
+    () =>
+      attachedRefs.filter(
+        (ref) =>
+          ref.category === "asset" &&
+          typeof ref.assetUrl === "string" &&
+          ref.assetUrl.trim().length > 0 &&
+          (ref.assetType === "image" || ref.assetType === "video" || ref.assetType === "audio"),
+      ),
+    [attachedRefs],
+  )
 
   React.useEffect(() => {
     if (!activeRunInfo) return
@@ -687,9 +701,9 @@ export function AutomationsPage() {
   }, [])
 
   const handleAssetLibrarySelect = React.useCallback(
-    ({ url, assetType }: AssetSelectionPick) => {
+    (pick: AssetSelectionPick) => {
       if (assetPickerForVariable) {
-        const base = attachedRefFromAssetUrl(url, assetType)
+        const base = attachedRefFromAssetPick(pick)
         const taken = new Set<string>()
         for (const r of attachedRefs) {
           if (r.mentionToken) taken.add(r.mentionToken)
@@ -716,7 +730,7 @@ export function AutomationsPage() {
         setAssetModalOpen(false)
         return
       }
-      setAttachedRefs((prev) => [...prev, attachedRefFromAssetUrl(url, assetType)])
+      setAttachedRefs((prev) => [...prev, attachedRefFromAssetPick(pick)])
       setAssetModalOpen(false)
     },
     [assetPickerForVariable, attachedRefs, automationVariables],
@@ -755,6 +769,8 @@ export function AutomationsPage() {
     [],
   )
 
+  const sanitizedVariables = React.useMemo(() => sanitizeAutomationVariables(automationVariables), [automationVariables])
+
   const currentPromptPayload = React.useMemo((): AutomationPromptPayload => {
     const attachments: AutomationPromptAttachment[] = [
       ...savedAttachments,
@@ -766,19 +782,18 @@ export function AutomationsPage() {
           filename: u.file.name,
         })),
     ]
-    const vars = sanitizeAutomationVariables(automationVariables)
     return {
       text: prompt.trim(),
       refs: attachedRefs,
       attachments,
-      ...(vars.length > 0 ? { variables: vars } : {}),
+      ...(sanitizedVariables.length > 0 ? { variables: sanitizedVariables } : {}),
     }
-  }, [prompt, attachedRefs, savedAttachments, uploadQueue, automationVariables])
+  }, [prompt, attachedRefs, savedAttachments, uploadQueue, sanitizedVariables])
 
   const persistSnapshot = React.useMemo(() => {
     if (!selected || newDialogOpen || isCommunityScope) return ""
     const cron = presetTab === "custom" ? customCron.trim() : effectiveCron
-    return buildPersistSnapshot({
+    const snapshot = buildPersistSnapshot({
       name,
       description,
       promptPayload: currentPromptPayload,
@@ -787,6 +802,8 @@ export function AutomationsPage() {
       model,
       isPublic: isPublicAutomation,
     })
+    console.log('persistSnapshot changed:', snapshot !== persistSnapshot)
+    return snapshot
   }, [
     selected,
     newDialogOpen,
@@ -812,17 +829,95 @@ export function AutomationsPage() {
     setEditBaselineSnapshot("")
   }, [selectedId])
 
+  const performAutoSave = React.useCallback(
+    async (currentPersistSnapshot: string) => {
+      if (isCommunityScope || !selected || newDialogOpen) return
+      if (!name.trim() || !prompt.trim()) return
+      if (uploadQueue.some((u) => u.isUploading)) return
+      const cron = presetTab === "custom" ? customCron.trim() : effectiveCron
+      if (!cron) return
+      
+      const vars = sanitizeAutomationVariables(automationVariables)
+      const promptPayload: AutomationPromptPayload = {
+        text: prompt.trim(),
+        refs: attachedRefs,
+        attachments: [
+          ...savedAttachments,
+          ...uploadQueue
+            .filter((u) => u.uploadedUrl)
+            .map((u) => ({
+              url: u.uploadedUrl!,
+              mediaType: u.file.type || "application/octet-stream",
+              filename: u.file.name,
+            })),
+        ],
+        ...(vars.length > 0 ? { variables: vars } : {}),
+      }
+      const scheduleSummary = describeCronHumanSummary(cron)
+      
+      try {
+        setAutoSaveStatus('saving')
+        const generatedDescription = await generateAutomationDescription({
+          name: name.trim(),
+          prompt: promptPayload.text,
+          scheduleSummary,
+        })
+        
+        const res = await fetch(`/api/automations/${selected.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name.trim(),
+            description: generatedDescription,
+            promptPayload,
+            cronSchedule: cron,
+            timezone,
+            model: model || null,
+            isPublic: isPublicAutomation,
+          }),
+        })
+        
+        if (!res.ok) {
+          setAutoSaveStatus('saved')
+          return
+        }
+        
+        setAutoSaveStatus('saved')
+        setDescription(generatedDescription)
+        // Update baseline so we don't keep autosaving the same thing
+        setEditBaselineSnapshot(currentPersistSnapshot)
+      } catch (e) {
+        setAutoSaveStatus('saved')
+      }
+    },
+    [isCommunityScope, selected, newDialogOpen, name, prompt, uploadQueue, presetTab, customCron, effectiveCron, automationVariables, attachedRefs, savedAttachments, timezone, model, isPublicAutomation, generateAutomationDescription]
+  )
+
+  // Debounced autosave
+  React.useEffect(() => {
+    if (isCommunityScope || !selected || newDialogOpen) return
+    if (!name.trim() || !prompt.trim()) return
+    if (uploadQueue.some((u) => u.isUploading)) return
+    if (persistSnapshot === editBaselineSnapshot || persistSnapshot === "") return
+
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current)
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      void performAutoSave(persistSnapshot)
+    }, 1500)
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+      }
+    }
+  }, [persistSnapshot, editBaselineSnapshot, isCommunityScope, selected, newDialogOpen, name, prompt, uploadQueue])
+
   const isEditHydrationPending = Boolean(
     selected && selectedId && lastHydratedId.current !== selectedId,
   )
-  const hasUnsavedFormEdits =
-    !isCommunityScope &&
-    Boolean(selected) &&
-    !newDialogOpen &&
-    !isEditHydrationPending &&
-    persistSnapshot.length > 0 &&
-    editBaselineSnapshot.length > 0 &&
-    persistSnapshot !== editBaselineSnapshot
 
   const previewTemplatePayload = React.useMemo((): AutomationPromptPayload | null => {
     if (!selected) return null
@@ -876,7 +971,6 @@ export function AutomationsPage() {
       ...(vars.length > 0 ? { variables: vars } : {}),
     }
     const scheduleSummary = describeCronHumanSummary(cron)
-    setSaving(true)
     try {
       const generatedDescription = await generateAutomationDescription({
         name: name.trim(),
@@ -936,8 +1030,6 @@ export function AutomationsPage() {
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed")
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -1092,10 +1184,11 @@ export function AutomationsPage() {
 
   function renderAutomationFormFields(
     idPrefix: string,
-    opts: { readOnly?: boolean; showVisibility?: boolean } = {},
+    opts: { readOnly?: boolean; showVisibility?: boolean; showInlineActions?: boolean } = {},
   ) {
     const readOnly = opts.readOnly ?? false
     const showVisibility = opts.showVisibility ?? false
+    const showInlineActions = opts.showInlineActions ?? false
     const scheduleModeValue = presetTab === "custom" ? "custom" : presetKind
     const scheduleControlLabel = describeScheduleControlLabel({
       presetTab,
@@ -1128,7 +1221,7 @@ export function AutomationsPage() {
             Keep the title short. The prompt does the heavy lifting.
           </p>
         </div>
-        {(savedAttachments.length > 0 || uploadQueue.length > 0) && (
+        {(savedAttachments.length > 0 || selectedAssetRefs.length > 0 || uploadQueue.length > 0) && (
           <div className="flex flex-row flex-wrap gap-2">
             {savedAttachments.map((att) => {
               const kind = mediaKindFromMime(att.mediaType)
@@ -1157,6 +1250,41 @@ export function AutomationsPage() {
                     className="absolute -top-1.5 -right-1.5 z-10 rounded-full border border-border bg-background p-1 shadow-sm hover:bg-destructive hover:text-destructive-foreground disabled:pointer-events-none disabled:opacity-50"
                     aria-label="Remove attachment"
                     onClick={() => setSavedAttachments((prev) => prev.filter((x) => x.url !== att.url))}
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </div>
+              )
+            })}
+            {selectedAssetRefs.map((ref) => {
+              const kind = ref.assetType
+              return (
+                <div key={ref.chipId} className="relative">
+                  {kind === "image" ? (
+                    <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-border bg-muted/40">
+                      <img src={ref.previewUrl ?? ref.assetUrl ?? ""} alt={ref.label} className="h-full w-full object-cover" />
+                    </div>
+                  ) : kind === "video" ? (
+                    <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-border bg-muted/40">
+                      <video
+                        src={ref.assetUrl ?? ""}
+                        poster={ref.previewUrl ?? undefined}
+                        muted
+                        playsInline
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ) : kind === "audio" ? (
+                    <div className="flex h-16 min-w-[180px] max-w-[220px] items-center rounded-2xl border border-border bg-muted/40 px-2">
+                      <audio src={ref.assetUrl ?? ""} controls className="h-8 w-full" />
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    className="absolute -top-1.5 -right-1.5 z-10 rounded-full border border-border bg-background p-1 shadow-sm hover:bg-destructive hover:text-destructive-foreground disabled:pointer-events-none disabled:opacity-50"
+                    aria-label="Remove asset"
+                    onClick={() => setAttachedRefs((prev) => prev.filter((x) => x.chipId !== ref.chipId))}
                   >
                     <Trash2 className="size-3" />
                   </button>
@@ -1193,18 +1321,34 @@ export function AutomationsPage() {
           <Label htmlFor={`${idPrefix}-prompt`} className="sr-only">
             Prompt
           </Label>
-          <CommandTextarea
-            value={prompt}
-            onChange={setPrompt}
-            refs={attachedRefs}
-            onRefsChange={setAttachedRefs}
-            rows={10}
-            className="min-h-[240px] max-h-[420px] rounded-none border-0 bg-transparent px-0 py-0 font-mono text-sm leading-6 shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
-            placeholder="Add prompt e.g. create tomorrow's post ideas, captions, and image directions. Type / for templates, @ for brands and assets."
-            slashCommands={AUTOMATION_SLASH_COMMANDS}
-            slashCommandsContext="Automation"
-            onPasteImage={(file) => void handleAttachFiles([file])}
-          />
+          <div className="relative">
+            <CommandTextarea
+              value={prompt}
+              onChange={setPrompt}
+              refs={attachedRefs}
+              onRefsChange={setAttachedRefs}
+              rows={10}
+              className="min-h-[240px] max-h-[420px] rounded-none border-0 bg-transparent px-0 py-0 font-mono text-sm leading-6 shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
+              placeholder="Add prompt e.g. create tomorrow's post ideas, captions, and image directions. Type / for templates, @ for brands and assets."
+              slashCommands={AUTOMATION_SLASH_COMMANDS}
+              slashCommandsContext="Automation"
+              onPasteImage={(file) => void handleAttachFiles([file])}
+            />
+            {!readOnly && !isCommunityScope && selected ? (
+              <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                {autoSaveStatus === 'saving' ? (
+                  <Badge variant="outline" className="gap-1.5">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Saving...
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400">
+                    ✓ Saved
+                  </Badge>
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -1513,18 +1657,32 @@ export function AutomationsPage() {
             </PopoverContent>
           </Popover>
 
-          {showVisibility ? (
-            <div className="ml-auto flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1.5">
-              <Globe className="h-4 w-4 text-muted-foreground" />
-              <Label htmlFor={`${idPrefix}-is-public`} className="cursor-pointer text-sm">
-                Public
-              </Label>
-              <Switch
-                id={`${idPrefix}-is-public`}
-                checked={isPublicAutomation}
-                onCheckedChange={setIsPublicAutomation}
-                disabled={readOnly}
-              />
+          {showVisibility || showInlineActions ? (
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {showVisibility ? (
+                <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1.5">
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor={`${idPrefix}-is-public`} className="cursor-pointer text-sm">
+                    Public
+                  </Label>
+                  <Switch
+                    id={`${idPrefix}-is-public`}
+                    checked={isPublicAutomation}
+                    onCheckedChange={setIsPublicAutomation}
+                    disabled={readOnly}
+                  />
+                </div>
+              ) : null}
+              {showInlineActions ? (
+                <>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setNewDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="button" size="sm" onClick={() => void save()}>
+                    Create
+                  </Button>
+                </>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -1949,6 +2107,7 @@ export function AutomationsPage() {
                     {selected.description.trim()}
                   </p>
                 ) : null}
+                <div className="my-3 border-t border-border/40" />
                 <CardDescription>
                   Runs on its own, on the schedule you pick. Each run becomes a chat you can open to see
                   the results, tweak the prompt, or run it again right away.
@@ -2038,19 +2197,14 @@ export function AutomationsPage() {
                         className={cn("h-3.5 w-3.5 transition-transform", editDetailsOpen && "rotate-180")}
                       />
                     </Button>
-                    {hasUnsavedFormEdits ? (
+                    {false ? (
                       <Button
                         type="button"
                         size="sm"
                         className="gap-1.5 shadow-sm"
-                        disabled={saving}
                         onClick={() => void save()}
                       >
-                        {saving ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Save className="h-3.5 w-3.5" />
-                        )}
+                        <Save className="h-3.5 w-3.5" />
                         Save edits
                       </Button>
                     ) : null}
@@ -2241,7 +2395,7 @@ export function AutomationsPage() {
                       </p>
                     </div>
 
-                    {!isCommunityScope ? (
+                    {false ? (
                       <div className="flex flex-col gap-3 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <p className="text-sm text-muted-foreground">
                           Changes are kept only after you save.
@@ -2251,13 +2405,8 @@ export function AutomationsPage() {
                           size="lg"
                           className="w-full shadow-sm sm:w-auto"
                           onClick={() => void save()}
-                          disabled={saving}
                         >
-                          {saving ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Save className="mr-2 h-4 w-4" />
-                          )}
+                          <Save className="mr-2 h-4 w-4" />
                           Save changes
                         </Button>
                       </div>
@@ -2397,17 +2546,8 @@ export function AutomationsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
-            {renderAutomationFormFields("new", { readOnly: false, showVisibility: true })}
+            {renderAutomationFormFields("new", { readOnly: false, showVisibility: true, showInlineActions: true })}
           </div>
-          <DialogFooter className="gap-2 border-t border-border/60 pt-4 sm:justify-end">
-            <Button type="button" variant="outline" onClick={() => setNewDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={() => void save()} disabled={saving}>
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Create
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

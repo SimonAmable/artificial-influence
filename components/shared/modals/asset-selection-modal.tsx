@@ -47,6 +47,9 @@ interface Generation {
 }
 
 export type AssetSelectionPick = {
+  id?: string
+  previewUrl?: string | null
+  title?: string
   url: string
   assetType: AssetType
 }
@@ -350,10 +353,18 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                   >
                     <div 
                       className="group/image relative aspect-square cursor-pointer hover:ring-2 hover:ring-primary transition-all rounded-md"
-                      onClick={() => handleSelect({ url: asset.url, assetType: asset.assetType })}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Select ${asset.assetType} asset`}
+                       onClick={() =>
+                         handleSelect({
+                           id: asset.id,
+                           previewUrl: asset.thumbnailUrl || asset.url,
+                           title: asset.title,
+                           url: asset.url,
+                           assetType: asset.assetType,
+                         })
+                       }
+                       role="button"
+                       tabIndex={0}
+                       aria-label={`Select ${asset.assetType} asset`}
                     >
                       {asset.assetType === "image" && (
                         <Image
@@ -437,7 +448,12 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                     <div 
                       className="group/image relative aspect-square cursor-pointer hover:ring-2 hover:ring-primary transition-all rounded-md"
                       onClick={() =>
-                        handleSelect({ url: generation.url, assetType: generation.type })
+                        handleSelect({
+                          previewUrl: generation.url,
+                          title: generation.prompt || "Generated media",
+                          url: generation.url,
+                          assetType: generation.type,
+                        })
                       }
                       role="button"
                       tabIndex={0}

@@ -293,9 +293,9 @@ export function Header() {
       setCredits(null)
       return
     }
-    const supabase = createClient()
 
     const fetchCredits = async () => {
+      const supabase = createClient()
       try {
         const { data } = await supabase
           .from("profiles")
@@ -309,6 +309,26 @@ export function Header() {
     }
 
     void fetchCredits()
+  }, [user?.id])
+
+  const refreshCredits = React.useCallback(async () => {
+    if (!user?.id) {
+      setCredits(null)
+      return
+    }
+
+    const supabase = createClient()
+
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("credits")
+        .eq("id", user.id)
+        .single()
+      setCredits(data?.credits ?? 0)
+    } catch {
+      setCredits(0)
+    }
   }, [user?.id])
 
   const handleLogout = async () => {
@@ -620,7 +640,13 @@ export function Header() {
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <DropdownMenu>
+              <DropdownMenu
+                onOpenChange={(open) => {
+                  if (open) {
+                    void refreshCredits()
+                  }
+                }}
+              >
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" className="shadow-md">
                     <User className="h-[1.2rem] w-[1.2rem]" />
@@ -629,7 +655,12 @@ export function Header() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="font-normal">
-                    {credits !== null ? `${credits} credits available` : "Credits unavailable"}
+                    <div className="space-y-1">
+                      <div>{credits !== null ? `${credits} credits available` : "Credits unavailable"}</div>
+                      {user?.email ? (
+                        <div className="text-xs text-muted-foreground">{user.email}</div>
+                      ) : null}
+                    </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => router.push("/affiliate")}>

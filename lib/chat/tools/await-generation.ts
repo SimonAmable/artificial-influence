@@ -2,6 +2,7 @@ import { tool } from "ai"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { formatGenerationMediaId } from "@/lib/chat/media-id"
+import { tryCompleteFalPendingImage } from "@/lib/server/fal-image-completion"
 
 const POLL_MS_MIN = 2000
 const POLL_MS_MAX = 6000
@@ -38,14 +39,14 @@ interface CreateAwaitGenerationToolOptions {
 export function createAwaitGenerationTool({ supabase, userId }: CreateAwaitGenerationToolOptions) {
   return tool({
     description:
-      "Wait (poll) until a pending Replicate generation completes or fails, up to a bounded time (image cap: 60s, video cap: 90s). **Only** when a **chain** needs the finished file in the **same** turn (otherwise skip — UI updates alone). **Images:** this is the correct wait path when chaining (e.g. image then video/draft/tools); never use scheduleGenerationFollowUp for images. **Video:** use when the next tool needs the file and the job can plausibly complete within ~90s; for long models (e.g. Kling Motion Control, Seedance 2.0) that need a chained next step after many minutes, use scheduleGenerationFollowUp instead. Requires predictionId from generateImage/generateVideo pending output, or a generations table id. Do not call twice for the same prediction. If this returns timeout, tell the user the UI will keep updating.",
+      "Wait (poll) until a pending generation completes or fails, up to a bounded time (image cap: 60s, video cap: 90s). Supports the app's async image/video backends, including Replicate and Fal-backed image jobs. **Only** when a **chain** needs the finished file in the **same** turn (otherwise skip — UI updates alone). **Images:** this is the correct wait path when chaining (e.g. image then video/draft/tools); never use scheduleGenerationFollowUp for images. **Video:** use when the next tool needs the file and the job can plausibly complete within ~90s; for long models (e.g. Kling Motion Control, Seedance 2.0) that need a chained next step after many minutes, use scheduleGenerationFollowUp instead. Requires predictionId from generateImage/generateVideo pending output, or a generations table id. Do not call twice for the same prediction. If this returns timeout, tell the user the UI will keep updating.",
     inputSchema: z
       .object({
         predictionId: z
           .string()
           .min(1)
           .optional()
-          .describe("Replicate prediction id from a pending generateImage / generateVideo tool result."),
+          .describe("Async prediction/request id from a pending generateImage / generateVideo tool result."),
         generationId: z
           .string()
           .uuid()
@@ -135,6 +136,12 @@ export function createAwaitGenerationTool({ supabase, userId }: CreateAwaitGener
       const isPending = (rows: typeof first) => rows.some((r) => r.status === "pending")
 
       let rows = first
+      const maybeRefreshFalPending = async (currentRows: typeof rows) => {
+        if (!currentRows.some((row) => row.status === "pending")) return
+        const pendingPredictionId = currentRows.find((row) => row.replicate_prediction_id)?.replicate_prediction_id
+        if (!pendingPredictionId) return
+        await tryCompleteFalPendingImage(supabase, userId, pendingPredictionId)
+      }
       const computeAggregateStatus = (r: typeof rows) => {
         if (r.some((row) => row.status === "failed")) return "failed" as const
         if (r.some((row) => row.status === "completed")) return "completed" as const
@@ -142,7 +149,10 @@ export function createAwaitGenerationTool({ supabase, userId }: CreateAwaitGener
       }
       let lastStatus = computeAggregateStatus(rows)
 
+      await maybeRefreshFalPending(rows)
+
       while (Date.now() < effectiveDeadline && isPending(rows)) {
+        await maybeRefreshFalPending(rows)
         await sleep(pollMs)
         rows = await fetchRows()
         if (rows.length === 0) break

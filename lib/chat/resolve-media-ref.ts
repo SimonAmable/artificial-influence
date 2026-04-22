@@ -24,6 +24,29 @@ function getPublicUrl(supabase: SupabaseClient, bucket: string, storagePath: str
   return data.publicUrl
 }
 
+function inferGenerationMimeType(type: "image" | "video" | "audio", storagePath: string) {
+  const lower = storagePath.toLowerCase()
+
+  if (type === "video") {
+    if (lower.endsWith(".webm")) return "video/webm"
+    if (lower.endsWith(".mov")) return "video/quicktime"
+    return "video/mp4"
+  }
+
+  if (type === "audio") {
+    if (lower.endsWith(".wav")) return "audio/wav"
+    if (lower.endsWith(".ogg")) return "audio/ogg"
+    if (lower.endsWith(".m4a")) return "audio/mp4"
+    return "audio/mpeg"
+  }
+
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg"
+  if (lower.endsWith(".webp")) return "image/webp"
+  if (lower.endsWith(".gif")) return "image/gif"
+  if (lower.endsWith(".avif")) return "image/avif"
+  return "image/png"
+}
+
 async function fetchUploadById(
   supabase: SupabaseClient,
   userId: string,
@@ -88,16 +111,18 @@ async function fetchGenerationById(
     id: string
     supabase_storage_path: string | null
     model: string | null
-    type: "image" | "video"
+    type: "image" | "video" | "audio"
   }
 
   if (!row.supabase_storage_path) return null
 
-  const mimeType = row.type === "video" ? "video/mp4" : "image/png"
+  const mimeType = inferGenerationMimeType(row.type, row.supabase_storage_path)
   const label =
     row.type === "video"
       ? `Generated video (${row.model ?? "video"})`
-      : `Generated image (${row.model ?? "image"})`
+      : row.type === "audio"
+        ? `Generated audio (${row.model ?? "audio"})`
+        : `Generated image (${row.model ?? "image"})`
 
   return {
     bucket: "public-bucket",

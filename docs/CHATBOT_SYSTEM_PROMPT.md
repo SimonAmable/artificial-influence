@@ -34,6 +34,7 @@ Generate stunning images from text prompts. Available models:
 - **Google Nano Banana** (Default, $0.001/gen) - Fast, reliable, great for iterations
 - **Nano Banana Pro** ($0.003/gen) - State-of-the-art, up to 4K resolution
 - **GPT Image 1.5** ($0.004/gen) - OpenAI's advanced image model
+- **GPT Image 2** - OpenAI image generation on Fal with text-to-image and image-to-image editing
 - **Seedream 4.5** ($0.0025/gen) - Bytedance model, 2K-4K outputs
 - **Flux Kontext Fast** ($0.002/gen) - Ultra fast, perfect for quick iterations
 - **Z-Image Turbo** (`prunaai/z-image-turbo`) - Fast image model for quick generations

@@ -12,13 +12,12 @@ import {
   runReplicatePollingImageGeneration,
 } from "@/lib/server/replicate-image-generation"
 import {
-  aspectRatioToQwenImageSize,
-  buildQwenFalInput,
+  buildFalImageRequest,
+  GPT_IMAGE_2_CANONICAL_ID,
+  isSupportedFalImageModel,
   QWEN_IMAGE2_CANONICAL_ID,
-  resolveQwenImage2Route,
-  submitQwenImage2Queue,
-  type QwenUnifiedParams,
-} from "@/lib/server/fal-qwen-image-2"
+  submitFalImageQueue,
+} from "@/lib/server/fal-image"
 import { aspectRatioToDimensions, modelUsesDimensions } from "@/lib/utils/model-parameters"
 import type {
   AvailableChatImageReference,
@@ -523,7 +522,11 @@ export function createGenerateImageTool({
         }
       }
 
-      if (provider === "fal" && modelIdentifier === QWEN_IMAGE2_CANONICAL_ID) {
+      if (
+        provider === "fal" &&
+        (modelIdentifier === QWEN_IMAGE2_CANONICAL_ID ||
+          modelIdentifier === GPT_IMAGE_2_CANONICAL_ID)
+      ) {
         const hasCredits = await checkUserHasCredits(userId, requiredCredits, supabase)
         if (!hasCredits) {
           throw new Error(`Insufficient credits. This generation requires ${requiredCredits} credits.`)
@@ -533,21 +536,25 @@ export function createGenerateImageTool({
           throw new Error("FAL_KEY environment variable is not set.")
         }
 
-        const { endpointId } = resolveQwenImage2Route(referenceImageUrls)
-        const resolvedAspectRatio =
-          aspectRatio ?? (referenceImageUrls.length > 0 ? "match_input_image" : "1:1")
-        const qwenParams: QwenUnifiedParams = {
-          prompt: finalPrompt,
-          negativePrompt: null,
-          numImages: effectiveVariantCount,
-          seed: null,
-          outputFormat: "png",
-          enablePromptExpansion: true,
-          enableSafetyChecker: false,
-          imageSize: aspectRatioToQwenImageSize(resolvedAspectRatio),
+        if (!isSupportedFalImageModel(modelIdentifier)) {
+          throw new Error(`Unsupported Fal image model: ${modelIdentifier}`)
         }
-        const input = buildQwenFalInput(endpointId, qwenParams, referenceImageUrls)
-        const { requestId, endpointId: falEndpoint } = await submitQwenImage2Queue(endpointId, input)
+
+        const falRequest = buildFalImageRequest({
+          aspectRatio,
+          enablePromptExpansion: modelIdentifier === QWEN_IMAGE2_CANONICAL_ID ? true : undefined,
+          enableSafetyChecker: modelIdentifier === QWEN_IMAGE2_CANONICAL_ID ? false : undefined,
+          modelIdentifier,
+          numImages: effectiveVariantCount,
+          outputFormat: "png",
+          prompt: finalPrompt,
+          quality: modelIdentifier === GPT_IMAGE_2_CANONICAL_ID ? "high" : undefined,
+          referenceImageUrls,
+        })
+        const { requestId, endpointId: falEndpoint } = await submitFalImageQueue(
+          falRequest.endpointId,
+          falRequest.input,
+        )
 
         const { data: pendingGeneration, error: saveError } = await supabase
           .from("generations")
@@ -557,7 +564,7 @@ export function createGenerateImageTool({
             supabase_storage_path: null,
             reference_images_supabase_storage_path:
               referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
-            aspect_ratio: resolvedAspectRatio,
+            aspect_ratio: falRequest.resolvedAspectRatio,
             model: modelIdentifier,
             type: "image",
             is_public: true,
@@ -576,7 +583,7 @@ export function createGenerateImageTool({
         }
 
         return {
-          aspectRatio: resolvedAspectRatio,
+          aspectRatio: falRequest.resolvedAspectRatio,
           generationId: pendingGeneration.id,
           message: `Started an image generation with ${modelIdentifier}.`,
           model: modelIdentifier,

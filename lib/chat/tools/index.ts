@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { SkillCatalogEntry } from "@/lib/chat/skills/catalog"
+import { createGenerateAudioTool } from "@/lib/chat/tools/generate-audio"
 import type { AvailableChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
 import { createGenerateImageTool } from "@/lib/chat/tools/generate-image"
 import { createGenerateImageWithNanoBananaTool } from "@/lib/chat/tools/generate-image-with-nano-banana"
@@ -15,6 +16,7 @@ import { createSaveGenerationAsAssetTool } from "@/lib/chat/tools/save-generatio
 import { createPrepareInstagramPostTool } from "@/lib/chat/tools/prepare-instagram-post"
 import { createSearchAssetsTool } from "@/lib/chat/tools/search-assets"
 import { createSearchModelsTool } from "@/lib/chat/tools/search-models"
+import { createSearchVoicesTool } from "@/lib/chat/tools/search-voices"
 import { createActivateSkillTool, createSaveSkillTool } from "@/lib/chat/tools/skills"
 import { createExtractVideoFramesTool } from "@/lib/chat/tools/extract-video-frames"
 import { createComposeTimelineVideoTool } from "@/lib/chat/tools/compose-timeline-video"
@@ -82,6 +84,11 @@ export function createCreativeChatTools({
       userId,
       requireApproval: source === "chat",
     }),
+    generateAudio: createGenerateAudioTool({
+      supabase,
+      threadId,
+      userId,
+    }),
     generateImage: createGenerateImageTool({
       availableReferences,
       supabase,
@@ -126,6 +133,9 @@ export function createCreativeChatTools({
       userId,
     }),
     searchModels: createSearchModelsTool({
+      supabase,
+    }),
+    searchVoices: createSearchVoicesTool({
       supabase,
     }),
     awaitGeneration: createAwaitGenerationTool({ supabase, userId }),

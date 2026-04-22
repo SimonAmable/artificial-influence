@@ -1,0 +1,175 @@
+import { fal } from "@fal-ai/client"
+
+export const QWEN_IMAGE2_CANONICAL_ID = "fal-ai/qwen-image-2" as const
+export const GPT_IMAGE_2_CANONICAL_ID = "openai/gpt-image-2" as const
+
+export const FAL_QWEN_T2I = "fal-ai/qwen-image-2/text-to-image" as const
+export const FAL_QWEN_EDIT = "fal-ai/qwen-image-2/edit" as const
+export const FAL_GPT_IMAGE_2_T2I = "fal-ai/gpt-image-2" as const
+export const FAL_GPT_IMAGE_2_EDIT = "fal-ai/gpt-image-2/image-to-image" as const
+
+export type SupportedFalImageModelIdentifier =
+  | typeof QWEN_IMAGE2_CANONICAL_ID
+  | typeof GPT_IMAGE_2_CANONICAL_ID
+
+export type FalImageEndpoint =
+  | typeof FAL_QWEN_T2I
+  | typeof FAL_QWEN_EDIT
+  | typeof FAL_GPT_IMAGE_2_T2I
+  | typeof FAL_GPT_IMAGE_2_EDIT
+
+const FAL_IMAGE_MODEL_CONFIG: Record<
+  SupportedFalImageModelIdentifier,
+  {
+    editEndpointId: FalImageEndpoint
+    maxReferenceImages: number
+    textEndpointId: FalImageEndpoint
+  }
+> = {
+  [QWEN_IMAGE2_CANONICAL_ID]: {
+    textEndpointId: FAL_QWEN_T2I,
+    editEndpointId: FAL_QWEN_EDIT,
+    maxReferenceImages: 3,
+  },
+  [GPT_IMAGE_2_CANONICAL_ID]: {
+    textEndpointId: FAL_GPT_IMAGE_2_T2I,
+    editEndpointId: FAL_GPT_IMAGE_2_EDIT,
+    maxReferenceImages: 4,
+  },
+}
+
+export interface FalImageRequestOptions {
+  aspectRatio?: string | null
+  enablePromptExpansion?: boolean
+  enableSafetyChecker?: boolean
+  modelIdentifier: SupportedFalImageModelIdentifier
+  negativePrompt?: string | null
+  numImages: number
+  outputFormat?: "png" | "jpeg" | "webp" | null
+  prompt: string
+  quality?: "low" | "medium" | "high" | null
+  referenceImageUrls: string[]
+  seed?: number | null
+}
+
+export function configureFal() {
+  const key = process.env.FAL_KEY
+  if (!key) {
+    throw new Error("FAL_KEY is not configured.")
+  }
+
+  fal.config({ credentials: key })
+}
+
+export function isSupportedFalImageModel(
+  modelIdentifier: string,
+): modelIdentifier is SupportedFalImageModelIdentifier {
+  return modelIdentifier in FAL_IMAGE_MODEL_CONFIG
+}
+
+export function aspectRatioToFalImageSize(aspectRatio: string | null | undefined) {
+  const a = (aspectRatio || "1:1").trim()
+  if (a === "16:9" || a === "21:9") return "landscape_16_9"
+  if (a === "9:16") return "portrait_16_9"
+  if (a === "4:3") return "landscape_4_3"
+  if (a === "3:4") return "portrait_4_3"
+  if (a === "1:1") return "square_hd"
+  return "square_hd"
+}
+
+function normalizeOutputFormat(
+  outputFormat: FalImageRequestOptions["outputFormat"],
+): "png" | "jpeg" | "webp" {
+  if (outputFormat === "jpeg" || outputFormat === "webp") return outputFormat
+  return "png"
+}
+
+function normalizeQuality(
+  quality: FalImageRequestOptions["quality"],
+): "low" | "medium" | "high" {
+  if (quality === "low" || quality === "medium") return quality
+  return "high"
+}
+
+export function buildFalImageRequest(options: FalImageRequestOptions): {
+  endpointId: FalImageEndpoint
+  input: Record<string, unknown>
+  resolvedAspectRatio: string
+} {
+  const config = FAL_IMAGE_MODEL_CONFIG[options.modelIdentifier]
+  if (!config) {
+    throw new Error(`Unsupported Fal image model: ${options.modelIdentifier}`)
+  }
+
+  const referenceImageUrls = options.referenceImageUrls
+    .filter((url) => typeof url === "string" && url.length > 0)
+    .slice(0, config.maxReferenceImages)
+  const isEdit = referenceImageUrls.length > 0
+  const endpointId = isEdit ? config.editEndpointId : config.textEndpointId
+  const resolvedAspectRatio =
+    options.aspectRatio ?? (isEdit ? "match_input_image" : "1:1")
+  const imageSize =
+    resolvedAspectRatio === "match_input_image" && isEdit
+      ? undefined
+      : aspectRatioToFalImageSize(resolvedAspectRatio)
+
+  if (options.modelIdentifier === QWEN_IMAGE2_CANONICAL_ID) {
+    const input: Record<string, unknown> = {
+      prompt: options.prompt,
+      negative_prompt: options.negativePrompt ?? "",
+      num_images: Math.min(4, Math.max(1, options.numImages)),
+      output_format: normalizeOutputFormat(options.outputFormat),
+      enable_prompt_expansion: options.enablePromptExpansion ?? true,
+      enable_safety_checker: options.enableSafetyChecker ?? false,
+    }
+
+    if (options.seed != null && !Number.isNaN(Number(options.seed))) {
+      input.seed = Math.round(Number(options.seed))
+    }
+
+    if (imageSize) {
+      input.image_size = imageSize
+    }
+
+    if (isEdit) {
+      input.image_urls = referenceImageUrls
+    }
+
+    return { endpointId, input, resolvedAspectRatio }
+  }
+
+  if (options.modelIdentifier === GPT_IMAGE_2_CANONICAL_ID) {
+    const input: Record<string, unknown> = {
+      prompt: options.prompt,
+      num_images: Math.min(4, Math.max(1, options.numImages)),
+      output_format: normalizeOutputFormat(options.outputFormat),
+      quality: normalizeQuality(options.quality),
+    }
+
+    if (imageSize) {
+      input.image_size = imageSize
+    }
+
+    if (isEdit) {
+      input.image_urls = referenceImageUrls
+    }
+
+    return { endpointId, input, resolvedAspectRatio }
+  }
+
+  throw new Error(`Unsupported Fal image model: ${options.modelIdentifier}`)
+}
+
+export async function submitFalImageQueue(
+  endpointId: FalImageEndpoint,
+  input: Record<string, unknown>,
+): Promise<{ requestId: string; endpointId: FalImageEndpoint }> {
+  configureFal()
+  const submitted = await fal.queue.submit(endpointId, { input })
+  const requestId = submitted.request_id
+  if (!requestId) {
+    throw new Error("Fal queue submit did not return request_id")
+  }
+
+  return { requestId, endpointId }
+}

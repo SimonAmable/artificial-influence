@@ -638,6 +638,83 @@ VALUES (
 )
 ON CONFLICT (identifier) DO NOTHING;
 
+-- Image model: openai/gpt-image-2
+INSERT INTO public.models (
+  identifier,
+  name,
+  description,
+  type,
+  provider,
+  is_active,
+  model_cost,
+  parameters,
+  aspect_ratios,
+  default_aspect_ratio,
+  supports_reference_image,
+  supports_reference_video,
+  max_images
+)
+VALUES (
+  'openai/gpt-image-2',
+  'GPT Image 2',
+  'Best when you want strong prompt-following from OpenAI, clean text-to-image output, or guided image-to-image edits with a reference image.',
+  'image',
+  'fal',
+  true,
+  4,
+  '{
+    "parameters": [
+      {
+        "name": "quality",
+        "type": "string",
+        "label": "Quality",
+        "description": "Generation quality preset",
+        "required": false,
+        "default": "high",
+        "enum": ["low", "medium", "high"],
+        "ui_type": "select"
+      },
+      {
+        "name": "num_images",
+        "type": "number",
+        "label": "Number of Images",
+        "description": "How many image variants to generate",
+        "required": false,
+        "default": 1,
+        "min": 1,
+        "max": 4,
+        "ui_type": "number"
+      },
+      {
+        "name": "output_format",
+        "type": "string",
+        "label": "Output Format",
+        "description": "Image file format",
+        "required": false,
+        "default": "png",
+        "enum": ["png", "jpeg", "webp"],
+        "ui_type": "select"
+      },
+      {
+        "name": "image_size",
+        "type": "string",
+        "label": "Image Size",
+        "description": "Preset output image size",
+        "required": false,
+        "default": "square_hd",
+        "enum": ["square_hd", "square", "portrait_4_3", "portrait_16_9", "landscape_4_3", "landscape_16_9"],
+        "ui_type": "select"
+      }
+    ]
+  }'::jsonb,
+  ARRAY['1:1', '16:9', '9:16', '4:3', '3:4'],
+  '1:1',
+  true,
+  false,
+  4
+)
+ON CONFLICT (identifier) DO NOTHING;
+
 -- Image model: bytedance/seedream-4.5
 INSERT INTO public.models (identifier, name, description, type, provider, is_active, model_cost, parameters)
 VALUES (

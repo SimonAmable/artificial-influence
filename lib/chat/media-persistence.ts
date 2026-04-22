@@ -52,7 +52,7 @@ type StoredGenerationRow = {
   status: string | null
   supabase_storage_path: string | null
   tool: string | null
-  type: "image" | "video"
+  type: "image" | "video" | "audio"
   user_id: string
 }
 

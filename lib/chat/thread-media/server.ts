@@ -40,6 +40,24 @@ function inferMimeFromStoragePath(path: string, fallback: string) {
   return fallback
 }
 
+function inferGenerationMimeType(type: "image" | "video" | "audio", storagePath: string) {
+  if (type === "video") {
+    return inferMimeFromStoragePath(storagePath, "video/mp4")
+  }
+
+  if (type === "audio") {
+    return inferMimeFromStoragePath(storagePath, "audio/mpeg")
+  }
+
+  return inferMimeFromStoragePath(storagePath, "image/png")
+}
+
+function buildGenerationLabel(type: "image" | "video" | "audio", model: string | null) {
+  if (type === "video") return `Generated video (${model ?? "video"})`
+  if (type === "audio") return `Generated audio (${model ?? "audio"})`
+  return `Generated image (${model ?? "image"})`
+}
+
 function getPublicUrlForPath(supabase: SupabaseClient, bucket: string, storagePath: string) {
   const { data } = supabase.storage.from(bucket).getPublicUrl(storagePath)
   return data.publicUrl
@@ -181,20 +199,14 @@ export async function listThreadMediaPage(
         user_id: string
         chat_thread_id: string | null
         supabase_storage_path: string | null
-        type: "image" | "video"
+        type: "image" | "video" | "audio"
         model: string | null
         created_at: string
       }
       if (!r.chat_thread_id || !r.supabase_storage_path) continue
 
-      const mimeType = inferMimeFromStoragePath(
-        r.supabase_storage_path,
-        r.type === "video" ? "video/mp4" : "image/png",
-      )
-      const label =
-        r.type === "video"
-          ? `Generated video (${r.model ?? "video"})`
-          : `Generated image (${r.model ?? "image"})`
+      const mimeType = inferGenerationMimeType(r.type, r.supabase_storage_path)
+      const label = buildGenerationLabel(r.type, r.model)
 
       generationRows.push({
         id: formatGenerationMediaId(r.id),

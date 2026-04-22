@@ -29,6 +29,13 @@ export type AutomationPromptPayload = {
   variables?: AutomationPromptVariable[]
 }
 
+function mediaTypeFromAssetType(assetType: AttachedRef["assetType"]): string {
+  if (assetType === "image") return "image/*"
+  if (assetType === "video") return "video/*"
+  if (assetType === "audio") return "audio/*"
+  return "application/octet-stream"
+}
+
 function isHttpUrl(url: string): boolean {
   return url.startsWith("https://") || url.startsWith("http://")
 }
@@ -167,6 +174,22 @@ export function buildAutomationUserMessage(
   genId: () => string,
 ): UIMessage {
   const parts: UIMessage["parts"] = []
+  const attachedAssetUrls = new Set(payload.attachments.map((attachment) => attachment.url))
+
+  for (const ref of payload.refs) {
+    if (ref.category !== "asset" || !ref.assetUrl || !ref.assetType) {
+      continue
+    }
+    if (attachedAssetUrls.has(ref.assetUrl)) {
+      continue
+    }
+    parts.push({
+      type: "file",
+      url: ref.assetUrl,
+      mediaType: mediaTypeFromAssetType(ref.assetType),
+      filename: ref.label || undefined,
+    })
+  }
 
   for (const a of payload.attachments) {
     parts.push({

@@ -191,9 +191,9 @@ export const megaNavGroups: MegaNavGroup[] = [
             iconSrc: "/ai_icons/gemini-color.svg",
           },
           {
-            path: "/image?model=openai/gpt-image-1.5",
-            label: "GPT Image 1.5",
-            description: "True-color precision rendering",
+            path: "/image?model=openai/gpt-image-2",
+            label: "GPT Image 2",
+            description: "OpenAI image generation on Fal",
             badge: "new",
             iconSrc: "/ai_icons/openai.svg",
           },

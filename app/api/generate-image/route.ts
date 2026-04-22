@@ -11,13 +11,12 @@ import { modelUsesDimensions, aspectRatioToDimensions } from '@/lib/utils/model-
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from '@/lib/constants/models';
 import { runReplicatePollingImageGeneration } from '@/lib/server/replicate-image-generation';
 import {
+  buildFalImageRequest,
+  GPT_IMAGE_2_CANONICAL_ID,
+  isSupportedFalImageModel,
   QWEN_IMAGE2_CANONICAL_ID,
-  aspectRatioToQwenImageSize,
-  buildQwenFalInput,
-  resolveQwenImage2Route,
-  submitQwenImage2Queue,
-  type QwenUnifiedParams,
-} from '@/lib/server/fal-qwen-image-2';
+  submitFalImageQueue,
+} from '@/lib/server/fal-image';
 
 const STALE_PENDING_MINUTES = 30;
 const FREE_CONCURRENCY_LIMIT = 1;
@@ -175,7 +174,7 @@ export async function POST(request: NextRequest) {
     console.log('[generate-image] ✓ Model found:', modelData.name);
 
     const modelProvider = String(modelData.provider ?? '').toLowerCase();
-    if (modelIdentifier === QWEN_IMAGE2_CANONICAL_ID && modelProvider === 'fal') {
+    if (modelProvider === 'fal') {
       if (!process.env.FAL_KEY) {
         console.error('[generate-image] FAL_KEY not set for Fal model');
         return NextResponse.json(
@@ -389,12 +388,21 @@ export async function POST(request: NextRequest) {
       console.log('[generate-image] Prompt enhancement skipped');
     }
 
-    if (modelProvider === 'fal' && modelIdentifier === QWEN_IMAGE2_CANONICAL_ID) {
-      const { endpointId } = resolveQwenImage2Route(referenceImageUrls);
-      const aspectForQwen = aspectRatio || aspect_ratio || null;
+    if (
+      modelProvider === 'fal' &&
+      (modelIdentifier === QWEN_IMAGE2_CANONICAL_ID || modelIdentifier === GPT_IMAGE_2_CANONICAL_ID)
+    ) {
+      if (!isSupportedFalImageModel(modelIdentifier)) {
+        return NextResponse.json(
+          { error: `Unsupported Fal image model: ${modelIdentifier}` },
+          { status: 400 },
+        );
+      }
+
       const negativePromptField = formData.get('negative_prompt') as string | null;
       const enablePromptExpansion = formData.get('enable_prompt_expansion') !== 'false';
       const enableSafetyChecker = formData.get('enable_safety_checker') === 'true';
+      const qualityRaw = (formData.get('quality') as string | null)?.toLowerCase();
       const rawFormat = (output_format || 'png').toLowerCase();
       const outputFormatResolved: 'png' | 'jpeg' | 'webp' =
         rawFormat === 'jpeg' || rawFormat === 'jpg'
@@ -402,19 +410,34 @@ export async function POST(request: NextRequest) {
           : rawFormat === 'webp'
             ? 'webp'
             : 'png';
-      const imageSize = aspectRatioToQwenImageSize(aspectForQwen);
-      const qwenParams: QwenUnifiedParams = {
-        prompt: finalPrompt,
-        negativePrompt: negativePromptField?.trim() ? negativePromptField : null,
+      const falRequest = buildFalImageRequest({
+        aspectRatio: aspectRatio || aspect_ratio || null,
+        enablePromptExpansion:
+          modelIdentifier === QWEN_IMAGE2_CANONICAL_ID ? enablePromptExpansion : undefined,
+        enableSafetyChecker:
+          modelIdentifier === QWEN_IMAGE2_CANONICAL_ID ? enableSafetyChecker : undefined,
+        modelIdentifier,
+        negativePrompt:
+          modelIdentifier === QWEN_IMAGE2_CANONICAL_ID && negativePromptField?.trim()
+            ? negativePromptField
+            : null,
         numImages: effectiveN,
-        seed: seed != null && !Number.isNaN(seed) ? seed : null,
         outputFormat: outputFormatResolved,
-        enablePromptExpansion,
-        enableSafetyChecker,
-        imageSize,
-      };
-      const input = buildQwenFalInput(endpointId, qwenParams, referenceImageUrls);
-      const { requestId, endpointId: falEndpoint } = await submitQwenImage2Queue(endpointId, input);
+        prompt: finalPrompt,
+        quality:
+          qualityRaw === 'low' || qualityRaw === 'medium' || qualityRaw === 'high'
+            ? qualityRaw
+            : undefined,
+        referenceImageUrls,
+        seed:
+          modelIdentifier === QWEN_IMAGE2_CANONICAL_ID && seed != null && !Number.isNaN(seed)
+            ? seed
+            : null,
+      });
+      const { requestId, endpointId: falEndpoint } = await submitFalImageQueue(
+        falRequest.endpointId,
+        falRequest.input,
+      );
 
       const { data: pendingGeneration, error: insertError } = await supabase
         .from('generations')
@@ -424,7 +447,7 @@ export async function POST(request: NextRequest) {
           supabase_storage_path: null,
           reference_images_supabase_storage_path:
             referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
-          aspect_ratio: aspectRatio || aspect_ratio || null,
+          aspect_ratio: falRequest.resolvedAspectRatio,
           model: modelIdentifier,
           type: 'image',
           is_public: true,
@@ -996,7 +1019,7 @@ export async function GET() {
     asyncFalQwen: !!process.env.FAL_KEY,
     note:
       process.env.REPLICATE_WEBHOOK_BASE_URL || process.env.FAL_KEY
-        ? 'Async mode: POST may return 202 with predictionId; poll GET /api/generate-image/status?predictionId=... (Replicate webhooks and/or Fal Qwen Image 2 queue).'
+        ? 'Async mode: POST may return 202 with predictionId; poll GET /api/generate-image/status?predictionId=... (Replicate webhooks and/or Fal image queues).'
         : undefined,
     usage: {
       method: 'POST',

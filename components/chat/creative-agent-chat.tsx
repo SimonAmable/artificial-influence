@@ -104,20 +104,17 @@ function formatThreadUpdatedAt(value: string) {
 }
 
 const STARTER_PROMPTS: { label: string; prompt: string }[] = [
-  { label: "What can this agent do?", prompt: "What can this agent do?" },
   {
-    label: "Image prompt from a rough idea",
-    prompt: "Turn my rough idea into a detailed image-generation prompt.",
+    label: "What can this agent do?",
+    prompt: "What can this agent do?",
   },
   {
-    label: "Concept → finished visuals",
-    prompt:
-      "What workflow should I use to take this from concept to finished visuals?",
+    label: "Generate Image",
+    prompt: "Based on my input, generate the best image possible. Decide on the optimal prompt, style, and settings.",
   },
   {
-    label: "Break down a reference",
-    prompt:
-      "I’ll attach a reference. Break down what stands out and how to borrow from it.",
+    label: "Generate Video",
+    prompt: "Based on my input, generate the best video possible. Decide on the optimal prompt, duration, and settings.",
   },
   {
     label: "Visual traits as JSON",
@@ -125,13 +122,8 @@ const STARTER_PROMPTS: { label: string; prompt: string }[] = [
       "I’ll attach an image. Extract detailed visual traits as JSON for a Nano Banana prompt.",
   },
   {
-    label: "Verbose JSON from image (Nano Banana)",
-    prompt:
-      "Turn this image into a detailed JSON prompt. Use the full verbose Nano Banana blueprint: top-level keys prompt (with main_subject, scene, style object with art_style/lighting/color_palette/camera/mood, details array, text_in_image, characters, products, background, negative_prompts), technical, references, workflow, notes_for_model. Be exhaustive: rich strings, many detail bullets, thorough negative_prompts, and concrete notes_for_model like the reference examples. Output one pretty-printed JSON code block only after a short preamble.",
-  },
-  {
-    label: "Notes → client brief",
-    prompt: "Turn these notes into a clear, client-ready creative brief.",
+    label: "Generate Audio",
+    prompt: "Based on my input, generate the best audio possible. Decide on the optimal voice, tone, and settings.",
   },
 ]
 
@@ -237,6 +229,35 @@ type GenerateVideoToolPart = {
   errorText?: string
 }
 
+type GenerateAudioToolPart = {
+  type: "tool-generateAudio"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    languageCode?: string
+    modelIdentifier?: string
+    provider?: "inworld" | "google"
+    stylePrompt?: string
+    text?: string
+    voiceId?: string
+  }
+  output?: {
+    audio?: {
+      mimeType?: string
+      storagePath?: string | null
+      url: string
+    }
+    generationId?: string | null
+    message?: string
+    model?: string
+    provider?: "inworld" | "google"
+    status?: "completed" | "failed"
+    voiceDisplayName?: string | null
+    voiceId?: string
+  }
+  errorText?: string
+}
+
 type SearchModelsToolPart = {
   type: "tool-searchModels"
   toolCallId: string
@@ -263,6 +284,39 @@ type SearchModelsToolPart = {
     }>
     total?: number
     type?: "image" | "video" | "audio" | "upscale" | null
+  }
+  errorText?: string
+}
+
+type SearchVoicesToolPart = {
+  type: "tool-searchVoices"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    languageCodes?: string[]
+    limit?: number
+    provider?: "inworld" | "google"
+    query?: string
+    source?: "SYSTEM" | "IVC" | "PVC"
+  }
+  output?: {
+    message?: string
+    provider?: "inworld" | "google" | null
+    query?: string | null
+    source?: "SYSTEM" | "IVC" | "PVC" | null
+    total?: number
+    voices?: Array<{
+      description: string
+      displayName: string
+      langCode: string
+      model?: string | null
+      previewAudioUrl?: string | null
+      previewText?: string | null
+      provider?: string | null
+      source: string
+      tags: string[]
+      voiceId: string
+    }>
   }
   errorText?: string
 }
@@ -1514,6 +1568,97 @@ function VideoGenerationResultCard({
   return null
 }
 
+function AudioGenerationResultCard({
+  messageId,
+  part,
+}: {
+  messageId: string
+  part: GenerateAudioToolPart
+}) {
+  if (part.state === "input-streaming") {
+    return (
+      <Card key={messageId} className="border-border/60 bg-muted/20">
+        <CardContent className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+          <CircleNotch className="h-4 w-4 animate-spin" />
+          Preparing audio generation...
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (part.state === "input-available") {
+    return (
+      <Card key={messageId} className="border-border/60 bg-muted/20">
+        <CardContent className="space-y-3 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Audio Generation Tool</p>
+              <p className="text-xs text-muted-foreground">Starting text-to-speech generation</p>
+            </div>
+            <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+          {part.input?.text ? (
+            <p className="text-sm leading-6 text-foreground">{part.input.text}</p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {part.input?.provider ? <Badge variant="outline">{part.input.provider}</Badge> : null}
+            {part.input?.modelIdentifier ? <Badge variant="outline">{part.input.modelIdentifier}</Badge> : null}
+            {part.input?.voiceId ? <Badge variant="outline">{part.input.voiceId}</Badge> : null}
+            {part.input?.languageCode ? <Badge variant="outline">{part.input.languageCode}</Badge> : null}
+            <PromptLengthBadge prompt={part.input?.text} />
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (part.state === "output-error") {
+    return (
+      <Card key={messageId} className="border-destructive/30 bg-destructive/5">
+        <CardContent className="space-y-2 p-4 text-sm text-destructive">
+          <p className="font-medium">Audio generation failed</p>
+          <p>{part.errorText || "Unknown tool error."}</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (part.state === "output-available") {
+    return (
+      <Card key={messageId} className="border-border/60 bg-muted/10">
+        <CardContent className="space-y-4 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>Generated Audio</Badge>
+            {part.output?.provider ? <Badge variant="outline">{part.output.provider}</Badge> : null}
+            {part.output?.model ? <Badge variant="outline">{part.output.model}</Badge> : null}
+            {part.output?.voiceDisplayName ? (
+              <Badge variant="outline">{part.output.voiceDisplayName}</Badge>
+            ) : part.output?.voiceId ? (
+              <Badge variant="outline">{part.output.voiceId}</Badge>
+            ) : null}
+            {part.input?.languageCode ? <Badge variant="outline">{part.input.languageCode}</Badge> : null}
+            <PromptLengthBadge prompt={part.input?.text} />
+          </div>
+          {part.output?.message ? (
+            <p className="text-sm text-muted-foreground">{part.output.message}</p>
+          ) : null}
+          {part.output?.audio?.url ? (
+            <audio
+              src={part.output.audio.url}
+              controls
+              className="w-full rounded-xl border border-border/60 bg-background p-2"
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">No audio URL returned.</p>
+          )}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return null
+}
+
 function formatInstagramSchedule(value?: string | null) {
   if (!value) return null
 
@@ -1666,6 +1811,11 @@ export function MessageParts({
         if (part.type === "tool-generateVideo") {
           const toolPart = part as GenerateVideoToolPart
           return <VideoGenerationResultCard key={`${message.id}-${index}`} messageId={`${message.id}-${index}`} part={toolPart} />
+        }
+
+        if (part.type === "tool-generateAudio") {
+          const toolPart = part as GenerateAudioToolPart
+          return <AudioGenerationResultCard key={`${message.id}-${index}`} messageId={`${message.id}-${index}`} part={toolPart} />
         }
 
         if (part.type === "tool-extractVideoFrames") {
@@ -2132,6 +2282,100 @@ export function MessageParts({
           )
         }
 
+        if (part.type === "tool-searchVoices") {
+          const toolPart = part as SearchVoicesToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Searching voices</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {toolPart.input?.query
+                        ? `Looking for ${toolPart.input.query}`
+                        : `Loading ${toolPart.input?.provider || "available"} voices`}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Voice search failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const voices = toolPart.output?.voices ?? []
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Voices</Badge>
+                  {toolPart.output?.provider ? (
+                    <Badge variant="outline">{toolPart.output.provider}</Badge>
+                  ) : null}
+                  {toolPart.output?.source ? (
+                    <Badge variant="outline">{toolPart.output.source}</Badge>
+                  ) : null}
+                  {typeof toolPart.output?.total === "number" ? (
+                    <Badge variant="outline">{toolPart.output.total} result{toolPart.output.total === 1 ? "" : "s"}</Badge>
+                  ) : null}
+                </div>
+                {toolPart.output?.message ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
+                ) : null}
+                {voices.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No voices matched that search.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {voices.map((voice) => (
+                      <div key={`${voice.provider ?? "unknown"}:${voice.voiceId}`} className="rounded-xl border border-border/60 bg-background/80 p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium">{voice.displayName}</p>
+                          <Badge variant="outline">{voice.voiceId}</Badge>
+                          {voice.provider ? <Badge variant="outline">{voice.provider}</Badge> : null}
+                          <Badge variant="outline">{voice.source}</Badge>
+                          {voice.langCode ? <Badge variant="outline">{voice.langCode}</Badge> : null}
+                        </div>
+                        {voice.description ? (
+                          <p className="mt-2 text-xs text-muted-foreground">{voice.description}</p>
+                        ) : null}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {voice.model ? <Badge variant="outline">{voice.model}</Badge> : null}
+                          {voice.tags.slice(0, 6).map((tag) => (
+                            <Badge key={`${voice.voiceId}-${tag}`} variant="outline">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                        {voice.previewText ? (
+                          <p className="mt-2 text-[11px] text-muted-foreground">{voice.previewText}</p>
+                        ) : null}
+                        {voice.previewAudioUrl ? (
+                          <audio
+                            src={voice.previewAudioUrl}
+                            controls
+                            className="mt-3 w-full rounded-lg border border-border/60 bg-background p-2"
+                          />
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )
+        }
+
         if (part.type === "tool-searchAssets") {
           const toolPart = part as SearchAssetsToolPart
 
@@ -2265,6 +2509,13 @@ export function MessageParts({
                         {generation.model ? <span>{generation.model}</span> : null}
                         <span>{new Date(generation.createdAt).toLocaleString()}</span>
                       </div>
+                      {generation.type === "audio" && generation.url ? (
+                        <audio
+                          src={generation.url}
+                          controls
+                          className="mt-3 w-full rounded-lg border border-border/60 bg-background p-2"
+                        />
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -2321,8 +2572,8 @@ export function MessageParts({
                   ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  IDs here are valid <span className="font-mono">mediaIds</span> for image/video tools. Use
-                  listThreadMedia before referencing earlier chat visuals.
+                  IDs here are valid <span className="font-mono">mediaIds</span> for image, video, and audio-aware tools. Use
+                  listThreadMedia before referencing earlier chat media.
                 </p>
                 {items.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No media registered for this thread yet.</p>
@@ -2330,6 +2581,7 @@ export function MessageParts({
                   <div className="space-y-2">
                     {items.map((item) => {
                       const isImage = item.mimeType.startsWith("image/")
+                      const isAudio = item.mimeType.startsWith("audio/")
                       return (
                         <div
                           key={item.id}
@@ -2342,6 +2594,10 @@ export function MessageParts({
                                 alt=""
                                 className="h-full w-full object-cover"
                               />
+                            ) : isAudio ? (
+                              <div className="flex h-full w-full items-center justify-center p-1 text-center text-[10px] text-muted-foreground">
+                                Audio
+                              </div>
                             ) : (
                               <div className="flex h-full w-full items-center justify-center p-1 text-center text-[10px] text-muted-foreground">
                                 {item.mimeType}
@@ -2360,6 +2616,9 @@ export function MessageParts({
                             <p className="text-[11px] text-muted-foreground">
                               {new Date(item.createdAt).toLocaleString()}
                             </p>
+                            {isAudio ? (
+                              <audio src={item.publicUrl} controls className="mt-2 w-full" />
+                            ) : null}
                           </div>
                         </div>
                       )
@@ -3650,7 +3909,7 @@ export function CreativeAgentChat({
                     />
                   </span>
                   <div className="min-w-0 flex-1 text-left text-sm text-foreground">
-                    <Shimmer className="leading-none">Loading...</Shimmer>
+                    <Shimmer className="leading-none">Thinking...</Shimmer>
                   </div>
                 </div>
               </Message>
@@ -3957,3 +4216,4 @@ export function CreativeAgentChat({
     </div>
   )
 }
+

@@ -36,7 +36,7 @@ export interface AvailableChatVideoReference extends ChatVideoReference {
   label: string
 }
 
-/** Transcript id `refa_N` → user-uploaded audio in this conversation. */
+/** Transcript id `refa_N` → uploaded or generated audio in this conversation. */
 export interface AvailableChatAudioReference extends ChatAudioReference {
   id: string
   label: string
