@@ -51,8 +51,6 @@ export function TermsAcceptanceGate() {
   const [status, setStatus] = React.useState<AcceptanceStatusResponse | null>(null)
   const [checked, setChecked] = React.useState(false)
   const [submitting, setSubmitting] = React.useState(false)
-  const [hasReachedEnd, setHasReachedEnd] = React.useState(false)
-  const termsScrollRef = React.useRef<HTMLDivElement | null>(null)
 
   React.useEffect(() => {
     let isMounted = true
@@ -76,9 +74,6 @@ export function TermsAcceptanceGate() {
 
   React.useEffect(() => {
     if (!userId || isExemptPath(pathname)) {
-      setStatus(null)
-      setChecked(false)
-      setHasReachedEnd(false)
       return
     }
 
@@ -100,7 +95,6 @@ export function TermsAcceptanceGate() {
         const nextStatus = (await response.json()) as AcceptanceStatusResponse
         setStatus(nextStatus)
         setChecked(false)
-        setHasReachedEnd(false)
       })
       .catch((error: unknown) => {
         if (cancelled) return
@@ -114,39 +108,7 @@ export function TermsAcceptanceGate() {
   }, [pathname, userId])
 
   const open = Boolean(status?.needsAcceptance) && !isExemptPath(pathname)
-  const canAccept = hasReachedEnd && checked && !submitting
-
-  const handleTermsScroll = React.useCallback(() => {
-    const element = termsScrollRef.current
-    if (!element || hasReachedEnd) {
-      return
-    }
-
-    const distanceFromBottom =
-      element.scrollHeight - element.scrollTop - element.clientHeight
-
-    if (distanceFromBottom <= 8) {
-      setHasReachedEnd(true)
-    }
-  }, [hasReachedEnd])
-
-  React.useEffect(() => {
-    if (!open) {
-      return
-    }
-
-    const element = termsScrollRef.current
-    if (!element) {
-      return
-    }
-
-    if (element.scrollHeight <= element.clientHeight + 8) {
-      setHasReachedEnd(true)
-    } else {
-      setHasReachedEnd(false)
-      element.scrollTop = 0
-    }
-  }, [open, status?.currentTerms.version])
+  const canAccept = checked && !submitting
 
   const handleAccept = async () => {
     if (!canAccept) return
@@ -166,7 +128,6 @@ export function TermsAcceptanceGate() {
 
       setStatus((prev) => (prev ? { ...prev, needsAcceptance: false, reason: null } : prev))
       setChecked(false)
-      setHasReachedEnd(false)
       toast.success("Terms accepted.")
       router.refresh()
     } catch (error) {
@@ -199,7 +160,7 @@ export function TermsAcceptanceGate() {
           <DialogDescription className="leading-6">
             {status?.reason === "outdated"
               ? "Before you continue using UniCan, please review and accept the latest Terms of Use."
-              : "Please read the full Terms of Use below. You can only accept after scrolling to the end."}
+              : "Please review the full Terms of Use below and confirm acceptance to continue."}
           </DialogDescription>
         </DialogHeader>
 
@@ -213,28 +174,20 @@ export function TermsAcceptanceGate() {
                 Last updated {status.currentTerms.lastUpdated}
               </p>
             ) : null}
-            <p className="mt-3 leading-6">
-              Read the full Terms below. Scroll to the bottom to unlock acceptance.
-            </p>
+            <p className="mt-3 leading-6">Read the full Terms below before accepting.</p>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card/70">
             <div className="shrink-0 border-b border-border px-4 py-3 text-sm font-medium text-foreground">
               Read the full Terms of Use
             </div>
-            <div
-              ref={termsScrollRef}
-              onScroll={handleTermsScroll}
-              className="min-h-0 flex-1 overflow-y-auto px-5 py-4 pb-10"
-            >
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 pb-10">
               <LegalMarkdown content={status?.currentTerms.content ?? ""} />
             </div>
           </div>
 
           <div className="shrink-0 rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-            {hasReachedEnd
-              ? "You reached the end of the Terms. You can now confirm acceptance."
-              : "Scroll to the end of the Terms to unlock acceptance."}
+            Confirm the checkbox below once you have reviewed the Terms.
           </div>
 
           <div className="shrink-0 rounded-2xl border border-border bg-card/70 p-4">
@@ -244,7 +197,6 @@ export function TermsAcceptanceGate() {
                 checked={checked}
                 onCheckedChange={(value) => setChecked(value === true)}
                 className="mt-0.5"
-                disabled={!hasReachedEnd}
               />
               <span className="leading-6 text-muted-foreground">
                 I have read the Terms of Use above, I agree to the current{" "}
