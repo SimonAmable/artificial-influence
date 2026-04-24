@@ -113,7 +113,11 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        await handleCheckoutSessionCompleted(session);
+        if (session.mode === 'payment' && session.metadata?.type === 'credit_pack') {
+          await handleCreditPackCheckoutSessionCompleted(session);
+        } else {
+          await handleCheckoutSessionCompleted(session);
+        }
         break;
       }
 
@@ -166,6 +170,38 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+async function handleCreditPackCheckoutSessionCompleted(
+  session: Stripe.Checkout.Session
+) {
+  if (session.payment_status !== 'paid') {
+    console.log(
+      `Skipping credit pack fulfillment for Checkout Session ${session.id}; payment_status=${session.payment_status}`
+    );
+    return;
+  }
+
+  const paymentIntentId =
+    typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : session.payment_intent?.id ?? null;
+
+  const { data, error } = await supabaseAdmin.rpc('fulfill_credit_purchase', {
+    p_checkout_session_id: session.id,
+    p_payment_intent_id: paymentIntentId,
+  });
+
+  if (error) {
+    console.error('Error fulfilling credit purchase:', error);
+    throw error;
+  }
+
+  const result = Array.isArray(data) ? data[0] : null;
+  console.log(
+    `Credit pack fulfilled for Checkout Session ${session.id}:`,
+    result ?? { paymentIntentId }
+  );
 }
 
 async function handleCheckoutSessionCompleted(

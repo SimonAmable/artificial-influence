@@ -9,7 +9,7 @@ import {
   resolveMediaIdsToImageReferences as resolveMediaIdsToImageReferencesImpl,
   resolveMediaRowsForTimelineCompose as resolveMediaRowsForTimelineComposeImpl,
 } from "@/lib/chat/resolve-media-ref"
-import type { ChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
+import type { ChatImageReference } from "@/lib/chat/tools/image-reference-types"
 
 export type ChatThreadMediaKind = "user_upload" | "generation"
 

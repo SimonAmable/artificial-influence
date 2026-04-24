@@ -16,7 +16,7 @@ import { resolveThreadMediaIdToFrameExtractReference } from "@/lib/chat/thread-m
 import type {
   AvailableChatImageReference,
   ChatImageReference,
-} from "@/lib/chat/tools/generate-image-with-nano-banana"
+} from "@/lib/chat/tools/image-reference-types"
 import type { AvailableChatVideoReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
 
 const MAX_SOURCE_BYTES = 50 * 1024 * 1024

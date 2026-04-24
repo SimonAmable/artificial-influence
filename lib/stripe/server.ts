@@ -64,6 +64,63 @@ export async function createCheckoutSession({
 }
 
 /**
+ * Create a Stripe Checkout Session for a one-time credit pack purchase.
+ */
+export async function createCreditPackCheckoutSession({
+  customerId,
+  userId,
+  creditPurchaseId,
+  credits,
+  amountCents,
+  currency,
+  successUrl,
+  cancelUrl,
+}: {
+  customerId: string;
+  userId: string;
+  creditPurchaseId: string;
+  credits: number;
+  amountCents: number;
+  currency: string;
+  successUrl: string;
+  cancelUrl: string;
+}) {
+  const metadata: Record<string, string> = {
+    type: 'credit_pack',
+    userId,
+    creditPurchaseId,
+    credits: String(credits),
+  };
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price_data: {
+          currency,
+          unit_amount: amountCents,
+          product_data: {
+            name: `${credits.toLocaleString()} credits`,
+            description: 'One-time credit top-up',
+          },
+        },
+        quantity: 1,
+      },
+    ],
+    customer: customerId,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    metadata,
+    payment_intent_data: {
+      metadata,
+    },
+  });
+
+  return session;
+}
+
+/**
  * Create a Customer Portal Session for subscription management
  */
 export async function createCustomerPortalSession({

@@ -1,6 +1,6 @@
 import type { UIMessage } from "ai"
 
-import type { AvailableChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
+import type { AvailableChatImageReference } from "@/lib/chat/tools/image-reference-types"
 import type {
   AvailableChatAudioReference,
   AvailableChatVideoReference,

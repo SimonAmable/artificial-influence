@@ -8,7 +8,7 @@ import { checkUserHasCredits } from "@/lib/credits"
 import type {
   AvailableChatImageReference,
   ChatImageReference,
-} from "@/lib/chat/tools/generate-image-with-nano-banana"
+} from "@/lib/chat/tools/image-reference-types"
 import { mediaIdStringSchema } from "@/lib/chat/media-id"
 import { resolveToolAudioReferences } from "@/lib/chat/resolve-tool-audio-references"
 import { resolveToolImageReferences } from "@/lib/chat/resolve-tool-references"

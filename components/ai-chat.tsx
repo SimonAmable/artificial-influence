@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import dynamic from "next/dynamic"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import type { UIMessage } from "ai"
@@ -19,7 +20,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { CreativeAgentChat } from "@/components/chat/creative-agent-chat"
 import {
   clearStoredSidebarThreadId,
   getStoredSidebarThreadId,
@@ -28,11 +28,23 @@ import {
 import { UNICAN_ASSISTANT_NAME } from "@/lib/constants/system-prompts"
 import { createClient as createSupabaseClient } from "@/lib/supabase/client"
 
+const SidebarCreativeAgentChat = dynamic(
+  () => import("@/components/chat/creative-agent-chat").then((mod) => mod.CreativeAgentChat),
+  { ssr: false },
+)
+
 export function AIChat() {
   const pathname = usePathname()
+
+  if (pathname === "/chat" || pathname.startsWith("/chat/")) {
+    return null
+  }
+
+  return <AIChatSidebar />
+}
+
+function AIChatSidebar() {
   const router = useRouter()
-  const hideFabOnChatRoute =
-    pathname === "/chat" || pathname.startsWith("/chat/")
   const [open, setOpen] = React.useState(false)
   const [authReady, setAuthReady] = React.useState(false)
   const [userId, setUserId] = React.useState<string | null>(null)
@@ -54,6 +66,10 @@ export function AIChat() {
   }, [])
 
   React.useEffect(() => {
+    if (!open) {
+      return
+    }
+
     const supabase = createSupabaseClient()
 
     let cancelled = false
@@ -92,7 +108,7 @@ export function AIChat() {
       cancelled = true
       subscription.unsubscribe()
     }
-  }, [])
+  }, [open])
 
   React.useEffect(() => {
     if (!open || !authReady || !userId || hasHydratedStoredThread) {
@@ -211,7 +227,7 @@ export function AIChat() {
 
   return (
     <>
-      {!hideFabOnChatRoute && !open ? (
+      {!open ? (
         <Button
           onClick={() => setOpen(true)}
           className="fixed right-6 bottom-6 z-60 h-14 w-14 rounded-full shadow-depth-l"
@@ -221,95 +237,96 @@ export function AIChat() {
         </Button>
       ) : null}
 
-        <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent
-          side="right"
-          forceMount
-          className="flex h-full w-full max-w-[540px] flex-col overflow-hidden p-0"
-        >
-          <SheetHeader className="gap-2 border-b border-border/60 px-4 py-4 pr-14 text-left">
-            <div className="flex items-center justify-between gap-3">
-              <SheetTitle className="flex min-w-0 items-center gap-2 text-base">
-                <span className="flex size-5 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/40">
-                  <Image
-                    src="/logo.svg"
-                    alt="Website AI"
-                    width={12}
-                    height={12}
-                    className="dark:invert"
-                  />
-                </span>
-                <span className="truncate">{UNICAN_ASSISTANT_NAME}</span>
-              </SheetTitle>
-              <div className="flex items-center gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="rounded-full"
-                      onClick={handleNewChat}
-                      aria-label="New chat"
-                    >
-                      <NotePencil className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" sideOffset={8}>New chat</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="rounded-full"
-                      onClick={handleOpenFullChat}
-                      aria-label="Open current chat in full page"
-                    >
-                      <ArrowSquareOut className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" sideOffset={8}>Open current chat</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="rounded-full"
-                      onClick={handleOpenHistory}
-                      aria-label="Open chat history"
-                      disabled={!authReady || !userId}
-                    >
-                      <ClockCounterClockwise className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" sideOffset={8}>Chat history</TooltipContent>
-                </Tooltip>
+      <Sheet open={open} onOpenChange={setOpen}>
+        {open ? (
+          <SheetContent
+            side="right"
+            className="flex h-full w-full max-w-[540px] flex-col overflow-hidden p-0"
+          >
+            <SheetHeader className="gap-2 border-b border-border/60 px-4 py-4 pr-14 text-left">
+              <div className="flex items-center justify-between gap-3">
+                <SheetTitle className="flex min-w-0 items-center gap-2 text-base">
+                  <span className="flex size-5 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/40">
+                    <Image
+                      src="/logo.svg"
+                      alt="Website AI"
+                      width={12}
+                      height={12}
+                      className="dark:invert"
+                    />
+                  </span>
+                  <span className="truncate">{UNICAN_ASSISTANT_NAME}</span>
+                </SheetTitle>
+                <div className="flex items-center gap-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="rounded-full"
+                        onClick={handleNewChat}
+                        aria-label="New chat"
+                      >
+                        <NotePencil className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" sideOffset={8}>New chat</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="rounded-full"
+                        onClick={handleOpenFullChat}
+                        aria-label="Open current chat in full page"
+                      >
+                        <ArrowSquareOut className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" sideOffset={8}>Open current chat</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="rounded-full"
+                        onClick={handleOpenHistory}
+                        aria-label="Open chat history"
+                        disabled={!authReady || !userId}
+                      >
+                        <ClockCounterClockwise className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" sideOffset={8}>Chat history</TooltipContent>
+                  </Tooltip>
+                </div>
               </div>
+              <SheetDescription>Your AI assistant for website tasks.</SheetDescription>
+            </SheetHeader>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {!authReady || isHydratingThread ? (
+                <div className="flex h-full items-center justify-center gap-2 px-4 text-sm text-muted-foreground">
+                  <CircleNotch className="h-4 w-4 animate-spin" />
+                  Restoring your chat...
+                </div>
+              ) : (
+                <SidebarCreativeAgentChat
+                  key={`${chatRenderKey}:${initialThreadId ?? "draft"}`}
+                  compact
+                  enablePersistence
+                  initialMessages={initialMessages}
+                  initialThreadId={initialThreadId}
+                  onThreadIdChange={handleThreadIdChange}
+                />
+              )}
             </div>
-            <SheetDescription>Your AI assistant for website tasks.</SheetDescription>
-          </SheetHeader>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {!authReady || isHydratingThread ? (
-              <div className="flex h-full items-center justify-center gap-2 px-4 text-sm text-muted-foreground">
-                <CircleNotch className="h-4 w-4 animate-spin" />
-                Restoring your chat...
-              </div>
-            ) : (
-              <CreativeAgentChat
-                key={`${chatRenderKey}:${initialThreadId ?? "draft"}`}
-                compact
-                enablePersistence
-                initialMessages={initialMessages}
-                initialThreadId={initialThreadId}
-                onThreadIdChange={handleThreadIdChange}
-              />
-            )}
-          </div>
-        </SheetContent>
+          </SheetContent>
+        ) : null}
       </Sheet>
     </>
   )

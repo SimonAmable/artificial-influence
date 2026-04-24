@@ -25,7 +25,7 @@ import { aspectRatioToDimensions, modelUsesDimensions } from "@/lib/utils/model-
 import type {
   AvailableChatImageReference,
   ChatImageReference,
-} from "@/lib/chat/tools/generate-image-with-nano-banana"
+} from "@/lib/chat/tools/image-reference-types"
 import { mediaIdStringSchema } from "@/lib/chat/media-id"
 import { resolveToolImageReferences } from "@/lib/chat/resolve-tool-references"
 

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { CaretLeft, CaretRight, Sparkle, Info } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
+import { CreditPackCheckout } from '@/components/credits/credit-pack-checkout';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -386,7 +387,7 @@ export default function PricingPage() {
           </p>
           
           {/* Billing Interval Toggle */}
-          <div className="flex flex-col items-center gap-2">
+          <div className="relative inline-flex items-center justify-center">
             <div className="flex items-center justify-center gap-4">
               <span className={`text-sm font-medium ${billingInterval === 'month' ? 'text-foreground' : 'text-muted-foreground'}`}>
                 Monthly
@@ -399,16 +400,16 @@ export default function PricingPage() {
                 Yearly
               </span>
             </div>
-            <div
-              className="flex min-h-9 w-full items-center justify-center"
+            <span
+              className={cn(
+                'pointer-events-none absolute left-full ml-4 inline-flex whitespace-nowrap rounded-full border border-green-600/25 bg-green-600/10 px-3 py-1 text-xs font-semibold text-green-700 opacity-0 transition-opacity dark:border-green-400/30 dark:bg-green-400/10 dark:text-green-400',
+                billingInterval === 'year' && 'opacity-100'
+              )}
               aria-hidden={billingInterval === 'month'}
             >
-              {billingInterval === 'year' ? (
-                <span className="inline-flex items-center rounded-full border border-green-600/25 bg-green-600/10 px-3 py-1 text-xs font-semibold text-green-700 dark:border-green-400/30 dark:bg-green-400/10 dark:text-green-400">
-                  Save up to 50% on yearly plans
-                </span>
-              ) : null}
-            </div>
+              <span className="sm:hidden">Save 50%</span>
+              <span className="hidden sm:inline">Save up to 50% on yearly plans</span>
+            </span>
           </div>
         </div>
 
@@ -479,7 +480,7 @@ export default function PricingPage() {
           ref={carouselRef}
           className={[
             'flex max-w-7xl mx-auto items-stretch',
-            '-mx-4 flex-row gap-3 overflow-x-auto overscroll-x-contain pb-4 px-[calc((100vw-85vw)/2)] pt-1',
+            '-mx-4 flex-row gap-3 overflow-x-auto overscroll-x-contain pb-4 px-[calc((100vw-85vw)/2)] pt-5',
             'snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
             'sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:overscroll-auto sm:pb-0 sm:px-0 sm:pt-0',
             'sm:snap-none lg:gap-8 xl:grid-cols-3',
@@ -498,8 +499,8 @@ export default function PricingPage() {
               }`}
             >
               {plan.popular ? (
-                <div className="mb-4 flex justify-center">
-                  <span className="rounded-full bg-primary px-4 py-1 text-sm font-semibold text-primary-foreground">
+                <div className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-1/2">
+                  <span className="inline-flex rounded-full bg-primary px-4 py-1 text-sm font-semibold leading-none text-primary-foreground shadow-sm">
                     Most Popular
                   </span>
                 </div>
@@ -669,6 +670,8 @@ export default function PricingPage() {
             </div>
           </div>
         </div>
+
+        <CreditPackCheckout className="mt-10" redirectPath="/pricing" />
 
         {/* Footer Note */}
         <div className="text-center mt-12">

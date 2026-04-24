@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { ChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
+import type { ChatImageReference } from "@/lib/chat/tools/image-reference-types"
 import { formatGenerationMediaId, formatUploadMediaId, parseMediaId } from "@/lib/chat/media-id"
 
 export type ResolvedMediaRef = {

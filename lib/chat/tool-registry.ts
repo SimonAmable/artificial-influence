@@ -5,7 +5,6 @@ export const ALWAYS_AVAILABLE_CREATIVE_CHAT_TOOL_KEYS = [
   "prepareInstagramPost",
   "generateAudio",
   "generateImage",
-  "generateImageWithNanoBanana",
   "generateVideo",
   "extractVideoFrames",
   "getBrandContext",

@@ -2,9 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { SkillCatalogEntry } from "@/lib/chat/skills/catalog"
 import type { AutomationPromptAttachment } from "@/lib/automations/prompt-payload"
 import { createGenerateAudioTool } from "@/lib/chat/tools/generate-audio"
-import type { AvailableChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
+import type { AvailableChatImageReference } from "@/lib/chat/tools/image-reference-types"
 import { createGenerateImageTool } from "@/lib/chat/tools/generate-image"
-import { createGenerateImageWithNanoBananaTool } from "@/lib/chat/tools/generate-image-with-nano-banana"
 import type {
   AvailableChatAudioReference,
   AvailableChatVideoReference,
@@ -112,12 +111,6 @@ export function createCreativeChatTools({
       userId,
     }),
     generateImage: createGenerateImageTool({
-      availableReferences,
-      supabase,
-      threadId,
-      userId,
-    }),
-    generateImageWithNanoBanana: createGenerateImageWithNanoBananaTool({
       availableReferences,
       supabase,
       threadId,

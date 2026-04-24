@@ -4,7 +4,7 @@ import { resolveMediaRef } from "@/lib/chat/resolve-media-ref"
 import type {
   AvailableChatImageReference,
   ChatImageReference,
-} from "@/lib/chat/tools/generate-image-with-nano-banana"
+} from "@/lib/chat/tools/image-reference-types"
 
 const TRANSCRIPT_REF_RE = /^ref_\d+$/
 
