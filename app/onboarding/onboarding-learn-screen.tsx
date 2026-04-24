@@ -434,7 +434,7 @@ export function OnboardingLearnScreen({
                 Skip for now
               </Button>
               <Button type="button" size="lg" onClick={onContinue}>
-                Continue to dashboard
+                Continue to chat
                 <ArrowSquareOut className="size-4" data-icon="inline-end" />
               </Button>
             </div>

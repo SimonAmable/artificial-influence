@@ -12,11 +12,14 @@ import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from '@/lib/constants/models';
 import { runReplicatePollingImageGeneration } from '@/lib/server/replicate-image-generation';
 import {
   buildFalImageRequest,
-  GPT_IMAGE_2_CANONICAL_ID,
   isSupportedFalImageModel,
   QWEN_IMAGE2_CANONICAL_ID,
   submitFalImageQueue,
 } from '@/lib/server/fal-image';
+import {
+  buildReplicateGptImage2Input,
+  isReplicateGptImage2Model,
+} from '@/lib/server/replicate-gpt-image';
 
 const STALE_PENDING_MINUTES = 30;
 const FREE_CONCURRENCY_LIMIT = 1;
@@ -148,6 +151,9 @@ export async function POST(request: NextRequest) {
     let aspect_ratio = formData.get('aspect_ratio') as string | null;
     const resolution = formData.get('resolution') as string | null;
     const output_format = formData.get('output_format') as string | null;
+    const quality = (formData.get('quality') as string | null)?.toLowerCase() ?? null;
+    const moderation = (formData.get('moderation') as string | null)?.toLowerCase() ?? null;
+    const background = (formData.get('background') as string | null)?.toLowerCase() ?? null;
     const widthForm = formData.get('width');
     const heightForm = formData.get('height');
     const width = widthForm ? parseInt(widthForm as string) : null;
@@ -173,7 +179,9 @@ export async function POST(request: NextRequest) {
     }
     console.log('[generate-image] ✓ Model found:', modelData.name);
 
-    const modelProvider = String(modelData.provider ?? '').toLowerCase();
+    const modelProvider = isReplicateGptImage2Model(modelIdentifier)
+      ? 'replicate'
+      : String(modelData.provider ?? '').toLowerCase();
     if (modelProvider === 'fal') {
       if (!process.env.FAL_KEY) {
         console.error('[generate-image] FAL_KEY not set for Fal model');
@@ -250,6 +258,7 @@ export async function POST(request: NextRequest) {
     // Store both the buffers (for AI SDK) and URLs (for logging/persistence)
     const referenceImageUrls: string[] = [];
     const referenceImageStoragePaths: string[] = [];
+    const replicateGptImage2ReferenceImages: File[] = [];
     
     if (referenceImageFiles.length > 0) {
       console.log(`[generate-image] Processing ${referenceImageFiles.length} reference image(s)...`);
@@ -301,6 +310,13 @@ export async function POST(request: NextRequest) {
           console.log(`[generate-image] Converting reference image ${i + 1} to buffer...`);
           const arrayBuffer = await referenceImageFile.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
+          if (isReplicateGptImage2Model(modelIdentifier)) {
+            replicateGptImage2ReferenceImages.push(
+              new File([buffer], referenceImageFile.name || filename, {
+                type: referenceImageFile.type || 'image/png',
+              })
+            );
+          }
           console.log(`[generate-image] ✓ Buffer ${i + 1} created, size:`, buffer.length, 'bytes');
 
           // Upload to Supabase storage (for persistence/logging)
@@ -388,10 +404,7 @@ export async function POST(request: NextRequest) {
       console.log('[generate-image] Prompt enhancement skipped');
     }
 
-    if (
-      modelProvider === 'fal' &&
-      (modelIdentifier === QWEN_IMAGE2_CANONICAL_ID || modelIdentifier === GPT_IMAGE_2_CANONICAL_ID)
-    ) {
+    if (modelProvider === 'fal' && modelIdentifier === QWEN_IMAGE2_CANONICAL_ID) {
       if (!isSupportedFalImageModel(modelIdentifier)) {
         return NextResponse.json(
           { error: `Unsupported Fal image model: ${modelIdentifier}` },
@@ -402,7 +415,6 @@ export async function POST(request: NextRequest) {
       const negativePromptField = formData.get('negative_prompt') as string | null;
       const enablePromptExpansion = formData.get('enable_prompt_expansion') !== 'false';
       const enableSafetyChecker = formData.get('enable_safety_checker') === 'true';
-      const qualityRaw = (formData.get('quality') as string | null)?.toLowerCase();
       const rawFormat = (output_format || 'png').toLowerCase();
       const outputFormatResolved: 'png' | 'jpeg' | 'webp' =
         rawFormat === 'jpeg' || rawFormat === 'jpg'
@@ -412,27 +424,15 @@ export async function POST(request: NextRequest) {
             : 'png';
       const falRequest = buildFalImageRequest({
         aspectRatio: aspectRatio || aspect_ratio || null,
-        enablePromptExpansion:
-          modelIdentifier === QWEN_IMAGE2_CANONICAL_ID ? enablePromptExpansion : undefined,
-        enableSafetyChecker:
-          modelIdentifier === QWEN_IMAGE2_CANONICAL_ID ? enableSafetyChecker : undefined,
+        enablePromptExpansion,
+        enableSafetyChecker,
         modelIdentifier,
-        negativePrompt:
-          modelIdentifier === QWEN_IMAGE2_CANONICAL_ID && negativePromptField?.trim()
-            ? negativePromptField
-            : null,
+        negativePrompt: negativePromptField?.trim() ? negativePromptField : null,
         numImages: effectiveN,
         outputFormat: outputFormatResolved,
         prompt: finalPrompt,
-        quality:
-          qualityRaw === 'low' || qualityRaw === 'medium' || qualityRaw === 'high'
-            ? qualityRaw
-            : undefined,
         referenceImageUrls,
-        seed:
-          modelIdentifier === QWEN_IMAGE2_CANONICAL_ID && seed != null && !Number.isNaN(seed)
-            ? seed
-            : null,
+        seed: seed != null && !Number.isNaN(seed) ? seed : null,
       });
       const { requestId, endpointId: falEndpoint } = await submitFalImageQueue(
         falRequest.endpointId,
@@ -559,9 +559,20 @@ export async function POST(request: NextRequest) {
     } else {
       // Replicate provider options
       console.log('[generate-image] Setting up Replicate provider options');
-      const usesDimensions = modelUsesDimensions(modelData.parameters);
-
-      if (usesDimensions) {
+      if (isReplicateGptImage2Model(modelIdentifier)) {
+        const gptImage2Request = buildReplicateGptImage2Input({
+          aspectRatio: aspect_ratio || aspectRatio,
+          background,
+          moderation,
+          numberOfImages: effectiveN,
+          outputFormat: output_format,
+          prompt: finalPrompt,
+          quality,
+          referenceImages: replicateGptImage2ReferenceImages,
+        });
+        const { prompt: _ignoredPrompt, ...replicateProviderOptions } = gptImage2Request.input;
+        generateOptions.providerOptions.replicate = replicateProviderOptions as never;
+      } else if (modelUsesDimensions(modelData.parameters)) {
         // Model expects width/height (e.g. prunaai/z-image-turbo)
         const aspectValue = aspect_ratio || aspectRatio;
         const dims =
@@ -683,14 +694,30 @@ export async function POST(request: NextRequest) {
 
         const replicateProviderOptions = (generateOptions.providerOptions?.replicate ?? {}) as Record<string, unknown>;
         const replicateInputDefaults = (modelData.parameters as Record<string, unknown> | null)?.replicate_input_defaults as Record<string, unknown> | undefined;
-        const replicateInput: Record<string, unknown> = {
-          prompt: finalPrompt,
-          ...(generateOptions.n && { num_outputs: generateOptions.n }),
-          ...(generateOptions.seed && { seed: generateOptions.seed }),
-          ...(generateOptions.size && { size: generateOptions.size }),
-          ...(replicateInputDefaults && Object.keys(replicateInputDefaults).length > 0 ? replicateInputDefaults : {}),
-          ...replicateProviderOptions,
-        };
+        let replicateResolvedAspectRatio: string | null = aspectRatio || aspect_ratio || null;
+        const replicateInput: Record<string, unknown> = isReplicateGptImage2Model(modelIdentifier)
+          ? (() => {
+              const gptImage2Request = buildReplicateGptImage2Input({
+                aspectRatio: aspect_ratio || aspectRatio,
+                background,
+                moderation,
+                numberOfImages: effectiveN,
+                outputFormat: output_format,
+                prompt: finalPrompt,
+                quality,
+                referenceImages: replicateGptImage2ReferenceImages,
+              });
+              replicateResolvedAspectRatio = gptImage2Request.resolvedAspectRatio;
+              return gptImage2Request.input;
+            })()
+          : {
+              prompt: finalPrompt,
+              ...(generateOptions.n && { num_outputs: generateOptions.n }),
+              ...(generateOptions.seed && { seed: generateOptions.seed }),
+              ...(generateOptions.size && { size: generateOptions.size }),
+              ...(replicateInputDefaults && Object.keys(replicateInputDefaults).length > 0 ? replicateInputDefaults : {}),
+              ...replicateProviderOptions,
+            };
 
         // Enable Google grounding features for nano-banana 2
         if (modelIdentifier === 'google/nano-banana-2') {
@@ -725,7 +752,7 @@ export async function POST(request: NextRequest) {
               prompt: finalPrompt,
               supabase_storage_path: null,
               reference_images_supabase_storage_path: referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
-              aspect_ratio: aspectRatio || aspect_ratio || null,
+              aspect_ratio: replicateResolvedAspectRatio,
               model: modelIdentifier,
               type: 'image',
               is_public: true,
@@ -758,7 +785,7 @@ export async function POST(request: NextRequest) {
         });
 
         const syncResult = await runReplicatePollingImageGeneration({
-          aspectRatio: aspectRatio || aspect_ratio || null,
+          aspectRatio: replicateResolvedAspectRatio,
           modelIdentifier,
           prompt: finalPrompt,
           referenceImageStoragePaths,

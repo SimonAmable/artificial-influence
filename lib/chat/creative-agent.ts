@@ -4,7 +4,7 @@ import {
   ToolLoopAgent,
 } from "ai"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { CHATBOT_SYSTEM_PROMPT } from "@/lib/constants/system-prompts"
+import type { AutomationPromptAttachment } from "@/lib/automations/prompt-payload"
 import { type AvailableChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
 import {
   buildSkillsCatalogAppendix,
@@ -15,6 +15,13 @@ import type {
   AvailableChatVideoReference,
 } from "@/lib/chat/tools/generate-video"
 import { createCreativeChatTools } from "@/lib/chat/tools"
+import {
+  getChatPromptDefinition,
+  getChatPromptVersion,
+  type ChatPromptDefinition,
+  type PromptVersion,
+} from "@/lib/chat/prompt-registry"
+import type { AttachedRef } from "@/lib/commands/types"
 
 function buildReferenceManifest(
   imageRefs: AvailableChatImageReference[],
@@ -45,17 +52,19 @@ function buildReferenceManifest(
   return blocks.join("\n\n")
 }
 
-function buildCreativeAgentAppendix(
+function buildCreativeAgentAppendixV1(
   imageReferences: AvailableChatImageReference[],
   videoReferences: AvailableChatVideoReference[],
   audioReferences: AvailableChatAudioReference[],
   selectedReferenceContext?: string,
+  onboardingContext?: string,
 ) {
   return `
 You are operating as a creative tool-calling agent inside UniCan chat.
 
 Agent rules:
 - You also have **generateAudio** for text-to-speech and **searchVoices** for catalog voice discovery inside chat.
+- You can also manage automations from chat with **listAutomations** and **manageAutomation**.
 - You currently have creative tools for image generation, video generation, **extractVideoFrames** (ffmpeg stills from user videos; first/last by default, optional interior times and timestamps), **composeTimelineVideo** (ffmpeg: stitch existing thread images, GIFs, and videos in order into one muted MP4; requires persisted thread + **listThreadMedia** "mediaIds"; pick **outputPreset** for 16:9 vs 9:16), **scheduleGenerationFollowUp** (persisted thread + **chained** workflow only: run follow-up when the webhook fires — **reserve for long video** jobs where the next step **must** have the finished file but same-turn waiting is unrealistic, e.g. **Kling Motion Control** (\`kwaivgi/kling-v2.6-motion-control\`, \`kwaivgi/kling-v3-motion-control\`), **Seedance 2.0** (\`bytedance/seedance-2.0\`), or other multi-minute video; **never** for images; **do not** use if there is no real next-step chain), **awaitGeneration** (poll until complete — **only** when a **chain** in the **same** turn needs the file; **images**: this is the right wait tool when chaining; **video**: use only when the job can finish within ~90s; otherwise use **scheduleGenerationFollowUp** for long models), **estimateModelLatency** (typical wait ranges from recent completions or fallbacks), thread media listing (listThreadMedia, when the chat thread is persisted), model lookup, asset lookup, recent generation lookup, generation-to-asset saving, saved brand-kit context, Instagram account listing, and Instagram post preparation.
 - **Tool prompt fidelity:** For **generateImage**, **generateImageWithNanoBanana**, and **generateVideo**, copy the user's creative brief into the tool \`prompt\` **verbatim** when (a) it is already **detailed or explicit**, or (b) they ask for **exact / verbatim / literal / as written / use my prompt / do not rewrite / no enhancement**. Do not substitute your own expanded wording in those cases. When they want literal execution, set **enhancePrompt: false** on **generateImage** (never turn on enhancement after they forbade it). When the user message is **vague** and they want media **now** with no literal constraint, you may compose a fuller prompt in the tool call and set **enhancePrompt: true** only if a stronger brief is clearly needed and they did not ask to preserve their exact text.
 - **Audio script fidelity:** For **generateAudio**, keep the spoken script in \`text\` **literal** by default. Do not rewrite, summarize, or embellish the spoken words unless the user explicitly asked you to write or polish the script.
@@ -86,6 +95,12 @@ Agent rules:
 - When multiple earlier images could match the user's intent, ask a short clarifying question instead of guessing which prior image to use.
 - If the user's visual request is underspecified for execution, ask one concise clarifying question instead of guessing.
 - If the user is brainstorming, prompt-writing, or evaluating ideas, respond normally without calling the tool.
+- If the user wants to create an automation, make a prompt recurring, change an automation, pause/resume it, run it now, or delete it, use the automation tools instead of giving manual instructions.
+- Before editing, pausing, resuming, running, or deleting an automation, call **listAutomations** in the same turn unless you already have a fresh automation id from tool output.
+- Use **manageAutomation(action: "create")** when the user clearly wants a new automation now. Gather missing essentials first: what it should do, when it should run, and timezone if the schedule would otherwise be ambiguous.
+- Use **manageAutomation(action: "update")** for simple edits to the prompt, schedule, timezone, model, name, or active state.
+- Use **manageAutomation(action: "pause" | "resume" | "run_now" | "delete")** for lifecycle actions after you have resolved the target automation.
+- When the current user message includes selected refs or uploaded files and they are turning that request into an automation, preserve those refs/files in the automation instead of dropping them.
 - When you decide to execute, do not output a prompt package, JSON block, recommended_model block, workflow block, or copy-paste-ready prompt first.
 - In execution mode, either ask a brief clarifying question or call the tool directly.
 - After execution, respond in short natural language only. Do not dump the internal prompt unless the user explicitly asks to see it.
@@ -124,6 +139,67 @@ Agent rules:
 
 ${buildReferenceManifest(imageReferences, videoReferences, audioReferences)}
 ${selectedReferenceContext ? `\n\n${selectedReferenceContext}` : ""}
+${onboardingContext ? `\n\nFirst-turn onboarding context:\n${onboardingContext}` : ""}
+`
+}
+
+function buildCreativeAgentAppendixV2(
+  imageReferences: AvailableChatImageReference[],
+  videoReferences: AvailableChatVideoReference[],
+  audioReferences: AvailableChatAudioReference[],
+  selectedReferenceContext?: string,
+  onboardingContext?: string,
+) {
+  return `
+<runtime_context>
+- You are operating as a creative tool-calling agent inside UniCan chat.
+- Available tool families: image generation/editing, video generation, audio TTS, model lookup, voice lookup, assets/history, brand context, Instagram draft prep, and optional skills.
+- Tool descriptions and input schemas are the canonical contract for field names and tool-specific rules.
+</runtime_context>
+
+<reference_rules>
+- Attachments are never auto-included in tool calls. Pass explicit referenceIds, referenceVideoIds, referenceAudioIds, mediaIds, or assetIds as required by the tool.
+- If the user refers to earlier thread media, call listThreadMedia in the same turn before any generation tool that depends on those references.
+- Do not guess media ids, asset ids, or URLs. If lookup does not return a match, explain that and ask for the needed reference.
+
+${buildReferenceManifest(imageReferences, videoReferences, audioReferences)}
+${selectedReferenceContext ? `\n\nSelected reference context:\n${selectedReferenceContext}` : ""}
+</reference_rules>
+
+${onboardingContext ? `<onboarding_context>
+${onboardingContext}
+</onboarding_context>
+
+` : ""}
+
+<execution_rules>
+- Advice, prompting help, brainstorming, critique, and workflow planning should usually be answered directly without generation.
+- Execute when the user clearly wants media or an action now.
+- If the request is ambiguous between prompt help and execution, ask one short clarifying question.
+- After execution, respond briefly in natural language. Do not dump internal prompts unless the user asks.
+- If a generation tool returns \`status: "pending"\` and no later tool in this same turn needs that result, stop tool-calling and reply briefly. Do not wait just to confirm completion.
+</execution_rules>
+
+<tool_routing>
+- Before the first image generation in a conversation, or whenever a fuzzy model name must be resolved, use searchModels to confirm the live model id.
+- Use searchVoices when the user asks for a voice by qualities instead of an exact voice id.
+- Use getBrandContext when the user wants on-brand output and the target brand is identifiable.
+- Use listAutomations before controlling an existing automation unless the exact automation id was returned by a tool in this turn.
+- Use manageAutomation for create, update, pause, resume, run-now, and delete automation requests.
+- Use listInstagramConnections before prepareInstagramPost when the target account is not explicit.
+- Use saveGenerationAsAsset only after explicit user confirmation.
+- Prefer one generation tool plus only the support tools actually needed for the turn.
+</tool_routing>
+
+<async_rules>
+- Await/schedule tools are for dependency chains, not reassurance.
+- Use them only when a later tool call in this same workflow needs the generated file, such as image -> video, image -> extract frames, image -> Instagram draft, or video -> follow-up processing.
+- If the user asked only for the generation itself, do not call awaitGeneration or scheduleGenerationFollowUp.
+- If no same-turn follow-up depends on the finished file, do not wait; let the UI update asynchronously.
+- Use awaitGeneration only when the next tool in the same turn requires the finished output.
+- Use scheduleGenerationFollowUp only for long-running chained video workflows in persisted threads.
+- If awaitGeneration times out, do not loop.
+</async_rules>
 `
 }
 
@@ -131,42 +207,102 @@ interface CreateCreativeAgentOptions {
   availableReferences: AvailableChatImageReference[]
   availableVideoReferences: AvailableChatVideoReference[]
   availableAudioReferences: AvailableChatAudioReference[]
+  defaultAutomationRefs?: AttachedRef[]
+  defaultAutomationAttachments?: AutomationPromptAttachment[]
   model: string
   selectedReferenceContext?: string
+  onboardingContext?: string
   skillsCatalog?: SkillCatalogEntry[]
   supabase: SupabaseClient
   threadId?: string
   userId: string
   source?: "chat" | "automation" | "resume"
+  promptVersion?: PromptVersion
+}
+
+interface BuildCreativeAgentInstructionsOptions {
+  availableReferences: AvailableChatImageReference[]
+  availableVideoReferences: AvailableChatVideoReference[]
+  availableAudioReferences: AvailableChatAudioReference[]
+  selectedReferenceContext?: string
+  onboardingContext?: string
+  skillsCatalog?: SkillCatalogEntry[]
+  promptVersion?: PromptVersion
+}
+
+export function getCreativeAgentInstructions({
+  availableReferences,
+  availableVideoReferences,
+  availableAudioReferences,
+  selectedReferenceContext,
+  onboardingContext,
+  skillsCatalog = [],
+  promptVersion,
+}: BuildCreativeAgentInstructionsOptions): {
+  promptVersion: PromptVersion
+  promptDefinition: ChatPromptDefinition
+  appendix: string
+  fullInstructions: string
+} {
+  const resolvedPromptVersion = getChatPromptVersion(promptVersion)
+  const promptDefinition = getChatPromptDefinition(resolvedPromptVersion)
+  const skillsAppendix = buildSkillsCatalogAppendix(skillsCatalog)
+  const baseAppendix =
+    resolvedPromptVersion === "v1"
+      ? buildCreativeAgentAppendixV1(
+          availableReferences,
+          availableVideoReferences,
+          availableAudioReferences,
+          selectedReferenceContext,
+          onboardingContext,
+        )
+      : buildCreativeAgentAppendixV2(
+          availableReferences,
+          availableVideoReferences,
+          availableAudioReferences,
+          selectedReferenceContext,
+          onboardingContext,
+        )
+  const appendix =
+    skillsAppendix.length > 0 ? `${baseAppendix}\n\n${skillsAppendix}` : baseAppendix
+
+  return {
+    promptVersion: resolvedPromptVersion,
+    promptDefinition,
+    appendix,
+    fullInstructions: `${promptDefinition.basePrompt}\n\n${appendix}`.trim(),
+  }
 }
 
 export function createCreativeAgent({
   availableReferences,
   availableVideoReferences,
   availableAudioReferences,
+  defaultAutomationRefs = [],
+  defaultAutomationAttachments = [],
   model,
   selectedReferenceContext,
+  onboardingContext,
   skillsCatalog = [],
   supabase,
   threadId,
   userId,
   source = "chat",
+  promptVersion,
 }: CreateCreativeAgentOptions) {
   const gateway = createGateway({
     apiKey: process.env.AI_GATEWAY_API_KEY,
   })
 
-  const skillsAppendix = buildSkillsCatalogAppendix(skillsCatalog)
-  const baseAppendix = buildCreativeAgentAppendix(
+  const { fullInstructions } = getCreativeAgentInstructions({
     availableReferences,
     availableVideoReferences,
     availableAudioReferences,
     selectedReferenceContext,
-  )
-  const combinedAppendix =
-    skillsAppendix.length > 0 ? `${baseAppendix}\n\n${skillsAppendix}` : baseAppendix
-
-  const fullInstructions = `${CHATBOT_SYSTEM_PROMPT}\n\n${combinedAppendix}`.trim()
+    onboardingContext,
+    skillsCatalog,
+    promptVersion,
+  })
   const turnStartedAtMs = Date.now()
 
   return new ToolLoopAgent({
@@ -182,6 +318,8 @@ export function createCreativeAgent({
       availableReferences,
       availableVideoReferences,
       availableAudioReferences,
+      defaultAutomationRefs,
+      defaultAutomationAttachments,
       supabase,
       threadId,
       userId,

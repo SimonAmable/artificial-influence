@@ -341,6 +341,18 @@ export function getFooterMegaNavColumns(): {
   imageModels: FooterMegaNavLink[]
   videoModels: FooterMegaNavLink[]
 } {
+  const dedupeLinks = (links: FooterMegaNavLink[]): FooterMegaNavLink[] => {
+    const seen = new Set<string>()
+    return links.filter((link) => {
+      const key = `${link.path}-${link.label}`
+      if (seen.has(key)) {
+        return false
+      }
+      seen.add(key)
+      return true
+    })
+  }
+
   const toLinks = (items: MegaNavItem[]): FooterMegaNavLink[] =>
     items.map((i) => ({ path: i.path, label: i.label }))
 
@@ -373,7 +385,13 @@ export function getFooterMegaNavColumns(): {
     }
   }
 
-  return { imageTools, videoTools, otherTools, imageModels, videoModels }
+  return {
+    imageTools: dedupeLinks(imageTools),
+    videoTools: dedupeLinks(videoTools),
+    otherTools: dedupeLinks(otherTools),
+    imageModels: dedupeLinks(imageModels),
+    videoModels: dedupeLinks(videoModels),
+  }
 }
 
 /**

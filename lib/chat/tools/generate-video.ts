@@ -280,7 +280,7 @@ export function createGenerateVideoTool({
 
   return tool({
     description:
-      "Generate a video using UniCan's active video models. Pass **reference images** via **referenceIds** (`ref_1`…`ref_N`, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or **mediaId** from listRecentGenerations). Pass **videos** via **referenceVideoIds** (`refv_1`…, same upl_/gen_ shapes). Pass **audio** via **referenceAudioIds** (`refa_1`…, same upl_/gen_ shapes). Deprecated alias for image refs: **mediaIds**. Use assetIds only for saved library assets. Nothing is auto-included from attachments. Use the transcript manifest or listThreadMedia.",
+      "Generate a video using UniCan's active video models. Pass **reference images** via **referenceIds** (`ref_1`…`ref_N`, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or **mediaId** from listRecentGenerations). Pass **videos** via **referenceVideoIds** (`refv_1`…, same upl_/gen_ shapes). Pass **audio** via **referenceAudioIds** (`refa_1`…, same upl_/gen_ shapes). Deprecated alias for image refs: **mediaIds**. Use assetIds only for saved library assets. Nothing is auto-included from attachments. Use the transcript manifest or listThreadMedia. If this returns **pending**, do not call awaitGeneration or scheduleGenerationFollowUp unless another tool or automatic follow-up in this same workflow needs the finished video.",
     inputSchema: z.object({
       prompt: z
         .string()
@@ -697,8 +697,10 @@ export function createGenerateVideoTool({
 
       return {
         generationId: pendingGeneration.id,
-        message: `Started a video generation with ${resolvedModel}.`,
+        message: `Started a video generation with ${resolvedModel}. If no later tool or automatic follow-up in this workflow needs the finished video, stop here and let the UI update asynchronously.`,
         model: resolvedModel,
+        nextStepHint:
+          "Only call awaitGeneration for short same-turn dependency chains, or scheduleGenerationFollowUp for long video chains that truly require a later automatic step. Otherwise reply to the user and stop.",
         predictionId: prediction.id,
         status: "pending" as const,
         usedImageReferenceCount: uploadedImages.length,

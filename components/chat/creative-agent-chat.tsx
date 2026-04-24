@@ -17,6 +17,7 @@ import {
   Images,
   NotePencil,
   Palette,
+  PencilSimple,
   Plus,
   Sparkle,
   X,
@@ -32,6 +33,7 @@ import {
   AssetSelectionModal,
   type AssetSelectionPick,
 } from "@/components/shared/modals/asset-selection-modal"
+import { SkillEditModal } from "@/components/chat/skill-edit-modal"
 import { SkillLoadModal } from "@/components/chat/skill-load-modal"
 import { countUniqueSkillsLoadedInMessages } from "@/lib/chat/skills/loaded-in-messages"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
@@ -388,6 +390,95 @@ type ListRecentGenerationsToolPart = {
   errorText?: string
 }
 
+type ListAutomationsToolPart = {
+  type: "tool-listAutomations"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  output?: {
+    automations?: Array<{
+      id: string
+      name: string
+      description?: string | null
+      scheduleSummary?: string
+      timezone?: string
+      model?: string | null
+      isActive?: boolean
+      nextRunAt?: string
+      lastRunAt?: string | null
+      runCount?: number
+      lastError?: string | null
+      latestRun?: Record<string, unknown> | null
+    }>
+    message?: string
+    total?: number
+  }
+  errorText?: string
+}
+
+type ManageAutomationToolInput = {
+  action: "create" | "update" | "pause" | "resume" | "run_now" | "delete"
+  automationId?: string
+  name?: string
+  description?: string
+  promptText?: string
+  cronScheduleOrNaturalLanguage?: string
+  timezone?: string
+  model?: string
+  isActive?: boolean
+  refs?: Array<{
+    id: string
+    label: string
+    category: "brand" | "asset"
+  }>
+  attachments?: Array<{
+    url: string
+    mediaType: string
+    filename?: string
+  }>
+}
+
+type ManageAutomationToolSummary = {
+  id: string
+  name: string
+  description?: string | null
+  promptExcerpt?: string
+  scheduleSummary?: string
+  cronSchedule?: string
+  timezone?: string
+  model?: string | null
+  isActive?: boolean
+  nextRunAt?: string
+}
+
+type ManageAutomationToolPart = {
+  type: "tool-manageAutomation"
+  toolCallId: string
+  state:
+    | "input-streaming"
+    | "input-available"
+    | "approval-requested"
+    | "approval-responded"
+    | "output-available"
+    | "output-error"
+    | "output-denied"
+  input?: ManageAutomationToolInput
+  output?: {
+    action?: ManageAutomationToolInput["action"]
+    automation?: ManageAutomationToolSummary
+    deletedAutomationId?: string
+    deletedAutomationName?: string
+    message?: string
+    runId?: string
+    threadId?: string
+  }
+  approval?: {
+    approved?: boolean
+    id: string
+    reason?: string
+  }
+  errorText?: string
+}
+
 type ListThreadMediaToolPart = {
   type: "tool-listThreadMedia"
   toolCallId: string
@@ -652,6 +743,7 @@ type ActivateSkillToolPart = {
     slug?: string
   }
   output?: {
+    isMine?: boolean
     message?: string
     name?: string
     slug?: string
@@ -722,8 +814,42 @@ type ComposerAssetAttachment = {
 type ComposerAttachment = ComposerUploadAttachment | ComposerAssetAttachment
 
 const EMPTY_MESSAGES: UIMessage[] = []
+const ONBOARDING_HANDOFF_PROMPT =
+  "I just finished onboarding. What is this app, and what should I do first based on my goals?"
 
 const REACTFLOW_NODE_MIME = "application/reactflow-node"
+
+function formatAutomationActionLabel(action?: ManageAutomationToolInput["action"]) {
+  switch (action) {
+    case "create":
+      return "Create"
+    case "update":
+      return "Update"
+    case "pause":
+      return "Pause"
+    case "resume":
+      return "Resume"
+    case "run_now":
+      return "Run Now"
+    case "delete":
+      return "Delete"
+    default:
+      return "Automation"
+  }
+}
+
+function formatAutomationDate(value?: string | null) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleString()
+}
+
+function getAutomationPromptPreview(text?: string | null, maxLength = 220) {
+  const trimmed = text?.trim()
+  if (!trimmed) return null
+  return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength).trimEnd()}...` : trimmed
+}
 
 function composerDropTypesAccept(dt: DataTransfer): boolean {
   const types = Array.from(dt.types ?? [])
@@ -1716,10 +1842,12 @@ function InstagramMediaPreview({
 export function MessageParts({
   message,
   instagramConnectionsById,
+  onEditSkillRequest,
   onToolApprovalResponse,
 }: {
   message: UIMessage
   instagramConnectionsById: Map<string, InstagramConnectionToolSummary>
+  onEditSkillRequest?: (slug: string) => void
   onToolApprovalResponse: (approvalId: string, approved: boolean) => void
 }) {
   return (
@@ -2524,6 +2652,278 @@ export function MessageParts({
           )
         }
 
+        if (part.type === "tool-listAutomations") {
+          const toolPart = part as unknown as ListAutomationsToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Loading automations</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      Looking up existing automation schedules and status
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Automation lookup failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const automations = toolPart.output?.automations ?? []
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Automations</Badge>
+                  {typeof toolPart.output?.total === "number" ? (
+                    <Badge variant="outline">
+                      {toolPart.output.total} result{toolPart.output.total === 1 ? "" : "s"}
+                    </Badge>
+                  ) : null}
+                </div>
+                {toolPart.output?.message ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
+                ) : null}
+                {automations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No automations found.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {automations.map((automation) => (
+                      <div
+                        key={automation.id}
+                        className="rounded-xl border border-border/60 bg-background/80 p-3"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium">{automation.name}</p>
+                          <Badge variant="outline">{automation.isActive ? "active" : "paused"}</Badge>
+                          <Badge variant="outline">{automation.id.slice(0, 8)}</Badge>
+                          {automation.model ? <Badge variant="outline">{automation.model}</Badge> : null}
+                        </div>
+                        {automation.description ? (
+                          <p className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">
+                            {automation.description}
+                          </p>
+                        ) : null}
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                          {automation.scheduleSummary ? <span>{automation.scheduleSummary}</span> : null}
+                          {automation.timezone ? <span>{automation.timezone}</span> : null}
+                          {formatAutomationDate(automation.nextRunAt) ? (
+                            <span>Next {formatAutomationDate(automation.nextRunAt)}</span>
+                          ) : null}
+                          {formatAutomationDate(automation.lastRunAt) ? (
+                            <span>Last {formatAutomationDate(automation.lastRunAt)}</span>
+                          ) : null}
+                          {typeof automation.runCount === "number" ? (
+                            <span>{automation.runCount} run{automation.runCount === 1 ? "" : "s"}</span>
+                          ) : null}
+                        </div>
+                        {automation.lastError ? (
+                          <p className="mt-2 text-xs text-destructive">{automation.lastError}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )
+        }
+
+        if (part.type === "tool-manageAutomation") {
+          const toolPart = part as unknown as ManageAutomationToolPart
+          const summary = toolPart.output?.automation
+          const inputSummary = toolPart.input
+          const action = toolPart.output?.action ?? toolPart.input?.action
+          const promptPreview =
+            getAutomationPromptPreview(summary?.promptExcerpt) ??
+            getAutomationPromptPreview(inputSummary?.promptText)
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{formatAutomationActionLabel(action)} automation</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      Preparing the automation action for approval
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "approval-requested") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+                <CardContent className="space-y-4 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>Automation Approval</Badge>
+                    {action ? <Badge variant="outline">{formatAutomationActionLabel(action)}</Badge> : null}
+                    {inputSummary?.model ? <Badge variant="outline">{inputSummary.model}</Badge> : null}
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <p className="font-medium">
+                      {inputSummary?.name || toolPart.output?.deletedAutomationName || inputSummary?.automationId || "Automation"}
+                    </p>
+                    {inputSummary?.description ? (
+                      <p className="text-muted-foreground whitespace-pre-wrap">{inputSummary.description}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    {inputSummary?.cronScheduleOrNaturalLanguage ? (
+                      <Badge variant="outline">{inputSummary.cronScheduleOrNaturalLanguage}</Badge>
+                    ) : null}
+                    {inputSummary?.timezone ? <Badge variant="outline">{inputSummary.timezone}</Badge> : null}
+                    {typeof inputSummary?.isActive === "boolean" ? (
+                      <Badge variant="outline">{inputSummary.isActive ? "active" : "paused"}</Badge>
+                    ) : null}
+                  </div>
+                  {promptPreview ? (
+                    <div className="rounded-xl border border-border/60 bg-background/80 p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Prompt</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{promptPreview}</p>
+                    </div>
+                  ) : null}
+                  {action === "delete" ? (
+                    <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                      This will permanently delete the automation and its future scheduled runs.
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => toolPart.approval?.id && onToolApprovalResponse(toolPart.approval.id, true)}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => toolPart.approval?.id && onToolApprovalResponse(toolPart.approval.id, false)}
+                    >
+                      Deny
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "approval-responded") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Processing approval</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {toolPart.approval?.approved ? "Applying the automation change" : "Recording the denial"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-denied") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+                <CardContent className="space-y-2 p-4 text-sm">
+                  <p className="font-medium">Automation unchanged</p>
+                  <p className="text-muted-foreground">
+                    The approval request was denied, so no automation changes were saved.
+                  </p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Automation action failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Automation</Badge>
+                  {action ? <Badge variant="outline">{formatAutomationActionLabel(action)}</Badge> : null}
+                  {summary?.model ? <Badge variant="outline">{summary.model}</Badge> : null}
+                  {typeof summary?.isActive === "boolean" ? (
+                    <Badge variant="outline">{summary.isActive ? "active" : "paused"}</Badge>
+                  ) : null}
+                </div>
+                {toolPart.output?.message ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
+                ) : null}
+                {action === "delete" ? (
+                  <div className="rounded-xl border border-border/60 bg-background/80 p-3">
+                    <p className="text-sm font-medium">
+                      {toolPart.output?.deletedAutomationName || "Automation"} deleted
+                    </p>
+                    {toolPart.output?.deletedAutomationId ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        ID {toolPart.output.deletedAutomationId.slice(0, 8)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : summary ? (
+                  <div className="rounded-xl border border-border/60 bg-background/80 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium">{summary.name}</p>
+                      <Badge variant="outline">{summary.id.slice(0, 8)}</Badge>
+                    </div>
+                    {summary.description ? (
+                      <p className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">
+                        {summary.description}
+                      </p>
+                    ) : null}
+                    {promptPreview ? (
+                      <p className="mt-3 whitespace-pre-wrap text-sm text-foreground">{promptPreview}</p>
+                    ) : null}
+                    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                      {summary.scheduleSummary ? <span>{summary.scheduleSummary}</span> : null}
+                      {summary.timezone ? <span>{summary.timezone}</span> : null}
+                      {formatAutomationDate(summary.nextRunAt) ? (
+                        <span>Next {formatAutomationDate(summary.nextRunAt)}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+                {toolPart.output?.threadId ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/chat/${toolPart.output.threadId}`}>Open Run Thread</Link>
+                    </Button>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          )
+        }
+
         if (part.type === "tool-listThreadMedia") {
           const toolPart = part as ListThreadMediaToolPart
 
@@ -2907,7 +3307,8 @@ export function MessageParts({
                   ok ? "border-border/60 bg-muted/10" : "border-destructive/30 bg-destructive/5"
                 }
               >
-                <CardContent className="space-y-1 p-4 text-sm">
+                <CardContent className="space-y-3 p-4 text-sm">
+                  <div className="space-y-1">
                   <p className="font-medium">{ok ? "Skill loaded" : "Skill not loaded"}</p>
                   {output?.slug ? (
                     <p className="text-muted-foreground">
@@ -2916,6 +3317,24 @@ export function MessageParts({
                     </p>
                   ) : null}
                   {output?.message ? <p className="text-muted-foreground">{output.message}</p> : null}
+                  </div>
+                  {ok && output?.isMine && typeof output.slug === "string" ? (
+                    <div className="flex justify-start">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (output.slug) {
+                            onEditSkillRequest?.(output.slug)
+                          }
+                        }}
+                      >
+                        <PencilSimple className="mr-2 size-4" />
+                        Edit skill
+                      </Button>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             )
@@ -3076,6 +3495,7 @@ export function CreativeAgentChat({
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
   const [assetModalOpen, setAssetModalOpen] = React.useState(false)
   const [skillLoadModalOpen, setSkillLoadModalOpen] = React.useState(false)
+  const [skillEditModalSlug, setSkillEditModalSlug] = React.useState<string | null>(null)
   const [composerDropActive, setComposerDropActive] = React.useState(false)
   const [userId, setUserId] = React.useState<string | null>(null)
   const [authReady, setAuthReady] = React.useState(false)
@@ -3086,8 +3506,12 @@ export function CreativeAgentChat({
   const [threadId, setThreadId] = React.useState<string | undefined>(initialThreadId)
   const [isCreatingThread, setIsCreatingThread] = React.useState(false)
   const [isEnhancingComposer, setIsEnhancingComposer] = React.useState(false)
+  const [isBootstrappingOnboarding, setIsBootstrappingOnboarding] = React.useState(false)
   const initialChatId = React.useMemo(() => initialThreadId ?? "creative-chat-draft", [initialThreadId])
   const threadIdRef = React.useRef<string | undefined>(initialThreadId)
+  const onboardingBootstrapInFlightRef = React.useRef(false)
+  const onboardingHandoffPendingRef = React.useRef(false)
+  const onboardingBootstrapCompletedRef = React.useRef(false)
   const chatGatewayModelRef = React.useRef<string>(DEFAULT_CHAT_GATEWAY_MODEL)
   const [chatGatewayModelId, setChatGatewayModelId] = React.useState<string>(DEFAULT_CHAT_GATEWAY_MODEL)
 
@@ -3120,12 +3544,17 @@ export function CreativeAgentChat({
           api: "/api/chat",
           prepareSendMessagesRequest: ({ messages }) => {
             const model = chatGatewayModelRef.current
+            const onboardingHandoff = onboardingHandoffPendingRef.current
+            if (onboardingHandoff) {
+              onboardingHandoffPendingRef.current = false
+            }
             if (enablePersistence && threadIdRef.current && messages.length > 0) {
               return {
                 body: {
                   message: messages[messages.length - 1],
                   mode: "chat",
                   model,
+                  ...(onboardingHandoff ? { onboardingHandoff: true } : {}),
                   threadId: threadIdRef.current,
                 },
               }
@@ -3136,6 +3565,7 @@ export function CreativeAgentChat({
                 messages,
                 mode: "chat",
                 model,
+                ...(onboardingHandoff ? { onboardingHandoff: true } : {}),
                 threadId: threadIdRef.current,
               },
             }
@@ -3269,6 +3699,7 @@ export function CreativeAgentChat({
 
   const hasPendingUploads = attachedFiles.some((attachment) => attachment.isUploading)
   const newChatToken = searchParams.get("new")
+  const onboardingToken = searchParams.get("onboarding")
 
   React.useEffect(() => {
     setThreadId(initialThreadId)
@@ -3294,6 +3725,9 @@ export function CreativeAgentChat({
     setAttachedRefs([])
     setThreadId(undefined)
     threadIdRef.current = undefined
+    onboardingBootstrapInFlightRef.current = false
+    onboardingHandoffPendingRef.current = false
+    onboardingBootstrapCompletedRef.current = false
     onThreadIdChange?.(undefined)
 
     if (fileInputRef.current) {
@@ -3302,6 +3736,11 @@ export function CreativeAgentChat({
 
     router.replace("/chat")
   }, [newChatToken, onThreadIdChange, router, setMessages])
+
+  React.useEffect(() => {
+    onboardingBootstrapInFlightRef.current = false
+    onboardingBootstrapCompletedRef.current = false
+  }, [onboardingToken])
 
   const handleAttachFiles = React.useCallback(async (files: File[]) => {
     if (files.length === 0) return
@@ -3543,11 +3982,90 @@ export function CreativeAgentChat({
     [enablePersistence, onThreadIdChange, syncUrlOnThreadCreate, threadId],
   )
 
+  React.useEffect(() => {
+    if (onboardingToken !== "1") {
+      return
+    }
+    if (!enablePersistence || !authReady || !userId) {
+      return
+    }
+    if (initialThreadId || threadIdRef.current || messages.length > 0) {
+      return
+    }
+    if (
+      hasPendingUploads ||
+      isCreatingThread ||
+      isBootstrappingOnboarding ||
+      onboardingBootstrapInFlightRef.current ||
+      onboardingBootstrapCompletedRef.current ||
+      status === "submitted" ||
+      status === "streaming"
+    ) {
+      return
+    }
+
+    onboardingBootstrapInFlightRef.current = true
+    setIsBootstrappingOnboarding(true)
+
+    const bootstrap = async () => {
+      try {
+        const nextThreadId = await ensurePersistedThread("Getting Started")
+        if (!nextThreadId) {
+          return
+        }
+
+        threadIdRef.current = nextThreadId
+        onboardingHandoffPendingRef.current = true
+        onboardingBootstrapCompletedRef.current = true
+
+        sendMessage({
+          role: "user",
+          parts: [{ type: "text", text: ONBOARDING_HANDOFF_PROMPT }],
+        })
+
+        const url = new URL(window.location.href)
+        url.searchParams.delete("onboarding")
+        const nextUrl = `${url.pathname}${url.search}${url.hash}`
+        window.history.replaceState(window.history.state, "", nextUrl)
+      } catch (bootstrapError) {
+        onboardingBootstrapCompletedRef.current = true
+        onboardingHandoffPendingRef.current = false
+        const url = new URL(window.location.href)
+        url.searchParams.delete("onboarding")
+        const nextUrl = `${url.pathname}${url.search}${url.hash}`
+        window.history.replaceState(window.history.state, "", nextUrl)
+        toast.error(
+          bootstrapError instanceof Error
+            ? bootstrapError.message
+            : "Could not start your onboarding chat.",
+        )
+      } finally {
+        onboardingBootstrapInFlightRef.current = false
+        setIsBootstrappingOnboarding(false)
+      }
+    }
+
+    void bootstrap()
+  }, [
+    authReady,
+    enablePersistence,
+    ensurePersistedThread,
+    hasPendingUploads,
+    initialThreadId,
+    isBootstrappingOnboarding,
+    messages.length,
+    onboardingToken,
+    sendMessage,
+    status,
+    userId,
+  ])
+
   const handleSendMessage = React.useCallback(async () => {
     if (!userId) return
     if (!composerValue.trim() && composerAttachments.length === 0) return
     if (hasPendingUploads) return
     if (isCreatingThread) return
+    if (isBootstrappingOnboarding) return
 
     const parts: UIMessage["parts"] = []
     if (composerValue.trim()) {
@@ -3587,6 +4105,7 @@ export function CreativeAgentChat({
     composerValue,
     ensurePersistedThread,
     hasPendingUploads,
+    isBootstrappingOnboarding,
     isCreatingThread,
     sendMessage,
     userId,
@@ -3602,7 +4121,7 @@ export function CreativeAgentChat({
         toast.message("Wait for uploads to finish.")
         return
       }
-      if (isCreatingThread) {
+      if (isCreatingThread || isBootstrappingOnboarding) {
         return
       }
       if (status === "submitted" || status === "streaming") {
@@ -3630,6 +4149,7 @@ export function CreativeAgentChat({
     [
       ensurePersistedThread,
       hasPendingUploads,
+      isBootstrappingOnboarding,
       isCreatingThread,
       sendMessage,
       status,
@@ -3859,6 +4379,7 @@ export function CreativeAgentChat({
                       <MessageParts
                         message={message}
                         instagramConnectionsById={instagramConnectionsById}
+                        onEditSkillRequest={(slug) => setSkillEditModalSlug(slug)}
                         onToolApprovalResponse={(approvalId, approved) => {
                           void addToolApprovalResponse({
                             id: approvalId,
@@ -3882,6 +4403,7 @@ export function CreativeAgentChat({
                         <MessageParts
                           message={message}
                           instagramConnectionsById={instagramConnectionsById}
+                          onEditSkillRequest={(slug) => setSkillEditModalSlug(slug)}
                           onToolApprovalResponse={(approvalId, approved) => {
                             void addToolApprovalResponse({
                               id: approvalId,
@@ -4020,6 +4542,7 @@ export function CreativeAgentChat({
                             aria-label="Attach files or assets"
                             disabled={
                               isCreatingThread ||
+                              isBootstrappingOnboarding ||
                               status === "submitted" ||
                               status === "streaming"
                             }
@@ -4033,6 +4556,7 @@ export function CreativeAgentChat({
                             onClick={() => fileInputRef.current?.click()}
                             disabled={
                               isCreatingThread ||
+                              isBootstrappingOnboarding ||
                               status === "submitted" ||
                               status === "streaming"
                             }
@@ -4044,6 +4568,7 @@ export function CreativeAgentChat({
                             onClick={() => setAssetModalOpen(true)}
                             disabled={
                               isCreatingThread ||
+                              isBootstrappingOnboarding ||
                               status === "submitted" ||
                               status === "streaming"
                             }
@@ -4061,6 +4586,7 @@ export function CreativeAgentChat({
                         }}
                         disabled={
                           isCreatingThread ||
+                          isBootstrappingOnboarding ||
                           status === "submitted" ||
                           status === "streaming"
                         }
@@ -4105,6 +4631,7 @@ export function CreativeAgentChat({
                             aria-label={`Skills loaded in this chat: ${loadedSkillsCount}. Open skill picker.`}
                             disabled={
                               isCreatingThread ||
+                              isBootstrappingOnboarding ||
                               status === "submitted" ||
                               status === "streaming"
                             }
@@ -4135,6 +4662,7 @@ export function CreativeAgentChat({
                             onClick={() => void handleEnhanceComposerInstructions()}
                             disabled={
                               isCreatingThread ||
+                              isBootstrappingOnboarding ||
                               hasPendingUploads ||
                               isEnhancingComposer ||
                               status === "submitted" ||
@@ -4166,6 +4694,7 @@ export function CreativeAgentChat({
                         onTranscriptionError={handleSpeechError}
                         disabled={
                           isCreatingThread ||
+                          isBootstrappingOnboarding ||
                           status === "submitted" ||
                           status === "streaming"
                         }
@@ -4176,6 +4705,7 @@ export function CreativeAgentChat({
                         onClick={() => void handleSendMessage()}
                         disabled={
                           isCreatingThread ||
+                          isBootstrappingOnboarding ||
                           hasPendingUploads ||
                           status === "submitted" ||
                           status === "streaming" ||
@@ -4203,17 +4733,26 @@ export function CreativeAgentChat({
                 onRequestLoad={handleRequestSkillLoad}
                 disabled={
                   isCreatingThread ||
+                  isBootstrappingOnboarding ||
                   hasPendingUploads ||
                   status === "submitted" ||
                   status === "streaming"
                 }
               />
-              </>
-            ) : null}
+              <SkillEditModal
+                open={Boolean(skillEditModalSlug)}
+                onOpenChange={(nextOpen) => {
+                  if (!nextOpen) {
+                    setSkillEditModalSlug(null)
+                  }
+                }}
+                slug={skillEditModalSlug}
+              />
+               </>
+             ) : null}
           </div>
         </div>
       </div>
     </div>
   )
 }
-

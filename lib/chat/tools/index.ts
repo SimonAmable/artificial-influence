@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { SkillCatalogEntry } from "@/lib/chat/skills/catalog"
+import type { AutomationPromptAttachment } from "@/lib/automations/prompt-payload"
 import { createGenerateAudioTool } from "@/lib/chat/tools/generate-audio"
 import type { AvailableChatImageReference } from "@/lib/chat/tools/generate-image-with-nano-banana"
 import { createGenerateImageTool } from "@/lib/chat/tools/generate-image"
@@ -24,11 +25,16 @@ import { createAwaitGenerationTool } from "@/lib/chat/tools/await-generation"
 import { createEstimateModelLatencyTool } from "@/lib/chat/tools/estimate-model-latency"
 import { createListThreadMediaTool } from "@/lib/chat/tools/list-thread-media"
 import { createScheduleGenerationFollowUpTool } from "@/lib/chat/tools/schedule-generation-follow-up"
+import { createListAutomationsTool } from "@/lib/chat/tools/list-automations"
+import { createManageAutomationTool } from "@/lib/chat/tools/manage-automation"
+import type { AttachedRef } from "@/lib/commands/types"
 
 interface CreateCreativeChatToolsOptions {
   availableReferences: AvailableChatImageReference[]
   availableVideoReferences: AvailableChatVideoReference[]
   availableAudioReferences: AvailableChatAudioReference[]
+  defaultAutomationRefs?: AttachedRef[]
+  defaultAutomationAttachments?: AutomationPromptAttachment[]
   supabase: SupabaseClient
   threadId?: string
   userId: string
@@ -41,6 +47,8 @@ export function createCreativeChatTools({
   availableReferences,
   availableVideoReferences,
   availableAudioReferences,
+  defaultAutomationRefs = [],
+  defaultAutomationAttachments = [],
   supabase,
   threadId,
   userId,
@@ -74,6 +82,20 @@ export function createCreativeChatTools({
     ...(composeTimelineVideoTool ? { composeTimelineVideo: composeTimelineVideoTool } : {}),
     ...(scheduleGenerationFollowUpTool
       ? { scheduleGenerationFollowUp: scheduleGenerationFollowUpTool }
+      : {}),
+    ...(source === "chat"
+      ? {
+          listAutomations: createListAutomationsTool({
+            supabase,
+            userId,
+          }),
+          manageAutomation: createManageAutomationTool({
+            defaultRefs: defaultAutomationRefs,
+            defaultAttachments: defaultAutomationAttachments,
+            supabase,
+            userId,
+          }),
+        }
       : {}),
     listInstagramConnections: createListInstagramConnectionsTool({
       supabase,

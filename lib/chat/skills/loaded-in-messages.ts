@@ -12,14 +12,19 @@ export function getLoadedSkillSlugsFromMessages(messages: UIMessage[]): string[]
     }
 
     for (const part of message.parts) {
+      const toolPart = part as {
+        output?: { slug?: string; status?: string }
+        state?: string
+        type?: string
+      }
       if (
-        part.type === "tool-activateSkill" &&
-        part.state === "output-available" &&
-        part.output?.status === "ok" &&
-        typeof part.output.slug === "string" &&
-        part.output.slug.length > 0
+        toolPart.type === "tool-activateSkill" &&
+        toolPart.state === "output-available" &&
+        toolPart.output?.status === "ok" &&
+        typeof toolPart.output.slug === "string" &&
+        toolPart.output.slug.length > 0
       ) {
-        slugs.add(part.output.slug)
+        slugs.add(toolPart.output.slug)
       }
     }
   }

@@ -18,6 +18,7 @@ import { loadSkillsCatalog } from "@/lib/chat/skills/catalog"
 import { bindPendingGenerationsToChatMessages } from "@/lib/chat/media-persistence"
 import { sanitizeToolErrorPartsInMessages } from "@/lib/chat/sanitize-ui-messages"
 import { createCreativeChatTools } from "@/lib/chat/tools"
+import { getAutomationDefaultsFromMessages } from "@/lib/chat/automation-defaults"
 import {
   getAvailableConversationAudioReferences,
   getAvailableConversationImageReferences,
@@ -26,6 +27,7 @@ import {
 import { resolveChatGatewayModel } from "@/lib/constants/chat-llm-models"
 import { buildSelectedReferenceContext } from "@/lib/chat/selected-reference-context"
 import { registerThreadMediaFromUserMessageParts } from "@/lib/chat/thread-media/server"
+import { buildOnboardingHiddenContext } from "@/lib/onboarding/hidden-context"
 
 /** Allows long chained tool turns (e.g. awaitGeneration + follow-up tools) on Vercel Pro (max 300s). */
 export const maxDuration = 300
@@ -61,12 +63,14 @@ export async function POST(req: Request) {
       mode = "chat",
       model: modelFromBody,
       threadId,
+      onboardingHandoff,
     }: {
       message?: UIMessage
       messages?: UIMessage[]
       mode?: "chat" | "prompt-recreate"
       model?: string
       threadId?: string
+      onboardingHandoff?: boolean
     } = body
 
     const model = resolveChatGatewayModel(
@@ -74,6 +78,7 @@ export async function POST(req: Request) {
     )
 
     let requestMessages: UIMessage[]
+    let isFirstThreadTurn = false
 
     if (threadId && message) {
       const existingThread = await getChatThreadById(threadId, user.id)
@@ -82,8 +87,10 @@ export async function POST(req: Request) {
         return new Response(JSON.stringify({ error: "Chat thread not found" }), { status: 404 })
       }
 
+      isFirstThreadTurn = existingThread.messages.length === 0
       requestMessages = [...existingThread.messages, message]
     } else if (Array.isArray(messages)) {
+      isFirstThreadTurn = messages.length <= 1
       requestMessages = messages
     } else {
       return new Response(JSON.stringify({ error: "No chat messages were provided" }), { status: 400 })
@@ -101,11 +108,14 @@ export async function POST(req: Request) {
     }
 
     const skillsCatalog = await loadSkillsCatalog(supabase, user.id)
+    const automationDefaults = getAutomationDefaultsFromMessages(requestMessages)
 
     const validationTools = createCreativeChatTools({
       availableReferences: [],
       availableVideoReferences: [],
       availableAudioReferences: [],
+      defaultAutomationRefs: automationDefaults.refs,
+      defaultAutomationAttachments: automationDefaults.attachments,
       supabase,
       threadId,
       userId: user.id,
@@ -190,13 +200,33 @@ export async function POST(req: Request) {
       user.id,
       validatedMessages,
     )
+    let onboardingContext = ""
 
-    const creativeAgent = createCreativeAgent({
-      availableReferences: getAvailableConversationImageReferences(validatedMessages),
-      availableVideoReferences: getAvailableConversationVideoReferences(validatedMessages),
-      availableAudioReferences: getAvailableConversationAudioReferences(validatedMessages),
-      model,
-      selectedReferenceContext,
+    if (onboardingHandoff === true && isFirstThreadTurn) {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("onboarding_json_data")
+        .eq("id", user.id)
+        .maybeSingle()
+
+      if (profileError) {
+        console.error("[chat] Failed to load onboarding context:", profileError)
+      } else {
+        onboardingContext = buildOnboardingHiddenContext(
+          (profile as { onboarding_json_data?: unknown } | null)?.onboarding_json_data,
+        )
+      }
+    }
+
+      const creativeAgent = createCreativeAgent({
+        availableReferences: getAvailableConversationImageReferences(validatedMessages),
+        availableVideoReferences: getAvailableConversationVideoReferences(validatedMessages),
+        availableAudioReferences: getAvailableConversationAudioReferences(validatedMessages),
+        defaultAutomationRefs: automationDefaults.refs,
+        defaultAutomationAttachments: automationDefaults.attachments,
+        model,
+        selectedReferenceContext,
+        onboardingContext,
       skillsCatalog,
       supabase,
       threadId,

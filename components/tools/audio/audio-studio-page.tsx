@@ -593,7 +593,7 @@ export function AudioStudioPage() {
   const [modelId, setModelId] = React.useState<string>(
     getDefaultAudioModel(DEFAULT_AUDIO_PROVIDER)
   )
-  const [stylePrompt, setStylePrompt] = React.useState(DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT)
+  const [stylePrompt, setStylePrompt] = React.useState<string>(DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT)
   const [languageCode, setLanguageCode] = React.useState<string>(
     DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE
   )

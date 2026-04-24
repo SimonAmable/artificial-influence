@@ -1,22 +1,13 @@
 import { fal } from "@fal-ai/client"
 
 export const QWEN_IMAGE2_CANONICAL_ID = "fal-ai/qwen-image-2" as const
-export const GPT_IMAGE_2_CANONICAL_ID = "openai/gpt-image-2" as const
 
 export const FAL_QWEN_T2I = "fal-ai/qwen-image-2/text-to-image" as const
 export const FAL_QWEN_EDIT = "fal-ai/qwen-image-2/edit" as const
-export const FAL_GPT_IMAGE_2_T2I = "fal-ai/gpt-image-2" as const
-export const FAL_GPT_IMAGE_2_EDIT = "fal-ai/gpt-image-2/image-to-image" as const
 
-export type SupportedFalImageModelIdentifier =
-  | typeof QWEN_IMAGE2_CANONICAL_ID
-  | typeof GPT_IMAGE_2_CANONICAL_ID
+export type SupportedFalImageModelIdentifier = typeof QWEN_IMAGE2_CANONICAL_ID
 
-export type FalImageEndpoint =
-  | typeof FAL_QWEN_T2I
-  | typeof FAL_QWEN_EDIT
-  | typeof FAL_GPT_IMAGE_2_T2I
-  | typeof FAL_GPT_IMAGE_2_EDIT
+export type FalImageEndpoint = typeof FAL_QWEN_T2I | typeof FAL_QWEN_EDIT
 
 const FAL_IMAGE_MODEL_CONFIG: Record<
   SupportedFalImageModelIdentifier,
@@ -31,11 +22,6 @@ const FAL_IMAGE_MODEL_CONFIG: Record<
     editEndpointId: FAL_QWEN_EDIT,
     maxReferenceImages: 3,
   },
-  [GPT_IMAGE_2_CANONICAL_ID]: {
-    textEndpointId: FAL_GPT_IMAGE_2_T2I,
-    editEndpointId: FAL_GPT_IMAGE_2_EDIT,
-    maxReferenceImages: 4,
-  },
 }
 
 export interface FalImageRequestOptions {
@@ -47,7 +33,6 @@ export interface FalImageRequestOptions {
   numImages: number
   outputFormat?: "png" | "jpeg" | "webp" | null
   prompt: string
-  quality?: "low" | "medium" | "high" | null
   referenceImageUrls: string[]
   seed?: number | null
 }
@@ -84,13 +69,6 @@ function normalizeOutputFormat(
   return "png"
 }
 
-function normalizeQuality(
-  quality: FalImageRequestOptions["quality"],
-): "low" | "medium" | "high" {
-  if (quality === "low" || quality === "medium") return quality
-  return "high"
-}
-
 export function buildFalImageRequest(options: FalImageRequestOptions): {
   endpointId: FalImageEndpoint
   input: Record<string, unknown>
@@ -125,25 +103,6 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
 
     if (options.seed != null && !Number.isNaN(Number(options.seed))) {
       input.seed = Math.round(Number(options.seed))
-    }
-
-    if (imageSize) {
-      input.image_size = imageSize
-    }
-
-    if (isEdit) {
-      input.image_urls = referenceImageUrls
-    }
-
-    return { endpointId, input, resolvedAspectRatio }
-  }
-
-  if (options.modelIdentifier === GPT_IMAGE_2_CANONICAL_ID) {
-    const input: Record<string, unknown> = {
-      prompt: options.prompt,
-      num_images: Math.min(4, Math.max(1, options.numImages)),
-      output_format: normalizeOutputFormat(options.outputFormat),
-      quality: normalizeQuality(options.quality),
     }
 
     if (imageSize) {

@@ -1,11 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { OnboardingForm } from "@/app/onboarding/onboarding-form"
-import {
-  mapAutomationRowToOnboardingLearnAutomation,
-  ONBOARDING_LEARN_AUTOMATION_ID,
-} from "@/lib/onboarding/learn-automation"
-import type { AutomationRow } from "@/lib/automations/types"
 
 export default async function OnboardingPage() {
   const supabase = await createClient()
@@ -27,22 +22,5 @@ export default async function OnboardingPage() {
     redirect("/dashboard")
   }
 
-  const { data: learnAutomationRow, error: learnAutomationError } = await supabase
-    .from("automations")
-    .select(
-      "id,user_id,name,prompt,cron_schedule,timezone,model,is_active,last_run_at,next_run_at,run_count,last_error,created_at,updated_at,prompt_payload,is_public,preview_captured_at,cloned_from,description,preview_run_id",
-    )
-    .eq("id", ONBOARDING_LEARN_AUTOMATION_ID)
-    .eq("is_public", true)
-    .maybeSingle()
-
-  if (learnAutomationError) {
-    console.error("[onboarding] featured learn automation:", learnAutomationError)
-  }
-
-  const learnAutomation = mapAutomationRowToOnboardingLearnAutomation(
-    learnAutomationRow as Partial<AutomationRow> | null,
-  )
-
-  return <OnboardingForm userId={user.id} learnAutomation={learnAutomation} />
+  return <OnboardingForm userId={user.id} />
 }

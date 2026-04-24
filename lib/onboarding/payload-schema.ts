@@ -16,13 +16,13 @@ export const onboardingRoleSchema = z.enum([
 ])
 
 export const onboardingCreationGoalSchema = z.enum([
+  "ai_ugc",
   "ai_influencer_content",
+  "automated_tiktok_instagram",
+  "memes_brainrot",
   "motion_control_videos",
   "product_ads",
-  "social_media",
-  "artistic",
-  "memes",
-  "professional",
+  "artistic_cinematic",
   "other",
 ])
 

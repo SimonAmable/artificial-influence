@@ -237,6 +237,7 @@ export function createGenerateImageWithNanoBananaTool({
       "- **Literal mode** (set `rawPrompt: true`): pass the user's exact wording as `prompt`. Use when the user supplied a quoted prompt, labeled it (`prompt:` / `\"prompt\": \"...\"`), said exact/verbatim/literal/as-written/copy-paste/don't rewrite, pasted a finished prompt, or issued a short edit command paired with reference images (e.g. \"merge these\", \"swap outfits\", \"make it night\"). Do **not** wrap their text in JSON, do **not** add image_description/edit_description/negative_constraints, do **not** \"polish\" it. Short is fine.\n" +
       "- **Expand mode** (leave `rawPrompt` unset): the user gave a vague idea and expects you to compose a production-ready prompt. Build a JSON string with a rich `image_description` object (new images) **or** `edit_description` object (edits), a fluent master `prompt` field, and `negative_constraints` when useful. Omit `recommended_model` and `output_specs`; set `aspectRatio` and `variantCount` as tool args instead.\n\n" +
       "When in doubt between Literal and Expand, prefer Literal. Silently rewriting a user's prompt is worse than a terser result they can iterate on.\n\n" +
+      "If this tool returns **pending**, do not call awaitGeneration unless another tool in this same turn immediately needs the finished image.\n\n" +
       "For reference images from earlier in the chat or from listRecentGenerations, pass **referenceIds**: `ref_1`…`ref_N` (transcript), `upl_<uuid>` / `gen_<uuid>`, or raw UUID (`mediaId` from listRecentGenerations). Deprecated alias: **mediaIds** (same values).",
     inputSchema: z.object({
       prompt: z
@@ -381,8 +382,10 @@ export function createGenerateImageWithNanoBananaTool({
         return {
           aspectRatio: resolvedAspectRatio,
           generationId: pendingGeneration.id,
-          message: `Started an image generation with ${NANO_BANANA_MODEL}.`,
+          message: `Started an image generation with ${NANO_BANANA_MODEL}. If no later tool in this same turn needs the finished image, stop here and let the UI update asynchronously.`,
           model: NANO_BANANA_MODEL,
+          nextStepHint:
+            "Only call awaitGeneration when a later tool in this same turn needs the finished image (for example image -> video or image -> extract frames). Otherwise reply to the user and stop.",
           predictionId: prediction.id,
           promptMode: rawPrompt ? ("literal" as const) : ("expanded" as const),
           status: "pending" as const,

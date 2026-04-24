@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '100', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
     const includePending = searchParams.get('includePending') === 'true';
+    const excludeFailed = searchParams.get('excludeFailed') === 'true';
 
     // Build query
     let query = supabase
@@ -39,9 +40,13 @@ export async function GET(request: NextRequest) {
       query = query.eq('tool', tool);
     }
 
-    // Default to completed/failed history, but allow callers to hydrate active pending rows.
+    // Default to terminal history, but allow callers to hydrate active pending rows.
     if (!includePending) {
       query = query.neq('status', 'pending');
+    }
+
+    if (excludeFailed) {
+      query = query.neq('status', 'failed');
     }
 
     const { data: generations, error } = await query;

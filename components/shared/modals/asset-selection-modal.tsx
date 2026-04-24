@@ -35,7 +35,7 @@ import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { toast } from "sonner"
 
-interface Generation {
+interface RawGeneration {
   id: string
   user_id: string
   prompt: string | null
@@ -43,6 +43,11 @@ interface Generation {
   type: 'image' | 'video' | 'audio'
   model: string | null
   created_at: string
+  url: string | null
+  status?: "pending" | "completed" | "failed" | null
+}
+
+interface Generation extends Omit<RawGeneration, "url"> {
   url: string
 }
 
@@ -111,12 +116,20 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
     setLoadingHistory(true)
     setHistoryError(null)
     try {
-      const response = await fetch('/api/generations?type=image&limit=50')
+      const response = await fetch('/api/generations?type=image&limit=50&excludeFailed=true')
       if (!response.ok) {
         throw new Error('Failed to fetch history')
       }
       const data = await response.json()
-      setGenerations(data.generations || [])
+      const nextGenerations = Array.isArray(data.generations)
+        ? (data.generations as RawGeneration[]).filter(
+            (generation): generation is Generation =>
+              generation.status !== "failed" &&
+              typeof generation.url === "string" &&
+              generation.url.length > 0
+          )
+        : []
+      setGenerations(nextGenerations)
     } catch (error) {
       console.error('Error fetching history:', error)
       setHistoryError(error instanceof Error ? error.message : 'Failed to load history')
@@ -215,7 +228,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="w-screen! h-screen! max-w-none! m-0! p-0! gap-0 overflow-hidden border-0 rounded-none! translate-x-0! translate-y-0! left-0! top-0! fixed! inset-0!"
+        className="!fixed !inset-0 !left-0 !top-0 !m-0 !flex !h-screen !w-screen !max-w-none !translate-x-0 !translate-y-0 !flex-col !gap-0 overflow-hidden !rounded-none border-0 !p-0"
         aria-describedby="asset-selection-description"
       >
         {/* Header */}
@@ -321,9 +334,9 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
           </div>
 
           {/* Assets Tab */}
-          <TabsContent value="assets" className="m-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
+          <TabsContent value="assets" className="m-0 min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
             {loadingAssets ? (
-              <div className="flex items-center justify-center h-64">
+              <div className="flex min-h-48 items-start justify-center pt-8">
                 <CircleNotch className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : assetsError ? (
@@ -415,9 +428,9 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
           </TabsContent>
 
           {/* History Tab */}
-          <TabsContent value="history" className="m-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
+          <TabsContent value="history" className="m-0 min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
             {loadingHistory ? (
-              <div className="flex items-center justify-center h-64">
+              <div className="flex min-h-48 items-start justify-center pt-8">
                 <CircleNotch className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : historyError ? (

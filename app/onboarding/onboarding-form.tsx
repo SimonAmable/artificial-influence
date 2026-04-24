@@ -10,7 +10,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Baby,
-  Briefcase,
   Buildings,
   ChartBar,
   Check,
@@ -31,7 +30,6 @@ import {
   MagnifyingGlass,
   Palette,
   PencilLine,
-  ShareNetwork,
   ShoppingBag,
   Sliders,
   Stack,
@@ -49,9 +47,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { completeOnboarding } from "@/app/onboarding/actions"
-import { OnboardingLearnScreen } from "@/app/onboarding/onboarding-learn-screen"
 import { setOnboardingCompletedLocal } from "@/lib/onboarding/client-storage"
-import type { OnboardingLearnAutomation } from "@/lib/onboarding/learn-automation"
 import type { CompleteOnboardingPayload } from "@/lib/onboarding/payload-schema"
 import { cn } from "@/lib/utils"
 
@@ -106,14 +102,19 @@ const CREATION_GOAL_OPTIONS: {
   icon: React.ReactNode
 }[] = [
   {
+    id: "ai_ugc",
+    label: "AI UGC",
+    icon: <MagicWand className="size-6" weight="duotone" />,
+  },
+  {
     id: "ai_influencer_content",
-    label: "AI Influencer Content",
+    label: "AI Influencers",
     icon: <User className="size-6" weight="duotone" />,
   },
   {
-    id: "motion_control_videos",
-    label: "Motion Control Videos",
-    icon: <FilmStrip className="size-6" weight="duotone" />,
+    id: "automated_tiktok_instagram",
+    label: "TikTok / Instagram Auto",
+    icon: <InstagramLogo className="size-6" weight="duotone" />,
   },
   {
     id: "product_ads",
@@ -121,24 +122,19 @@ const CREATION_GOAL_OPTIONS: {
     icon: <ShoppingBag className="size-6" weight="duotone" />,
   },
   {
-    id: "social_media",
-    label: "Social Media",
-    icon: <ShareNetwork className="size-6" weight="duotone" />,
-  },
-  {
-    id: "artistic",
-    label: "Artistic",
-    icon: <Palette className="size-6" weight="duotone" />,
-  },
-  {
-    id: "memes",
-    label: "Memes",
+    id: "memes_brainrot",
+    label: "Memes & Brainrot",
     icon: <Ghost className="size-6" weight="duotone" />,
   },
   {
-    id: "professional",
-    label: "Professional",
-    icon: <Briefcase className="size-6" weight="duotone" />,
+    id: "motion_control_videos",
+    label: "Motion Videos",
+    icon: <FilmStrip className="size-6" weight="duotone" />,
+  },
+  {
+    id: "artistic_cinematic",
+    label: "Cinematic / Artistic",
+    icon: <Palette className="size-6" weight="duotone" />,
   },
   {
     id: "other",
@@ -335,7 +331,7 @@ function SelectableRowSingle({
       {selected && (
         <motion.div
           layoutId={layoutId}
-          className="pointer-events-none absolute inset-0 rounded-2xl bg-primary/12 shadow-[0_0_28px_-2px] shadow-primary/50 ring-2 ring-primary/45"
+          className="pointer-events-none absolute inset-px rounded-[calc(theme(borderRadius.2xl)-1px)] bg-primary/12 shadow-[0_0_28px_-2px] shadow-primary/50 ring-1 ring-primary/45"
           transition={{
             type: "spring",
             stiffness: 380,
@@ -382,6 +378,7 @@ type SelectableRowMultiProps = {
   icon: React.ReactNode
   label: string
   description?: string
+  compact?: boolean
 }
 
 function SelectableRowMulti({
@@ -390,27 +387,30 @@ function SelectableRowMulti({
   icon,
   label,
   description,
+  compact = false,
 }: SelectableRowMultiProps) {
   return (
     <button
       type="button"
       onClick={onToggle}
       className={cn(
-        "relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border bg-card/50 px-4 py-3.5 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-ring",
-        selected
-          ? "border-primary/45 ring-2 ring-primary/45"
-          : "border-border"
+        "relative flex w-full items-center overflow-hidden rounded-2xl border bg-card/50 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-ring",
+        compact ? "gap-2.5 px-4 py-3" : "gap-3 px-4 py-3.5",
+        selected ? "border-primary/45" : "border-border"
       )}
     >
+      {selected ? (
+        <span className="pointer-events-none absolute inset-px rounded-[calc(theme(borderRadius.2xl)-1px)] bg-primary/12 shadow-[0_0_28px_-2px] shadow-primary/50 ring-1 ring-primary/45" />
+      ) : null}
       <span
         className={cn(
-          "shrink-0",
+          "relative z-10 shrink-0",
           selected ? "text-primary" : "text-muted-foreground"
         )}
       >
         {icon}
       </span>
-      <span className="min-w-0 flex-1">
+      <span className="relative z-10 min-w-0 flex-1">
         <span
           className={cn(
             "block font-medium",
@@ -426,7 +426,7 @@ function SelectableRowMulti({
         ) : null}
       </span>
       {selected ? (
-        <Check className="size-5 shrink-0 text-primary" weight="bold" />
+        <Check className="relative z-10 size-5 shrink-0 text-primary" weight="bold" />
       ) : null}
     </button>
   )
@@ -434,16 +434,13 @@ function SelectableRowMulti({
 
 export function OnboardingForm({
   userId,
-  learnAutomation,
 }: {
   userId: string
-  learnAutomation: OnboardingLearnAutomation | null
 }) {
   const router = useRouter()
   const { setTheme } = useTheme()
   const [step, setStep] = React.useState(0)
   const [pending, setPending] = React.useState(false)
-  const [showLearnScreen, setShowLearnScreen] = React.useState(false)
 
   const [themeChoice, setThemeChoice] = React.useState<
     CompleteOnboardingPayload["theme"] | null
@@ -544,11 +541,7 @@ export function OnboardingForm({
         return
       }
       setOnboardingCompletedLocal(userId)
-      if (learnAutomation) {
-        setShowLearnScreen(true)
-        return
-      }
-      router.push("/dashboard")
+      router.push("/chat?onboarding=1")
       router.refresh()
     } finally {
       setPending(false)
@@ -556,7 +549,7 @@ export function OnboardingForm({
   }
 
   const leaveOnboarding = React.useCallback(() => {
-    router.push("/dashboard")
+    router.push("/chat?onboarding=1")
     router.refresh()
   }, [router])
 
@@ -566,16 +559,6 @@ export function OnboardingForm({
 
   const showBack = step > 0
   const isLastStep = step === STEPS - 1
-
-  if (showLearnScreen && learnAutomation) {
-    return (
-      <OnboardingLearnScreen
-        automation={learnAutomation}
-        onSkip={leaveOnboarding}
-        onContinue={leaveOnboarding}
-      />
-    )
-  }
 
   return (
     <div className="relative min-h-dvh w-full bg-background">
@@ -684,6 +667,7 @@ export function OnboardingForm({
                       onToggle={() => toggleCreationGoal(opt.id)}
                       icon={opt.icon}
                       label={opt.label}
+                      compact
                     />
                   ))}
                 </div>

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server"
 
 import {
-  automationPayloadToRowFields,
   parsePromptPayloadFromRequestBody,
 } from "@/lib/automations/prompt-payload"
-import { computeNextRun, validateCronExpression } from "@/lib/automations/schedule"
-import { resolveChatGatewayModel } from "@/lib/constants/chat-llm-models"
+import {
+  createAutomationForUser,
+  isAutomationServiceError,
+  listOwnedAutomations,
+} from "@/lib/automations/service"
 import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 
@@ -77,51 +79,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ automations, scope: "community" })
     }
 
-    const { data: rows, error } = await supabase
-      .from("automations")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("updated_at", { ascending: false })
-
-    if (error) {
-      console.error("[automations] GET list:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    const automations = rows ?? []
-    const ids = automations.map((a) => a.id as string)
-    const latestRuns: Record<string, Record<string, unknown>> = {}
-
-    if (ids.length > 0) {
-      const { data: runRows, error: runsError } = await supabase
-        .from("automation_runs")
-        .select("*")
-        .in("automation_id", ids)
-        .order("created_at", { ascending: false })
-
-      if (!runsError && runRows) {
-        for (const r of runRows) {
-          const aid = r.automation_id as string
-          if (!latestRuns[aid]) {
-            latestRuns[aid] = r as Record<string, unknown>
-          }
-        }
-      }
-    }
-
+    const automations = await listOwnedAutomations(supabase, user.id)
     return NextResponse.json({
-      automations: automations.map((a) => {
-        const row = a as Record<string, unknown>
-        return {
-          ...row,
-          hasPreview: hasPreviewSnapshot(row.preview_thread),
-          latestRun: latestRuns[row.id as string] ?? null,
-        }
-      }),
+      automations,
       scope: "mine",
     })
   } catch (e) {
     console.error("[automations] GET:", e)
+    if (isAutomationServiceError(e)) {
+      return NextResponse.json({ error: e.message }, { status: e.status })
+    }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -148,12 +115,7 @@ export async function POST(req: Request) {
     const promptPayload = parsePromptPayloadFromRequestBody(body)
     const cronSchedule = typeof body.cronSchedule === "string" ? body.cronSchedule.trim() : ""
     const timezone = typeof body.timezone === "string" ? body.timezone.trim() || "UTC" : "UTC"
-    const model =
-      typeof body.model === "string" && body.model.trim().length > 0
-        ? resolveChatGatewayModel(body.model.trim())
-        : null
     const isActive = typeof body.isActive === "boolean" ? body.isActive : true
-    const isPublic = body.isPublic === true
     const description =
       typeof body.description === "string" ? body.description.trim() || null : null
 
@@ -164,46 +126,39 @@ export async function POST(req: Request) {
       )
     }
 
-    const { prompt, prompt_payload } = automationPayloadToRowFields(promptPayload)
+    const row = await createAutomationForUser(supabase, user.id, {
+      name,
+      description,
+      promptPayload,
+      cronScheduleOrNaturalLanguage: cronSchedule,
+      timezone,
+      model: typeof body.model === "string" ? body.model : null,
+      isActive,
+    })
 
-    try {
-      validateCronExpression(cronSchedule, timezone)
-    } catch (e) {
-      return NextResponse.json(
-        { error: e instanceof Error ? e.message : "Invalid cron expression" },
-        { status: 400 },
-      )
-    }
+    if (body.isPublic === true) {
+      const { data: updatedRow, error: updateError } = await supabase
+        .from("automations")
+        .update({ is_public: true })
+        .eq("id", row.id)
+        .eq("user_id", user.id)
+        .select("*")
+        .single()
 
-    const nextRunAt = computeNextRun(cronSchedule, timezone, new Date())
+      if (updateError) {
+        console.error("[automations] POST visibility update:", updateError)
+        return NextResponse.json({ error: updateError.message }, { status: 500 })
+      }
 
-    const { data: row, error } = await supabase
-      .from("automations")
-      .insert({
-        user_id: user.id,
-        name,
-        description,
-        prompt,
-        prompt_payload,
-        cron_schedule: cronSchedule,
-        timezone,
-        model,
-        is_active: isActive,
-        next_run_at: nextRunAt.toISOString(),
-        run_count: 0,
-        is_public: isPublic,
-      })
-      .select("*")
-      .single()
-
-    if (error) {
-      console.error("[automations] POST:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ automation: updatedRow })
     }
 
     return NextResponse.json({ automation: row })
   } catch (e) {
     console.error("[automations] POST exception:", e)
+    if (isAutomationServiceError(e)) {
+      return NextResponse.json({ error: e.message }, { status: e.status })
+    }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

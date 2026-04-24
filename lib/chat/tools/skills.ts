@@ -44,6 +44,7 @@ export function createActivateSkillTool({
         const parsed = parseSkillDocument(row.skill_document)
         return {
           status: "ok" as const,
+          isMine: row.user_id === userId,
           slug: row.slug,
           title: row.title,
           name: parsed.name,

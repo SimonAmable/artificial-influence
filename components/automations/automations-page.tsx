@@ -802,7 +802,6 @@ export function AutomationsPage() {
       model,
       isPublic: isPublicAutomation,
     })
-    console.log('persistSnapshot changed:', snapshot !== persistSnapshot)
     return snapshot
   }, [
     selected,

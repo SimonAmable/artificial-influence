@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server"
 
-import { runAutomation } from "@/lib/automations/run"
-import type { AutomationRow } from "@/lib/automations/types"
+import { isAutomationServiceError, runAutomationNowForUser } from "@/lib/automations/service"
 import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
-import { createServiceRoleClient } from "@/lib/supabase/service-role"
 
 export const maxDuration = 300
 
@@ -32,27 +30,7 @@ export async function POST(_req: Request, context: RouteContext) {
       return termsResponse
     }
 
-    const { data: row, error: fetchError } = await supabase
-      .from("automations")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (fetchError || !row) {
-      return NextResponse.json({ error: "Automation not found" }, { status: 404 })
-    }
-
-    const admin = createServiceRoleClient()
-    if (!admin) {
-      return NextResponse.json({ error: "Server configuration error" }, { status: 500 })
-    }
-
-    const result = await runAutomation(admin, row as AutomationRow, { trigger: "manual" })
-
-    if (!result.ok) {
-      return NextResponse.json({ error: result.error, runId: result.runId }, { status: 500 })
-    }
+    const result = await runAutomationNowForUser(supabase, user.id, id)
 
     return NextResponse.json({
       ok: true,
@@ -61,6 +39,9 @@ export async function POST(_req: Request, context: RouteContext) {
     })
   } catch (e) {
     console.error("[automations/run] POST:", e)
+    if (isAutomationServiceError(e)) {
+      return NextResponse.json({ error: e.message }, { status: e.status })
+    }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

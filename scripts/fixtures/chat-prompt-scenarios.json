@@ -1,0 +1,67 @@
+[
+  {
+    "id": "literal-quoted-prompt",
+    "userMessage": "Use this prompt exactly: \"cinematic portrait of a sailor at dusk, 85mm, f/1.8\"",
+    "expectedAssertions": ["literal_preserve_wording", "no_silent_expansion"]
+  },
+  {
+    "id": "vague-image-request",
+    "userMessage": "a cyberpunk cat on a neon rooftop",
+    "expectedAssertions": ["expand_when_vague", "execute_if_user_wants_output_now"]
+  },
+  {
+    "id": "standalone-generation-no-wait",
+    "userMessage": "Generate a product photo of a silver perfume bottle on black marble",
+    "expectedAssertions": ["no_wait_for_standalone_generation"]
+  },
+  {
+    "id": "prompt-only-json-request",
+    "userMessage": "Write me a Nano Banana JSON prompt pack for a luxury perfume ad",
+    "expectedAssertions": ["structured_prompt_package", "no_execution_without_explicit_generate"]
+  },
+  {
+    "id": "fuzzy-model-name",
+    "userMessage": "Animate this with grok",
+    "expectedAssertions": ["resolve_fuzzy_model_name", "use_model_lookup_before_rejecting"]
+  },
+  {
+    "id": "edit-previous-image",
+    "userMessage": "Edit the last image we made and change the background to a rainy alley",
+    "expectedAssertions": ["list_thread_media_before_prior_media_edit", "do_not_guess_media_ids"]
+  },
+  {
+    "id": "save-asset-confirmation",
+    "userMessage": "Save that generation as an asset",
+    "expectedAssertions": ["require_save_confirmation"]
+  },
+  {
+    "id": "long-running-video-chain",
+    "userMessage": "Generate a long motion-copy clip and then continue the next step when it finishes",
+    "expectedAssertions": ["await_only_when_same_turn_needs_output", "schedule_follow_up_for_long_video_chain"]
+  },
+  {
+    "id": "brand-context-ambiguity",
+    "userMessage": "Make this on-brand for my brand",
+    "expectedAssertions": ["resolve_or_clarify_brand_context"]
+  },
+  {
+    "id": "automation-create-from-chat",
+    "userMessage": "Turn this into an automation that runs daily at 9am and keeps the attached references",
+    "expectedAssertions": ["automation_create_from_chat"]
+  },
+  {
+    "id": "automation-update-existing",
+    "userMessage": "Change my weekly content automation to run every Friday at 2pm instead",
+    "expectedAssertions": ["automation_list_before_existing_action", "automation_update_from_chat"]
+  },
+  {
+    "id": "automation-delete",
+    "userMessage": "Delete my old promo automation",
+    "expectedAssertions": ["automation_list_before_existing_action", "automation_delete_requires_approval"]
+  },
+  {
+    "id": "automation-ambiguous-schedule",
+    "userMessage": "Create an automation to make product ideas every day",
+    "expectedAssertions": ["automation_create_from_chat", "automation_schedule_ambiguity_needs_follow_up"]
+  }
+]

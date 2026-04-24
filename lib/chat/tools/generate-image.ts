@@ -13,11 +13,14 @@ import {
 } from "@/lib/server/replicate-image-generation"
 import {
   buildFalImageRequest,
-  GPT_IMAGE_2_CANONICAL_ID,
   isSupportedFalImageModel,
   QWEN_IMAGE2_CANONICAL_ID,
   submitFalImageQueue,
 } from "@/lib/server/fal-image"
+import {
+  buildReplicateGptImage2Input,
+  isReplicateGptImage2Model,
+} from "@/lib/server/replicate-gpt-image"
 import { aspectRatioToDimensions, modelUsesDimensions } from "@/lib/utils/model-parameters"
 import type {
   AvailableChatImageReference,
@@ -47,6 +50,35 @@ interface StoredAsset {
   mimeType: string
   storagePath: string | null
   url: string
+}
+
+function buildReferenceFilename({
+  fallbackStem,
+  mimeType,
+  source,
+}: {
+  fallbackStem: string
+  mimeType: string
+  source?: string | null
+}) {
+  const extension = getFileExtension(mimeType)
+
+  if (!source) {
+    return `${fallbackStem}.${extension}`
+  }
+
+  const normalizedSource = source.split("?")[0]?.replace(/\/+$/, "") ?? ""
+  const sourceName = normalizedSource.split("/").pop()
+
+  if (!sourceName) {
+    return `${fallbackStem}.${extension}`
+  }
+
+  if (sourceName.includes(".")) {
+    return sourceName
+  }
+
+  return `${sourceName}.${extension}`
 }
 
 function getFileExtension(mimeType: string, fallback = "png") {
@@ -219,6 +251,52 @@ async function uploadReferenceImage(
   })
 }
 
+async function storedAssetToFile(
+  reference: StoredAsset,
+  index: number,
+  supabase: SupabaseClient,
+): Promise<File> {
+  if (reference.storagePath) {
+    const { data, error } = await supabase.storage
+      .from("public-bucket")
+      .download(reference.storagePath)
+
+    if (error || !data) {
+      throw new Error(`Failed to download reference image: ${error?.message ?? "Unknown error"}`)
+    }
+
+    const mimeType = data.type || reference.mimeType || "image/png"
+    return new File(
+      [data],
+      buildReferenceFilename({
+        fallbackStem: `reference-${index + 1}`,
+        mimeType,
+        source: reference.storagePath,
+      }),
+      { type: mimeType },
+    )
+  }
+
+  validateReferenceUrl(reference.url)
+
+  const response = await fetch(reference.url)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch reference image: HTTP ${response.status}`)
+  }
+
+  const blob = await response.blob()
+  const mimeType = blob.type || reference.mimeType || "image/png"
+  return new File(
+    [blob],
+    buildReferenceFilename({
+      fallbackStem: `reference-${index + 1}`,
+      mimeType,
+      source: reference.url,
+    }),
+    { type: mimeType },
+  )
+}
+
 async function loadAssetReferences(
   assetIds: string[],
   supabase: SupabaseClient,
@@ -296,7 +374,7 @@ export function createGenerateImageTool({
 
   return tool({
     description:
-      "Generate or edit an image using any active UniCan image model. Use this when the user explicitly wants an image created now, especially if they name a model, ask for non-Nano output, or want you to use saved asset references. Pass reference images via **referenceIds** (`ref_1`…`ref_N` from the transcript manifest, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or **mediaId** from listRecentGenerations). Deprecated alias: **mediaIds**. Attachments are not auto-included.",
+      "Generate or edit an image using any active UniCan image model. Use this when the user explicitly wants an image created now, especially if they name a model, ask for non-Nano output, or want you to use saved asset references. Pass reference images via **referenceIds** (`ref_1`…`ref_N` from the transcript manifest, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or **mediaId** from listRecentGenerations). Deprecated alias: **mediaIds**. Attachments are not auto-included. If this returns **pending**, do not call awaitGeneration unless another tool in this same turn immediately needs the generated result.",
     inputSchema: z.object({
       prompt: z
         .string()
@@ -315,7 +393,7 @@ export function createGenerateImageTool({
         .min(1)
         .max(32)
         .optional()
-        .describe("Preferred aspect ratio such as 1:1, 4:5, 9:16, 16:9, or match_input_image."),
+        .describe("Preferred aspect ratio. It must match the selected model's supported aspect ratios from searchModels. For `openai/gpt-image-2`, only use `1:1`, `3:2`, or `2:3`."),
       variantCount: z
         .number()
         .int()
@@ -408,7 +486,9 @@ export function createGenerateImageTool({
         referenceImageUrls,
         shouldEnhance,
       })
-      const provider = String(modelData.provider ?? "").toLowerCase()
+      const provider = isReplicateGptImage2Model(modelIdentifier)
+        ? "replicate"
+        : String(modelData.provider ?? "").toLowerCase()
       const requiredCredits = Math.max(1, costPerImage * effectiveVariantCount)
 
       if (provider === "xai") {
@@ -522,11 +602,7 @@ export function createGenerateImageTool({
         }
       }
 
-      if (
-        provider === "fal" &&
-        (modelIdentifier === QWEN_IMAGE2_CANONICAL_ID ||
-          modelIdentifier === GPT_IMAGE_2_CANONICAL_ID)
-      ) {
+      if (provider === "fal" && modelIdentifier === QWEN_IMAGE2_CANONICAL_ID) {
         const hasCredits = await checkUserHasCredits(userId, requiredCredits, supabase)
         if (!hasCredits) {
           throw new Error(`Insufficient credits. This generation requires ${requiredCredits} credits.`)
@@ -542,13 +618,12 @@ export function createGenerateImageTool({
 
         const falRequest = buildFalImageRequest({
           aspectRatio,
-          enablePromptExpansion: modelIdentifier === QWEN_IMAGE2_CANONICAL_ID ? true : undefined,
-          enableSafetyChecker: modelIdentifier === QWEN_IMAGE2_CANONICAL_ID ? false : undefined,
+          enablePromptExpansion: true,
+          enableSafetyChecker: false,
           modelIdentifier,
           numImages: effectiveVariantCount,
           outputFormat: "png",
           prompt: finalPrompt,
-          quality: modelIdentifier === GPT_IMAGE_2_CANONICAL_ID ? "high" : undefined,
           referenceImageUrls,
         })
         const { requestId, endpointId: falEndpoint } = await submitFalImageQueue(
@@ -585,8 +660,10 @@ export function createGenerateImageTool({
         return {
           aspectRatio: falRequest.resolvedAspectRatio,
           generationId: pendingGeneration.id,
-          message: `Started an image generation with ${modelIdentifier}.`,
+          message: `Started an image generation with ${modelIdentifier}. If no later tool in this same turn needs the finished image, stop here and let the UI update asynchronously.`,
           model: modelIdentifier,
+          nextStepHint:
+            "Only call awaitGeneration when a later tool in this same turn needs the finished image (for example image -> video or image -> draft). Otherwise reply to the user and stop.",
           predictionId: requestId,
           status: "pending" as const,
           usedReferenceCount: referenceImageUrls.length,
@@ -599,29 +676,45 @@ export function createGenerateImageTool({
         throw new Error(`Unsupported Fal image model: ${modelIdentifier}`)
       }
 
-      const usesDimensions = modelUsesDimensions(modelData.parameters)
-      const resolvedAspectRatio =
+      let resolvedAspectRatio =
         aspectRatio ?? (referenceImageUrls.length > 0 ? "match_input_image" : "1:1")
-      const replicateInput: Record<string, unknown> = {
-        prompt: finalPrompt,
-        ...(effectiveVariantCount > 1 ? { num_outputs: effectiveVariantCount } : {}),
-      }
+      let replicateInput: Record<string, unknown>
 
-      if (usesDimensions) {
-        const dims = aspectRatioToDimensions(resolvedAspectRatio)
-        replicateInput.width = dims.width
-        replicateInput.height = dims.height
+      if (isReplicateGptImage2Model(modelIdentifier)) {
+        const replicateGptImage2ReferenceImages = await Promise.all(
+          allReferences.map((reference, index) => storedAssetToFile(reference, index, supabase)),
+        )
+        const gptImage2Request = buildReplicateGptImage2Input({
+          aspectRatio,
+          numberOfImages: effectiveVariantCount,
+          prompt: finalPrompt,
+          referenceImages: replicateGptImage2ReferenceImages,
+        })
+        resolvedAspectRatio = gptImage2Request.resolvedAspectRatio
+        replicateInput = gptImage2Request.input
       } else {
-        replicateInput.aspect_ratio = resolvedAspectRatio
-      }
+        const usesDimensions = modelUsesDimensions(modelData.parameters)
+        replicateInput = {
+          prompt: finalPrompt,
+          ...(effectiveVariantCount > 1 ? { num_outputs: effectiveVariantCount } : {}),
+        }
 
-      if (referenceImageUrls.length > 0) {
-        replicateInput.image_input = referenceImageUrls
-      }
+        if (usesDimensions) {
+          const dims = aspectRatioToDimensions(resolvedAspectRatio)
+          replicateInput.width = dims.width
+          replicateInput.height = dims.height
+        } else {
+          replicateInput.aspect_ratio = resolvedAspectRatio
+        }
 
-      if (modelIdentifier === "google/nano-banana-2") {
-        replicateInput.google_search = true
-        replicateInput.image_search = true
+        if (referenceImageUrls.length > 0) {
+          replicateInput.image_input = referenceImageUrls
+        }
+
+        if (modelIdentifier === "google/nano-banana-2") {
+          replicateInput.google_search = true
+          replicateInput.image_search = true
+        }
       }
 
       const webhookBase = process.env.REPLICATE_WEBHOOK_BASE_URL?.replace(/\/$/, "")
@@ -680,8 +773,10 @@ export function createGenerateImageTool({
         return {
           aspectRatio: resolvedAspectRatio,
           generationId: pendingGeneration.id,
-          message: `Started an image generation with ${modelIdentifier}.`,
+          message: `Started an image generation with ${modelIdentifier}. If no later tool in this same turn needs the finished image, stop here and let the UI update asynchronously.`,
           model: modelIdentifier,
+          nextStepHint:
+            "Only call awaitGeneration when a later tool in this same turn needs the finished image (for example image -> video or image -> draft). Otherwise reply to the user and stop.",
           predictionId: prediction.id,
           status: "pending" as const,
           usedReferenceCount: referenceImageUrls.length,
