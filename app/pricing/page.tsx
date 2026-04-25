@@ -4,16 +4,16 @@ import { useRef, useState } from 'react';
 import { getStoredAffiliateRef } from '@/hooks/use-affiliate-ref';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { CaretLeft, CaretRight, Sparkle, Info } from '@phosphor-icons/react';
+import { Sparkle, Info } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { CreditPackCheckout } from '@/components/credits/credit-pack-checkout';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Switch } from '@/components/ui/switch';
 
 type PricingPlan = {
   id: string;
@@ -29,6 +29,8 @@ type PricingPlan = {
   savings?: string;
   priceNote?: string;
 };
+
+type PricingTab = 'monthly' | 'yearly' | 'one-time' | 'enterprise';
 
 // Stripe live Price IDs, Pro / Max only
 const monthlyPlans: PricingPlan[] = [
@@ -309,24 +311,51 @@ function scrollCardIntoView(el: HTMLElement | null) {
   el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 }
 
+function EnterprisePlanCard({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'relative mx-auto flex h-full w-full max-w-3xl flex-col rounded-lg border-2 border-border bg-card p-8 shadow-lg transition-shadow hover:shadow-xl',
+        className
+      )}
+    >
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold mb-2">Enterprise</h2>
+        <p className="text-muted-foreground mb-4">For organizations at scale</p>
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-3xl font-bold tracking-tight">Custom</span>
+          <span className="text-sm text-muted-foreground">Let&apos;s scope your needs</span>
+        </div>
+      </div>
+      <a
+        href={`mailto:${ENTERPRISE_CONTACT_EMAIL}?subject=${encodeURIComponent('Enterprise plan inquiry')}`}
+        className="w-full py-3 px-6 rounded-lg font-semibold transition-colors mb-6 text-center bg-secondary text-secondary-foreground hover:bg-secondary/80 inline-block"
+      >
+        Contact us
+      </a>
+      <div className="flex flex-col items-center gap-2 mb-6">
+        <p className="text-sm text-muted-foreground text-center">
+          Volume pricing, security reviews, and tailored terms
+        </p>
+      </div>
+      <div className="mt-auto">
+        <PlanFeatureList features={enterpriseFeatures} className="mb-0" />
+      </div>
+    </div>
+  );
+}
+
 export default function PricingPage() {
   const [loading, setLoading] = useState<string | null>(null);
-  const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
+  const [activePricingTab, setActivePricingTab] = useState<PricingTab>('monthly');
   const router = useRouter();
   const supabase = createClient();
   const carouselRef = useRef<HTMLDivElement>(null);
   const proCardRef = useRef<HTMLDivElement>(null);
   const maxCardRef = useRef<HTMLDivElement>(null);
-  const enterpriseCardRef = useRef<HTMLDivElement>(null);
 
-  const pricingPlans = billingInterval === 'month' ? monthlyPlans : yearlyPlans;
-
-  const scrollCarouselBy = (direction: 'prev' | 'next') => {
-    const el = carouselRef.current;
-    if (!el) return;
-    const delta = Math.max(280, Math.floor(el.clientWidth * 0.75));
-    el.scrollBy({ left: direction === 'next' ? delta : -delta, behavior: 'smooth' });
-  };
+  const isSubscriptionTab = activePricingTab === 'monthly' || activePricingTab === 'yearly';
+  const pricingPlans = activePricingTab === 'yearly' ? yearlyPlans : monthlyPlans;
 
   const handleSubscribe = async (priceId: string, planId: string) => {
     setLoading(planId);
@@ -364,7 +393,7 @@ export default function PricingPage() {
 
       // Redirect to Stripe Checkout
       if (data.url) {
-        window.location.href = data.url;
+        window.location.assign(data.url);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -385,64 +414,53 @@ export default function PricingPage() {
           <p className="text-xl text-muted-foreground mb-6">
             Select the perfect plan for your needs
           </p>
-          
-          {/* Billing Interval Toggle */}
-          <div className="relative inline-flex items-center justify-center">
-            <div className="flex items-center justify-center gap-4">
-              <span className={`text-sm font-medium ${billingInterval === 'month' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                Monthly
-              </span>
-              <Switch
-                checked={billingInterval === 'year'}
-                onCheckedChange={(checked) => setBillingInterval(checked ? 'year' : 'month')}
-              />
-              <span className={`text-sm font-medium ${billingInterval === 'year' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                Yearly
-              </span>
-            </div>
-            <span
-              className={cn(
-                'pointer-events-none absolute left-full ml-4 inline-flex whitespace-nowrap rounded-full border border-green-600/25 bg-green-600/10 px-3 py-1 text-xs font-semibold text-green-700 opacity-0 transition-opacity dark:border-green-400/30 dark:bg-green-400/10 dark:text-green-400',
-                billingInterval === 'year' && 'opacity-100'
-              )}
-              aria-hidden={billingInterval === 'month'}
+
+          <Tabs
+            value={activePricingTab}
+            onValueChange={(value) => setActivePricingTab(value as PricingTab)}
+            className="mx-auto flex w-full max-w-4xl flex-col items-stretch"
+          >
+            <TabsList
+              variant="default"
+              className="!mx-auto grid !h-auto min-h-12 w-full max-w-4xl grid-cols-2 gap-1 rounded-4xl border-0 bg-transparent p-1 sm:min-h-11 sm:grid-cols-4"
             >
-              <span className="sm:hidden">Save 50%</span>
-              <span className="hidden sm:inline">Save up to 50% on yearly plans</span>
-            </span>
-          </div>
+              <TabsTrigger
+                value="monthly"
+                className="flex min-h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-transparent px-2 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:min-h-9 sm:px-3 sm:text-sm"
+              >
+                Monthly
+              </TabsTrigger>
+              <TabsTrigger
+                value="yearly"
+                className="flex min-h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-transparent px-2 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:min-h-9 sm:px-3 sm:text-sm"
+              >
+                <span>Yearly</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="one-time"
+                className="flex min-h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-transparent px-2 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:min-h-9 sm:px-3 sm:text-sm"
+              >
+                One-time
+              </TabsTrigger>
+              <TabsTrigger
+                value="enterprise"
+                className="flex min-h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-transparent px-2 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:min-h-9 sm:px-3 sm:text-sm"
+              >
+                Enterprise
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
-        {/* Plan navigation, jump + carousel arrows on small screens */}
-        <div className="mb-4 flex flex-col items-center gap-3 sm:mb-6">
-          <p className="text-sm text-muted-foreground sm:hidden">Jump to a plan</p>
-          <div className="flex w-full max-w-lg flex-wrap items-center justify-center gap-2 sm:max-w-none">
-            <div className="flex shrink-0 items-center gap-1 sm:hidden">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                className="rounded-full"
-                aria-label="Scroll plans left"
-                onClick={() => scrollCarouselBy('prev')}
-              >
-                <CaretLeft className="size-4" weight="bold" />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                className="rounded-full"
-                aria-label="Scroll plans right"
-                onClick={() => scrollCarouselBy('next')}
-              >
-                <CaretRight className="size-4" weight="bold" />
-              </Button>
-            </div>
+        {isSubscriptionTab ? (
+          <>
+        {/* Mobile plan shortcuts */}
+        <div className="mb-4 flex flex-col items-center gap-3 sm:hidden">
+          <div className="flex w-full max-w-lg flex-wrap items-center justify-center gap-2">
             <div
               className="flex flex-wrap justify-center gap-2"
-              role="tablist"
-              aria-label="Choose plan to scroll into view"
+              role="group"
+              aria-label="Choose subscription plan to scroll into view"
             >
               <Button
                 type="button"
@@ -462,28 +480,19 @@ export default function PricingPage() {
               >
                 Max
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="rounded-full"
-                onClick={() => scrollCardIntoView(enterpriseCardRef.current)}
-              >
-                Enterprise
-              </Button>
             </div>
           </div>
         </div>
 
-        {/* Pricing Cards: Pro | Max | Enterprise, mobile: snap carousel, one centered + peek */}
+        {/* Pricing Cards: Pro | Max, mobile: snap carousel, one centered + peek */}
         <div
           ref={carouselRef}
           className={[
-            'flex max-w-7xl mx-auto items-stretch',
+            'flex max-w-5xl mx-auto items-stretch',
             '-mx-4 flex-row gap-3 overflow-x-auto overscroll-x-contain pb-4 px-[calc((100vw-85vw)/2)] pt-5',
             'snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-            'sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:overscroll-auto sm:pb-0 sm:px-0 sm:pt-0',
-            'sm:snap-none lg:gap-8 xl:grid-cols-3',
+            'sm:mx-auto sm:grid sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:overscroll-auto sm:pb-0 sm:px-0 sm:pt-0',
+            'sm:snap-none lg:gap-8',
           ].join(' ')}
         >
           {/* Free tier, commented out for experiment; see freeFeatures + freeCardRef above */}
@@ -640,38 +649,15 @@ export default function PricingPage() {
             </div>
             );
           })}
-
-          {/* Enterprise */}
-          <div
-            ref={enterpriseCardRef}
-            className="relative flex h-full min-h-0 max-sm:snap-center max-sm:shrink-0 max-sm:w-[85vw] max-sm:max-w-md flex-col bg-card rounded-lg border-2 border-border p-8 shadow-lg transition-shadow hover:shadow-xl sm:w-auto sm:max-w-none"
-          >
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold mb-2">Enterprise</h2>
-              <p className="text-muted-foreground mb-4">For organizations at scale</p>
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-3xl font-bold tracking-tight">Custom</span>
-                <span className="text-sm text-muted-foreground">Let&apos;s scope your needs</span>
-              </div>
-            </div>
-            <a
-              href={`mailto:${ENTERPRISE_CONTACT_EMAIL}?subject=${encodeURIComponent('Enterprise plan inquiry')}`}
-              className="w-full py-3 px-6 rounded-lg font-semibold transition-colors mb-6 text-center bg-secondary text-secondary-foreground hover:bg-secondary/80 inline-block"
-            >
-              Contact us
-            </a>
-            <div className="flex flex-col items-center gap-2 mb-6">
-              <p className="text-sm text-muted-foreground text-center">
-                Volume pricing, security reviews, and tailored terms
-              </p>
-            </div>
-            <div className="mt-auto">
-              <PlanFeatureList features={enterpriseFeatures} className="mb-0" />
-            </div>
-          </div>
         </div>
+          </>
+        ) : null}
 
-        <CreditPackCheckout className="mt-10" redirectPath="/pricing" />
+        {activePricingTab === 'one-time' ? (
+          <CreditPackCheckout redirectPath="/pricing" />
+        ) : null}
+
+        {activePricingTab === 'enterprise' ? <EnterprisePlanCard /> : null}
 
         {/* Footer Note */}
         <div className="text-center mt-12">
