@@ -279,21 +279,15 @@ export function ImageGrid({
       </div>
 
       {/* Image Grid - Masonry style with fixed row heights */}
-      <div className="flex-1 min-h-0 p-0 pt-0">
+      <div className="flex-1 min-h-0 overflow-auto p-0 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <div 
           className={cn(
-            "grid p-2 overflow-auto h-full",
+            "grid w-full auto-rows-auto content-start items-start justify-items-stretch p-2",
             gridColsClass,
             gapClass,
             // Center items in one-column mode
             isOneColumn && "justify-items-center",
-            // Hide scrollbar while maintaining scrollability
-            "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
           )}
-          style={{
-            gridAutoRows: 'auto', // Let aspect-square determine row height
-            gridAutoFlow: 'row', // Ensure proper row wrapping
-          }}
         >
           {/* Skeleton loading grid - shown when loading history */}
           {isLoadingSkeleton && Array.from({ length: 12 }).map((_, index) => (
@@ -313,8 +307,8 @@ export function ImageGrid({
                 <div
                   key={item.id}
                   className={cn(
-                    "relative isolate w-full overflow-hidden rounded-lg border border-white/10 bg-zinc-900",
-                    isOneColumn ? "min-h-[50vh]" : "aspect-square min-h-[180px]"
+                    "relative isolate w-full min-w-0 overflow-hidden rounded-lg border border-white/10 bg-zinc-900",
+                    isOneColumn ? "min-h-[50vh]" : "aspect-square min-h-0"
                   )}
                 >
                   {/* White fading line animation - 20 second infinite duration */}
@@ -336,8 +330,8 @@ export function ImageGrid({
             <div
               key={getImageItemKey(item.data)}
               className={cn(
-                "group relative bg-background flex items-center justify-center w-full cursor-pointer",
-                isOneColumn ? "aspect-auto" : "aspect-square"
+                "group relative flex w-full min-w-0 cursor-pointer items-center justify-center bg-background",
+                isOneColumn ? "aspect-auto" : "aspect-square min-h-0"
               )}
               onClick={() => setFullscreenImage(item.data)}
               draggable

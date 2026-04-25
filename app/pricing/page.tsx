@@ -1,19 +1,17 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { getStoredAffiliateRef } from '@/hooks/use-affiliate-ref';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Sparkle, Info } from '@phosphor-icons/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { CreditPackCheckout } from '@/components/credits/credit-pack-checkout';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 type PricingPlan = {
   id: string;
@@ -32,6 +30,29 @@ type PricingPlan = {
 
 type PricingTab = 'monthly' | 'yearly' | 'one-time' | 'enterprise';
 
+const ALL_MODELS_INFO =
+  'Includes top image models (Nano Banana Pro, Nano Banana 2, GPT Image 2, Seedream 5.0, FLUX.2 Flex), video models (Veo 3.1 Fast, Kling 3.0, Seedance 2.0, Fabric 1.0), and Gemini 3.1 Flash TTS.';
+
+const pageFade = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -6 },
+};
+
+const cardList = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.06,
+    },
+  },
+};
+
+const cardFade = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0 },
+};
+
 // Stripe live Price IDs, Pro / Max only
 const monthlyPlans: PricingPlan[] = [
   {
@@ -46,7 +67,7 @@ const monthlyPlans: PricingPlan[] = [
     features: [
       {
         name: 'Access to all AI models',
-        info: 'Includes image generation (Nano Banana, FLUX.2 Flex), video generation (Fabric 1.0), and audio models',
+        info: ALL_MODELS_INFO,
       },
       {
         name: 'Concurrent generations',
@@ -87,7 +108,7 @@ const monthlyPlans: PricingPlan[] = [
     features: [
       {
         name: 'Access to all AI models',
-        info: 'Includes image generation (Nano Banana, FLUX.2 Flex), video generation (Fabric 1.0), and audio models',
+        info: ALL_MODELS_INFO,
       },
       {
         name: 'Maximum concurrent generations',
@@ -135,7 +156,7 @@ const yearlyPlans: PricingPlan[] = [
     features: [
       {
         name: 'Access to all AI models',
-        info: 'Includes image generation (Nano Banana, FLUX.2 Flex), video generation (Fabric 1.0), and audio models',
+        info: ALL_MODELS_INFO,
       },
       {
         name: 'Concurrent generations',
@@ -177,7 +198,7 @@ const yearlyPlans: PricingPlan[] = [
     features: [
       {
         name: 'Access to all AI models',
-        info: 'Includes image generation (Nano Banana, FLUX.2 Flex), video generation (Fabric 1.0), and audio models',
+        info: ALL_MODELS_INFO,
       },
       {
         name: 'Maximum concurrent generations',
@@ -268,6 +289,31 @@ const enterpriseFeatures: { name: string; info: string }[] = [
   },
 ];
 
+function InfoPopover({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="shrink-0 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          aria-label={label}
+        >
+          <Info className="w-4 h-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="max-w-xs text-sm leading-relaxed" align="end" sideOffset={8}>
+        {children}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function PlanFeatureList({ features, className }: { features: { name: string; info: string }[]; className?: string }) {
   return (
     <ul className={cn('space-y-3 mb-8', className)}>
@@ -287,20 +333,9 @@ function PlanFeatureList({ features, className }: { features: { name: string; in
             </svg>
             <span className="text-sm">{feature.name}</span>
           </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                aria-label="More information"
-              >
-                <Info className="w-4 h-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="max-w-xs text-sm">{feature.info}</p>
-            </TooltipContent>
-          </Tooltip>
+          <InfoPopover label={`More information about ${feature.name}`}>
+            <p>{feature.info}</p>
+          </InfoPopover>
         </li>
       ))}
     </ul>
@@ -348,6 +383,7 @@ function EnterprisePlanCard({ className }: { className?: string }) {
 export default function PricingPage() {
   const [loading, setLoading] = useState<string | null>(null);
   const [activePricingTab, setActivePricingTab] = useState<PricingTab>('monthly');
+  const reduceMotion = useReducedMotion();
   const router = useRouter();
   const supabase = createClient();
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -356,6 +392,37 @@ export default function PricingPage() {
 
   const isSubscriptionTab = activePricingTab === 'monthly' || activePricingTab === 'yearly';
   const pricingPlans = activePricingTab === 'yearly' ? yearlyPlans : monthlyPlans;
+  const headerCopy: Record<PricingTab, { title: string; description: string; footer: string }> = {
+    monthly: {
+      title: 'Pick Your Plan',
+      description: 'Monthly credits, priority access, and integrations for steady creation.',
+      footer:
+        'Create consistently with credits that stay in your balance, plus priority access and Instagram integrations on higher tiers. Cancel anytime.',
+    },
+    yearly: {
+      title: 'Pick Your Plan',
+      description: 'Lock in the best subscription value while receiving credits each month.',
+      footer:
+        'Get the best value, keep receiving credits each month, and use your balance when your workflow is ready. Manage renewal anytime.',
+    },
+    'one-time': {
+      title: 'Buy Credits',
+      description: 'One-time credits for extra generations. They do not expire or change your plan.',
+      footer:
+        'Top up once and create on your own schedule. Credits do not expire, do not renew, and do not change your current plan.',
+    },
+    enterprise: {
+      title: 'Enterprise',
+      description: 'Custom credit volume, support, and terms for teams operating at scale.',
+      footer:
+        'Enterprise pricing is scoped with your team and can include custom credit volume, security review, invoicing, and implementation support.',
+    },
+  };
+  const activeCopy = headerCopy[activePricingTab];
+  const motionTransition = reduceMotion
+    ? { duration: 0 }
+    : { duration: 0.24, ease: [0.22, 1, 0.36, 1] as const };
+  const hoverLift = reduceMotion ? undefined : { y: -4 };
 
   const handleSubscribe = async (priceId: string, planId: string) => {
     setLoading(planId);
@@ -407,102 +474,122 @@ export default function PricingPage() {
     <div className="min-h-[90vh] pt-20 bg-background to-muted py-4 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-6 sm:mb-8">
-          <h1 className="text-4xl font-bold tracking-tight mb-4 uppercase">
-            Pick Your Plan
-          </h1>
-          <p className="text-xl text-muted-foreground mb-6">
-            Select the perfect plan for your needs
-          </p>
+        <motion.div
+          className="text-center mb-6 sm:mb-8"
+          initial={reduceMotion ? false : 'hidden'}
+          animate="visible"
+          variants={pageFade}
+          transition={motionTransition}
+        >
+          <div className="mx-auto mb-6 flex min-h-[116px] max-w-5xl flex-col items-center justify-center">
+            <h1 className="mb-4 text-4xl font-bold uppercase tracking-tight">
+              {activeCopy.title}
+            </h1>
+            <p className="max-w-5xl text-xl text-muted-foreground">
+              {activeCopy.description}
+            </p>
+          </div>
 
           <Tabs
             value={activePricingTab}
             onValueChange={(value) => setActivePricingTab(value as PricingTab)}
-            className="mx-auto flex w-full max-w-4xl flex-col items-stretch"
+            className="mx-auto flex w-full max-w-xl flex-col items-stretch"
           >
             <TabsList
               variant="default"
-              className="!mx-auto grid !h-auto min-h-12 w-full max-w-4xl grid-cols-2 gap-1 rounded-4xl border-0 bg-transparent p-1 sm:min-h-11 sm:grid-cols-4"
+              className="!mx-auto grid !h-auto min-h-11 w-full max-w-xl grid-cols-4 gap-1 rounded-4xl border-0 bg-transparent p-1"
             >
               <TabsTrigger
                 value="monthly"
-                className="flex min-h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-transparent px-2 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:min-h-9 sm:px-3 sm:text-sm"
+                className="flex min-h-9 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
               >
                 Monthly
               </TabsTrigger>
               <TabsTrigger
                 value="yearly"
-                className="flex min-h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-transparent px-2 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:min-h-9 sm:px-3 sm:text-sm"
+                className="flex min-h-9 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
               >
                 <span>Yearly</span>
               </TabsTrigger>
               <TabsTrigger
                 value="one-time"
-                className="flex min-h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-transparent px-2 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:min-h-9 sm:px-3 sm:text-sm"
+                className="flex min-h-9 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
               >
-                One-time
+                Credits
               </TabsTrigger>
               <TabsTrigger
                 value="enterprise"
-                className="flex min-h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-transparent px-2 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:min-h-9 sm:px-3 sm:text-sm"
+                className="flex min-h-9 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
               >
                 Enterprise
               </TabsTrigger>
             </TabsList>
           </Tabs>
-        </div>
+        </motion.div>
 
-        {isSubscriptionTab ? (
-          <>
-        {/* Mobile plan shortcuts */}
-        <div className="mb-4 flex flex-col items-center gap-3 sm:hidden">
-          <div className="flex w-full max-w-lg flex-wrap items-center justify-center gap-2">
-            <div
-              className="flex flex-wrap justify-center gap-2"
-              role="group"
-              aria-label="Choose subscription plan to scroll into view"
+        <div>
+          {isSubscriptionTab ? (
+            <motion.div
+              key={activePricingTab}
+              initial={reduceMotion ? false : 'hidden'}
+              animate="visible"
+              exit="exit"
+              variants={pageFade}
+              transition={motionTransition}
             >
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="rounded-full"
-                onClick={() => scrollCardIntoView(proCardRef.current)}
-              >
-                Pro
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="rounded-full"
-                onClick={() => scrollCardIntoView(maxCardRef.current)}
-              >
-                Max
-              </Button>
-            </div>
-          </div>
-        </div>
+              {/* Mobile plan shortcuts */}
+              <div className="mb-4 flex flex-col items-center gap-3 sm:hidden">
+                <div className="flex w-full max-w-lg flex-wrap items-center justify-center gap-2">
+                  <div
+                    className="flex flex-wrap justify-center gap-2"
+                    role="group"
+                    aria-label="Choose subscription plan to scroll into view"
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => scrollCardIntoView(proCardRef.current)}
+                    >
+                      Pro
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => scrollCardIntoView(maxCardRef.current)}
+                    >
+                      Max
+                    </Button>
+                  </div>
+                </div>
+              </div>
 
-        {/* Pricing Cards: Pro | Max, mobile: snap carousel, one centered + peek */}
-        <div
-          ref={carouselRef}
-          className={[
-            'flex max-w-5xl mx-auto items-stretch',
-            '-mx-4 flex-row gap-3 overflow-x-auto overscroll-x-contain pb-4 px-[calc((100vw-85vw)/2)] pt-5',
-            'snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-            'sm:mx-auto sm:grid sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:overscroll-auto sm:pb-0 sm:px-0 sm:pt-0',
-            'sm:snap-none lg:gap-8',
-          ].join(' ')}
-        >
-          {/* Free tier, commented out for experiment; see freeFeatures + freeCardRef above */}
+              {/* Pricing Cards: Pro | Max, mobile: snap carousel, one centered + peek */}
+              <motion.div
+                ref={carouselRef}
+                className={[
+                  'flex max-w-5xl mx-auto items-stretch',
+                  '-mx-4 flex-row gap-3 overflow-x-auto overscroll-x-contain pb-4 px-[calc((100vw-85vw)/2)] pt-5',
+                  'snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+                  'sm:mx-auto sm:grid sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:overscroll-auto sm:pb-0 sm:px-0 sm:pt-0',
+                  'sm:snap-none lg:gap-8',
+                ].join(' ')}
+                variants={cardList}
+              >
+                {/* Free tier, commented out for experiment; see freeFeatures + freeCardRef above */}
 
-          {pricingPlans.map((plan) => {
-            const listMonthly = monthlyPlans.find((p) => p.name === plan.name)?.price;
-            return (
-            <div
+                {pricingPlans.map((plan) => {
+                  const listMonthly = monthlyPlans.find((p) => p.name === plan.name)?.price;
+                  return (
+            <motion.div
               key={plan.id}
               ref={plan.name === 'Pro' ? proCardRef : maxCardRef}
+              variants={cardFade}
+              transition={motionTransition}
+              whileHover={hoverLift}
               className={`relative flex h-full min-h-0 max-sm:snap-center max-sm:shrink-0 max-sm:w-[85vw] max-sm:max-w-md flex-col bg-card rounded-lg border-2 p-8 shadow-lg transition-shadow hover:shadow-xl sm:w-auto sm:max-w-none ${
                 plan.popular ? 'z-10 border-primary ring-2 ring-primary/20' : 'border-border'
               }`}
@@ -607,17 +694,17 @@ export default function PricingPage() {
                     {plan.credits} credits per month
                   </span>
                 </div>
-                <Tooltip>
-                  <TooltipTrigger asChild>
+                <Popover>
+                  <PopoverTrigger asChild>
                     <button
                       type="button"
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors flex flex-col items-center gap-1"
+                      className="flex flex-col items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       aria-label="Credit usage information"
                     >
                       <div className="flex items-start justify-center gap-1">
                         <span className="flex flex-col items-center gap-0.5 text-center leading-snug">
                           <span>
-                            {`~${Math.floor(plan.credits / 4)}–${Math.floor(plan.credits / 2)} Nano Banana images`}
+                            {`~${Math.floor(plan.credits / 4)}-${Math.floor(plan.credits / 2)} Nano Banana images`}
                           </span>
                           <span>
                             {`~${Math.floor(plan.credits / 20)} Kling 3.0 motion control videos`}
@@ -626,9 +713,9 @@ export default function PricingPage() {
                         <Info className="w-3 h-3 shrink-0 mt-0.5" />
                       </div>
                     </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-sm">
-                    <div className="text-sm space-y-2">
+                  </PopoverTrigger>
+                  <PopoverContent className="max-w-sm" align="center" sideOffset={8}>
+                    <div className="space-y-2 text-sm">
                       <p className="font-medium">Example credit costs</p>
                       <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
                         <li>2 credits = 1 Google Nano Banana image</li>
@@ -639,31 +726,55 @@ export default function PricingPage() {
                         Totals above use these examples; other models use different amounts.
                       </p>
                     </div>
-                  </TooltipContent>
-                </Tooltip>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="mt-auto">
                 <PlanFeatureList features={plan.features} className="mb-0" />
               </div>
-            </div>
+            </motion.div>
             );
-          })}
+                })}
+              </motion.div>
+            </motion.div>
+          ) : activePricingTab === 'one-time' ? (
+            <motion.div
+              key="one-time"
+              initial={reduceMotion ? false : 'hidden'}
+              animate="visible"
+              exit="exit"
+              variants={pageFade}
+              transition={motionTransition}
+            >
+              <CreditPackCheckout redirectPath="/pricing" />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="enterprise"
+              initial={reduceMotion ? false : 'hidden'}
+              animate="visible"
+              exit="exit"
+              variants={pageFade}
+              transition={motionTransition}
+              whileHover={hoverLift}
+            >
+              <EnterprisePlanCard />
+            </motion.div>
+          )}
         </div>
-          </>
-        ) : null}
-
-        {activePricingTab === 'one-time' ? (
-          <CreditPackCheckout redirectPath="/pricing" />
-        ) : null}
-
-        {activePricingTab === 'enterprise' ? <EnterprisePlanCard /> : null}
 
         {/* Footer Note */}
         <div className="text-center mt-12">
-          <p className="text-sm text-muted-foreground">
-            Cancel anytime. No long-term commitments. Higher tiers add more credits, priority, and integrations such as Instagram connections.
-          </p>
+          <motion.p
+            key={`${activePricingTab}-footer`}
+            className="text-sm text-muted-foreground"
+            initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={motionTransition}
+          >
+            {activeCopy.footer}
+          </motion.p>
         </div>
       </div>
     </div>

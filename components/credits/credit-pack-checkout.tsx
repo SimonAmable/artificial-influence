@@ -122,23 +122,26 @@ export function CreditPackCheckout({
   };
 
   return (
-    <section className={cn('mx-auto max-w-4xl rounded-lg border border-border bg-card p-6 shadow-lg sm:p-8', className)}>
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+    <section
+      className={cn(
+        'mx-auto max-w-3xl rounded-lg border-2 border-border bg-card p-6 shadow-lg transition-shadow hover:shadow-xl sm:p-8',
+        className
+      )}
+    >
+      <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-xl">
           <div className="mb-3 flex items-center gap-2">
             <Sparkle className="size-5 text-primary" weight="fill" />
-            <h2 className="text-2xl font-bold">Buy credits</h2>
+            <h2 className="text-2xl font-bold">Credit pack</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Add one-time credits whenever you need extra generations. Credit packs start at
-            {' '}
-            {formatCreditPackAmount(calculateCreditPackAmountCents(MIN_CREDIT_PACK_CREDITS))}
-            {' '}
-            and do not change your subscription.
+            One-time credits that do not expire. Add extra generations whenever you need them.
+            Starts at{' '}
+            {formatCreditPackAmount(calculateCreditPackAmountCents(MIN_CREDIT_PACK_CREDITS))}.
           </p>
         </div>
 
-        <div className="rounded-lg border border-border bg-background/60 px-4 py-3 text-sm">
+        <div className="text-sm sm:text-right">
           <p className="text-muted-foreground">Current balance</p>
           <p className="text-2xl font-semibold">
             {loadingBalance
@@ -150,7 +153,7 @@ export function CreditPackCheckout({
         </div>
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_260px]">
+      <div className="mt-6">
         <div>
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
@@ -200,27 +203,22 @@ export function CreditPackCheckout({
           </div>
         </div>
 
-        <div className="rounded-lg border border-border bg-background/60 p-4">
-          <div className="mb-4">
+        <div className="mt-6 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
             <p className="text-sm text-muted-foreground">Total</p>
-            <p className="text-3xl font-bold">{formatCreditPackAmount(amountCents)}</p>
+            <p className="text-2xl font-bold">{formatCreditPackAmount(amountCents)}</p>
           </div>
           <Button
             type="button"
-            className="w-full"
+            className="w-full sm:w-auto"
             onClick={handleCheckout}
             disabled={checkoutLoading}
           >
-            {checkoutLoading ? 'Opening checkout...' : 'Buy credits'}
+            {checkoutLoading ? 'Opening checkout...' : 'Continue to Stripe'}
           </Button>
-          {error ? (
-            <p className="mt-3 text-sm text-destructive">{error}</p>
-          ) : (
-            <p className="mt-3 text-xs text-muted-foreground">
-              Secure checkout is handled by Stripe.
-            </p>
-          )}
         </div>
+
+        {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
       </div>
     </section>
   );

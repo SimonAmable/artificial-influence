@@ -842,7 +842,7 @@ export function VideoInputBox({
                 </div>
               </div>
             )}
-            {isReferenceVideoSupported && (inputVideo?.url || chipSlotInfo.referenceVideoChipUrl) && (
+            {!isMotionCopyModel && isReferenceVideoSupported && (inputVideo?.url || chipSlotInfo.referenceVideoChipUrl) && (
               <div className="relative inline-block">
                 <video
                   src={inputVideo?.url ?? chipSlotInfo.referenceVideoChipUrl!}

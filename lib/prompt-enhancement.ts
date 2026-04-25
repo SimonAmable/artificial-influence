@@ -39,9 +39,53 @@ function jsonEnhancementVisionLanguageModel() {
 
 // Prompt constants for different use cases
 const PROMPT_ENHANCEMENT_PROMPTS = {
-  edit: 'Optimize this prompt for editing tasks. Make it short, clear, specific, and actionable:',
-  generate: 'Optimize this prompt for generation tasks. Make it detailed, descriptive, and comprehensive:',
+  edit: {
+    task: 'Rewrite the user input into a stronger image-editing prompt.',
+    style:
+      'Keep it concise, clear, specific, and actionable. Separate what must stay unchanged from what should change when that is implied.',
+  },
+  generate: {
+    task: 'Rewrite the user input into a stronger image-generation prompt.',
+    style:
+      'Make it detailed and descriptive enough for generation, while preserving the original intent and avoiding generic filler.',
+  },
 } as const;
+
+const PROMPT_ENHANCEMENT_SYSTEM = `You are a hidden prompt-enhancement step inside an image generation product.
+
+Output contract:
+- Return ONLY the enhanced prompt text that should be sent directly to the image model.
+- Do not include a title, heading, label, markdown, code fence, quote wrapper, rationale, explanation, checklist, usage tips, or notes.
+- Do not write phrases like "Optimized Prompt", "Enhanced Prompt", "Here is", or "Why this prompt is optimized".
+- Do not describe what you changed.
+- Preserve the user's intent, subject, constraints, named models, exact quoted text that should appear in the image, and reference-image instructions.
+- If the input is already a good prompt, lightly tighten it instead of expanding it into a prompt-writing article.`;
+
+function cleanEnhancedPromptOutput(text: string): string {
+  let out = text.trim();
+
+  const hasPromptArticleMarkers =
+    /optimized prompt|enhanced prompt|improved prompt|why this prompt|usage tips/i.test(out);
+  const fencedMatch = out.match(/```(?:[a-zA-Z0-9_-]+)?\s*([\s\S]*?)```/);
+  if (fencedMatch && (hasPromptArticleMarkers || out.startsWith('```'))) {
+    out = fencedMatch[1].trim();
+  }
+
+  out = out
+    .replace(/^\s{0,3}#{1,6}\s*(?:optimized|enhanced|improved|rewritten)?\s*prompt[^\n]*\n+/i, '')
+    .replace(/^\s*(?:optimized|enhanced|improved|rewritten)\s+prompt\s*:\s*/i, '')
+    .replace(/\n{2,}\s{0,3}#{1,6}\s*(?:why|usage tips|explanation|notes)\b[\s\S]*$/i, '')
+    .trim();
+
+  if (
+    (out.startsWith('"') && out.endsWith('"')) ||
+    (out.startsWith("'") && out.endsWith("'"))
+  ) {
+    out = out.slice(1, -1).trim();
+  }
+
+  return out;
+}
 
 type UseCase = keyof typeof PROMPT_ENHANCEMENT_PROMPTS;
 
@@ -59,10 +103,12 @@ export async function enhancePrompt(
 
   const { text } = await generateText({
     model: enhancementLanguageModel(),
-    prompt: `${enhancementPrompt}\n\n${prompt}`,
+    system: PROMPT_ENHANCEMENT_SYSTEM,
+    prompt: `${enhancementPrompt.task}\n${enhancementPrompt.style}\n\nUser prompt:\n${prompt}`,
+    temperature: 0.35,
   });
 
-  return text;
+  return cleanEnhancedPromptOutput(text);
 }
 
 const AGENT_COMPOSER_INSTRUCTIONS_SYSTEM = `You rewrite user drafts into clearer instructions for a creative AI agent that uses tools (image/video generation, research, etc.).
