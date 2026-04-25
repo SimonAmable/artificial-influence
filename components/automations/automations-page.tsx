@@ -15,7 +15,6 @@ import {
   Pencil,
   Play,
   Plus,
-  RefreshCw,
   Save,
   Star,
   Trash2,
@@ -39,7 +38,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -50,7 +48,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Select,
   SelectContent,
@@ -355,6 +352,8 @@ export function AutomationsPage() {
   const [automations, setAutomations] = React.useState<AutomationApi[]>([])
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   const [newDialogOpen, setNewDialogOpen] = React.useState(false)
+  const [automationDetailsOpen, setAutomationDetailsOpen] = React.useState(false)
+  const [recentRunsOpen, setRecentRunsOpen] = React.useState(false)
   const [runs, setRuns] = React.useState<AutomationRunApi[]>([])
   const [loadingRuns, setLoadingRuns] = React.useState(false)
   const [editDetailsOpen, setEditDetailsOpen] = React.useState(false)
@@ -491,6 +490,9 @@ export function AutomationsPage() {
 
   const goToCommunity = React.useCallback(() => {
     setSelectedId(null)
+    setAutomationDetailsOpen(false)
+    setRecentRunsOpen(false)
+    setNewDialogOpen(false)
     lastHydratedId.current = null
     setCommunityPreviewOpen(false)
     setScope("community")
@@ -498,16 +500,12 @@ export function AutomationsPage() {
 
   const goToMine = React.useCallback(() => {
     setSelectedId(null)
+    setAutomationDetailsOpen(false)
+    setRecentRunsOpen(false)
     lastHydratedId.current = null
     setCommunityPreviewOpen(false)
     setScope("mine")
   }, [])
-
-  React.useEffect(() => {
-    if (scope === "community") {
-      setNewDialogOpen(false)
-    }
-  }, [scope])
 
   const loadRuns = React.useCallback(async (automationId: string) => {
     setLoadingRuns(true)
@@ -532,10 +530,6 @@ export function AutomationsPage() {
     }
   }, [selectedId, loadRuns, isCommunityScope])
   /* eslint-enable react-hooks/set-state-in-effect */
-
-  React.useEffect(() => {
-    setEditDetailsOpen(false)
-  }, [selectedId])
 
   const effectiveCron = React.useMemo(() => {
     if (presetTab === "custom") {
@@ -592,6 +586,8 @@ export function AutomationsPage() {
   const resetFormForNew = React.useCallback(() => {
     lastHydratedId.current = null
     setSelectedId(null)
+    setAutomationDetailsOpen(false)
+    setRecentRunsOpen(false)
     setName("")
     setDescription("")
     setPrompt("")
@@ -614,6 +610,13 @@ export function AutomationsPage() {
     setVariablesDialogOpen(false)
     setNewDialogOpen(true)
   }, [])
+
+  const openCreateAutomation = React.useCallback(() => {
+    if (scope !== "mine") {
+      setScope("mine")
+    }
+    resetFormForNew()
+  }, [resetFormForNew, scope])
 
   const hydrateFromAutomation = React.useCallback((a: AutomationApi) => {
     setName(a.name)
@@ -824,9 +827,11 @@ export function AutomationsPage() {
     needsEditBaselineCaptureRef.current = false
   }, [persistSnapshot, selectedId])
 
+  /* eslint-disable react-hooks/set-state-in-effect -- reset autosave baseline when switching automations */
   React.useEffect(() => {
     setEditBaselineSnapshot("")
   }, [selectedId])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const performAutoSave = React.useCallback(
     async (currentPersistSnapshot: string) => {
@@ -885,7 +890,7 @@ export function AutomationsPage() {
         setDescription(generatedDescription)
         // Update baseline so we don't keep autosaving the same thing
         setEditBaselineSnapshot(currentPersistSnapshot)
-      } catch (e) {
+      } catch {
         setAutoSaveStatus('saved')
       }
     },
@@ -912,11 +917,7 @@ export function AutomationsPage() {
         clearTimeout(autoSaveTimeoutRef.current)
       }
     }
-  }, [persistSnapshot, editBaselineSnapshot, isCommunityScope, selected, newDialogOpen, name, prompt, uploadQueue])
-
-  const isEditHydrationPending = Boolean(
-    selected && selectedId && lastHydratedId.current !== selectedId,
-  )
+  }, [persistSnapshot, editBaselineSnapshot, isCommunityScope, selected, newDialogOpen, name, prompt, uploadQueue, performAutoSave])
 
   const previewTemplatePayload = React.useMemo((): AutomationPromptPayload | null => {
     if (!selected) return null
@@ -1883,7 +1884,7 @@ export function AutomationsPage() {
                 Next run: <strong className="text-foreground">{nextPreview}</strong>
               </span>
             ) : (
-              <span>Pick a schedule to see when it'll run next.</span>
+              <span>Pick a schedule to see when it will run next.</span>
             )}
           </div>
           <span className="inline-flex items-center gap-1">
@@ -1977,76 +1978,110 @@ export function AutomationsPage() {
       !selected ||
       pendingManualForSelected.runId !== selected.preview_run_id)
 
+  const pageTitle = isCommunityScope ? "Community Automations" : "Automations"
+  const pageDescription = isCommunityScope
+    ? "Browse shared workflows from other creators, preview the useful ones, and save a copy when one fits."
+    : "Automate recurring creative work with scheduled chats that keep your content moving."
+
   return (
-    <div className="mx-auto flex min-h-dvh max-w-6xl flex-col gap-4 px-4 pb-12 pt-20 md:flex-row md:gap-6">
-      <aside className="w-full shrink-0 md:w-80">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-lg font-semibold">
-            {scope === "community" ? "Community Automations" : "My Automations"}
-          </h1>
-          <div className="flex flex-wrap justify-start gap-1">
-            <Button variant="outline" size="icon-sm" onClick={() => void loadAutomations()} aria-label="Refresh">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            {scope === "mine" ? (
-              <>
-                <Button variant="outline" size="sm" onClick={goToCommunity}>
-                  <Globe className="mr-1 h-4 w-4" />
-                  View Community
-                </Button>
-                <Button size="sm" onClick={resetFormForNew}>
-                  <Plus className="mr-1 h-4 w-4" />
-                  New
-                </Button>
-              </>
-            ) : (
-              <Button variant="outline" size="sm" onClick={goToMine}>
-                <ArrowLeft className="mr-1 h-4 w-4" />
-                Mine
-              </Button>
-            )}
-          </div>
+    <div className="mx-auto min-h-dvh w-full max-w-[1180px] px-4 pb-12 pt-20">
+      <div className="flex flex-col gap-5 border-b border-border/40 pb-6 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <h1 className="text-2xl font-semibold tracking-tight">{pageTitle}</h1>
+          <p className="text-sm leading-6 text-muted-foreground">{pageDescription}</p>
         </div>
-        <ScrollArea className="mt-4 h-[calc(100dvh-10rem)] pr-2">
-          {loadingList ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : automations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {scope === "community"
-                ? "Nothing shared here yet. Check back soon."
-                : "Nothing on autopilot yet. Hit New to set up a recurring task."}
-            </p>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {isCommunityScope ? (
+            <Button variant="outline" size="sm" onClick={goToMine}>
+              <ArrowLeft className="h-4 w-4" />
+              View Mine
+            </Button>
           ) : (
-            <ul className="space-y-2">
-              {automations.map((a) => (
-                <li key={a.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewDialogOpen(false)
-                      setSelectedId(a.id)
-                    }}
-                    className={cn(
-                      "w-full rounded-xl border px-3 py-3 text-left text-sm transition-colors",
-                      selectedId === a.id
-                        ? "border-primary/40 bg-primary/10"
-                        : "border-border/60 bg-background hover:bg-muted/40",
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="line-clamp-2 font-medium">{a.name}</span>
-                      <div className="flex shrink-0 flex-col items-end gap-0.5">
-                        {scope === "community" ? (
+            <Button variant="outline" size="sm" onClick={goToCommunity}>
+              <Globe className="h-4 w-4" />
+              View Community
+            </Button>
+          )}
+          <Button size="sm" onClick={openCreateAutomation}>
+            <Plus className="h-4 w-4" />
+            Create
+          </Button>
+        </div>
+      </div>
+
+      <main className="pt-8">
+        {loadingList ? (
+          <div className="flex min-h-[260px] items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : automations.length === 0 ? (
+          <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/10 px-6 py-12 text-center">
+            <div className="flex max-w-md flex-col items-center">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-border/60 bg-background">
+                <CalendarClock className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <h2 className="text-lg font-semibold tracking-tight">
+                {isCommunityScope ? "No community automations yet" : "No automations yet"}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {isCommunityScope
+                  ? "Shared workflows will appear here once creators publish reusable automations."
+                  : "Create your first scheduled workflow, or browse community automations for a useful starting point."}
+              </p>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                {isCommunityScope ? (
+                  <Button variant="outline" size="sm" onClick={goToMine}>
+                    <ArrowLeft className="h-4 w-4" />
+                    View Mine
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={goToCommunity}>
+                    <Globe className="h-4 w-4" />
+                    View Community
+                  </Button>
+                )}
+                <Button size="sm" onClick={openCreateAutomation}>
+                  <Plus className="h-4 w-4" />
+                  Create
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {automations.map((a) => (
+              <li key={a.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewDialogOpen(false)
+                    setSelectedId(a.id)
+                    setEditDetailsOpen(false)
+                    setAutomationDetailsOpen(true)
+                    setRecentRunsOpen(false)
+                  }}
+                  className={cn(
+                    "group flex h-full min-h-[156px] w-full flex-col justify-between rounded-2xl border p-4 text-left transition-colors",
+                    selectedId === a.id && automationDetailsOpen
+                      ? "border-primary/40 bg-primary/10"
+                      : "border-border/50 bg-card/45 hover:border-border hover:bg-muted/25",
+                  )}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="line-clamp-2 text-sm font-medium leading-5 text-foreground">
+                        {a.name}
+                      </span>
+                      <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                        {isCommunityScope ? (
                           <>
                             {a.user_id === userId ? (
-                              <Badge variant="default" className="text-[10px]">
+                              <Badge variant="default" className="h-5 rounded-full px-2 text-[10px]">
                                 Yours
                               </Badge>
                             ) : null}
                             {a.hasPreview ? (
-                              <Badge variant="outline" className="text-[10px]">
+                              <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px]">
                                 Preview
                               </Badge>
                             ) : null}
@@ -2054,11 +2089,11 @@ export function AutomationsPage() {
                         ) : (
                           <>
                             {a.is_public === true ? (
-                              <Badge variant="outline" className="text-[10px]">
+                              <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px]">
                                 Public
                               </Badge>
                             ) : null}
-                            <Badge variant={a.is_active ? "default" : "secondary"} className="text-[10px]">
+                            <Badge variant={a.is_active ? "default" : "secondary"} className="h-5 rounded-full px-2 text-[10px]">
                               {a.is_active ? "On" : "Off"}
                             </Badge>
                           </>
@@ -2066,51 +2101,62 @@ export function AutomationsPage() {
                       </div>
                     </div>
                     {a.description?.trim() ? (
-                      <p className="mt-0.5 line-clamp-2 whitespace-pre-line text-xs text-muted-foreground">
+                      <p className="line-clamp-3 whitespace-pre-line text-xs leading-5 text-muted-foreground">
                         {a.description.trim()}
                       </p>
-                    ) : null}
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                      {describeCronHumanSummary(a.cron_schedule)}
-                    </p>
-                    {scope === "mine" && a.last_error ? (
-                      <p className="mt-1 truncate text-xs text-destructive">{a.last_error}</p>
-                    ) : null}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </ScrollArea>
-      </aside>
+                    ) : (
+                      <p className="line-clamp-3 text-xs leading-5 text-muted-foreground">
+                        {describeCronHumanSummary(a.cron_schedule)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-border/35 pt-3 text-xs text-muted-foreground">
+                    <span className="line-clamp-1">{describeCronHumanSummary(a.cron_schedule)}</span>
+                    <Eye className="h-3.5 w-3.5 shrink-0 opacity-45 transition-opacity group-hover:opacity-80" />
+                  </div>
+                  {!isCommunityScope && a.last_error ? (
+                    <p className="mt-2 truncate text-xs text-destructive">{a.last_error}</p>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </main>
 
-      <main className="flex min-w-0 flex-1 flex-col gap-4">
-        {!selectedId || !selected ? (
-          <Card className="border-dashed py-4">
-            <CardHeader>
-              <CardTitle>Pick one or start fresh</CardTitle>
-              <CardDescription>
-                Open an automation from the list to edit it, or hit <strong>New</strong> to set up a task
-                that runs on its own: daily ideas, weekly reports, hourly scans, whatever you need.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        ) : (
-          <>
-            <Card className="py-4">
-            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4 space-y-0">
+      <Dialog
+        open={Boolean(selected && automationDetailsOpen)}
+        onOpenChange={(open) => {
+          setAutomationDetailsOpen(open)
+          if (!open) {
+            setRecentRunsOpen(false)
+            setVariablesDialogOpen(false)
+          }
+        }}
+      >
+        {selected ? (
+          <DialogContent className="max-h-[min(92dvh,920px)] overflow-y-auto sm:max-w-5xl">
+            <DialogHeader className="sr-only">
+              <DialogTitle>{selected.name}</DialogTitle>
+              <DialogDescription>
+                Review, edit, run, or inspect this automation.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-border/50 bg-card/70 p-4 sm:p-5">
+            <div className="flex flex-row flex-wrap items-start justify-between gap-4">
               <div>
-                <CardTitle>{selected.name}</CardTitle>
+                <h2 className="text-lg font-semibold">{selected.name}</h2>
                 {selected.description?.trim() ? (
                   <p className="mt-1 whitespace-pre-line text-sm leading-snug text-muted-foreground">
                     {selected.description.trim()}
                   </p>
                 ) : null}
                 <div className="my-3 border-t border-border/40" />
-                <CardDescription>
+                <p className="text-sm text-muted-foreground">
                   Runs on its own, on the schedule you pick. Each run becomes a chat you can open to see
                   the results, tweak the prompt, or run it again right away.
-                </CardDescription>
+                </p>
                 {isCommunityScope ? (
                   <p className="mt-2 text-xs text-muted-foreground">
                     {selected.hasPreview
@@ -2311,8 +2357,8 @@ export function AutomationsPage() {
                   </>
                 )}
               </div>
-            </CardHeader>
-            <CardContent className="pt-0">
+            </div>
+            <div className="pt-4">
               <CollapsiblePrimitive.Root open={editDetailsOpen} onOpenChange={setEditDetailsOpen}>
                 <CollapsiblePrimitive.Content
                   className={cn(
@@ -2413,15 +2459,29 @@ export function AutomationsPage() {
                   </div>
                 </CollapsiblePrimitive.Content>
               </CollapsiblePrimitive.Root>
-            </CardContent>
-            </Card>
+            </div>
+              </div>
 
             {!isCommunityScope ? (
-              <Card className="py-4">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Recent runs</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
+              <CollapsiblePrimitive.Root open={recentRunsOpen} onOpenChange={setRecentRunsOpen}>
+                <div className="rounded-2xl border border-border/50 bg-background/70">
+                  <CollapsiblePrimitive.Trigger asChild>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium sm:px-5"
+                    >
+                      <span>Recent runs</span>
+                      <ChevronDown
+                        className={cn("h-4 w-4 text-muted-foreground transition-transform", recentRunsOpen && "rotate-180")}
+                      />
+                    </button>
+                  </CollapsiblePrimitive.Trigger>
+                  <CollapsiblePrimitive.Content
+                    className={cn(
+                      "overflow-hidden border-t border-border/40 px-4 py-4 text-sm transition-all sm:px-5",
+                      "data-[state=closed]:hidden",
+                    )}
+                  >
                   {loadingRuns ? (
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   ) : runs.length === 0 ? (
@@ -2519,12 +2579,14 @@ export function AutomationsPage() {
                       })}
                     </ul>
                   )}
-                </CardContent>
-              </Card>
+                  </CollapsiblePrimitive.Content>
+                </div>
+              </CollapsiblePrimitive.Root>
             ) : null}
-          </>
-        )}
-      </main>
+            </div>
+          </DialogContent>
+        ) : null}
+      </Dialog>
 
       <Dialog
         open={newDialogOpen}
@@ -2540,7 +2602,7 @@ export function AutomationsPage() {
           <DialogHeader className="sr-only">
             <DialogTitle>New automation</DialogTitle>
             <DialogDescription>
-              Set up a task once and it'll run on its own. Every run becomes a chat you can open to
+              Set up a task once and it will run on its own. Every run becomes a chat you can open to
               review the results or take them further.
             </DialogDescription>
           </DialogHeader>
@@ -2598,7 +2660,7 @@ export function AutomationsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this automation?</AlertDialogTitle>
-            <AlertDialogDescription>It'll stop running from now on. You can't undo this.</AlertDialogDescription>
+            <AlertDialogDescription>It will stop running from now on. You cannot undo this.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
