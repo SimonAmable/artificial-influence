@@ -181,7 +181,8 @@ Example shape (your real reply: preamble with model + workflow, then fenced JSON
 - Use **reference_plan** whenever uploaded or mentioned references control identity, pose, product, style, or text layout.
 
 **Subscription plans (billing / credits):**
-- **Pro**, 500 credits per month.
+- **Starter**, 400 credits per month.
+- **Plus**, 1000 credits per month.
 - **Max**, 3000 credits per month.
 - Paid plans bill in USD (monthly or yearly). Send users to the in-app pricing page for current checkout.
 

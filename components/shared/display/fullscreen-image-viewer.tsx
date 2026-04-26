@@ -4,7 +4,7 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { X, DownloadSimple, Copy, Trash, Plus, Check, CalendarBlank, ImageSquare } from "@phosphor-icons/react"
+import { X, DownloadSimple, Copy, Trash, Plus, Check, CalendarBlank, ImageSquare, ShieldCheck } from "@phosphor-icons/react"
 
 export type ImageViewerMetadata = {
   id?: string
@@ -30,8 +30,10 @@ interface FullscreenImageViewerProps {
   onCopy: (imageUrl: string) => void
   onDelete?: (id: string, imageUrl: string) => void
   onSaveToAssets?: (imageUrl: string) => void
+  onRemoveMetadata?: (imageUrl: string) => void
   copiedImageUrl?: string | null
   deletingImageId?: string | null
+  removingMetadataImageUrl?: string | null
 }
 
 // Normalize model names by removing prefix before slash, replacing dashes with spaces, and capitalizing
@@ -104,8 +106,10 @@ export function FullscreenImageViewer({
   onCopy,
   onDelete,
   onSaveToAssets,
+  onRemoveMetadata,
   copiedImageUrl,
   deletingImageId,
+  removingMetadataImageUrl,
 }: FullscreenImageViewerProps) {
   // activeRefIndex: null = main image, 0..n = reference image index
   const [activeRefIndex, setActiveRefIndex] = React.useState<number | null>(null)
@@ -120,6 +124,7 @@ export function FullscreenImageViewer({
 
   const canDelete = Boolean(currentMetadata.id && onDelete)
   const canSaveToAssets = Boolean(onSaveToAssets)
+  const canRemoveMetadata = Boolean(onRemoveMetadata)
 
   return (
     <div
@@ -323,6 +328,23 @@ export function FullscreenImageViewer({
                 >
                   <Plus className="size-4" />
                   Save to Assets
+                </Button>
+              )}
+
+              {canRemoveMetadata && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 w-full justify-start gap-2"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onRemoveMetadata?.(currentImageUrl)
+                  }}
+                  disabled={removingMetadataImageUrl === currentImageUrl}
+                >
+                  <ShieldCheck className="size-4" />
+                  {removingMetadataImageUrl === currentImageUrl ? "Cleaning..." : "Remove Metadata"}
                 </Button>
               )}
 

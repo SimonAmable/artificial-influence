@@ -24,6 +24,8 @@ export function getSitemapEntries(): Array<{
     { path: "/inpaint", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
     { path: "/pricing", lastModified: DEFAULT_LAST, changeFrequency: "monthly", priority: 0.8 },
     { path: "/autopost", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
+    { path: "/free-tools", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
+    { path: "/free-tools/metadata-remover", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
     {
       path: "/canvases",
       lastModified: new Date(canvasesLanding.lastUpdated),

@@ -18,6 +18,7 @@ import {
   SquaresFour,
   ChatCircleDots,
   Robot,
+  ShieldCheck,
   Users,
 } from "@phosphor-icons/react"
 
@@ -34,6 +35,7 @@ const toolIconMap: Record<DashboardToolIcon, typeof ImageIcon> = {
   "squares-four": SquaresFour,
   "chat-circle-dots": ChatCircleDots,
   robot: Robot,
+  "shield-check": ShieldCheck,
 }
 
 export function FeatureButtonGrid() {

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
-import { ArrowsOutSimple, Copy, DownloadSimple, Check, X, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple } from "@phosphor-icons/react"
+import { ArrowsOutSimple, Copy, DownloadSimple, Check, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple, ShieldCheck } from "@phosphor-icons/react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { FullscreenImageViewer } from "./fullscreen-image-viewer"
+import { FullscreenMediaViewer, type FullscreenMediaViewerAction } from "./fullscreen-media-viewer"
+import { copyMediaToClipboard, downloadMediaFile } from "./media-viewer-utils"
 import { toast } from "sonner"
 
 interface ImageData {
@@ -45,7 +46,9 @@ interface ImageGridProps {
   onRecreate?: (image: ImageData) => void
   onCreateAsset?: (imageUrl: string, index: number) => void
   onUpscale?: (imageUrl: string, index: number) => void
+  onRemoveMetadata?: (imageUrl: string, index: number) => void
   upscalingImageUrl?: string | null
+  removingMetadataImageUrl?: string | null
   onDelete?: (id: string, imageUrl: string, index: number) => void
   basicActionsOnly?: boolean
   /** Initial column count for the layout slider (default 2). */
@@ -83,7 +86,9 @@ export function ImageGrid({
   onRecreate,
   onCreateAsset,
   onUpscale,
+  onRemoveMetadata,
   upscalingImageUrl = null,
+  removingMetadataImageUrl = null,
   onDelete,
   basicActionsOnly = false,
   initialColumnCount = 2,
@@ -132,69 +137,21 @@ export function ImageGrid({
   )
 
   const handleDownload = React.useCallback(async (imageUrl: string) => {
-    try {
-      const response = await fetch(imageUrl)
-      if (!response.ok) {
-        throw new Error("Failed to fetch image for download")
-      }
-
-      const blob = await response.blob()
-      const blobUrl = window.URL.createObjectURL(blob)
-      const extension = blob.type.split("/")[1] || "png"
-      const anchor = document.createElement("a")
-      anchor.href = blobUrl
-      anchor.download = `generated-image-${Date.now()}.${extension}`
-      document.body.appendChild(anchor)
-      anchor.click()
-      document.body.removeChild(anchor)
-      window.URL.revokeObjectURL(blobUrl)
-    } catch {
-      const anchor = document.createElement("a")
-      anchor.href = imageUrl
-      anchor.download = `generated-image-${Date.now()}.png`
-      document.body.appendChild(anchor)
-      anchor.click()
-      document.body.removeChild(anchor)
-    }
+    await downloadMediaFile({ url: imageUrl, kind: "image" })
   }, [])
 
   const handleCopy = React.useCallback(async (imageUrl: string) => {
     try {
-      const response = await fetch(imageUrl)
-      if (!response.ok) {
-        throw new Error("Failed to fetch image for clipboard copy")
-      }
-
-      const blob = await response.blob()
-      const canWriteImage =
-        typeof navigator !== "undefined" &&
-        !!navigator.clipboard &&
-        typeof ClipboardItem !== "undefined" &&
-        blob.type.startsWith("image/")
-
-      if (canWriteImage) {
-        await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
+      const result = await copyMediaToClipboard({ url: imageUrl, kind: "image" })
+      if (result === "media") {
         toast.success("Image copied to clipboard")
       } else {
-        await navigator.clipboard.writeText(imageUrl)
         toast.success("Image URL copied to clipboard")
       }
-
       setCopiedImageUrl(imageUrl)
       window.setTimeout(() => setCopiedImageUrl(null), 1500)
     } catch {
-      if (navigator?.clipboard) {
-        try {
-          await navigator.clipboard.writeText(imageUrl)
-          toast.success("Image URL copied to clipboard")
-          setCopiedImageUrl(imageUrl)
-          window.setTimeout(() => setCopiedImageUrl(null), 1500)
-        } catch {
-          toast.error("Failed to copy image")
-        }
-      } else {
-        toast.error("Clipboard not available")
-      }
+      toast.error("Failed to copy image")
     }
   }, [])
 
@@ -506,6 +463,19 @@ export function ImageGrid({
                         </>
                       )}
                     </DropdownMenuItem>
+                    {onRemoveMetadata && (
+                      <DropdownMenuItem
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onRemoveMetadata(item.data.url, index)
+                        }}
+                        className="cursor-pointer"
+                        disabled={removingMetadataImageUrl === item.data.url}
+                      >
+                        <ShieldCheck className="mr-2 size-4" />
+                        {removingMetadataImageUrl === item.data.url ? "Cleaning..." : "Remove Metadata"}
+                      </DropdownMenuItem>
+                    )}
                     {!basicActionsOnly && item.data.id && onDelete && (
                       <>
                         <DropdownMenuSeparator />
@@ -642,6 +612,22 @@ export function ImageGrid({
                       )}
                     </Button>
                   )}
+                  {onRemoveMetadata && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={removingMetadataImageUrl === item.data.url}
+                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onRemoveMetadata(item.data.url, index)
+                      }}
+                    >
+                      <ShieldCheck className="mr-1 size-3" />
+                      {removingMetadataImageUrl === item.data.url ? "Cleaning..." : "Clean"}
+                    </Button>
+                  )}
                 </div>
                 
                 {/* Mobile - column of actions (below sm) */}
@@ -726,6 +712,22 @@ export function ImageGrid({
                           </DropdownMenuItem>
                         </>
                       )}
+                      {onRemoveMetadata && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              onRemoveMetadata(item.data.url, index)
+                            }}
+                            className="cursor-pointer"
+                            disabled={removingMetadataImageUrl === item.data.url}
+                          >
+                            <ShieldCheck className="mr-2 size-4" />
+                            {removingMetadataImageUrl === item.data.url ? "Cleaning..." : "Remove Metadata"}
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -738,8 +740,9 @@ export function ImageGrid({
       </div>
 
       {fullscreenImage && (
-        <FullscreenImageViewer
-          imageUrl={fullscreenImage.url}
+        <FullscreenMediaViewer
+          kind="image"
+          url={fullscreenImage.url}
           metadata={{
             id: fullscreenImage.id,
             model: fullscreenImage.model ?? null,
@@ -751,23 +754,62 @@ export function ImageGrid({
           }}
           referenceImages={(fullscreenImage.referenceImageUrls ?? []).map((imageUrl) => ({ imageUrl }))}
           onClose={() => setFullscreenImage(null)}
-          onDownload={handleDownload}
-          onCopy={handleCopy}
-          onDelete={onDelete ? (id, url) => {
-            const imageIndex = normalizedImages.findIndex(img => img.id === id)
-            if (imageIndex !== -1) {
-              handleDelete(id, url, imageIndex)
-              setFullscreenImage(null)
+          copiedUrl={copiedImageUrl}
+          actions={({ url, metadata }): FullscreenMediaViewerAction[] => {
+            const imageIndexByUrl = normalizedImages.findIndex((img) => img.url === url)
+            const actions: FullscreenMediaViewerAction[] = [
+              {
+                id: "download",
+                label: "Download",
+                icon: <DownloadSimple className="size-4" />,
+                onClick: () => void handleDownload(url),
+              },
+              {
+                id: "copy",
+                label: "Copy",
+                icon: <Copy className="size-4" />,
+                onClick: () => void handleCopy(url),
+              },
+            ]
+
+            if (onCreateAsset && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "save-to-assets",
+                label: "Save to Assets",
+                icon: <Plus className="size-4" />,
+                onClick: () => onCreateAsset(url, imageIndexByUrl),
+              })
             }
-          } : undefined}
-          onSaveToAssets={onCreateAsset ? (url) => {
-            const imageIndex = normalizedImages.findIndex(img => img.url === url)
-            if (imageIndex !== -1) {
-              onCreateAsset(url, imageIndex)
+
+            if (onRemoveMetadata && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "remove-metadata",
+                label: removingMetadataImageUrl === url ? "Cleaning..." : "Remove Metadata",
+                icon: <ShieldCheck className="size-4" />,
+                disabled: removingMetadataImageUrl === url,
+                onClick: () => onRemoveMetadata(url, imageIndexByUrl),
+              })
             }
-          } : undefined}
-          copiedImageUrl={copiedImageUrl}
-          deletingImageId={deletingImageId}
+
+            if (onDelete && metadata.id) {
+              const imageIndexById = normalizedImages.findIndex((img) => img.id === metadata.id)
+              if (imageIndexById !== -1) {
+                actions.push({
+                  id: "delete",
+                  label: deletingImageId === metadata.id ? "Deleting..." : "Delete",
+                  icon: <Trash className="size-4" />,
+                  destructive: true,
+                  disabled: deletingImageId === metadata.id,
+                  onClick: () => {
+                    void handleDelete(metadata.id!, url, imageIndexById)
+                    setFullscreenImage(null)
+                  },
+                })
+              }
+            }
+
+            return actions
+          }}
         />
       )}
     </div>

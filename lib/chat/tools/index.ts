@@ -26,6 +26,12 @@ import { createListThreadMediaTool } from "@/lib/chat/tools/list-thread-media"
 import { createScheduleGenerationFollowUpTool } from "@/lib/chat/tools/schedule-generation-follow-up"
 import { createListAutomationsTool } from "@/lib/chat/tools/list-automations"
 import { createManageAutomationTool } from "@/lib/chat/tools/manage-automation"
+import {
+  createCapturePageScreenshotTool,
+  createReadWebPageTool,
+  createSearchWebImagesTool,
+  createSearchWebTool,
+} from "@/lib/chat/tools/web-research"
 import type { AttachedRef } from "@/lib/commands/types"
 
 interface CreateCreativeChatToolsOptions {
@@ -141,6 +147,14 @@ export function createCreativeChatTools({
     }),
     saveGenerationAsAsset: createSaveGenerationAsAssetTool({
       supabase,
+      userId,
+    }),
+    searchWeb: createSearchWebTool(),
+    readWebPage: createReadWebPageTool(),
+    searchWebImages: createSearchWebImagesTool(),
+    capturePageScreenshot: createCapturePageScreenshotTool({
+      supabase,
+      threadId,
       userId,
     }),
     searchAssets: createSearchAssetsTool({

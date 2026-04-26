@@ -24,6 +24,7 @@ import {
   PaperPlaneTilt,
   PencilSimple,
   Robot as RobotIcon,
+  ShieldCheck,
   SquaresFour,
   Users,
   ArrowsLeftRight,
@@ -64,6 +65,7 @@ const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
   microphone: MicrophoneIcon,
   "chat-circle-dots": ChatCircleDots,
   robot: RobotIcon,
+  "shield-check": ShieldCheck,
 }
 
 const MOBILE_NAV_ICON_MAP: Record<string, typeof ImageIcon> = {
@@ -84,6 +86,7 @@ const MOBILE_NAV_ICON_MAP: Record<string, typeof ImageIcon> = {
   "/autopost": PaperPlaneTilt,
   "/history": ClockCounterClockwise,
   "/assets": FolderSimple,
+  "/free-tools": ShieldCheck,
   "/pricing": CurrencyDollar,
   "/pricing-test": CurrencyDollar,
 }
@@ -134,7 +137,7 @@ function MenuBadge({ badge }: { badge: MegaNavBadge }) {
 }
 
 function isGroupActive(pathname: string, group: MegaNavGroup) {
-  if (group.path) return pathname === group.path
+  if (group.path && pathname === group.path) return true
   const items = [
     ...(group.simpleItems ?? []),
     ...((group.sections ?? []).flatMap((section) => section.items)),

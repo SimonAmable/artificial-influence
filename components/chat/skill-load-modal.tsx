@@ -137,8 +137,8 @@ export function SkillLoadModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[min(90dvh,32rem)] flex-col gap-0 p-0 sm:max-w-md">
-          <DialogHeader className="border-b border-border/60 px-6 py-4 text-left">
+        <DialogContent className="flex h-[min(90dvh,44rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl lg:max-w-3xl">
+          <DialogHeader className="border-b border-border/60 px-4 py-4 text-left sm:px-6">
             <DialogTitle className="flex items-center gap-2">
               <Books className="size-5 shrink-0 opacity-80" weight="duotone" />
               Load a skill
@@ -149,7 +149,7 @@ export function SkillLoadModal({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-3 px-6 pb-2 pt-3">
+          <div className="flex flex-col gap-3 px-4 pb-2 pt-3 sm:px-6">
             <Input
               placeholder="Search by name or slug..."
               value={query}
@@ -159,7 +159,7 @@ export function SkillLoadModal({
             />
           </div>
 
-          <ScrollArea className="min-h-0 flex-1 px-6">
+          <ScrollArea className="min-h-0 flex-1 px-4 sm:px-6">
             <div className="flex flex-col gap-2 pb-4 pr-3">
               {loading ? (
                 <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
@@ -174,7 +174,7 @@ export function SkillLoadModal({
                 filtered.map((skill) => (
                   <div
                     key={skill.slug}
-                    className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/10 p-3 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/10 p-3 md:flex-row md:items-center md:justify-between"
                   >
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -193,7 +193,7 @@ export function SkillLoadModal({
                       <p className="line-clamp-2 text-xs text-muted-foreground">{skill.description}</p>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-2 self-start sm:self-center">
+                    <div className="flex shrink-0 items-center gap-2 self-start md:self-center">
                       {skill.isMine ? (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

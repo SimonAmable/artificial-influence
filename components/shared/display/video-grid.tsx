@@ -3,9 +3,11 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
-import { ArrowsOutSimple, DownloadSimple, FilmStrip, Plus } from "@phosphor-icons/react"
+import { ArrowsOutSimple, Copy, DownloadSimple, FilmStrip, Plus } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
+import { FullscreenMediaViewer, type FullscreenMediaViewerAction } from "./fullscreen-media-viewer"
+import { copyMediaToClipboard, downloadMediaFile } from "./media-viewer-utils"
 
 /** Row shape for completed videos (API + optimistic). */
 export interface VideoHistoryItem {
@@ -70,79 +72,21 @@ function useFinePointerHoverDevice() {
   return React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 }
 
-async function downloadVideoFile(videoUrl: string) {
-  try {
-    const response = await fetch(videoUrl)
-    if (!response.ok) {
-      throw new Error("Failed to fetch video for download")
-    }
-    const blob = await response.blob()
-    const blobUrl = window.URL.createObjectURL(blob)
-    const ext =
-      blob.type.includes("webm") ? "webm" : blob.type.includes("quicktime") ? "mov" : "mp4"
-    const anchor = document.createElement("a")
-    anchor.href = blobUrl
-    anchor.download = `generated-video-${Date.now()}.${ext}`
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
-    window.URL.revokeObjectURL(blobUrl)
-  } catch {
-    const anchor = document.createElement("a")
-    anchor.href = videoUrl
-    anchor.download = `generated-video-${Date.now()}.mp4`
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
-  }
-}
-
-function tryEnterVideoFullscreen(video: HTMLVideoElement) {
-  const v = video as HTMLVideoElement & {
-    webkitRequestFullscreen?: () => void
-    webkitEnterFullscreen?: () => void
-  }
-  const fallbackWebKit = () => {
-    if (typeof v.webkitEnterFullscreen === "function") {
-      v.webkitEnterFullscreen()
-      return true
-    }
-    if (typeof v.webkitRequestFullscreen === "function") {
-      v.webkitRequestFullscreen()
-      return true
-    }
-    return false
-  }
-  const run = async () => {
-    if (typeof video.requestFullscreen === "function") {
-      await video.requestFullscreen()
-      return
-    }
-    if (!fallbackWebKit()) {
-      toast.error("Fullscreen not supported in this browser")
-    }
-  }
-  void run().catch(() => {
-    if (!fallbackWebKit()) {
-      toast.error("Could not enter fullscreen")
-    }
-  })
-}
-
 function VideoHistoryTile({
   item,
   index,
   showNativeControlsOnHoverOnly,
+  onViewFullscreen,
   onUseVideoAsReference,
   onSaveVideoAsAsset,
 }: {
   item: VideoHistoryItem
   index: number
   showNativeControlsOnHoverOnly: boolean
+  onViewFullscreen: (item: VideoHistoryItem, index: number) => void
   onUseVideoAsReference?: (videoUrl: string, index: number) => void
   onSaveVideoAsAsset?: (videoUrl: string, index: number) => void
 }) {
-  const videoRef = React.useRef<HTMLVideoElement>(null)
   const [hovered, setHovered] = React.useState(false)
   const [clientReady, setClientReady] = React.useState(false)
   const finePointer = useFinePointerHoverDevice()
@@ -165,7 +109,6 @@ function VideoHistoryTile({
     >
       <div className="absolute inset-0 z-0 overflow-hidden">
         <video
-          ref={videoRef}
           src={item.url}
           controls={nativeControlsVisible}
           className="block h-full w-full object-contain"
@@ -188,8 +131,7 @@ function VideoHistoryTile({
           className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
           onClick={(event) => {
             event.stopPropagation()
-            const v = videoRef.current
-            if (v) tryEnterVideoFullscreen(v)
+            onViewFullscreen(item, index)
           }}
           aria-label="Fullscreen"
         >
@@ -217,7 +159,7 @@ function VideoHistoryTile({
           className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
           onClick={(event) => {
             event.stopPropagation()
-            void downloadVideoFile(item.url)
+            void downloadMediaFile({ url: item.url, kind: "video" })
           }}
           aria-label="Download video"
         >
@@ -273,6 +215,11 @@ export function VideoGrid({
   onSaveVideoAsAsset,
 }: VideoGridProps) {
   const [columnCount, setColumnCount] = React.useState(3)
+  const [fullscreenVideo, setFullscreenVideo] = React.useState<{
+    item: VideoHistoryItem
+    index: number
+  } | null>(null)
+  const [copiedVideoUrl, setCopiedVideoUrl] = React.useState<string | null>(null)
 
   const items = React.useMemo((): VideoGridItem[] => {
     if (itemsProp !== undefined) {
@@ -313,6 +260,17 @@ export function VideoGrid({
     }[columnCount] || "gap-1.5 sm:gap-2 md:gap-3"
 
   const showSkeletonOnly = isLoadingSkeleton && items.length === 0
+
+  const handleCopyVideo = React.useCallback(async (videoUrl: string) => {
+    try {
+      await copyMediaToClipboard({ url: videoUrl, kind: "video" })
+      toast.success("Video URL copied to clipboard")
+      setCopiedVideoUrl(videoUrl)
+      window.setTimeout(() => setCopiedVideoUrl(null), 1500)
+    } catch {
+      toast.error("Failed to copy video URL")
+    }
+  }, [])
 
   return (
     <div className={cn("w-full h-full flex flex-col py-0", className)}>
@@ -373,6 +331,9 @@ export function VideoGrid({
                     item={item.data}
                     index={index}
                     showNativeControlsOnHoverOnly={showNativeControlsOnHoverOnly}
+                    onViewFullscreen={(video, videoIndex) =>
+                      setFullscreenVideo({ item: video, index: videoIndex })
+                    }
                     onUseVideoAsReference={onUseVideoAsReference}
                     onSaveVideoAsAsset={onSaveVideoAsAsset}
                   />
@@ -381,6 +342,59 @@ export function VideoGrid({
             )}
         </div>
       </div>
+
+      {fullscreenVideo && (
+        <FullscreenMediaViewer
+          kind="video"
+          url={fullscreenVideo.item.url}
+          metadata={{
+            id: fullscreenVideo.item.id,
+            model: fullscreenVideo.item.model ?? null,
+            prompt: fullscreenVideo.item.prompt ?? null,
+            tool: fullscreenVideo.item.tool ?? null,
+            type: "video",
+            createdAt: fullscreenVideo.item.createdAt ?? null,
+          }}
+          copiedUrl={copiedVideoUrl}
+          onClose={() => setFullscreenVideo(null)}
+          actions={({ url }): FullscreenMediaViewerAction[] => {
+            const actions: FullscreenMediaViewerAction[] = [
+              {
+                id: "download",
+                label: "Download",
+                icon: <DownloadSimple className="size-4" />,
+                onClick: () => void downloadMediaFile({ url, kind: "video" }),
+              },
+              {
+                id: "copy",
+                label: "Copy URL",
+                icon: <Copy className="size-4" />,
+                onClick: () => void handleCopyVideo(url),
+              },
+            ]
+
+            if (onSaveVideoAsAsset) {
+              actions.push({
+                id: "save-to-assets",
+                label: "Save to Assets",
+                icon: <Plus className="size-4" weight="bold" />,
+                onClick: () => onSaveVideoAsAsset(url, fullscreenVideo.index),
+              })
+            }
+
+            if (onUseVideoAsReference) {
+              actions.push({
+                id: "use-as-reference",
+                label: "Use as Reference",
+                icon: <FilmStrip className="size-4" />,
+                onClick: () => onUseVideoAsReference(url, fullscreenVideo.index),
+              })
+            }
+
+            return actions
+          }}
+        />
+      )}
     </div>
   )
 }

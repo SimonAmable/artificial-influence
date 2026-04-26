@@ -27,6 +27,7 @@ export type MegaNavPhosphorIcon =
   | "microphone"
   | "chat-circle-dots"
   | "robot"
+  | "shield-check"
 
 export interface MegaNavItem {
   path: string
@@ -67,6 +68,7 @@ export type DashboardToolIcon =
   | "squares-four"
   | "chat-circle-dots"
   | "robot"
+  | "shield-check"
 
 export interface DashboardToolNavItem {
   label: string
@@ -93,6 +95,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/autopost", label: "Autopost" },
   { path: "/history", label: "History" },
   { path: "/assets", label: "Assets" },
+  { path: "/free-tools", label: "Free Tools" },
   { path: "/pricing-test", label: "Pricing (Test)", devOnly: true },
   { path: "/pricing", label: "Pricing" },
 ]
@@ -177,6 +180,13 @@ export const megaNavGroups: MegaNavGroup[] = [
             label: "Image Editing",
             description: "Select area and edit",
             iconPhosphor: "paint-brush",
+          },
+          {
+            path: "/free-tools/metadata-remover",
+            label: "Metadata Remover",
+            description: "Remove metadata from AI images locally",
+            badge: "new",
+            iconPhosphor: "shield-check",
           },
         ],
       },
@@ -316,6 +326,25 @@ export const megaNavGroups: MegaNavGroup[] = [
     ],
   },
   { label: "Canvas", path: "/canvases" },
+  {
+    label: "Free Tools",
+    path: "/free-tools",
+    simpleItems: [
+      {
+        path: "/free-tools",
+        label: "Free Tools",
+        description: "Browse free browser-based creator utilities",
+        iconPhosphor: "shield-check",
+      },
+      {
+        path: "/free-tools/metadata-remover",
+        label: "Metadata Remover",
+        description: "Clean AI image metadata in your browser",
+        badge: "new",
+        iconPhosphor: "shield-check",
+      },
+    ],
+  },
   { label: "Apps", path: "/apps", badge: "new" },
   { label: "Autopost", path: "/autopost", badge: "new" },
   { label: "Automations", path: "/automations", badge: "beta" },
@@ -357,6 +386,7 @@ export function getFooterMegaNavColumns(): {
   const imageGroup = megaNavGroups.find((g) => g.label === "Image")
   const videoGroup = megaNavGroups.find((g) => g.label === "Video")
   const assetsGroup = megaNavGroups.find((g) => g.label === "Assets")
+  const freeToolsGroup = megaNavGroups.find((g) => g.label === "Free Tools")
 
   const imageTools = toLinks(
     imageGroup?.sections?.find((s) => s.title === "Features")?.items ?? [],
@@ -376,6 +406,9 @@ export function getFooterMegaNavColumns(): {
     for (const item of assetsGroup.simpleItems) {
       otherTools.push({ path: item.path, label: item.label })
     }
+  }
+  if (freeToolsGroup?.path) {
+    otherTools.push({ path: freeToolsGroup.path, label: freeToolsGroup.label })
   }
   for (const g of megaNavGroups) {
     if (g.path && !g.sections?.length && !g.simpleItems?.length) {

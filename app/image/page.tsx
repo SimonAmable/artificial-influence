@@ -33,6 +33,7 @@ import {
   getImageAssetUrlsFromRefChips,
   hasVideoOrAudioAssetRefs,
 } from "@/lib/commands/ref-image-pipeline"
+import { stripImageMetadataAndDownload } from "@/lib/images/strip-metadata"
 
 interface ImageHistoryItem {
   id?: string
@@ -201,6 +202,7 @@ function ImagePageContent() {
 
   // Upscale: which image is currently upscaling (by URL)
   const [upscalingImageUrl, setUpscalingImageUrl] = React.useState<string | null>(null)
+  const [removingMetadataImageUrl, setRemovingMetadataImageUrl] = React.useState<string | null>(null)
 
   // Set default model when models load (prefer Nano Banana 2)
   React.useEffect(() => {
@@ -705,6 +707,21 @@ function ImagePageContent() {
     }
   }, [])
 
+  const handleRemoveMetadata = React.useCallback(async (imageUrl: string, _index: number) => {
+    setRemovingMetadataImageUrl(imageUrl)
+    try {
+      await stripImageMetadataAndDownload(imageUrl)
+      toast.success("Metadata removed", {
+        description: "Clean image downloaded.",
+      })
+    } catch (err) {
+      console.error("Metadata removal error:", err)
+      toast.error(err instanceof Error ? err.message : "Could not remove metadata")
+    } finally {
+      setRemovingMetadataImageUrl(null)
+    }
+  }, [])
+
   // Grid order: generating (at front) → filled (newest) → older
   // Grid order: pending requests (newest first) followed by completed history.
   const gridItems = React.useMemo(() => {
@@ -739,7 +756,9 @@ function ImagePageContent() {
           onRecreate={handleRecreate}
           onCreateAsset={handleCreateAsset}
           onUpscale={handleUpscale}
+          onRemoveMetadata={handleRemoveMetadata}
           upscalingImageUrl={upscalingImageUrl}
+          removingMetadataImageUrl={removingMetadataImageUrl}
         />
       )
     }

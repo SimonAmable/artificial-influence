@@ -9,7 +9,7 @@ import {
 import { createClient } from "@/lib/supabase/server"
 
 type RouteContext = {
-  params: Promise<{ slug: string }> | { slug: string }
+  params: Promise<{ slug: string }>
 }
 
 function normalizeTitle(value: unknown) {
@@ -38,7 +38,7 @@ function mapEditableSkill(row: { slug: string; skill_document: string; title: st
 
 export async function GET(_request: Request, context: RouteContext) {
   try {
-    const { slug } = await Promise.resolve(context.params)
+    const { slug } = await context.params
 
     if (!isValidSkillSlug(slug)) {
       return NextResponse.json({ error: "Invalid skill slug." }, { status: 400 })
@@ -79,7 +79,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const { slug } = await Promise.resolve(context.params)
+    const { slug } = await context.params
 
     if (!isValidSkillSlug(slug)) {
       return NextResponse.json({ error: "Invalid skill slug." }, { status: 400 })

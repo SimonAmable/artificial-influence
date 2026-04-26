@@ -1,12 +1,12 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getStoredAffiliateRef } from '@/hooks/use-affiliate-ref';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Sparkle, Info } from '@phosphor-icons/react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { CreditPackCheckout } from '@/components/credits/credit-pack-checkout';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,6 @@ type PricingPlan = {
   credits: number;
   features: { name: string; info: string }[];
   popular?: boolean;
-  savings?: string;
   priceNote?: string;
 };
 
@@ -53,17 +52,17 @@ const cardFade = {
   visible: { opacity: 1, y: 0 },
 };
 
-// Stripe live Price IDs, Pro / Max only
+// Stripe live Price IDs, Starter / Plus / Max
 const monthlyPlans: PricingPlan[] = [
   {
-    id: 'pro-monthly',
-    name: 'Pro',
-    description: 'For professional users',
+    id: 'starter-monthly',
+    name: 'Starter',
+    description: 'For getting started',
     price: 20.0,
-    priceId: 'price_1SrWl8GYRyfMJZ0CeXU9f7LE',
+    priceId: 'price_1TQK3qGYRyfMJZ0CFGGqUXJ8',
     interval: 'month' as const,
     currency: 'USD' as const,
-    credits: 500,
+    credits: 400,
     features: [
       {
         name: 'Access to all AI models',
@@ -97,11 +96,51 @@ const monthlyPlans: PricingPlan[] = [
     popular: true,
   },
   {
+    id: 'plus-monthly',
+    name: 'Plus',
+    description: 'For growing creators',
+    price: 39.0,
+    priceId: 'price_1TQIqwGYRyfMJZ0CivzObR67',
+    interval: 'month' as const,
+    currency: 'USD' as const,
+    credits: 1000,
+    features: [
+      {
+        name: 'Access to all AI models',
+        info: ALL_MODELS_INFO,
+      },
+      {
+        name: 'Expanded concurrent generations',
+        info: 'Run more image and video generations in parallel as your production volume grows',
+      },
+      {
+        name: 'Early access to new models',
+        info: 'Be among the first to try new AI models and features as they are released',
+      },
+      {
+        name: 'Priority support',
+        info: 'Get priority email support with faster response times (within 24 hours)',
+      },
+      {
+        name: 'Commercial license',
+        info: 'Use generated content for commercial purposes without attribution requirements',
+      },
+      {
+        name: '3 Instagram connections',
+        info: 'Connect up to three Instagram accounts for publishing and related workflows',
+      },
+      {
+        name: 'Unlimited automations',
+        info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
+      },
+    ],
+  },
+  {
     id: 'max-monthly',
     name: 'Max',
     description: 'For power users and teams',
-    price: 100.0,
-    priceId: 'price_1TIyQeGYRyfMJZ0Cg7gwAPJE',
+    price: 200.0,
+    priceId: 'price_1TQIsxGYRyfMJZ0CzYtrgkNP',
     interval: 'month' as const,
     currency: 'USD' as const,
     credits: 3000,
@@ -144,15 +183,14 @@ const monthlyPlans: PricingPlan[] = [
 
 const yearlyPlans: PricingPlan[] = [
   {
-    id: 'pro-yearly',
-    name: 'Pro',
-    description: 'For professional users',
-    price: 160.0,
-    priceId: 'price_1SrWmVGYRyfMJZ0CyKUeZ5T9',
+    id: 'starter-yearly',
+    name: 'Starter',
+    description: 'For getting started',
+    price: 240.0,
+    priceId: 'price_1TQK4BGYRyfMJZ0CdR1RMtUm',
     interval: 'year' as const,
     currency: 'USD' as const,
-    savings: 'Save 33%',
-    credits: 500,
+    credits: 400,
     features: [
       {
         name: 'Access to all AI models',
@@ -186,14 +224,53 @@ const yearlyPlans: PricingPlan[] = [
     popular: true,
   },
   {
+    id: 'plus-yearly',
+    name: 'Plus',
+    description: 'For growing creators',
+    price: 360.0,
+    priceId: 'price_1TQIrfGYRyfMJZ0C7s5GmQSw',
+    interval: 'year' as const,
+    currency: 'USD' as const,
+    credits: 1000,
+    features: [
+      {
+        name: 'Access to all AI models',
+        info: ALL_MODELS_INFO,
+      },
+      {
+        name: 'Expanded concurrent generations',
+        info: 'Run more image and video generations in parallel as your production volume grows',
+      },
+      {
+        name: 'Early access to new models',
+        info: 'Be among the first to try new AI models and features as they are released',
+      },
+      {
+        name: 'Priority support',
+        info: 'Get priority email support with faster response times (within 24 hours)',
+      },
+      {
+        name: 'Commercial license',
+        info: 'Use generated content for commercial purposes without attribution requirements',
+      },
+      {
+        name: '3 Instagram connections',
+        info: 'Connect up to three Instagram accounts for publishing and related workflows',
+      },
+      {
+        name: 'Unlimited automations',
+        info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
+      },
+    ],
+  },
+  {
     id: 'max-yearly',
     name: 'Max',
     description: 'For power users and teams',
-    price: 600.0,
-    priceId: 'price_1TIySoGYRyfMJZ0CKCD93aWh',
+    price: 812.04,
+    priceId: 'price_1TQIvNGYRyfMJZ0CBCQJiJ6T',
     interval: 'year' as const,
     currency: 'USD' as const,
-    savings: 'Save 50%',
     credits: 3000,
     features: [
       {
@@ -239,6 +316,20 @@ function formatPlanCurrency(amount: number, currency: 'USD' | 'CAD') {
   const prefix = currency === 'CAD' ? 'CA$' : '$';
   const body = amount % 1 === 0 ? amount.toFixed(0) : amount.toFixed(2);
   return `${prefix}${body}`;
+}
+
+function getYearlySavingsLabel(plan: PricingPlan, listMonthly?: number) {
+  if (plan.interval !== 'year' || listMonthly == null) {
+    return null;
+  }
+
+  const yearlyAtMonthlyRate = listMonthly * 12;
+  if (yearlyAtMonthlyRate <= 0 || plan.price >= yearlyAtMonthlyRate) {
+    return null;
+  }
+
+  const savingsPercent = Math.round((1 - plan.price / yearlyAtMonthlyRate) * 100);
+  return savingsPercent > 0 ? `Save ${savingsPercent}%` : null;
 }
 
 /* Experiment: hide Free tier, restore block + Free jump button + freeCardRef + xl:grid-cols-4
@@ -296,18 +387,63 @@ function InfoPopover({
   label: string;
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const clearCloseTimeout = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  };
+
+  const handleMouseEnter = () => {
+    clearCloseTimeout();
+    setOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    clearCloseTimeout();
+    closeTimeoutRef.current = setTimeout(() => {
+      setOpen(false);
+      closeTimeoutRef.current = null;
+    }, 120);
+  };
+
   return (
-    <Popover>
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        clearCloseTimeout();
+        setOpen(nextOpen);
+      }}
+    >
       <PopoverTrigger asChild>
         <button
           type="button"
           className="shrink-0 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-label={label}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
           <Info className="w-4 h-4" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="max-w-xs text-sm leading-relaxed" align="end" sideOffset={8}>
+      <PopoverContent
+        className="max-w-xs text-sm leading-relaxed"
+        align="end"
+        sideOffset={8}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         {children}
       </PopoverContent>
     </Popover>
@@ -387,7 +523,8 @@ export default function PricingPage() {
   const router = useRouter();
   const supabase = createClient();
   const carouselRef = useRef<HTMLDivElement>(null);
-  const proCardRef = useRef<HTMLDivElement>(null);
+  const starterCardRef = useRef<HTMLDivElement>(null);
+  const plusCardRef = useRef<HTMLDivElement>(null);
   const maxCardRef = useRef<HTMLDivElement>(null);
 
   const isSubscriptionTab = activePricingTab === 'monthly' || activePricingTab === 'yearly';
@@ -550,9 +687,18 @@ export default function PricingPage() {
                       variant="outline"
                       size="sm"
                       className="rounded-full"
-                      onClick={() => scrollCardIntoView(proCardRef.current)}
+                      onClick={() => scrollCardIntoView(starterCardRef.current)}
                     >
-                      Pro
+                      Starter
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => scrollCardIntoView(plusCardRef.current)}
+                    >
+                      Plus
                     </Button>
                     <Button
                       type="button"
@@ -567,14 +713,15 @@ export default function PricingPage() {
                 </div>
               </div>
 
-              {/* Pricing Cards: Pro | Max, mobile: snap carousel, one centered + peek */}
+              {/* Pricing Cards: Starter | Plus | Max, mobile: snap carousel, one centered + peek */}
               <motion.div
                 ref={carouselRef}
                 className={[
-                  'flex max-w-5xl mx-auto items-stretch',
+                  'flex max-w-7xl mx-auto items-stretch',
                   '-mx-4 flex-row gap-3 overflow-x-auto overscroll-x-contain pb-4 px-[calc((100vw-85vw)/2)] pt-5',
                   'snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
                   'sm:mx-auto sm:grid sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:overscroll-auto sm:pb-0 sm:px-0 sm:pt-0',
+                  'lg:grid-cols-3',
                   'sm:snap-none lg:gap-8',
                 ].join(' ')}
                 variants={cardList}
@@ -583,10 +730,14 @@ export default function PricingPage() {
 
                 {pricingPlans.map((plan) => {
                   const listMonthly = monthlyPlans.find((p) => p.name === plan.name)?.price;
+                  const annualMonthly = plan.price / 12;
+                  const hasYearlyDiscount =
+                    plan.interval === 'year' && listMonthly != null && annualMonthly < listMonthly;
+                  const savingsLabel = getYearlySavingsLabel(plan, listMonthly);
                   return (
             <motion.div
               key={plan.id}
-              ref={plan.name === 'Pro' ? proCardRef : maxCardRef}
+              ref={plan.name === 'Starter' ? starterCardRef : plan.name === 'Plus' ? plusCardRef : maxCardRef}
               variants={cardFade}
               transition={motionTransition}
               whileHover={hoverLift}
@@ -606,22 +757,32 @@ export default function PricingPage() {
                 <h2 className="text-2xl font-bold mb-2">{plan.name}</h2>
                 <p className="text-muted-foreground mb-4">{plan.description}</p>
                 <div className="flex flex-col items-center gap-1">
-                  {plan.interval === 'year' && listMonthly != null ? (
+                  {hasYearlyDiscount ? (
                     <div
                       className="flex flex-col items-center gap-2 w-full"
-                      aria-label={`${formatPlanCurrency(plan.price / 12, plan.currency)} per month, billed annually (${formatPlanCurrency(plan.price, plan.currency)} per year), compared to ${formatPlanCurrency(listMonthly, plan.currency)} per month on the monthly plan`}
+                      aria-label={`${formatPlanCurrency(annualMonthly, plan.currency)} per month, billed annually (${formatPlanCurrency(plan.price, plan.currency)} per year), compared to ${formatPlanCurrency(listMonthly, plan.currency)} per month on the monthly plan`}
                     >
                       <div className="flex items-baseline justify-center gap-2 flex-wrap">
                         <span className="text-3xl sm:text-4xl font-bold text-primary line-through decoration-2 decoration-primary">
                           {formatPlanCurrency(listMonthly, plan.currency)}
                         </span>
                         <span className="text-5xl font-bold tracking-tight text-foreground">
-                          {formatPlanCurrency(plan.price / 12, plan.currency)}
+                          {formatPlanCurrency(annualMonthly, plan.currency)}
                         </span>
                         <span className="text-muted-foreground text-base font-medium">
                           /month, billed annually
                         </span>
                       </div>
+                    </div>
+                  ) : plan.interval === 'year' && listMonthly != null ? (
+                    <div
+                      className="flex items-baseline justify-center gap-1 flex-wrap"
+                      aria-label={`${formatPlanCurrency(annualMonthly, plan.currency)} per month, billed annually (${formatPlanCurrency(plan.price, plan.currency)} per year)`}
+                    >
+                      <span className="text-5xl font-bold tracking-tight">
+                        {formatPlanCurrency(annualMonthly, plan.currency)}
+                      </span>
+                      <span className="text-muted-foreground">/month, billed annually</span>
                     </div>
                   ) : plan.interval === 'year' ? (
                     <div className="flex items-baseline justify-center gap-1">
@@ -641,9 +802,9 @@ export default function PricingPage() {
                   {plan.priceNote ? (
                     <span className="text-xs text-muted-foreground">{plan.priceNote}</span>
                   ) : null}
-                  {plan.savings ? (
+                  {savingsLabel ? (
                     <span className="inline-flex items-center rounded-full border border-green-600/25 bg-green-600/10 px-3 py-1 text-xs font-semibold text-green-700 dark:border-green-400/30 dark:bg-green-400/10 dark:text-green-400">
-                      {plan.savings}
+                      {savingsLabel}
                     </span>
                   ) : null}
                 </div>

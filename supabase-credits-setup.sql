@@ -31,13 +31,19 @@ DECLARE
     "price_1SrXZ0K2MiVk67BiQY0XpX7z": 500,
     "price_1SrXZDK2MiVk67Bi0Y57icpS": 3000,
     "price_1SrWkoGYRyfMJZ0CCuVwjLKc": 100,
-    "price_1SrWl8GYRyfMJZ0CeXU9f7LE": 500,
+    "price_1SrWl8GYRyfMJZ0CeXU9f7LE": 400,
     "price_1SrWlMGYRyfMJZ0CTNcrZ1gS": 3000,
     "price_1TIyQeGYRyfMJZ0Cg7gwAPJE": 3000,
     "price_1TIySoGYRyfMJZ0CKCD93aWh": 3000,
     "price_1SrWlzGYRyfMJZ0CICD6aj5j": 100,
-    "price_1SrWmVGYRyfMJZ0CyKUeZ5T9": 500,
-    "price_1SrWmtGYRyfMJZ0CzG1ac2Ra": 3000
+    "price_1SrWmVGYRyfMJZ0CyKUeZ5T9": 400,
+    "price_1SrWmtGYRyfMJZ0CzG1ac2Ra": 3000,
+    "price_1TQK3qGYRyfMJZ0CFGGqUXJ8": 400,
+    "price_1TQK4BGYRyfMJZ0CdR1RMtUm": 400,
+    "price_1TQIqwGYRyfMJZ0CivzObR67": 1000,
+    "price_1TQIrfGYRyfMJZ0C7s5GmQSw": 1000,
+    "price_1TQIsxGYRyfMJZ0CzYtrgkNP": 3000,
+    "price_1TQIvNGYRyfMJZ0CBCQJiJ6T": 3000
   }'::JSONB;
 BEGIN
   RETURN COALESCE((credits_map->>price_id)::INTEGER, 0);
@@ -56,7 +62,10 @@ DECLARE
     'price_1SrWlzGYRyfMJZ0CICD6aj5j',
     'price_1SrWmVGYRyfMJZ0CyKUeZ5T9',
     'price_1SrWmtGYRyfMJZ0CzG1ac2Ra',
-    'price_1TIySoGYRyfMJZ0CKCD93aWh'
+    'price_1TIySoGYRyfMJZ0CKCD93aWh',
+    'price_1TQK4BGYRyfMJZ0CdR1RMtUm',
+    'price_1TQIrfGYRyfMJZ0C7s5GmQSw',
+    'price_1TQIvNGYRyfMJZ0CBCQJiJ6T'
   ];
 BEGIN
   RETURN price_id = ANY(yearly_price_ids);

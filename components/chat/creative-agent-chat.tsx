@@ -119,13 +119,13 @@ const STARTER_PROMPTS: { label: string; prompt: string }[] = [
     prompt: "Based on my input, generate the best video possible. Decide on the optimal prompt, duration, and settings.",
   },
   {
+    label: "Generate Audio",
+    prompt: "Based on my input, generate the best audio possible. Decide on the optimal voice, tone, and settings.",
+  },
+  {
     label: "Visual traits as JSON",
     prompt:
       "I’ll attach an image. Extract detailed visual traits as JSON for a Nano Banana prompt.",
-  },
-  {
-    label: "Generate Audio",
-    prompt: "Based on my input, generate the best audio possible. Decide on the optimal voice, tone, and settings.",
   },
 ]
 
@@ -319,6 +319,107 @@ type SearchVoicesToolPart = {
       tags: string[]
       voiceId: string
     }>
+  }
+  errorText?: string
+}
+
+type SearchWebToolPart = {
+  type: "tool-searchWeb"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    limit?: number
+    query?: string
+  }
+  output?: {
+    message?: string
+    provider?: "firecrawl"
+    query?: string
+    results?: Array<{
+      source?: string | null
+      snippet?: string | null
+      title: string
+      url: string
+    }>
+    total?: number
+  }
+  errorText?: string
+}
+
+type ReadWebPageToolPart = {
+  type: "tool-readWebPage"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    maxChars?: number
+    url?: string
+  }
+  output?: {
+    fallbackReason?: string | null
+    message?: string
+    provider?: "simple" | "firecrawl"
+    page?: {
+      description?: string | null
+      finalUrl: string
+      images: Array<{ alt?: string | null; url: string }>
+      links: Array<{ text?: string | null; url: string }>
+      markdown: string
+      provider: "simple" | "firecrawl"
+      text: string
+      title?: string | null
+      url: string
+    }
+  }
+  errorText?: string
+}
+
+type SearchWebImagesToolPart = {
+  type: "tool-searchWebImages"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    limit?: number
+    query?: string
+  }
+  output?: {
+    images?: Array<{
+      height?: number | null
+      imageUrl: string
+      sourceDomain?: string | null
+      sourcePageUrl: string
+      title: string
+      width?: number | null
+    }>
+    licenseNotice?: string
+    message?: string
+    provider?: "firecrawl"
+    query?: string
+    total?: number
+  }
+  errorText?: string
+}
+
+type CapturePageScreenshotToolPart = {
+  type: "tool-capturePageScreenshot"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    fullPage?: boolean
+    url?: string
+    viewportHeight?: number
+    viewportWidth?: number
+  }
+  output?: {
+    message?: string
+    screenshot?: {
+      fullPage: boolean
+      provider: "firecrawl"
+      sourceUrl: string
+      storagePath: string
+      url: string
+      viewportHeight: number
+      viewportWidth: number
+    }
   }
   errorText?: string
 }
@@ -2498,6 +2599,270 @@ export function MessageParts({
                       </div>
                     ))}
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          )
+        }
+
+        if (part.type === "tool-searchWeb") {
+          const toolPart = part as SearchWebToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Searching the web</p>
+                    <p className="truncate text-xs text-muted-foreground">{toolPart.input?.query || "Finding links"}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Web search failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const results = toolPart.output?.results ?? []
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Web Search</Badge>
+                  {toolPart.output?.provider ? <Badge variant="outline">{toolPart.output.provider}</Badge> : null}
+                  {typeof toolPart.output?.total === "number" ? (
+                    <Badge variant="outline">{toolPart.output.total} result{toolPart.output.total === 1 ? "" : "s"}</Badge>
+                  ) : null}
+                </div>
+                {toolPart.output?.message ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
+                ) : null}
+                <div className="space-y-2">
+                  {results.map((result) => (
+                    <div key={result.url} className="rounded-xl border border-border/60 bg-background/80 p-3">
+                      <Link
+                        href={result.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                      >
+                        {result.title}
+                      </Link>
+                      <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                        {result.source ? <span>{result.source}</span> : null}
+                        <span className="truncate">{result.url}</span>
+                      </div>
+                      {result.snippet ? (
+                        <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">{result.snippet}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )
+        }
+
+        if (part.type === "tool-readWebPage") {
+          const toolPart = part as ReadWebPageToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Reading web page</p>
+                    <p className="truncate text-xs text-muted-foreground">{toolPart.input?.url || "Extracting page content"}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Page read failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const page = toolPart.output?.page
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Web Page</Badge>
+                  {toolPart.output?.provider ? <Badge variant="outline">{toolPart.output.provider}</Badge> : null}
+                  {toolPart.output?.fallbackReason ? <Badge variant="outline">fallback used</Badge> : null}
+                </div>
+                {page ? (
+                  <div className="rounded-xl border border-border/60 bg-background/80 p-3">
+                    {page.title ? <p className="text-sm font-medium">{page.title}</p> : null}
+                    <Link
+                      href={page.finalUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 block truncate text-xs text-muted-foreground underline-offset-4 hover:underline"
+                    >
+                      {page.finalUrl}
+                    </Link>
+                    {page.description ? (
+                      <p className="mt-2 text-xs text-muted-foreground">{page.description}</p>
+                    ) : null}
+                    {page.text ? (
+                      <p className="mt-3 line-clamp-5 text-xs text-foreground/80">{page.text}</p>
+                    ) : null}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge variant="outline">{page.links.length} links</Badge>
+                      <Badge variant="outline">{page.images.length} images</Badge>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No page content returned.</p>
+                )}
+              </CardContent>
+            </Card>
+          )
+        }
+
+        if (part.type === "tool-searchWebImages") {
+          const toolPart = part as SearchWebImagesToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Searching web images</p>
+                    <p className="truncate text-xs text-muted-foreground">{toolPart.input?.query || "Finding image references"}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Web image search failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const images = toolPart.output?.images ?? []
+          const imageGridImages = images.map((image, imageIndex) => ({
+            id: `${image.sourcePageUrl}-${imageIndex}`,
+            url: image.imageUrl,
+            model: "web-image-search",
+            prompt: image.title,
+            tool: "searchWebImages",
+            aspectRatio: null as string | null,
+          }))
+
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Web Images</Badge>
+                  {toolPart.output?.provider ? <Badge variant="outline">{toolPart.output.provider}</Badge> : null}
+                  {typeof toolPart.output?.total === "number" ? (
+                    <Badge variant="outline">{toolPart.output.total} result{toolPart.output.total === 1 ? "" : "s"}</Badge>
+                  ) : null}
+                </div>
+                {toolPart.output?.licenseNotice ? (
+                  <p className="text-xs text-muted-foreground">{toolPart.output.licenseNotice}</p>
+                ) : null}
+                {imageGridImages.length > 0 ? (
+                  <div className="overflow-hidden rounded-2xl border border-border/60 bg-background">
+                    <ImageGrid images={imageGridImages} className="h-auto" basicActionsOnly initialColumnCount={2} />
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No image references returned.</p>
+                )}
+              </CardContent>
+            </Card>
+          )
+        }
+
+        if (part.type === "tool-capturePageScreenshot") {
+          const toolPart = part as CapturePageScreenshotToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Capturing screenshot</p>
+                    <p className="truncate text-xs text-muted-foreground">{toolPart.input?.url || "Rendering page"}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Screenshot failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const screenshot = toolPart.output?.screenshot
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Screenshot</Badge>
+                  {screenshot?.provider ? <Badge variant="outline">{screenshot.provider}</Badge> : null}
+                  {screenshot?.fullPage ? <Badge variant="outline">full page</Badge> : <Badge variant="outline">viewport</Badge>}
+                  {screenshot ? <Badge variant="outline">{screenshot.viewportWidth}x{screenshot.viewportHeight}</Badge> : null}
+                </div>
+                {toolPart.output?.message ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
+                ) : null}
+                {screenshot ? (
+                  <div className="space-y-3">
+                    <img
+                      src={screenshot.url}
+                      alt={`Screenshot of ${screenshot.sourceUrl}`}
+                      className="max-h-[520px] w-full rounded-2xl border border-border/60 object-contain"
+                      loading="lazy"
+                    />
+                    <Link
+                      href={screenshot.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block truncate text-xs text-muted-foreground underline-offset-4 hover:underline"
+                    >
+                      {screenshot.sourceUrl}
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No screenshot returned.</p>
                 )}
               </CardContent>
             </Card>
