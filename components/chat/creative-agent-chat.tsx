@@ -137,6 +137,7 @@ const MARKDOWN_LINK_URL_REGEX = /\[[^\]]+\]\((https?:\/\/[^\s)]+)\)/gi
 const RAW_URL_REGEX = /https?:\/\/[^\s<>"')\]]+/gi
 
 type MediaValueType = "image" | "video" | "audio" | "other"
+type FileMessagePart = Extract<UIMessage["parts"][number], { type: "file" }>
 
 type GenerateImageToolPart = {
   type: "tool-generateImageWithNanoBanana"
@@ -1940,6 +1941,103 @@ function InstagramMediaPreview({
   )
 }
 
+function MessageFilePart({
+  className,
+  messageId,
+  part,
+  partIndex,
+}: {
+  className?: string
+  messageId: string
+  part: FileMessagePart
+  partIndex: number
+}) {
+  if (part.mediaType?.startsWith("image/")) {
+    return (
+      <img
+        key={`${messageId}-${partIndex}`}
+        src={part.url}
+        alt={part.filename || "Attachment"}
+        className={cn("my-2 max-h-72 rounded-2xl border border-border/60 object-contain", className)}
+      />
+    )
+  }
+
+  if (part.mediaType?.startsWith("video/")) {
+    return (
+      <video
+        key={`${messageId}-${partIndex}`}
+        src={part.url}
+        controls
+        className={cn("my-2 max-h-72 rounded-2xl border border-border/60 bg-black", className)}
+      />
+    )
+  }
+
+  if (part.mediaType?.startsWith("audio/")) {
+    return (
+      <audio
+        key={`${messageId}-${partIndex}`}
+        src={part.url}
+        controls
+        className={cn("my-2 w-full", className)}
+      />
+    )
+  }
+
+  return null
+}
+
+function UserMessageTextParts({
+  message,
+}: {
+  message: UIMessage
+}) {
+  const textParts = message.parts.filter((part) => part.type === "text")
+
+  if (textParts.length === 0) return null
+
+  return (
+    <>
+      {textParts.map((part, index) => (
+        <MessageResponse key={`${message.id}-text-${index}`}>
+          {part.text}
+        </MessageResponse>
+      ))}
+    </>
+  )
+}
+
+function UserMessageMediaParts({
+  message,
+}: {
+  message: UIMessage
+}) {
+  const mediaParts = message.parts.filter(
+    (part): part is FileMessagePart =>
+      part.type === "file" &&
+      (part.mediaType?.startsWith("image/") ||
+        part.mediaType?.startsWith("video/") ||
+        part.mediaType?.startsWith("audio/")),
+  )
+
+  if (mediaParts.length === 0) return null
+
+  return (
+    <div className="flex w-full flex-col items-end gap-2">
+      {mediaParts.map((part, index) => (
+        <MessageFilePart
+          key={`${message.id}-media-${index}`}
+          messageId={`${message.id}-media`}
+          part={part}
+          partIndex={index}
+          className="my-0 max-w-full rounded-[18px]"
+        />
+      ))}
+    </div>
+  )
+}
+
 export function MessageParts({
   message,
   instagramConnectionsById,
@@ -1975,38 +2073,14 @@ export function MessageParts({
         }
 
         if (part.type === "file") {
-          if (part.mediaType?.startsWith("image/")) {
-            return (
-              <img
-                key={`${message.id}-${index}`}
-                src={part.url}
-                alt={part.filename || "Attachment"}
-                className="my-2 max-h-72 rounded-2xl border border-border/60 object-contain"
-              />
-            )
-          }
-
-          if (part.mediaType?.startsWith("video/")) {
-            return (
-              <video
-                key={`${message.id}-${index}`}
-                src={part.url}
-                controls
-                className="my-2 max-h-72 rounded-2xl border border-border/60 bg-black"
-              />
-            )
-          }
-
-          if (part.mediaType?.startsWith("audio/")) {
-            return (
-              <audio
-                key={`${message.id}-${index}`}
-                src={part.url}
-                controls
-                className="my-2 w-full"
-              />
-            )
-          }
+          return (
+            <MessageFilePart
+              key={`${message.id}-${index}`}
+              messageId={message.id}
+              part={part}
+              partIndex={index}
+            />
+          )
         }
 
         if (part.type === "tool-generateImageWithNanoBanana") {
@@ -4080,6 +4154,17 @@ export function CreativeAgentChat({
   }, [enablePersistence, initialMessages, setMessages])
 
   React.useEffect(() => {
+    const handleOpenSkillPicker = () => {
+      setSkillLoadModalOpen(true)
+    }
+
+    window.addEventListener("chat-open-skill-picker", handleOpenSkillPicker)
+    return () => {
+      window.removeEventListener("chat-open-skill-picker", handleOpenSkillPicker)
+    }
+  }, [])
+
+  React.useEffect(() => {
     if (!newChatToken) {
       return
     }
@@ -4740,19 +4825,14 @@ export function CreativeAgentChat({
                   className={cn(!isUserMessage && "mb-2")}
                 >
                   {isUserMessage ? (
-                    <MessageContent className="max-w-[85%] rounded-[24px] px-4 py-3 shadow-sm">
-                      <MessageParts
-                        message={message}
-                        instagramConnectionsById={instagramConnectionsById}
-                        onEditSkillRequest={(slug) => setSkillEditModalSlug(slug)}
-                        onToolApprovalResponse={(approvalId, approved) => {
-                          void addToolApprovalResponse({
-                            id: approvalId,
-                            approved,
-                          })
-                        }}
-                      />
-                    </MessageContent>
+                    <div className="flex w-full max-w-[85%] flex-col items-end gap-2">
+                      {message.parts.some((part) => part.type === "text") ? (
+                        <MessageContent className="max-w-full rounded-[24px] px-4 py-3 shadow-sm">
+                          <UserMessageTextParts message={message} />
+                        </MessageContent>
+                      ) : null}
+                      <UserMessageMediaParts message={message} />
+                    </div>
                   ) : (
                     <div className="flex w-full min-w-0 max-w-3xl items-start gap-3">
                       <span className="mt-1 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/40">

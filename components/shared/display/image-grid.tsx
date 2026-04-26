@@ -13,6 +13,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { FullscreenMediaViewer, type FullscreenMediaViewerAction } from "./fullscreen-media-viewer"
 import { copyMediaToClipboard, downloadMediaFile } from "./media-viewer-utils"
 import { toast } from "sonner"
@@ -49,7 +59,7 @@ interface ImageGridProps {
   onRemoveMetadata?: (imageUrl: string, index: number) => void
   upscalingImageUrl?: string | null
   removingMetadataImageUrl?: string | null
-  onDelete?: (id: string, imageUrl: string, index: number) => void
+  onDelete?: (id: string, imageUrl: string, index: number) => void | Promise<void>
   basicActionsOnly?: boolean
   /** Initial column count for the layout slider (default 2). */
   initialColumnCount?: number
@@ -99,6 +109,11 @@ export function ImageGrid({
   const [copiedImageUrl, setCopiedImageUrl] = React.useState<string | null>(null)
   const [copiedPromptKey, setCopiedPromptKey] = React.useState<string | null>(null)
   const [deletingImageId, setDeletingImageId] = React.useState<string | null>(null)
+  const [pendingDeleteImage, setPendingDeleteImage] = React.useState<{
+    id: string
+    url: string
+    index: number
+  } | null>(null)
 
   // Build unified items: either from items prop (slot-based) or from images + isGenerating + generatingCount (legacy)
   const items = React.useMemo((): GridItem[] => {
@@ -169,25 +184,28 @@ export function ImageGrid({
     }
   }, [])
 
-  const handleDelete = React.useCallback(async (id: string, imageUrl: string, index: number) => {
+  const requestDelete = React.useCallback((id: string, imageUrl: string, index: number) => {
     if (!id) {
       console.error('Cannot delete image without ID')
       return
     }
 
-    // Confirm deletion
-    if (!window.confirm('Are you sure you want to delete this image? This action cannot be undone.')) {
-      return
-    }
+    setPendingDeleteImage({ id, url: imageUrl, index })
+  }, [])
 
+  const confirmDelete = React.useCallback(async () => {
+    if (!pendingDeleteImage) return
+    const { id, url, index } = pendingDeleteImage
     setDeletingImageId(id)
     
     try {
-      onDelete?.(id, imageUrl, index)
+      await onDelete?.(id, url, index)
+      setPendingDeleteImage(null)
+      setFullscreenImage((current) => (current?.id === id ? null : current))
     } finally {
       setDeletingImageId(null)
     }
-  }, [onDelete])
+  }, [onDelete, pendingDeleteImage])
 
   React.useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -342,7 +360,7 @@ export function ImageGrid({
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/85 via-black/35 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
 
-              <div className="absolute right-2 top-2 z-10 flex flex-col items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+              <div className="absolute right-2 top-2 z-10 hidden flex-col items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100 lg:flex">
                 {/* Main action buttons - always visible on hover */}
                 <Button
                   type="button"
@@ -482,7 +500,7 @@ export function ImageGrid({
                         <DropdownMenuItem
                           onClick={(event) => {
                             event.stopPropagation()
-                            void handleDelete(item.data.id!, item.data.url, index)
+                            requestDelete(item.data.id!, item.data.url, index)
                           }}
                           className="cursor-pointer text-destructive focus:text-destructive"
                           disabled={deletingImageId === item.data.id}
@@ -497,7 +515,7 @@ export function ImageGrid({
               </div>
 
               {/* Bottom bar: prompt (left) + buttons (right) - no overlap */}
-              <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-1 sm:gap-2 px-2 pb-2 pt-6 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+              <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-1 px-2 pb-2 pt-6 opacity-100 transition-opacity duration-200 lg:gap-2 lg:opacity-0 lg:group-hover:opacity-100">
                 <div className="min-w-0 flex-1 overflow-hidden pr-1 sm:pr-2">
                   {item.data.model && (
                     <p className="truncate text-[10px] font-semibold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
@@ -521,8 +539,8 @@ export function ImageGrid({
                 
                 {!basicActionsOnly ? (
                 <>
-                {/* Desktop buttons (sm and up) - column */}
-                <div className="hidden sm:flex shrink-0 flex-col items-end gap-1">
+                {/* Wide layout buttons. Narrow layouts collapse these into a single menu. */}
+                <div className="hidden shrink-0 flex-col items-end gap-1 lg:flex">
                   <Button
                     type="button"
                     variant="secondary"
@@ -630,21 +648,21 @@ export function ImageGrid({
                   )}
                 </div>
                 
-                {/* Mobile - column of actions (below sm) */}
-                <div className="flex sm:hidden shrink-0 flex-col items-end gap-1">
+                {/* Narrow layout: a single overflow menu prevents controls from covering the media. */}
+                <div className="flex shrink-0 flex-col items-end gap-1 lg:hidden">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         type="button"
                         variant="secondary"
-                        size="sm"
-                        className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                        size="icon"
+                        className="h-8 w-8 rounded-full border border-white/20 bg-black/60 text-white hover:bg-black/80"
                         onClick={(event) => {
                           event.stopPropagation()
                         }}
+                        aria-label="More image actions"
                       >
-                        <Play className="mr-1 size-3" weight="fill" />
-                        Animate
+                        <DotsThree className="size-4" weight="bold" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent 
@@ -652,6 +670,76 @@ export function ImageGrid({
                       className="w-48"
                       onClick={(event) => event.stopPropagation()}
                     >
+                      {!basicActionsOnly && onCreateAsset && (
+                        <>
+                          <DropdownMenuItem
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              onCreateAsset(item.data.url, index)
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <Plus className="mr-2 size-4" />
+                            Create Asset
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      <DropdownMenuItem
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setFullscreenImage(item.data)
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <ArrowsOutSimple className="mr-2 size-4" />
+                        Full Screen
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void handleDownload(item.data.url)
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <DownloadSimple className="mr-2 size-4" />
+                        Download
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void handleCopy(item.data.url)
+                        }}
+                        className="cursor-pointer"
+                      >
+                        {copiedImageUrl === item.data.url ? (
+                          <>
+                            <Check className="mr-2 size-4" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="mr-2 size-4" />
+                            Copy
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      {!basicActionsOnly && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void handleCopyPrompt(item.data.prompt ?? "", `${item.data.url}-mobile-prompt`)
+                            }}
+                            className="cursor-pointer"
+                            disabled={!item.data.prompt?.trim()}
+                          >
+                            <Copy className="mr-2 size-4" />
+                            {copiedPromptKey && copiedPromptKey.startsWith(item.data.url) ? "Copied Prompt" : "Copy Prompt"}
+                          </DropdownMenuItem>
+                        </>
+                      )}
                       <DropdownMenuItem
                         onClick={(event) => {
                           event.stopPropagation()
@@ -663,17 +751,18 @@ export function ImageGrid({
                         <Play className="mr-2 size-4" weight="fill" />
                         Animate
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          onUseAsReference?.(item.data.url, index)
-                        }}
-                        className="cursor-pointer"
-                      >
-                        <ArrowsOutSimple className="mr-2 size-4" />
-                        Use as Reference
-                      </DropdownMenuItem>
+                      {!basicActionsOnly && (
+                        <DropdownMenuItem
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            onUseAsReference?.(item.data.url, index)
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <ArrowsOutSimple className="mr-2 size-4" />
+                          Use as Reference
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem
                         onClick={(event) => {
                           event.stopPropagation()
@@ -684,7 +773,7 @@ export function ImageGrid({
                         <PencilSimple className="mr-2 size-4" />
                         Edit
                       </DropdownMenuItem>
-                      {onRecreate && (
+                      {!basicActionsOnly && onRecreate && (
                         <DropdownMenuItem
                           onClick={(event) => {
                             event.stopPropagation()
@@ -696,7 +785,7 @@ export function ImageGrid({
                           Recreate
                         </DropdownMenuItem>
                       )}
-                      {onUpscale && (
+                      {!basicActionsOnly && onUpscale && (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -725,6 +814,22 @@ export function ImageGrid({
                           >
                             <ShieldCheck className="mr-2 size-4" />
                             {removingMetadataImageUrl === item.data.url ? "Cleaning..." : "Remove Metadata"}
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      {!basicActionsOnly && item.data.id && onDelete && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              requestDelete(item.data.id!, item.data.url, index)
+                            }}
+                            className="cursor-pointer text-destructive focus:text-destructive"
+                            disabled={deletingImageId === item.data.id}
+                          >
+                            <Trash className="mr-2 size-4" />
+                            {deletingImageId === item.data.id ? "Deleting..." : "Delete"}
                           </DropdownMenuItem>
                         </>
                       )}
@@ -801,8 +906,7 @@ export function ImageGrid({
                   destructive: true,
                   disabled: deletingImageId === metadata.id,
                   onClick: () => {
-                    void handleDelete(metadata.id!, url, imageIndexById)
-                    setFullscreenImage(null)
+                    requestDelete(metadata.id!, url, imageIndexById)
                   },
                 })
               }
@@ -812,6 +916,37 @@ export function ImageGrid({
           }}
         />
       )}
+
+      <AlertDialog
+        open={pendingDeleteImage !== null}
+        onOpenChange={(open) => {
+          if (!open && !deletingImageId) {
+            setPendingDeleteImage(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this image?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the generation from your history and deletes its stored file. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(deletingImageId)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={Boolean(deletingImageId)}
+              onClick={(event) => {
+                event.preventDefault()
+                void confirmDelete()
+              }}
+            >
+              {deletingImageId ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

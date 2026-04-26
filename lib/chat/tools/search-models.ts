@@ -12,7 +12,7 @@ type ModelTypeFilter = "image" | "video" | "audio" | "upscale"
 export function createSearchModelsTool({ supabase }: CreateSearchModelsToolOptions) {
   return tool({
     description:
-      "List UniCan's active models (optional type filter). Use this when the user asks which models are available, which one supports a capability, or when you need a valid model identifier before generating an image, video, or audio asset. The response includes model-specific `aspectRatios` when available, so use those instead of guessing supported ratios. There is no text search. Inspect the returned list and match by name or identifier yourself.",
+      "List UniCan's active models (optional type filter). Use this when the user asks which models are available, which one supports a capability, or when you need a valid model identifier before generating an image, video, or audio asset. The response includes model-specific `aspectRatios` and `usageGuide` when available, so use those instead of guessing supported ratios, input semantics, and model-specific routing rules. There is no text search. Inspect the returned list and match by name or identifier yourself.",
     inputSchema: z.object({
       type: z
         .enum(["image", "video", "audio", "upscale"])
@@ -24,7 +24,7 @@ export function createSearchModelsTool({ supabase }: CreateSearchModelsToolOptio
       let dbQuery = supabase
         .from("models")
         .select(
-          "identifier, name, description, provider, type, model_cost, aspect_ratios, default_aspect_ratio, supports_reference_image, supports_reference_video, supports_reference_audio, supports_first_frame, supports_last_frame, max_images",
+          "identifier, name, description, provider, type, model_cost, aspect_ratios, default_aspect_ratio, supports_reference_image, supports_reference_video, supports_reference_audio, supports_first_frame, supports_last_frame, max_images, agent_usage",
         )
         .eq("is_active", true)
         .order("name", { ascending: true })
@@ -69,6 +69,10 @@ export function createSearchModelsTool({ supabase }: CreateSearchModelsToolOptio
         supportsReferenceImage: Boolean(model.supports_reference_image),
         supportsReferenceVideo: Boolean(model.supports_reference_video),
         type: model.type as ModelTypeFilter,
+        usageGuide:
+          model.agent_usage && typeof model.agent_usage === "object" && !Array.isArray(model.agent_usage)
+            ? model.agent_usage
+            : null,
       }))
 
       return {

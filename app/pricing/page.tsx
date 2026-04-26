@@ -93,7 +93,6 @@ const monthlyPlans: PricingPlan[] = [
         info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
       },
     ],
-    popular: true,
   },
   {
     id: 'plus-monthly',
@@ -134,6 +133,7 @@ const monthlyPlans: PricingPlan[] = [
         info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
       },
     ],
+    popular: true,
   },
   {
     id: 'max-monthly',
@@ -143,7 +143,7 @@ const monthlyPlans: PricingPlan[] = [
     priceId: 'price_1TQIsxGYRyfMJZ0CzYtrgkNP',
     interval: 'month' as const,
     currency: 'USD' as const,
-    credits: 3000,
+    credits: 6000,
     features: [
       {
         name: 'Access to all AI models',
@@ -221,7 +221,6 @@ const yearlyPlans: PricingPlan[] = [
         info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
       },
     ],
-    popular: true,
   },
   {
     id: 'plus-yearly',
@@ -262,16 +261,17 @@ const yearlyPlans: PricingPlan[] = [
         info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
       },
     ],
+    popular: true,
   },
   {
     id: 'max-yearly',
     name: 'Max',
     description: 'For power users and teams',
-    price: 812.04,
-    priceId: 'price_1TQIvNGYRyfMJZ0CBCQJiJ6T',
+    price: 792.0,
+    priceId: 'price_1TQKZwGYRyfMJZ0CcVI6e5wM',
     interval: 'year' as const,
     currency: 'USD' as const,
-    credits: 3000,
+    credits: 6000,
     features: [
       {
         name: 'Access to all AI models',
@@ -559,8 +559,6 @@ export default function PricingPage() {
   const motionTransition = reduceMotion
     ? { duration: 0 }
     : { duration: 0.24, ease: [0.22, 1, 0.36, 1] as const };
-  const hoverLift = reduceMotion ? undefined : { y: -4 };
-
   const handleSubscribe = async (priceId: string, planId: string) => {
     setLoading(planId);
 
@@ -740,7 +738,6 @@ export default function PricingPage() {
               ref={plan.name === 'Starter' ? starterCardRef : plan.name === 'Plus' ? plusCardRef : maxCardRef}
               variants={cardFade}
               transition={motionTransition}
-              whileHover={hoverLift}
               className={`relative flex h-full min-h-0 max-sm:snap-center max-sm:shrink-0 max-sm:w-[85vw] max-sm:max-w-md flex-col bg-card rounded-lg border-2 p-8 shadow-lg transition-shadow hover:shadow-xl sm:w-auto sm:max-w-none ${
                 plan.popular ? 'z-10 border-primary ring-2 ring-primary/20' : 'border-border'
               }`}
@@ -813,11 +810,7 @@ export default function PricingPage() {
               <button
                 onClick={() => handleSubscribe(plan.priceId, plan.id)}
                 disabled={loading === plan.id}
-                className={`w-full py-3 px-6 rounded-lg font-semibold transition-colors mb-6 ${
-                  plan.popular
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                className="w-full py-3 px-6 rounded-lg font-semibold transition-colors mb-6 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading === plan.id ? (
                   <span className="flex items-center justify-center gap-2">
@@ -918,7 +911,6 @@ export default function PricingPage() {
               exit="exit"
               variants={pageFade}
               transition={motionTransition}
-              whileHover={hoverLift}
             >
               <EnterprisePlanCard />
             </motion.div>

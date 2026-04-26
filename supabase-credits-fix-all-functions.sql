@@ -19,21 +19,22 @@ DECLARE
   credits_map JSONB := '{
     "price_1SrXYkK2MiVk67BiHuwPn21M": 100,
     "price_1SrXZ0K2MiVk67BiQY0XpX7z": 500,
-    "price_1SrXZDK2MiVk67Bi0Y57icpS": 3000,
+    "price_1SrXZDK2MiVk67Bi0Y57icpS": 6000,
     "price_1SrWkoGYRyfMJZ0CCuVwjLKc": 100,
     "price_1SrWl8GYRyfMJZ0CeXU9f7LE": 400,
-    "price_1SrWlMGYRyfMJZ0CTNcrZ1gS": 3000,
-    "price_1TIyQeGYRyfMJZ0Cg7gwAPJE": 3000,
-    "price_1TIySoGYRyfMJZ0CKCD93aWh": 3000,
+    "price_1SrWlMGYRyfMJZ0CTNcrZ1gS": 6000,
+    "price_1TIyQeGYRyfMJZ0Cg7gwAPJE": 6000,
+    "price_1TIySoGYRyfMJZ0CKCD93aWh": 6000,
     "price_1SrWlzGYRyfMJZ0CICD6aj5j": 100,
     "price_1SrWmVGYRyfMJZ0CyKUeZ5T9": 400,
-    "price_1SrWmtGYRyfMJZ0CzG1ac2Ra": 3000,
+    "price_1SrWmtGYRyfMJZ0CzG1ac2Ra": 6000,
     "price_1TQK3qGYRyfMJZ0CFGGqUXJ8": 400,
     "price_1TQK4BGYRyfMJZ0CdR1RMtUm": 400,
     "price_1TQIqwGYRyfMJZ0CivzObR67": 1000,
     "price_1TQIrfGYRyfMJZ0C7s5GmQSw": 1000,
-    "price_1TQIsxGYRyfMJZ0CzYtrgkNP": 3000,
-    "price_1TQIvNGYRyfMJZ0CBCQJiJ6T": 3000
+    "price_1TQIsxGYRyfMJZ0CzYtrgkNP": 6000,
+    "price_1TQIvNGYRyfMJZ0CBCQJiJ6T": 6000,
+    "price_1TQKZwGYRyfMJZ0CcVI6e5wM": 6000
   }'::JSONB;
 BEGIN
   RETURN COALESCE((credits_map->>price_id)::INTEGER, 0);
@@ -55,7 +56,8 @@ DECLARE
     'price_1TIySoGYRyfMJZ0CKCD93aWh',
     'price_1TQK4BGYRyfMJZ0CdR1RMtUm',
     'price_1TQIrfGYRyfMJZ0C7s5GmQSw',
-    'price_1TQIvNGYRyfMJZ0CBCQJiJ6T'
+    'price_1TQIvNGYRyfMJZ0CBCQJiJ6T',
+    'price_1TQKZwGYRyfMJZ0CcVI6e5wM'
   ];
 BEGIN
   RETURN price_id = ANY(yearly_price_ids);
@@ -210,6 +212,7 @@ SELECT public.get_monthly_credits_for_price_id('price_1SrWl8GYRyfMJZ0CeXU9f7LE':
 SELECT public.get_monthly_credits_for_price_id('price_1TQK3qGYRyfMJZ0CFGGqUXJ8'::TEXT) as starter_monthly_credits;
 SELECT public.get_monthly_credits_for_price_id('price_1TQIqwGYRyfMJZ0CivzObR67'::TEXT) as plus_monthly_credits;
 SELECT public.get_monthly_credits_for_price_id('price_1TQIsxGYRyfMJZ0CzYtrgkNP'::TEXT) as new_max_monthly_credits;
+SELECT public.get_monthly_credits_for_price_id('price_1TQKZwGYRyfMJZ0CcVI6e5wM'::TEXT) as newest_max_yearly_monthly_credits;
 
 -- Test is_yearly_subscription
 SELECT public.is_yearly_subscription('price_1TIySoGYRyfMJZ0CKCD93aWh'::TEXT) as max_yearly;
@@ -217,3 +220,4 @@ SELECT public.is_yearly_subscription('price_1SrWl8GYRyfMJZ0CeXU9f7LE'::TEXT) as 
 SELECT public.is_yearly_subscription('price_1TQK4BGYRyfMJZ0CdR1RMtUm'::TEXT) as starter_yearly;
 SELECT public.is_yearly_subscription('price_1TQIrfGYRyfMJZ0C7s5GmQSw'::TEXT) as plus_yearly;
 SELECT public.is_yearly_subscription('price_1TQIvNGYRyfMJZ0CBCQJiJ6T'::TEXT) as new_max_yearly;
+SELECT public.is_yearly_subscription('price_1TQKZwGYRyfMJZ0CcVI6e5wM'::TEXT) as newest_max_yearly;

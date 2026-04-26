@@ -3,9 +3,19 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
-import { ArrowsOutSimple, Copy, DownloadSimple, FilmStrip, Plus } from "@phosphor-icons/react"
+import { ArrowsOutSimple, Copy, DownloadSimple, FilmStrip, Plus, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { FullscreenMediaViewer, type FullscreenMediaViewerAction } from "./fullscreen-media-viewer"
 import { copyMediaToClipboard, downloadMediaFile } from "./media-viewer-utils"
 
@@ -48,6 +58,7 @@ interface VideoGridProps {
   showNativeControlsOnHoverOnly?: boolean
   onUseVideoAsReference?: (videoUrl: string, index: number) => void
   onSaveVideoAsAsset?: (videoUrl: string, index: number) => void
+  onDelete?: (id: string, videoUrl: string, index: number) => void | Promise<void>
 }
 
 function displayTime(item: VideoHistoryItem): number {
@@ -213,6 +224,7 @@ export function VideoGrid({
   showNativeControlsOnHoverOnly = false,
   onUseVideoAsReference,
   onSaveVideoAsAsset,
+  onDelete,
 }: VideoGridProps) {
   const [columnCount, setColumnCount] = React.useState(3)
   const [fullscreenVideo, setFullscreenVideo] = React.useState<{
@@ -220,6 +232,12 @@ export function VideoGrid({
     index: number
   } | null>(null)
   const [copiedVideoUrl, setCopiedVideoUrl] = React.useState<string | null>(null)
+  const [deletingVideoId, setDeletingVideoId] = React.useState<string | null>(null)
+  const [pendingDeleteVideo, setPendingDeleteVideo] = React.useState<{
+    id: string
+    url: string
+    index: number
+  } | null>(null)
 
   const items = React.useMemo((): VideoGridItem[] => {
     if (itemsProp !== undefined) {
@@ -271,6 +289,23 @@ export function VideoGrid({
       toast.error("Failed to copy video URL")
     }
   }, [])
+
+  const requestDeleteVideo = React.useCallback((id: string, videoUrl: string, index: number) => {
+    setPendingDeleteVideo({ id, url: videoUrl, index })
+  }, [])
+
+  const confirmDeleteVideo = React.useCallback(async () => {
+    if (!pendingDeleteVideo) return
+    const { id, url, index } = pendingDeleteVideo
+    setDeletingVideoId(id)
+    try {
+      await onDelete?.(id, url, index)
+      setPendingDeleteVideo(null)
+      setFullscreenVideo(null)
+    } finally {
+      setDeletingVideoId(null)
+    }
+  }, [onDelete, pendingDeleteVideo])
 
   return (
     <div className={cn("w-full h-full flex flex-col py-0", className)}>
@@ -391,10 +426,54 @@ export function VideoGrid({
               })
             }
 
+            if (onDelete && fullscreenVideo.item.id) {
+              actions.push({
+                id: "delete",
+                label: deletingVideoId === fullscreenVideo.item.id ? "Deleting..." : "Delete",
+                icon: <Trash className="size-4" />,
+                destructive: true,
+                disabled: deletingVideoId === fullscreenVideo.item.id,
+                onClick: () => {
+                  requestDeleteVideo(fullscreenVideo.item.id!, url, fullscreenVideo.index)
+                },
+              })
+            }
+
             return actions
           }}
         />
       )}
+
+      <AlertDialog
+        open={pendingDeleteVideo !== null}
+        onOpenChange={(open) => {
+          if (!open && !deletingVideoId) {
+            setPendingDeleteVideo(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this video?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the generation from your history and deletes its stored file. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(deletingVideoId)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={Boolean(deletingVideoId)}
+              onClick={(event) => {
+                event.preventDefault()
+                void confirmDeleteVideo()
+              }}
+            >
+              {deletingVideoId ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

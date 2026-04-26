@@ -722,6 +722,25 @@ function ImagePageContent() {
     }
   }, [])
 
+  const handleDeleteImage = React.useCallback(async (id: string, _imageUrl: string, _index: number) => {
+    try {
+      const response = await fetch(`/api/generations/${id}`, {
+        method: "DELETE",
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Failed to delete image")
+      }
+
+      setHistoryImages((prev) => prev.filter((image) => image.id !== id))
+      toast.success("Image deleted")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete image")
+      throw err
+    }
+  }, [])
+
   // Grid order: generating (at front) → filled (newest) → older
   // Grid order: pending requests (newest first) followed by completed history.
   const gridItems = React.useMemo(() => {
@@ -757,6 +776,7 @@ function ImagePageContent() {
           onCreateAsset={handleCreateAsset}
           onUpscale={handleUpscale}
           onRemoveMetadata={handleRemoveMetadata}
+          onDelete={handleDeleteImage}
           upscalingImageUrl={upscalingImageUrl}
           removingMetadataImageUrl={removingMetadataImageUrl}
         />

@@ -830,6 +830,25 @@ function VideoPageContent() {
     setCreateAssetDialogOpen(true)
   }, [])
 
+  const handleDeleteVideo = React.useCallback(async (id: string, _videoUrl: string, _index: number) => {
+    try {
+      const response = await fetch(`/api/generations/${id}`, {
+        method: "DELETE",
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Failed to delete video")
+      }
+
+      setHistoryVideos((prev) => prev.filter((video) => video.id !== id))
+      toast.success("Video deleted")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete video")
+      throw err
+    }
+  }, [])
+
   // Render showcase
   const renderShowcase = () => {
     const hasItems = gridItems.length > 0
@@ -844,6 +863,7 @@ function VideoPageContent() {
           showNativeControlsOnHoverOnly
           onUseVideoAsReference={handleUseVideoAsReference}
           onSaveVideoAsAsset={handleSaveVideoAsAsset}
+          onDelete={handleDeleteVideo}
         />
       )
     }
