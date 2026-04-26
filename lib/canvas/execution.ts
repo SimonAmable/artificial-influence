@@ -81,9 +81,13 @@ function createBrowserRuntime(): WorkflowExecutionRuntime {
 
       const { generateImageAndWait } = await import("@/lib/generate-image-client")
       const result = await generateImageAndWait(formData)
-      const imageUrl = result.image?.url ?? result.images?.[0]?.url
+      const imageUrls =
+        result.images
+          ?.map((image) => image?.url)
+          .filter((url): url is string => typeof url === "string" && url.length > 0) ?? []
+      const imageUrl = imageUrls[0] ?? result.image?.url
       if (!imageUrl) throw new Error("No image URL in response")
-      return { imageUrl }
+      return { imageUrl, imageUrls: imageUrls.length > 0 ? imageUrls : [imageUrl] }
     },
 
     async generateVideo({ imageUrl, videoUrl, prompt, mode }) {

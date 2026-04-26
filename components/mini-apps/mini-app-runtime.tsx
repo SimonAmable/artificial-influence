@@ -21,6 +21,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
 import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
+import { ImageGrid, type GridItem } from "@/components/shared/display/image-grid"
+import { VideoGrid, type VideoGridItem } from "@/components/shared/display/video-grid"
 
 interface MiniAppRuntimeProps {
   miniApp: MiniApp
@@ -107,6 +109,50 @@ function getNodeOutputUrl(node: Node): string | null {
   }
 
   return null
+}
+
+function dedupeStrings(values: string[]): string[] {
+  return Array.from(new Set(values.filter((value) => value.length > 0)))
+}
+
+function getNodeImageOutputUrls(node: Node): string[] {
+  const data = (node.data ?? {}) as Record<string, unknown>
+
+  if (node.type === "image-gen") {
+    const generatedImageUrls = Array.isArray(data.generatedImageUrls)
+      ? data.generatedImageUrls.filter((value): value is string => typeof value === "string" && value.length > 0)
+      : []
+    const generatedImageUrl =
+      typeof data.generatedImageUrl === "string" && data.generatedImageUrl.length > 0
+        ? data.generatedImageUrl
+        : null
+
+    return dedupeStrings([...generatedImageUrls, ...(generatedImageUrl ? [generatedImageUrl] : [])])
+  }
+
+  if (node.type === "upload" && data.fileType === "image" && typeof data.fileUrl === "string") {
+    return [data.fileUrl]
+  }
+
+  return []
+}
+
+function isNodeGenerating(node: Node): boolean {
+  return Boolean((node.data as Record<string, unknown> | undefined)?.isGenerating)
+}
+
+function getMediaGridPrompt(node: Node): string | null {
+  const data = (node.data ?? {}) as Record<string, unknown>
+  const promptParts = [data.connectedPrompt, data.prompt, data.text].filter(
+    (value): value is string => typeof value === "string" && value.trim().length > 0
+  )
+
+  return promptParts.length > 0 ? promptParts.join(" ").trim() : null
+}
+
+function getMediaGridModel(node: Node): string | null {
+  const model = (node.data as Record<string, unknown> | undefined)?.model
+  return typeof model === "string" && model.length > 0 ? model : null
 }
 
 async function downloadUrl(url: string, fileName: string) {
@@ -369,7 +415,6 @@ function MiniAppInputPanel({
             >
               {mediaInputNodes.map((node) => {
                 const config = nodeConfig[node.id]
-                const label = getNodeLabel(node)
                 const labelDisplay = getNodeLabelDisplay(node)
 
                 return (
@@ -399,7 +444,6 @@ function MiniAppInputPanel({
           {visibleInputs
             .filter((node) => node.type !== "text" && node.type !== "upload")
             .map((node) => {
-            const config = nodeConfig[node.id]
             const labelDisplay = getNodeLabelDisplay(node)
             return (
               <div key={node.id} className="grid gap-2">
@@ -466,10 +510,69 @@ export function MiniAppRuntime({ miniApp }: MiniAppRuntimeProps) {
     [miniApp.node_config, nodes]
   )
 
-  const featuredOutput =
-    visibleOutputs.find((node) => node.id === miniApp.featured_output_node_id) ?? visibleOutputs[0] ?? null
-  const alternateOutputs = visibleOutputs.filter((node) => node.id !== featuredOutput?.id)
   const hasAnyRenderedOutput = visibleOutputs.some((node) => getNodeOutputUrl(node))
+  const imageOutputs = React.useMemo(
+    () => visibleOutputs.filter((node) => getNodeOutputType(node) === "image"),
+    [visibleOutputs]
+  )
+  const videoOutputs = React.useMemo(
+    () => visibleOutputs.filter((node) => getNodeOutputType(node) === "video"),
+    [visibleOutputs]
+  )
+  const otherOutputs = React.useMemo(
+    () =>
+      visibleOutputs.filter((node) => {
+        const type = getNodeOutputType(node)
+        return type !== "image" && type !== "video"
+      }),
+    [visibleOutputs]
+  )
+
+  const imageGridItems = React.useMemo((): GridItem[] => {
+    const generating: GridItem[] = imageOutputs
+      .filter((node) => isRunning || isNodeGenerating(node))
+      .map((node) => ({ type: "generating", id: `mini-app-image-generating-${node.id}` }))
+    const completed: GridItem[] = imageOutputs.flatMap((node) =>
+      getNodeImageOutputUrls(node).map((url, index) => ({
+        type: "image" as const,
+        data: {
+          id: `${node.id}-${index}`,
+          url,
+          model: getMediaGridModel(node),
+          prompt: getMediaGridPrompt(node),
+          tool: "mini-app",
+          type: "image",
+        },
+      }))
+    )
+
+    return [...generating, ...completed]
+  }, [imageOutputs, isRunning])
+
+  const videoGridItems = React.useMemo((): VideoGridItem[] => {
+    const generating: VideoGridItem[] = videoOutputs
+      .filter((node) => isRunning || isNodeGenerating(node))
+      .map((node) => ({ type: "generating", id: `mini-app-video-generating-${node.id}` }))
+    const completed: VideoGridItem[] = videoOutputs.flatMap((node) => {
+      const url = getNodeOutputUrl(node)
+      if (!url) return []
+
+      return [
+        {
+          type: "video" as const,
+          data: {
+            id: node.id,
+            url,
+            model: getMediaGridModel(node),
+            prompt: getMediaGridPrompt(node),
+            tool: "mini-app",
+          },
+        },
+      ]
+    })
+
+    return [...generating, ...completed]
+  }, [isRunning, videoOutputs])
 
   const handleGenerate = async () => {
     try {
@@ -563,15 +666,22 @@ export function MiniAppRuntime({ miniApp }: MiniAppRuntimeProps) {
                 }
 
                 if (typeof output.text === "string") nextData.text = output.text
-                if (typeof output.imageUrl === "string") {
+                const outputImageUrls = dedupeStrings([
+                  ...(Array.isArray(output.imageUrls)
+                    ? output.imageUrls.filter((value): value is string => typeof value === "string")
+                    : []),
+                  ...(typeof output.imageUrl === "string" ? [output.imageUrl] : []),
+                ])
+                if (outputImageUrls.length > 0) {
                   const currentImageUrls = Array.isArray((node.data as { generatedImageUrls?: unknown }).generatedImageUrls)
                     ? ((node.data as { generatedImageUrls?: unknown }).generatedImageUrls as unknown[])
                         .filter((value): value is string => typeof value === "string")
                     : []
-                  const nextImageUrls = [...currentImageUrls, output.imageUrl].slice(-20)
+                  const nextImageUrls = [...currentImageUrls, ...outputImageUrls].slice(-20)
+                  const nextActiveImageIndex = Math.max(0, nextImageUrls.length - outputImageUrls.length)
                   nextData.generatedImageUrls = nextImageUrls
-                  nextData.activeImageIndex = nextImageUrls.length - 1
-                  nextData.generatedImageUrl = nextImageUrls[nextImageUrls.length - 1] ?? null
+                  nextData.activeImageIndex = nextActiveImageIndex
+                  nextData.generatedImageUrl = nextImageUrls[nextActiveImageIndex] ?? null
                 }
                 if (typeof output.videoUrl === "string") nextData.generatedVideoUrl = output.videoUrl
                 if (typeof output.audioUrl === "string") nextData.generatedAudioUrl = output.audioUrl
@@ -623,16 +733,29 @@ export function MiniAppRuntime({ miniApp }: MiniAppRuntimeProps) {
   )
 
   const renderShowcase = () => {
-    if (!hasAnyRenderedOutput) {
+    const hasMediaGridItems = imageGridItems.length > 0 || videoGridItems.length > 0
+
+    if (!hasAnyRenderedOutput && !isRunning && !hasMediaGridItems) {
       return <MiniAppShowcaseCard miniApp={miniApp} />
     }
 
     return (
-      <div className="w-full space-y-5 px-4 sm:px-0">
-        {featuredOutput ? <MiniAppOutputCard node={featuredOutput} featured /> : null}
-        {alternateOutputs.length > 0 ? (
+      <div className="flex h-full min-h-0 w-full flex-col gap-5 px-2 sm:px-0">
+        {imageGridItems.length > 0 ? (
+          <div className={cn("min-h-0 w-full", videoGridItems.length > 0 || otherOutputs.length > 0 ? "min-h-[420px] flex-1" : "h-full")}>
+            <ImageGrid items={imageGridItems} basicActionsOnly />
+          </div>
+        ) : null}
+
+        {videoGridItems.length > 0 ? (
+          <div className={cn("min-h-0 w-full", imageGridItems.length > 0 || otherOutputs.length > 0 ? "min-h-[420px] flex-1" : "h-full")}>
+            <VideoGrid items={videoGridItems} showNativeControlsOnHoverOnly />
+          </div>
+        ) : null}
+
+        {otherOutputs.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2">
-            {alternateOutputs.map((node) => (
+            {otherOutputs.map((node) => (
               <MiniAppOutputCard key={node.id} node={node} />
             ))}
           </div>

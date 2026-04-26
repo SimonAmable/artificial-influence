@@ -35,7 +35,7 @@ export function MiniAppsShowcaseSection({ miniApps }: MiniAppsShowcaseSectionPro
           </p>
         </div>
 
-        <div className="mt-12 space-y-6">
+        <div className="mt-12 grid gap-6 md:grid-cols-2">
           {miniApps.map((miniApp) => (
             <Link
               key={miniApp.id}
@@ -43,7 +43,7 @@ export function MiniAppsShowcaseSection({ miniApps }: MiniAppsShowcaseSectionPro
               className="group block"
             >
               <div className="relative overflow-hidden rounded-3xl bg-black">
-                <div className="relative h-[420px] w-full sm:h-[520px]">
+                <div className="relative aspect-square w-full">
                   {miniApp.thumbnail_url ? (
                     <img
                       src={miniApp.thumbnail_url}

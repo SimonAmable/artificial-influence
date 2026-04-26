@@ -12,6 +12,7 @@
 - [Image editing](https://unican.app/inpaint): Inpaint and regional edits.
 - [Canvas](https://unican.app/canvases): Node-based workflows you can rerun.
 - [Autopost](https://unican.app/autopost): Connect Instagram and publish on schedule.
+- [Free tools](https://unican.app/free-tools): Local utilities for metadata removal and asset compression.
 - [Pricing](https://unican.app/pricing): Plans and limits.
 
 ## About

@@ -23,7 +23,7 @@ export interface WorkflowExecutionRuntime {
     aspectRatio: string
     enhancePrompt: boolean
     referenceImageUrls: string[]
-  }): Promise<{ imageUrl: string }>
+  }): Promise<{ imageUrl: string; imageUrls?: string[] }>
   generateVideo(input: {
     imageUrl: string
     videoUrl: string
@@ -287,7 +287,7 @@ async function executeNode(
         referenceImageUrls,
       })
 
-      return { imageUrl: result.imageUrl, imageUrls: [result.imageUrl] }
+      return { imageUrl: result.imageUrl, imageUrls: result.imageUrls ?? [result.imageUrl] }
     }
 
     case "video-gen": {
