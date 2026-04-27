@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server"
 
 const OAUTH_STATE_COOKIE = "tiktok_oauth_state"
 const TIKTOK_OAUTH_URL = "https://www.tiktok.com/v2/auth/authorize/"
-const TIKTOK_V1_SCOPE = "user.info.basic"
+const TIKTOK_V1_SCOPE = "user.info.basic,user.info.profile,user.info.stats,video.list,video.publish,video.upload"
 
 export async function GET(request: Request) {
   try {
