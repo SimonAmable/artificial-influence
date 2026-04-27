@@ -619,14 +619,6 @@ export function MiniAppRuntime({ miniApp }: MiniAppRuntimeProps) {
     try {
       setIsRunning(true)
       setHasRun(true)
-      setNodes((current) =>
-        current.map((node) => {
-          const config = miniApp.node_config[node.id]
-          return config?.show_in_mini_app && config.role === "output"
-            ? clearCurrentOutputData(node)
-            : node
-        })
-      )
 
       const nextNodes = await Promise.all(
         miniApp.snapshot_nodes.map(async (node) => {

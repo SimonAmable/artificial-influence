@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
-import { markInstagramSocialConnectionDisconnected } from "@/lib/social-connections"
+import { decryptAutopostToken } from "@/lib/autopost/crypto"
+import { revokeTikTokToken } from "@/lib/tiktok/oauth"
 import { createClient } from "@/lib/supabase/server"
 
 function parseConnectionId(body: unknown): string | null {
@@ -36,42 +37,49 @@ export async function POST(request: Request) {
     }
 
     const { data: row, error: rowError } = await supabase
-      .from("instagram_connections")
-      .select("instagram_user_id")
+      .from("social_connections")
+      .select("id, access_token_encrypted, status")
       .eq("id", connectionId)
       .eq("user_id", user.id)
+      .eq("provider", "tiktok")
       .maybeSingle()
 
     if (rowError) {
-      console.error("[instagram/disconnect] lookup failed:", rowError)
-      return NextResponse.json({ error: "Failed to disconnect Instagram account." }, { status: 500 })
+      console.error("[tiktok/disconnect] query failed:", rowError)
+      return NextResponse.json({ error: "Failed to load TikTok connection." }, { status: 500 })
     }
 
-    const { error } = await supabase
-      .from("instagram_connections")
-      .delete()
+    if (!row) {
+      return NextResponse.json({ error: "TikTok connection not found." }, { status: 404 })
+    }
+
+    if (row.status === "connected" && row.access_token_encrypted) {
+      try {
+        const accessToken = decryptAutopostToken(row.access_token_encrypted)
+        await revokeTikTokToken(accessToken)
+      } catch (revokeError) {
+        console.warn("[tiktok/disconnect] revoke failed; marking disconnected locally:", revokeError)
+      }
+    }
+
+    const { error: updateError } = await supabase
+      .from("social_connections")
+      .update({
+        status: "disconnected",
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", connectionId)
       .eq("user_id", user.id)
+      .eq("provider", "tiktok")
 
-    if (error) {
-      console.error("[instagram/disconnect] delete failed:", error)
-      return NextResponse.json({ error: "Failed to disconnect Instagram account." }, { status: 500 })
-    }
-
-    if (row?.instagram_user_id) {
-      const { error: socialError } = await markInstagramSocialConnectionDisconnected(supabase, {
-        userId: user.id,
-        instagramUserId: row.instagram_user_id,
-      })
-
-      if (socialError) {
-        console.warn("[instagram/disconnect] social mirror failed:", socialError)
-      }
+    if (updateError) {
+      console.error("[tiktok/disconnect] update failed:", updateError)
+      return NextResponse.json({ error: "Failed to disconnect TikTok account." }, { status: 500 })
     }
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("[instagram/disconnect] POST exception:", error)
+    console.error("[tiktok/disconnect] POST exception:", error)
     return NextResponse.json({ error: "Internal server error." }, { status: 500 })
   }
 }

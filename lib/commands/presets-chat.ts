@@ -15,6 +15,36 @@ export const CHAT_AGENT_COMMANDS: CommandItem[] = [
     inject: "Edit the attached image so that: ",
   },
   {
+    id: "agent-storyboard-3x3",
+    label: "Storyboard 3x3",
+    description: "Use GPT Image 2 to make an imaginative 3x3 storyboard from a reference",
+    inject: `Using the attached reference image, use the GPT Image 2 model (openai/gpt-image-2) to generate ONE imaginative storyboard image arranged as a clean 3x3 grid with nine equal panels.
+
+Base the story world, character/product identity, visual style, colors, and key details on the reference. Invent a coherent visual sequence across the nine panels: setup, escalation, discovery, transformation, emotional beat, action beat, twist, resolution, and final hero frame.
+
+Keep the reference subject recognizable throughout. Use cinematic composition, varied shot sizes, consistent lighting logic, thin gutters between panels, no text labels, no speech bubbles, no watermarks.`,
+  },
+  {
+    id: "agent-variation-3x3",
+    label: "Variation 3x3",
+    description: "Use GPT Image 2 to make a 3x3 set of creative variations from a reference",
+    inject: `Using the attached reference image, use the GPT Image 2 model (openai/gpt-image-2) to generate ONE composite image arranged as a clean 3x3 grid with nine equal panels.
+
+Create nine imaginative variations based on the reference. Preserve the core subject identity, proportions, important materials, and recognizable details, but vary creative direction across panels: mood, setting, styling, color grade, lighting, composition, atmosphere, and campaign angle.
+
+Each panel should feel distinct while clearly belonging to the same reference-driven family. Thin gutters between panels, no text labels, no watermarks.`,
+  },
+  {
+    id: "agent-angles-3x3",
+    label: "Angles 3x3",
+    description: "Use GPT Image 2 to make a 3x3 angle sheet from a reference",
+    inject: `Using the attached reference image, use the GPT Image 2 model (openai/gpt-image-2) to generate ONE composite image arranged as a clean 3x3 grid with nine equal panels.
+
+Keep the same subject, identity, clothing/product details, materials, and overall design from the reference. Only vary camera angle and framing across the panels: front, 3/4 left, 3/4 right, left profile, right profile, high angle, low angle, wide shot, and tight detail shot.
+
+Maintain consistent photoreal style, lighting mood, and color grade across all panels. Thin gutters between panels, no text labels, no watermarks.`,
+  },
+  {
     id: "agent-analyze-references",
     label: "Analyze references",
     description: "Review attached assets and call out what matters",

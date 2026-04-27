@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { encryptAutopostToken } from "@/lib/autopost/crypto"
 import { fetchInstagramMeForLink, type InstagramMeResponse, type InstagramSavedProfile } from "@/lib/instagram/profile"
 import { resolveInstagramOAuthRedirectUri } from "@/lib/instagram/oauth-redirect"
+import { upsertInstagramSocialConnection } from "@/lib/social-connections"
 import { createClient } from "@/lib/supabase/server"
 
 const OAUTH_STATE_COOKIE = "instagram_oauth_state"
@@ -191,7 +192,7 @@ export async function GET(request: Request) {
         ? new Date(Date.now() + tokenPayload.expires_in * 1000).toISOString()
         : null
 
-    const { error: upsertError } = await supabase.from("instagram_connections").upsert(
+    const { data: connectionRow, error: upsertError } = await supabase.from("instagram_connections").upsert(
       {
         user_id: user.id,
         provider: "instagram_login",
@@ -215,13 +216,32 @@ export async function GET(request: Request) {
       {
         onConflict: "user_id,instagram_user_id",
       }
-    )
+    ).select("id, user_id, instagram_user_id, instagram_username, access_token_encrypted, access_token_last4, token_expires_at, status, metadata")
+      .single()
 
     if (upsertError) {
       console.error("[instagram/callback] upsert failed:", upsertError)
       return buildAutopostRedirect(appUrl, {
         error: "Failed to save Instagram connection.",
       })
+    }
+
+    if (connectionRow?.instagram_user_id && connectionRow.access_token_encrypted) {
+      const { error: socialError } = await upsertInstagramSocialConnection(supabase, {
+        id: connectionRow.id,
+        user_id: connectionRow.user_id,
+        instagram_user_id: connectionRow.instagram_user_id,
+        instagram_username: connectionRow.instagram_username,
+        access_token_encrypted: connectionRow.access_token_encrypted,
+        access_token_last4: connectionRow.access_token_last4,
+        token_expires_at: connectionRow.token_expires_at,
+        status: "connected",
+        metadata: connectionRow.metadata,
+      })
+
+      if (socialError) {
+        console.warn("[instagram/callback] social mirror failed:", socialError)
+      }
     }
 
     return buildAutopostRedirect(appUrl, { connected: "1" })

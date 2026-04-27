@@ -7,6 +7,7 @@ import {
   type InstagramMeResponse,
   type InstagramSavedProfile,
 } from "@/lib/instagram/profile"
+import { upsertInstagramSocialConnection } from "@/lib/social-connections"
 import { createClient } from "@/lib/supabase/server"
 
 function parseConnectionId(body: unknown): string | null {
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
     const { data: row, error: rowError } = await supabase
       .from("instagram_connections")
       .select(
-        "metadata, access_token_encrypted, token_expires_at, status, instagram_username, instagram_user_id"
+        "id, user_id, metadata, access_token_encrypted, access_token_last4, token_expires_at, status, instagram_username, instagram_user_id"
       )
       .eq("id", connectionId)
       .eq("user_id", user.id)
@@ -120,6 +121,25 @@ export async function POST(request: Request) {
     if (updateError) {
       console.error("[instagram/refresh-profile] update failed:", updateError)
       return NextResponse.json({ error: "Failed to save profile." }, { status: 500 })
+    }
+
+    const nextInstagramUserId = me.id ?? row.instagram_user_id
+    if (nextInstagramUserId) {
+      const { error: socialError } = await upsertInstagramSocialConnection(supabase, {
+        id: row.id,
+        user_id: row.user_id,
+        instagram_user_id: nextInstagramUserId,
+        instagram_username: me.username ?? row.instagram_username,
+        access_token_encrypted: row.access_token_encrypted,
+        access_token_last4: row.access_token_last4,
+        token_expires_at: row.token_expires_at,
+        status: "connected",
+        metadata: nextMetadata,
+      })
+
+      if (socialError) {
+        console.warn("[instagram/refresh-profile] social mirror failed:", socialError)
+      }
     }
 
     return NextResponse.json({

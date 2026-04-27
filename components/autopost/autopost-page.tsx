@@ -213,7 +213,7 @@ function jobListThumbnailIsVideo(job: AutopostJobRow): boolean {
 
 const TOKEN_EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000
 
-function instagramTokenExpiryBanner(tokenExpiresAt: string | null): {
+function socialTokenExpiryBanner(provider: "Instagram" | "TikTok", tokenExpiresAt: string | null): {
   variant: "expired" | "soon"
   body: string
 } | null {
@@ -225,7 +225,7 @@ function instagramTokenExpiryBanner(tokenExpiresAt: string | null): {
   if (t <= now) {
     return {
       variant: "expired",
-      body: "Access token expired. Disconnect and connect Instagram again to keep publishing.",
+      body: `${provider} access token expired. Disconnect and connect again.`,
     }
   }
   if (t - now > TOKEN_EXPIRY_WARNING_MS) return null
@@ -236,20 +236,55 @@ function instagramTokenExpiryBanner(tokenExpiresAt: string | null): {
   }
 }
 
-type InstagramConnectionItem = {
+type SocialProvider = "instagram" | "tiktok"
+
+type SocialConnectionItem = {
   id: string
+  provider: SocialProvider
+  providerAccountId: string
+  username: string | null
+  displayName: string | null
+  avatarUrl: string | null
+  status: "connected" | "disconnected" | "error" | "expired" | string
+  scopes: string[]
+  refreshTokenExpiresAt: string | null
+  metadata?: Record<string, unknown>
+  profile: InstagramSavedProfile | TikTokSavedProfile | null
+  instagramConnectionId: string | null
   instagramUsername: string | null
   instagramUserId: string | null
   accountType: string | null
-  profile: InstagramSavedProfile | null
-  provider: string | null
   tokenExpiresAt: string | null
   updatedAt: string
 }
 
-type InstagramConnectionStatus = {
+type SocialProviderStatus = {
   connected: boolean
-  connections: InstagramConnectionItem[]
+  connections: SocialConnectionItem[]
+}
+
+type SocialConnectionsStatus = {
+  providers?: {
+    instagram?: SocialProviderStatus
+    tiktok?: SocialProviderStatus
+  }
+  instagram?: SocialProviderStatus
+  tiktok?: SocialProviderStatus
+}
+
+type TikTokSavedProfile = {
+  open_id: string
+  display_name: string | null
+  avatar_url: string | null
+  profile_deep_link: string | null
+  bio_description: string | null
+  fetched_at: string
+}
+
+type DisconnectTarget = {
+  provider: SocialProvider
+  connectionId: string
+  label: string
 }
 
 function statusLabel(status: string) {
@@ -290,7 +325,7 @@ function statusBadgeClass(status: string) {
 }
 
 export function AutopostPage() {
-  const [status, setStatus] = React.useState<InstagramConnectionStatus | null>(null)
+  const [status, setStatus] = React.useState<SocialConnectionsStatus | null>(null)
   const [isLoadingStatus, setIsLoadingStatus] = React.useState(true)
   const [isDisconnecting, setIsDisconnecting] = React.useState(false)
   const [refreshingConnectionId, setRefreshingConnectionId] = React.useState<string | null>(null)
@@ -310,7 +345,7 @@ export function AutopostPage() {
   const [isPostingDraft, setIsPostingDraft] = React.useState(false)
   const [actionJobId, setActionJobId] = React.useState<string | null>(null)
 
-  const [disconnectTargetId, setDisconnectTargetId] = React.useState<string | null>(null)
+  const [disconnectTarget, setDisconnectTarget] = React.useState<DisconnectTarget | null>(null)
   const [composerCardHeight, setComposerCardHeight] = React.useState<number | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const composerCardRef = React.useRef<HTMLDivElement>(null)
@@ -340,37 +375,51 @@ export function AutopostPage() {
   }, [])
 
   React.useEffect(() => {
-    setSelectedFiles([])
-    setPreviewUrls((prev) => {
-      prev.forEach((u) => URL.revokeObjectURL(u))
-      return []
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      setSelectedFiles([])
+      setPreviewUrls((prev) => {
+        prev.forEach((u) => URL.revokeObjectURL(u))
+        return []
+      })
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+      if (postFormat === "story") {
+        setCaption("")
+      }
     })
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
-    if (postFormat === "story") {
-      setCaption("")
+    return () => {
+      cancelled = true
     }
   }, [postFormat])
 
   const fetchStatus = React.useCallback(async () => {
     setIsLoadingStatus(true)
     try {
-      const response = await fetch("/api/instagram/status", { cache: "no-store" })
-      const data = (await response.json()) as InstagramConnectionStatus | { error?: string }
+      const response = await fetch("/api/social-connections/status", { cache: "no-store" })
+      const data = (await response.json()) as SocialConnectionsStatus | { error?: string }
 
       if (!response.ok) {
-        throw new Error("error" in data && data.error ? data.error : "Failed to load Instagram connection status.")
+        throw new Error("error" in data && data.error ? data.error : "Failed to load social connection status.")
       }
 
-      const payload = data as InstagramConnectionStatus
+      const payload = data as SocialConnectionsStatus
+      const instagram = payload.providers?.instagram ?? payload.instagram ?? { connected: false, connections: [] }
+      const tiktok = payload.providers?.tiktok ?? payload.tiktok ?? { connected: false, connections: [] }
       setStatus({
-        connected: payload.connected,
-        connections: payload.connections ?? [],
+        providers: { instagram, tiktok },
+        instagram,
+        tiktok,
       })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to load Instagram status")
-      setStatus({ connected: false, connections: [] })
+      toast.error(error instanceof Error ? error.message : "Failed to load social connection status")
+      const emptyStatus = {
+        instagram: { connected: false, connections: [] },
+        tiktok: { connected: false, connections: [] },
+      }
+      setStatus({ providers: emptyStatus, ...emptyStatus })
     } finally {
       setIsLoadingStatus(false)
     }
@@ -401,24 +450,32 @@ export function AutopostPage() {
   )
 
   React.useEffect(() => {
-    const list = status?.connections ?? []
-    if (list.length === 0) {
-      setSelectedComposerConnectionId(null)
-      return
-    }
-    setSelectedComposerConnectionId((current) => {
-      if (current && list.some((c) => c.id === current)) {
-        return current
+    const list = status?.instagram?.connections ?? []
+    const publishableConnections = list.filter((c) => c.instagramConnectionId)
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      if (list.length === 0) {
+        setSelectedComposerConnectionId(null)
+        return
       }
-      if (typeof window !== "undefined") {
-        const stored = localStorage.getItem(AUTOPOST_COMPOSER_ACCOUNT_KEY)
-        if (stored && list.some((c) => c.id === stored)) {
-          return stored
+      setSelectedComposerConnectionId((current) => {
+        if (current && publishableConnections.some((c) => c.instagramConnectionId === current)) {
+          return current
         }
-      }
-      return list[0].id
+        if (typeof window !== "undefined") {
+          const stored = localStorage.getItem(AUTOPOST_COMPOSER_ACCOUNT_KEY)
+          if (stored && publishableConnections.some((c) => c.instagramConnectionId === stored)) {
+            return stored
+          }
+        }
+        return publishableConnections[0]?.instagramConnectionId ?? null
+      })
     })
-  }, [status?.connections])
+    return () => {
+      cancelled = true
+    }
+  }, [status?.instagram?.connections])
 
   const fetchJobs = React.useCallback(async () => {
     setIsLoadingJobs(true)
@@ -438,8 +495,10 @@ export function AutopostPage() {
   }, [])
 
   React.useEffect(() => {
-    void fetchStatus()
-    void fetchJobs()
+    queueMicrotask(() => {
+      void fetchStatus()
+      void fetchJobs()
+    })
   }, [fetchStatus, fetchJobs])
 
   React.useEffect(() => {
@@ -449,6 +508,7 @@ export function AutopostPage() {
 
     const error = searchParams.get("error")
     const connected = searchParams.get("connected")
+    const provider = searchParams.get("provider")
 
     if (!error && !connected) {
       return
@@ -459,45 +519,59 @@ export function AutopostPage() {
     if (error) {
       toast.error(error)
     } else if (connected === "1") {
-      toast.success("Instagram account connected.")
-      void fetchStatus()
+      toast.success(provider === "tiktok" ? "TikTok account connected." : "Instagram account connected.")
+      queueMicrotask(() => void fetchStatus())
     }
 
     const nextUrl = new URL(window.location.href)
     nextUrl.searchParams.delete("error")
     nextUrl.searchParams.delete("connected")
+    nextUrl.searchParams.delete("provider")
     const search = nextUrl.searchParams.toString()
     window.history.replaceState({}, "", search ? `${nextUrl.pathname}?${search}` : nextUrl.pathname)
   }, [fetchStatus, searchParams])
 
-  const handleConnect = () => {
+  const handleConnectInstagram = () => {
     window.location.href = "/api/instagram/connect"
   }
 
+  const handleConnectTikTok = () => {
+    window.location.href = "/api/tiktok/connect"
+  }
+
   const handleDisconnect = async () => {
-    if (!disconnectTargetId) {
+    if (!disconnectTarget) {
       return
     }
-    const id = disconnectTargetId
+    const target = disconnectTarget
     setIsDisconnecting(true)
     try {
-      const response = await fetch("/api/instagram/disconnect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ connectionId: id }),
-      })
+      const response = await fetch(
+        target.provider === "tiktok" ? "/api/tiktok/disconnect" : "/api/instagram/disconnect",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ connectionId: target.connectionId }),
+        }
+      )
       const data = (await response.json()) as { error?: string }
       if (!response.ok) {
-        throw new Error(data.error || "Failed to disconnect Instagram account.")
+        throw new Error(
+          data.error ||
+            `Failed to disconnect ${target.provider === "tiktok" ? "TikTok" : "Instagram"} account.`
+        )
       }
-      toast.success("Instagram account disconnected.")
-      setDisconnectTargetId(null)
-      if (typeof window !== "undefined" && localStorage.getItem(AUTOPOST_COMPOSER_ACCOUNT_KEY) === id) {
+      toast.success(`${target.provider === "tiktok" ? "TikTok" : "Instagram"} account disconnected.`)
+      setDisconnectTarget(null)
+      if (
+        typeof window !== "undefined" &&
+        localStorage.getItem(AUTOPOST_COMPOSER_ACCOUNT_KEY) === target.connectionId
+      ) {
         localStorage.removeItem(AUTOPOST_COMPOSER_ACCOUNT_KEY)
       }
       await fetchStatus()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to disconnect Instagram account")
+      toast.error(error instanceof Error ? error.message : "Failed to disconnect account")
     } finally {
       setIsDisconnecting(false)
     }
@@ -552,7 +626,7 @@ export function AutopostPage() {
       return null
     }
 
-    if (!status?.connected) {
+    if (!status?.instagram?.connected) {
       toast.error("Connect Instagram before publishing.")
       return null
     }
@@ -817,8 +891,9 @@ export function AutopostPage() {
     }
   }
 
-  const connections = status?.connections ?? []
-  const isConnected = connections.length > 0
+  const instagramConnections = status?.instagram?.connections ?? []
+  const tiktokConnections = status?.tiktok?.connections ?? []
+  const isConnected = instagramConnections.some((connection) => connection.status === "connected")
 
   const composerReady =
     postFormat === "carousel"
@@ -832,12 +907,12 @@ export function AutopostPage() {
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold tracking-tight">Autopost</h1>
             <p className="text-sm text-muted-foreground">
-              Connect Instagram, publish immediately, or schedule posts. All activity appears in your post history.
+              Connect social accounts, publish to Instagram, or schedule posts. All activity appears in your post history.
             </p>
           </div>
           <Button
             type="button"
-            onClick={handleConnect}
+            onClick={handleConnectInstagram}
             variant="outline"
             className="shrink-0"
           >
@@ -846,191 +921,312 @@ export function AutopostPage() {
           </Button>
         </div>
 
-        <Card className="py-4 sm:py-6 order-last" data-instagram-connection-card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Link2 className="h-4 w-4" />
-              Instagram Connection
-            </CardTitle>
-            <CardDescription>
-              Connect with Instagram Login. Publishing uses the Content Publishing API on graph.instagram.com.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoadingStatus ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading connection status...
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <Badge variant={isConnected ? "default" : "outline"}>
-                  {isConnected
-                    ? `${connections.length} account${connections.length === 1 ? "" : "s"} connected`
-                    : "Not connected"}
-                </Badge>
-                {isConnected ? (
-                  <div className="flex flex-col gap-4">
-                    {connections.map((connection) => {
-                      const tokenBanner = instagramTokenExpiryBanner(connection.tokenExpiresAt)
-                      const profile = connection.profile
-                      return (
-                        <div
-                          key={connection.id}
-                          className="rounded-xl border border-border/80 bg-muted/30 p-4 shadow-sm"
-                        >
-                          <div className="flex gap-3 sm:gap-4">
-                            {profile?.profile_picture_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- remote Instagram CDN URL from Graph API
-                              <img
-                                src={profile.profile_picture_url}
-                                alt=""
-                                className="h-14 w-14 shrink-0 rounded-full border border-border/80 object-cover"
-                                width={56}
-                                height={56}
-                              />
-                            ) : (
-                              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-border/80 bg-muted">
-                                <UserRound className="h-7 w-7 text-muted-foreground" aria-hidden />
-                              </div>
-                            )}
-                            <div className="min-w-0 flex-1 space-y-2">
-                              <div className="flex flex-wrap items-start justify-between gap-2">
-                                <div className="min-w-0 space-y-0.5">
-                                  <p className="font-semibold leading-tight text-foreground">
-                                    {profile?.name?.trim() ||
-                                      (connection.instagramUsername
-                                        ? `@${connection.instagramUsername}`
-                                        : "Instagram")}
-                                  </p>
-                                  {connection.instagramUsername ? (
-                                    <a
-                                      href={`https://www.instagram.com/${connection.instagramUsername}/`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-sm text-primary underline-offset-4 hover:underline"
-                                    >
-                                      instagram.com/{connection.instagramUsername}
-                                    </a>
-                                  ) : null}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="py-4 sm:py-6" data-instagram-connection-card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Link2 className="h-4 w-4" />
+                Instagram
+              </CardTitle>
+              <CardDescription>
+                Publishing and scheduling currently use connected Instagram professional accounts.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isLoadingStatus ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading connection status...
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Badge variant={isConnected ? "default" : "outline"}>
+                    {isConnected
+                      ? `${instagramConnections.length} account${instagramConnections.length === 1 ? "" : "s"} connected`
+                      : "Not connected"}
+                  </Badge>
+                  {isConnected ? (
+                    <div className="flex flex-col gap-4">
+                      {instagramConnections.map((connection) => {
+                        const tokenBanner = socialTokenExpiryBanner("Instagram", connection.tokenExpiresAt)
+                        const profile = connection.profile as InstagramSavedProfile | null
+                        const instagramConnectionId = connection.instagramConnectionId
+                        const label = connection.instagramUsername
+                          ? `@${connection.instagramUsername}`
+                          : connection.displayName || "Instagram account"
+                        return (
+                          <div
+                            key={connection.id}
+                            className="rounded-xl border border-border/80 bg-muted/30 p-4 shadow-sm"
+                          >
+                            <div className="flex gap-3 sm:gap-4">
+                              {profile?.profile_picture_url || connection.avatarUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element -- remote Instagram CDN URL from Graph API
+                                <img
+                                  src={profile?.profile_picture_url ?? connection.avatarUrl ?? ""}
+                                  alt=""
+                                  className="h-14 w-14 shrink-0 rounded-full border border-border/80 object-cover"
+                                  width={56}
+                                  height={56}
+                                />
+                              ) : (
+                                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-border/80 bg-muted">
+                                  <UserRound className="h-7 w-7 text-muted-foreground" aria-hidden />
                                 </div>
-                                <div className="flex shrink-0 items-center gap-2">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon-sm"
-                                    className="shrink-0"
-                                    disabled={refreshingConnectionId === connection.id}
-                                    aria-label={`Refresh profile for ${connection.instagramUsername ?? "account"}`}
-                                    onClick={() => void handleRefreshProfile(connection.id)}
-                                  >
-                                    <RefreshCw
-                                      className={cn(
-                                        "h-3.5 w-3.5",
-                                        refreshingConnectionId === connection.id && "animate-spin"
-                                      )}
-                                      aria-hidden
-                                    />
-                                  </Button>
+                              )}
+                              <div className="min-w-0 flex-1 space-y-2">
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                  <div className="min-w-0 space-y-0.5">
+                                    <p className="font-semibold leading-tight text-foreground">
+                                      {profile?.name?.trim() || connection.displayName || label}
+                                    </p>
+                                    {connection.instagramUsername ? (
+                                      <a
+                                        href={`https://www.instagram.com/${connection.instagramUsername}/`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-primary underline-offset-4 hover:underline"
+                                      >
+                                        instagram.com/{connection.instagramUsername}
+                                      </a>
+                                    ) : null}
+                                  </div>
+                                  <div className="flex shrink-0 items-center gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="icon-sm"
+                                      className="shrink-0"
+                                      disabled={!instagramConnectionId || refreshingConnectionId === instagramConnectionId}
+                                      aria-label={`Refresh profile for ${label}`}
+                                      onClick={() => instagramConnectionId ? void handleRefreshProfile(instagramConnectionId) : undefined}
+                                    >
+                                      <RefreshCw
+                                        className={cn(
+                                          "h-3.5 w-3.5",
+                                          refreshingConnectionId === instagramConnectionId && "animate-spin"
+                                        )}
+                                        aria-hidden
+                                      />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="shrink-0"
+                                      disabled={isDisconnecting || !instagramConnectionId}
+                                      onClick={() =>
+                                        instagramConnectionId
+                                          ? setDisconnectTarget({
+                                              provider: "instagram",
+                                              connectionId: instagramConnectionId,
+                                              label,
+                                            })
+                                          : undefined
+                                      }
+                                    >
+                                      Disconnect
+                                    </Button>
+                                  </div>
+                                </div>
+                                {profile?.biography ? (
+                                  <p className="line-clamp-3 text-sm text-muted-foreground">{profile.biography}</p>
+                                ) : null}
+                                {profile &&
+                                (profile.followers_count != null ||
+                                  profile.follows_count != null ||
+                                  profile.media_count != null) ? (
+                                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                    {profile.followers_count != null ? (
+                                      <span>
+                                        <span className="font-medium text-foreground">
+                                          {profile.followers_count.toLocaleString()}
+                                        </span>{" "}
+                                        followers
+                                      </span>
+                                    ) : null}
+                                    {profile.follows_count != null ? (
+                                      <span>
+                                        <span className="font-medium text-foreground">
+                                          {profile.follows_count.toLocaleString()}
+                                        </span>{" "}
+                                        following
+                                      </span>
+                                    ) : null}
+                                    {profile.media_count != null ? (
+                                      <span>
+                                        <span className="font-medium text-foreground">
+                                          {profile.media_count.toLocaleString()}
+                                        </span>{" "}
+                                        posts
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                            {tokenBanner ? (
+                              <div
+                                role="alert"
+                                className={cn(
+                                  "mt-3 flex gap-2 rounded-lg border px-3 py-2.5 text-sm",
+                                  tokenBanner.variant === "expired"
+                                    ? "border-destructive/50 bg-destructive/10 text-destructive"
+                                    : "border-amber-500/45 bg-amber-500/10 text-amber-950 dark:text-amber-100"
+                                )}
+                              >
+                                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                                <p className="min-w-0 leading-snug">{tokenBanner.body}</p>
+                              </div>
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground">No account linked</p>
+                      <p className="mt-1">Connect Instagram before publishing or scheduling posts.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="gap-2">
+              <Button onClick={handleConnectInstagram}>Connect Instagram</Button>
+            </CardFooter>
+          </Card>
+
+          <Card className="py-4 sm:py-6" data-tiktok-connection-card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Film className="h-4 w-4" />
+                TikTok
+              </CardTitle>
+              <CardDescription>
+                TikTok v1 connects accounts only. Uploading and Direct Post stay hidden until the next release.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isLoadingStatus ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading connection status...
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Badge variant={tiktokConnections.some((connection) => connection.status === "connected") ? "default" : "outline"}>
+                    {tiktokConnections.length > 0
+                      ? `${tiktokConnections.length} account${tiktokConnections.length === 1 ? "" : "s"} connected`
+                      : "Not connected"}
+                  </Badge>
+                  {tiktokConnections.length > 0 ? (
+                    <div className="flex flex-col gap-4">
+                      {tiktokConnections.map((connection) => {
+                        const tokenBanner = socialTokenExpiryBanner("TikTok", connection.tokenExpiresAt)
+                        const profile = connection.profile as TikTokSavedProfile | null
+                        const label = connection.displayName || profile?.display_name || "TikTok account"
+                        return (
+                          <div
+                            key={connection.id}
+                            className="rounded-xl border border-border/80 bg-muted/30 p-4 shadow-sm"
+                          >
+                            <div className="flex gap-3 sm:gap-4">
+                              {connection.avatarUrl || profile?.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element -- remote TikTok avatar URL
+                                <img
+                                  src={connection.avatarUrl ?? profile?.avatar_url ?? ""}
+                                  alt=""
+                                  className="h-14 w-14 shrink-0 rounded-full border border-border/80 object-cover"
+                                  width={56}
+                                  height={56}
+                                />
+                              ) : (
+                                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-border/80 bg-muted">
+                                  <UserRound className="h-7 w-7 text-muted-foreground" aria-hidden />
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1 space-y-2">
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                  <div className="min-w-0 space-y-0.5">
+                                    <p className="font-semibold leading-tight text-foreground">{label}</p>
+                                    {profile?.profile_deep_link ? (
+                                      <a
+                                        href={profile.profile_deep_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-primary underline-offset-4 hover:underline"
+                                      >
+                                        Open TikTok profile
+                                      </a>
+                                    ) : (
+                                      <p className="font-mono text-xs text-muted-foreground">
+                                        {connection.providerAccountId.slice(0, 12)}...
+                                      </p>
+                                    )}
+                                  </div>
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
                                     className="shrink-0"
                                     disabled={isDisconnecting}
-                                    onClick={() => setDisconnectTargetId(connection.id)}
+                                    onClick={() =>
+                                      setDisconnectTarget({
+                                        provider: "tiktok",
+                                        connectionId: connection.id,
+                                        label,
+                                      })
+                                    }
                                   >
                                     Disconnect
                                   </Button>
                                 </div>
-                              </div>
-                              {profile?.biography ? (
-                                <p className="line-clamp-3 text-sm text-muted-foreground">{profile.biography}</p>
-                              ) : null}
-                              {profile &&
-                              (profile.followers_count != null ||
-                                profile.follows_count != null ||
-                                profile.media_count != null) ? (
-                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                                  {profile.followers_count != null ? (
-                                    <span>
-                                      <span className="font-medium text-foreground">
-                                        {profile.followers_count.toLocaleString()}
-                                      </span>{" "}
-                                      followers
-                                    </span>
-                                  ) : null}
-                                  {profile.follows_count != null ? (
-                                    <span>
-                                      <span className="font-medium text-foreground">
-                                        {profile.follows_count.toLocaleString()}
-                                      </span>{" "}
-                                      following
-                                    </span>
-                                  ) : null}
-                                  {profile.media_count != null ? (
-                                    <span>
-                                      <span className="font-medium text-foreground">
-                                        {profile.media_count.toLocaleString()}
-                                      </span>{" "}
-                                      posts
-                                    </span>
+                                {profile?.bio_description ? (
+                                  <p className="line-clamp-3 text-sm text-muted-foreground">{profile.bio_description}</p>
+                                ) : null}
+                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                  <Badge variant="outline">Profile only</Badge>
+                                  {connection.status !== "connected" ? (
+                                    <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300">
+                                      {connection.status}
+                                    </Badge>
                                   ) : null}
                                 </div>
-                              ) : null}
-                              {profile?.website ? (
-                                <a
-                                  href={
-                                    profile.website.startsWith("http")
-                                      ? profile.website
-                                      : `https://${profile.website}`
-                                  }
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-block max-w-full truncate text-xs text-primary underline-offset-4 hover:underline"
-                                >
-                                  {profile.website}
-                                </a>
-                              ) : null}
+                              </div>
                             </div>
+                            {tokenBanner ? (
+                              <div
+                                role="alert"
+                                className={cn(
+                                  "mt-3 flex gap-2 rounded-lg border px-3 py-2.5 text-sm",
+                                  tokenBanner.variant === "expired"
+                                    ? "border-destructive/50 bg-destructive/10 text-destructive"
+                                    : "border-amber-500/45 bg-amber-500/10 text-amber-950 dark:text-amber-100"
+                                )}
+                              >
+                                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                                <p className="min-w-0 leading-snug">{tokenBanner.body}</p>
+                              </div>
+                            ) : null}
                           </div>
-                          {tokenBanner ? (
-                            <div
-                              role="alert"
-                              className={cn(
-                                "mt-3 flex gap-2 rounded-lg border px-3 py-2.5 text-sm",
-                                tokenBanner.variant === "expired"
-                                  ? "border-destructive/50 bg-destructive/10 text-destructive"
-                                  : "border-amber-500/45 bg-amber-500/10 text-amber-950 dark:text-amber-100"
-                              )}
-                            >
-                              <AlertTriangle
-                                className="mt-0.5 h-4 w-4 shrink-0 opacity-90"
-                                aria-hidden
-                              />
-                              <p className="min-w-0 leading-snug">{tokenBanner.body}</p>
-                            </div>
-                          ) : null}
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
-                    <p className="font-medium text-foreground">No account linked</p>
-                    <p className="mt-1">Connect an Instagram professional account to continue.</p>
-                    <p className="mt-2 text-xs">
-                      Business and Creator accounts are supported. A Facebook Page link is not required.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-          <CardFooter className="gap-2">
-            <Button onClick={handleConnect}>Connect Instagram</Button>
-          </CardFooter>
-        </Card>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground">No TikTok account linked</p>
+                      <p className="mt-1">Connect TikTok to prepare for upcoming upload and posting support.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="gap-2">
+              <Button onClick={handleConnectTikTok}>Connect TikTok</Button>
+            </CardFooter>
+          </Card>
+        </div>
 
         <div
           className="grid gap-6 lg:grid-cols-2 lg:items-start"
@@ -1057,7 +1253,7 @@ export function AutopostPage() {
                 <Select
                   value={postFormat}
                   onValueChange={(v) => setPostFormat(v as PostFormat)}
-                  disabled={!isConnected || connections.length === 0}
+                  disabled={!isConnected || instagramConnections.length === 0}
                 >
                   <SelectTrigger id="autopost-post-type" className="w-full">
                     <SelectValue />
@@ -1104,14 +1300,14 @@ export function AutopostPage() {
                       localStorage.setItem(AUTOPOST_COMPOSER_ACCOUNT_KEY, value)
                     }
                   }}
-                  disabled={!isConnected || connections.length === 0}
+                  disabled={!isConnected || instagramConnections.length === 0}
                 >
                   <SelectTrigger id="autopost-account" className="w-full">
                     <SelectValue placeholder={isConnected ? "Select account" : "Connect Instagram first"} />
                   </SelectTrigger>
                   <SelectContent position="popper" className="z-120">
-                    {connections.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
+                    {instagramConnections.filter((c) => c.instagramConnectionId).map((c) => (
+                      <SelectItem key={c.id} value={c.instagramConnectionId as string}>
                         {c.instagramUsername ? `@${c.instagramUsername}` : c.instagramUserId ?? "Account"}
                       </SelectItem>
                     ))}
@@ -1554,30 +1750,27 @@ export function AutopostPage() {
       </div>
 
       <AlertDialog
-        open={disconnectTargetId !== null}
+        open={disconnectTarget !== null}
         onOpenChange={(open) => {
           if (!open && isDisconnecting) {
             return
           }
           if (!open) {
-            setDisconnectTargetId(null)
+            setDisconnectTarget(null)
           }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Disconnect Instagram?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Disconnect {disconnectTarget?.provider === "tiktok" ? "TikTok" : "Instagram"}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               This removes the link to{" "}
-              {connections.find((c) => c.id === disconnectTargetId)?.instagramUsername ? (
-                <span className="font-medium text-foreground">
-                  @
-                  {connections.find((c) => c.id === disconnectTargetId)?.instagramUsername}
-                </span>
-              ) : (
-                "this Instagram account"
-              )}
-              . You will need to connect again before publishing to it.
+              <span className="font-medium text-foreground">
+                {disconnectTarget?.label ?? "this account"}
+              </span>
+              . You can connect it again later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
