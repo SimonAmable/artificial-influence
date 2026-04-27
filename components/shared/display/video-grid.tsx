@@ -56,6 +56,7 @@ interface VideoGridProps {
    * Coarse pointer / no-hover devices keep controls always available.
    */
   showNativeControlsOnHoverOnly?: boolean
+  initialColumnCount?: number
   onUseVideoAsReference?: (videoUrl: string, index: number) => void
   onSaveVideoAsAsset?: (videoUrl: string, index: number) => void
   onDelete?: (id: string, videoUrl: string, index: number) => void | Promise<void>
@@ -99,16 +100,10 @@ function VideoHistoryTile({
   onSaveVideoAsAsset?: (videoUrl: string, index: number) => void
 }) {
   const [hovered, setHovered] = React.useState(false)
-  const [clientReady, setClientReady] = React.useState(false)
   const finePointer = useFinePointerHoverDevice()
-
-  React.useEffect(() => {
-    setClientReady(true)
-  }, [])
 
   const nativeControlsVisible =
     !showNativeControlsOnHoverOnly ||
-    !clientReady ||
     !finePointer ||
     hovered
 
@@ -222,11 +217,14 @@ export function VideoGrid({
   isLoadingSkeleton = false,
   className,
   showNativeControlsOnHoverOnly = false,
+  initialColumnCount = 3,
   onUseVideoAsReference,
   onSaveVideoAsAsset,
   onDelete,
 }: VideoGridProps) {
-  const [columnCount, setColumnCount] = React.useState(3)
+  const [columnCount, setColumnCount] = React.useState(() =>
+    Math.min(Math.max(Math.round(initialColumnCount), 1), 4)
+  )
   const [fullscreenVideo, setFullscreenVideo] = React.useState<{
     item: VideoHistoryItem
     index: number
