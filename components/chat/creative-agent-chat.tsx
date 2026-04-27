@@ -2104,7 +2104,7 @@ export function MessageParts({
               key={`${message.id}-${index}`}
               badgeLabel="Generated"
               messageId={`${message.id}-${index}`}
-              modelFallback="google/nano-banana-2"
+              modelFallback="openai/gpt-image-2"
               part={toolPart}
               title="Image Generation Tool"
             />

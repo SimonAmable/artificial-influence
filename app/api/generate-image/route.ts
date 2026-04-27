@@ -13,7 +13,6 @@ import { runReplicatePollingImageGeneration } from '@/lib/server/replicate-image
 import {
   buildFalImageRequest,
   isSupportedFalImageModel,
-  QWEN_IMAGE2_CANONICAL_ID,
   submitFalImageQueue,
 } from '@/lib/server/fal-image';
 import {
@@ -404,14 +403,7 @@ export async function POST(request: NextRequest) {
       console.log('[generate-image] Prompt enhancement skipped');
     }
 
-    if (modelProvider === 'fal' && modelIdentifier === QWEN_IMAGE2_CANONICAL_ID) {
-      if (!isSupportedFalImageModel(modelIdentifier)) {
-        return NextResponse.json(
-          { error: `Unsupported Fal image model: ${modelIdentifier}` },
-          { status: 400 },
-        );
-      }
-
+    if (modelProvider === 'fal' && isSupportedFalImageModel(modelIdentifier)) {
       const negativePromptField = formData.get('negative_prompt') as string | null;
       const enablePromptExpansion = formData.get('enable_prompt_expansion') !== 'false';
       const enableSafetyChecker = formData.get('enable_safety_checker') === 'true';

@@ -107,6 +107,14 @@ export async function generateImageAndWait(
       const statusData = await statusRes.json();
 
       if (statusData.status === 'completed') {
+        if (statusData.images?.length) {
+          return {
+            images: statusData.images.map((img: { url: string; mimeType?: string }) => ({
+              url: img.url,
+              mimeType: img.mimeType || 'image/png',
+            })),
+          };
+        }
         if (statusData.image?.url) {
           return { image: { url: statusData.image.url, mimeType: statusData.image.mimeType || 'image/png' } };
         }

@@ -5,6 +5,7 @@
 
 export function isHiddenCatalogModelIdentifier(identifier: string): boolean {
   if (identifier.startsWith("fal-ai/qwen-image-2/")) return true
+  if (identifier.startsWith("fal-ai/wan/v2.7/")) return true
   if (identifier.startsWith("wan-video/wan-2.7-")) return true
   return false
 }

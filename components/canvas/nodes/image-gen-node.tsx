@@ -143,7 +143,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     ]
   }, [imageModels])
 
-  /** Align with app default (Nano Banana 2); fix Radix Select when stored id is missing from the list. */
+  /** Align with app default; fix Radix Select when stored id is missing from the list. */
   const canvasSelectedImageModel = React.useMemo(() => {
     if (effectiveImageModels.length === 0) {
       return nodeData.model || DEFAULT_IMAGE_MODEL_IDENTIFIER

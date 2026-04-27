@@ -19,6 +19,7 @@ export const MODEL_IDENTIFIERS = {
   GOOGLE_NANO_BANANA_PRO: 'google/nano-banana-pro',
   GOOGLE_NANO_BANANA_2: 'google/nano-banana-2',
   OPENAI_GPT_IMAGE_1_5: 'openai/gpt-image-1.5',
+  OPENAI_GPT_IMAGE_2: 'openai/gpt-image-2',
   BYTEDANCE_SEEDREAM_4_5: 'bytedance/seedream-4.5',
   BYTEDANCE_SEEDREAM_5_LITE: 'bytedance/seedream-5-lite',
   PRUNAAI_Z_IMAGE_TURBO: 'prunaai/z-image-turbo',
@@ -41,7 +42,7 @@ export const MODEL_IDENTIFIERS = {
 } as const;
 
 /** Default model for image generation (used when no model is specified). */
-export const DEFAULT_IMAGE_MODEL_IDENTIFIER = MODEL_IDENTIFIERS.GOOGLE_NANO_BANANA_2;
+export const DEFAULT_IMAGE_MODEL_IDENTIFIER = MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_2;
 
 // ============================================================================
 // PARAMETER DEFINITIONS

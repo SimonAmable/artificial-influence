@@ -121,6 +121,8 @@ const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
   "gpt-image": "openai/gpt-image-2",
   "gpt-image-2": "openai/gpt-image-2",
   "grok-imagine": "xai/grok-imagine-image",
+  wan: "fal-ai/wan/v2.7",
+  "wan-2.7": "fal-ai/wan/v2.7",
 }
 const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
   full_character:
@@ -204,7 +206,7 @@ function ImagePageContent() {
   const [upscalingImageUrl, setUpscalingImageUrl] = React.useState<string | null>(null)
   const [removingMetadataImageUrl, setRemovingMetadataImageUrl] = React.useState<string | null>(null)
 
-  // Set default model when models load (prefer Nano Banana 2)
+  // Set default model when models load.
   React.useEffect(() => {
     if (effectiveImageModels.length > 0 && !selectedModel) {
       const defaultModel = effectiveImageModels.find((m) => m.identifier === DEFAULT_IMAGE_MODEL_IDENTIFIER) ?? effectiveImageModels[0]

@@ -14,13 +14,13 @@ import {
 import {
   buildFalImageRequest,
   isSupportedFalImageModel,
-  QWEN_IMAGE2_CANONICAL_ID,
   submitFalImageQueue,
 } from "@/lib/server/fal-image"
 import {
   buildReplicateGptImage2Input,
   isReplicateGptImage2Model,
 } from "@/lib/server/replicate-gpt-image"
+import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { aspectRatioToDimensions, modelUsesDimensions } from "@/lib/utils/model-parameters"
 import type {
   AvailableChatImageReference,
@@ -29,7 +29,7 @@ import type {
 import { mediaIdStringSchema } from "@/lib/chat/media-id"
 import { resolveToolImageReferences } from "@/lib/chat/resolve-tool-references"
 
-const DEFAULT_IMAGE_MODEL = "google/nano-banana-2" as const
+const DEFAULT_IMAGE_MODEL = DEFAULT_IMAGE_MODEL_IDENTIFIER
 const MAX_REFERENCE_IMAGES = 4
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 const JSON_SUPPORTED_MODELS = new Set([
@@ -387,7 +387,7 @@ export function createGenerateImageTool({
         .min(1)
         .max(120)
         .optional()
-        .describe("Image model identifier, preferably selected from searchModels. Defaults to google/nano-banana-2."),
+        .describe("Image model identifier, preferably selected from searchModels. Defaults to openai/gpt-image-2."),
       aspectRatio: z
         .string()
         .min(1)
@@ -602,7 +602,7 @@ export function createGenerateImageTool({
         }
       }
 
-      if (provider === "fal" && modelIdentifier === QWEN_IMAGE2_CANONICAL_ID) {
+      if (provider === "fal" && isSupportedFalImageModel(modelIdentifier)) {
         const hasCredits = await checkUserHasCredits(userId, requiredCredits, supabase)
         if (!hasCredits) {
           throw new Error(`Insufficient credits. This generation requires ${requiredCredits} credits.`)
@@ -610,10 +610,6 @@ export function createGenerateImageTool({
 
         if (!process.env.FAL_KEY) {
           throw new Error("FAL_KEY environment variable is not set.")
-        }
-
-        if (!isSupportedFalImageModel(modelIdentifier)) {
-          throw new Error(`Unsupported Fal image model: ${modelIdentifier}`)
         }
 
         const falRequest = buildFalImageRequest({

@@ -304,6 +304,36 @@ export const GPT_IMAGE_2_META: ModelMetadata = {
   ],
 };
 
+export const WAN_27_IMAGE_META: ModelMetadata = {
+  id: 'wan-2.7-image-meta',
+  identifier: 'fal-ai/wan/v2.7',
+  name: 'Wan 2.7 Image',
+  description: 'WAN 2.7 on fal for text-to-image and text-guided image editing under one selector item.',
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 4.0,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+  customParameters: [
+    {
+      name: 'image_size',
+      label: 'Image Size',
+      options: ['square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9'],
+      default: 'square_hd',
+      description: 'Fal image size preset',
+    },
+    {
+      name: 'enable_safety_checker',
+      label: 'Safety Checker',
+      options: ['false', 'true'],
+      default: 'false',
+      description: 'Content moderation toggle',
+    },
+  ],
+};
+
 export const FLUX_KONTEXT_FAST_META: ModelMetadata = {
   id: 'b3a0e0b8-ae8f-4f0b-b692-150ecabefd19',
   identifier: 'prunaai/flux-kontext-fast',
@@ -622,6 +652,7 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
   GROK_IMAGINE_META,
   GPT_IMAGE_1_5_META,
   GPT_IMAGE_2_META,
+  WAN_27_IMAGE_META,
   Z_IMAGE_TURBO_META,
   FLUX_KONTEXT_FAST_META,
 ];
@@ -689,7 +720,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     SEEDANCE_2_0_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
-  fal: [],
+  fal: [WAN_27_IMAGE_META],
   xai: [GROK_IMAGINE_META],
 };
 

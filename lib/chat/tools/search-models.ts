@@ -1,6 +1,7 @@
 import { tool } from "ai"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
+import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { filterPublicCatalogModels } from "@/lib/server/model-catalog-visibility"
 
 interface CreateSearchModelsToolOptions {
@@ -12,7 +13,7 @@ type ModelTypeFilter = "image" | "video" | "audio" | "upscale"
 export function createSearchModelsTool({ supabase }: CreateSearchModelsToolOptions) {
   return tool({
     description:
-      "List UniCan's active models (optional type filter). Use this when the user asks which models are available, which one supports a capability, or when you need a valid model identifier before generating an image, video, or audio asset. The response includes model-specific `aspectRatios` and `usageGuide` when available, so use those instead of guessing supported ratios, input semantics, and model-specific routing rules. There is no text search. Inspect the returned list and match by name or identifier yourself.",
+      "List UniCan's active models (optional type filter). Use this when the user asks which models are available, which one supports a capability, or when you need a valid model identifier before generating an image, video, or audio asset. For image models, the default image generation model is returned as `defaultImageModel` and is currently `openai/gpt-image-2`. The response includes model-specific `aspectRatios` and `usageGuide` when available, so use those instead of guessing supported ratios, input semantics, and model-specific routing rules. There is no text search. Inspect the returned list and match by name or identifier yourself.",
     inputSchema: z.object({
       type: z
         .enum(["image", "video", "audio", "upscale"])
@@ -76,6 +77,8 @@ export function createSearchModelsTool({ supabase }: CreateSearchModelsToolOptio
       }))
 
       return {
+        defaultImageModel:
+          type === "image" || type == null ? DEFAULT_IMAGE_MODEL_IDENTIFIER : null,
         message:
           models.length > 0
             ? `Listed ${models.length} active ${type ?? ""} model${models.length === 1 ? "" : "s"}.`
