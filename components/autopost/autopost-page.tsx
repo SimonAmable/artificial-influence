@@ -276,8 +276,6 @@ type TikTokSavedProfile = {
   open_id: string
   display_name: string | null
   avatar_url: string | null
-  profile_deep_link: string | null
-  bio_description: string | null
   fetched_at: string
 }
 
@@ -1150,20 +1148,9 @@ export function AutopostPage() {
                                 <div className="flex flex-wrap items-start justify-between gap-2">
                                   <div className="min-w-0 space-y-0.5">
                                     <p className="font-semibold leading-tight text-foreground">{label}</p>
-                                    {profile?.profile_deep_link ? (
-                                      <a
-                                        href={profile.profile_deep_link}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-sm text-primary underline-offset-4 hover:underline"
-                                      >
-                                        Open TikTok profile
-                                      </a>
-                                    ) : (
-                                      <p className="font-mono text-xs text-muted-foreground">
-                                        {connection.providerAccountId.slice(0, 12)}...
-                                      </p>
-                                    )}
+                                    <p className="font-mono text-xs text-muted-foreground">
+                                      {connection.providerAccountId.slice(0, 12)}...
+                                    </p>
                                   </div>
                                   <Button
                                     type="button"
@@ -1182,9 +1169,6 @@ export function AutopostPage() {
                                     Disconnect
                                   </Button>
                                 </div>
-                                {profile?.bio_description ? (
-                                  <p className="line-clamp-3 text-sm text-muted-foreground">{profile.bio_description}</p>
-                                ) : null}
                                 <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                                   <Badge variant="outline">Profile only</Badge>
                                   {connection.status !== "connected" ? (

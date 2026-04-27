@@ -1,12 +1,10 @@
 const TIKTOK_USER_INFO_URL = "https://open.tiktokapis.com/v2/user/info/"
-const USER_INFO_FIELDS = "open_id,display_name,avatar_url,profile_deep_link,bio_description"
+const USER_INFO_FIELDS = "open_id,display_name,avatar_url"
 
 export type TikTokSavedProfile = {
   open_id: string
   display_name: string | null
   avatar_url: string | null
-  profile_deep_link: string | null
-  bio_description: string | null
   fetched_at: string
 }
 
@@ -14,8 +12,6 @@ type TikTokUserObject = {
   open_id?: string
   display_name?: string
   avatar_url?: string
-  profile_deep_link?: string
-  bio_description?: string
 }
 
 type TikTokUserInfoResponse = {
@@ -60,8 +56,6 @@ export async function fetchTikTokUserProfile(accessToken: string): Promise<TikTo
     open_id: user.open_id,
     display_name: user.display_name ?? null,
     avatar_url: user.avatar_url ?? null,
-    profile_deep_link: user.profile_deep_link ?? null,
-    bio_description: user.bio_description ?? null,
     fetched_at: new Date().toISOString(),
   }
 }
@@ -85,10 +79,6 @@ export function parseTikTokSavedProfile(metadata: unknown): TikTokSavedProfile |
     open_id: openId,
     display_name: typeof profile.display_name === "string" ? profile.display_name : null,
     avatar_url: typeof profile.avatar_url === "string" ? profile.avatar_url : null,
-    profile_deep_link:
-      typeof profile.profile_deep_link === "string" ? profile.profile_deep_link : null,
-    bio_description:
-      typeof profile.bio_description === "string" ? profile.bio_description : null,
     fetched_at: fetchedAt,
   }
 }
