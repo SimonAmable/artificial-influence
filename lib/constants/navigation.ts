@@ -272,6 +272,13 @@ export const megaNavGroups: MegaNavGroup[] = [
             iconPhosphor: "microphone",
           },
           {
+            path: "/free-tools/tiktok-video-fixer",
+            label: "TikTok Video Fixer",
+            description: "Repair videos for safer TikTok uploads",
+            badge: "new",
+            iconPhosphor: "shield-check",
+          },
+          {
             path: "/free-tools/video-compressor",
             label: "Video Compressor",
             description: "Shrink short clips locally",
@@ -365,6 +372,13 @@ export const megaNavGroups: MegaNavGroup[] = [
         description: "Resize and compress images locally",
         badge: "new",
         iconPhosphor: "image",
+      },
+      {
+        path: "/free-tools/tiktok-video-fixer",
+        label: "TikTok Video Fixer",
+        description: "Repair video format issues for TikTok",
+        badge: "new",
+        iconPhosphor: "shield-check",
       },
       {
         path: "/free-tools/video-compressor",

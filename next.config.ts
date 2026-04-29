@@ -10,6 +10,18 @@ const nextConfig: NextConfig = {
       "./node_modules/ffmpeg-static/ffmpeg",
       "./node_modules/ffprobe-static/bin/linux/x64/ffprobe",
     ],
+    "/api/autopost/publish": [
+      "./node_modules/ffmpeg-static/ffmpeg",
+      "./node_modules/ffprobe-static/bin/linux/x64/ffprobe",
+    ],
+    "/api/cron/autopost-queue": [
+      "./node_modules/ffmpeg-static/ffmpeg",
+      "./node_modules/ffprobe-static/bin/linux/x64/ffprobe",
+    ],
+    "/api/free-tools/tiktok-video-fixer": [
+      "./node_modules/ffmpeg-static/ffmpeg",
+      "./node_modules/ffprobe-static/bin/linux/x64/ffprobe",
+    ],
   },
   async redirects() {
     return [

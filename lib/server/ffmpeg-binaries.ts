@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process"
 import { existsSync } from "node:fs"
+import { isAbsolute, resolve } from "node:path"
 
 import ffmpegInstaller from "ffmpeg-static"
 import ffprobeInstaller from "ffprobe-static"
@@ -18,8 +19,13 @@ function tryBinaryFromShell(command: string): string | null {
 
 function resolveExistingBinary(candidates: Array<string | null | undefined>): string | null {
   for (const candidate of candidates) {
-    if (candidate && existsSync(candidate)) {
-      return candidate
+    if (!candidate) {
+      continue
+    }
+
+    const normalizedCandidate = isAbsolute(candidate) ? candidate : resolve(process.cwd(), candidate)
+    if (existsSync(normalizedCandidate)) {
+      return normalizedCandidate
     }
   }
 

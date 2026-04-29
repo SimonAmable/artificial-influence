@@ -11,6 +11,7 @@ import {
   queryTikTokCreatorInfo,
   TikTokApiError,
 } from "@/lib/tiktok/publish"
+import { normalizeTikTokVideoUrlToStorage } from "@/lib/tiktok/normalize-video"
 import { getValidTikTokAccessToken } from "@/lib/tiktok/token-service"
 
 export type PublishAutopostJobResult =
@@ -217,11 +218,17 @@ async function publishTikTokAutopostJob(
   }
 
   try {
+    const normalizedVideo = await normalizeTikTokVideoUrlToStorage({
+      mediaUrl: row.media_url,
+      userId: row.user_id,
+      supabase,
+    })
+
     const result =
       mode === "direct"
         ? await initTikTokDirectVideoPost({
             accessToken: token.accessToken,
-            videoUrl: row.media_url,
+            videoUrl: normalizedVideo.publicUrl,
             postInfo: {
               title: row.caption ?? undefined,
               privacyLevel: metadata.tiktok?.privacyLevel ?? "SELF_ONLY",
@@ -235,7 +242,7 @@ async function publishTikTokAutopostJob(
           })
         : await initTikTokInboxVideoUpload({
             accessToken: token.accessToken,
-            videoUrl: row.media_url,
+            videoUrl: normalizedVideo.publicUrl,
           })
 
     if (!result.publish_id) {
@@ -246,6 +253,10 @@ async function publishTikTokAutopostJob(
     const nextMetadata = mergeTikTokMetadata(row, {
       publishId: result.publish_id,
       uploadUrl: result.upload_url ?? null,
+      normalizedVideoUrl: normalizedVideo.publicUrl,
+      normalizedStoragePath: normalizedVideo.storagePath,
+      normalizationProfile: normalizedVideo.profile,
+      normalizedAt: now,
       status: "SUBMITTED",
       statusFetchedAt: now,
     })

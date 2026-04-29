@@ -5,6 +5,7 @@ import {
   ImageSquare,
   ShieldCheck,
   VideoCamera,
+  MagicWand,
 } from "@phosphor-icons/react/dist/ssr"
 
 import { Badge } from "@/components/ui/badge"
@@ -30,6 +31,13 @@ const freeTools = [
     description: "Resize and compress images locally before uploading or publishing.",
     badge: "Free",
     icon: ImageSquare,
+  },
+  {
+    href: "/free-tools/tiktok-video-fixer",
+    label: "TikTok Video Fixer",
+    description: "Re-encode a video into a safer MP4 profile when TikTok rejects the format.",
+    badge: "Free",
+    icon: MagicWand,
   },
   {
     href: "/free-tools/video-compressor",

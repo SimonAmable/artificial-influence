@@ -33,6 +33,10 @@ export type TikTokPublishOptions = {
   }
   publishId?: string
   uploadUrl?: string | null
+  normalizedVideoUrl?: string | null
+  normalizedStoragePath?: string | null
+  normalizationProfile?: string | null
+  normalizedAt?: string | null
   status?: string
   failReason?: string | null
   statusFetchedAt?: string

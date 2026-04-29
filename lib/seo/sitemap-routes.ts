@@ -27,6 +27,7 @@ export function getSitemapEntries(): Array<{
     { path: "/free-tools", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
     { path: "/free-tools/metadata-remover", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
     { path: "/free-tools/image-compressor", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
+    { path: "/free-tools/tiktok-video-fixer", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
     { path: "/free-tools/video-compressor", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
     {
       path: "/canvases",
