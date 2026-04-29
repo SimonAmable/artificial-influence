@@ -271,25 +271,15 @@ export function createGenerateVideoTool({
         .max(MAX_REFERENCE_IMAGES)
         .optional()
         .describe(
-          "Reference images: ref_1…ref_N, upl_/gen_ prefixed, raw UUID, or mediaId from listRecentGenerations.",
+          "Reference images: ref_1…ref_N, upl_/gen_ prefixed, raw UUID, mediaId from listRecentGenerations, or a safe public https image URL.",
         ),
-      externalImageUrls: z
-        .array(z.string().url())
-        .max(MAX_REFERENCE_IMAGES)
-        .optional()
-        .describe("Transient public image URLs from stock/reference providers or other safe HTTPS sources."),
       referenceVideoIds: z
         .array(z.string().min(1))
         .max(MAX_REFERENCE_VIDEOS)
         .optional()
         .describe(
-          "Reference videos: refv_1…ref_N, upl_/gen_ prefixed, raw UUID, or mediaId from listThreadMedia / listRecentGenerations.",
+          "Reference videos: refv_1…ref_N, upl_/gen_ prefixed, raw UUID, mediaId from listThreadMedia / listRecentGenerations, or a safe public https video URL.",
         ),
-      externalVideoUrls: z
-        .array(z.string().url())
-        .max(MAX_REFERENCE_VIDEOS)
-        .optional()
-        .describe("Transient public video URLs from stock/reference providers or other safe HTTPS sources."),
       referenceAudioIds: z
         .array(z.string().min(1))
         .max(MAX_REFERENCE_AUDIOS)
@@ -320,8 +310,6 @@ export function createGenerateVideoTool({
       prompt = "",
       modelIdentifier,
       assetIds = [],
-      externalImageUrls = [],
-      externalVideoUrls = [],
       mediaIds = [],
       referenceIds = [],
       referenceVideoIds = [],
@@ -380,9 +368,6 @@ export function createGenerateVideoTool({
       const assetReferences = await loadAssetReferences(assetIds, supabase, userId)
       const imageReferences = dedupeReferences([
         ...resolvedFromIds,
-        ...externalImageUrls.map((url) => ({
-          url,
-        })),
         ...assetReferences
           .filter((asset) => asset.assetType === "image")
           .map((asset) => ({
@@ -393,9 +378,6 @@ export function createGenerateVideoTool({
       ]).slice(0, MAX_REFERENCE_IMAGES)
       const videoReferences = dedupeReferences([
         ...resolvedVideoFromIds,
-        ...externalVideoUrls.map((url) => ({
-          url,
-        })),
         ...assetReferences
           .filter((asset) => asset.assetType === "video")
           .map((asset) => ({

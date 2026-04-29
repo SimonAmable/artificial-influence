@@ -369,14 +369,7 @@ export function createGenerateImageTool({
         .max(MAX_REFERENCE_IMAGES)
         .optional()
         .describe(
-          "Reference images: `ref_1`…`ref_N`, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or mediaId from listRecentGenerations.",
-        ),
-      externalImageUrls: z
-        .array(z.string().url())
-        .max(MAX_REFERENCE_IMAGES)
-        .optional()
-        .describe(
-          "Transient public image URLs from stock/reference search, such as GIPHY or other safe HTTPS sources. Do not use for saved asset ids.",
+          "Reference images: `ref_1`…`ref_N`, `upl_<uuid>` / `gen_<uuid>`, raw UUID, mediaId from listRecentGenerations, or a safe public https image URL.",
         ),
       mediaIds: z
         .array(mediaIdStringSchema)
@@ -400,7 +393,6 @@ export function createGenerateImageTool({
       aspectRatio,
       assetIds = [],
       enhancePrompt: shouldEnhance = false,
-      externalImageUrls = [],
       modelIdentifier = DEFAULT_IMAGE_MODEL,
       prompt,
       mediaIds = [],
@@ -420,11 +412,7 @@ export function createGenerateImageTool({
             })
           : { references: [] as ChatImageReference[], warnings: [] as string[] }
 
-      const externalReferences = externalImageUrls.map((url) => ({ url }))
-      const referenceCandidates = dedupeReferences([
-        ...resolvedFromIds,
-        ...externalReferences,
-      ]).slice(0, MAX_REFERENCE_IMAGES)
+      const referenceCandidates = dedupeReferences(resolvedFromIds).slice(0, MAX_REFERENCE_IMAGES)
 
       const [uploadedReferences, assetReferences, modelResponse] = await Promise.all([
         Promise.all(

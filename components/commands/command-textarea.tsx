@@ -60,6 +60,10 @@ export function CommandTextarea({
   const [scrollTop, setScrollTop] = React.useState(0)
   const [mirrorMinHeight, setMirrorMinHeight] = React.useState(0)
   const [paletteFixedStyle, setPaletteFixedStyle] = React.useState<React.CSSProperties | null>(null)
+  const hasInlineMentions = React.useMemo(
+    () => refs.some((ref) => ref.mentionToken.length > 0 && value.includes(ref.mentionToken)),
+    [refs, value]
+  )
 
   const {
     trigger,
@@ -236,21 +240,23 @@ export function CommandTextarea({
         onMouseMove={(e) => updateMentionHoverFromPoint(e.clientX, e.clientY)}
         onMouseLeave={() => setMentionHoverKey(null)}
       >
-        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-          <MentionMirror
-            value={value}
-            refs={refs}
-            scrollTop={scrollTop}
-            mirrorMinHeight={mirrorMinHeight}
-            layerRef={layerRef}
-            onControlLayouts={setMentionLayouts}
-            hoveredKey={mentionHoverKey}
-            className={cn(
-              "box-border h-full w-full m-0 p-0 text-sm leading-snug",
-              className
-            )}
-          />
-        </div>
+        {hasInlineMentions ? (
+          <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+            <MentionMirror
+              value={value}
+              refs={refs}
+              scrollTop={scrollTop}
+              mirrorMinHeight={mirrorMinHeight}
+              layerRef={layerRef}
+              onControlLayouts={setMentionLayouts}
+              hoveredKey={mentionHoverKey}
+              className={cn(
+                "box-border h-full w-full m-0 p-0 text-sm leading-snug",
+                className
+              )}
+            />
+          </div>
+        ) : null}
         <textarea
           ref={textareaRef}
           value={value}
@@ -265,21 +271,24 @@ export function CommandTextarea({
           placeholder={placeholder}
           spellCheck={false}
           className={cn(
-            "relative z-10 box-border m-0 w-full border-none p-0 outline-none resize-none bg-transparent text-sm leading-snug",
+            "relative z-10 box-border m-0 w-full border-none p-0 outline-none resize-none bg-transparent text-sm leading-snug text-foreground caret-foreground",
             "overflow-y-auto whitespace-pre-wrap break-words",
-            "text-transparent caret-foreground selection:bg-primary/25",
+            "selection:bg-primary/25",
             "placeholder:text-muted-foreground placeholder:opacity-100",
             "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
-            className
+            className,
+            hasInlineMentions && "text-transparent"
           )}
           aria-autocomplete="list"
           aria-expanded={paletteOpen}
         />
-        <MentionRemoveOverlay
-          layouts={mentionLayouts}
-          onRemove={removeMentionRange}
-          hoveredKey={mentionHoverKey}
-        />
+        {hasInlineMentions ? (
+          <MentionRemoveOverlay
+            layouts={mentionLayouts}
+            onRemove={removeMentionRange}
+            hoveredKey={mentionHoverKey}
+          />
+        ) : null}
       </div>
     </div>
   )

@@ -18,6 +18,7 @@ import type {
   ChatImageReference,
 } from "@/lib/chat/tools/image-reference-types"
 import type { AvailableChatVideoReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
+import { assertSafeHttpUrl } from "@/lib/server/web-research/url-safety"
 
 const MAX_SOURCE_BYTES = 50 * 1024 * 1024
 const MAX_FRAME_COUNT = 24
@@ -86,8 +87,8 @@ function sanitizeFileStem(value: string | undefined, fallback: string) {
   return cleaned && cleaned.length > 0 ? cleaned.toLowerCase() : fallback
 }
 
-function validateReferenceUrl(url: string) {
-  if (url.startsWith("data:")) return
+function validateStoredReferenceUrl(url: string) {
+  if (url.startsWith("data:")) return url
 
   let parsedUrl: URL
   try {
@@ -125,6 +126,8 @@ function validateReferenceUrl(url: string) {
   if (!isAllowedSupabaseUrl && !isAllowedAppUrl) {
     throw new Error("Reference media URLs must come from this app's stored assets.")
   }
+
+  return parsedUrl.toString()
 }
 
 function parseDataUrlSource(dataUrl: string) {
@@ -152,6 +155,29 @@ function sourceExtensionFromMime(mimeType: string) {
   return "mp4"
 }
 
+function inferFrameExtractMimeFromUrl(url: string): string | null {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase()
+    if (pathname.endsWith(".gif")) return "image/gif"
+    if (pathname.endsWith(".webm")) return "video/webm"
+    if (pathname.endsWith(".mov")) return "video/quicktime"
+    if (pathname.endsWith(".mp4") || pathname.endsWith(".m4v")) return "video/mp4"
+  } catch {
+    return null
+  }
+  return null
+}
+
+function inferFilenameFromUrl(url: string): string | undefined {
+  try {
+    const pathname = new URL(url).pathname
+    const lastSegment = pathname.split("/").filter(Boolean).at(-1)
+    return lastSegment ? decodeURIComponent(lastSegment) : undefined
+  } catch {
+    return undefined
+  }
+}
+
 function isGifReference(reference: { mediaType?: string; url: string }) {
   const normalized = reference.mediaType?.toLowerCase()
   if (normalized === "image/gif") return true
@@ -166,7 +192,97 @@ function isGifReference(reference: { mediaType?: string; url: string }) {
 const TRANSCRIPT_IMAGE_REF_RE = /^ref_\d+$/
 const TRANSCRIPT_VIDEO_REF_RE = /^refv_\d+$/
 
-function resolveTranscriptRefForFrameExtract({
+async function normalizeRemoteFrameExtractUrl(rawUrl: string) {
+  if (rawUrl.startsWith("data:")) {
+    return { url: rawUrl, isExternal: false }
+  }
+
+  try {
+    return {
+      url: validateStoredReferenceUrl(rawUrl),
+      isExternal: false,
+    }
+  } catch {
+    return {
+      url: await assertSafeHttpUrl(rawUrl.trim()),
+      isExternal: true,
+    }
+  }
+}
+
+async function resolveExternalUrlForFrameExtract(rawUrl: string): Promise<ChatVideoReference> {
+  const normalized = await normalizeRemoteFrameExtractUrl(rawUrl)
+
+  try {
+    const headResponse = await fetch(normalized.url, {
+      method: "HEAD",
+      redirect: "follow",
+      signal: AbortSignal.timeout(10_000),
+    })
+
+    if (headResponse.ok) {
+      const finalUrl = normalized.isExternal
+        ? await assertSafeHttpUrl(headResponse.url)
+        : headResponse.url
+      const contentType = headResponse.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? null
+      const contentLength = Number(headResponse.headers.get("content-length") ?? "")
+
+      if (Number.isFinite(contentLength) && contentLength > MAX_SOURCE_BYTES) {
+        throw new Error("Media is too large for frame extraction.")
+      }
+
+      if (contentType?.startsWith("video/") || contentType === "image/gif") {
+        return {
+          url: finalUrl,
+          mediaType: contentType,
+          filename: inferFilenameFromUrl(finalUrl),
+        }
+      }
+
+      if (contentType?.startsWith("image/")) {
+        throw new Error(
+          "Frame extraction needs a direct animated GIF or video URL. Static images and webpage URLs will not work.",
+        )
+      }
+
+      const inferredMime = inferFrameExtractMimeFromUrl(finalUrl)
+      if (inferredMime) {
+        return {
+          url: finalUrl,
+          mediaType: inferredMime,
+          filename: inferFilenameFromUrl(finalUrl),
+        }
+      }
+    }
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("frame extraction") ||
+        error.message.includes("too large") ||
+        error.message.includes("Local and private network URLs") ||
+        error.message.includes("Could not verify") ||
+        error.message.includes("Invalid URL") ||
+        error.message.includes("Only http(s) URLs"))
+    ) {
+      throw error
+    }
+  }
+
+  const inferredMime = inferFrameExtractMimeFromUrl(normalized.url)
+  if (!inferredMime) {
+    throw new Error(
+      "Could not verify that referenceId is a direct GIF/video URL. Use refv_N, ref_N for an attached GIF, a thread media id, an asset id, or a direct .gif/.mp4/.webm/.mov URL.",
+    )
+  }
+
+  return {
+    url: normalized.url,
+    mediaType: inferredMime,
+    filename: inferFilenameFromUrl(normalized.url),
+  }
+}
+
+async function resolveTranscriptRefForFrameExtract({
   referenceId,
   imageMap,
   videoMap,
@@ -174,8 +290,11 @@ function resolveTranscriptRefForFrameExtract({
   referenceId: string
   imageMap: Map<string, AvailableChatImageReference>
   videoMap: Map<string, AvailableChatVideoReference>
-}): ChatVideoReference | ChatImageReference {
+}): Promise<ChatVideoReference | ChatImageReference> {
   const trimmed = referenceId.trim()
+  if (/^https?:\/\//i.test(trimmed)) {
+    return resolveExternalUrlForFrameExtract(trimmed)
+  }
   if (TRANSCRIPT_VIDEO_REF_RE.test(trimmed)) {
     const video = videoMap.get(trimmed)
     if (!video) {
@@ -208,19 +327,26 @@ function resolveTranscriptRefForFrameExtract({
     }
   }
   throw new Error(
-    `Invalid referenceId "${referenceId}". Expected refv_N for video or ref_N for an attached GIF.`,
+    `Invalid referenceId "${referenceId}". Expected refv_N for video, ref_N for an attached GIF, or a direct public GIF/video URL.`,
   )
 }
 
 async function downloadSourceToBuffer(url: string): Promise<Buffer> {
-  validateReferenceUrl(url)
   if (url.startsWith("data:")) {
     return parseDataUrlSource(url).buffer
   }
 
-  const response = await fetch(url)
+  const normalized = await normalizeRemoteFrameExtractUrl(url)
+  const response = await fetch(normalized.url, {
+    redirect: "follow",
+    signal: AbortSignal.timeout(30_000),
+  })
   if (!response.ok) {
     throw new Error(`Failed to download source media (${response.status}).`)
+  }
+
+  if (normalized.isExternal) {
+    await assertSafeHttpUrl(response.url)
   }
 
   const arrayBuffer = await response.arrayBuffer()
@@ -276,8 +402,6 @@ async function loadFrameExtractAssetById(assetId: string, supabase: SupabaseClie
   if (row.asset_type !== "video" && !isGifAsset) {
     throw new Error("That asset is not a video or GIF. Use searchAssets to find a video or animated GIF asset.")
   }
-
-  validateReferenceUrl(url)
 
   return {
     url,
@@ -587,14 +711,14 @@ export function createExtractVideoFramesTool({
 
   return tool({
     description:
-      "Extract still frames from a user-owned video or animated GIF (first and last frame by default, optional interior samples and explicit timestamps). Uses ffmpeg. Pass **referenceId** `refv_N` for a video or `ref_N` for an attached GIF (transcript manifest), **mediaId** from listThreadMedia (`upl_`/`gen_`), or **assetId** from searchAssets. Uploaded frames are registered on the thread when threadId exists so their ids can be used as mediaIds on image tools.",
+      "Extract still frames from a video or animated GIF (first and last frame by default, optional interior samples and explicit timestamps). Uses ffmpeg. Pass **referenceId** `refv_N` for a video, `ref_N` for an attached GIF, or a direct public GIF/video URL, **mediaId** from listThreadMedia (`upl_`/`gen_`), or **assetId** from searchAssets. Uploaded frames are registered on the thread when threadId exists so their ids can be used as mediaIds on image tools.",
     inputSchema: z.object({
       referenceId: z
         .string()
         .min(1)
         .optional()
         .describe(
-          "Transcript ref: refv_N for video, ref_N for GIF. Mutually exclusive with mediaId and assetId.",
+          "Transcript ref: refv_N for video, ref_N for GIF, or a direct public https GIF/video URL. Mutually exclusive with mediaId and assetId.",
         ),
       mediaId: mediaIdStringSchema
         .optional()
@@ -670,7 +794,7 @@ export function createExtractVideoFramesTool({
       let source: ChatVideoReference | ChatImageReference
 
       if (referenceId) {
-        source = resolveTranscriptRefForFrameExtract({
+        source = await resolveTranscriptRefForFrameExtract({
           referenceId,
           imageMap,
           videoMap,
@@ -684,7 +808,7 @@ export function createExtractVideoFramesTool({
         source = await loadFrameExtractAssetById(assetId, supabase, userId)
       } else {
         throw new Error(
-          "Pass referenceId (refv_N or ref_N for GIF), mediaId from listThreadMedia, or assetId from searchAssets.",
+          "Pass referenceId (refv_N, ref_N for GIF, or a direct GIF/video URL), mediaId from listThreadMedia, or assetId from searchAssets.",
         )
       }
 

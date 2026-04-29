@@ -5,18 +5,18 @@ import Image from "next/image"
 import Link from "next/link"
 import {
   ArrowSquareOut,
+  CircleNotch,
   Copy,
   FilmStrip,
   Gif,
   Image as ImageIcon,
-  MagnifyingGlass,
+  PaperPlaneTilt,
   Sticker,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -56,13 +56,14 @@ function ResourcePreview({ result }: { result: StockReferenceResult }) {
 
 export function ResourcesPage() {
   const [query, setQuery] = React.useState(DEFAULT_QUERY)
-  const deferredQuery = React.useDeferredValue(query)
   const [provider, setProvider] = React.useState<"auto" | "giphy">("auto")
   const [mediaType, setMediaType] = React.useState<"all" | "gif" | "sticker">("all")
   const [rating, setRating] = React.useState<"g" | "pg" | "pg-13" | "r">("pg")
   const [result, setResult] = React.useState<SearchStockReferencesResult | null>(null)
+  const [submittedQuery, setSubmittedQuery] = React.useState("")
   const [isLoading, setIsLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const abortRef = React.useRef<AbortController | null>(null)
 
   function handleQueryChange(nextValue: string) {
     setQuery(nextValue)
@@ -74,54 +75,58 @@ export function ResourcesPage() {
     }
   }
 
-  React.useEffect(() => {
-    const trimmedQuery = deferredQuery.trim()
+  async function handleSearch() {
+    const trimmedQuery = query.trim()
     if (!trimmedQuery) {
+      setResult(null)
+      setSubmittedQuery("")
+      setError("Enter a reference to search for.")
       return
     }
 
+    abortRef.current?.abort()
     const controller = new AbortController()
+    abortRef.current = controller
 
-    async function loadResults() {
-      setIsLoading(true)
-      setError(null)
+    setSubmittedQuery(trimmedQuery)
+    setIsLoading(true)
+    setError(null)
 
-      try {
-        const params = new URLSearchParams({
-          query: trimmedQuery,
-          provider,
-          mediaType,
-          rating,
-          limit: "18",
-        })
+    try {
+      const params = new URLSearchParams({
+        query: trimmedQuery,
+        provider,
+        mediaType,
+        rating,
+        limit: "18",
+      })
 
-        const response = await fetch(`/api/stock/search?${params.toString()}`, {
-          signal: controller.signal,
-        })
-        const payload = (await response.json()) as SearchStockReferencesResult | { error?: string }
+      const response = await fetch(`/api/stock/search?${params.toString()}`, {
+        signal: controller.signal,
+      })
+      const payload = (await response.json()) as SearchStockReferencesResult | { error?: string }
 
-        if (!response.ok) {
-          throw new Error("error" in payload && payload.error ? payload.error : "Stock search failed.")
-        }
+      if (!response.ok) {
+        throw new Error("error" in payload && payload.error ? payload.error : "Stock search failed.")
+      }
 
-        React.startTransition(() => {
-          setResult(payload as SearchStockReferencesResult)
-        })
-      } catch (loadError) {
-        if (controller.signal.aborted) return
-        setResult(null)
-        setError(loadError instanceof Error ? loadError.message : "Stock search failed.")
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false)
-        }
+      React.startTransition(() => {
+        setResult(payload as SearchStockReferencesResult)
+      })
+    } catch (loadError) {
+      if (controller.signal.aborted) return
+      setResult(null)
+      setError(loadError instanceof Error ? loadError.message : "Stock search failed.")
+    } finally {
+      if (!controller.signal.aborted) {
+        setIsLoading(false)
       }
     }
+  }
 
-    void loadResults()
-
-    return () => controller.abort()
-  }, [deferredQuery, mediaType, provider, rating])
+  React.useEffect(() => {
+    return () => abortRef.current?.abort()
+  }, [])
 
   async function copyValue(value: string, label: string) {
     try {
@@ -132,39 +137,83 @@ export function ResourcesPage() {
     }
   }
 
+  function handlePromptKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault()
+      void handleSearch()
+    }
+  }
+
+  const isReady = query.trim().length > 0
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,200,120,0.18),_transparent_35%),radial-gradient(circle_at_top_right,_rgba(120,180,255,0.18),_transparent_30%),linear-gradient(180deg,_rgba(250,248,243,1)_0%,_rgba(255,255,255,1)_24%,_rgba(248,247,244,1)_100%)]">
-      <div className="container mx-auto px-4 py-10">
-        <div className="mx-auto max-w-6xl space-y-8">
-          <section className="rounded-[28px] border border-border/70 bg-background/90 p-6 shadow-[0_24px_60px_rgba(0,0,0,0.08)] backdrop-blur">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-2xl space-y-3">
-                <Badge variant="outline" className="w-fit gap-2 rounded-full px-3 py-1">
-                  <MagnifyingGlass className="h-3.5 w-3.5" />
-                  Live stock references
-                </Badge>
-                <div className="space-y-2">
-                  <h1 className="text-4xl font-semibold tracking-tight text-foreground">Resources</h1>
-                  <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-                    Search live external references for memes, reactions, GIFs, and stickers. These stay external so you can pull URLs into the agent without mixing them into your saved asset library.
-                  </p>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
-                <p>{result?.attribution ?? "Powered by GIPHY"}</p>
-                <p className="mt-1">Use copied URLs as transient references for image and video generation.</p>
-              </div>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8 sm:py-10">
+        <div className="mx-auto max-w-6xl space-y-7">
+          <section className="mx-auto max-w-4xl space-y-4">
+            <div className="space-y-1 text-center">
+              <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Reference Search</h1>
+              <p className="text-sm text-muted-foreground">{result?.attribution ?? "Powered by GIPHY"}</p>
             </div>
 
-            <div className="mt-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_160px_140px]">
-              <Input
-                value={query}
-                onChange={(event) => handleQueryChange(event.target.value)}
-                placeholder="Search exact terms, like cat reaction meme"
-                className="h-12 rounded-2xl border-border/70 bg-background px-4"
-              />
+            <form
+              onSubmit={(event) => {
+                event.preventDefault()
+                void handleSearch()
+              }}
+            >
+              <Card className="relative overflow-visible transition-colors">
+                <CardContent className="flex flex-col gap-1.5 p-2">
+                  <div className="flex items-start gap-2 px-2 pt-1">
+                    <div className="min-w-0 flex-1">
+                      <textarea
+                        aria-label="Reference search prompt"
+                        value={query}
+                        onChange={(event) => handleQueryChange(event.target.value)}
+                        onKeyDown={handlePromptKeyDown}
+                        placeholder="Search reaction meme, sticker, or reference..."
+                        className="min-h-[60px] max-h-[120px] w-full resize-none overflow-y-auto border-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                        rows={3}
+                        disabled={isLoading}
+                      />
+                    </div>
+
+                    <div className="shrink-0">
+                      <div
+                        className={[
+                          "relative inline-block transition-all duration-300",
+                          isReady && !isLoading
+                            ? "before:absolute before:inset-[-12px] before:-z-10 before:rounded-full before:bg-primary before:opacity-50 before:blur-[15px] before:content-['']"
+                            : "",
+                        ].join(" ")}
+                      >
+                        <Button
+                          type="submit"
+                          disabled={!isReady || isLoading}
+                          className="relative z-0 h-10 min-w-[96px] px-4 py-6 text-sm font-semibold"
+                        >
+                          {isLoading ? (
+                            <>
+                              <CircleNotch className="size-3.5 animate-spin" />
+                              Searching
+                            </>
+                          ) : (
+                            <>
+                              <PaperPlaneTilt className="size-4" weight="fill" />
+                              Send
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </form>
+
+            <div className="grid gap-2 sm:grid-cols-3">
               <Select value={provider} onValueChange={(value: "auto" | "giphy") => setProvider(value)}>
-                <SelectTrigger className="h-12 rounded-2xl">
+                <SelectTrigger aria-label="Reference provider" className="h-9 text-xs">
                   <SelectValue placeholder="Provider" />
                 </SelectTrigger>
                 <SelectContent>
@@ -173,7 +222,7 @@ export function ResourcesPage() {
                 </SelectContent>
               </Select>
               <Select value={mediaType} onValueChange={(value: "all" | "gif" | "sticker") => setMediaType(value)}>
-                <SelectTrigger className="h-12 rounded-2xl">
+                <SelectTrigger aria-label="Reference media type" className="h-9 text-xs">
                   <SelectValue placeholder="Media type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -183,7 +232,7 @@ export function ResourcesPage() {
                 </SelectContent>
               </Select>
               <Select value={rating} onValueChange={(value: "g" | "pg" | "pg-13" | "r") => setRating(value)}>
-                <SelectTrigger className="h-12 rounded-2xl">
+                <SelectTrigger aria-label="Reference rating" className="h-9 text-xs">
                   <SelectValue placeholder="Rating" />
                 </SelectTrigger>
                 <SelectContent>
@@ -203,7 +252,7 @@ export function ResourcesPage() {
                   {mediaType === "sticker" ? <Sticker className="h-3.5 w-3.5" /> : <Gif className="h-3.5 w-3.5" />}
                   {result?.total ?? 0} results
                 </Badge>
-                <span>{result?.message ?? "Search for a live reference source."}</span>
+                <span>{result?.message ?? (submittedQuery ? `Showing results for "${submittedQuery}".` : "Search for a live reference source.")}</span>
               </div>
               <Button asChild variant="outline" className="rounded-full">
                 <Link href="/assets">Open saved assets</Link>

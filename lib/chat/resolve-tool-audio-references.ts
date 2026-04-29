@@ -4,6 +4,7 @@ import { resolveMediaRef } from "@/lib/chat/resolve-media-ref"
 import type { AvailableChatAudioReference, ChatAudioReference } from "@/lib/chat/tools/generate-video"
 
 const TRANSCRIPT_AUDIO_REF_RE = /^refa_\d+$/
+const HTTP_URL_RE = /^https?:\/\//i
 
 export type ResolveToolAudioReferencesResult = {
   references: ChatAudioReference[]
@@ -37,6 +38,11 @@ export async function resolveToolAudioReferences({
   const warnings: string[] = []
 
   for (const rawId of ids) {
+    if (HTTP_URL_RE.test(rawId)) {
+      references.push({ url: rawId })
+      continue
+    }
+
     if (TRANSCRIPT_AUDIO_REF_RE.test(rawId)) {
       const reference = availableReferenceMap.get(rawId)
       if (!reference) {
@@ -57,7 +63,7 @@ export async function resolveToolAudioReferences({
       parsed = parseMediaId(rawId)
     } catch {
       throw new Error(
-        `Invalid audio reference id "${rawId}". Expected refa_N, upl_<uuid>, gen_<uuid>, or a raw upload/generation UUID.`,
+        `Invalid audio reference id "${rawId}". Expected refa_N, upl_<uuid>, gen_<uuid>, a raw upload/generation UUID, or a public https URL.`,
       )
     }
 

@@ -4,6 +4,7 @@ import { resolveMediaRef } from "@/lib/chat/resolve-media-ref"
 import type { AvailableChatVideoReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
 
 const TRANSCRIPT_VIDEO_REF_RE = /^refv_\d+$/
+const HTTP_URL_RE = /^https?:\/\//i
 
 export type ResolveToolVideoReferencesResult = {
   references: ChatVideoReference[]
@@ -37,6 +38,11 @@ export async function resolveToolVideoReferences({
   const warnings: string[] = []
 
   for (const rawId of ids) {
+    if (HTTP_URL_RE.test(rawId)) {
+      references.push({ url: rawId })
+      continue
+    }
+
     if (TRANSCRIPT_VIDEO_REF_RE.test(rawId)) {
       const reference = availableReferenceMap.get(rawId)
       if (!reference) {
@@ -57,7 +63,7 @@ export async function resolveToolVideoReferences({
       parsed = parseMediaId(rawId)
     } catch {
       throw new Error(
-        `Invalid video reference id "${rawId}". Expected refv_N, upl_<uuid>, gen_<uuid>, or a raw upload/generation UUID.`,
+        `Invalid video reference id "${rawId}". Expected refv_N, upl_<uuid>, gen_<uuid>, a raw upload/generation UUID, or a public https URL.`,
       )
     }
 

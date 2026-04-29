@@ -7,6 +7,7 @@ import type {
 } from "@/lib/chat/tools/image-reference-types"
 
 const TRANSCRIPT_REF_RE = /^ref_\d+$/
+const HTTP_URL_RE = /^https?:\/\//i
 
 function mergeIdLists(primary: string[] | undefined, secondary: string[] | undefined): string[] {
   const seen = new Set<string>()
@@ -54,6 +55,11 @@ export async function resolveToolImageReferences({
   const warnings: string[] = []
 
   for (const rawId of ids) {
+    if (HTTP_URL_RE.test(rawId)) {
+      references.push({ url: rawId })
+      continue
+    }
+
     if (TRANSCRIPT_REF_RE.test(rawId)) {
       const reference = availableReferenceMap.get(rawId)
       if (!reference) {
@@ -74,7 +80,7 @@ export async function resolveToolImageReferences({
       parsed = parseMediaId(rawId)
     } catch {
       throw new Error(
-        `Invalid reference id "${rawId}". Expected ref_N, upl_<uuid>, gen_<uuid>, or a raw upload/generation UUID.`,
+        `Invalid reference id "${rawId}". Expected ref_N, upl_<uuid>, gen_<uuid>, a raw upload/generation UUID, or a public https URL.`,
       )
     }
 

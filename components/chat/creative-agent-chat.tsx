@@ -174,7 +174,6 @@ type UniversalGenerateImageToolPart = {
     aspectRatio?: string
     assetIds?: string[]
     enhancePrompt?: boolean
-    externalImageUrls?: string[]
     modelIdentifier?: string
     prompt: string
     referenceIds?: string[]
@@ -207,8 +206,6 @@ type GenerateVideoToolPart = {
     assetIds?: string[]
     characterOrientation?: "image" | "video"
     duration?: number
-    externalImageUrls?: string[]
-    externalVideoUrls?: string[]
     generateAudio?: boolean
     keepOriginalSound?: boolean
     mode?: "pro" | "std"

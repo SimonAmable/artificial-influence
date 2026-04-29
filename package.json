@@ -6,6 +6,7 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
+    "postinstall": "npm rebuild ffmpeg-static",
     "lint": "eslint",
     "ngrok": "ngrok http 3000",
     "typecheck": "npx tsc --noEmit",
