@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { AutopostCarouselItem, AutopostJobMetadata, AutopostMediaType } from "@/lib/autopost/types"
+import { publishAutopostJob } from "@/lib/autopost/publish-job"
 import { isUserPublicBucketMediaUrl } from "@/lib/autopost/validate-media-url"
 import { parseSavedProfileFromMetadata } from "@/lib/instagram/profile"
 
-export type PrepareInstagramPostAction = "draft" | "schedule"
+export type PrepareInstagramPostAction = "draft" | "publish" | "schedule"
 
 export type PrepareInstagramPostInput = {
   action: PrepareInstagramPostAction
@@ -56,6 +57,7 @@ type CreateInstagramPostJobFailureCode =
   | "connection_not_found"
   | "insert_failed"
   | "missing_connection_link"
+  | "publish_failed"
 
 type CreateInstagramPostJobFailure = {
   ok: false
@@ -375,6 +377,54 @@ export async function createInstagramPostJob({
       code: "missing_connection_link",
       message: "The post was saved without an Instagram account link. Try again.",
       statusCode: 500,
+    }
+  }
+
+  if (parsed.value.action === "publish") {
+    const publishResult = await publishAutopostJob(supabase, job.id, {
+      userId,
+    })
+
+    if (!publishResult.ok) {
+      return {
+        ok: false,
+        code: "publish_failed",
+        message: publishResult.error,
+        statusCode: publishResult.statusCode,
+      }
+    }
+
+    const { data: publishedJob, error: publishedJobError } = await supabase
+      .from("autopost_jobs")
+      .select("id, media_url, caption, media_type, status, scheduled_at, created_at, instagram_connection_id, metadata")
+      .eq("id", job.id)
+      .eq("user_id", userId)
+      .single()
+
+    if (publishedJobError || !publishedJob?.instagram_connection_id) {
+      console.error("[autopost/create-instagram-post-job] published row lookup failed:", publishedJobError)
+      return {
+        ok: false,
+        code: "publish_failed",
+        message: "Instagram post was published, but the saved record could not be refreshed.",
+        statusCode: 500,
+      }
+    }
+
+    return {
+      ok: true,
+      connection: toConnectionSummary(connection),
+      job: {
+        caption: publishedJob.caption,
+        created_at: publishedJob.created_at,
+        id: publishedJob.id,
+        instagram_connection_id: publishedJob.instagram_connection_id,
+        media_type: publishedJob.media_type,
+        media_url: publishedJob.media_url,
+        metadata: (publishedJob.metadata ?? {}) as AutopostJobMetadata,
+        scheduled_at: publishedJob.scheduled_at,
+        status: publishedJob.status,
+      },
     }
   }
 

@@ -1,11 +1,8 @@
-import { execSync, spawn } from "node:child_process"
-import { existsSync } from "node:fs"
+import { spawn } from "node:child_process"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import ffmpegInstaller from "ffmpeg-static"
-import ffprobeInstaller from "ffprobe-static"
 import { tool } from "ai"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
@@ -18,54 +15,16 @@ import type {
   ChatImageReference,
 } from "@/lib/chat/tools/image-reference-types"
 import type { AvailableChatVideoReference, ChatVideoReference } from "@/lib/chat/tools/generate-video"
+import {
+  createMissingFfmpegMessage,
+  resolveFfmpegBinaryPath,
+  resolveFfprobeBinaryPath,
+} from "@/lib/server/ffmpeg-binaries"
 import { assertSafeHttpUrl } from "@/lib/server/web-research/url-safety"
 
 const MAX_SOURCE_BYTES = 50 * 1024 * 1024
 const MAX_FRAME_COUNT = 24
 const LAST_FRAME_EPSILON_SEC = 0.05
-
-function tryBinaryFromShell(command: string): string | null {
-  try {
-    const stdout = execSync(command, { encoding: "utf8", windowsHide: true }).trim()
-    const line = stdout.split(/\r?\n/).find((entry) => entry.length > 0)
-    if (!line) return null
-    const candidate = line.trim()
-    return existsSync(candidate) ? candidate : null
-  } catch {
-    return null
-  }
-}
-
-function resolveFfmpegBinaryPath(): string | null {
-  const fromEnv = process.env.FFMPEG_BINARY ?? process.env.FFMPEG_PATH
-  if (fromEnv && existsSync(fromEnv)) {
-    return fromEnv
-  }
-
-  const fromPackage = typeof ffmpegInstaller === "string" ? ffmpegInstaller : null
-  if (fromPackage && existsSync(fromPackage)) {
-    return fromPackage
-  }
-
-  return tryBinaryFromShell(process.platform === "win32" ? "where ffmpeg" : "command -v ffmpeg")
-}
-
-function resolveFfprobeBinaryPath(): string | null {
-  const fromEnv = process.env.FFPROBE_BINARY ?? process.env.FFPROBE_PATH
-  if (fromEnv && existsSync(fromEnv)) {
-    return fromEnv
-  }
-
-  const packaged =
-    ffprobeInstaller && typeof ffprobeInstaller === "object" && "path" in ffprobeInstaller
-      ? String((ffprobeInstaller as { path: string }).path)
-      : null
-  if (packaged && existsSync(packaged)) {
-    return packaged
-  }
-
-  return tryBinaryFromShell(process.platform === "win32" ? "where ffprobe" : "command -v ffprobe")
-}
 
 interface CreateExtractVideoFramesToolOptions {
   availableImageReferences: AvailableChatImageReference[]
@@ -781,9 +740,7 @@ export function createExtractVideoFramesTool({
       const ffprobePath = resolveFfprobeBinaryPath()
 
       if (!ffmpegPath || !ffprobePath) {
-        throw new Error(
-          "Frame extraction needs ffmpeg and ffprobe on the server. Install ffmpeg on PATH, set FFMPEG_BINARY and FFPROBE_BINARY, or allow the ffmpeg-static postinstall (pnpm onlyBuiltDependencies includes ffmpeg-static) then run pnpm install.",
-        )
+        throw new Error(createMissingFfmpegMessage())
       }
 
       const sourceSelectors = [referenceId, mediaId, assetId].filter(Boolean)

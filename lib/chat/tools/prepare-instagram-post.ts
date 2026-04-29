@@ -16,9 +16,11 @@ export function createPrepareInstagramPostTool({
 }: CreatePrepareInstagramPostToolOptions) {
   return tool({
     description:
-      "Prepare an Instagram post by saving it as a draft or approved scheduled post. This tool is Instagram-only, never publishes immediately, and always requires explicit user approval in the tool UI before writing any job row.",
+      "Create an Instagram post as a draft, publish it immediately, or schedule it for later. This tool is Instagram-only and requires explicit user approval in the tool UI before writing or publishing any post in normal chat.",
     inputSchema: z.object({
-      action: z.enum(["draft", "schedule"]).describe("Whether to save a draft or schedule the post for later publishing."),
+      action: z
+        .enum(["draft", "publish", "schedule"])
+        .describe("Whether to save a draft, publish now, or schedule the post for later publishing."),
       mediaType: z
         .enum(["image", "feed_video", "reel", "carousel", "story"])
         .describe("Instagram media type."),
@@ -85,7 +87,9 @@ export function createPrepareInstagramPostTool({
         message:
           input.action === "schedule"
             ? "Instagram post approved and scheduled."
-            : "Instagram post approved and saved as a draft.",
+            : input.action === "publish"
+              ? "Instagram post approved and published."
+              : "Instagram post approved and saved as a draft.",
         post: {
           caption: result.job.caption,
           createdAt: result.job.created_at,

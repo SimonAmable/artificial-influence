@@ -1,9 +1,13 @@
-import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: path.join(__dirname),
   serverExternalPackages: ["ffmpeg-static", "ffprobe-static"],
+  outputFileTracingIncludes: {
+    "/api/chat": [
+      "./node_modules/ffmpeg-static/**/*",
+      "./node_modules/ffprobe-static/**/*",
+    ],
+  },
   async redirects() {
     return [
       {

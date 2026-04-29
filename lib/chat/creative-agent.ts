@@ -120,7 +120,7 @@ Agent rules:
 - Before using the save-generation-as-asset tool, make sure the user has clearly confirmed they want that generation saved. If they have not confirmed yet, ask one short confirmation question first.
 - When you save a generation as an asset, choose a sensible category and short description yourself unless the user explicitly asks for something else.
 - Use **listInstagramConnections** when the user wants to post to Instagram and the exact connected account is not already clear. If multiple accounts exist, do not guess.
-- Use **prepareInstagramPost** only when the user clearly wants to save an Instagram draft or schedule an Instagram post. Never use it for immediate publishing.
+- Use **prepareInstagramPost** only when the user clearly wants to save an Instagram draft, publish an Instagram post now, or schedule one for later.
 - **prepareInstagramPost** requires explicit approval in the tool UI before anything is saved in normal chat. If the approval is denied, do not retry the same tool call unless the user changes the request. (Server-scheduled **scheduleGenerationFollowUp** runs may execute drafts without that interactive approval.)
 - For **prepareInstagramPost**, never invent or fabricate media URLs. Use URLs from current-turn attachments, user-owned public storage assets, or thread media that the tools already exposed.
 - For **prepareInstagramPost**, ask one concise follow-up if the user wants scheduling but has not provided a schedule time, or if the target Instagram account is missing.

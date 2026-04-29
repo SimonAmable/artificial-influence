@@ -800,7 +800,7 @@ type ListInstagramConnectionsToolPart = {
 }
 
 type PrepareInstagramPostToolInput = {
-  action: "draft" | "schedule"
+  action: "draft" | "publish" | "schedule"
   caption?: string
   carouselItems?: Array<{
     kind: "image" | "video"
@@ -831,7 +831,7 @@ type PrepareInstagramPostToolPart = {
     | "output-denied"
   input?: PrepareInstagramPostToolInput
   output?: {
-    action: "draft" | "schedule"
+    action: "draft" | "publish" | "schedule"
     instagramAccount?: InstagramConnectionToolSummary
     message?: string
     post?: {
@@ -2420,7 +2420,9 @@ export function MessageParts({
                     <p className="text-muted-foreground">
                       {toolPart.input?.action === "schedule"
                         ? `Schedule this post${scheduleLabel ? ` for ${scheduleLabel}` : ""}?`
-                        : "Save this post as a draft?"}
+                        : toolPart.input?.action === "publish"
+                          ? "Publish this post to Instagram now?"
+                          : "Save this post as a draft?"}
                     </p>
                   </div>
                   {toolPart.input?.caption ? (
@@ -2494,7 +2496,13 @@ export function MessageParts({
             <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
               <CardContent className="space-y-4 p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge>{toolPart.output?.post?.status === "queued" ? "Instagram Scheduled" : "Instagram Draft"}</Badge>
+                  <Badge>
+                    {toolPart.output?.post?.status === "published"
+                      ? "Instagram Published"
+                      : toolPart.output?.post?.status === "queued"
+                        ? "Instagram Scheduled"
+                        : "Instagram Draft"}
+                  </Badge>
                   {toolPart.output?.post?.mediaType ? <Badge variant="outline">{toolPart.output.post.mediaType}</Badge> : null}
                   {resolvedAccount?.instagramUsername ? (
                     <Badge variant="outline">{resolvedAccount.instagramUsername}</Badge>

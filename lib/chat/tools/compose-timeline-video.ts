@@ -1,11 +1,8 @@
-import { execSync, spawn } from "node:child_process"
-import { existsSync } from "node:fs"
+import { spawn } from "node:child_process"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import ffmpegInstaller from "ffmpeg-static"
-import ffprobeInstaller from "ffprobe-static"
 import { tool } from "ai"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
@@ -13,6 +10,11 @@ import { z } from "zod"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import { mediaIdStringSchema } from "@/lib/chat/media-id"
 import { resolveThreadMediaRowsForTimelineCompose } from "@/lib/chat/thread-media/server"
+import {
+  createMissingFfmpegMessage,
+  resolveFfmpegBinaryPath,
+  resolveFfprobeBinaryPath,
+} from "@/lib/server/ffmpeg-binaries"
 import { COMPOSITION_ASPECT_PRESETS } from "@/lib/video-editor/composition-presets"
 
 const COMPOSE_TIMELINE_CREDITS = 2
@@ -20,51 +22,6 @@ const MAX_SEGMENTS = 15
 const MAX_OUTPUT_DURATION_SEC = 120
 const MAX_SOURCE_BYTES = 50 * 1024 * 1024
 const DEFAULT_IMAGE_DURATION_SEC = 3
-
-
-function tryBinaryFromShell(command: string): string | null {
-  try {
-    const stdout = execSync(command, { encoding: "utf8", windowsHide: true }).trim()
-    const line = stdout.split(/\r?\n/).find((entry) => entry.length > 0)
-    if (!line) return null
-    const candidate = line.trim()
-    return existsSync(candidate) ? candidate : null
-  } catch {
-    return null
-  }
-}
-
-function resolveFfmpegBinaryPath(): string | null {
-  const fromEnv = process.env.FFMPEG_BINARY ?? process.env.FFMPEG_PATH
-  if (fromEnv && existsSync(fromEnv)) {
-    return fromEnv
-  }
-
-  const fromPackage = typeof ffmpegInstaller === "string" ? ffmpegInstaller : null
-  if (fromPackage && existsSync(fromPackage)) {
-    return fromPackage
-  }
-
-  return tryBinaryFromShell(process.platform === "win32" ? "where ffmpeg" : "command -v ffmpeg")
-}
-
-function resolveFfprobeBinaryPath(): string | null {
-  const fromEnv = process.env.FFPROBE_BINARY ?? process.env.FFPROBE_PATH
-  if (fromEnv && existsSync(fromEnv)) {
-    return fromEnv
-  }
-
-  const packaged =
-    ffprobeInstaller && typeof ffprobeInstaller === "object" && "path" in ffprobeInstaller
-      ? String((ffprobeInstaller as { path: string }).path)
-      : null
-  if (packaged && existsSync(packaged)) {
-    return packaged
-  }
-
-  return tryBinaryFromShell(process.platform === "win32" ? "where ffprobe" : "command -v ffprobe")
-}
-
 function validateReferenceUrl(url: string) {
   if (url.startsWith("data:")) return
 
@@ -338,7 +295,7 @@ export function createComposeTimelineVideoTool({
       const ffmpeg = resolveFfmpegBinaryPath()
       const ffprobe = resolveFfprobeBinaryPath()
       if (!ffmpeg || !ffprobe) {
-        throw new Error("ffmpeg or ffprobe is not available on the server.")
+        throw new Error(createMissingFfmpegMessage())
       }
 
       const hasCredits = await checkUserHasCredits(userId, COMPOSE_TIMELINE_CREDITS, supabase)
