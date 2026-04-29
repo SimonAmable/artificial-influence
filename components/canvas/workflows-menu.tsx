@@ -19,14 +19,7 @@ export function WorkflowsMenu({ onInstantiate, onEdit, onPublish, isOpen }: Work
   const [loading, setLoading] = React.useState(false)
   const scrollContainerRef = React.useRef<HTMLDivElement>(null)
 
-  // Fetch workflows when menu opens
-  React.useEffect(() => {
-    if (isOpen) {
-      fetchWorkflows()
-    }
-  }, [isOpen])
-
-  const fetchWorkflows = async () => {
+  const fetchWorkflows = React.useCallback(async () => {
     setLoading(true)
     try {
       const response = await fetch("/api/workflows")
@@ -42,7 +35,14 @@ export function WorkflowsMenu({ onInstantiate, onEdit, onPublish, isOpen }: Work
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  // Fetch workflows when menu opens
+  React.useEffect(() => {
+    if (isOpen) {
+      void fetchWorkflows()
+    }
+  }, [fetchWorkflows, isOpen])
 
   const handleDelete = async (workflowId: string, event: React.MouseEvent) => {
     event.stopPropagation()

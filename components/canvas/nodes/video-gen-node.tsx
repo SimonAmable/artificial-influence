@@ -78,7 +78,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     connectingFromId: state.connection.fromHandle?.nodeId,
   }))
   const updateNodeInternals = useUpdateNodeInternals()
-  const nodeCounterRef = React.useRef(Date.now())
+  const nodeCounterRef = React.useRef(0)
 
   const connectedPrompt = React.useMemo(() => {
     const currentNode = nodes.find((n) => n.id === id)

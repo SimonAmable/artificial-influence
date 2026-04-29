@@ -25,11 +25,7 @@ export function CanvasesPage() {
   const [canvasToDelete, setCanvasToDelete] = useState<Canvas | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
-    loadCanvases()
-  }, [])
-
-  async function loadCanvases() {
+  const loadCanvases = async () => {
     try {
       setLoading(true)
       const data = await fetchUserCanvases()
@@ -40,6 +36,10 @@ export function CanvasesPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    void loadCanvases()
+  }, [])
 
   function handleCreateNew() {
     router.push("/canvas")

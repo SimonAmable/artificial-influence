@@ -1,5 +1,4 @@
 import type { Metadata } from "next"
-import { DM_Sans, Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/app/theme-provider"
 import { Header } from "@/components/app/header"
@@ -32,16 +31,6 @@ export const metadata: Metadata = {
   },
 }
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-})
-
-const dmSansDisplay = DM_Sans({
-  subsets: ["latin"],
-  variable: "--font-display",
-})
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -51,7 +40,6 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${dmSansDisplay.variable}`}
     >
       <body className="font-sans antialiased">
         <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>

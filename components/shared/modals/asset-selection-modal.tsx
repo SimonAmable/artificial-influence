@@ -105,14 +105,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
   const [createAssetUploading, setCreateAssetUploading] = React.useState(false)
   const createAssetFileInputRef = React.useRef<HTMLInputElement>(null)
 
-  // Fetch history when tab is opened
-  React.useEffect(() => {
-    if (open && activeTab === "history" && generations.length === 0) {
-      fetchHistory()
-    }
-  }, [open, activeTab])
-
-  const fetchHistory = async () => {
+  const fetchHistory = React.useCallback(async () => {
     setLoadingHistory(true)
     setHistoryError(null)
     try {
@@ -136,7 +129,14 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
     } finally {
       setLoadingHistory(false)
     }
-  }
+  }, [])
+
+  // Fetch history when tab is opened
+  React.useEffect(() => {
+    if (open && activeTab === "history" && generations.length === 0) {
+      void fetchHistory()
+    }
+  }, [activeTab, fetchHistory, generations.length, open])
 
   const fetchAssets = React.useCallback(async () => {
     setLoadingAssets(true)

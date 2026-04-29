@@ -157,8 +157,8 @@ export function OnboardingLearnScreen({
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
                 This full-screen walkthrough shows an actual public automation, the preview run it
-                generated, and the record behind it so new users can see what "set it once, let it
-                run" looks like in practice.
+                generated, and the record behind it so new users can see what &ldquo;set it once,
+                let it run&rdquo; looks like in practice.
               </p>
             </div>
 

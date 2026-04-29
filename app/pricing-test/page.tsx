@@ -111,7 +111,7 @@ export default function PricingTestPage() {
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to create checkout session');
-      if (data.url) window.location.href = data.url;
+      if (data.url) window.location.assign(data.url);
     } catch (error) {
       console.error('Error:', error);
       alert('Failed to start checkout. Please try again.');

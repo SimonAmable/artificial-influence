@@ -26,13 +26,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "predictionId is required" }, { status: 400 })
     }
 
-    let { data: generation, error } = await supabase
+    const { data: generationData, error } = await supabase
       .from("generations")
       .select("id, status, supabase_storage_path, error_message")
       .eq("replicate_prediction_id", predictionId)
       .eq("user_id", user.id)
       .eq("type", "video")
       .maybeSingle()
+
+    let generation = generationData
 
     if (error) {
       console.error("[generate-video/status]", error)
