@@ -53,8 +53,11 @@ export async function POST(request: Request) {
     if (result.ok) {
       return NextResponse.json({
         ok: true,
+        provider: result.provider,
         instagramMediaId: result.instagramMediaId,
         containerId: result.containerId,
+        publishId: result.publishId,
+        status: result.status,
       })
     }
 

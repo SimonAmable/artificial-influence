@@ -106,6 +106,7 @@ function pad2(n: number) {
 
 export type AutopostJobRow = {
   id: string
+  provider?: "instagram" | "tiktok" | string | null
   media_url: string
   caption: string | null
   media_type: string
@@ -118,6 +119,9 @@ export type AutopostJobRow = {
   last_error: string | null
   provider_publish_id: string | null
   provider_container_id: string | null
+  social_connection_id?: string | null
+  social_display_name?: string | null
+  social_username?: string | null
   instagram_connection_id: string | null
   instagram_username: string | null
 }
@@ -141,6 +145,8 @@ function postStatusTimeLine(job: AutopostJobRow): string {
       return `Saved ${formatLocal(job.created_at)}`
     case "processing":
       return `Publishing… ${formatLocal(job.updated_at)}`
+    case "inbox_delivered":
+      return `Sent to TikTok inbox ${formatLocal(job.updated_at)}`
     case "failed":
       return `Failed ${formatLocal(job.updated_at)}`
     case "cancelled":
@@ -168,6 +174,9 @@ function scheduledVsPublishedNote(job: AutopostJobRow): string | null {
 
 /** Label for which IG account a job targets (shown prominently in the list). */
 function jobAccountLabel(job: AutopostJobRow): string {
+  if (job.provider === "tiktok") {
+    return job.social_display_name || job.social_username || "TikTok"
+  }
   const u = job.instagram_username?.trim()
   if (u) {
     return `@${u}`
@@ -192,6 +201,10 @@ function mediaTypeLabel(mediaType: string): string {
       return "Carousel"
     case "story":
       return "Story"
+    case "tiktok_video_upload":
+      return "TikTok inbox upload"
+    case "tiktok_video_direct":
+      return "TikTok Direct Post"
     default:
       return mediaType
   }
@@ -199,7 +212,7 @@ function mediaTypeLabel(mediaType: string): string {
 
 function jobListThumbnailIsVideo(job: AutopostJobRow): boolean {
   const t = job.media_type
-  if (t === "reel" || t === "feed_video") {
+  if (t === "reel" || t === "feed_video" || t === "tiktok_video_upload" || t === "tiktok_video_direct") {
     return true
   }
   if (t === "story") {
@@ -232,7 +245,10 @@ function socialTokenExpiryBanner(provider: "Instagram" | "TikTok", tokenExpiresA
   const when = expires.toLocaleString()
   return {
     variant: "soon",
-    body: `Token expires ${formatDistanceToNow(expires, { addSuffix: true })} (${when}). Reconnect before then to avoid interruptions.`,
+    body:
+      provider === "TikTok"
+        ? `Access token refreshes automatically. Current token expires ${formatDistanceToNow(expires, { addSuffix: true })} (${when}).`
+        : `Token expires ${formatDistanceToNow(expires, { addSuffix: true })} (${when}). Reconnect before then to avoid interruptions.`,
   }
 }
 
@@ -285,6 +301,39 @@ type DisconnectTarget = {
   label: string
 }
 
+type ComposerProvider = "instagram" | "tiktok"
+type TikTokMode = "upload" | "direct"
+
+type TikTokCreatorInfo = {
+  creator_avatar_url?: string
+  creator_username?: string
+  creator_nickname?: string
+  privacy_level_options?: string[]
+  comment_disabled?: boolean
+  duet_disabled?: boolean
+  stitch_disabled?: boolean
+  max_video_post_duration_sec?: number
+}
+
+function hasScope(connection: SocialConnectionItem | null | undefined, scope: string) {
+  return connection?.scopes?.includes(scope) === true
+}
+
+function privacyLabel(value: string) {
+  switch (value) {
+    case "PUBLIC_TO_EVERYONE":
+      return "Public"
+    case "MUTUAL_FOLLOW_FRIENDS":
+      return "Friends"
+    case "FOLLOWER_OF_CREATOR":
+      return "Followers"
+    case "SELF_ONLY":
+      return "Only me"
+    default:
+      return value
+  }
+}
+
 function statusLabel(status: string) {
   switch (status) {
     case "draft":
@@ -295,6 +344,8 @@ function statusLabel(status: string) {
       return "Publishing"
     case "published":
       return "Published"
+    case "inbox_delivered":
+      return "Inbox delivered"
     case "failed":
       return "Failed"
     case "cancelled":
@@ -307,6 +358,8 @@ function statusLabel(status: string) {
 function statusBadgeClass(status: string) {
   switch (status) {
     case "published":
+      return "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+    case "inbox_delivered":
       return "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
     case "queued":
       return "border-sky-500/40 bg-sky-500/10 text-sky-800 dark:text-sky-300"
@@ -327,7 +380,19 @@ export function AutopostPage() {
   const [isLoadingStatus, setIsLoadingStatus] = React.useState(true)
   const [isDisconnecting, setIsDisconnecting] = React.useState(false)
   const [refreshingConnectionId, setRefreshingConnectionId] = React.useState<string | null>(null)
+  const [composerProvider, setComposerProvider] = React.useState<ComposerProvider>("instagram")
   const [selectedComposerConnectionId, setSelectedComposerConnectionId] = React.useState<string | null>(null)
+  const [selectedTikTokConnectionId, setSelectedTikTokConnectionId] = React.useState<string | null>(null)
+  const [tiktokMode, setTikTokMode] = React.useState<TikTokMode>("upload")
+  const [tiktokPrivacyLevel, setTikTokPrivacyLevel] = React.useState("SELF_ONLY")
+  const [tiktokDisableComment, setTikTokDisableComment] = React.useState(false)
+  const [tiktokDisableDuet, setTikTokDisableDuet] = React.useState(false)
+  const [tiktokDisableStitch, setTikTokDisableStitch] = React.useState(false)
+  const [tiktokIsAigc, setTikTokIsAigc] = React.useState(true)
+  const [tiktokBrandOrganic, setTikTokBrandOrganic] = React.useState(false)
+  const [tiktokBrandContent, setTikTokBrandContent] = React.useState(false)
+  const [tiktokCreatorInfo, setTikTokCreatorInfo] = React.useState<TikTokCreatorInfo | null>(null)
+  const [isLoadingTikTokCreatorInfo, setIsLoadingTikTokCreatorInfo] = React.useState(false)
   const [caption, setCaption] = React.useState("")
   const [postFormat, setPostFormat] = React.useState<PostFormat>("feed_image")
   const [selectedFiles, setSelectedFiles] = React.useState<File[]>([])
@@ -391,7 +456,7 @@ export function AutopostPage() {
     return () => {
       cancelled = true
     }
-  }, [postFormat])
+  }, [composerProvider, postFormat])
 
   const fetchStatus = React.useCallback(async () => {
     setIsLoadingStatus(true)
@@ -476,6 +541,82 @@ export function AutopostPage() {
       cancelled = true
     }
   }, [status?.instagram?.connections])
+
+  React.useEffect(() => {
+    const list = status?.tiktok?.connections ?? []
+    const connected = list.filter((c) => c.status === "connected")
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      if (connected.length === 0) {
+        setSelectedTikTokConnectionId(null)
+        return
+      }
+      setSelectedTikTokConnectionId((current) => {
+        if (current && connected.some((c) => c.id === current)) {
+          return current
+        }
+        return connected[0].id
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [status?.tiktok?.connections])
+
+  React.useEffect(() => {
+    if (composerProvider !== "tiktok" || tiktokMode !== "direct" || !selectedTikTokConnectionId) {
+      queueMicrotask(() => setTikTokCreatorInfo(null))
+      return
+    }
+
+    const connection = status?.tiktok?.connections.find((c) => c.id === selectedTikTokConnectionId)
+    if (!hasScope(connection, "video.publish")) {
+      queueMicrotask(() => setTikTokCreatorInfo(null))
+      return
+    }
+
+    let cancelled = false
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setIsLoadingTikTokCreatorInfo(true)
+      }
+    })
+    fetch(`/api/tiktok/creator-info?connectionId=${encodeURIComponent(selectedTikTokConnectionId)}`, {
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const data = (await response.json()) as { creatorInfo?: TikTokCreatorInfo; error?: string }
+        if (!response.ok) {
+          throw new Error(data.error || "Could not load TikTok creator settings.")
+        }
+        if (cancelled) return
+        const info = data.creatorInfo ?? null
+        setTikTokCreatorInfo(info)
+        const options = info?.privacy_level_options ?? []
+        setTikTokPrivacyLevel((current) =>
+          options.length > 0 && !options.includes(current) ? (options.includes("SELF_ONLY") ? "SELF_ONLY" : options[0]) : current,
+        )
+        setTikTokDisableComment(info?.comment_disabled === true)
+        setTikTokDisableDuet(info?.duet_disabled === true)
+        setTikTokDisableStitch(info?.stitch_disabled === true)
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          toast.error(error instanceof Error ? error.message : "Could not load TikTok creator settings.")
+          setTikTokCreatorInfo(null)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingTikTokCreatorInfo(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [composerProvider, selectedTikTokConnectionId, status?.tiktok?.connections, tiktokMode])
 
   const fetchJobs = React.useCallback(async () => {
     setIsLoadingJobs(true)
@@ -614,6 +755,9 @@ export function AutopostPage() {
     })
     setShareReelToFeed(true)
     setReelCoverUrl("")
+    setTikTokBrandOrganic(false)
+    setTikTokBrandContent(false)
+    setTikTokIsAigc(true)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -624,6 +768,73 @@ export function AutopostPage() {
     if (selectedFiles.length === 0) {
       toast.error("Choose media first.")
       return null
+    }
+
+    if (composerProvider === "tiktok") {
+      if (!selectedTikTokConnectionId) {
+        toast.error("Select a TikTok account for this post.")
+        return null
+      }
+      const connection = status?.tiktok?.connections.find((c) => c.id === selectedTikTokConnectionId)
+      const requiredScope = tiktokMode === "direct" ? "video.publish" : "video.upload"
+      if (!hasScope(connection, requiredScope)) {
+        toast.error(`Reconnect TikTok and approve ${tiktokMode === "direct" ? "Direct Post" : "upload"} permissions.`)
+        return null
+      }
+      if (selectedFiles.length !== 1) {
+        toast.error("TikTok publishing needs one video file.")
+        return null
+      }
+      const file = selectedFiles[0]
+      if (inferFileKind(file) !== "video") {
+        toast.error("TikTok publishing requires a video file.")
+        return null
+      }
+      if (tiktokMode === "direct" && !tiktokPrivacyLevel) {
+        toast.error("Pick a TikTok privacy level.")
+        return null
+      }
+
+      const uploaded = await uploadFileToSupabase(file, AUTOPOST_MEDIA_FOLDER)
+      if (!uploaded) {
+        return null
+      }
+
+      const body: Record<string, unknown> = {
+        provider: "tiktok",
+        caption,
+        mediaUrl: uploaded.url,
+        tiktokConnectionId: selectedTikTokConnectionId,
+        tiktokMode,
+        isAigc: tiktokIsAigc,
+        brandOrganicToggle: tiktokBrandOrganic,
+        brandContentToggle: tiktokBrandContent,
+      }
+      if (scheduledAtIso) {
+        body.scheduledAt = scheduledAtIso
+      }
+      if (tiktokMode === "direct") {
+        body.privacyLevel = tiktokPrivacyLevel
+        body.disableComment = tiktokDisableComment
+        body.disableDuet = tiktokDisableDuet
+        body.disableStitch = tiktokDisableStitch
+      }
+
+      const draftResponse = await fetch("/api/autopost/drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+
+      const draftData = (await draftResponse.json()) as { error?: string; draft?: { id: string } }
+      if (!draftResponse.ok) {
+        throw new Error(draftData.error || "Failed to save TikTok draft.")
+      }
+      const jobId = draftData.draft?.id
+      if (!jobId) {
+        throw new Error("Draft saved but missing job id.")
+      }
+      return { jobId, mediaType: tiktokMode === "direct" ? "tiktok_video_direct" : "tiktok_video_upload" }
     }
 
     if (!status?.instagram?.connected) {
@@ -768,8 +979,15 @@ export function AutopostPage() {
 
       const { jobId, mediaType } = result
 
-      if (mediaType === "reel" || mediaType === "feed_video" || mediaType === "carousel") {
-        toast.message("Publishing…", {
+      if (String(mediaType).startsWith("tiktok_")) {
+        toast.message("Sending to TikTok...", {
+          description:
+            mediaType === "tiktok_video_upload"
+              ? "TikTok will notify the account to finish this draft in-app."
+              : "TikTok will process this Direct Post asynchronously.",
+        })
+      } else if (mediaType === "reel" || mediaType === "feed_video" || mediaType === "carousel") {
+        toast.message("Publishing...", {
           description: "Instagram may take a few minutes to process video or multi-slide posts.",
         })
       }
@@ -780,13 +998,19 @@ export function AutopostPage() {
         body: JSON.stringify({ jobId }),
       })
 
-      const publishData = (await publishResponse.json()) as { error?: string }
+      const publishData = (await publishResponse.json()) as { error?: string; provider?: string }
 
       if (!publishResponse.ok) {
-        throw new Error(publishData.error || "Instagram publishing failed.")
+        throw new Error(publishData.error || "Publishing failed.")
       }
 
-      toast.success("Published to Instagram.")
+      toast.success(
+        publishData.provider === "tiktok"
+          ? tiktokMode === "upload"
+            ? "Sent to TikTok inbox."
+            : "TikTok Direct Post submitted."
+          : "Published to Instagram."
+      )
       resetComposer()
       void fetchJobs()
     } catch (error) {
@@ -813,7 +1037,11 @@ export function AutopostPage() {
         return
       }
 
-      toast.success("Post scheduled. It will publish automatically when due.")
+      toast.success(
+        composerProvider === "tiktok"
+          ? "TikTok post scheduled. It will submit automatically when due."
+          : "Post scheduled. It will publish automatically when due."
+      )
       resetComposer()
       void fetchJobs()
     } catch (error) {
@@ -826,8 +1054,12 @@ export function AutopostPage() {
   const handlePublishJobFromList = async (job: AutopostJobRow) => {
     setActionJobId(job.id)
     try {
-      if (job.media_type === "reel" || job.media_type === "feed_video" || job.media_type === "carousel") {
-        toast.message("Publishing…", {
+      if (job.provider === "tiktok") {
+        toast.message("Sending to TikTok...", {
+          description: "TikTok will process this request asynchronously.",
+        })
+      } else if (job.media_type === "reel" || job.media_type === "feed_video" || job.media_type === "carousel") {
+        toast.message("Publishing...", {
           description: "Instagram may take a few minutes to process video or multi-slide posts.",
         })
       }
@@ -844,7 +1076,7 @@ export function AutopostPage() {
       if (!publishResponse.ok) {
         throw new Error(publishData.error || "Publishing failed.")
       }
-      toast.success("Published to Instagram.")
+      toast.success(job.provider === "tiktok" ? "TikTok request submitted." : "Published to Instagram.")
       void fetchJobs()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Publish failed")
@@ -891,14 +1123,47 @@ export function AutopostPage() {
     }
   }
 
+  const handleRefreshTikTokJobStatus = async (jobId: string) => {
+    setActionJobId(jobId)
+    try {
+      const response = await fetch("/api/tiktok/publish-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId }),
+      })
+      const data = (await response.json()) as { error?: string; status?: string }
+      if (!response.ok) {
+        throw new Error(data.error || "Could not refresh TikTok status.")
+      }
+      toast.success(data.status ? `TikTok status: ${statusLabel(data.status)}` : "TikTok status updated.")
+      void fetchJobs()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not refresh TikTok status")
+    } finally {
+      setActionJobId(null)
+    }
+  }
+
   const instagramConnections = status?.instagram?.connections ?? []
   const tiktokConnections = status?.tiktok?.connections ?? []
   const isConnected = instagramConnections.some((connection) => connection.status === "connected")
+  const selectedTikTokConnection = tiktokConnections.find((connection) => connection.id === selectedTikTokConnectionId)
+  const isTikTokConnected = tiktokConnections.some((connection) => connection.status === "connected")
+  const tikTokRequiredScope = tiktokMode === "direct" ? "video.publish" : "video.upload"
+  const tiktokReady =
+    isTikTokConnected &&
+    Boolean(selectedTikTokConnectionId) &&
+    hasScope(selectedTikTokConnection, tikTokRequiredScope) &&
+    selectedFiles.length === 1 &&
+    inferFileKind(selectedFiles[0]) === "video" &&
+    (tiktokMode === "upload" || Boolean(tiktokPrivacyLevel))
 
   const composerReady =
-    postFormat === "carousel"
-      ? selectedFiles.length >= 2 && selectedFiles.length <= 10
-      : selectedFiles.length === 1
+    composerProvider === "tiktok"
+      ? tiktokReady
+      : postFormat === "carousel"
+        ? selectedFiles.length >= 2 && selectedFiles.length <= 10
+        : selectedFiles.length === 1
 
   return (
     <div className="min-h-screen bg-background px-4 pb-6 pt-20 md:pt-24">
@@ -1235,6 +1500,79 @@ export function AutopostPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
+                <Label htmlFor="autopost-provider">Platform</Label>
+                <Select
+                  value={composerProvider}
+                  onValueChange={(value) => setComposerProvider(value as ComposerProvider)}
+                >
+                  <SelectTrigger id="autopost-provider" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-120">
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                    <SelectItem value="tiktok">TikTok</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {composerProvider === "tiktok" ? (
+                <div className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <Label htmlFor="autopost-tiktok-account">TikTok account</Label>
+                  <Select
+                    value={selectedTikTokConnectionId ?? undefined}
+                    onValueChange={setSelectedTikTokConnectionId}
+                    disabled={!isTikTokConnected}
+                  >
+                    <SelectTrigger id="autopost-tiktok-account" className="w-full">
+                      <SelectValue placeholder={isTikTokConnected ? "Select account" : "Connect TikTok first"} />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-120">
+                      {tiktokConnections
+                        .filter((connection) => connection.status === "connected")
+                        .map((connection) => (
+                          <SelectItem key={connection.id} value={connection.id}>
+                            {connection.displayName || connection.username || "TikTok account"}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="autopost-tiktok-mode">TikTok action</Label>
+                      <Select value={tiktokMode} onValueChange={(value) => setTikTokMode(value as TikTokMode)}>
+                        <SelectTrigger id="autopost-tiktok-mode" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-120">
+                          <SelectItem value="upload">Send to inbox draft</SelectItem>
+                          <SelectItem value="direct">Direct Post</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Required scope</Label>
+                      <div className="flex h-10 items-center">
+                        <Badge
+                          variant={hasScope(selectedTikTokConnection, tikTokRequiredScope) ? "default" : "outline"}
+                        >
+                          {tikTokRequiredScope}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  {!hasScope(selectedTikTokConnection, tikTokRequiredScope) ? (
+                    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-950 dark:text-amber-100">
+                      Reconnect TikTok to approve {tiktokMode === "direct" ? "Direct Post" : "upload"} permissions.
+                      <Button type="button" size="sm" className="mt-2 w-full" onClick={handleConnectTikTok}>
+                        Reconnect TikTok
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {composerProvider === "instagram" ? (
+              <div className="space-y-2">
                 <Label htmlFor="autopost-post-type">Post type</Label>
                 <Select
                   value={postFormat}
@@ -1256,8 +1594,9 @@ export function AutopostPage() {
                   Reels are single videos. Carousel = up to 10 slides on the feed. Stories expire after 24h.
                 </p>
               </div>
+              ) : null}
 
-              {postFormat === "reel" ? (
+              {composerProvider === "instagram" && postFormat === "reel" ? (
                 <div className="flex items-start gap-2">
                   <Checkbox
                     id="autopost-reel-feed"
@@ -1276,6 +1615,7 @@ export function AutopostPage() {
                 </div>
               ) : null}
 
+              {composerProvider === "instagram" ? (
               <div className="space-y-2">
                 <Label htmlFor="autopost-account">Instagram account</Label>
                 <Select
@@ -1305,29 +1645,116 @@ export function AutopostPage() {
                   New posts and drafts are saved for the account you pick here.
                 </p>
               </div>
+              ) : null}
+
+              {composerProvider === "tiktok" && tiktokMode === "direct" ? (
+                <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="autopost-tiktok-privacy">Privacy</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Loaded from TikTok creator settings before Direct Post.
+                      </p>
+                    </div>
+                    {isLoadingTikTokCreatorInfo ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+                  </div>
+                  <Select
+                    value={tiktokPrivacyLevel}
+                    onValueChange={setTikTokPrivacyLevel}
+                    disabled={isLoadingTikTokCreatorInfo}
+                  >
+                    <SelectTrigger id="autopost-tiktok-privacy" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-120">
+                      {(tiktokCreatorInfo?.privacy_level_options?.length
+                        ? tiktokCreatorInfo.privacy_level_options
+                        : ["SELF_ONLY"]
+                      ).map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {privacyLabel(option)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="flex items-start gap-2 text-sm">
+                      <Checkbox
+                        checked={tiktokDisableComment}
+                        disabled={tiktokCreatorInfo?.comment_disabled === true}
+                        onCheckedChange={(value) => setTikTokDisableComment(value === true)}
+                      />
+                      <span>Disable comments</span>
+                    </label>
+                    <label className="flex items-start gap-2 text-sm">
+                      <Checkbox
+                        checked={tiktokDisableDuet}
+                        disabled={tiktokCreatorInfo?.duet_disabled === true}
+                        onCheckedChange={(value) => setTikTokDisableDuet(value === true)}
+                      />
+                      <span>Disable duet</span>
+                    </label>
+                    <label className="flex items-start gap-2 text-sm">
+                      <Checkbox
+                        checked={tiktokDisableStitch}
+                        disabled={tiktokCreatorInfo?.stitch_disabled === true}
+                        onCheckedChange={(value) => setTikTokDisableStitch(value === true)}
+                      />
+                      <span>Disable stitch</span>
+                    </label>
+                    <label className="flex items-start gap-2 text-sm">
+                      <Checkbox
+                        checked={tiktokIsAigc}
+                        onCheckedChange={(value) => setTikTokIsAigc(value === true)}
+                      />
+                      <span>Label as AI-generated</span>
+                    </label>
+                    <label className="flex items-start gap-2 text-sm sm:col-span-2">
+                      <Checkbox
+                        checked={tiktokBrandOrganic}
+                        onCheckedChange={(value) => setTikTokBrandOrganic(value === true)}
+                      />
+                      <span>Promotes my own business or brand</span>
+                    </label>
+                    <label className="flex items-start gap-2 text-sm sm:col-span-2">
+                      <Checkbox
+                        checked={tiktokBrandContent}
+                        onCheckedChange={(value) => setTikTokBrandContent(value === true)}
+                      />
+                      <span>Paid partnership or branded content</span>
+                    </label>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="space-y-2">
                 <Label htmlFor="autopost-media">Media</Label>
                 <Input
-                  key={postFormat}
+                  key={`${composerProvider}-${postFormat}`}
                   id="autopost-media"
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*,video/*"
-                  multiple={postFormat === "carousel"}
+                  accept={composerProvider === "tiktok" ? "video/mp4,video/quicktime,video/webm" : "image/*,video/*"}
+                  multiple={composerProvider === "instagram" && postFormat === "carousel"}
                   className="cursor-pointer"
                   onChange={handleMediaFileChange}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {postFormat === "carousel"
-                    ? "Select 2–10 images and/or videos. Order is preserved."
-                    : "One image or one video depending on post type."}{" "}
-                  PNG/WebP/GIF are converted to JPEG where needed (
-                  <span className="text-foreground/80">max 10 MB</span> upload).
+                  {composerProvider === "tiktok"
+                    ? "Select one MP4, MOV, or WebM video. TikTok will pull it from the uploaded public URL."
+                    : postFormat === "carousel"
+                      ? "Select 2-10 images and/or videos. Order is preserved."
+                      : "One image or one video depending on post type."}{" "}
+                  {composerProvider === "instagram" ? (
+                    <>
+                      PNG/WebP/GIF are converted to JPEG where needed (
+                      <span className="text-foreground/80">max 10 MB</span> upload).
+                    </>
+                  ) : null}
                 </p>
               </div>
 
-              {postFormat === "reel" ? (
+              {composerProvider === "instagram" && postFormat === "reel" ? (
                 <div className="space-y-2">
                   <Label htmlFor="autopost-reel-cover">Cover image URL (optional)</Label>
                   <Input
@@ -1388,13 +1815,18 @@ export function AutopostPage() {
                   id="autopost-caption"
                   value={caption}
                   onChange={(event) => setCaption(event.target.value)}
-                  placeholder="Write your caption..."
+                  placeholder={composerProvider === "tiktok" ? "TikTok title/caption..." : "Write your caption..."}
                   rows={5}
-                  disabled={postFormat === "story"}
+                  disabled={composerProvider === "instagram" && postFormat === "story"}
                 />
-                {postFormat === "story" ? (
+                {composerProvider === "instagram" && postFormat === "story" ? (
                   <p className="text-xs text-muted-foreground">
                     Story captions are not supported by the Instagram publishing API; compose text in-app if needed.
+                  </p>
+                ) : null}
+                {composerProvider === "tiktok" ? (
+                  <p className="text-xs text-muted-foreground">
+                    TikTok captions are sent as the video title for Direct Post. Inbox drafts can still be edited in TikTok.
                   </p>
                 ) : null}
               </div>
@@ -1412,13 +1844,23 @@ export function AutopostPage() {
                 </TabsList>
                 <TabsContent value="now" className="mt-4 space-y-2">
                   <p className="text-xs text-muted-foreground">
-                    Uploads your media, then publishes to Instagram immediately.
+                    {composerProvider === "tiktok"
+                      ? tiktokMode === "upload"
+                        ? "Uploads your video and sends it to the selected TikTok account inbox."
+                        : "Submits your video to TikTok Direct Post with the selected privacy settings."
+                      : "Uploads your media, then publishes to Instagram immediately."}
                   </p>
                   <Button
                     type="button"
                     className="w-full"
                     onClick={() => void handlePublishNow()}
-                    disabled={!composerReady || isPostingDraft || !isConnected || !selectedComposerConnectionId}
+                    disabled={
+                      !composerReady ||
+                      isPostingDraft ||
+                      (composerProvider === "instagram"
+                        ? !isConnected || !selectedComposerConnectionId
+                        : !isTikTokConnected || !selectedTikTokConnectionId)
+                    }
                   >
                     {isPostingDraft && composerTab === "now" ? (
                       <>
@@ -1428,7 +1870,11 @@ export function AutopostPage() {
                     ) : (
                       <>
                         <Upload className="mr-2 h-4 w-4" />
-                        Publish to Instagram
+                        {composerProvider === "tiktok"
+                          ? tiktokMode === "upload"
+                            ? "Send to TikTok inbox"
+                            : "Direct Post to TikTok"
+                          : "Publish to Instagram"}
                       </>
                     )}
                   </Button>
@@ -1538,7 +1984,13 @@ export function AutopostPage() {
                     className="w-full"
                     variant="secondary"
                     onClick={() => void handleSchedulePost()}
-                    disabled={!composerReady || isPostingDraft || !isConnected || !selectedComposerConnectionId}
+                    disabled={
+                      !composerReady ||
+                      isPostingDraft ||
+                      (composerProvider === "instagram"
+                        ? !isConnected || !selectedComposerConnectionId
+                        : !isTikTokConnected || !selectedTikTokConnectionId)
+                    }
                   >
                     {isPostingDraft && composerTab === "schedule" ? (
                       <>
@@ -1548,7 +2000,7 @@ export function AutopostPage() {
                     ) : (
                       <>
                         <CalendarClock className="mr-2 h-4 w-4" />
-                        Schedule post
+                        {composerProvider === "tiktok" ? "Schedule TikTok" : "Schedule post"}
                       </>
                     )}
                   </Button>
@@ -1585,6 +2037,7 @@ export function AutopostPage() {
                       const thumbIsVideo = jobListThumbnailIsVideo(job)
                       const carouselCount = job.media_type === "carousel" ? job.metadata?.carouselItems?.length : undefined
                       const scheduleNote = scheduledVsPublishedNote(job)
+                      const canPublishThisJob = job.provider === "tiktok" ? isTikTokConnected : isConnected
                       return (
                         <li
                           key={job.id}
@@ -1611,7 +2064,10 @@ export function AutopostPage() {
                               <span className="absolute bottom-1 right-1 rounded bg-background/90 px-1 py-0.5 text-[10px] text-muted-foreground">
                                 {job.media_type === "carousel" ? (
                                   <Layers className="inline h-3 w-3" />
-                                ) : job.media_type === "reel" || job.media_type === "feed_video" ? (
+                                ) : job.media_type === "reel" ||
+                                  job.media_type === "feed_video" ||
+                                  job.media_type === "tiktok_video_upload" ||
+                                  job.media_type === "tiktok_video_direct" ? (
                                   <Film className="inline h-3 w-3" />
                                 ) : job.media_type === "story" ? (
                                   <Sparkles className="inline h-3 w-3" />
@@ -1658,9 +2114,10 @@ export function AutopostPage() {
                               {job.status === "failed" && job.last_error ? (
                                 <p className="line-clamp-2 text-xs text-destructive">{job.last_error}</p>
                               ) : null}
-                              {job.status === "published" && job.provider_publish_id ? (
+                              {(job.status === "published" || job.provider === "tiktok") && job.provider_publish_id ? (
                                 <p className="text-[11px] text-muted-foreground">
-                                  Media ID: <span className="font-mono">{job.provider_publish_id}</span>
+                                  {job.provider === "tiktok" ? "Publish ID" : "Media ID"}:{" "}
+                                  <span className="font-mono">{job.provider_publish_id}</span>
                                 </p>
                               ) : null}
                               <div className="flex flex-wrap gap-2 pt-1">
@@ -1670,7 +2127,7 @@ export function AutopostPage() {
                                       type="button"
                                       size="sm"
                                       variant="default"
-                                      disabled={busy || !isConnected}
+                                      disabled={busy || !canPublishThisJob}
                                       onClick={() => void handlePublishJobFromList(job)}
                                     >
                                       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
@@ -1693,7 +2150,7 @@ export function AutopostPage() {
                                     <Button
                                       type="button"
                                       size="sm"
-                                      disabled={busy || !isConnected}
+                                      disabled={busy || !canPublishThisJob}
                                       onClick={() => void handlePublishJobFromList(job)}
                                     >
                                       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
@@ -1721,6 +2178,18 @@ export function AutopostPage() {
                                   >
                                     {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                                     Retry
+                                  </Button>
+                                ) : null}
+                                {job.provider === "tiktok" && job.status === "processing" ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={busy}
+                                    onClick={() => void handleRefreshTikTokJobStatus(job.id)}
+                                  >
+                                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                    Refresh status
                                   </Button>
                                 ) : null}
                               </div>

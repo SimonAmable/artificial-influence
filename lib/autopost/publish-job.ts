@@ -4,15 +4,32 @@ import { decryptAutopostToken } from "@/lib/autopost/crypto"
 import type { AutopostJobMetadata } from "@/lib/autopost/types"
 import { InstagramGraphError } from "@/lib/instagram/graph"
 import { publishInstagramContent, type PublishJobSpec } from "@/lib/instagram/publish"
+import {
+  fetchTikTokPublishStatus,
+  initTikTokDirectVideoPost,
+  initTikTokInboxVideoUpload,
+  queryTikTokCreatorInfo,
+  TikTokApiError,
+} from "@/lib/tiktok/publish"
+import { getValidTikTokAccessToken } from "@/lib/tiktok/token-service"
 
 export type PublishAutopostJobResult =
-  | { ok: true; instagramMediaId: string; containerId: string }
+  | {
+      ok: true
+      provider: "instagram" | "tiktok"
+      instagramMediaId?: string
+      containerId?: string
+      publishId?: string
+      status?: string
+    }
   | { ok: false; error: string; statusCode: number }
 
 type AutopostJobRow = {
   id: string
   user_id: string
+  provider?: string | null
   instagram_connection_id: string | null
+  social_connection_id?: string | null
   media_url: string
   caption: string | null
   media_type: string
@@ -27,6 +44,31 @@ function parseMetadata(raw: unknown): AutopostJobMetadata {
     return {}
   }
   return raw as AutopostJobMetadata
+}
+
+function mergeTikTokMetadata(row: AutopostJobRow, update: NonNullable<AutopostJobMetadata["tiktok"]>): AutopostJobMetadata {
+  const metadata = parseMetadata(row.metadata)
+  return {
+    ...metadata,
+    tiktok: {
+      ...(metadata.tiktok ?? {}),
+      ...update,
+    },
+  }
+}
+
+function tiktokStatusToJobStatus(status: string | undefined): string {
+  switch (status) {
+    case "SEND_TO_USER_INBOX":
+      return "inbox_delivered"
+    case "PUBLISH_COMPLETE":
+    case "PUBLICLY_AVAILABLE":
+      return "published"
+    case "FAILED":
+      return "failed"
+    default:
+      return "processing"
+  }
 }
 
 function buildPublishSpec(row: AutopostJobRow): PublishJobSpec {
@@ -70,6 +112,267 @@ function buildPublishSpec(row: AutopostJobRow): PublishJobSpec {
   }
 }
 
+async function claimJobForProcessing(
+  supabase: SupabaseClient,
+  row: AutopostJobRow,
+  jobId: string
+): Promise<PublishAutopostJobResult | null> {
+  const attempts = row.attempts ?? 0
+
+  const { data: processingRow, error: processingUpdateError } = await supabase
+    .from("autopost_jobs")
+    .update({
+      status: "processing",
+      attempts: attempts + 1,
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId)
+    .eq("user_id", row.user_id)
+    .in("status", ["draft", "failed", "queued"])
+    .select("id")
+    .maybeSingle()
+
+  if (processingUpdateError) {
+    console.error("[autopost/publish-job] processing update failed:", processingUpdateError)
+    return { ok: false, error: "Failed to update job.", statusCode: 500 }
+  }
+
+  if (!processingRow) {
+    return {
+      ok: false,
+      error: "Could not claim job for publishing (it may have already started).",
+      statusCode: 409,
+    }
+  }
+
+  return null
+}
+
+async function publishTikTokAutopostJob(
+  supabase: SupabaseClient,
+  row: AutopostJobRow,
+  jobId: string
+): Promise<PublishAutopostJobResult> {
+  const connectionId = row.social_connection_id
+  if (!connectionId) {
+    return { ok: false, error: "Pick a connected TikTok account before publishing.", statusCode: 400 }
+  }
+
+  const metadata = parseMetadata(row.metadata)
+  const mode = row.media_type === "tiktok_video_direct" ? "direct" : "upload"
+  const requiredScope = mode === "direct" ? "video.publish" : "video.upload"
+
+  let token
+  try {
+    token = await getValidTikTokAccessToken(supabase, {
+      connectionId,
+      userId: row.user_id,
+    })
+  } catch (tokenError) {
+    return {
+      ok: false,
+      error: tokenError instanceof Error ? tokenError.message : "Could not read TikTok credentials.",
+      statusCode: 400,
+    }
+  }
+
+  if (!token.scopes.includes(requiredScope)) {
+    return {
+      ok: false,
+      error: `Reconnect TikTok and approve ${mode === "direct" ? "Direct Post" : "upload"} permissions.`,
+      statusCode: 400,
+    }
+  }
+
+  if (mode === "direct") {
+    const privacyLevel = metadata.tiktok?.privacyLevel
+    if (!privacyLevel) {
+      return { ok: false, error: "Direct Post requires a TikTok privacy level.", statusCode: 400 }
+    }
+
+    try {
+      const creatorInfo = await queryTikTokCreatorInfo(token.accessToken)
+      const allowed = creatorInfo.privacy_level_options ?? []
+      if (allowed.length > 0 && !allowed.includes(privacyLevel)) {
+        return {
+          ok: false,
+          error: "The selected TikTok privacy level is no longer available. Refresh creator settings.",
+          statusCode: 400,
+        }
+      }
+    } catch (creatorError) {
+      const statusCode = creatorError instanceof TikTokApiError && creatorError.status ? creatorError.status : 502
+      return {
+        ok: false,
+        error: creatorError instanceof Error ? creatorError.message : "Could not verify TikTok creator settings.",
+        statusCode,
+      }
+    }
+  }
+
+  const claimError = await claimJobForProcessing(supabase, row, jobId)
+  if (claimError) {
+    return claimError
+  }
+
+  try {
+    const result =
+      mode === "direct"
+        ? await initTikTokDirectVideoPost({
+            accessToken: token.accessToken,
+            videoUrl: row.media_url,
+            postInfo: {
+              title: row.caption ?? undefined,
+              privacyLevel: metadata.tiktok?.privacyLevel ?? "SELF_ONLY",
+              disableComment: metadata.tiktok?.disableComment,
+              disableDuet: metadata.tiktok?.disableDuet,
+              disableStitch: metadata.tiktok?.disableStitch,
+              isAigc: metadata.tiktok?.isAigc,
+              brandOrganicToggle: metadata.tiktok?.brandOrganicToggle,
+              brandContentToggle: metadata.tiktok?.brandContentToggle,
+            },
+          })
+        : await initTikTokInboxVideoUpload({
+            accessToken: token.accessToken,
+            videoUrl: row.media_url,
+          })
+
+    if (!result.publish_id) {
+      throw new TikTokApiError("TikTok accepted the request but returned no publish id.")
+    }
+
+    const now = new Date().toISOString()
+    const nextMetadata = mergeTikTokMetadata(row, {
+      publishId: result.publish_id,
+      uploadUrl: result.upload_url ?? null,
+      status: "SUBMITTED",
+      statusFetchedAt: now,
+    })
+
+    const { error: successUpdateError } = await supabase
+      .from("autopost_jobs")
+      .update({
+        status: "processing",
+        provider_publish_id: result.publish_id,
+        provider_container_id: result.upload_url ?? null,
+        last_error: null,
+        metadata: nextMetadata,
+        updated_at: now,
+      })
+      .eq("id", jobId)
+      .eq("user_id", row.user_id)
+
+    if (successUpdateError) {
+      console.error("[autopost/publish-job] TikTok success update failed:", successUpdateError)
+    }
+
+    return {
+      ok: true,
+      provider: "tiktok",
+      publishId: result.publish_id,
+      containerId: result.upload_url,
+      status: "processing",
+    }
+  } catch (publishError) {
+    const message = publishError instanceof Error ? publishError.message : "TikTok publishing failed."
+
+    const { error: failUpdateError } = await supabase
+      .from("autopost_jobs")
+      .update({
+        status: "failed",
+        last_error: message.slice(0, 2000),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", jobId)
+      .eq("user_id", row.user_id)
+
+    if (failUpdateError) {
+      console.error("[autopost/publish-job] TikTok fail update failed:", failUpdateError)
+    }
+
+    const statusCode = publishError instanceof TikTokApiError && publishError.status ? publishError.status : 502
+    return { ok: false, error: message, statusCode }
+  }
+}
+
+export async function refreshTikTokAutopostJobStatus(
+  supabase: SupabaseClient,
+  jobId: string,
+  options: { userId?: string } = {}
+): Promise<PublishAutopostJobResult> {
+  let query = supabase
+    .from("autopost_jobs")
+    .select("id, user_id, provider, social_connection_id, provider_publish_id, metadata")
+    .eq("id", jobId)
+    .eq("provider", "tiktok")
+
+  if (options.userId) {
+    query = query.eq("user_id", options.userId)
+  }
+
+  const { data: job, error } = await query.maybeSingle()
+  if (error || !job?.provider_publish_id || !job.social_connection_id) {
+    return { ok: false, error: "TikTok post not found.", statusCode: 404 }
+  }
+
+  try {
+    const token = await getValidTikTokAccessToken(supabase, {
+      connectionId: job.social_connection_id,
+      userId: job.user_id,
+    })
+    const status = await fetchTikTokPublishStatus({
+      accessToken: token.accessToken,
+      publishId: job.provider_publish_id,
+    })
+    const nextStatus = tiktokStatusToJobStatus(status.status)
+    const metadata = job.metadata && typeof job.metadata === "object" ? (job.metadata as AutopostJobMetadata) : {}
+    const nextMetadata: AutopostJobMetadata = {
+      ...metadata,
+      tiktok: {
+        ...(metadata.tiktok ?? {}),
+        status: status.status,
+        failReason: status.fail_reason ?? null,
+        statusFetchedAt: new Date().toISOString(),
+      },
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      status: nextStatus,
+      last_error: nextStatus === "failed" ? status.fail_reason ?? "TikTok processing failed." : null,
+      metadata: nextMetadata,
+      updated_at: new Date().toISOString(),
+    }
+    if (nextStatus === "published") {
+      updatePayload.published_at = new Date().toISOString()
+    }
+
+    const { error: updateError } = await supabase
+      .from("autopost_jobs")
+      .update(updatePayload)
+      .eq("id", jobId)
+      .eq("user_id", job.user_id)
+
+    if (updateError) {
+      console.error("[autopost/publish-job] TikTok status update failed:", updateError)
+      return { ok: false, error: "Failed to save TikTok status.", statusCode: 500 }
+    }
+
+    return {
+      ok: true,
+      provider: "tiktok",
+      publishId: job.provider_publish_id,
+      status: nextStatus,
+    }
+  } catch (statusError) {
+    return {
+      ok: false,
+      error: statusError instanceof Error ? statusError.message : "Could not refresh TikTok status.",
+      statusCode: statusError instanceof TikTokApiError && statusError.status ? statusError.status : 502,
+    }
+  }
+}
+
 /**
  * Loads the job, validates status, publishes to Instagram, and updates the row.
  * Works with the user-scoped server client (RLS) or the service role client.
@@ -89,7 +392,7 @@ export async function publishAutopostJob(
   let query = supabase
     .from("autopost_jobs")
     .select(
-      "id, user_id, instagram_connection_id, media_url, caption, media_type, status, attempts, scheduled_at, metadata"
+      "id, user_id, provider, instagram_connection_id, social_connection_id, media_url, caption, media_type, status, attempts, scheduled_at, metadata"
     )
     .eq("id", jobId)
 
@@ -122,6 +425,10 @@ export async function publishAutopostJob(
         statusCode: 400,
       }
     }
+  }
+
+  if ((row.provider ?? "instagram") === "tiktok") {
+    return publishTikTokAutopostJob(supabase, row, jobId)
   }
 
   let connectionQuery = supabase
@@ -217,7 +524,7 @@ export async function publishAutopostJob(
       console.error("[autopost/publish-job] success update failed:", successUpdateError)
     }
 
-    return { ok: true, instagramMediaId: mediaId, containerId }
+    return { ok: true, provider: "instagram", instagramMediaId: mediaId, containerId }
   } catch (publishError) {
     const message =
       publishError instanceof InstagramGraphError

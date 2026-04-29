@@ -3,8 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
-    "build": "next build --webpack",
+    "dev": "next dev",
+    "build": "next build",
+    "dev:webpack": "next dev --webpack",
+    "build:webpack": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "ngrok": "ngrok http 3000",

@@ -55,7 +55,10 @@ async function handleAutopostCron(request: Request) {
       ok: true,
       processed: 1,
       jobId: dueRow.id,
+      provider: result.provider,
       instagramMediaId: result.instagramMediaId,
+      publishId: result.publishId,
+      status: result.status,
     })
   }
 

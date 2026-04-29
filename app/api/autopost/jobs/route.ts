@@ -3,6 +3,11 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
 type IgEmbed = { instagram_username: string | null }
+type SocialEmbed = {
+  provider: string | null
+  username: string | null
+  display_name: string | null
+}
 
 type JobRow = {
   id: string
@@ -18,9 +23,12 @@ type JobRow = {
   last_error: string | null
   provider_publish_id: string | null
   provider_container_id: string | null
+  provider: string | null
+  social_connection_id: string | null
   instagram_connection_id: string | null
   /** PostgREST may return object or single-element array for nested embeds. */
   instagram_connections: IgEmbed | IgEmbed[] | null
+  social_connections: SocialEmbed | SocialEmbed[] | null
 }
 
 function resolveInstagramUsername(embed: JobRow["instagram_connections"]): string | null {
@@ -31,6 +39,11 @@ function resolveInstagramUsername(embed: JobRow["instagram_connections"]): strin
     return embed[0]?.instagram_username ?? null
   }
   return embed.instagram_username ?? null
+}
+
+function resolveSocialConnection(embed: JobRow["social_connections"]): SocialEmbed | null {
+  if (!embed) return null
+  return Array.isArray(embed) ? embed[0] ?? null : embed
 }
 
 export async function GET() {
@@ -48,7 +61,7 @@ export async function GET() {
     const { data: rawJobs, error } = await supabase
       .from("autopost_jobs")
       .select(
-        "id, media_url, caption, media_type, metadata, status, scheduled_at, published_at, created_at, updated_at, last_error, provider_publish_id, provider_container_id, instagram_connection_id, instagram_connections!instagram_connection_id ( instagram_username )"
+        "id, provider, social_connection_id, media_url, caption, media_type, metadata, status, scheduled_at, published_at, created_at, updated_at, last_error, provider_publish_id, provider_container_id, instagram_connection_id, instagram_connections!instagram_connection_id ( instagram_username ), social_connections!social_connection_id ( provider, username, display_name )"
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -63,6 +76,7 @@ export async function GET() {
       const j = row as JobRow
       return {
         id: j.id,
+        provider: j.provider ?? "instagram",
         media_url: j.media_url,
         caption: j.caption,
         media_type: j.media_type,
@@ -75,8 +89,11 @@ export async function GET() {
         last_error: j.last_error,
         provider_publish_id: j.provider_publish_id,
         provider_container_id: j.provider_container_id,
+        social_connection_id: j.social_connection_id,
         instagram_connection_id: j.instagram_connection_id,
         instagram_username: resolveInstagramUsername(j.instagram_connections),
+        social_display_name: resolveSocialConnection(j.social_connections)?.display_name ?? null,
+        social_username: resolveSocialConnection(j.social_connections)?.username ?? null,
       }
     })
 

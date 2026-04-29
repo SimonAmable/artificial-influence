@@ -69,6 +69,20 @@ export async function exchangeTikTokCodeForToken(params: {
   )
 }
 
+export async function refreshTikTokAccessToken(refreshToken: string): Promise<TikTokTokenResponse> {
+  const { clientKey, clientSecret } = getTikTokClientConfig()
+
+  return postTikTokForm<TikTokTokenResponse>(
+    TIKTOK_TOKEN_URL,
+    new URLSearchParams({
+      client_key: clientKey,
+      client_secret: clientSecret,
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    })
+  )
+}
+
 export async function revokeTikTokToken(accessToken: string): Promise<void> {
   const { clientKey, clientSecret } = getTikTokClientConfig()
 

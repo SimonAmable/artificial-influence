@@ -95,6 +95,7 @@ export function CanvasSidebar({
   const [loadingAssets, setLoadingAssets] = React.useState(false)
   const [loadingGenerations, setLoadingGenerations] = React.useState(false)
   const [hasMore, setHasMore] = React.useState(true)
+  const [historyNextOffset, setHistoryNextOffset] = React.useState(0)
   const menuRef = React.useRef<HTMLDivElement>(null)
   const scrollContainerRef = React.useRef<HTMLDivElement>(null)
   const addMenuCloseTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -122,7 +123,7 @@ export function CanvasSidebar({
     setActiveMenu(null)
   }, [onAddNode])
 
-  const fetchGenerations = React.useCallback(async (pageNum: number) => {
+  const fetchGenerations = React.useCallback(async (offset: number) => {
     setLoadingGenerations(prev => {
       if (prev) return prev // Already loading, skip
       return true
@@ -138,20 +139,25 @@ export function CanvasSidebar({
       }
 
       const limit = 12
-      const offset = (pageNum - 1) * limit
 
       const response = await fetch(`/api/generations?limit=${limit}&offset=${offset}`)
       if (response.ok) {
         const data = await response.json()
         const newGenerations = data.generations || []
-        
-        if (pageNum === 1) {
+        const pagination = data.pagination
+
+        if (offset === 0) {
           setGenerations(newGenerations)
         } else {
           setGenerations(prev => [...prev, ...newGenerations])
         }
-        
-        setHasMore(newGenerations.length === limit)
+
+        setHasMore(Boolean(pagination?.hasMore))
+        setHistoryNextOffset(
+          typeof pagination?.offset === "number" && typeof pagination?.returned === "number"
+            ? pagination.offset + pagination.returned
+            : offset + newGenerations.length
+        )
       }
     } catch (error) {
       console.error('Error fetching generations:', error)
@@ -162,11 +168,16 @@ export function CanvasSidebar({
 
   // Fetch generations when history menu opens
   React.useEffect(() => {
-    if (activeMenu === "history") {
+    if (activeMenu !== "history") return
+
+    const timeoutId = window.setTimeout(() => {
       setGenerations([])
       setHasMore(true)
-      fetchGenerations(1)
-    }
+      setHistoryNextOffset(0)
+      void fetchGenerations(0)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [activeMenu, fetchGenerations])
 
   const fetchAssets = React.useCallback(async () => {
@@ -189,20 +200,24 @@ export function CanvasSidebar({
 
   React.useEffect(() => {
     if (activeMenu !== "assets") return
-    void fetchAssets()
+
+    const timeoutId = window.setTimeout(() => {
+      void fetchAssets()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [activeMenu, fetchAssets])
 
   const handleScroll = React.useCallback(() => {
-    if (!scrollContainerRef.current || !hasMore) return
+    if (!scrollContainerRef.current || !hasMore || loadingGenerations) return
     
     const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current
     
     // Load more when scrolled to within 100px of bottom
     if (scrollTop + clientHeight >= scrollHeight - 100) {
-      const nextPage = Math.floor(generations.length / 12) + 1
-      fetchGenerations(nextPage)
+      fetchGenerations(historyNextOffset)
     }
-  }, [fetchGenerations, generations.length, hasMore])
+  }, [fetchGenerations, hasMore, historyNextOffset, loadingGenerations])
 
   // Group generations by date
   const groupedGenerations = React.useMemo(() => {

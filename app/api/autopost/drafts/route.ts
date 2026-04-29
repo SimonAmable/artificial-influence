@@ -1,18 +1,48 @@
 import { NextResponse } from "next/server"
 
 import { createInstagramPostJob, type PrepareInstagramPostInput } from "@/lib/autopost/create-instagram-post-job"
+import { createTikTokPostJob, type PrepareTikTokPostInput } from "@/lib/autopost/create-tiktok-post-job"
 import { createClient } from "@/lib/supabase/server"
 
 type MediaType = "image" | "reel" | "feed_video" | "carousel" | "story"
 
 function parseBody(
   body: unknown,
-): PrepareInstagramPostInput | "invalid_body" {
+): PrepareInstagramPostInput | PrepareTikTokPostInput | "invalid_body" {
   if (!body || typeof body !== "object") {
     return "invalid_body"
   }
   const record = body as Record<string, unknown>
+  const provider = record.provider === "tiktok" ? "tiktok" : "instagram"
   const caption = typeof record.caption === "string" ? record.caption : ""
+
+  if (provider === "tiktok") {
+    const tiktokConnectionId =
+      typeof record.tiktokConnectionId === "string" ? record.tiktokConnectionId.trim() : ""
+    const mode = record.tiktokMode === "direct" ? "direct" : "upload"
+    const mediaUrl = typeof record.mediaUrl === "string" ? record.mediaUrl.trim() : ""
+
+    if (!tiktokConnectionId || !mediaUrl) {
+      return "invalid_body"
+    }
+
+    return {
+      action: "draft",
+      brandOrganicToggle: record.brandOrganicToggle === true,
+      caption,
+      disableComment: record.disableComment === true,
+      disableDuet: record.disableDuet === true,
+      disableStitch: record.disableStitch === true,
+      isAigc: record.isAigc === false ? false : true,
+      mediaUrl,
+      mode,
+      brandContentToggle: record.brandContentToggle === true,
+      privacyLevel: typeof record.privacyLevel === "string" ? record.privacyLevel.trim() : undefined,
+      scheduledAt: typeof record.scheduledAt === "string" ? record.scheduledAt.trim() : undefined,
+      tiktokConnectionId,
+    }
+  }
+
   const instagramConnectionId =
     typeof record.instagramConnectionId === "string" ? record.instagramConnectionId.trim() : ""
 
@@ -72,6 +102,10 @@ function parseBody(
   }
 }
 
+function isTikTokInput(input: PrepareInstagramPostInput | PrepareTikTokPostInput): input is PrepareTikTokPostInput {
+  return "tiktokConnectionId" in input
+}
+
 export async function POST(request: Request) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -101,7 +135,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Invalid body. Send mediaType (image | reel | feed_video | carousel | story), instagramConnectionId, mediaUrl (or carouselItems for carousels), and for story assetKind (image | video).",
+            "Invalid body. Send a valid provider payload with account id and media URL.",
         },
         { status: 400 }
       )
@@ -118,16 +152,27 @@ export async function POST(request: Request) {
 
     const scheduleLater = hasScheduledAt && scheduledAtMs > Date.now()
 
-    const result = await createInstagramPostJob({
-      input: {
-        ...parsed,
-        action: scheduleLater ? "schedule" : "draft",
-        scheduledAt: scheduleLater ? parsed.scheduledAt : undefined,
-      },
-      supabase,
-      supabaseUrl,
-      userId: user.id,
-    })
+    const result = isTikTokInput(parsed)
+      ? await createTikTokPostJob({
+          input: {
+            ...parsed,
+            action: scheduleLater ? "schedule" : "draft",
+            scheduledAt: scheduleLater ? parsed.scheduledAt : undefined,
+          },
+          supabase,
+          supabaseUrl,
+          userId: user.id,
+        })
+      : await createInstagramPostJob({
+          input: {
+            ...parsed,
+            action: scheduleLater ? "schedule" : "draft",
+            scheduledAt: scheduleLater ? parsed.scheduledAt : undefined,
+          },
+          supabase,
+          supabaseUrl,
+          userId: user.id,
+        })
 
     if (!result.ok) {
       return NextResponse.json({ error: result.message }, { status: result.statusCode })
