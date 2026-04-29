@@ -211,7 +211,7 @@ export const megaNavGroups: MegaNavGroup[] = [
           {
             path: "/image?model=openai/gpt-image-2",
             label: "GPT Image 2",
-            description: "OpenAI image generation on Fal",
+            description: "OpenAI image generation with strong prompt following",
             badge: "new",
             iconSrc: "/ai_icons/openai.svg",
           },
@@ -291,10 +291,11 @@ export const megaNavGroups: MegaNavGroup[] = [
         title: "Models",
         items: [
           {
-            path: "/video?model=xai/grok-imagine-video",
-            label: "Grok Imagine Video",
-            description: "Creative video generation",
-            iconSrc: "/ai_icons/grok.svg",
+            path: "/video?model=alibaba/happy-horse",
+            label: "Happy Horse",
+            description: "Unified text, image, and reference-to-video generation",
+            badge: "new",
+            iconSrc: "/ai_icons/qwen.svg",
           },
           {
             path: "/video?model=google/veo-3.1-fast",
@@ -318,7 +319,7 @@ export const megaNavGroups: MegaNavGroup[] = [
           },
           {
             path: "/video?model=kwaivgi/kling-v3-video",
-            label: "Kling V3 Video",
+            label: "Kling Video 3.0",
             description: "Cinematic text and image to video",
             badge: "new",
             iconSrc: "/ai_icons/kling-color.svg",

@@ -16,7 +16,9 @@ const VENDOR_LABELS: Record<string, string> = {
   veed: "Veed",
   prunaai: "Pruna",
   qwen: "Qwen",
-  xai: "xAI",
+  xai: "Grok",
+  alibaba: "Alibaba",
+  "fal-ai": "Wan",
 }
 
 export interface VendorModelGroup {

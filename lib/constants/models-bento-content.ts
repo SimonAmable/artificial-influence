@@ -19,6 +19,18 @@ export const modelsBentoCopy = {
   secondaryCtaHref: "/pricing",
 } as const
 
+/** Curated homepage cards so the landing page shows actual supported model names, not backend/provider buckets. */
+export const modelsBentoFeaturedIdentifiers = [
+  "google/nano-banana-2",
+  "openai/gpt-image-2",
+  "xai/grok-imagine-image",
+  "bytedance/seedream-5-lite",
+  "google/veo-3.1-fast",
+  "bytedance/seedance-2.0",
+  "alibaba/happy-horse",
+  "kwaivgi/kling-v3-motion-control",
+] as const
+
 /**
  * One background per vendor slug (identifier prefix before `/`).
  * Filenames in `AI_MATERIALS_SHOWCASES` match the brand/model line each card showcases.
@@ -35,6 +47,7 @@ export const modelsBentoShowcaseByVendorSlug: Record<string, LandingBentoCardMed
   xai: { mediaType: "image", src: showcase("grok.jpeg") },
   minimax: { mediaType: "image", src: showcase("minimax.jpeg") },
   veed: { mediaType: "image", src: showcase("veed.jpeg") },
+  alibaba: { mediaType: "image", src: showcase("showcase-02.png") },
   /** Pruna / FLUX & related */
   prunaai: { mediaType: "image", src: showcase("generated-image-1776347735470.jpeg") },
 }

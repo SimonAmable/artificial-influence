@@ -3,17 +3,22 @@
 import Link from "next/link"
 import { getActiveModelMetadata } from "@/lib/constants/model-metadata"
 import { aiVendorIconSrc } from "@/lib/constants/ai-vendor-icons"
-import { modelsBentoCopy } from "@/lib/constants/models-bento-content"
+import {
+  modelsBentoCopy,
+  modelsBentoFeaturedIdentifiers,
+} from "@/lib/constants/models-bento-content"
 import {
   groupModelsByVendor,
   modelHrefForLanding,
   pickBentoCardMedia,
   summarizeVendorModels,
+  vendorSlugFromIdentifier,
 } from "@/lib/utils/models-vendor-grouping"
 import { Button } from "@/components/ui/button"
 import { BentoCard, BentoGrid } from "@/components/ui/bento-grid"
 import { BlurFade } from "@/components/ui/blur-fade"
 import type { LandingBentoCardMedia } from "@/lib/types/landing"
+import type { ModelMetadata } from "@/lib/constants/model-metadata"
 import { cn } from "@/lib/utils"
 
 const BENTO_MIN_H = "lg:min-h-[280px]"
@@ -92,8 +97,29 @@ function BentoMediaBackground({ media }: { media: LandingBentoCardMedia }) {
   )
 }
 
+const FEATURED_MODEL_COUNT = modelsBentoFeaturedIdentifiers.length
+
+function getHomepageModels(): ModelMetadata[] {
+  const activeModels = getActiveModelMetadata().filter((model) => !model.deprecated)
+  const byIdentifier = new Map(activeModels.map((model) => [model.identifier, model] as const))
+  const featured = modelsBentoFeaturedIdentifiers
+    .map((identifier) => byIdentifier.get(identifier))
+    .filter((model): model is ModelMetadata => Boolean(model))
+
+  if (featured.length >= FEATURED_MODEL_COUNT) {
+    return featured.slice(0, FEATURED_MODEL_COUNT)
+  }
+
+  const featuredIdentifiers = new Set(featured.map((model) => model.identifier))
+  const fill = activeModels.filter((model) => {
+    if (featuredIdentifiers.has(model.identifier)) return false
+    return !model.identifier.startsWith("fal-ai/")
+  })
+  return [...featured, ...fill].slice(0, FEATURED_MODEL_COUNT)
+}
+
 export function ModelsBentoSection() {
-  const models = getActiveModelMetadata().filter((m) => !m.deprecated)
+  const models = getHomepageModels()
   const groups = groupModelsByVendor(models)
   const totalGroups = groups.length
 
@@ -123,7 +149,10 @@ export function ModelsBentoSection() {
             const href = first
               ? modelHrefForLanding(first.type, first.identifier)
               : "/pricing"
-            const media = pickBentoCardMedia(group.vendorSlug)
+            const primaryModel = first
+            const vendorSlug =
+              (primaryModel && vendorSlugFromIdentifier(primaryModel.identifier)) ?? group.vendorSlug
+            const media = pickBentoCardMedia(vendorSlug)
 
             return (
               <BlurFade
@@ -137,12 +166,12 @@ export function ModelsBentoSection() {
                 delay={index * 0.05}
                 className={cn(
                   "h-full",
-                  modelBentoLayoutClass(index, totalGroups, group.vendorSlug)
+                  modelBentoLayoutClass(index, totalGroups, vendorSlug)
                 )}
               >
                 <BentoCard
                   name={group.displayName}
-                  logoSrc={aiVendorIconSrc(group.vendorSlug)}
+                  logoSrc={aiVendorIconSrc(vendorSlug)}
                   logoAlt={`${group.displayName} logo`}
                   description={summarizeVendorModels(group.models)}
                   href={href}
