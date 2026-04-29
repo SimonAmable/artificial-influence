@@ -364,6 +364,7 @@ export function VideoModelParameterControls({
           .filter((param) => {
             // Kling v3 / Omni: multi_prompt has its own MultiShotEditor in the input box
             if ((selectedModel.identifier === 'kwaivgi/kling-v3-video' || selectedModel.identifier === 'kwaivgi/kling-v3-omni-video') && param.name === 'multi_prompt') return false
+            if (selectedModel.identifier === 'alibaba/happy-horse' && param.name === 'enable_safety_checker') return false
             return true
           })
           .map((param) => renderParameterInput(param))

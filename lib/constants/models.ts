@@ -25,6 +25,8 @@ export const MODEL_IDENTIFIERS = {
   PRUNAAI_Z_IMAGE_TURBO: 'prunaai/z-image-turbo',
   PRUNAAI_FLUX_KONTEXT_FAST: 'prunaai/flux-kontext-fast',
   XAI_GROK_IMAGINE: 'xai/grok-imagine-image',
+  FAL_WAN_27_IMAGE: 'fal-ai/wan/v2.7',
+  FAL_WAN_27_PRO_IMAGE: 'fal-ai/wan/v2.7/pro',
   
   // Video Models
   KWAIVGI_KLING_V2_6: 'kwaivgi/kling-v2.6-motion-control',
@@ -36,6 +38,7 @@ export const MODEL_IDENTIFIERS = {
   MINIMAX_HAILUO_2_3_FAST: 'minimax/hailuo-2.3-fast',
   GOOGLE_VEO_3_1_FAST: 'google/veo-3.1-fast',
   BYTEDANCE_SEEDANCE_2_0: 'bytedance/seedance-2.0',
+  ALIBABA_HAPPY_HORSE: 'alibaba/happy-horse',
 
   // Audio Models
   GOOGLE_GEMINI_3_1_FLASH_TTS: 'google/gemini-3.1-flash-tts',
@@ -528,6 +531,58 @@ const SEEDANCE_2_0_VIDEO_PARAMS: ParameterDefinition[] = [
     required: false,
     default: null,
     ui_type: 'textarea',
+  },
+  {
+    name: 'seed',
+    type: 'number',
+    label: 'Seed',
+    required: false,
+    default: null,
+    min: 0,
+    max: 2147483647,
+    ui_type: 'number',
+  },
+];
+
+const HAPPY_HORSE_VIDEO_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'image',
+    type: 'string',
+    label: 'Start Frame',
+    description: 'Optional first frame for image-to-video. Disabled when reference images are attached.',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
+    name: 'duration',
+    type: 'number',
+    label: 'Duration',
+    description: 'Video duration in seconds',
+    required: false,
+    default: 5,
+    enum: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    ui_type: 'select',
+  },
+  {
+    name: 'resolution',
+    type: 'string',
+    label: 'Resolution',
+    description: 'Output video resolution tier',
+    required: false,
+    default: '1080p',
+    enum: ['720p', '1080p'],
+    ui_type: 'select',
+  },
+  {
+    name: 'aspect_ratio',
+    type: 'string',
+    label: 'Aspect Ratio',
+    description: 'Used for text-to-video and reference-to-video. Ignored for image-to-video.',
+    required: false,
+    default: '16:9',
+    enum: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+    ui_type: 'select',
   },
   {
     name: 'seed',
@@ -1126,6 +1181,59 @@ const Z_IMAGE_TURBO_PARAMS: ParameterDefinition[] = [
   },
 ];
 
+const FAL_WAN_IMAGE_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'negative_prompt',
+    type: 'string',
+    label: 'Negative Prompt',
+    description: 'Description of what to exclude from the generated image',
+    required: false,
+    default: null,
+    ui_type: 'textarea',
+  },
+  {
+    name: 'num_images',
+    type: 'number',
+    label: 'Number of Images',
+    description: 'Number of output images to generate',
+    required: false,
+    default: 1,
+    min: 1,
+    max: 4,
+    ui_type: 'number',
+  },
+  {
+    name: 'enable_prompt_expansion',
+    type: 'boolean',
+    label: 'Prompt Expansion',
+    description: 'Expand brief edit prompts before generation',
+    required: false,
+    default: true,
+    ui_type: 'switch',
+  },
+  {
+    name: 'seed',
+    type: 'number',
+    label: 'Seed',
+    description: 'Random seed for reproducibility',
+    required: false,
+    default: null,
+    min: 0,
+    max: 2147483647,
+    ui_type: 'number',
+  },
+  {
+    name: 'image_size',
+    type: 'string',
+    label: 'Image Size',
+    description: 'Fal image size preset',
+    required: false,
+    default: 'square_hd',
+    enum: ['square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9'],
+    ui_type: 'select',
+  },
+];
+
 const GOOGLE_GEMINI_3_1_FLASH_TTS_PARAMS: ParameterDefinition[] = [
   {
     name: 'voice',
@@ -1351,6 +1459,26 @@ export const SEEDANCE_2_0_VIDEO_MODEL: Model = {
   updated_at: new Date().toISOString(),
 };
 
+export const HAPPY_HORSE_VIDEO_MODEL: Model = {
+  id: 'model-happy-horse',
+  identifier: MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE,
+  name: 'Happy Horse',
+  description:
+    'Alibaba Happy Horse on fal: text-to-video, image-to-video, or reference-to-video under one model selector.',
+  type: 'video',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 20,
+  parameters: {
+    parameters: HAPPY_HORSE_VIDEO_PARAMS,
+  },
+  supports_reference_image: true,
+  supports_reference_video: false,
+  supports_first_frame: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 /**
  * Flux Kontext Fast - Ultra fast image generation
  */
@@ -1423,6 +1551,38 @@ export const GPT_IMAGE_1_5_MODEL: Model = {
   model_cost: 0.004,
   parameters: {
     parameters: GPT_IMAGE_1_5_PARAMS,
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+export const FAL_WAN_27_IMAGE_MODEL: Model = {
+  id: 'model-fal-wan-2.7-image',
+  identifier: MODEL_IDENTIFIERS.FAL_WAN_27_IMAGE,
+  name: 'Wan 2.7 Image',
+  description: 'WAN 2.7 on fal for text-to-image and text-guided image editing under one selector item.',
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 4,
+  parameters: {
+    parameters: FAL_WAN_IMAGE_PARAMS,
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+export const FAL_WAN_27_PRO_IMAGE_MODEL: Model = {
+  id: 'model-fal-wan-2.7-pro-image',
+  identifier: MODEL_IDENTIFIERS.FAL_WAN_27_PRO_IMAGE,
+  name: 'Wan 2.7 Pro Image',
+  description: 'WAN 2.7 Pro on fal for text-to-image and text-guided image editing under one selector item.',
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 10,
+  parameters: {
+    parameters: FAL_WAN_IMAGE_PARAMS,
   },
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
@@ -1514,6 +1674,8 @@ export const IMAGE_MODELS = [
   GOOGLE_NANO_BANANA_MODEL,
   NANO_BANANA_PRO_MODEL,
   GPT_IMAGE_1_5_MODEL,
+  FAL_WAN_27_IMAGE_MODEL,
+  FAL_WAN_27_PRO_IMAGE_MODEL,
   SEEDREAM_4_5_MODEL,
   SEEDREAM_5_LITE_MODEL,
   Z_IMAGE_TURBO_MODEL,
@@ -1531,6 +1693,7 @@ export const VIDEO_MODELS = [
   HAILUO_2_3_FAST_MODEL,
   VEO_3_1_FAST_MODEL,
   SEEDANCE_2_0_VIDEO_MODEL,
+  HAPPY_HORSE_VIDEO_MODEL,
 ] as const;
 
 export const AUDIO_MODELS = [GOOGLE_GEMINI_3_1_FLASH_TTS_MODEL] as const;
@@ -1549,6 +1712,8 @@ const IMAGE_MODELS_FIXED = [
   GOOGLE_NANO_BANANA_MODEL,
   NANO_BANANA_PRO_MODEL,
   GPT_IMAGE_1_5_MODEL,
+  FAL_WAN_27_IMAGE_MODEL,
+  FAL_WAN_27_PRO_IMAGE_MODEL,
   SEEDREAM_4_5_MODEL,
   SEEDREAM_5_LITE_MODEL,
   Z_IMAGE_TURBO_MODEL,
@@ -1566,6 +1731,7 @@ const VIDEO_MODELS_FIXED = [
   HAILUO_2_3_FAST_MODEL,
   VEO_3_1_FAST_MODEL,
   SEEDANCE_2_0_VIDEO_MODEL,
+  HAPPY_HORSE_VIDEO_MODEL,
 ] as const;
 
 const ALL_MODELS_FIXED = [

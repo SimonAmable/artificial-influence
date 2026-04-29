@@ -93,6 +93,9 @@ const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
   "wan-2.7": "wan-video/wan-2.7",
   "wan2.7": "wan-video/wan-2.7",
   "wan-27": "wan-video/wan-2.7",
+  "happy-horse": "alibaba/happy-horse",
+  "happyhorse": "alibaba/happy-horse",
+  "happy-horse-video": "alibaba/happy-horse",
 }
 
 function VideoPageContent() {
@@ -370,6 +373,7 @@ function VideoPageContent() {
     const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
     const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
     const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
+    const isHappyHorse = selectedModel.identifier === 'alibaba/happy-horse'
     const isLipsync =
       selectedModel.identifier.includes('lipsync') ||
       selectedModel.identifier.includes('wav2lip') ||
@@ -395,6 +399,8 @@ function VideoPageContent() {
       hasLastFrame: !!(lastFrameImage?.file || lastFrameImage?.url),
       hasReferenceVideo: !!(inputVideo?.file || inputVideo?.url),
     })
+    const happyHorseReferenceMode =
+      isHappyHorse && (referenceImages.length > 0 || chipSlots.omniStyleImageChipUrls.length > 0)
 
     const refErr = validateVideoAttachedRefs(attachedCommandRefs, selectedModel)
     if (refErr) {
@@ -465,7 +471,10 @@ function VideoPageContent() {
             !!lastFrameImage ||
             !!inputAudio ||
             !!chipSlots.startImageChipUrl ||
-            !!chipSlots.lastFrameChipUrl))
+            !!chipSlots.lastFrameChipUrl)) ||
+        (isHappyHorse &&
+          !happyHorseReferenceMode &&
+          (!!inputImage || !!chipSlots.startImageChipUrl))
       if (!allowNoPrompt) {
         setError("Please enter a prompt")
         return
@@ -493,6 +502,8 @@ function VideoPageContent() {
       isKlingV3Omni,
       isSeedance2,
       isWan27,
+      isHappyHorse,
+      happyHorseReferenceMode,
       isLipsync,
     }
 
@@ -528,6 +539,8 @@ function VideoPageContent() {
       const isKlingV3Omni = capture.isKlingV3Omni
       const isSeedance2 = capture.isSeedance2
       const isWan27 = capture.isWan27
+      const isHappyHorse = capture.isHappyHorse
+      const happyHorseReferenceMode = capture.happyHorseReferenceMode
       const isLipsync = capture.isLipsync
 
       try {
@@ -574,7 +587,7 @@ function VideoPageContent() {
       }
       
       // Handle other models with image uploads
-      else if (inputImage?.file) {
+      else if (inputImage?.file && !(isHappyHorse && happyHorseReferenceMode)) {
         const imageUpload = await uploadImageToSupabase(inputImage.file, user.id, 'video-gen-input-images')
         if (selectedModel.identifier === 'kwaivgi/kling-v2.6') {
           requestBody.start_image = imageUpload.url
@@ -589,7 +602,7 @@ function VideoPageContent() {
         }
       }
       // Handle pre-loaded images from URL (no file to upload)
-      else if (inputImage?.url) {
+      else if (inputImage?.url && !(isHappyHorse && happyHorseReferenceMode)) {
         const firstUrl =
           isWan27
             ? await resolveBlobOrDataImageUrlForReplicate(
@@ -711,7 +724,7 @@ function VideoPageContent() {
       }
 
       // Kling v3 Omni / Seedance 2.0: extra reference images
-      if ((isKlingV3Omni || isSeedance2) && referenceImages.length > 0) {
+      if ((isKlingV3Omni || isSeedance2 || isHappyHorse) && referenceImages.length > 0) {
         const refUrls: string[] = []
         for (const ref of referenceImages) {
           if (ref.file) {
@@ -723,7 +736,7 @@ function VideoPageContent() {
         }
         if (refUrls.length > 0) requestBody.reference_images = refUrls
       }
-      if ((isKlingV3Omni || isSeedance2) && chipSlots.omniStyleImageChipUrls.length > 0) {
+      if ((isKlingV3Omni || isSeedance2 || isHappyHorse) && chipSlots.omniStyleImageChipUrls.length > 0) {
         const existing = Array.isArray(requestBody.reference_images)
           ? (requestBody.reference_images as string[])
           : []

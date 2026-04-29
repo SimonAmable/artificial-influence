@@ -123,6 +123,9 @@ const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
   "grok-imagine": "xai/grok-imagine-image",
   wan: "fal-ai/wan/v2.7",
   "wan-2.7": "fal-ai/wan/v2.7",
+  "wan-pro": "fal-ai/wan/v2.7/pro",
+  "wan-2.7-pro": "fal-ai/wan/v2.7/pro",
+  "wan-2.7-pro-image": "fal-ai/wan/v2.7/pro",
 }
 const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
   full_character:

@@ -95,6 +95,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/autopost", label: "Autopost" },
   { path: "/history", label: "History" },
   { path: "/assets", label: "Assets" },
+  { path: "/resources", label: "Resources" },
   { path: "/free-tools", label: "Free Tools" },
   { path: "/pricing-test", label: "Pricing (Test)", devOnly: true },
   { path: "/pricing", label: "Pricing" },
@@ -329,6 +330,7 @@ export const megaNavGroups: MegaNavGroup[] = [
     path: "/assets",
     simpleItems: [
       { path: "/assets", label: "Assets", description: "Store and sort your generated assets", iconSrc: "/window.svg", badge: "new" },
+      { path: "/resources", label: "Resources", description: "Search live stock and meme references", iconPhosphor: "image", badge: "new" },
       { path: "/history", label: "History", description: "Past generations and edits", iconSrc: "/file.svg" },
       {
         path: "/automations",
@@ -553,5 +555,11 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     href: "/assets",
     icon: "squares-four",
     hint: "Browse and manage your saved assets.",
+  },
+  {
+    label: "Resources",
+    href: "/resources",
+    icon: "image",
+    hint: "Search live stock references and meme sources.",
   },
 ]

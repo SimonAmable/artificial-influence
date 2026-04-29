@@ -54,7 +54,7 @@ function MentionTokenSpan({
       data-mention-end={String(end)}
       title={refItem.label}
       className={cn(
-        "inline-flex max-w-max shrink-0 items-baseline gap-0 whitespace-nowrap rounded-md py-px pr-0.5 leading-snug [box-decoration-break:clone]",
+        "inline-flex max-w-max shrink-0 items-baseline gap-0 whitespace-nowrap rounded-md py-px pr-0.5 [line-height:inherit] [box-decoration-break:clone]",
         isBrand
           ? "bg-violet-500/20 text-violet-300 ring-1 ring-inset ring-violet-500/25"
           : "bg-muted/80 text-foreground ring-1 ring-inset ring-border/40"
@@ -170,7 +170,7 @@ export function MentionMirror({
           minHeight: mirrorMinHeight > 0 ? mirrorMinHeight : undefined,
         }}
       >
-        <span className="whitespace-pre-wrap break-words leading-snug">
+        <span className="whitespace-pre-wrap break-words [line-height:inherit]">
           {parts.map((p) =>
             p.type === "text" ? (
               <span key={p.key}>{p.text}</span>

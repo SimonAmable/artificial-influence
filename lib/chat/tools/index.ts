@@ -16,6 +16,7 @@ import { createSaveGenerationAsAssetTool } from "@/lib/chat/tools/save-generatio
 import { createPrepareInstagramPostTool } from "@/lib/chat/tools/prepare-instagram-post"
 import { createSearchAssetsTool } from "@/lib/chat/tools/search-assets"
 import { createSearchModelsTool } from "@/lib/chat/tools/search-models"
+import { createSearchStockReferencesTool } from "@/lib/chat/tools/search-stock-references"
 import { createSearchVoicesTool } from "@/lib/chat/tools/search-voices"
 import { createActivateSkillTool, createSaveSkillTool } from "@/lib/chat/tools/skills"
 import { createExtractVideoFramesTool } from "@/lib/chat/tools/extract-video-frames"
@@ -161,6 +162,7 @@ export function createCreativeChatTools({
       supabase,
       userId,
     }),
+    searchStockReferences: createSearchStockReferencesTool(),
     searchModels: createSearchModelsTool({
       supabase,
     }),

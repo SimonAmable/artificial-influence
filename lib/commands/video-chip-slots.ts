@@ -22,6 +22,7 @@ export type VideoChipSlotOptions = {
 /**
  * Maps @ image/video library assets to model input slots (same URLs sent to the API as manual uploads).
  * - Kling Omni: first image @ = start frame when no manual start; remaining image @ = style reference_images; video @ = reference_video.
+ * - Happy Horse: image @ chips are always reference images, which switches the model into reference-to-video mode.
  * - Other models: first image @ = input/start when supported; second image @ = last frame when supported; first video @ = reference video when supported.
  */
 export function getVideoChipSlotInfo(model: Model, attachedRefs: AttachedRef[], opts: VideoChipSlotOptions) {
@@ -30,7 +31,8 @@ export function getVideoChipSlotInfo(model: Model, attachedRefs: AttachedRef[], 
   const vids = videoAssetRefs(attachedRefs)
   const isOmni = id === "kwaivgi/kling-v3-omni-video"
   const isSeedance = id === "bytedance/seedance-2.0"
-  const useOmniStyleChips = isOmni || (isSeedance && opts.hasReferenceVideo)
+  const isHappyHorse = id === "alibaba/happy-horse"
+  const useOmniStyleChips = isOmni || (isSeedance && opts.hasReferenceVideo) || isHappyHorse
 
   const supportsInput =
     model.parameters?.parameters?.some((p) =>
@@ -50,7 +52,7 @@ export function getVideoChipSlotInfo(model: Model, attachedRefs: AttachedRef[], 
   const omniStyleImageRefs: AttachedRef[] = []
 
   if (useOmniStyleChips) {
-    if (!opts.hasInputImage && imgs[imgIdx]) {
+    if (!isHappyHorse && !opts.hasInputImage && imgs[imgIdx]) {
       startImageChipUrl = imgs[imgIdx].assetUrl!.trim()
       startImageRef = imgs[imgIdx]
       imgIdx++

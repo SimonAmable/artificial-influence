@@ -43,7 +43,7 @@ export async function fetchTikTokUserProfile(accessToken: string): Promise<TikTo
 
   const data = (await response.json()) as TikTokUserInfoResponse
 
-  if (!response.ok || data.error?.code) {
+  if (!response.ok || (data.error?.code && data.error.code !== "ok")) {
     throw new Error(tiktokErrorMessage(data))
   }
 

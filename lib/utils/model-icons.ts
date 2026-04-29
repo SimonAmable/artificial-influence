@@ -27,6 +27,7 @@ export function getModelIconPath(identifier: string): string | null {
     case 'minimax':
       return '/ai_icons/minimax.svg'
     case 'fal-ai':
+    case 'alibaba':
     case 'wan-video':
       // Wan (Wan 2.x), Alibaba Qwen family; same mark as fal-ai/qwen-image-2
       return '/ai_icons/qwen.svg'

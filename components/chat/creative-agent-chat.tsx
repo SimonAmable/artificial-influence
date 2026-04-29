@@ -174,6 +174,7 @@ type UniversalGenerateImageToolPart = {
     aspectRatio?: string
     assetIds?: string[]
     enhancePrompt?: boolean
+    externalImageUrls?: string[]
     modelIdentifier?: string
     prompt: string
     referenceIds?: string[]
@@ -206,6 +207,8 @@ type GenerateVideoToolPart = {
     assetIds?: string[]
     characterOrientation?: "image" | "video"
     duration?: number
+    externalImageUrls?: string[]
+    externalVideoUrls?: string[]
     generateAudio?: boolean
     keepOriginalSound?: boolean
     mode?: "pro" | "std"
@@ -450,6 +453,47 @@ type SearchAssetsToolPart = {
     }>
     message?: string
     query?: string | null
+    total?: number
+  }
+  errorText?: string
+}
+
+type SearchStockReferencesToolPart = {
+  type: "tool-searchStockReferences"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    intent?: string
+    lang?: string
+    limit?: number
+    mediaType?: "all" | "gif" | "sticker" | "image" | "video" | "audio"
+    offset?: number
+    provider?: "auto" | "giphy"
+    query?: string
+    rating?: "g" | "pg" | "pg-13" | "r"
+  }
+  output?: {
+    attribution?: string
+    licenseNotice?: string | null
+    mediaType?: "all" | "gif" | "sticker" | "image" | "video" | "audio"
+    message?: string
+    provider?: "giphy"
+    query?: string
+    results?: Array<{
+      attribution: string
+      height?: number | null
+      id: string
+      licenseNotice?: string | null
+      mediaType: "gif" | "sticker" | "image" | "video" | "audio"
+      pageUrl: string
+      previewUrl: string
+      provider: "giphy"
+      referenceImageUrl?: string | null
+      referenceVideoUrl?: string | null
+      thumbnailUrl: string
+      title: string
+      width?: number | null
+    }>
     total?: number
   }
   errorText?: string
@@ -2871,6 +2915,110 @@ export function MessageParts({
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">No image references returned.</p>
+                )}
+              </CardContent>
+            </Card>
+          )
+        }
+
+        if (part.type === "tool-searchStockReferences") {
+          const toolPart = part as SearchStockReferencesToolPart
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Searching stock references</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {toolPart.input?.query || "Looking for live external references"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Stock reference search failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const results = toolPart.output?.results ?? []
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Stock References</Badge>
+                  {toolPart.output?.provider ? <Badge variant="outline">{toolPart.output.provider}</Badge> : null}
+                  {typeof toolPart.output?.total === "number" ? (
+                    <Badge variant="outline">{toolPart.output.total} result{toolPart.output.total === 1 ? "" : "s"}</Badge>
+                  ) : null}
+                  {toolPart.output?.mediaType ? (
+                    <Badge variant="outline">{toolPart.output.mediaType}</Badge>
+                  ) : null}
+                </div>
+                {toolPart.output?.message ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
+                ) : null}
+                {toolPart.output?.licenseNotice ? (
+                  <p className="text-xs text-muted-foreground">{toolPart.output.licenseNotice}</p>
+                ) : null}
+                {results.length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {results.map((result) => (
+                      <div key={`${result.provider}-${result.id}`} className="overflow-hidden rounded-xl border border-border/60 bg-background/80">
+                        <div className="aspect-[4/3] bg-muted">
+                          {result.referenceVideoUrl ? (
+                            <video
+                              src={result.referenceVideoUrl}
+                              muted
+                              loop
+                              autoPlay
+                              playsInline
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <img
+                              src={result.previewUrl}
+                              alt={result.title}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          )}
+                        </div>
+                        <div className="space-y-2 p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="line-clamp-1 text-sm font-medium">{result.title}</p>
+                            <Badge variant="outline">{result.mediaType}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{result.attribution}</p>
+                          <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                            {result.referenceImageUrl ? <span>image URL ready</span> : null}
+                            {result.referenceVideoUrl ? <span>video URL ready</span> : null}
+                            {result.width && result.height ? <span>{result.width}x{result.height}</span> : null}
+                          </div>
+                          <Link
+                            href={result.pageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block truncate text-xs text-muted-foreground underline-offset-4 hover:underline"
+                          >
+                            {result.pageUrl}
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No stock references returned.</p>
                 )}
               </CardContent>
             </Card>

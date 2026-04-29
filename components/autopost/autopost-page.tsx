@@ -449,7 +449,9 @@ export function AutopostPage() {
 
   React.useEffect(() => {
     const list = status?.instagram?.connections ?? []
-    const publishableConnections = list.filter((c) => c.instagramConnectionId)
+    const publishableConnections = list.filter(
+      (c) => c.instagramConnectionId && c.status === "connected"
+    )
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
@@ -1290,7 +1292,9 @@ export function AutopostPage() {
                     <SelectValue placeholder={isConnected ? "Select account" : "Connect Instagram first"} />
                   </SelectTrigger>
                   <SelectContent position="popper" className="z-120">
-                    {instagramConnections.filter((c) => c.instagramConnectionId).map((c) => (
+                    {instagramConnections
+                      .filter((c) => c.instagramConnectionId && c.status === "connected")
+                      .map((c) => (
                       <SelectItem key={c.id} value={c.instagramConnectionId as string}>
                         {c.instagramUsername ? `@${c.instagramUsername}` : c.instagramUserId ?? "Account"}
                       </SelectItem>

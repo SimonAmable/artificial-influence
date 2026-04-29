@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { tryCompleteFalPendingVideo } from "@/lib/server/fal-video-completion"
 
 function inferVideoMimeType(storagePath: string) {
   const lower = storagePath.toLowerCase()
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "predictionId is required" }, { status: 400 })
     }
 
-    const { data: generation, error } = await supabase
+    let { data: generation, error } = await supabase
       .from("generations")
       .select("id, status, supabase_storage_path, error_message")
       .eq("replicate_prediction_id", predictionId)
@@ -40,6 +41,21 @@ export async function GET(request: NextRequest) {
 
     if (!generation) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
+    if (generation.status === "pending") {
+      await tryCompleteFalPendingVideo(supabase, user.id, predictionId)
+      const refreshed = await supabase
+        .from("generations")
+        .select("id, status, supabase_storage_path, error_message")
+        .eq("replicate_prediction_id", predictionId)
+        .eq("user_id", user.id)
+        .eq("type", "video")
+        .maybeSingle()
+
+      if (!refreshed.error && refreshed.data) {
+        generation = refreshed.data
+      }
     }
 
     if (generation.status === "pending") {

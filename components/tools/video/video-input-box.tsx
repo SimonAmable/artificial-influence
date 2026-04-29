@@ -175,10 +175,11 @@ export function VideoInputBox({
   const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
   const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
   const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
+  const isHappyHorse = selectedModel.identifier === 'alibaba/happy-horse'
   const isKlingV3OrOmni = isKlingV3 || isKlingV3Omni
-  const usesRefImageGallery = isKlingV3Omni || isSeedance2
+  const usesRefImageGallery = isKlingV3Omni || isSeedance2 || isHappyHorse
   const totalDuration = Number(parameters.duration) || 5
-  const maxReferenceImages = isSeedance2 ? 9 : inputVideo ? 4 : 7
+  const maxReferenceImages = isSeedance2 || isHappyHorse ? 9 : inputVideo ? 4 : 7
 
   // Determine if we need prompt
   const needsPrompt = !isMotionCopyModel && !isLipsyncModel
@@ -209,6 +210,15 @@ export function VideoInputBox({
       }),
     [selectedModel, attachedRefs, inputImage, lastFrameImage, inputVideo]
   )
+
+  const happyHorseReferenceMode =
+    isHappyHorse &&
+    (referenceImages.length > 0 || chipSlotInfo.omniStyleImageChipUrls.length > 0)
+
+  React.useEffect(() => {
+    if (!happyHorseReferenceMode || !inputImage) return
+    onInputImageChange(null)
+  }, [happyHorseReferenceMode, inputImage, onInputImageChange])
 
   const removeAttachedRef = React.useCallback(
     (ref: AttachedRef) => {
@@ -280,6 +290,9 @@ export function VideoInputBox({
       referenceImages.length + chipSlotInfo.omniStyleImageChipUrls.length >= maxReferenceImages
     )
       return
+    if (isHappyHorse && inputImage) {
+      onInputImageChange(null)
+    }
     const next: ImageUpload = { file, url: URL.createObjectURL(file) }
     onReferenceImagesChange([...referenceImages, next])
     e.target.value = ''
@@ -319,6 +332,12 @@ export function VideoInputBox({
     if (isKlingV3OrOmni && !multiShotMode) {
       return mergedPromptForReady.length > 0 || !!inputImage || hasRefChips
     }
+    if (isHappyHorse) {
+      if (happyHorseReferenceMode) {
+        return mergedPromptForReady.length > 0
+      }
+      return mergedPromptForReady.length > 0 || !!inputImage
+    }
     if (isSeedance2 || isWan27) {
       return (
         mergedPromptForReady.length > 0 ||
@@ -351,9 +370,10 @@ export function VideoInputBox({
     modelSupportsImage,
     modelSupportsLastFrame,
     lastFrameImage,
+    isHappyHorse,
+    happyHorseReferenceMode,
     isSeedance2,
     isWan27,
-    inputVideo,
     referenceImages.length,
   ])
 
@@ -416,9 +436,14 @@ export function VideoInputBox({
     return !inputVideo || !isMotionCopyModel
   }, [inputVideo, isMotionCopyModel, isReferenceVideoSupported])
 
-  const nextImageDropSlot = React.useMemo<"input" | "lastFrame" | null>(() => {
+  const nextImageDropSlot = React.useMemo<"input" | "lastFrame" | "reference" | null>(() => {
     // Motion copy and lipsync always use an image slot
     if (isMotionCopyModel || isLipsyncModel) {
+      return "input"
+    }
+
+    if (isHappyHorse) {
+      if (happyHorseReferenceMode) return "reference"
       return "input"
     }
 
@@ -432,6 +457,8 @@ export function VideoInputBox({
     return null
   }, [
     inputImage,
+    isHappyHorse,
+    happyHorseReferenceMode,
     isLipsyncModel,
     isMotionCopyModel,
     lastFrameImage,
@@ -440,15 +467,17 @@ export function VideoInputBox({
   ])
 
   const nextImageDropLabel = React.useMemo(() => {
+    if (nextImageDropSlot === "reference") return "Reference Image"
     if (nextImageDropSlot === "lastFrame") return isKlingV3OrOmni ? "End Frame" : "Last Frame"
     if (nextImageDropSlot === "input") {
       if (selectedModel.identifier === "minimax/hailuo-2.3-fast") return "First Frame"
+      if (isHappyHorse) return "Start Frame"
       if (isKlingV3OrOmni) return "Start Frame"
       if (isMotionCopyModel || isLipsyncModel) return "Reference Image"
       return "Input Image"
     }
     return "Reference Image"
-  }, [isKlingV3OrOmni, isLipsyncModel, isMotionCopyModel, nextImageDropSlot, selectedModel.identifier])
+  }, [isHappyHorse, isKlingV3OrOmni, isLipsyncModel, isMotionCopyModel, nextImageDropSlot, selectedModel.identifier])
 
   const canAcceptImageDrop = nextImageDropSlot !== null
   const canAcceptPromptDrop = needsPrompt && (canAcceptImageDrop || canDropReferenceVideo)
@@ -461,13 +490,31 @@ export function VideoInputBox({
       url: URL.createObjectURL(file),
     }
 
+    if (nextImageDropSlot === "reference") {
+      if (
+        onReferenceImagesChange &&
+        referenceImages.length + chipSlotInfo.omniStyleImageChipUrls.length < maxReferenceImages
+      ) {
+        onReferenceImagesChange([...referenceImages, imageUpload])
+      }
+      return
+    }
+
     if (nextImageDropSlot === "lastFrame") {
       onLastFrameChange(imageUpload)
       return
     }
 
     onInputImageChange(imageUpload)
-  }, [nextImageDropSlot, onInputImageChange, onLastFrameChange])
+  }, [
+    chipSlotInfo.omniStyleImageChipUrls.length,
+    maxReferenceImages,
+    nextImageDropSlot,
+    onInputImageChange,
+    onLastFrameChange,
+    onReferenceImagesChange,
+    referenceImages,
+  ])
 
   const getDraggedMediaKind = React.useCallback((dataTransfer: DataTransfer): "image" | "video" | "unknown" => {
     const items = Array.from(dataTransfer.items || [])
@@ -505,13 +552,34 @@ export function VideoInputBox({
       url: URL.createObjectURL(file),
     }
 
+    if (nextImageDropSlot === "reference") {
+      if (
+        onReferenceImagesChange &&
+        referenceImages.length + chipSlotInfo.omniStyleImageChipUrls.length < maxReferenceImages
+      ) {
+        onReferenceImagesChange([...referenceImages, imageUpload])
+      }
+      return
+    }
+
     if (nextImageDropSlot === "lastFrame") {
       onLastFrameChange(imageUpload)
       return
     }
 
     onInputImageChange(imageUpload)
-  }, [canAcceptPromptDrop, canDropReferenceVideo, nextImageDropSlot, onInputImageChange, onInputVideoChange, onLastFrameChange])
+  }, [
+    canAcceptPromptDrop,
+    canDropReferenceVideo,
+    chipSlotInfo.omniStyleImageChipUrls.length,
+    maxReferenceImages,
+    nextImageDropSlot,
+    onInputImageChange,
+    onInputVideoChange,
+    onLastFrameChange,
+    onReferenceImagesChange,
+    referenceImages,
+  ])
 
   const handlePromptDragOver = React.useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -627,13 +695,15 @@ export function VideoInputBox({
                 {modelSupportsImage && (
                   <DropdownMenuItem
                     onClick={() => inputRef.current?.click()}
-                    disabled={!!inputImage || chipSlotInfo.inputSlotFromChip}
+                    disabled={!!inputImage || chipSlotInfo.inputSlotFromChip || happyHorseReferenceMode}
                     className="flex items-center justify-between gap-2"
                   >
                     <span className="flex items-center">
                       <FilePlus className="size-4 mr-2 shrink-0" />
                       {selectedModel.identifier === "minimax/hailuo-2.3-fast"
                         ? "Upload First Frame"
+                        : isHappyHorse
+                          ? "Upload Start Frame"
                         : "Upload Input Image"}
                     </span>
                     {(chipSlotInfo.inputSlotFromChip || inputImage) && (
@@ -679,7 +749,7 @@ export function VideoInputBox({
                   >
                     <span className="flex items-center text-sm font-medium">
                       <FilePlus className="mr-2 size-4 shrink-0" />
-                      {isSeedance2 ? "Reference image" : "Add reference image"}
+                        {isSeedance2 || isHappyHorse ? "Reference image" : "Add reference image"}
                     </span>
                     {isSeedance2 ? (
                       <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
@@ -810,6 +880,8 @@ export function VideoInputBox({
                   {inputImage?.url
                     ? selectedModel.identifier === "minimax/hailuo-2.3-fast"
                       ? "First Frame"
+                      : isHappyHorse
+                        ? "Start Frame"
                       : isKlingV3OrOmni
                         ? "Start Frame"
                         : "Input"
@@ -817,7 +889,7 @@ export function VideoInputBox({
                 </div>
               </div>
             )}
-            {(lastFrameImage?.url || chipSlotInfo.lastFrameChipUrl) && !isMotionCopyModel && !isLipsyncModel && (
+            {modelSupportsLastFrame && (lastFrameImage?.url || chipSlotInfo.lastFrameChipUrl) && !isMotionCopyModel && !isLipsyncModel && (
               <div className="relative inline-block">
                 <Image
                   src={lastFrameImage?.url ?? chipSlotInfo.lastFrameChipUrl!}
@@ -1026,126 +1098,26 @@ export function VideoInputBox({
           </div>
         )}
 
-        {/* Kling v3 Omni: Reference images */}
-        {usesRefImageGallery && onReferenceImagesChange && (
-          <div className="px-2 space-y-1.5 border-t border-border/50 pt-2 mt-1">
-            <p className="text-[11px] text-muted-foreground">
-              {isSeedance2
-                ? `Seedance multimodal references, This row: extra stills as .jpg / .jpeg / .png (up to ${maxReferenceImages}; use [Image1], … in the prompt). Reference audio: add via either + as .wav / .mp3 / .m4a / .aac (~15s combined with other media; use [Audio1], …). Frames & reference video: use the bottom + for input/start image, last frame, or reference video (e.g. .mp4, .webm, .mov). Reference audio needs at least one of those image or video references.`
-                : `Reference images for elements, scenes, or styles. Supports .jpg/.jpeg/.png. Max ${maxReferenceImages} without video, 4 with video.`}
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {referenceImages.length > 0 && referenceImages.map((ref, index) => ref.url && (
-                <div key={index} className="relative">
-                  <Image
-                    src={ref.url}
-                    alt={`Ref ${index + 1}`}
-                    width={56}
-                    height={56}
-                    className="size-12 rounded-md object-cover border border-border"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeReferenceImage(index)}
-                    className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow border border-border"
-                    aria-label={`Remove reference ${index + 1}`}
-                  >
-                    <X className="size-2.5" weight="bold" />
-                  </button>
-                </div>
-              ))}
-              {isSeedance2 && (inputAudio?.url || inputAudio?.file) && (
-                  <div className="relative flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md border border-dashed border-border bg-muted/25">
-                    <Waveform className="size-5 text-primary" weight="duotone" aria-hidden />
-                    <button
-                      type="button"
-                      onClick={() => onInputAudioChange(null)}
-                      className="absolute -top-1 -right-1 rounded-full border border-border bg-destructive p-0.5 text-destructive-foreground shadow"
-                      aria-label="Remove reference audio"
-                    >
-                      <X className="size-2.5" weight="bold" />
-                    </button>
-                    <span className="pointer-events-none absolute bottom-0.5 left-1/2 -translate-x-1/2 rounded bg-background/90 px-1 py-0.5 text-[8px] font-medium text-muted-foreground">
-                      Audio
-                    </span>
-                  </div>
-              )}
-              {isSeedance2 && (canAddReferenceImage || canAddSeedanceReferenceAudio) ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-12 w-12 rounded-md border-dashed p-0"
-                      disabled={!allowOptionsDuringGeneration && isGenerating}
-                      aria-label="Add reference image or audio"
-                    >
-                      <Plus className="size-5" weight="bold" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem
-                      disabled={!canAddReferenceImage}
-                      onClick={() => referenceImagesRef.current?.click()}
-                      className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
-                    >
-                      <span className="flex items-center text-sm font-medium">
-                        <FilePlus className="mr-2 size-4 shrink-0" />
-                        Reference image
-                      </span>
-                      <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
-                        JPEG or PNG, up to {maxReferenceImages}. Use [Image1] in your prompt.
-                      </span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={!canAddSeedanceReferenceAudio}
-                      onClick={() => referenceAudioRef.current?.click()}
-                      className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
-                    >
-                      <span className="flex items-center text-sm font-medium">
-                        <Waveform className="mr-2 size-4 shrink-0" weight="duotone" />
-                        Reference audio
-                      </span>
-                      <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
-                        .wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a start/end frame, input image, or reference video.
-                      </span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : !isSeedance2 && canAddReferenceImage ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-12 w-12 rounded-md border-dashed p-0"
-                  onClick={() => referenceImagesRef.current?.click()}
-                  disabled={!allowOptionsDuringGeneration && isGenerating}
-                  aria-label="Add reference image"
-                >
-                  <Plus className="size-5" weight="bold" />
-                </Button>
-              ) : null}
-            </div>
-            <input
-              ref={referenceImagesRef}
-              type="file"
-              accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-              onChange={handleReferenceImageAdd}
-              className="hidden"
-            />
-            {isSeedance2 ? (
-              <input
-                ref={referenceAudioRef}
-                type="file"
-                accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac"
-                onChange={handleReferenceAudioAdd}
-                className="hidden"
-                aria-hidden
-              />
-            ) : null}
-          </div>
-        )}
+        {usesRefImageGallery && onReferenceImagesChange ? (
+          <input
+            ref={referenceImagesRef}
+            type="file"
+            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+            onChange={handleReferenceImageAdd}
+            className="hidden"
+            aria-hidden
+          />
+        ) : null}
+        {isSeedance2 ? (
+          <input
+            ref={referenceAudioRef}
+            type="file"
+            accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac"
+            onChange={handleReferenceAudioAdd}
+            className="hidden"
+            aria-hidden
+          />
+        ) : null}
 
         {/* 2. CUSTOM UPLOAD COMPONENTS IN MIDDLE (only for motion-copy and lipsync) */}
         {isMotionCopyModel && (

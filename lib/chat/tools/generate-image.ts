@@ -22,6 +22,7 @@ import {
 } from "@/lib/server/replicate-gpt-image"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { aspectRatioToDimensions, modelUsesDimensions } from "@/lib/utils/model-parameters"
+import { validateExternalReferenceUrl } from "@/lib/server/external-reference-url"
 import type {
   AvailableChatImageReference,
   ChatImageReference,
@@ -119,52 +120,6 @@ function parseDataUrl(dataUrl: string) {
   }
 }
 
-function validateReferenceUrl(url: string) {
-  if (url.startsWith("data:")) {
-    return
-  }
-
-  let parsedUrl: URL
-
-  try {
-    parsedUrl = new URL(url)
-  } catch {
-    throw new Error("Reference image URL is invalid.")
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
-
-  const isAllowedSupabaseUrl = (() => {
-    if (!supabaseUrl) return false
-
-    try {
-      const parsedSupabaseUrl = new URL(supabaseUrl)
-      return (
-        parsedUrl.origin === parsedSupabaseUrl.origin &&
-        parsedUrl.pathname.startsWith("/storage/v1/object/public/public-bucket/")
-      )
-    } catch {
-      return false
-    }
-  })()
-
-  const isAllowedAppUrl = (() => {
-    if (!appUrl) return false
-
-    try {
-      const parsedAppUrl = new URL(appUrl)
-      return parsedUrl.origin === parsedAppUrl.origin
-    } catch {
-      return false
-    }
-  })()
-
-  if (!isAllowedSupabaseUrl && !isAllowedAppUrl) {
-    throw new Error("Reference image URLs must come from this app's stored assets.")
-  }
-}
-
 function dedupeReferences(references: ChatImageReference[]) {
   const seen = new Set<string>()
 
@@ -226,12 +181,16 @@ async function uploadReferenceImage(
   userId: string,
 ) {
   if (!reference.url.startsWith("data:")) {
-    validateReferenceUrl(reference.url)
+    const safeUrl = await validateExternalReferenceUrl({
+      url: reference.url,
+      expectedKind: "image",
+      maxContentLengthBytes: MAX_FILE_SIZE_BYTES,
+    })
 
     return {
       mimeType: reference.mediaType ?? "image/png",
-      storagePath: inferStoragePathFromUrl(reference.url),
-      url: reference.url,
+      storagePath: inferStoragePathFromUrl(safeUrl),
+      url: safeUrl,
     }
   }
 
@@ -277,9 +236,13 @@ async function storedAssetToFile(
     )
   }
 
-  validateReferenceUrl(reference.url)
+  const safeUrl = await validateExternalReferenceUrl({
+    url: reference.url,
+    expectedKind: "image",
+    maxContentLengthBytes: MAX_FILE_SIZE_BYTES,
+  })
 
-  const response = await fetch(reference.url)
+  const response = await fetch(safeUrl)
   if (!response.ok) {
     throw new Error(`Failed to fetch reference image: HTTP ${response.status}`)
   }
@@ -408,6 +371,13 @@ export function createGenerateImageTool({
         .describe(
           "Reference images: `ref_1`…`ref_N`, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or mediaId from listRecentGenerations.",
         ),
+      externalImageUrls: z
+        .array(z.string().url())
+        .max(MAX_REFERENCE_IMAGES)
+        .optional()
+        .describe(
+          "Transient public image URLs from stock/reference search, such as GIPHY or other safe HTTPS sources. Do not use for saved asset ids.",
+        ),
       mediaIds: z
         .array(mediaIdStringSchema)
         .max(MAX_REFERENCE_IMAGES)
@@ -430,6 +400,7 @@ export function createGenerateImageTool({
       aspectRatio,
       assetIds = [],
       enhancePrompt: shouldEnhance = false,
+      externalImageUrls = [],
       modelIdentifier = DEFAULT_IMAGE_MODEL,
       prompt,
       mediaIds = [],
@@ -449,7 +420,11 @@ export function createGenerateImageTool({
             })
           : { references: [] as ChatImageReference[], warnings: [] as string[] }
 
-      const referenceCandidates = dedupeReferences(resolvedFromIds).slice(0, MAX_REFERENCE_IMAGES)
+      const externalReferences = externalImageUrls.map((url) => ({ url }))
+      const referenceCandidates = dedupeReferences([
+        ...resolvedFromIds,
+        ...externalReferences,
+      ]).slice(0, MAX_REFERENCE_IMAGES)
 
       const [uploadedReferences, assetReferences, modelResponse] = await Promise.all([
         Promise.all(

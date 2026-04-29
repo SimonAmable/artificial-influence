@@ -334,6 +334,36 @@ export const WAN_27_IMAGE_META: ModelMetadata = {
   ],
 };
 
+export const WAN_27_PRO_IMAGE_META: ModelMetadata = {
+  id: 'wan-2.7-pro-image-meta',
+  identifier: 'fal-ai/wan/v2.7/pro',
+  name: 'Wan 2.7 Pro Image',
+  description: 'WAN 2.7 Pro on fal for text-to-image and text-guided image editing under one selector item.',
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 10.0,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+  customParameters: [
+    {
+      name: 'image_size',
+      label: 'Image Size',
+      options: ['square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9'],
+      default: 'square_hd',
+      description: 'Fal image size preset',
+    },
+    {
+      name: 'enable_prompt_expansion',
+      label: 'Prompt Expansion',
+      options: ['true', 'false'],
+      default: 'true',
+      description: 'Expand brief edit prompts before generation',
+    },
+  ],
+};
+
 export const FLUX_KONTEXT_FAST_META: ModelMetadata = {
   id: 'b3a0e0b8-ae8f-4f0b-b692-150ecabefd19',
   identifier: 'prunaai/flux-kontext-fast',
@@ -605,6 +635,38 @@ export const SEEDANCE_2_0_META: ModelMetadata = {
   ],
 };
 
+export const HAPPY_HORSE_META: ModelMetadata = {
+  id: 'happy-horse-meta',
+  identifier: 'alibaba/happy-horse',
+  name: 'Happy Horse',
+  description:
+    'Alibaba Happy Horse on fal: text-to-video, image-to-video, or reference-to-video under one model selector.',
+  type: 'video',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 20,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+  supports_first_frame: true,
+  customParameters: [
+    {
+      name: 'resolution',
+      label: 'Resolution',
+      options: ['720p', '1080p'],
+      default: '1080p',
+      description: 'Output video resolution tier',
+    },
+    {
+      name: 'aspect_ratio',
+      label: 'Aspect Ratio',
+      options: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+      default: '16:9',
+      description: 'Used for text-to-video and reference-to-video',
+    },
+  ],
+};
+
 export const GOOGLE_GEMINI_3_1_FLASH_TTS_META: ModelMetadata = {
   id: 'google-gemini-3.1-flash-tts-meta',
   identifier: 'google/gemini-3.1-flash-tts',
@@ -653,6 +715,7 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
   GPT_IMAGE_1_5_META,
   GPT_IMAGE_2_META,
   WAN_27_IMAGE_META,
+  WAN_27_PRO_IMAGE_META,
   Z_IMAGE_TURBO_META,
   FLUX_KONTEXT_FAST_META,
 ];
@@ -668,6 +731,7 @@ export const VIDEO_MODELS_METADATA: ModelMetadata[] = [
   KLING_V2_6_PRO_META,
   HAILUO_2_3_FAST_META,
   SEEDANCE_2_0_META,
+  HAPPY_HORSE_META,
 ];
 
 export const AUDIO_MODELS_METADATA: ModelMetadata[] = [
@@ -720,7 +784,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     SEEDANCE_2_0_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
-  fal: [WAN_27_IMAGE_META],
+  fal: [WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, HAPPY_HORSE_META],
   xai: [GROK_IMAGINE_META],
 };
 

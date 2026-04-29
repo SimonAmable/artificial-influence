@@ -86,6 +86,7 @@ const MOBILE_NAV_ICON_MAP: Record<string, typeof ImageIcon> = {
   "/autopost": PaperPlaneTilt,
   "/history": ClockCounterClockwise,
   "/assets": FolderSimple,
+  "/resources": ImageIcon,
   "/free-tools": ShieldCheck,
   "/pricing": CurrencyDollar,
   "/pricing-test": CurrencyDollar,

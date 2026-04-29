@@ -4,6 +4,11 @@ import { assertAcceptedCurrentTerms } from '@/lib/legal/terms-acceptance';
 import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 import { inferStoragePathFromUrl } from '@/lib/assets/library';
+import {
+  buildFalVideoRequest,
+  isSupportedFalVideoModel,
+  submitFalVideoQueue,
+} from '@/lib/server/fal-video';
 import { resolveWan27Replicate } from '@/lib/server/wan-2.7-replicate';
 
 function collectStoragePaths(values: unknown[]): string[] {
@@ -28,15 +33,6 @@ export async function POST(request: NextRequest) {
   console.log('[generate-video-test] ===== Request started =====');
   
   try {
-    // Check for API token
-    if (!process.env.REPLICATE_API_TOKEN) {
-      console.error('[generate-video-test] REPLICATE_API_TOKEN not set');
-      return NextResponse.json(
-        { error: 'REPLICATE_API_TOKEN environment variable is not set' },
-        { status: 500 }
-      );
-    }
-
     // Get authenticated user
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -88,6 +84,19 @@ export async function POST(request: NextRequest) {
     const motionCopyImage = image || body.imagePublicUrl;
     const motionCopyVideo = body.video || body.videoPublicUrl;
     const hasMotionCopyInputs = isMotionCopy && motionCopyImage && motionCopyVideo;
+    const isHappyHorse = model === 'alibaba/happy-horse';
+    const happyHorseReferenceImages = Array.isArray(body.reference_images)
+      ? body.reference_images.filter(
+          (value: unknown): value is string => typeof value === 'string' && value.length > 0,
+        )
+      : [];
+    const hasHappyHorseReferenceInputs = isHappyHorse && happyHorseReferenceImages.length > 0;
+    const hasHappyHorseStartImage =
+      isHappyHorse &&
+      (typeof image === 'string' && image.length > 0 ||
+        typeof first_frame_image === 'string' && first_frame_image.length > 0);
+    const allowsPromptlessRequest =
+      hasMotionCopyInputs || (isHappyHorse && hasHappyHorseStartImage && !hasHappyHorseReferenceInputs);
 
     if (isMotionCopy && !hasMotionCopyInputs) {
       return NextResponse.json(
@@ -95,7 +104,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!hasMotionCopyInputs && (!prompt || typeof prompt !== 'string')) {
+    if (!allowsPromptlessRequest && (!prompt || typeof prompt !== 'string')) {
       return NextResponse.json(
         { error: 'Prompt is required' },
         { status: 400 }
@@ -104,7 +113,7 @@ export async function POST(request: NextRequest) {
 
     const { data: modelData, error: modelError } = await supabase
       .from('models')
-      .select('model_cost')
+      .select('model_cost, provider')
       .eq('identifier', model)
       .eq('type', 'video')
       .eq('is_active', true)
@@ -123,6 +132,94 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: `Insufficient credits. Video generation requires ${requiredCredits} credits.` },
         { status: 402 }
+      );
+    }
+
+    const modelProvider = typeof modelData.provider === 'string' ? modelData.provider : null;
+
+    if (modelProvider === 'fal' && isSupportedFalVideoModel(model)) {
+      const referenceImageStoragePaths = collectStoragePaths([
+        image,
+        first_frame_image,
+        body.reference_images,
+      ]);
+      const falRequest = buildFalVideoRequest({
+        aspectRatio:
+          typeof otherParams.aspect_ratio === 'string' ? otherParams.aspect_ratio : null,
+        duration:
+          typeof otherParams.duration === 'number' || typeof otherParams.duration === 'string'
+            ? otherParams.duration
+            : null,
+        imageUrl:
+          typeof image === 'string'
+            ? image
+            : typeof first_frame_image === 'string'
+              ? first_frame_image
+              : null,
+        modelIdentifier: model,
+        prompt: typeof prompt === 'string' ? prompt : null,
+        referenceImageUrls: happyHorseReferenceImages,
+        resolution:
+          typeof otherParams.resolution === 'string' ? otherParams.resolution : null,
+        seed:
+          otherParams.seed !== null && otherParams.seed !== undefined
+            ? (otherParams.seed as number | string)
+            : null,
+      });
+      const { requestId, endpointId: falEndpoint } = await submitFalVideoQueue(
+        falRequest.endpointId,
+        falRequest.input,
+      );
+
+      const { data: pendingGeneration, error: insertError } = await supabase
+        .from('generations')
+        .insert({
+          user_id: user.id,
+          prompt: typeof prompt === 'string' ? prompt : null,
+          supabase_storage_path: null,
+          reference_images_supabase_storage_path:
+            referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+          reference_videos_supabase_storage_path: null,
+          model,
+          type: 'video',
+          is_public: true,
+          tool: typeof body.tool === 'string' ? body.tool : null,
+          status: 'pending',
+          replicate_prediction_id: requestId,
+          fal_request_id: requestId,
+          fal_endpoint_id: falEndpoint,
+        })
+        .select('id')
+        .single();
+
+      if (insertError || !pendingGeneration) {
+        console.error('[generate-video-test] Failed to insert pending Fal generation:', insertError);
+        throw new Error('Failed to create pending generation');
+      }
+
+      return NextResponse.json(
+        {
+          status: 'pending',
+          predictionId: requestId,
+          generationId: pendingGeneration.id,
+          message: `Video generation started. Poll GET /api/generate-video/status?predictionId=${requestId}`,
+        },
+        { status: 202 },
+      );
+    }
+
+    if (modelProvider === 'fal') {
+      return NextResponse.json(
+        { error: `Unsupported Fal video model: ${model}` },
+        { status: 400 },
+      );
+    }
+
+    if (!process.env.REPLICATE_API_TOKEN) {
+      console.error('[generate-video-test] REPLICATE_API_TOKEN not set');
+      return NextResponse.json(
+        { error: 'REPLICATE_API_TOKEN environment variable is not set' },
+        { status: 500 }
       );
     }
 

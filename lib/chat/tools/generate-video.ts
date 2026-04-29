@@ -5,6 +5,7 @@ import { z } from "zod"
 import { inferStoragePathFromUrl } from "@/lib/assets/library"
 import { resolveWan27Replicate } from "@/lib/server/wan-2.7-replicate"
 import { checkUserHasCredits } from "@/lib/credits"
+import { validateExternalReferenceUrl } from "@/lib/server/external-reference-url"
 import type {
   AvailableChatImageReference,
   ChatImageReference,
@@ -102,47 +103,6 @@ function parseDataUrl(dataUrl: string) {
   }
 }
 
-function validateReferenceUrl(url: string) {
-  if (url.startsWith("data:")) return
-
-  let parsedUrl: URL
-  try {
-    parsedUrl = new URL(url)
-  } catch {
-    throw new Error("Reference media URL is invalid.")
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
-
-  const isAllowedSupabaseUrl = (() => {
-    if (!supabaseUrl) return false
-    try {
-      const parsedSupabaseUrl = new URL(supabaseUrl)
-      return (
-        parsedUrl.origin === parsedSupabaseUrl.origin &&
-        parsedUrl.pathname.startsWith("/storage/v1/object/public/public-bucket/")
-      )
-    } catch {
-      return false
-    }
-  })()
-
-  const isAllowedAppUrl = (() => {
-    if (!appUrl) return false
-    try {
-      const parsedAppUrl = new URL(appUrl)
-      return parsedUrl.origin === parsedAppUrl.origin
-    } catch {
-      return false
-    }
-  })()
-
-  if (!isAllowedSupabaseUrl && !isAllowedAppUrl) {
-    throw new Error("Reference media URLs must come from this app's stored assets.")
-  }
-}
-
 function dedupeReferences<T extends { url: string }>(references: T[]) {
   const seen = new Set<string>()
 
@@ -210,13 +170,17 @@ async function uploadMediaReference({
   userId: string
 }) {
   if (!reference.url.startsWith("data:")) {
-    validateReferenceUrl(reference.url)
+    const safeUrl = await validateExternalReferenceUrl({
+      url: reference.url,
+      expectedKind: kind,
+      maxContentLengthBytes: MAX_FILE_SIZE_BYTES,
+    })
     return {
       mimeType:
         reference.mediaType ??
         (kind === "video" ? "video/mp4" : kind === "audio" ? "audio/mpeg" : "image/png"),
-      storagePath: inferStoragePathFromUrl(reference.url),
-      url: reference.url,
+      storagePath: inferStoragePathFromUrl(safeUrl),
+      url: safeUrl,
     }
   }
 
@@ -309,6 +273,11 @@ export function createGenerateVideoTool({
         .describe(
           "Reference images: ref_1…ref_N, upl_/gen_ prefixed, raw UUID, or mediaId from listRecentGenerations.",
         ),
+      externalImageUrls: z
+        .array(z.string().url())
+        .max(MAX_REFERENCE_IMAGES)
+        .optional()
+        .describe("Transient public image URLs from stock/reference providers or other safe HTTPS sources."),
       referenceVideoIds: z
         .array(z.string().min(1))
         .max(MAX_REFERENCE_VIDEOS)
@@ -316,6 +285,11 @@ export function createGenerateVideoTool({
         .describe(
           "Reference videos: refv_1…ref_N, upl_/gen_ prefixed, raw UUID, or mediaId from listThreadMedia / listRecentGenerations.",
         ),
+      externalVideoUrls: z
+        .array(z.string().url())
+        .max(MAX_REFERENCE_VIDEOS)
+        .optional()
+        .describe("Transient public video URLs from stock/reference providers or other safe HTTPS sources."),
       referenceAudioIds: z
         .array(z.string().min(1))
         .max(MAX_REFERENCE_AUDIOS)
@@ -346,6 +320,8 @@ export function createGenerateVideoTool({
       prompt = "",
       modelIdentifier,
       assetIds = [],
+      externalImageUrls = [],
+      externalVideoUrls = [],
       mediaIds = [],
       referenceIds = [],
       referenceVideoIds = [],
@@ -404,6 +380,9 @@ export function createGenerateVideoTool({
       const assetReferences = await loadAssetReferences(assetIds, supabase, userId)
       const imageReferences = dedupeReferences([
         ...resolvedFromIds,
+        ...externalImageUrls.map((url) => ({
+          url,
+        })),
         ...assetReferences
           .filter((asset) => asset.assetType === "image")
           .map((asset) => ({
@@ -414,6 +393,9 @@ export function createGenerateVideoTool({
       ]).slice(0, MAX_REFERENCE_IMAGES)
       const videoReferences = dedupeReferences([
         ...resolvedVideoFromIds,
+        ...externalVideoUrls.map((url) => ({
+          url,
+        })),
         ...assetReferences
           .filter((asset) => asset.assetType === "video")
           .map((asset) => ({
