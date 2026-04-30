@@ -1,17 +1,19 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import { useSearchParams } from "next/navigation"
 import {
-  AlertTriangle,
+  ArrowRightLeft,
   Calendar as CalendarIcon,
   CalendarClock,
+  ChevronDown,
   Film,
   ImageIcon,
   Layers,
   LayoutList,
-  Link2,
   Loader2,
+  Plus,
   RefreshCw,
   ShieldCheck,
   Sparkles,
@@ -20,7 +22,7 @@ import {
   UserRound,
   Zap,
 } from "lucide-react"
-import { format, formatDistanceToNow, isBefore, startOfDay, startOfToday } from "date-fns"
+import { format, isBefore, startOfDay, startOfToday } from "date-fns"
 import { toast } from "sonner"
 
 import type { AutopostJobMetadata } from "@/lib/autopost/types"
@@ -44,10 +46,23 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -63,6 +78,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
+import {
+  AutopostPostMediaViewer,
+  type AutopostViewerAction,
+} from "@/components/autopost/autopost-post-media-viewer"
 
 const AUTOPOST_MEDIA_FOLDER = "autopost-drafts"
 
@@ -233,32 +252,248 @@ function jobListThumbnailIsVideo(job: AutopostJobRow): boolean {
   return false
 }
 
-const TOKEN_EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000
+function inferMediaKindFromUrl(url: string): "image" | "video" | null {
+  try {
+    const pathname = new URL(url).pathname
+    if (/\.(mp4|mov|webm|m4v)$/i.test(pathname)) {
+      return "video"
+    }
+    if (/\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(pathname)) {
+      return "image"
+    }
+  } catch {
+    return null
+  }
+  return null
+}
 
-function socialTokenExpiryBanner(provider: "Instagram" | "TikTok", tokenExpiresAt: string | null): {
-  variant: "expired" | "soon"
-  body: string
-} | null {
-  if (!tokenExpiresAt) return null
-  const expires = new Date(tokenExpiresAt)
-  const t = expires.getTime()
-  if (!Number.isFinite(t)) return null
-  const now = Date.now()
-  if (t <= now) {
-    return {
-      variant: "expired",
-      body: `${provider} access token expired. Disconnect and connect again.`,
+function isJpegBackedUrl(url: string): boolean {
+  try {
+    return /\.(jpe?g)$/i.test(new URL(url).pathname)
+  } catch {
+    return false
+  }
+}
+
+function getJobMediaItems(job: AutopostJobRow): ComposerMediaItem[] {
+  if (job.media_type === "carousel") {
+    return (job.metadata?.carouselItems ?? [])
+      .map((item, index) => ({
+        url: item.url,
+        kind: item.kind,
+        label: `${index + 1}`,
+        origin: "repurpose" as const,
+      }))
+      .filter((item) => item.url)
+  }
+
+  if (job.media_type === "tiktok_photo_upload" || job.media_type === "tiktok_photo_direct") {
+    return (job.metadata?.tiktok?.photoItems ?? [])
+      .map((item, index) => ({
+        url: item.url,
+        kind: "image" as const,
+        label: `${index + 1}`,
+        origin: "repurpose" as const,
+      }))
+      .filter((item) => item.url)
+  }
+
+  const explicitKind =
+    job.media_type === "feed_video" ||
+    job.media_type === "reel" ||
+    job.media_type === "tiktok_video_upload" ||
+    job.media_type === "tiktok_video_direct"
+      ? "video"
+      : job.media_type === "story"
+        ? job.metadata?.assetKind === "video"
+          ? "video"
+          : "image"
+        : inferMediaKindFromUrl(job.media_url) ?? (jobListThumbnailIsVideo(job) ? "video" : "image")
+
+  return job.media_url
+    ? [
+        {
+          url: job.media_url,
+          kind: explicitKind,
+          label: "1",
+          origin: "repurpose" as const,
+        },
+      ]
+    : []
+}
+
+function getJobViewerIcon(job: AutopostJobRow): "image" | "video" | "carousel" | "story" {
+  if (
+    job.media_type === "carousel" ||
+    job.media_type === "tiktok_photo_upload" ||
+    job.media_type === "tiktok_photo_direct"
+  ) {
+    return "carousel"
+  }
+  if (
+    job.media_type === "feed_video" ||
+    job.media_type === "reel" ||
+    job.media_type === "tiktok_video_upload" ||
+    job.media_type === "tiktok_video_direct"
+  ) {
+    return "video"
+  }
+  if (job.media_type === "story") {
+    return "story"
+  }
+  return "image"
+}
+
+function connectedInstagramRepurposeAccounts(connections: SocialConnectionItem[]) {
+  return connections
+    .filter((connection) => connection.status === "connected" && connection.instagramConnectionId)
+    .map((connection) => ({
+      id: connection.instagramConnectionId as string,
+      label: connection.instagramUsername ? `@${connection.instagramUsername}` : connection.displayName || "Instagram account",
+    }))
+}
+
+function connectedTikTokRepurposeAccounts(connections: SocialConnectionItem[]) {
+  return connections
+    .filter((connection) => connection.status === "connected")
+    .map((connection) => ({
+      id: connection.id,
+      label: connection.displayName || connection.username || "TikTok account",
+    }))
+}
+
+function getRepurposeTargets(
+  job: AutopostJobRow,
+  instagramConnections: SocialConnectionItem[],
+  tiktokConnections: SocialConnectionItem[],
+): RepurposeTargetOption[] {
+  const instagramAccounts = connectedInstagramRepurposeAccounts(instagramConnections)
+  const tiktokAccounts = connectedTikTokRepurposeAccounts(tiktokConnections)
+  const mediaItems = getJobMediaItems(job)
+  const pushUnique = (list: RepurposeTargetSpec[], next: RepurposeTargetSpec) => {
+    if (!list.some((item) => item.id === next.id)) {
+      list.push(next)
     }
   }
-  if (t - now > TOKEN_EXPIRY_WARNING_MS) return null
-  const when = expires.toLocaleString()
-  return {
-    variant: "soon",
-    body:
-      provider === "TikTok"
-        ? `Access token refreshes automatically. Current token expires ${formatDistanceToNow(expires, { addSuffix: true })} (${when}).`
-        : `Token expires ${formatDistanceToNow(expires, { addSuffix: true })} (${when}). Reconnect before then to avoid interruptions.`,
+
+  if (mediaItems.length === 0) {
+    return []
   }
+
+  const list: RepurposeTargetSpec[] = []
+  const single = mediaItems.length === 1 ? mediaItems[0] : null
+  const allImages = mediaItems.every((item) => item.kind === "image")
+  const sourceProvider: ComposerProvider = job.provider === "tiktok" ? "tiktok" : "instagram"
+
+  if (mediaItems.length > 1) {
+    if (allImages) {
+      if (sourceProvider === "tiktok") {
+        pushUnique(list, {
+          id: "instagram:carousel",
+          provider: "instagram",
+          label: "Instagram carousel",
+          postFormat: "carousel",
+        })
+        pushUnique(list, {
+          id: "tiktok:photo",
+          provider: "tiktok",
+          label: "TikTok photo post",
+          tiktokPostType: "photo",
+        })
+      } else {
+        pushUnique(list, {
+          id: "tiktok:photo",
+          provider: "tiktok",
+          label: "TikTok photo post",
+          tiktokPostType: "photo",
+        })
+        pushUnique(list, {
+          id: "instagram:carousel",
+          provider: "instagram",
+          label: "Instagram carousel",
+          postFormat: "carousel",
+        })
+      }
+    } else {
+      pushUnique(list, {
+        id: "instagram:carousel",
+        provider: "instagram",
+        label: "Instagram carousel",
+        postFormat: "carousel",
+      })
+    }
+  } else if (single?.kind === "image") {
+    if (isJpegBackedUrl(single.url)) {
+      pushUnique(list, {
+        id: "instagram:feed_image",
+        provider: "instagram",
+        label: "Instagram feed photo",
+        postFormat: "feed_image",
+      })
+    }
+    pushUnique(list, {
+      id: "instagram:story",
+      provider: "instagram",
+      label: "Instagram story",
+      postFormat: "story",
+    })
+    pushUnique(list, {
+      id: "tiktok:photo",
+      provider: "tiktok",
+      label: "TikTok photo post",
+      tiktokPostType: "photo",
+    })
+  } else if (single?.kind === "video") {
+    if (job.media_type === "story") {
+      pushUnique(list, {
+        id: "instagram:story",
+        provider: "instagram",
+        label: "Instagram story",
+        postFormat: "story",
+      })
+    }
+    pushUnique(list, {
+      id: "instagram:reel",
+      provider: "instagram",
+      label: "Instagram reel",
+      postFormat: "reel",
+    })
+    pushUnique(list, {
+      id: "instagram:feed_video",
+      provider: "instagram",
+      label: "Instagram feed video",
+      postFormat: "feed_video",
+    })
+    pushUnique(list, {
+      id: "tiktok:video",
+      provider: "tiktok",
+      label: "TikTok video post",
+      tiktokPostType: "video",
+    })
+  }
+
+  return list
+    .map((target) => ({
+      ...target,
+      accounts: target.provider === "instagram" ? instagramAccounts : tiktokAccounts,
+    }))
+    .filter((target) => target.accounts.length > 0)
+}
+
+function repurposeAllowsMove(job: AutopostJobRow) {
+  return job.status === "draft" || job.status === "queued"
+}
+
+function targetMatchesComposer(
+  target: RepurposeTargetSpec,
+  provider: ComposerProvider,
+  postFormat: PostFormat,
+  tiktokPostType: TikTokPostType,
+) {
+  return target.provider === provider && (
+    (provider === "instagram" && target.postFormat === postFormat) ||
+    (provider === "tiktok" && target.tiktokPostType === tiktokPostType)
+  )
 }
 
 type SocialProvider = "instagram" | "tiktok"
@@ -313,6 +548,7 @@ type DisconnectTarget = {
 type ComposerProvider = "instagram" | "tiktok"
 type TikTokMode = "upload" | "direct"
 type TikTokPostType = "video" | "photo"
+type RepurposeIntent = "copy" | "move"
 
 type TikTokCreatorInfo = {
   creator_avatar_url?: string
@@ -323,6 +559,48 @@ type TikTokCreatorInfo = {
   duet_disabled?: boolean
   stitch_disabled?: boolean
   max_video_post_duration_sec?: number
+}
+
+type ComposerMediaItem = {
+  url: string
+  kind: "image" | "video"
+  label?: string
+  origin: "local" | "repurpose"
+  name?: string
+}
+
+type RepurposeTargetSpec = {
+  id: string
+  provider: ComposerProvider
+  label: string
+  postFormat?: PostFormat
+  tiktokPostType?: TikTokPostType
+}
+
+type RepurposeTargetOption = RepurposeTargetSpec & {
+  accounts: Array<{ id: string; label: string }>
+}
+
+type RepurposeSource = {
+  sourceJobId: string
+  sourceProvider: ComposerProvider
+  sourceStatus: string
+  sourceLabel: string
+  intent: RepurposeIntent
+  mediaItems: ComposerMediaItem[]
+  allowedTargets: RepurposeTargetSpec[]
+  caption: string
+  tiktokDescription: string
+  photoCoverIndex: number
+  shareReelToFeed: boolean
+  reelCoverUrl: string
+}
+
+type RepurposeDialogState = {
+  job: AutopostJobRow
+  targets: RepurposeTargetOption[]
+  selectedTargetId: string
+  selectedAccountId: string | null
 }
 
 function hasScope(connection: SocialConnectionItem | null | undefined, scope: string) {
@@ -385,6 +663,27 @@ function statusBadgeClass(status: string) {
   }
 }
 
+function providerLabel(provider: SocialProvider) {
+  return provider === "tiktok" ? "TikTok" : "Instagram"
+}
+
+function providerIconSrc(provider: SocialProvider) {
+  return provider === "tiktok" ? "/brand_icons/tiktok-icon.svg" : "/brand_icons/instagram-icon.svg"
+}
+
+function BrandIcon({ provider, className }: { provider: SocialProvider; className?: string }) {
+  return (
+    <Image
+      alt=""
+      aria-hidden
+      className={className}
+      height={20}
+      src={providerIconSrc(provider)}
+      width={20}
+    />
+  )
+}
+
 export function AutopostPage() {
   const [status, setStatus] = React.useState<SocialConnectionsStatus | null>(null)
   const [isLoadingStatus, setIsLoadingStatus] = React.useState(true)
@@ -421,13 +720,52 @@ export function AutopostPage() {
   const [isLoadingJobs, setIsLoadingJobs] = React.useState(true)
   const [isPostingDraft, setIsPostingDraft] = React.useState(false)
   const [actionJobId, setActionJobId] = React.useState<string | null>(null)
+  const [activeViewerJob, setActiveViewerJob] = React.useState<{
+    job: AutopostJobRow
+    mediaItems: ComposerMediaItem[]
+  } | null>(null)
+  const [composerOpen, setComposerOpen] = React.useState(false)
+  const [repurposeDialog, setRepurposeDialog] = React.useState<RepurposeDialogState | null>(null)
+  const [repurposeSource, setRepurposeSource] = React.useState<RepurposeSource | null>(null)
+  const [connectIconProvider, setConnectIconProvider] = React.useState<SocialProvider>("instagram")
 
   const [disconnectTarget, setDisconnectTarget] = React.useState<DisconnectTarget | null>(null)
-  const [composerCardHeight, setComposerCardHeight] = React.useState<number | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
-  const composerCardRef = React.useRef<HTMLDivElement>(null)
   const searchParams = useSearchParams()
   const hasHandledAuthParams = React.useRef(false)
+
+  const localComposerMediaItems = React.useMemo<ComposerMediaItem[]>(
+    () =>
+      previewUrls.reduce<ComposerMediaItem[]>((items, url, index) => {
+        const file = selectedFiles[index]
+        const kind = file ? inferFileKind(file) : null
+        if (!kind) {
+          return items
+        }
+        items.push({
+          url,
+          kind,
+          label: `${index + 1}`,
+          origin: "local",
+          name: file.name,
+        })
+        return items
+      }, []),
+    [previewUrls, selectedFiles],
+  )
+
+  const composerMediaItems = repurposeSource?.mediaItems?.length ? repurposeSource.mediaItems : localComposerMediaItems
+
+  const clearLocalComposerMedia = React.useCallback(() => {
+    setSelectedFiles([])
+    setPreviewUrls((previous) => {
+      previous.forEach((u) => URL.revokeObjectURL(u))
+      return []
+    })
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }, [])
 
   React.useEffect(() => {
     return () => {
@@ -436,33 +774,10 @@ export function AutopostPage() {
   }, [previewUrls])
 
   React.useEffect(() => {
-    const composerCard = composerCardRef.current
-    if (!composerCard || typeof ResizeObserver === "undefined") {
-      return
-    }
-
-    const syncHeight = () => {
-      setComposerCardHeight(composerCard.getBoundingClientRect().height)
-    }
-
-    syncHeight()
-    const observer = new ResizeObserver(syncHeight)
-    observer.observe(composerCard)
-    return () => observer.disconnect()
-  }, [])
-
-  React.useEffect(() => {
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
-      setSelectedFiles([])
-      setPreviewUrls((prev) => {
-        prev.forEach((u) => URL.revokeObjectURL(u))
-        return []
-      })
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""
-      }
+      clearLocalComposerMedia()
       if (postFormat === "story") {
         setCaption("")
       }
@@ -470,7 +785,15 @@ export function AutopostPage() {
     return () => {
       cancelled = true
     }
-  }, [composerProvider, postFormat, tiktokPostType])
+  }, [clearLocalComposerMedia, composerProvider, postFormat, tiktokPostType])
+
+  React.useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setConnectIconProvider((current) => (current === "instagram" ? "tiktok" : "instagram"))
+    }, 2600)
+
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   const fetchStatus = React.useCallback(async () => {
     setIsLoadingStatus(true)
@@ -633,12 +956,15 @@ export function AutopostPage() {
   }, [composerProvider, selectedTikTokConnectionId, status?.tiktok?.connections, tiktokMode])
 
   React.useEffect(() => {
-    if (selectedFiles.length === 0) {
+    if (composerProvider !== "tiktok" || tiktokPostType !== "photo") {
+      return
+    }
+    if (composerMediaItems.length === 0) {
       setTikTokPhotoCoverIndex(0)
       return
     }
-    setTikTokPhotoCoverIndex((current) => (current >= 0 && current < selectedFiles.length ? current : 0))
-  }, [selectedFiles.length])
+    setTikTokPhotoCoverIndex((current) => (current >= 0 && current < composerMediaItems.length ? current : 0))
+  }, [composerMediaItems.length, composerProvider, tiktokPostType])
 
   const fetchJobs = React.useCallback(async () => {
     setIsLoadingJobs(true)
@@ -693,6 +1019,203 @@ export function AutopostPage() {
     const search = nextUrl.searchParams.toString()
     window.history.replaceState({}, "", search ? `${nextUrl.pathname}?${search}` : nextUrl.pathname)
   }, [fetchStatus, searchParams])
+
+  const handleComposerProviderChange = React.useCallback(
+    (value: string) => {
+      const nextProvider = value as ComposerProvider
+      setComposerProvider(nextProvider)
+
+      if (!repurposeSource) {
+        return
+      }
+
+      const targetsForProvider = repurposeSource.allowedTargets.filter((target) => target.provider === nextProvider)
+      if (targetsForProvider.length === 0) {
+        setRepurposeSource(null)
+        return
+      }
+
+      const currentTarget = targetsForProvider.find((target) =>
+        targetMatchesComposer(target, nextProvider, postFormat, tiktokPostType),
+      )
+      const resolvedTarget = currentTarget ?? targetsForProvider[0]
+
+      if (nextProvider === "instagram" && resolvedTarget.postFormat) {
+        setPostFormat(resolvedTarget.postFormat)
+      }
+      if (nextProvider === "tiktok" && resolvedTarget.tiktokPostType) {
+        setTikTokPostType(resolvedTarget.tiktokPostType)
+      }
+    },
+    [postFormat, repurposeSource, tiktokPostType],
+  )
+
+  const handleInstagramPostFormatChange = React.useCallback(
+    (value: string) => {
+      const nextFormat = value as PostFormat
+      if (
+        repurposeSource &&
+        !repurposeSource.allowedTargets.some(
+          (target) => target.provider === "instagram" && target.postFormat === nextFormat,
+        )
+      ) {
+        return
+      }
+      setPostFormat(nextFormat)
+    },
+    [repurposeSource],
+  )
+
+  const handleTikTokPostTypeChange = React.useCallback(
+    (value: string) => {
+      const nextType = value as TikTokPostType
+      if (
+        repurposeSource &&
+        !repurposeSource.allowedTargets.some(
+          (target) => target.provider === "tiktok" && target.tiktokPostType === nextType,
+        )
+      ) {
+        return
+      }
+      setTikTokPostType(nextType)
+    },
+    [repurposeSource],
+  )
+
+  const openRepurposeDialog = React.useCallback(
+    (job: AutopostJobRow) => {
+      const targets = getRepurposeTargets(
+        job,
+        status?.instagram?.connections ?? [],
+        status?.tiktok?.connections ?? [],
+      )
+      if (targets.length === 0) {
+        toast.error("No compatible repurpose targets are available for this post yet.")
+        return
+      }
+
+      const defaultTarget = targets[0]
+      setRepurposeDialog({
+        job,
+        targets,
+        selectedTargetId: defaultTarget.id,
+        selectedAccountId: defaultTarget.accounts[0]?.id ?? null,
+      })
+    },
+    [status],
+  )
+
+  const applyRepurposeSelection = React.useCallback(
+    (intent: RepurposeIntent) => {
+      if (!repurposeDialog) {
+        return
+      }
+
+      const selectedTarget = repurposeDialog.targets.find((target) => target.id === repurposeDialog.selectedTargetId)
+      if (!selectedTarget) {
+        toast.error("Choose a compatible destination first.")
+        return
+      }
+
+      const selectedAccountId = repurposeDialog.selectedAccountId ?? selectedTarget.accounts[0]?.id ?? null
+      if (!selectedAccountId) {
+        toast.error("Choose an account for the repurposed post.")
+        return
+      }
+
+      const mediaItems = getJobMediaItems(repurposeDialog.job)
+      if (mediaItems.length === 0) {
+        toast.error("This post is missing media to repurpose.")
+        return
+      }
+
+      const sourceDescription = repurposeDialog.job.metadata?.tiktok?.description?.trim() ?? ""
+      const combinedInstagramCaption =
+        repurposeDialog.job.provider === "tiktok" &&
+        (repurposeDialog.job.media_type === "tiktok_photo_upload" ||
+          repurposeDialog.job.media_type === "tiktok_photo_direct") &&
+        sourceDescription
+          ? [repurposeDialog.job.caption?.trim(), sourceDescription].filter(Boolean).join("\n\n")
+          : repurposeDialog.job.caption ?? ""
+
+      clearLocalComposerMedia()
+      setRepurposeSource({
+        sourceJobId: repurposeDialog.job.id,
+        sourceProvider: repurposeDialog.job.provider === "tiktok" ? "tiktok" : "instagram",
+        sourceStatus: repurposeDialog.job.status,
+        sourceLabel: jobAccountLabel(repurposeDialog.job),
+        intent,
+        mediaItems,
+        allowedTargets: repurposeDialog.targets.map((target) => ({
+          id: target.id,
+          label: target.label,
+          provider: target.provider,
+          postFormat: target.postFormat,
+          tiktokPostType: target.tiktokPostType,
+        })),
+        caption: selectedTarget.provider === "instagram" ? combinedInstagramCaption : repurposeDialog.job.caption ?? "",
+        tiktokDescription:
+          selectedTarget.provider === "tiktok" && selectedTarget.tiktokPostType === "photo"
+            ? sourceDescription
+            : "",
+        photoCoverIndex:
+          repurposeDialog.job.metadata?.tiktok?.photoCoverIndex != null
+            ? Math.min(
+                Math.max(repurposeDialog.job.metadata.tiktok.photoCoverIndex, 0),
+                Math.max(mediaItems.length - 1, 0),
+              )
+            : 0,
+        shareReelToFeed: repurposeDialog.job.metadata?.publishOptions?.shareToFeed !== false,
+        reelCoverUrl: repurposeDialog.job.metadata?.publishOptions?.coverUrl ?? "",
+      })
+
+      setCaption(selectedTarget.provider === "instagram" ? combinedInstagramCaption : repurposeDialog.job.caption ?? "")
+      setTikTokDescription(
+        selectedTarget.provider === "tiktok" && selectedTarget.tiktokPostType === "photo" ? sourceDescription : "",
+      )
+      setTikTokPhotoCoverIndex(
+        repurposeDialog.job.metadata?.tiktok?.photoCoverIndex != null
+          ? Math.min(
+              Math.max(repurposeDialog.job.metadata.tiktok.photoCoverIndex, 0),
+              Math.max(mediaItems.length - 1, 0),
+            )
+          : 0,
+      )
+      setShareReelToFeed(repurposeDialog.job.metadata?.publishOptions?.shareToFeed !== false)
+      setReelCoverUrl(repurposeDialog.job.metadata?.publishOptions?.coverUrl ?? "")
+      setComposerProvider(selectedTarget.provider)
+      if (selectedTarget.provider === "instagram") {
+        setPostFormat(selectedTarget.postFormat ?? "feed_image")
+        setSelectedComposerConnectionId(selectedAccountId)
+        if (typeof window !== "undefined") {
+          localStorage.setItem(AUTOPOST_COMPOSER_ACCOUNT_KEY, selectedAccountId)
+        }
+      } else {
+        setTikTokPostType(selectedTarget.tiktokPostType ?? "video")
+        setSelectedTikTokConnectionId(selectedAccountId)
+      }
+      setComposerTab("now")
+      setRepurposeDialog(null)
+      setComposerOpen(true)
+    },
+    [clearLocalComposerMedia, repurposeDialog],
+  )
+
+  const finalizeRepurposeMoveIfNeeded = React.useCallback(async () => {
+    if (!repurposeSource || repurposeSource.intent !== "move") {
+      return
+    }
+
+    if (repurposeSource.sourceStatus !== "draft" && repurposeSource.sourceStatus !== "queued") {
+      return
+    }
+
+    const response = await fetch(`/api/autopost/jobs/${repurposeSource.sourceJobId}`, { method: "DELETE" })
+    const data = (await response.json()) as { error?: string }
+    if (!response.ok) {
+      throw new Error(data.error || "Repurpose succeeded, but the original draft could not be removed.")
+    }
+  }, [repurposeSource])
 
   const handleConnectInstagram = () => {
     window.location.href = "/api/instagram/connect"
@@ -784,6 +1307,7 @@ export function AutopostPage() {
       }
     }
 
+    setRepurposeSource(null)
     setPreviewUrls((previous) => {
       previous.forEach((u) => URL.revokeObjectURL(u))
       return picked.map((file) => URL.createObjectURL(file))
@@ -793,11 +1317,8 @@ export function AutopostPage() {
 
   const resetComposer = () => {
     setCaption("")
-    setSelectedFiles([])
-    setPreviewUrls((previous) => {
-      previous.forEach((u) => URL.revokeObjectURL(u))
-      return []
-    })
+    clearLocalComposerMedia()
+    setRepurposeSource(null)
     setShareReelToFeed(true)
     setReelCoverUrl("")
     setTikTokPostType("video")
@@ -807,14 +1328,14 @@ export function AutopostPage() {
     setTikTokAutoAddMusic(true)
     setTikTokDescription("")
     setTikTokPhotoCoverIndex(0)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
     setScheduleDate(defaultScheduleDate())
   }
 
   const uploadAndCreateDraft = async (scheduledAtIso: string | null) => {
-    if (selectedFiles.length === 0) {
+    const usingRepurposeMedia = selectedFiles.length === 0 && Boolean(repurposeSource?.mediaItems.length)
+    const sourceMediaItems = usingRepurposeMedia ? repurposeSource?.mediaItems ?? [] : localComposerMediaItems
+
+    if (sourceMediaItems.length === 0) {
       toast.error("Choose media first.")
       return null
     }
@@ -850,38 +1371,47 @@ export function AutopostPage() {
       }
 
       if (tiktokPostType === "video") {
-        if (selectedFiles.length !== 1) {
+        if (sourceMediaItems.length !== 1) {
           toast.error("TikTok video publishing needs one video file.")
           return null
         }
-        const file = selectedFiles[0]
-        if (inferFileKind(file) !== "video") {
+        const single = sourceMediaItems[0]
+        if (single.kind !== "video") {
           toast.error("TikTok video publishing requires a video file.")
           return null
         }
 
-        const uploaded = await uploadFileToSupabase(file, AUTOPOST_MEDIA_FOLDER)
-        if (!uploaded) {
-          return null
-        }
-        body.mediaUrl = uploaded.url
-      } else {
-        if (selectedFiles.length === 0 || selectedFiles.length > 35) {
-          toast.error("TikTok photo posts need between 1 and 35 images.")
-          return null
-        }
-        if (selectedFiles.some((file) => inferFileKind(file) !== "image")) {
-          toast.error("TikTok photo posts require image files only.")
-          return null
-        }
-
-        const photoItems: string[] = []
-        for (const file of selectedFiles) {
+        if (usingRepurposeMedia) {
+          body.mediaUrl = single.url
+        } else {
+          const file = selectedFiles[0]
           const uploaded = await uploadFileToSupabase(file, AUTOPOST_MEDIA_FOLDER)
           if (!uploaded) {
             return null
           }
-          photoItems.push(uploaded.url)
+          body.mediaUrl = uploaded.url
+        }
+      } else {
+        if (sourceMediaItems.length === 0 || sourceMediaItems.length > 35) {
+          toast.error("TikTok photo posts need between 1 and 35 images.")
+          return null
+        }
+        if (sourceMediaItems.some((item) => item.kind !== "image")) {
+          toast.error("TikTok photo posts require image files only.")
+          return null
+        }
+
+        let photoItems: string[] = []
+        if (usingRepurposeMedia) {
+          photoItems = sourceMediaItems.map((item) => item.url)
+        } else {
+          for (const file of selectedFiles) {
+            const uploaded = await uploadFileToSupabase(file, AUTOPOST_MEDIA_FOLDER)
+            if (!uploaded) {
+              return null
+            }
+            photoItems.push(uploaded.url)
+          }
         }
 
         body.photoItems = photoItems
@@ -942,17 +1472,17 @@ export function AutopostPage() {
     const apiMediaType = postFormatToApiMediaType(postFormat)
 
     if (postFormat === "carousel") {
-      if (selectedFiles.length < 2 || selectedFiles.length > 10) {
+      if (sourceMediaItems.length < 2 || sourceMediaItems.length > 10) {
         toast.error("Carousel needs between 2 and 10 images or videos.")
         return null
       }
-    } else if (selectedFiles.length !== 1) {
+    } else if (sourceMediaItems.length !== 1) {
       toast.error("Select a single file for this post type.")
       return null
     }
 
-    const single = selectedFiles[0]
-    const singleKind = inferFileKind(single)
+    const single = sourceMediaItems[0]
+    const singleKind = single?.kind ?? null
     if (!singleKind) {
       toast.error("Unsupported media type.")
       return null
@@ -985,17 +1515,50 @@ export function AutopostPage() {
     }
 
     if (postFormat === "carousel") {
-      const carouselItems: { url: string; kind: "image" | "video" }[] = []
-      for (const file of selectedFiles) {
-        const k = inferFileKind(file)
-        if (!k) {
-          toast.error("Unsupported file in carousel.")
+      if (usingRepurposeMedia) {
+        body.carouselItems = sourceMediaItems.map((item) => ({
+          url: item.url,
+          kind: item.kind,
+        }))
+      } else {
+        const carouselItems: { url: string; kind: "image" | "video" }[] = []
+        for (const file of selectedFiles) {
+          const k = inferFileKind(file)
+          if (!k) {
+            toast.error("Unsupported file in carousel.")
+            return null
+          }
+          let fileToUpload = file
+          if (k === "image") {
+            try {
+              fileToUpload = await ensureJpegForInstagramFeed(file)
+            } catch (conversionError) {
+              toast.error(
+                conversionError instanceof Error ? conversionError.message : "Could not convert image to JPEG."
+              )
+              return null
+            }
+          }
+          const uploaded = await uploadFileToSupabase(fileToUpload, AUTOPOST_MEDIA_FOLDER)
+          if (!uploaded) {
+            return null
+          }
+          carouselItems.push({ url: uploaded.url, kind: k })
+        }
+        body.carouselItems = carouselItems
+      }
+    } else {
+      if (usingRepurposeMedia) {
+        if (postFormat === "feed_image" && !isJpegBackedUrl(single.url)) {
+          toast.error("Instagram feed photos need a JPEG-backed media URL. Upload a JPEG or switch to Story.")
           return null
         }
-        let fileToUpload = file
-        if (k === "image") {
+        body.mediaUrl = single.url
+      } else {
+        let fileToUpload: File = selectedFiles[0]
+        if (singleKind === "image") {
           try {
-            fileToUpload = await ensureJpegForInstagramFeed(file)
+            fileToUpload = await ensureJpegForInstagramFeed(selectedFiles[0])
           } catch (conversionError) {
             toast.error(
               conversionError instanceof Error ? conversionError.message : "Could not convert image to JPEG."
@@ -1007,26 +1570,8 @@ export function AutopostPage() {
         if (!uploaded) {
           return null
         }
-        carouselItems.push({ url: uploaded.url, kind: k })
+        body.mediaUrl = uploaded.url
       }
-      body.carouselItems = carouselItems
-    } else {
-      let fileToUpload: File = single
-      if (singleKind === "image") {
-        try {
-          fileToUpload = await ensureJpegForInstagramFeed(single)
-        } catch (conversionError) {
-          toast.error(
-            conversionError instanceof Error ? conversionError.message : "Could not convert image to JPEG."
-          )
-          return null
-        }
-      }
-      const uploaded = await uploadFileToSupabase(fileToUpload, AUTOPOST_MEDIA_FOLDER)
-      if (!uploaded) {
-        return null
-      }
-      body.mediaUrl = uploaded.url
       if (postFormat === "story") {
         body.assetKind = singleKind
       }
@@ -1096,6 +1641,12 @@ export function AutopostPage() {
         throw new Error(publishData.error || "Publishing failed.")
       }
 
+      let moveWarning: string | null = null
+      try {
+        await finalizeRepurposeMoveIfNeeded()
+      } catch (error) {
+        moveWarning = error instanceof Error ? error.message : "Repurpose succeeded, but the original draft could not be removed."
+      }
       toast.success(
         publishData.provider === "tiktok"
           ? tiktokMode === "upload"
@@ -1105,7 +1656,11 @@ export function AutopostPage() {
               : "TikTok Direct Post submitted."
           : "Published to Instagram."
       )
+      if (moveWarning) {
+        toast.message(moveWarning)
+      }
       resetComposer()
+      setComposerOpen(false)
       void fetchJobs()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Publish failed")
@@ -1131,12 +1686,22 @@ export function AutopostPage() {
         return
       }
 
+      let moveWarning: string | null = null
+      try {
+        await finalizeRepurposeMoveIfNeeded()
+      } catch (error) {
+        moveWarning = error instanceof Error ? error.message : "Repurpose succeeded, but the original draft could not be removed."
+      }
       toast.success(
         composerProvider === "tiktok"
           ? "TikTok post scheduled. It will submit automatically when due."
           : "Post scheduled. It will publish automatically when due."
       )
+      if (moveWarning) {
+        toast.message(moveWarning)
+      }
       resetComposer()
+      setComposerOpen(false)
       void fetchJobs()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Schedule failed")
@@ -1244,12 +1809,15 @@ export function AutopostPage() {
   const selectedTikTokConnection = tiktokConnections.find((connection) => connection.id === selectedTikTokConnectionId)
   const isTikTokConnected = tiktokConnections.some((connection) => connection.status === "connected")
   const tikTokRequiredScope = tiktokMode === "direct" ? "video.publish" : "video.upload"
+  const repurposeTargetsForInstagram = repurposeSource?.allowedTargets.filter((target) => target.provider === "instagram") ?? []
+  const repurposeTargetsForTikTok = repurposeSource?.allowedTargets.filter((target) => target.provider === "tiktok") ?? []
+  const repurposeAllowedProviders = new Set(repurposeSource?.allowedTargets.map((target) => target.provider) ?? [])
   const tiktokHasValidMedia =
     tiktokPostType === "photo"
-      ? selectedFiles.length >= 1 &&
-        selectedFiles.length <= 35 &&
-        selectedFiles.every((file) => inferFileKind(file) === "image")
-      : selectedFiles.length === 1 && inferFileKind(selectedFiles[0]) === "video"
+      ? composerMediaItems.length >= 1 &&
+        composerMediaItems.length <= 35 &&
+        composerMediaItems.every((item) => item.kind === "image")
+      : composerMediaItems.length === 1 && composerMediaItems[0]?.kind === "video"
   const tiktokReady =
     isTikTokConnected &&
     Boolean(selectedTikTokConnectionId) &&
@@ -1261,355 +1829,426 @@ export function AutopostPage() {
     composerProvider === "tiktok"
       ? tiktokReady
       : postFormat === "carousel"
-        ? selectedFiles.length >= 2 && selectedFiles.length <= 10
-        : selectedFiles.length === 1
+        ? composerMediaItems.length >= 2 && composerMediaItems.length <= 10
+        : composerMediaItems.length === 1
+
+  const accountTiles = [
+    ...instagramConnections.map((connection) => {
+        const profile = connection.profile as InstagramSavedProfile | null
+        const displayLabel = connection.instagramUsername
+          ? `@${connection.instagramUsername}`
+          : connection.displayName || "Instagram account"
+        return {
+          id: connection.id,
+          provider: "instagram" as const,
+          title: profile?.name?.trim() || connection.displayName || displayLabel,
+          subtitle: displayLabel,
+          href: connection.instagramUsername
+            ? `https://www.instagram.com/${connection.instagramUsername}/`
+            : null,
+          avatarUrl: profile?.profile_picture_url ?? connection.avatarUrl,
+          status: connection.status,
+          meta:
+            profile?.followers_count != null
+              ? `${profile.followers_count.toLocaleString()} followers`
+              : profile?.media_count != null
+                ? `${profile.media_count.toLocaleString()} posts`
+                : "Ready to publish",
+          secondaryMeta:
+            connection.accountType?.trim()
+              ? connection.accountType.replace(/_/g, " ").toLowerCase()
+              : "professional account",
+          refreshId: connection.instagramConnectionId,
+          disconnectId: connection.instagramConnectionId,
+        }
+    }),
+    ...tiktokConnections.map((connection) => {
+        const profile = connection.profile as TikTokSavedProfile | null
+        const displayLabel =
+          connection.displayName || connection.username || profile?.display_name || "TikTok account"
+        return {
+          id: connection.id,
+          provider: "tiktok" as const,
+          title: displayLabel,
+          subtitle: connection.username ? `@${connection.username}` : "TikTok profile",
+          href: null,
+          avatarUrl: connection.avatarUrl ?? profile?.avatar_url,
+          status: connection.status,
+          meta: hasScope(connection, "video.publish") ? "Direct Post ready" : "Profile connected",
+          secondaryMeta: `${connection.providerAccountId.slice(0, 12)}...`,
+          refreshId: null,
+          disconnectId: connection.id,
+        }
+    }),
+  ]
+
+  const missingProviders = (["instagram", "tiktok"] as const).filter((provider) =>
+    provider === "instagram" ? instagramConnections.length === 0 : tiktokConnections.length === 0,
+  )
+  const connectedAccountCount = accountTiles.filter((tile) => tile.status === "connected").length
+
+  const activeViewerActions: AutopostViewerAction[] = (() => {
+    if (!activeViewerJob) {
+      return []
+    }
+
+    const { job } = activeViewerJob
+    const busy = actionJobId === job.id
+    const canPublishThisJob = job.provider === "tiktok" ? isTikTokConnected : isConnected
+    const actions: AutopostViewerAction[] = [
+      {
+        id: "repurpose",
+        label: "Repurpose",
+        icon: <ArrowRightLeft className="h-3.5 w-3.5" />,
+        variant: "outline",
+        disabled: getRepurposeTargets(job, instagramConnections, tiktokConnections).length === 0,
+        onClick: () => {
+          openRepurposeDialog(job)
+          setActiveViewerJob(null)
+        },
+      },
+    ]
+
+    if (job.status === "queued") {
+      actions.push({
+        id: "publish",
+        label: "Publish now",
+        variant: "default",
+        disabled: busy || !canPublishThisJob,
+        onClick: () => {
+          setActiveViewerJob(null)
+          void handlePublishJobFromList(job)
+        },
+      })
+      actions.push({
+        id: "cancel",
+        label: "Cancel",
+        icon: <Trash2 className="h-3.5 w-3.5" />,
+        variant: "ghost",
+        disabled: busy,
+        onClick: () => {
+          setActiveViewerJob(null)
+          void handleCancelJob(job.id)
+        },
+      })
+    }
+
+    if (job.status === "draft") {
+      actions.push({
+        id: "publish",
+        label: "Publish",
+        variant: "default",
+        disabled: busy || !canPublishThisJob,
+        onClick: () => {
+          setActiveViewerJob(null)
+          void handlePublishJobFromList(job)
+        },
+      })
+      actions.push({
+        id: "discard",
+        label: "Discard",
+        icon: <Trash2 className="h-3.5 w-3.5" />,
+        variant: "ghost",
+        disabled: busy,
+        onClick: () => {
+          setActiveViewerJob(null)
+          void handleCancelJob(job.id)
+        },
+      })
+    }
+
+    if (job.status === "failed") {
+      actions.push({
+        id: "retry",
+        label: "Retry",
+        variant: "secondary",
+        disabled: busy || (job.provider === "tiktok" ? !isTikTokConnected : !isConnected),
+        onClick: () => {
+          setActiveViewerJob(null)
+          void handleRetryFailed(job.id)
+        },
+      })
+    }
+
+    if (job.provider === "tiktok" && job.status === "processing") {
+      actions.push({
+        id: "refresh",
+        label: "Refresh status",
+        variant: "outline",
+        disabled: busy,
+        onClick: () => {
+          setActiveViewerJob(null)
+          void handleRefreshTikTokJobStatus(job.id)
+        },
+      })
+    }
+
+    return actions
+  })()
 
   return (
-    <div className="min-h-screen bg-background px-4 pb-6 pt-20 md:pt-24">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Autopost</h1>
-            <p className="text-sm text-muted-foreground">
-              Connect social accounts, publish to Instagram, or schedule posts. All activity appears in your post history.
+    <div className="min-h-screen bg-background px-4 pb-8 pt-20 md:pt-24">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-3 pr-0 md:pr-10">
+            <h1 className="text-3xl font-semibold tracking-tight">Manage your posts in one place.</h1>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Connect your accounts, create new posts, and keep track of everything from one simple page.
             </p>
           </div>
-          <Button
-            type="button"
-            onClick={handleConnectInstagram}
-            variant="outline"
-            className="shrink-0"
+          <div className="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">
+            <Button type="button" className="rounded-full px-4" onClick={() => setComposerOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Post
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" className="rounded-full px-4">
+                  <span className="relative mr-2 flex h-4 w-4 items-center justify-center">
+                    <BrandIcon
+                      provider="instagram"
+                      className={cn(
+                        "absolute h-4 w-4 transition-all duration-500",
+                        connectIconProvider === "instagram"
+                          ? "rotate-0 scale-100 opacity-100"
+                          : "-rotate-90 scale-75 opacity-0",
+                      )}
+                    />
+                    <BrandIcon
+                      provider="tiktok"
+                      className={cn(
+                        "absolute h-4 w-4 transition-all duration-500",
+                        connectIconProvider === "tiktok"
+                          ? "rotate-0 scale-100 opacity-100"
+                          : "rotate-90 scale-75 opacity-0",
+                      )}
+                    />
+                  </span>
+                  Connect
+                  <ChevronDown className="ml-2 h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem onSelect={handleConnectInstagram}>
+                  <BrandIcon provider="instagram" className="h-4 w-4" />
+                  <div className="space-y-0.5">
+                    <p className="font-medium">Instagram</p>
+                    <p className="text-xs text-muted-foreground">Connect a professional account</p>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleConnectTikTok}>
+                  <BrandIcon provider="tiktok" className="h-4 w-4" />
+                  <div className="space-y-0.5">
+                    <p className="font-medium">TikTok</p>
+                    <p className="text-xs text-muted-foreground">Connect a TikTok publishing profile</p>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h2 className="text-sm font-semibold text-foreground">Accounts</h2>
+              <p className="text-sm text-muted-foreground">
+                {connectedAccountCount > 0
+                  ? `${connectedAccountCount} account${connectedAccountCount === 1 ? "" : "s"} connected`
+                  : "Connect Instagram or TikTok to get started"}
+              </p>
+            </div>
+            <Badge variant={connectedAccountCount > 0 ? "secondary" : "outline"} className="rounded-full px-3 py-1">
+              {accountTiles.length} accounts
+            </Badge>
+          </div>
+
+          {isLoadingStatus ? (
+            <div className="flex items-center gap-2 rounded-[32px] border border-border/60 bg-muted/10 px-4 py-5 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading accounts...
+            </div>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {accountTiles.map((tile) => (
+                <article
+                  key={tile.id}
+                  className="flex aspect-square w-[198px] shrink-0 flex-col rounded-[30px] border border-border/70 bg-background/90 p-4 shadow-sm transition-colors duration-200 hover:border-border"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-muted/50 px-2.5 py-1 text-[11px] font-medium text-foreground">
+                      <BrandIcon provider={tile.provider} className="h-3.5 w-3.5" />
+                      {providerLabel(tile.provider)}
+                    </span>
+                    {tile.status === "connected" ? (
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden />
+                    ) : (
+                      <Badge variant="outline" className="px-2 py-0.5 text-[10px]">
+                        {statusLabel(tile.status)}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex flex-1 flex-col gap-3 pt-4">
+                    {tile.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- remote social avatar URLs
+                      <img
+                        src={tile.avatarUrl}
+                        alt=""
+                        className="h-16 w-16 rounded-[20px] border border-border/70 object-cover shadow-sm"
+                        width={56}
+                        height={56}
+                      />
+                    ) : (
+                      <div className="flex h-16 w-16 items-center justify-center rounded-[20px] border border-border/70 bg-muted/40">
+                        <UserRound className="h-6 w-6 text-muted-foreground" aria-hidden />
+                      </div>
+                    )}
+                    <div className="min-w-0 space-y-1">
+                      <p className="line-clamp-2 text-[15px] font-semibold leading-tight text-foreground">{tile.title}</p>
+                      {tile.href ? (
+                        <a
+                          href={tile.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block truncate text-xs text-sky-400 underline-offset-4 hover:underline"
+                        >
+                          {tile.subtitle}
+                        </a>
+                      ) : (
+                        <p className="truncate text-xs text-muted-foreground">{tile.subtitle}</p>
+                      )}
+                      <p className="pt-1 text-[11px] text-foreground/85">{tile.meta}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">{tile.secondaryMeta}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto space-y-2">
+                    <div className={cn("grid gap-2", tile.refreshId ? "grid-cols-2" : "grid-cols-1")}>
+                      {tile.refreshId ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-9 rounded-full px-3"
+                          disabled={refreshingConnectionId === tile.refreshId}
+                          onClick={() => tile.refreshId ? void handleRefreshProfile(tile.refreshId) : undefined}
+                        >
+                          <RefreshCw
+                            className={cn("mr-1.5 h-3.5 w-3.5", refreshingConnectionId === tile.refreshId && "animate-spin")}
+                          />
+                          Refresh
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-9 rounded-full px-3"
+                        disabled={isDisconnecting || !tile.disconnectId}
+                        onClick={() =>
+                          tile.disconnectId
+                            ? setDisconnectTarget({
+                                provider: tile.provider,
+                                connectionId: tile.disconnectId,
+                                label: tile.subtitle,
+                              })
+                            : undefined
+                        }
+                      >
+                        Disconnect
+                      </Button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+
+              {missingProviders.map((provider) => (
+                <button
+                  key={provider}
+                  type="button"
+                  className="flex aspect-square w-[198px] shrink-0 flex-col justify-between rounded-[30px] border border-dashed border-border/70 bg-muted/10 p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/20"
+                  onClick={provider === "instagram" ? handleConnectInstagram : handleConnectTikTok}
+                >
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-background shadow-sm">
+                    <BrandIcon provider={provider} className="h-5 w-5" />
+                  </span>
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-foreground">Connect {providerLabel(provider)}</p>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Add {providerLabel(provider)} so it appears here and can be used in the composer.
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {composerOpen ? (
+          <div
+            className="fixed inset-0 z-50 bg-background/80 p-4 backdrop-blur-sm"
+            onClick={() => setComposerOpen(false)}
           >
-            <Link2 className="mr-2 h-4 w-4" />
-            Connect Instagram
-          </Button>
-        </div>
+            <div className="mx-auto flex h-full w-full max-w-4xl items-center justify-center">
+              <Card
+                className="flex max-h-[90vh] w-full flex-col overflow-hidden rounded-[32px] border border-border/80 py-4 shadow-2xl"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <CardHeader className="shrink-0 border-b border-border/60 px-6 pb-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <CardTitle className="flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4" />
+                        Draft Composer
+                      </CardTitle>
+                      <CardDescription>
+                        Choose where to post, add your media, and publish now or schedule it for later.
+                      </CardDescription>
+                    </div>
+                    <Button type="button" variant="ghost" size="sm" className="rounded-full" onClick={() => setComposerOpen(false)}>
+                      Close
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4 overflow-y-auto px-6 pb-2">
+              {repurposeSource ? (
+                <div className="rounded-2xl border border-border/80 bg-muted/20 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Repurpose</p>
+                      <p className="text-sm font-medium text-foreground">
+                        Using saved media from {repurposeSource.sourceLabel}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {repurposeSource.intent === "move"
+                          ? "The original will be removed after the new post is created successfully."
+                          : "This stays linked to the existing uploaded media until you replace it."}
+                      </p>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" onClick={resetComposer}>
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="py-4 sm:py-6" data-instagram-connection-card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Link2 className="h-4 w-4" />
-                Instagram
-              </CardTitle>
-              <CardDescription>
-                Publishing and scheduling currently use connected Instagram professional accounts.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isLoadingStatus ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading connection status...
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <Badge variant={isConnected ? "default" : "outline"}>
-                    {isConnected
-                      ? `${instagramConnections.length} account${instagramConnections.length === 1 ? "" : "s"} connected`
-                      : "Not connected"}
-                  </Badge>
-                  {isConnected ? (
-                    <div className="flex flex-col gap-4">
-                      {instagramConnections.map((connection) => {
-                        const tokenBanner = socialTokenExpiryBanner("Instagram", connection.tokenExpiresAt)
-                        const profile = connection.profile as InstagramSavedProfile | null
-                        const instagramConnectionId = connection.instagramConnectionId
-                        const label = connection.instagramUsername
-                          ? `@${connection.instagramUsername}`
-                          : connection.displayName || "Instagram account"
-                        return (
-                          <div
-                            key={connection.id}
-                            className="rounded-xl border border-border/80 bg-muted/30 p-4 shadow-sm"
-                          >
-                            <div className="flex gap-3 sm:gap-4">
-                              {profile?.profile_picture_url || connection.avatarUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element -- remote Instagram CDN URL from Graph API
-                                <img
-                                  src={profile?.profile_picture_url ?? connection.avatarUrl ?? ""}
-                                  alt=""
-                                  className="h-14 w-14 shrink-0 rounded-full border border-border/80 object-cover"
-                                  width={56}
-                                  height={56}
-                                />
-                              ) : (
-                                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-border/80 bg-muted">
-                                  <UserRound className="h-7 w-7 text-muted-foreground" aria-hidden />
-                                </div>
-                              )}
-                              <div className="min-w-0 flex-1 space-y-2">
-                                <div className="flex flex-wrap items-start justify-between gap-2">
-                                  <div className="min-w-0 space-y-0.5">
-                                    <p className="font-semibold leading-tight text-foreground">
-                                      {profile?.name?.trim() || connection.displayName || label}
-                                    </p>
-                                    {connection.instagramUsername ? (
-                                      <a
-                                        href={`https://www.instagram.com/${connection.instagramUsername}/`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-sm text-primary underline-offset-4 hover:underline"
-                                      >
-                                        instagram.com/{connection.instagramUsername}
-                                      </a>
-                                    ) : null}
-                                  </div>
-                                  <div className="flex shrink-0 items-center gap-2">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="icon-sm"
-                                      className="shrink-0"
-                                      disabled={!instagramConnectionId || refreshingConnectionId === instagramConnectionId}
-                                      aria-label={`Refresh profile for ${label}`}
-                                      onClick={() => instagramConnectionId ? void handleRefreshProfile(instagramConnectionId) : undefined}
-                                    >
-                                      <RefreshCw
-                                        className={cn(
-                                          "h-3.5 w-3.5",
-                                          refreshingConnectionId === instagramConnectionId && "animate-spin"
-                                        )}
-                                        aria-hidden
-                                      />
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className="shrink-0"
-                                      disabled={isDisconnecting || !instagramConnectionId}
-                                      onClick={() =>
-                                        instagramConnectionId
-                                          ? setDisconnectTarget({
-                                              provider: "instagram",
-                                              connectionId: instagramConnectionId,
-                                              label,
-                                            })
-                                          : undefined
-                                      }
-                                    >
-                                      Disconnect
-                                    </Button>
-                                  </div>
-                                </div>
-                                {profile?.biography ? (
-                                  <p className="line-clamp-3 text-sm text-muted-foreground">{profile.biography}</p>
-                                ) : null}
-                                {profile &&
-                                (profile.followers_count != null ||
-                                  profile.follows_count != null ||
-                                  profile.media_count != null) ? (
-                                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                                    {profile.followers_count != null ? (
-                                      <span>
-                                        <span className="font-medium text-foreground">
-                                          {profile.followers_count.toLocaleString()}
-                                        </span>{" "}
-                                        followers
-                                      </span>
-                                    ) : null}
-                                    {profile.follows_count != null ? (
-                                      <span>
-                                        <span className="font-medium text-foreground">
-                                          {profile.follows_count.toLocaleString()}
-                                        </span>{" "}
-                                        following
-                                      </span>
-                                    ) : null}
-                                    {profile.media_count != null ? (
-                                      <span>
-                                        <span className="font-medium text-foreground">
-                                          {profile.media_count.toLocaleString()}
-                                        </span>{" "}
-                                        posts
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-                            {tokenBanner ? (
-                              <div
-                                role="alert"
-                                className={cn(
-                                  "mt-3 flex gap-2 rounded-lg border px-3 py-2.5 text-sm",
-                                  tokenBanner.variant === "expired"
-                                    ? "border-destructive/50 bg-destructive/10 text-destructive"
-                                    : "border-amber-500/45 bg-amber-500/10 text-amber-950 dark:text-amber-100"
-                                )}
-                              >
-                                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                                <p className="min-w-0 leading-snug">{tokenBanner.body}</p>
-                              </div>
-                            ) : null}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
-                      <p className="font-medium text-foreground">No account linked</p>
-                      <p className="mt-1">Connect Instagram before publishing or scheduling posts.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-            <CardFooter className="gap-2">
-              <Button onClick={handleConnectInstagram}>Connect Instagram</Button>
-            </CardFooter>
-          </Card>
-
-          <Card className="py-4 sm:py-6" data-tiktok-connection-card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Film className="h-4 w-4" />
-                TikTok
-              </CardTitle>
-              <CardDescription>
-                TikTok v1 connects accounts only. Uploading and Direct Post stay hidden until the next release.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isLoadingStatus ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading connection status...
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <Badge variant={tiktokConnections.some((connection) => connection.status === "connected") ? "default" : "outline"}>
-                    {tiktokConnections.length > 0
-                      ? `${tiktokConnections.length} account${tiktokConnections.length === 1 ? "" : "s"} connected`
-                      : "Not connected"}
-                  </Badge>
-                  {tiktokConnections.length > 0 ? (
-                    <div className="flex flex-col gap-4">
-                      {tiktokConnections.map((connection) => {
-                        const tokenBanner = socialTokenExpiryBanner("TikTok", connection.tokenExpiresAt)
-                        const profile = connection.profile as TikTokSavedProfile | null
-                        const label = connection.displayName || profile?.display_name || "TikTok account"
-                        return (
-                          <div
-                            key={connection.id}
-                            className="rounded-xl border border-border/80 bg-muted/30 p-4 shadow-sm"
-                          >
-                            <div className="flex gap-3 sm:gap-4">
-                              {connection.avatarUrl || profile?.avatar_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element -- remote TikTok avatar URL
-                                <img
-                                  src={connection.avatarUrl ?? profile?.avatar_url ?? ""}
-                                  alt=""
-                                  className="h-14 w-14 shrink-0 rounded-full border border-border/80 object-cover"
-                                  width={56}
-                                  height={56}
-                                />
-                              ) : (
-                                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-border/80 bg-muted">
-                                  <UserRound className="h-7 w-7 text-muted-foreground" aria-hidden />
-                                </div>
-                              )}
-                              <div className="min-w-0 flex-1 space-y-2">
-                                <div className="flex flex-wrap items-start justify-between gap-2">
-                                  <div className="min-w-0 space-y-0.5">
-                                    <p className="font-semibold leading-tight text-foreground">{label}</p>
-                                    <p className="font-mono text-xs text-muted-foreground">
-                                      {connection.providerAccountId.slice(0, 12)}...
-                                    </p>
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="shrink-0"
-                                    disabled={isDisconnecting}
-                                    onClick={() =>
-                                      setDisconnectTarget({
-                                        provider: "tiktok",
-                                        connectionId: connection.id,
-                                        label,
-                                      })
-                                    }
-                                  >
-                                    Disconnect
-                                  </Button>
-                                </div>
-                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                  <Badge variant="outline">Profile only</Badge>
-                                  {connection.status !== "connected" ? (
-                                    <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300">
-                                      {connection.status}
-                                    </Badge>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </div>
-                            {tokenBanner ? (
-                              <div
-                                role="alert"
-                                className={cn(
-                                  "mt-3 flex gap-2 rounded-lg border px-3 py-2.5 text-sm",
-                                  tokenBanner.variant === "expired"
-                                    ? "border-destructive/50 bg-destructive/10 text-destructive"
-                                    : "border-amber-500/45 bg-amber-500/10 text-amber-950 dark:text-amber-100"
-                                )}
-                              >
-                                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                                <p className="min-w-0 leading-snug">{tokenBanner.body}</p>
-                              </div>
-                            ) : null}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
-                      <p className="font-medium text-foreground">No TikTok account linked</p>
-                      <p className="mt-1">Connect TikTok to prepare video uploads, direct posts, and photo posts.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-            <CardFooter className="gap-2">
-              <Button onClick={handleConnectTikTok}>Connect TikTok</Button>
-            </CardFooter>
-          </Card>
-        </div>
-
-        <div
-          className="grid gap-6 lg:grid-cols-2 lg:items-start"
-          style={
-            composerCardHeight
-              ? ({ "--composer-card-height": `${composerCardHeight}px` } as React.CSSProperties)
-              : undefined
-          }
-        >
-          <Card ref={composerCardRef} className="py-4 sm:py-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4" />
-                Draft Composer
-              </CardTitle>
-              <CardDescription>
-                Choose a post type, then upload media. Images are converted to JPEG where required. Carousels are
-                multi-slide feed posts (not Reels).
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="autopost-provider">Platform</Label>
                 <Select
                   value={composerProvider}
-                  onValueChange={(value) => setComposerProvider(value as ComposerProvider)}
+                  onValueChange={handleComposerProviderChange}
                 >
                   <SelectTrigger id="autopost-provider" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper" className="z-120">
-                    <SelectItem value="instagram">Instagram</SelectItem>
-                    <SelectItem value="tiktok">TikTok</SelectItem>
+                    <SelectItem value="instagram" disabled={repurposeSource ? !repurposeAllowedProviders.has("instagram") : false}>
+                      Instagram
+                    </SelectItem>
+                    <SelectItem value="tiktok" disabled={repurposeSource ? !repurposeAllowedProviders.has("tiktok") : false}>
+                      TikTok
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1650,13 +2289,31 @@ export function AutopostPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="autopost-tiktok-post-type">TikTok post type</Label>
-                      <Select value={tiktokPostType} onValueChange={(value) => setTikTokPostType(value as TikTokPostType)}>
+                      <Select value={tiktokPostType} onValueChange={handleTikTokPostTypeChange}>
                         <SelectTrigger id="autopost-tiktok-post-type" className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent position="popper" className="z-120">
-                          <SelectItem value="video">Video</SelectItem>
-                          <SelectItem value="photo">Photo post</SelectItem>
+                          <SelectItem
+                            value="video"
+                            disabled={
+                              repurposeSource
+                                ? !repurposeTargetsForTikTok.some((target) => target.tiktokPostType === "video")
+                                : false
+                            }
+                          >
+                            Video
+                          </SelectItem>
+                          <SelectItem
+                            value="photo"
+                            disabled={
+                              repurposeSource
+                                ? !repurposeTargetsForTikTok.some((target) => target.tiktokPostType === "photo")
+                                : false
+                            }
+                          >
+                            Photo post
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1687,18 +2344,63 @@ export function AutopostPage() {
                 <Label htmlFor="autopost-post-type">Post type</Label>
                 <Select
                   value={postFormat}
-                  onValueChange={(v) => setPostFormat(v as PostFormat)}
+                  onValueChange={handleInstagramPostFormatChange}
                   disabled={!isConnected || instagramConnections.length === 0}
                 >
                   <SelectTrigger id="autopost-post-type" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper" className="z-120">
-                    <SelectItem value="feed_image">Feed photo</SelectItem>
-                    <SelectItem value="feed_video">Feed video</SelectItem>
-                    <SelectItem value="reel">Reel</SelectItem>
-                    <SelectItem value="carousel">Carousel (feed)</SelectItem>
-                    <SelectItem value="story">Story</SelectItem>
+                    <SelectItem
+                      value="feed_image"
+                      disabled={
+                        repurposeSource
+                          ? !repurposeTargetsForInstagram.some((target) => target.postFormat === "feed_image")
+                          : false
+                      }
+                    >
+                      Feed photo
+                    </SelectItem>
+                    <SelectItem
+                      value="feed_video"
+                      disabled={
+                        repurposeSource
+                          ? !repurposeTargetsForInstagram.some((target) => target.postFormat === "feed_video")
+                          : false
+                      }
+                    >
+                      Feed video
+                    </SelectItem>
+                    <SelectItem
+                      value="reel"
+                      disabled={
+                        repurposeSource
+                          ? !repurposeTargetsForInstagram.some((target) => target.postFormat === "reel")
+                          : false
+                      }
+                    >
+                      Reel
+                    </SelectItem>
+                    <SelectItem
+                      value="carousel"
+                      disabled={
+                        repurposeSource
+                          ? !repurposeTargetsForInstagram.some((target) => target.postFormat === "carousel")
+                          : false
+                      }
+                    >
+                      Carousel (feed)
+                    </SelectItem>
+                    <SelectItem
+                      value="story"
+                      disabled={
+                        repurposeSource
+                          ? !repurposeTargetsForInstagram.some((target) => target.postFormat === "story")
+                          : false
+                      }
+                    >
+                      Story
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
@@ -1872,6 +2574,7 @@ export function AutopostPage() {
                   onChange={handleMediaFileChange}
                 />
                 <p className="text-xs text-muted-foreground">
+                  {repurposeSource ? "Upload new files any time to replace the repurposed media. " : ""}
                   {composerProvider === "tiktok"
                     ? tiktokPostType === "photo"
                       ? "Select 1-35 images. Order is preserved, and TikTok will pull each public URL from your uploads."
@@ -1885,7 +2588,7 @@ export function AutopostPage() {
                       <span className="text-foreground/80">max 10 MB</span> upload).
                     </>
                   ) : null}
-                </p>
+                  </p>
               </div>
 
               {composerProvider === "instagram" && postFormat === "reel" ? (
@@ -1904,17 +2607,15 @@ export function AutopostPage() {
                 </div>
               ) : null}
 
-              {previewUrls.length > 0 &&
+              {composerMediaItems.length > 0 &&
               ((composerProvider === "instagram" && postFormat === "carousel") ||
                 (composerProvider === "tiktok" && tiktokPostType === "photo")) ? (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {previewUrls.map((url, i) => {
-                    const file = selectedFiles[i]
-                    const kind = file ? inferFileKind(file) : null
+                  {composerMediaItems.map((item, i) => {
                     const isTikTokPhotoCover = composerProvider === "tiktok" && tiktokPostType === "photo" && i === tiktokPhotoCoverIndex
                     return (
                       <div
-                        key={`${url}-${i}`}
+                        key={`${item.url}-${i}`}
                         className={cn(
                           "relative aspect-square overflow-hidden rounded-md border bg-muted/30",
                           composerProvider === "tiktok" &&
@@ -1928,11 +2629,11 @@ export function AutopostPage() {
                           }
                         }}
                       >
-                        {kind === "image" ? (
+                        {item.kind === "image" ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" className="h-full w-full object-cover" src={url} />
-                        ) : kind === "video" ? (
-                          <video className="h-full w-full object-cover" src={url} muted playsInline />
+                          <img alt="" className="h-full w-full object-cover" src={item.url} />
+                        ) : item.kind === "video" ? (
+                          <video className="h-full w-full object-cover" src={item.url} muted playsInline />
                         ) : null}
                         {composerProvider === "tiktok" && tiktokPostType === "photo" ? (
                           <span className="absolute left-1 top-1 rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
@@ -1945,8 +2646,8 @@ export function AutopostPage() {
                 </div>
               ) : null}
 
-              {previewUrls.length === 1 &&
-              selectedFiles[0]?.type.startsWith("image/") &&
+              {composerMediaItems.length === 1 &&
+              composerMediaItems[0]?.kind === "image" &&
               !(composerProvider === "instagram" && postFormat === "carousel") &&
               !(composerProvider === "tiktok" && tiktokPostType === "photo") ? (
                 <div className="overflow-hidden rounded-md border bg-muted/30">
@@ -1954,15 +2655,27 @@ export function AutopostPage() {
                   <img
                     alt="Selected media preview"
                     className="max-h-48 w-full object-contain"
-                    src={previewUrls[0]}
+                    src={composerMediaItems[0].url}
                   />
                 </div>
               ) : null}
 
-              {selectedFiles.length === 1 && selectedFiles[0] && !selectedFiles[0].type.startsWith("image/") ? (
-                <p className="text-sm text-muted-foreground">
-                  Selected: <span className="text-foreground">{selectedFiles[0].name}</span>
-                </p>
+              {composerMediaItems.length === 1 && composerMediaItems[0]?.kind === "video" ? (
+                <div className="overflow-hidden rounded-md border bg-muted/30">
+                  <video
+                    className="max-h-52 w-full object-contain"
+                    src={composerMediaItems[0].url}
+                    muted
+                    controls
+                    playsInline
+                    preload="metadata"
+                  />
+                  {composerMediaItems[0].name ? (
+                    <p className="border-t border-border/70 px-3 py-2 text-xs text-muted-foreground">
+                      Selected: <span className="text-foreground">{composerMediaItems[0].name}</span>
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
 
               <div className="space-y-2">
@@ -2194,17 +2907,21 @@ export function AutopostPage() {
                   </Button>
                 </TabsContent>
               </Tabs>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        ) : null}
 
-          <Card className="flex max-h-[min(720px,85vh)] flex-col py-4 sm:py-6 lg:h-(--composer-card-height) lg:max-h-none">
+        <section className="space-y-4">
+          <Card className="flex flex-col rounded-[30px] border-border/70 bg-muted/10 py-4 sm:py-5">
             <CardHeader className="shrink-0">
               <CardTitle className="flex items-center gap-2">
                 <LayoutList className="h-4 w-4" />
-                Your posts
+                Posts
               </CardTitle>
               <CardDescription>
-                Drafts through failed attempts. The account badge on each row is where that post will go (or went).
+                View your drafts, scheduled posts, and published posts in one place.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex min-h-0 flex-1 flex-col px-2 sm:px-6">
@@ -2214,15 +2931,20 @@ export function AutopostPage() {
                   Loading posts…
                 </div>
               ) : jobs.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  No posts yet. Create one from the composer.
-                </p>
+                <div className="flex flex-col items-center gap-3 py-10 text-center">
+                  <p className="text-sm text-muted-foreground">You have not created any posts yet.</p>
+                  <Button type="button" variant="outline" className="rounded-full" onClick={() => setComposerOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create your first post
+                  </Button>
+                </div>
               ) : (
-                <ScrollArea className="h-[min(560px,calc(85vh-12rem))] pr-3 lg:h-full lg:min-h-0 lg:flex-1">
+                <ScrollArea className="h-[min(640px,calc(100vh-16rem))] pr-3 lg:flex-1">
                   <ul className="flex flex-col gap-3">
                     {jobs.map((job) => {
                       const busy = actionJobId === job.id
-                      const thumbIsVideo = jobListThumbnailIsVideo(job)
+                      const mediaItems = getJobMediaItems(job)
+                      const primaryMedia = mediaItems[0]
                       const carouselCount =
                         job.media_type === "carousel"
                           ? job.metadata?.carouselItems?.length
@@ -2231,47 +2953,62 @@ export function AutopostPage() {
                             : undefined
                       const scheduleNote = scheduledVsPublishedNote(job)
                       const canPublishThisJob = job.provider === "tiktok" ? isTikTokConnected : isConnected
+                      const repurposeTargets = getRepurposeTargets(job, instagramConnections, tiktokConnections)
+                      const viewerIcon = getJobViewerIcon(job)
                       return (
                         <li
                           key={job.id}
-                          className="rounded-xl border border-border/80 bg-muted/20 p-3 shadow-sm"
+                          className="rounded-2xl border border-border/80 bg-muted/15 p-3 shadow-sm transition-colors hover:border-border md:p-4"
                         >
-                          <div className="flex gap-3">
-                            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border bg-background">
-                              {!thumbIsVideo ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                  src={job.media_url}
-                                />
-                              ) : (
-                                <video
-                                  className="h-full w-full object-cover"
-                                  src={job.media_url}
-                                  muted
-                                  playsInline
-                                  preload="metadata"
-                                />
-                              )}
-                              <span className="absolute bottom-1 right-1 rounded bg-background/90 px-1 py-0.5 text-[10px] text-muted-foreground">
-                                {job.media_type === "carousel" ||
-                                job.media_type === "tiktok_photo_upload" ||
-                                job.media_type === "tiktok_photo_direct" ? (
-                                  <Layers className="inline h-3 w-3" />
-                                ) : job.media_type === "reel" ||
-                                  job.media_type === "feed_video" ||
-                                  job.media_type === "tiktok_video_upload" ||
-                                  job.media_type === "tiktok_video_direct" ? (
-                                  <Film className="inline h-3 w-3" />
-                                ) : job.media_type === "story" ? (
-                                  <Sparkles className="inline h-3 w-3" />
+                          <div className="flex flex-col gap-4 md:flex-row-reverse md:items-stretch md:justify-between">
+                            <button
+                              type="button"
+                              className="group relative w-full overflow-hidden rounded-2xl border border-border/70 bg-background text-left transition hover:border-primary/40 hover:shadow-sm md:w-[180px] lg:w-[196px]"
+                              onClick={() => setActiveViewerJob({ job, mediaItems })}
+                            >
+                              <div className="aspect-[4/3] md:aspect-square">
+                                {primaryMedia?.kind === "video" ? (
+                                  <video
+                                    className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                                    src={primaryMedia.url}
+                                    muted
+                                    playsInline
+                                    preload="metadata"
+                                  />
+                                ) : primaryMedia ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    alt=""
+                                    className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                                    src={primaryMedia.url}
+                                  />
                                 ) : (
-                                  <ImageIcon className="inline h-3 w-3" />
+                                  <div className="flex h-full items-center justify-center bg-muted/40 text-muted-foreground">
+                                    <ImageIcon className="h-5 w-5" />
+                                  </div>
                                 )}
-                              </span>
-                            </div>
-                            <div className="min-w-0 flex-1 space-y-1.5">
+                              </div>
+                              <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-2">
+                                <span className="rounded-full bg-black/60 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-white">
+                                  {job.provider === "tiktok" ? "TikTok" : "Instagram"}
+                                </span>
+                                <span className="rounded-full bg-background/92 px-2 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
+                                  {viewerIcon === "carousel" ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Layers className="h-3 w-3" />
+                                      {carouselCount ?? mediaItems.length}
+                                    </span>
+                                  ) : viewerIcon === "video" ? (
+                                    <Film className="h-3 w-3" />
+                                  ) : viewerIcon === "story" ? (
+                                    <Sparkles className="h-3 w-3" />
+                                  ) : (
+                                    <ImageIcon className="h-3 w-3" />
+                                  )}
+                                </span>
+                              </div>
+                            </button>
+                            <div className="min-w-0 flex-1 space-y-3">
                               <div className="flex flex-wrap items-center gap-2">
                                 <Badge
                                   variant="secondary"
@@ -2280,6 +3017,12 @@ export function AutopostPage() {
                                 >
                                   {jobAccountLabel(job)}
                                 </Badge>
+                                <Badge
+                                  variant="outline"
+                                  className={cn("text-xs font-medium", statusBadgeClass(job.status))}
+                                >
+                                  {statusLabel(job.status)}
+                                </Badge>
                               </div>
                               <p className="text-[11px] text-muted-foreground">
                                 {mediaTypeLabel(job.media_type)}
@@ -2287,17 +3030,7 @@ export function AutopostPage() {
                                   ? ` · ${carouselCount} slides`
                                   : ""}
                               </p>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Badge
-                                  variant="outline"
-                                  className={cn("text-xs font-medium", statusBadgeClass(job.status))}
-                                >
-                                  {statusLabel(job.status)}
-                                </Badge>
-                                <span className="text-[11px] text-muted-foreground">
-                                  {postStatusTimeLine(job)}
-                                </span>
-                              </div>
+                              <p className="text-xs text-muted-foreground">{postStatusTimeLine(job)}</p>
                               {scheduleNote ? (
                                 <p className="text-xs text-muted-foreground">{scheduleNote}</p>
                               ) : null}
@@ -2316,6 +3049,16 @@ export function AutopostPage() {
                                 </p>
                               ) : null}
                               <div className="flex flex-wrap gap-2 pt-1">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={repurposeTargets.length === 0}
+                                  onClick={() => openRepurposeDialog(job)}
+                                >
+                                  <ArrowRightLeft className="mr-1 h-3.5 w-3.5" />
+                                  Repurpose
+                                </Button>
                                 {job.status === "queued" ? (
                                   <>
                                     <Button
@@ -2368,7 +3111,7 @@ export function AutopostPage() {
                                     type="button"
                                     size="sm"
                                     variant="secondary"
-                                    disabled={busy || !isConnected}
+                                    disabled={busy || (job.provider === "tiktok" ? !isTikTokConnected : !isConnected)}
                                     onClick={() => void handleRetryFailed(job.id)}
                                   >
                                     {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
@@ -2398,8 +3141,142 @@ export function AutopostPage() {
               )}
             </CardContent>
           </Card>
-        </div>
+        </section>
       </div>
+
+      {activeViewerJob ? (
+        <AutopostPostMediaViewer
+          accountLabel={jobAccountLabel(activeViewerJob.job)}
+          caption={activeViewerJob.job.caption}
+          createdAt={activeViewerJob.job.created_at}
+          lastError={activeViewerJob.job.status === "failed" ? activeViewerJob.job.last_error : null}
+          mediaItems={activeViewerJob.mediaItems}
+          mediaTypeIcon={getJobViewerIcon(activeViewerJob.job)}
+          mediaTypeLabel={mediaTypeLabel(activeViewerJob.job.media_type)}
+          onClose={() => setActiveViewerJob(null)}
+          providerLabel={activeViewerJob.job.provider === "tiktok" ? "TikTok" : "Instagram"}
+          providerPublishId={activeViewerJob.job.provider_publish_id}
+          providerPublishIdLabel={activeViewerJob.job.provider === "tiktok" ? "Publish ID" : "Media ID"}
+          publishedAt={activeViewerJob.job.published_at}
+          scheduleNote={scheduledVsPublishedNote(activeViewerJob.job)}
+          scheduledAt={activeViewerJob.job.scheduled_at}
+          statusClassName={statusBadgeClass(activeViewerJob.job.status)}
+          statusLabel={statusLabel(activeViewerJob.job.status)}
+          timestampsLabel={postStatusTimeLine(activeViewerJob.job)}
+          updatedAt={activeViewerJob.job.updated_at}
+          actions={activeViewerActions}
+        />
+      ) : null}
+
+      <Dialog
+        open={repurposeDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRepurposeDialog(null)
+          }
+        }}
+      >
+        {repurposeDialog ? (
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Repurpose post</DialogTitle>
+              <DialogDescription>
+                Move or copy this post into another compatible format or account. The composer will be prefilled with the
+                existing uploaded media.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-border/70 bg-muted/20 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Source</p>
+                <p className="mt-1 text-sm font-medium text-foreground">{jobAccountLabel(repurposeDialog.job)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {mediaTypeLabel(repurposeDialog.job.media_type)} · {statusLabel(repurposeDialog.job.status)}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="repurpose-target">Destination type</Label>
+                <Select
+                  value={repurposeDialog.selectedTargetId}
+                  onValueChange={(value) => {
+                    const selectedTarget = repurposeDialog.targets.find((target) => target.id === value)
+                    setRepurposeDialog((current) =>
+                      current
+                        ? {
+                            ...current,
+                            selectedTargetId: value,
+                            selectedAccountId: selectedTarget?.accounts[0]?.id ?? null,
+                          }
+                        : current,
+                    )
+                  }}
+                >
+                  <SelectTrigger id="repurpose-target" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-120">
+                    {repurposeDialog.targets.map((target) => (
+                      <SelectItem key={target.id} value={target.id}>
+                        {target.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="repurpose-account">Destination account</Label>
+                <Select
+                  value={
+                    repurposeDialog.selectedAccountId ??
+                    repurposeDialog.targets.find((target) => target.id === repurposeDialog.selectedTargetId)?.accounts[0]?.id ??
+                    undefined
+                  }
+                  onValueChange={(value) =>
+                    setRepurposeDialog((current) => (current ? { ...current, selectedAccountId: value } : current))
+                  }
+                >
+                  <SelectTrigger id="repurpose-account" className="w-full">
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-120">
+                    {(repurposeDialog.targets.find((target) => target.id === repurposeDialog.selectedTargetId)?.accounts ?? []).map(
+                      (account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.label}
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {!repurposeAllowsMove(repurposeDialog.job) ? (
+                <p className="text-xs text-muted-foreground">
+                  Move is only available for drafts and scheduled posts. Published or in-flight posts can still be copied.
+                </p>
+              ) : null}
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setRepurposeDialog(null)}>
+                Cancel
+              </Button>
+              <Button type="button" variant="outline" onClick={() => applyRepurposeSelection("copy")}>
+                Copy into composer
+              </Button>
+              <Button
+                type="button"
+                onClick={() => applyRepurposeSelection("move")}
+                disabled={!repurposeAllowsMove(repurposeDialog.job)}
+              >
+                Move into composer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        ) : null}
+      </Dialog>
 
       <AlertDialog
         open={disconnectTarget !== null}
