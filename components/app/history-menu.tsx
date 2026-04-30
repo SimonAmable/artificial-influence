@@ -181,6 +181,8 @@ function HistoryContent({
   })
 
   const tabStatesRef = React.useRef(tabStates)
+  const scrollContainerRef = React.useRef<HTMLDivElement | null>(null)
+  const loadMoreSentinelRef = React.useRef<HTMLDivElement | null>(null)
 
   React.useEffect(() => {
     tabStatesRef.current = tabStates
@@ -270,6 +272,40 @@ function HistoryContent({
     void fetchGenerations("video", false)
   }, [fetchGenerations])
 
+  React.useEffect(() => {
+    const target = loadMoreSentinelRef.current
+    const root = scrollContainerRef.current
+    const currentTabState = tabStates[activeTab]
+
+    if (
+      !target ||
+      !root ||
+      !currentTabState.hasLoaded ||
+      currentTabState.initialLoading ||
+      currentTabState.loadingMore ||
+      currentTabState.error ||
+      !currentTabState.pagination.hasMore
+    ) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          void fetchGenerations(activeTab, true)
+        }
+      },
+      {
+        root,
+        rootMargin: "200px 0px",
+      }
+    )
+
+    observer.observe(target)
+
+    return () => observer.disconnect()
+  }, [activeTab, fetchGenerations, tabStates])
+
   const imageCount = tabStates.image.hasLoaded ? tabStates.image.pagination.total : tabStates.image.items.length
   const videoCount = tabStates.video.hasLoaded ? tabStates.video.pagination.total : tabStates.video.items.length
 
@@ -350,15 +386,18 @@ function HistoryContent({
         {state.error ? <p className="text-center text-xs text-destructive">{state.error}</p> : null}
 
         {state.pagination.hasMore ? (
-          <div className="flex justify-center pt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void fetchGenerations(type, true)}
-              disabled={state.loadingMore}
-            >
-              {state.loadingMore ? "Loading..." : "Load more"}
-            </Button>
+          <div className="space-y-2 pt-1">
+            <div ref={loadMoreSentinelRef} className="h-px w-full" aria-hidden />
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void fetchGenerations(type, true)}
+                disabled={state.loadingMore}
+              >
+                {state.loadingMore ? "Loading..." : "Load more"}
+              </Button>
+            </div>
           </div>
         ) : null}
       </div>
@@ -392,7 +431,7 @@ function HistoryContent({
           </TabsTrigger>
         </TabsList>
 
-        <div className="flex-1 overflow-y-auto">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
           <TabsContent value="image" className="mt-0">
             {renderTabContent("image")}
           </TabsContent>

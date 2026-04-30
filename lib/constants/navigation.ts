@@ -390,7 +390,7 @@ export const megaNavGroups: MegaNavGroup[] = [
       },
     ],
   },
-  { label: "Apps", path: "/apps", badge: "new" },
+  { label: "Apps", path: "/apps" },
   { label: "Autopost", path: "/autopost", badge: "new" },
   { label: "Automations", path: "/automations", badge: "beta" },
   { label: "Pricing", path: "/pricing" },

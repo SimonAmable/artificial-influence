@@ -8,6 +8,7 @@ import {
   fetchTikTokPublishStatus,
   initTikTokDirectVideoPost,
   initTikTokInboxVideoUpload,
+  initTikTokPhotoPost,
   queryTikTokCreatorInfo,
   TikTokApiError,
 } from "@/lib/tiktok/publish"
@@ -56,6 +57,20 @@ function mergeTikTokMetadata(row: AutopostJobRow, update: NonNullable<AutopostJo
       ...update,
     },
   }
+}
+
+function getTikTokPostType(row: AutopostJobRow): "video" | "photo" {
+  if (row.media_type === "tiktok_photo_upload" || row.media_type === "tiktok_photo_direct") {
+    return "photo"
+  }
+  return "video"
+}
+
+function getTikTokMode(row: AutopostJobRow): "upload" | "direct" {
+  if (row.media_type === "tiktok_video_direct" || row.media_type === "tiktok_photo_direct") {
+    return "direct"
+  }
+  return "upload"
 }
 
 function tiktokStatusToJobStatus(status: string | undefined): string {
@@ -161,7 +176,8 @@ async function publishTikTokAutopostJob(
   }
 
   const metadata = parseMetadata(row.metadata)
-  const mode = row.media_type === "tiktok_video_direct" ? "direct" : "upload"
+  const postType = getTikTokPostType(row)
+  const mode = getTikTokMode(row)
   const requiredScope = mode === "direct" ? "video.publish" : "video.upload"
 
   let token
@@ -218,32 +234,80 @@ async function publishTikTokAutopostJob(
   }
 
   try {
-    const normalizedVideo = await normalizeTikTokVideoUrlToStorage({
-      mediaUrl: row.media_url,
-      userId: row.user_id,
-      supabase,
-    })
+    let result: { publish_id?: string; upload_url?: string }
+    let nextMetadataUpdate: NonNullable<AutopostJobMetadata["tiktok"]>
 
-    const result =
-      mode === "direct"
-        ? await initTikTokDirectVideoPost({
-            accessToken: token.accessToken,
-            videoUrl: normalizedVideo.publicUrl,
-            postInfo: {
-              title: row.caption ?? undefined,
-              privacyLevel: metadata.tiktok?.privacyLevel ?? "SELF_ONLY",
-              disableComment: metadata.tiktok?.disableComment,
-              disableDuet: metadata.tiktok?.disableDuet,
-              disableStitch: metadata.tiktok?.disableStitch,
-              isAigc: metadata.tiktok?.isAigc,
-              brandOrganicToggle: metadata.tiktok?.brandOrganicToggle,
-              brandContentToggle: metadata.tiktok?.brandContentToggle,
-            },
-          })
-        : await initTikTokInboxVideoUpload({
-            accessToken: token.accessToken,
-            videoUrl: normalizedVideo.publicUrl,
-          })
+    if (postType === "photo") {
+      const photoItems = metadata.tiktok?.photoItems?.map((item) => item.url).filter(Boolean) ?? []
+      if (photoItems.length === 0 || photoItems.length > 35) {
+        throw new TikTokApiError("TikTok photo posts need between 1 and 35 public image URLs.")
+      }
+
+      const requestedCoverIndex = metadata.tiktok?.photoCoverIndex
+      const photoCoverIndex =
+        typeof requestedCoverIndex === "number" &&
+        Number.isInteger(requestedCoverIndex) &&
+        requestedCoverIndex >= 0 &&
+        requestedCoverIndex < photoItems.length
+          ? requestedCoverIndex
+          : 0
+
+      result = await initTikTokPhotoPost({
+        accessToken: token.accessToken,
+        postMode: mode === "direct" ? "DIRECT_POST" : "MEDIA_UPLOAD",
+        photoImages: photoItems,
+        photoCoverIndex,
+        postInfo: {
+          title: row.caption ?? undefined,
+          description: metadata.tiktok?.description ?? undefined,
+          privacyLevel: mode === "direct" ? (metadata.tiktok?.privacyLevel ?? "SELF_ONLY") : undefined,
+          disableComment: mode === "direct" ? metadata.tiktok?.disableComment : undefined,
+          autoAddMusic: mode === "direct" ? metadata.tiktok?.autoAddMusic : undefined,
+          brandOrganicToggle: mode === "direct" ? metadata.tiktok?.brandOrganicToggle : undefined,
+          brandContentToggle: mode === "direct" ? metadata.tiktok?.brandContentToggle : undefined,
+        },
+      })
+
+      nextMetadataUpdate = {
+        ...(metadata.tiktok ?? {}),
+        photoCoverIndex,
+      }
+    } else {
+      const normalizedVideo = await normalizeTikTokVideoUrlToStorage({
+        mediaUrl: row.media_url,
+        userId: row.user_id,
+        supabase,
+      })
+
+      result =
+        mode === "direct"
+          ? await initTikTokDirectVideoPost({
+              accessToken: token.accessToken,
+              videoUrl: normalizedVideo.publicUrl,
+              postInfo: {
+                title: row.caption ?? undefined,
+                privacyLevel: metadata.tiktok?.privacyLevel ?? "SELF_ONLY",
+                disableComment: metadata.tiktok?.disableComment,
+                disableDuet: metadata.tiktok?.disableDuet,
+                disableStitch: metadata.tiktok?.disableStitch,
+                isAigc: metadata.tiktok?.isAigc,
+                brandOrganicToggle: metadata.tiktok?.brandOrganicToggle,
+                brandContentToggle: metadata.tiktok?.brandContentToggle,
+              },
+            })
+          : await initTikTokInboxVideoUpload({
+              accessToken: token.accessToken,
+              videoUrl: normalizedVideo.publicUrl,
+            })
+
+      nextMetadataUpdate = {
+        ...(metadata.tiktok ?? {}),
+        normalizedVideoUrl: normalizedVideo.publicUrl,
+        normalizedStoragePath: normalizedVideo.storagePath,
+        normalizationProfile: normalizedVideo.profile,
+        normalizedAt: new Date().toISOString(),
+      }
+    }
 
     if (!result.publish_id) {
       throw new TikTokApiError("TikTok accepted the request but returned no publish id.")
@@ -251,12 +315,9 @@ async function publishTikTokAutopostJob(
 
     const now = new Date().toISOString()
     const nextMetadata = mergeTikTokMetadata(row, {
+      ...nextMetadataUpdate,
       publishId: result.publish_id,
       uploadUrl: result.upload_url ?? null,
-      normalizedVideoUrl: normalizedVideo.publicUrl,
-      normalizedStoragePath: normalizedVideo.storagePath,
-      normalizationProfile: normalizedVideo.profile,
-      normalizedAt: now,
       status: "SUBMITTED",
       statusFetchedAt: now,
     })

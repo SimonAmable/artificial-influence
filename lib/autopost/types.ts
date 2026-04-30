@@ -6,6 +6,10 @@ export type AutopostCarouselItem = {
   kind: "image" | "video"
 }
 
+export type TikTokPhotoItem = {
+  url: string
+}
+
 export type AutopostPublishOptions = {
   /** Reels: also show on main feed when true (default true). */
   shareToFeed?: boolean
@@ -17,13 +21,18 @@ export type AutopostPublishOptions = {
 
 export type TikTokPublishOptions = {
   mode?: "upload" | "direct"
+  postType?: "video" | "photo"
   privacyLevel?: string
   disableComment?: boolean
   disableDuet?: boolean
   disableStitch?: boolean
   isAigc?: boolean
+  autoAddMusic?: boolean
   brandOrganicToggle?: boolean
   brandContentToggle?: boolean
+  description?: string | null
+  photoItems?: TikTokPhotoItem[]
+  photoCoverIndex?: number
   creatorInfo?: {
     privacyLevelOptions?: string[]
     commentDisabled?: boolean
@@ -58,3 +67,5 @@ export type AutopostMediaType =
   | "story"
   | "tiktok_video_upload"
   | "tiktok_video_direct"
+  | "tiktok_photo_upload"
+  | "tiktok_photo_direct"

@@ -1,27 +1,23 @@
 import type { NextConfig } from "next";
 
+const ffmpegBinaryPath =
+  process.platform === "win32" ? "./node_modules/ffmpeg-static/ffmpeg.exe" : "./node_modules/ffmpeg-static/ffmpeg"
+
+const ffmpegTracingIncludes = [
+  ffmpegBinaryPath,
+  `./node_modules/ffprobe-static/bin/${process.platform}/${process.arch}/${process.platform === "win32" ? "ffprobe.exe" : "ffprobe"}`,
+]
+
 const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
   serverExternalPackages: ["ffmpeg-static", "ffprobe-static"],
   outputFileTracingIncludes: {
-    "/api/chat": [
-      "./node_modules/ffmpeg-static/ffmpeg",
-      "./node_modules/ffprobe-static/bin/linux/x64/ffprobe",
-    ],
-    "/api/autopost/publish": [
-      "./node_modules/ffmpeg-static/ffmpeg",
-      "./node_modules/ffprobe-static/bin/linux/x64/ffprobe",
-    ],
-    "/api/cron/autopost-queue": [
-      "./node_modules/ffmpeg-static/ffmpeg",
-      "./node_modules/ffprobe-static/bin/linux/x64/ffprobe",
-    ],
-    "/api/free-tools/tiktok-video-fixer": [
-      "./node_modules/ffmpeg-static/ffmpeg",
-      "./node_modules/ffprobe-static/bin/linux/x64/ffprobe",
-    ],
+    "/api/chat": ffmpegTracingIncludes,
+    "/api/autopost/publish": ffmpegTracingIncludes,
+    "/api/cron/autopost-queue": ffmpegTracingIncludes,
+    "/api/free-tools/tiktok-video-fixer": ffmpegTracingIncludes,
   },
   async redirects() {
     return [

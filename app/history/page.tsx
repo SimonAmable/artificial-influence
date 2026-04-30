@@ -203,6 +203,7 @@ export default function HistoryPage() {
   })
 
   const tabStatesRef = React.useRef(tabStates)
+  const loadMoreSentinelRef = React.useRef<HTMLDivElement | null>(null)
 
   React.useEffect(() => {
     tabStatesRef.current = tabStates
@@ -292,6 +293,35 @@ export default function HistoryPage() {
     if (!currentTabState.hasLoaded && !currentTabState.initialLoading) {
       void fetchGenerations(activeTab, false)
     }
+  }, [activeTab, fetchGenerations, tabStates])
+
+  React.useEffect(() => {
+    const target = loadMoreSentinelRef.current
+    const currentTabState = tabStates[activeTab]
+
+    if (
+      !target ||
+      !currentTabState.hasLoaded ||
+      currentTabState.initialLoading ||
+      currentTabState.loadingMore ||
+      currentTabState.error ||
+      !currentTabState.pagination.hasMore
+    ) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          void fetchGenerations(activeTab, true)
+        }
+      },
+      { rootMargin: "400px 0px" }
+    )
+
+    observer.observe(target)
+
+    return () => observer.disconnect()
   }, [activeTab, fetchGenerations, tabStates])
 
   const handleDownload = async (generation: Generation) => {
@@ -469,14 +499,17 @@ export default function HistoryPage() {
         ) : null}
 
         {state.pagination.hasMore ? (
-          <div className="flex justify-center">
-            <Button
-              variant="outline"
-              onClick={() => void fetchGenerations(type, true)}
-              disabled={state.loadingMore}
-            >
-              {state.loadingMore ? "Loading more..." : "Load more"}
-            </Button>
+          <div className="space-y-3">
+            <div ref={loadMoreSentinelRef} className="h-px w-full" aria-hidden />
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                onClick={() => void fetchGenerations(type, true)}
+                disabled={state.loadingMore}
+              >
+                {state.loadingMore ? "Loading more..." : "Load more"}
+              </Button>
+            </div>
           </div>
         ) : null}
       </div>

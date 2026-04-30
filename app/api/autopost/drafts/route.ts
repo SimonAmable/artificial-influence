@@ -20,9 +20,13 @@ function parseBody(
     const tiktokConnectionId =
       typeof record.tiktokConnectionId === "string" ? record.tiktokConnectionId.trim() : ""
     const mode = record.tiktokMode === "direct" ? "direct" : "upload"
+    const postType = record.tiktokPostType === "photo" ? "photo" : "video"
     const mediaUrl = typeof record.mediaUrl === "string" ? record.mediaUrl.trim() : ""
+    const photoItems = Array.isArray(record.photoItems)
+      ? record.photoItems.filter((item): item is string => typeof item === "string").map((item) => item.trim())
+      : []
 
-    if (!tiktokConnectionId || !mediaUrl) {
+    if (!tiktokConnectionId || (postType === "video" ? !mediaUrl : photoItems.length === 0)) {
       return "invalid_body"
     }
 
@@ -34,10 +38,18 @@ function parseBody(
       disableDuet: record.disableDuet === true,
       disableStitch: record.disableStitch === true,
       isAigc: record.isAigc === false ? false : true,
+      autoAddMusic: record.autoAddMusic === true,
       mediaUrl,
       mode,
+      postType,
+      photoItems,
+      photoCoverIndex:
+        typeof record.photoCoverIndex === "number" && Number.isInteger(record.photoCoverIndex)
+          ? record.photoCoverIndex
+          : undefined,
       brandContentToggle: record.brandContentToggle === true,
       privacyLevel: typeof record.privacyLevel === "string" ? record.privacyLevel.trim() : undefined,
+      description: typeof record.description === "string" ? record.description : undefined,
       scheduledAt: typeof record.scheduledAt === "string" ? record.scheduledAt.trim() : undefined,
       tiktokConnectionId,
     }

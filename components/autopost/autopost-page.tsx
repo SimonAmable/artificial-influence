@@ -205,6 +205,10 @@ function mediaTypeLabel(mediaType: string): string {
       return "TikTok inbox upload"
     case "tiktok_video_direct":
       return "TikTok Direct Post"
+    case "tiktok_photo_upload":
+      return "TikTok photo inbox upload"
+    case "tiktok_photo_direct":
+      return "TikTok photo Direct Post"
     default:
       return mediaType
   }
@@ -212,7 +216,12 @@ function mediaTypeLabel(mediaType: string): string {
 
 function jobListThumbnailIsVideo(job: AutopostJobRow): boolean {
   const t = job.media_type
-  if (t === "reel" || t === "feed_video" || t === "tiktok_video_upload" || t === "tiktok_video_direct") {
+  if (
+    t === "reel" ||
+    t === "feed_video" ||
+    t === "tiktok_video_upload" ||
+    t === "tiktok_video_direct"
+  ) {
     return true
   }
   if (t === "story") {
@@ -303,6 +312,7 @@ type DisconnectTarget = {
 
 type ComposerProvider = "instagram" | "tiktok"
 type TikTokMode = "upload" | "direct"
+type TikTokPostType = "video" | "photo"
 
 type TikTokCreatorInfo = {
   creator_avatar_url?: string
@@ -384,13 +394,17 @@ export function AutopostPage() {
   const [selectedComposerConnectionId, setSelectedComposerConnectionId] = React.useState<string | null>(null)
   const [selectedTikTokConnectionId, setSelectedTikTokConnectionId] = React.useState<string | null>(null)
   const [tiktokMode, setTikTokMode] = React.useState<TikTokMode>("upload")
+  const [tiktokPostType, setTikTokPostType] = React.useState<TikTokPostType>("video")
   const [tiktokPrivacyLevel, setTikTokPrivacyLevel] = React.useState("SELF_ONLY")
   const [tiktokDisableComment, setTikTokDisableComment] = React.useState(false)
   const [tiktokDisableDuet, setTikTokDisableDuet] = React.useState(false)
   const [tiktokDisableStitch, setTikTokDisableStitch] = React.useState(false)
   const [tiktokIsAigc, setTikTokIsAigc] = React.useState(true)
+  const [tiktokAutoAddMusic, setTikTokAutoAddMusic] = React.useState(true)
   const [tiktokBrandOrganic, setTikTokBrandOrganic] = React.useState(false)
   const [tiktokBrandContent, setTikTokBrandContent] = React.useState(false)
+  const [tiktokDescription, setTikTokDescription] = React.useState("")
+  const [tiktokPhotoCoverIndex, setTikTokPhotoCoverIndex] = React.useState(0)
   const [tiktokCreatorInfo, setTikTokCreatorInfo] = React.useState<TikTokCreatorInfo | null>(null)
   const [isLoadingTikTokCreatorInfo, setIsLoadingTikTokCreatorInfo] = React.useState(false)
   const [caption, setCaption] = React.useState("")
@@ -456,7 +470,7 @@ export function AutopostPage() {
     return () => {
       cancelled = true
     }
-  }, [composerProvider, postFormat])
+  }, [composerProvider, postFormat, tiktokPostType])
 
   const fetchStatus = React.useCallback(async () => {
     setIsLoadingStatus(true)
@@ -618,6 +632,14 @@ export function AutopostPage() {
     }
   }, [composerProvider, selectedTikTokConnectionId, status?.tiktok?.connections, tiktokMode])
 
+  React.useEffect(() => {
+    if (selectedFiles.length === 0) {
+      setTikTokPhotoCoverIndex(0)
+      return
+    }
+    setTikTokPhotoCoverIndex((current) => (current >= 0 && current < selectedFiles.length ? current : 0))
+  }, [selectedFiles.length])
+
   const fetchJobs = React.useCallback(async () => {
     setIsLoadingJobs(true)
     try {
@@ -719,8 +741,14 @@ export function AutopostPage() {
   }
 
   const handleMediaFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const isCarousel = postFormat === "carousel"
-    const picked = isCarousel ? Array.from(event.target.files ?? []) : event.target.files?.[0] ? [event.target.files[0]] : []
+    const isCarousel = composerProvider === "instagram" && postFormat === "carousel"
+    const isTikTokPhoto = composerProvider === "tiktok" && tiktokPostType === "photo"
+    const picked =
+      isCarousel || isTikTokPhoto
+        ? Array.from(event.target.files ?? [])
+        : event.target.files?.[0]
+          ? [event.target.files[0]]
+          : []
 
     if (picked.length === 0) {
       setSelectedFiles([])
@@ -731,9 +759,26 @@ export function AutopostPage() {
       return
     }
 
+    if (isTikTokPhoto && picked.length > 35) {
+      toast.error("TikTok photo posts support up to 35 images.")
+      event.target.value = ""
+      return
+    }
+
     for (const file of picked) {
-      if (!inferFileKind(file)) {
+      const kind = inferFileKind(file)
+      if (!kind) {
         toast.error("Use images (JPEG, PNG, WebP, GIF) or video (MP4, MOV).")
+        event.target.value = ""
+        return
+      }
+      if (isTikTokPhoto && kind !== "image") {
+        toast.error("TikTok photo posts require image files only.")
+        event.target.value = ""
+        return
+      }
+      if (composerProvider === "tiktok" && tiktokPostType === "video" && kind !== "video") {
+        toast.error("TikTok video posts require a video file.")
         event.target.value = ""
         return
       }
@@ -755,9 +800,13 @@ export function AutopostPage() {
     })
     setShareReelToFeed(true)
     setReelCoverUrl("")
+    setTikTokPostType("video")
     setTikTokBrandOrganic(false)
     setTikTokBrandContent(false)
     setTikTokIsAigc(true)
+    setTikTokAutoAddMusic(true)
+    setTikTokDescription("")
+    setTikTokPhotoCoverIndex(0)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -781,31 +830,17 @@ export function AutopostPage() {
         toast.error(`Reconnect TikTok and approve ${tiktokMode === "direct" ? "Direct Post" : "upload"} permissions.`)
         return null
       }
-      if (selectedFiles.length !== 1) {
-        toast.error("TikTok publishing needs one video file.")
-        return null
-      }
-      const file = selectedFiles[0]
-      if (inferFileKind(file) !== "video") {
-        toast.error("TikTok publishing requires a video file.")
-        return null
-      }
       if (tiktokMode === "direct" && !tiktokPrivacyLevel) {
         toast.error("Pick a TikTok privacy level.")
-        return null
-      }
-
-      const uploaded = await uploadFileToSupabase(file, AUTOPOST_MEDIA_FOLDER)
-      if (!uploaded) {
         return null
       }
 
       const body: Record<string, unknown> = {
         provider: "tiktok",
         caption,
-        mediaUrl: uploaded.url,
         tiktokConnectionId: selectedTikTokConnectionId,
         tiktokMode,
+        tiktokPostType,
         isAigc: tiktokIsAigc,
         brandOrganicToggle: tiktokBrandOrganic,
         brandContentToggle: tiktokBrandContent,
@@ -813,11 +848,58 @@ export function AutopostPage() {
       if (scheduledAtIso) {
         body.scheduledAt = scheduledAtIso
       }
+
+      if (tiktokPostType === "video") {
+        if (selectedFiles.length !== 1) {
+          toast.error("TikTok video publishing needs one video file.")
+          return null
+        }
+        const file = selectedFiles[0]
+        if (inferFileKind(file) !== "video") {
+          toast.error("TikTok video publishing requires a video file.")
+          return null
+        }
+
+        const uploaded = await uploadFileToSupabase(file, AUTOPOST_MEDIA_FOLDER)
+        if (!uploaded) {
+          return null
+        }
+        body.mediaUrl = uploaded.url
+      } else {
+        if (selectedFiles.length === 0 || selectedFiles.length > 35) {
+          toast.error("TikTok photo posts need between 1 and 35 images.")
+          return null
+        }
+        if (selectedFiles.some((file) => inferFileKind(file) !== "image")) {
+          toast.error("TikTok photo posts require image files only.")
+          return null
+        }
+
+        const photoItems: string[] = []
+        for (const file of selectedFiles) {
+          const uploaded = await uploadFileToSupabase(file, AUTOPOST_MEDIA_FOLDER)
+          if (!uploaded) {
+            return null
+          }
+          photoItems.push(uploaded.url)
+        }
+
+        body.photoItems = photoItems
+        body.photoCoverIndex = Math.min(Math.max(tiktokPhotoCoverIndex, 0), photoItems.length - 1)
+        if (tiktokDescription.trim()) {
+          body.description = tiktokDescription.trim()
+        }
+      }
+
       if (tiktokMode === "direct") {
         body.privacyLevel = tiktokPrivacyLevel
         body.disableComment = tiktokDisableComment
-        body.disableDuet = tiktokDisableDuet
-        body.disableStitch = tiktokDisableStitch
+        if (tiktokPostType === "video") {
+          body.disableDuet = tiktokDisableDuet
+          body.disableStitch = tiktokDisableStitch
+        } else {
+          body.autoAddMusic = tiktokAutoAddMusic
+        }
       }
 
       const draftResponse = await fetch("/api/autopost/drafts", {
@@ -834,7 +916,17 @@ export function AutopostPage() {
       if (!jobId) {
         throw new Error("Draft saved but missing job id.")
       }
-      return { jobId, mediaType: tiktokMode === "direct" ? "tiktok_video_direct" : "tiktok_video_upload" }
+      return {
+        jobId,
+        mediaType:
+          tiktokPostType === "photo"
+            ? tiktokMode === "direct"
+              ? "tiktok_photo_direct"
+              : "tiktok_photo_upload"
+            : tiktokMode === "direct"
+              ? "tiktok_video_direct"
+              : "tiktok_video_upload",
+      }
     }
 
     if (!status?.instagram?.connected) {
@@ -982,7 +1074,7 @@ export function AutopostPage() {
       if (String(mediaType).startsWith("tiktok_")) {
         toast.message("Sending to TikTok...", {
           description:
-            mediaType === "tiktok_video_upload"
+            mediaType === "tiktok_video_upload" || mediaType === "tiktok_photo_upload"
               ? "TikTok will notify the account to finish this draft in-app."
               : "TikTok will process this Direct Post asynchronously.",
         })
@@ -1008,7 +1100,9 @@ export function AutopostPage() {
         publishData.provider === "tiktok"
           ? tiktokMode === "upload"
             ? "Sent to TikTok inbox."
-            : "TikTok Direct Post submitted."
+            : tiktokPostType === "photo"
+              ? "TikTok photo post submitted."
+              : "TikTok Direct Post submitted."
           : "Published to Instagram."
       )
       resetComposer()
@@ -1114,7 +1208,7 @@ export function AutopostPage() {
       if (!publishResponse.ok) {
         throw new Error(publishData.error || "Retry failed.")
       }
-      toast.success("Published to Instagram.")
+      toast.success("Post submitted.")
       void fetchJobs()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Retry failed")
@@ -1150,12 +1244,17 @@ export function AutopostPage() {
   const selectedTikTokConnection = tiktokConnections.find((connection) => connection.id === selectedTikTokConnectionId)
   const isTikTokConnected = tiktokConnections.some((connection) => connection.status === "connected")
   const tikTokRequiredScope = tiktokMode === "direct" ? "video.publish" : "video.upload"
+  const tiktokHasValidMedia =
+    tiktokPostType === "photo"
+      ? selectedFiles.length >= 1 &&
+        selectedFiles.length <= 35 &&
+        selectedFiles.every((file) => inferFileKind(file) === "image")
+      : selectedFiles.length === 1 && inferFileKind(selectedFiles[0]) === "video"
   const tiktokReady =
     isTikTokConnected &&
     Boolean(selectedTikTokConnectionId) &&
     hasScope(selectedTikTokConnection, tikTokRequiredScope) &&
-    selectedFiles.length === 1 &&
-    inferFileKind(selectedFiles[0]) === "video" &&
+    tiktokHasValidMedia &&
     (tiktokMode === "upload" || Boolean(tiktokPrivacyLevel))
 
   const composerReady =
@@ -1467,7 +1566,7 @@ export function AutopostPage() {
                   ) : (
                     <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
                       <p className="font-medium text-foreground">No TikTok account linked</p>
-                      <p className="mt-1">Connect TikTok to prepare for upcoming upload and posting support.</p>
+                      <p className="mt-1">Connect TikTok to prepare video uploads, direct posts, and photo posts.</p>
                     </div>
                   )}
                 </div>
@@ -1536,7 +1635,7 @@ export function AutopostPage() {
                         ))}
                     </SelectContent>
                   </Select>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid gap-2 sm:grid-cols-3">
                     <div className="space-y-2">
                       <Label htmlFor="autopost-tiktok-mode">TikTok action</Label>
                       <Select value={tiktokMode} onValueChange={(value) => setTikTokMode(value as TikTokMode)}>
@@ -1546,6 +1645,18 @@ export function AutopostPage() {
                         <SelectContent position="popper" className="z-120">
                           <SelectItem value="upload">Send to inbox draft</SelectItem>
                           <SelectItem value="direct">Direct Post</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="autopost-tiktok-post-type">TikTok post type</Label>
+                      <Select value={tiktokPostType} onValueChange={(value) => setTikTokPostType(value as TikTokPostType)}>
+                        <SelectTrigger id="autopost-tiktok-post-type" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-120">
+                          <SelectItem value="video">Video</SelectItem>
+                          <SelectItem value="photo">Photo post</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1686,22 +1797,34 @@ export function AutopostPage() {
                       />
                       <span>Disable comments</span>
                     </label>
-                    <label className="flex items-start gap-2 text-sm">
-                      <Checkbox
-                        checked={tiktokDisableDuet}
-                        disabled={tiktokCreatorInfo?.duet_disabled === true}
-                        onCheckedChange={(value) => setTikTokDisableDuet(value === true)}
-                      />
-                      <span>Disable duet</span>
-                    </label>
-                    <label className="flex items-start gap-2 text-sm">
-                      <Checkbox
-                        checked={tiktokDisableStitch}
-                        disabled={tiktokCreatorInfo?.stitch_disabled === true}
-                        onCheckedChange={(value) => setTikTokDisableStitch(value === true)}
-                      />
-                      <span>Disable stitch</span>
-                    </label>
+                    {tiktokPostType === "video" ? (
+                      <label className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                          checked={tiktokDisableDuet}
+                          disabled={tiktokCreatorInfo?.duet_disabled === true}
+                          onCheckedChange={(value) => setTikTokDisableDuet(value === true)}
+                        />
+                        <span>Disable duet</span>
+                      </label>
+                    ) : (
+                      <label className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                          checked={tiktokAutoAddMusic}
+                          onCheckedChange={(value) => setTikTokAutoAddMusic(value === true)}
+                        />
+                        <span>Auto-add recommended music</span>
+                      </label>
+                    )}
+                    {tiktokPostType === "video" ? (
+                      <label className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                          checked={tiktokDisableStitch}
+                          disabled={tiktokCreatorInfo?.stitch_disabled === true}
+                          onCheckedChange={(value) => setTikTokDisableStitch(value === true)}
+                        />
+                        <span>Disable stitch</span>
+                      </label>
+                    ) : null}
                     <label className="flex items-start gap-2 text-sm">
                       <Checkbox
                         checked={tiktokIsAigc}
@@ -1730,18 +1853,29 @@ export function AutopostPage() {
               <div className="space-y-2">
                 <Label htmlFor="autopost-media">Media</Label>
                 <Input
-                  key={`${composerProvider}-${postFormat}`}
+                  key={`${composerProvider}-${postFormat}-${tiktokPostType}`}
                   id="autopost-media"
                   ref={fileInputRef}
                   type="file"
-                  accept={composerProvider === "tiktok" ? "video/mp4,video/quicktime,video/webm" : "image/*,video/*"}
-                  multiple={composerProvider === "instagram" && postFormat === "carousel"}
+                  accept={
+                    composerProvider === "tiktok"
+                      ? tiktokPostType === "photo"
+                        ? "image/jpeg,image/png,image/webp,image/gif"
+                        : "video/mp4,video/quicktime,video/webm"
+                      : "image/*,video/*"
+                  }
+                  multiple={
+                    (composerProvider === "instagram" && postFormat === "carousel") ||
+                    (composerProvider === "tiktok" && tiktokPostType === "photo")
+                  }
                   className="cursor-pointer"
                   onChange={handleMediaFileChange}
                 />
                 <p className="text-xs text-muted-foreground">
                   {composerProvider === "tiktok"
-                    ? "Select one MP4, MOV, or WebM video. TikTok will pull it from the uploaded public URL."
+                    ? tiktokPostType === "photo"
+                      ? "Select 1-35 images. Order is preserved, and TikTok will pull each public URL from your uploads."
+                      : "Select one MP4, MOV, or WebM video. TikTok will pull it from the uploaded public URL."
                     : postFormat === "carousel"
                       ? "Select 2-10 images and/or videos. Order is preserved."
                       : "One image or one video depending on post type."}{" "}
@@ -1770,15 +1904,29 @@ export function AutopostPage() {
                 </div>
               ) : null}
 
-              {previewUrls.length > 0 && postFormat === "carousel" ? (
+              {previewUrls.length > 0 &&
+              ((composerProvider === "instagram" && postFormat === "carousel") ||
+                (composerProvider === "tiktok" && tiktokPostType === "photo")) ? (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {previewUrls.map((url, i) => {
                     const file = selectedFiles[i]
                     const kind = file ? inferFileKind(file) : null
+                    const isTikTokPhotoCover = composerProvider === "tiktok" && tiktokPostType === "photo" && i === tiktokPhotoCoverIndex
                     return (
                       <div
                         key={`${url}-${i}`}
-                        className="relative aspect-square overflow-hidden rounded-md border bg-muted/30"
+                        className={cn(
+                          "relative aspect-square overflow-hidden rounded-md border bg-muted/30",
+                          composerProvider === "tiktok" &&
+                            tiktokPostType === "photo" &&
+                            "cursor-pointer transition hover:border-primary/60",
+                          isTikTokPhotoCover && "border-primary ring-2 ring-primary/25"
+                        )}
+                        onClick={() => {
+                          if (composerProvider === "tiktok" && tiktokPostType === "photo") {
+                            setTikTokPhotoCoverIndex(i)
+                          }
+                        }}
                       >
                         {kind === "image" ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -1786,13 +1934,21 @@ export function AutopostPage() {
                         ) : kind === "video" ? (
                           <video className="h-full w-full object-cover" src={url} muted playsInline />
                         ) : null}
+                        {composerProvider === "tiktok" && tiktokPostType === "photo" ? (
+                          <span className="absolute left-1 top-1 rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+                            {isTikTokPhotoCover ? "Cover" : `#${i + 1}`}
+                          </span>
+                        ) : null}
                       </div>
                     )
                   })}
                 </div>
               ) : null}
 
-              {previewUrls.length === 1 && selectedFiles[0]?.type.startsWith("image/") && postFormat !== "carousel" ? (
+              {previewUrls.length === 1 &&
+              selectedFiles[0]?.type.startsWith("image/") &&
+              !(composerProvider === "instagram" && postFormat === "carousel") &&
+              !(composerProvider === "tiktok" && tiktokPostType === "photo") ? (
                 <div className="overflow-hidden rounded-md border bg-muted/30">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -1810,12 +1966,20 @@ export function AutopostPage() {
               ) : null}
 
               <div className="space-y-2">
-                <Label htmlFor="autopost-caption">Caption</Label>
+                <Label htmlFor="autopost-caption">
+                  {composerProvider === "tiktok" && tiktokPostType === "photo" ? "Title" : "Caption"}
+                </Label>
                 <Textarea
                   id="autopost-caption"
                   value={caption}
                   onChange={(event) => setCaption(event.target.value)}
-                  placeholder={composerProvider === "tiktok" ? "TikTok title/caption..." : "Write your caption..."}
+                  placeholder={
+                    composerProvider === "tiktok"
+                      ? tiktokPostType === "photo"
+                        ? "Short TikTok photo title..."
+                        : "TikTok title/caption..."
+                      : "Write your caption..."
+                  }
                   rows={5}
                   disabled={composerProvider === "instagram" && postFormat === "story"}
                 />
@@ -1826,10 +1990,28 @@ export function AutopostPage() {
                 ) : null}
                 {composerProvider === "tiktok" ? (
                   <p className="text-xs text-muted-foreground">
-                    TikTok captions are sent as the video title for Direct Post. Inbox drafts can still be edited in TikTok.
+                    {tiktokPostType === "photo"
+                      ? "TikTok photo posts support a title plus an optional description. Inbox drafts can still be edited in TikTok."
+                      : "TikTok captions are sent as the video title for Direct Post. Inbox drafts can still be edited in TikTok."}
                   </p>
                 ) : null}
               </div>
+
+              {composerProvider === "tiktok" && tiktokPostType === "photo" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="autopost-tiktok-description">Description (optional)</Label>
+                  <Textarea
+                    id="autopost-tiktok-description"
+                    value={tiktokDescription}
+                    onChange={(event) => setTikTokDescription(event.target.value)}
+                    placeholder="Longer TikTok photo description..."
+                    rows={4}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Sent to TikTok photo posts as `description`. Click a preview above to choose the cover image.
+                  </p>
+                </div>
+              ) : null}
 
               <Tabs value={composerTab} onValueChange={(v) => setComposerTab(v as "now" | "schedule")}>
                 <TabsList className="grid w-full grid-cols-2">
@@ -1846,8 +2028,12 @@ export function AutopostPage() {
                   <p className="text-xs text-muted-foreground">
                     {composerProvider === "tiktok"
                       ? tiktokMode === "upload"
-                        ? "Uploads your video and sends it to the selected TikTok account inbox."
-                        : "Submits your video to TikTok Direct Post with the selected privacy settings."
+                        ? tiktokPostType === "photo"
+                          ? "Uploads your photos and sends them to the selected TikTok account inbox."
+                          : "Uploads your video and sends it to the selected TikTok account inbox."
+                        : tiktokPostType === "photo"
+                          ? "Submits your photo post to TikTok Direct Post with the selected privacy settings."
+                          : "Submits your video to TikTok Direct Post with the selected privacy settings."
                       : "Uploads your media, then publishes to Instagram immediately."}
                   </p>
                   <Button
@@ -1873,7 +2059,9 @@ export function AutopostPage() {
                         {composerProvider === "tiktok"
                           ? tiktokMode === "upload"
                             ? "Send to TikTok inbox"
-                            : "Direct Post to TikTok"
+                            : tiktokPostType === "photo"
+                              ? "Direct Post photo to TikTok"
+                              : "Direct Post to TikTok"
                           : "Publish to Instagram"}
                       </>
                     )}
@@ -2035,7 +2223,12 @@ export function AutopostPage() {
                     {jobs.map((job) => {
                       const busy = actionJobId === job.id
                       const thumbIsVideo = jobListThumbnailIsVideo(job)
-                      const carouselCount = job.media_type === "carousel" ? job.metadata?.carouselItems?.length : undefined
+                      const carouselCount =
+                        job.media_type === "carousel"
+                          ? job.metadata?.carouselItems?.length
+                          : job.media_type === "tiktok_photo_upload" || job.media_type === "tiktok_photo_direct"
+                            ? job.metadata?.tiktok?.photoItems?.length
+                            : undefined
                       const scheduleNote = scheduledVsPublishedNote(job)
                       const canPublishThisJob = job.provider === "tiktok" ? isTikTokConnected : isConnected
                       return (
@@ -2062,7 +2255,9 @@ export function AutopostPage() {
                                 />
                               )}
                               <span className="absolute bottom-1 right-1 rounded bg-background/90 px-1 py-0.5 text-[10px] text-muted-foreground">
-                                {job.media_type === "carousel" ? (
+                                {job.media_type === "carousel" ||
+                                job.media_type === "tiktok_photo_upload" ||
+                                job.media_type === "tiktok_photo_direct" ? (
                                   <Layers className="inline h-3 w-3" />
                                 ) : job.media_type === "reel" ||
                                   job.media_type === "feed_video" ||

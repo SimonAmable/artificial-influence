@@ -56,6 +56,16 @@ export type TikTokDirectVideoPostInfo = {
   brandContentToggle?: boolean
 }
 
+export type TikTokPhotoPostInfo = {
+  title?: string
+  description?: string
+  privacyLevel?: string
+  disableComment?: boolean
+  autoAddMusic?: boolean
+  brandOrganicToggle?: boolean
+  brandContentToggle?: boolean
+}
+
 function tiktokMessage<T>(payload: TikTokEnvelope<T>, fallback: string) {
   return payload.error?.message || payload.error?.code || fallback
 }
@@ -144,6 +154,37 @@ export async function initTikTokDirectVideoPost(params: {
       source_info: {
         source: "PULL_FROM_URL",
         video_url: params.videoUrl,
+      },
+    },
+  })
+}
+
+export async function initTikTokPhotoPost(params: {
+  accessToken: string
+  postMode: "DIRECT_POST" | "MEDIA_UPLOAD"
+  photoImages: string[]
+  photoCoverIndex: number
+  postInfo: TikTokPhotoPostInfo
+}): Promise<TikTokInitPublishResponse> {
+  return postTikTokJson<TikTokInitPublishResponse>({
+    accessToken: params.accessToken,
+    path: "/v2/post/publish/content/init/",
+    body: {
+      media_type: "PHOTO",
+      post_mode: params.postMode,
+      post_info: {
+        title: params.postInfo.title,
+        description: params.postInfo.description,
+        privacy_level: params.postInfo.privacyLevel,
+        disable_comment: params.postInfo.disableComment === true,
+        auto_add_music: params.postInfo.autoAddMusic === true,
+        brand_organic_toggle: params.postInfo.brandOrganicToggle === true,
+        brand_content_toggle: params.postInfo.brandContentToggle === true,
+      },
+      source_info: {
+        source: "PULL_FROM_URL",
+        photo_cover_index: params.photoCoverIndex,
+        photo_images: params.photoImages,
       },
     },
   })

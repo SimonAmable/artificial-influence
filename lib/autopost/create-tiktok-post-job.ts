@@ -5,19 +5,25 @@ import { isUserPublicBucketMediaUrl } from "@/lib/autopost/validate-media-url"
 
 export type PrepareTikTokPostAction = "draft" | "schedule"
 export type TikTokPostMode = "upload" | "direct"
+export type TikTokPostType = "video" | "photo"
 
 export type PrepareTikTokPostInput = {
   action: PrepareTikTokPostAction
   tiktokConnectionId: string
   mode: TikTokPostMode
+  postType?: TikTokPostType
   caption?: string
+  description?: string
   scheduledAt?: string
   mediaUrl?: string
+  photoItems?: string[]
+  photoCoverIndex?: number
   privacyLevel?: string
   disableComment?: boolean
   disableDuet?: boolean
   disableStitch?: boolean
   isAigc?: boolean
+  autoAddMusic?: boolean
   brandOrganicToggle?: boolean
   brandContentToggle?: boolean
 }
@@ -29,7 +35,11 @@ type CreateTikTokPostJobResult =
         id: string
         media_url: string
         caption: string | null
-        media_type: "tiktok_video_upload" | "tiktok_video_direct"
+        media_type:
+          | "tiktok_video_upload"
+          | "tiktok_video_direct"
+          | "tiktok_photo_upload"
+          | "tiktok_photo_direct"
         status: string
         scheduled_at: string | null
         created_at: string
@@ -51,6 +61,14 @@ function isVideoUrl(url: string) {
   }
 }
 
+function isImageUrl(url: string) {
+  try {
+    return /\.(jpe?g|png|webp|gif)$/i.test(new URL(url).pathname)
+  } catch {
+    return false
+  }
+}
+
 export async function createTikTokPostJob({
   input,
   supabase,
@@ -64,28 +82,13 @@ export async function createTikTokPostJob({
 }): Promise<CreateTikTokPostJobResult> {
   const connectionId = input.tiktokConnectionId?.trim()
   const mode = input.mode === "direct" ? "direct" : "upload"
+  const postType = input.postType === "photo" ? "photo" : "video"
   const caption = input.caption?.trim() || null
+  const description = input.description?.trim() || null
   const mediaUrl = input.mediaUrl?.trim() || ""
 
   if (!connectionId) {
     return { ok: false, message: "Pick a connected TikTok account.", statusCode: 400 }
-  }
-  if (!mediaUrl) {
-    return { ok: false, message: "TikTok posts require a video URL.", statusCode: 400 }
-  }
-  if (!isUserPublicBucketMediaUrl(mediaUrl, userId, supabaseUrl)) {
-    return {
-      ok: false,
-      message: "Media URLs must be public files uploaded to your account storage.",
-      statusCode: 400,
-    }
-  }
-  if (!isVideoUrl(mediaUrl)) {
-    return {
-      ok: false,
-      message: "TikTok video publishing requires an MP4, MOV, or WebM public URL.",
-      statusCode: 400,
-    }
   }
 
   let scheduledAt: string | null = null
@@ -100,6 +103,66 @@ export async function createTikTokPostJob({
 
   if (mode === "direct" && !input.privacyLevel?.trim()) {
     return { ok: false, message: "Direct Post requires a TikTok privacy level.", statusCode: 400 }
+  }
+
+  let normalizedMediaUrl = mediaUrl
+  let photoItems: string[] = []
+  let photoCoverIndex = 0
+
+  if (postType === "video") {
+    if (!normalizedMediaUrl) {
+      return { ok: false, message: "TikTok video posts require a video URL.", statusCode: 400 }
+    }
+    if (!isUserPublicBucketMediaUrl(normalizedMediaUrl, userId, supabaseUrl)) {
+      return {
+        ok: false,
+        message: "Media URLs must be public files uploaded to your account storage.",
+        statusCode: 400,
+      }
+    }
+    if (!isVideoUrl(normalizedMediaUrl)) {
+      return {
+        ok: false,
+        message: "TikTok video publishing requires an MP4, MOV, or WebM public URL.",
+        statusCode: 400,
+      }
+    }
+  } else {
+    photoItems = Array.isArray(input.photoItems)
+      ? input.photoItems.map((item) => item.trim()).filter((item) => item.length > 0)
+      : []
+
+    if (photoItems.length === 0 || photoItems.length > 35) {
+      return {
+        ok: false,
+        message: "TikTok photo posts require between 1 and 35 public image URLs.",
+        statusCode: 400,
+      }
+    }
+
+    for (const itemUrl of photoItems) {
+      if (!isUserPublicBucketMediaUrl(itemUrl, userId, supabaseUrl)) {
+        return {
+          ok: false,
+          message: "Media URLs must be public files uploaded to your account storage.",
+          statusCode: 400,
+        }
+      }
+      if (!isImageUrl(itemUrl)) {
+        return {
+          ok: false,
+          message: "TikTok photo posts currently require JPEG, PNG, WebP, or GIF public URLs.",
+          statusCode: 400,
+        }
+      }
+    }
+
+    const requestedCoverIndex = Number(input.photoCoverIndex)
+    photoCoverIndex =
+      Number.isInteger(requestedCoverIndex) && requestedCoverIndex >= 0 && requestedCoverIndex < photoItems.length
+        ? requestedCoverIndex
+        : 0
+    normalizedMediaUrl = photoItems[photoCoverIndex]
   }
 
   const { data: connection, error: connectionError } = await supabase
@@ -132,18 +195,30 @@ export async function createTikTokPostJob({
   const metadata: AutopostJobMetadata = {
     tiktok: {
       mode,
+      postType,
       privacyLevel: input.privacyLevel?.trim(),
       disableComment: input.disableComment === true,
       disableDuet: input.disableDuet === true,
       disableStitch: input.disableStitch === true,
       isAigc: input.isAigc !== false,
+      autoAddMusic: input.autoAddMusic === true,
       brandOrganicToggle: input.brandOrganicToggle === true,
       brandContentToggle: input.brandContentToggle === true,
+      description,
+      photoItems: postType === "photo" ? photoItems.map((url) => ({ url })) : undefined,
+      photoCoverIndex: postType === "photo" ? photoCoverIndex : undefined,
     },
   }
 
   const status = input.action === "schedule" ? "queued" : "draft"
-  const mediaType = mode === "direct" ? "tiktok_video_direct" : "tiktok_video_upload"
+  const mediaType =
+    postType === "photo"
+      ? mode === "direct"
+        ? "tiktok_photo_direct"
+        : "tiktok_photo_upload"
+      : mode === "direct"
+        ? "tiktok_video_direct"
+        : "tiktok_video_upload"
 
   const { data: job, error: insertError } = await supabase
     .from("autopost_jobs")
@@ -152,7 +227,7 @@ export async function createTikTokPostJob({
       provider: "tiktok",
       social_connection_id: connection.id,
       media_type: mediaType,
-      media_url: mediaUrl,
+      media_url: normalizedMediaUrl,
       caption,
       status,
       scheduled_at: scheduledAt,
