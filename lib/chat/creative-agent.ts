@@ -1,26 +1,22 @@
-import {
-  createGateway,
-  stepCountIs,
-  ToolLoopAgent,
-} from "ai"
+import { stepCountIs, ToolLoopAgent } from "ai"
 import type { SupabaseClient } from "@supabase/supabase-js"
+
 import type { AutomationPromptAttachment } from "@/lib/automations/prompt-payload"
-import { type AvailableChatImageReference } from "@/lib/chat/tools/image-reference-types"
-import {
-  buildSkillsCatalogAppendix,
-  type SkillCatalogEntry,
-} from "@/lib/chat/skills/catalog"
-import type {
-  AvailableChatAudioReference,
-  AvailableChatVideoReference,
-} from "@/lib/chat/tools/generate-video"
-import { createCreativeChatTools } from "@/lib/chat/tools"
 import {
   getChatPromptDefinition,
   getChatPromptVersion,
   type ChatPromptDefinition,
   type PromptVersion,
 } from "@/lib/chat/prompt-registry"
+import { buildSkillsCatalogAppendix, type SkillCatalogEntry } from "@/lib/chat/skills/catalog"
+import { createCreativeChatTools } from "@/lib/chat/tools"
+import { getChatGatewayModelProviderOptions } from "@/lib/constants/chat-llm-models"
+import { createAIGatewayProvider } from "@/lib/ai/gateway"
+import type { AvailableChatImageReference } from "@/lib/chat/tools/image-reference-types"
+import type {
+  AvailableChatAudioReference,
+  AvailableChatVideoReference,
+} from "@/lib/chat/tools/generate-video"
 import type { AttachedRef } from "@/lib/commands/types"
 
 function buildReferenceManifest(
@@ -32,7 +28,7 @@ function buildReferenceManifest(
 
   if (imageRefs.length === 0) {
     blocks.push(
-      "Transcript image refs (ref_1, …): none. Pass **referenceIds** on image/video tools using manifest ids, **listThreadMedia**, or **listRecentGenerations** `mediaId`.",
+      "Transcript image refs (ref_1, ...): none. Pass **referenceIds** on image/video tools using manifest ids, **listThreadMedia**, or **listRecentGenerations** `mediaId`.",
     )
   } else {
     const lines = imageRefs.map((reference) => `- ${reference.id}: ${reference.label}`)
@@ -66,7 +62,7 @@ Agent rules:
 - You also have web research tools: **searchWeb** finds source links/snippets, **readWebPage** extracts one URL, **searchWebImages** finds license-unverified visual inspiration/reference images, **searchStockReferences** searches live external stock/reference providers such as GIPHY for memes, GIFs, stickers, and future stock sources, and **capturePageScreenshot** captures a viewport screenshot only when the user explicitly asks for a screenshot or visual page capture. Use full-page capture only if the user explicitly asks for full page.
 - You also have **generateAudio** for text-to-speech and **searchVoices** for catalog voice discovery inside chat.
 - You can also manage automations from chat with **listAutomations** and **manageAutomation**.
-- You currently have creative tools for image generation, video generation, **extractVideoFrames** (ffmpeg stills from user videos; first/last by default, optional interior times and timestamps), **composeTimelineVideo** (ffmpeg: stitch existing thread images, GIFs, and videos in order into one muted MP4; requires persisted thread + **listThreadMedia** "mediaIds"; pick **outputPreset** for 16:9 vs 9:16), **scheduleGenerationFollowUp** (persisted thread + **chained** workflow only: run follow-up when the webhook fires — **reserve for long video** jobs where the next step **must** have the finished file but same-turn waiting is unrealistic, e.g. **Kling Motion Control** (\`kwaivgi/kling-v2.6-motion-control\`, \`kwaivgi/kling-v3-motion-control\`), **Seedance 2.0** (\`bytedance/seedance-2.0\`), or other multi-minute video; **never** for images; **do not** use if there is no real next-step chain), **awaitGeneration** (poll until complete — **only** when a **chain** in the **same** turn needs the file; **images**: this is the right wait tool when chaining; **video**: use only when the job can finish within ~90s; otherwise use **scheduleGenerationFollowUp** for long models), **estimateModelLatency** (typical wait ranges from recent completions or fallbacks), thread media listing (listThreadMedia, when the chat thread is persisted), model lookup, asset lookup, recent generation lookup, generation-to-asset saving, saved brand-kit context, Instagram account listing, and Instagram post preparation.
+- You currently have creative tools for image generation, video generation, **extractVideoFrames** (ffmpeg stills from user videos; first/last by default, optional interior times and timestamps), **composeTimelineVideo** (ffmpeg: stitch existing thread images, GIFs, and videos in order into one muted MP4; requires persisted thread + **listThreadMedia** "mediaIds"; pick **outputPreset** for 16:9 vs 9:16), **scheduleGenerationFollowUp** (persisted thread + **chained** workflow only: run follow-up when the webhook fires - **reserve for long video** jobs where the next step **must** have the finished file but same-turn waiting is unrealistic, e.g. **Kling Motion Control** (\`kwaivgi/kling-v2.6-motion-control\`, \`kwaivgi/kling-v3-motion-control\`), **Seedance 2.0** (\`bytedance/seedance-2.0\`), or other multi-minute video; **never** for images; **do not** use if there is no real next-step chain), **awaitGeneration** (poll until complete - **only** when a **chain** in the **same** turn needs the file; **images**: this is the right wait tool when chaining; **video**: use only when the job can finish within ~90s; otherwise use **scheduleGenerationFollowUp** for long models), **estimateModelLatency** (typical wait ranges from recent completions or fallbacks), thread media listing (listThreadMedia, when the chat thread is persisted), model lookup, asset lookup, recent generation lookup, generation-to-asset saving, saved brand-kit context, social connection listing, and social post preparation.
 - If the user asks what the default image generation model is, answer plainly: **GPT Image 2** (\`openai/gpt-image-2\`). Do not say there is no single default and do not answer Google Nano Banana.
 - For generic image generation or editing, default to **GPT Image 2** (\`openai/gpt-image-2\`) unless the user explicitly names another model or the request is the dedicated character-swap workflow.
 - **Tool prompt fidelity:** For **generateImage** and **generateVideo**, copy the user's creative brief into the tool \`prompt\` **verbatim** when (a) it is already **detailed or explicit**, or (b) they ask for **exact / verbatim / literal / as written / use my prompt / do not rewrite / no enhancement**. Do not substitute your own expanded wording in those cases. When they want literal execution, set **enhancePrompt: false** on **generateImage** (never turn on enhancement after they forbade it). When the user message is **vague** and they want media **now** with no literal constraint, you may compose a fuller prompt in the tool call and set **enhancePrompt: true** only if a stronger brief is clearly needed and they did not ask to preserve their exact text.
@@ -90,9 +86,9 @@ Agent rules:
 - If the user asks for both a prompt and an image or video, prefer execution only when they clearly want the media made now. Otherwise give the prompt first.
 - If the user message is ambiguous between "write the prompt" and "do the generation", ask one short clarifying question instead of assuming.
 - When the request depends on an existing image, such as recreate, edit, replace text, keep the same composition, use the first image, use the earlier upload, or make this version with changes, you must ensure the tool call includes **referenceIds** (or **referenceVideoIds** / **referenceAudioIds** for video). Nothing is auto-included from user attachments; always pass explicit ids from the transcript manifest below, **listThreadMedia**, or **listRecentGenerations**.
-- For **generateImage** and **generateVideo** (images): pass **referenceIds** with **ref_1**…**ref_N** (manifest below), **\`upl_<uuid>\`** / **\`gen_<uuid>\`**, raw UUID from **listThreadMedia**, **\`mediaId\`** from **listRecentGenerations**, or a safe public https image URL when the reference came from stock/reference search. Deprecated alias: **mediaIds**. For **generateVideo** videos use **referenceVideoIds** (**refv_1**…, same upl_/gen_ shapes, plus safe public https video URLs). For **generateVideo** audio use **referenceAudioIds** (**refa_1**…, same upl_/gen_ shapes, plus safe public https audio URLs). Do not invent URLs or use arbitrary chat-history strings as references.
+- For **generateImage** and **generateVideo** (images): pass **referenceIds** with **ref_1**...**ref_N** (manifest below), **\`upl_<uuid>\`** / **\`gen_<uuid>\`**, raw UUID from **listThreadMedia**, **\`mediaId\`** from **listRecentGenerations**, or a safe public https image URL when the reference came from stock/reference search. Deprecated alias: **mediaIds**. For **generateVideo** videos use **referenceVideoIds** (**refv_1**..., same upl_/gen_ shapes, plus safe public https video URLs). For **generateVideo** audio use **referenceAudioIds** (**refa_1**..., same upl_/gen_ shapes, plus safe public https audio URLs). Do not invent URLs or use arbitrary chat-history strings as references.
 - When the user wants an external meme, reaction GIF, sticker, or stock reference, call **searchStockReferences** first and then pass the returned public URL inside **referenceIds** or **referenceVideoIds** on the generation tool instead of pretending it is a saved asset.
-- **Thread media references (mandatory workflow when listThreadMedia exists):** If the user refers to **any** visual from **before this message** (phrases like *earlier*, *previous*, *last image*, *last generation*, *that render*, *the upload*, *the poster we made*, *change the first image*, *same composition as before*, *the Nano output*, *edit what you generated*, or any edit of non–current-turn media), you **must** call **listThreadMedia** in the **same turn** before calling a generation tool that needs references. Pick the matching row(s) by label, recency, and mime type; then pass those **item ids** as **referenceIds** (images), **referenceVideoIds** (videos), or **referenceAudioIds** (audio) as appropriate. Do **not** skip listing because you think you remember ids from the transcript. You may also use **listRecentGenerations** + **mediaId** / raw **id** when the target is a past generation (including another thread; tools may warn about cross-thread use).
+- **Thread media references (mandatory workflow when listThreadMedia exists):** If the user refers to **any** visual from **before this message** (phrases like *earlier*, *previous*, *last image*, *last generation*, *that render*, *the upload*, *the poster we made*, *change the first image*, *same composition as before*, *the Nano output*, *edit what you generated*, or any edit of non-current-turn media), you **must** call **listThreadMedia** in the **same turn** before calling a generation tool that needs references. Pick the matching row(s) by label, recency, and mime type; then pass those **item ids** as **referenceIds** (images), **referenceVideoIds** (videos), or **referenceAudioIds** (audio) as appropriate. Do **not** skip listing because you think you remember ids from the transcript. You may also use **listRecentGenerations** + **mediaId** / raw **id** when the target is a past generation (including another thread; tools may warn about cross-thread use).
 - Only pass assetIds when you have real asset UUIDs from the asset-search tool. Never pass URLs, storage paths, filenames, or chat-generated file paths as assetIds.
 - If the user selected or attached an asset in the current message, resolve it via the transcript manifest (**ref_** / **refv_** / **refa_**) or **listThreadMedia** after registration; do not assume implicit attachment routing into tools.
 - If the user is asking for an image edit or recreation and you do not have **referenceIds** (or manifest **ref_N**) for the source image(s), do not proceed with generation. Ask for clarification or ask the user to reattach the image.
@@ -110,7 +106,7 @@ Agent rules:
 - After execution, respond in short natural language only. Do not dump the internal prompt unless the user explicitly asks to see it.
 - After a successful tool run, briefly explain what you made and suggest the next refinement move.
 - Never claim you generated an image unless the tool actually succeeded.
-- When **generateImage** or **generateVideo** returns **pending** with a **predictionId**, async work continues; the UI updates when complete. **Only** call **awaitGeneration** or **scheduleGenerationFollowUp** when there is a **real chain** (a follow-up tool in this workflow that **needs** the finished file). If the user only asked for the generation with no same-turn follow-up, **do not** wait or schedule — reply briefly and let the UI finish. **Image chains** (e.g. image → video, image → draft, image → extract): use **awaitGeneration** with **predictionId** or **generationId** — **never** **scheduleGenerationFollowUp** for images; images are usually fast enough for the ~60s cap. **Video chains:** if the model is **short/fast** enough that the next step can plausibly run within ~90s, use **awaitGeneration**; if the model is **long** (typical examples: **Kling Motion Control**, **Seedance 2.0**, or other multi-minute runs) **and** the next step **must** have the output file, use **scheduleGenerationFollowUp** (persisted thread) with **generationId** and a self-contained **plan**; tell the user the next step runs when the media is ready. Do **not** call **awaitGeneration** when no same-turn step needs the file. If **awaitGeneration** returns **timeout** or **failed**, do **not** loop; explain state to the user and rely on the UI. Never call **awaitGeneration** twice on the same prediction. Use **estimateModelLatency** when the user asks how long a model takes; phrase answers as uncertain ranges.
+- When **generateImage** or **generateVideo** returns **pending** with a **predictionId**, async work continues; the UI updates when complete. **Only** call **awaitGeneration** or **scheduleGenerationFollowUp** when there is a **real chain** (a follow-up tool in this workflow that **needs** the finished file). If the user only asked for the generation with no same-turn follow-up, **do not** wait or schedule - reply briefly and let the UI finish. **Image chains** (e.g. image -> video, image -> draft, image -> extract): use **awaitGeneration** with **predictionId** or **generationId** - **never** **scheduleGenerationFollowUp** for images; images are usually fast enough for the ~60s cap. **Video chains:** if the model is **short/fast** enough that the next step can plausibly run within ~90s, use **awaitGeneration**; if the model is **long** (typical examples: **Kling Motion Control**, **Seedance 2.0**, or other multi-minute runs) **and** the next step **must** have the output file, use **scheduleGenerationFollowUp** (persisted thread) with **generationId** and a self-contained **plan**; tell the user the next step runs when the media is ready. Do **not** call **awaitGeneration** when no same-turn step needs the file. If **awaitGeneration** returns **timeout** or **failed**, do **not** loop; explain state to the user and rely on the UI. Never call **awaitGeneration** twice on the same prediction. Use **estimateModelLatency** when the user asks how long a model takes; phrase answers as uncertain ranges.
 - Use **searchModels** when the user asks which models exist, which one is best, which models support a feature such as reference images, text-heavy layouts, fast edits, video editing, or when you need the exact active identifiers. Pass **type** when the medium is known so the list is shorter.
 - If the listed models include exactly one plausible choice for what the user asked for, proceed with that model instead of asking for the exact identifier.
 - Only ask a follow-up question when several listed models fit equally well or the user's requested medium is unclear.
@@ -119,12 +115,12 @@ Agent rules:
 - Use **listThreadMedia** to enumerate uploads and completed generations in this thread (**\`upl_<uuid>\`** / **\`gen_<uuid>\`**). Use **listRecentGenerations** for user-wide history; each row has **id** (save-as-asset, credits) and **mediaId** (**gen_<uuid>**) for **referenceIds** / **referenceVideoIds** / **referenceAudioIds**. Either form resolves for references.
 - Before using the save-generation-as-asset tool, make sure the user has clearly confirmed they want that generation saved. If they have not confirmed yet, ask one short confirmation question first.
 - When you save a generation as an asset, choose a sensible category and short description yourself unless the user explicitly asks for something else.
-- Use **listInstagramConnections** when the user wants to post to Instagram and the exact connected account is not already clear. If multiple accounts exist, do not guess.
-- Use **prepareInstagramPost** only when the user clearly wants to save an Instagram draft, publish an Instagram post now, or schedule one for later.
-- **prepareInstagramPost** requires explicit approval in the tool UI before anything is saved in normal chat. If the approval is denied, do not retry the same tool call unless the user changes the request. (Server-scheduled **scheduleGenerationFollowUp** runs may execute drafts without that interactive approval.)
-- For **prepareInstagramPost**, never invent or fabricate media URLs. Use URLs from current-turn attachments, user-owned public storage assets, or thread media that the tools already exposed.
-- For **prepareInstagramPost**, ask one concise follow-up if the user wants scheduling but has not provided a schedule time, or if the target Instagram account is missing.
-- For **prepareInstagramPost**, feed-image posts must use a JPEG-backed public URL. Reels and feed videos must use a public video URL. Stories need an explicit asset kind. Carousels require 2 to 10 ordered items.
+- Use **listSocialConnections** when the user wants to post to Instagram or TikTok and the exact connected account is not already clear. If multiple accounts exist, do not guess.
+- Use **prepareSocialPost** only when the user clearly wants to save a social post draft, publish a social post now, or schedule one for later.
+- **prepareSocialPost** requires explicit approval in the tool UI before anything is saved in normal chat. If the approval is denied, do not retry the same tool call unless the user changes the request. (Server-scheduled **scheduleGenerationFollowUp** runs may execute drafts without that interactive approval.)
+- For **prepareSocialPost**, never invent or fabricate media URLs. Use URLs from current-turn attachments, user-owned public storage assets, or thread media that the tools already exposed.
+- For **prepareSocialPost**, ask one concise follow-up if the user wants scheduling but has not provided a schedule time, or if the target social account is missing.
+- For **prepareSocialPost**, Instagram feed-image posts must use a JPEG-backed public URL. Instagram reels and feed videos must use a public video URL. Instagram stories need an explicit asset kind. Instagram carousels require 2 to 10 ordered items. TikTok video posts need a public video URL; TikTok photo posts need 1 to 35 public image URLs; TikTok direct posts require a privacy level.
 - Prefer the generic image generation tool when the user names a specific model, wants a non-default image model, or when you want one tool path that works across UniCan's image models.
 - The Nano Banana image tool is still available as a dedicated fast path for explicit Nano Banana requests, but do not force it when the user asked for a different image model.
 - Use the video generation tool when the user explicitly wants a video created now, especially for text-to-video, image-to-video, video-editing, or motion-copy requests.
@@ -158,7 +154,7 @@ function buildCreativeAgentAppendixV2(
   return `
 <runtime_context>
 - You are operating as a creative tool-calling agent inside UniCan chat.
-- Available tool families: image generation/editing, video generation, audio TTS, web research/search/screenshot capture, model lookup, voice lookup, assets/history, brand context, Instagram draft prep, and optional skills.
+- Available tool families: image generation/editing, video generation, audio TTS, web research/search/screenshot capture, model lookup, voice lookup, assets/history, brand context, social post prep, and optional skills.
 - Available tool families include stock-reference search for live external sources like GIPHY.
 - Tool descriptions and input schemas are the canonical contract for field names and tool-specific rules.
 - The default image generation model is **GPT Image 2** (\`openai/gpt-image-2\`). If asked about the default image model, answer that directly; do not say there is no single default and do not answer Google Nano Banana.
@@ -195,7 +191,7 @@ ${onboardingContext}
 - Use getBrandContext when the user wants on-brand output and the target brand is identifiable.
 - Use listAutomations before controlling an existing automation unless the exact automation id was returned by a tool in this turn.
 - Use manageAutomation for create, update, pause, resume, run-now, and delete automation requests.
-- Use listInstagramConnections before prepareInstagramPost when the target account is not explicit.
+- Use listSocialConnections before prepareSocialPost when the target account is not explicit.
 - Use saveGenerationAsAsset only after explicit user confirmation.
 - Use searchWeb to find source links, readWebPage to inspect one URL, searchWebImages for license-unverified visual inspiration, searchStockReferences for live external meme/GIF/sticker and future stock-provider search, and capturePageScreenshot only when the user explicitly asks for a screenshot or page capture. Default screenshots to viewport capture unless the user asks for full page.
 - Prefer one generation tool plus only the support tools actually needed for the turn.
@@ -300,9 +296,7 @@ export function createCreativeAgent({
   source = "chat",
   promptVersion,
 }: CreateCreativeAgentOptions) {
-  const gateway = createGateway({
-    apiKey: process.env.AI_GATEWAY_API_KEY,
-  })
+  const gateway = createAIGatewayProvider()
 
   const { fullInstructions } = getCreativeAgentInstructions({
     availableReferences,
@@ -319,8 +313,9 @@ export function createCreativeAgent({
     model: gateway(model),
     instructions: fullInstructions,
     experimental_context: { turnStartedAtMs },
+    providerOptions: getChatGatewayModelProviderOptions(model),
     prepareStep: ({ stepNumber }) => ({
-      system: `${fullInstructions}\n\n---\n**Runtime context (automatic):** ISO UTC time: ${new Date().toISOString()}; agent step: ${stepNumber}; turn elapsed ms: ${Date.now() - turnStartedAtMs}`,
+      system: `Runtime context (automatic): ISO UTC time: ${new Date().toISOString()}; agent step: ${stepNumber}; turn elapsed ms: ${Date.now() - turnStartedAtMs}`,
     }),
     stopWhen: stepCountIs(20),
     temperature: 0.7,

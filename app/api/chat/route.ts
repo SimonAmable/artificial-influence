@@ -1,7 +1,6 @@
 import {
   consumeStream,
   createAgentUIStreamResponse,
-  createGateway,
   createIdGenerator,
   convertToModelMessages,
   type InferAgentUIMessage,
@@ -28,16 +27,21 @@ import { resolveChatGatewayModel } from "@/lib/constants/chat-llm-models"
 import { buildSelectedReferenceContext } from "@/lib/chat/selected-reference-context"
 import { registerThreadMediaFromUserMessageParts } from "@/lib/chat/thread-media/server"
 import { buildOnboardingHiddenContext } from "@/lib/onboarding/hidden-context"
+import {
+  AI_GATEWAY_CONFIG_ERROR,
+  createAIGatewayProvider,
+  hasAIGatewayCredentials,
+} from "@/lib/ai/gateway"
 
 /** Allows long chained tool turns (e.g. awaitGeneration + follow-up tools) on Vercel Pro (max 300s). */
 export const maxDuration = 300
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.AI_GATEWAY_API_KEY) {
-      console.error("[chat] AI_GATEWAY_API_KEY not set")
+    if (!hasAIGatewayCredentials()) {
+      console.error("[chat] AI Gateway credentials not configured")
       return new Response(
-        JSON.stringify({ error: "AI_GATEWAY_API_KEY environment variable is not set" }),
+        JSON.stringify({ error: AI_GATEWAY_CONFIG_ERROR }),
         { status: 500 },
       )
     }
@@ -159,9 +163,7 @@ export async function POST(req: Request) {
     }
 
     if (mode === "prompt-recreate") {
-      const gateway = createGateway({
-        apiKey: process.env.AI_GATEWAY_API_KEY,
-      })
+      const gateway = createAIGatewayProvider()
 
       const convertedMessages = await convertToModelMessages(validatedMessages)
       const streamResult = streamText({
@@ -252,6 +254,7 @@ export async function POST(req: Request) {
         size: 16,
       }),
       originalMessages: creativeAgentMessages,
+      sendReasoning: false,
       onFinish: async ({ messages: responseMessages, isAborted }) => {
         if (!threadId || isAborted) {
           return

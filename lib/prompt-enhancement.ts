@@ -1,4 +1,4 @@
-import { createGateway, generateObject, generateText, zodSchema } from 'ai';
+import { generateObject, generateText, zodSchema } from 'ai';
 import { z } from 'zod';
 import { NANO_BANANA_PRO_ENHANCEMENT_PROMPT } from './constants/system-prompts';
 import {
@@ -7,6 +7,7 @@ import {
   DEFAULT_GOOGLE_GEMINI_VOICE_ID,
   type AudioProvider,
 } from "@/lib/constants/audio"
+import { createAIGatewayProvider, hasAIGatewayCredentials } from "@/lib/ai/gateway"
 
 /** Must match AI Gateway model ids (see @ai-sdk/gateway), not legacy `x-ai/...` strings. */
 const PROMPT_ENHANCEMENT_MODEL = 'xai/grok-4.1-fast-non-reasoning' as const;
@@ -18,23 +19,21 @@ const PROMPT_ENHANCEMENT_VISION_MODEL = 'google/gemini-3.1-flash-lite-preview' a
 const MAX_JSON_ENHANCEMENT_REFERENCE_IMAGES = 8;
 
 function enhancementLanguageModel() {
-  const apiKey = process.env.AI_GATEWAY_API_KEY;
-  if (!apiKey) {
+  if (!hasAIGatewayCredentials()) {
     throw new Error(
-      'AI_GATEWAY_API_KEY is not set; prompt enhancement uses the Vercel AI Gateway (same as /api/generate-text).'
+      'AI Gateway is not configured; prompt enhancement uses the Vercel AI Gateway and supports either AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN.'
     );
   }
-  return createGateway({ apiKey })(PROMPT_ENHANCEMENT_MODEL);
+  return createAIGatewayProvider()(PROMPT_ENHANCEMENT_MODEL);
 }
 
 function jsonEnhancementVisionLanguageModel() {
-  const apiKey = process.env.AI_GATEWAY_API_KEY;
-  if (!apiKey) {
+  if (!hasAIGatewayCredentials()) {
     throw new Error(
-      'AI_GATEWAY_API_KEY is not set; prompt enhancement uses the Vercel AI Gateway (same as /api/generate-text).'
+      'AI Gateway is not configured; prompt enhancement uses the Vercel AI Gateway and supports either AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN.'
     );
   }
-  return createGateway({ apiKey })(PROMPT_ENHANCEMENT_VISION_MODEL);
+  return createAIGatewayProvider()(PROMPT_ENHANCEMENT_VISION_MODEL);
 }
 
 // Prompt constants for different use cases

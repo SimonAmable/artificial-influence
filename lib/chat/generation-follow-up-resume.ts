@@ -21,6 +21,7 @@ import {
 import { buildSelectedReferenceContext } from "@/lib/chat/selected-reference-context"
 import { DEFAULT_CHAT_GATEWAY_MODEL } from "@/lib/constants/chat-llm-models"
 import { formatGenerationMediaId } from "@/lib/chat/media-id"
+import { AI_GATEWAY_CONFIG_ERROR, hasAIGatewayCredentials } from "@/lib/ai/gateway"
 
 function buildContinuationUserMessageText(options: {
   plan: string
@@ -51,9 +52,9 @@ export async function runGenerationFollowUpResume(options: {
 }): Promise<{ skipped: boolean; error?: string }> {
   const { supabase, generationId } = options
 
-  if (!process.env.AI_GATEWAY_API_KEY) {
-    console.error("[generation-follow-up-resume] AI_GATEWAY_API_KEY not set")
-    return { skipped: true, error: "AI_GATEWAY_API_KEY not set" }
+  if (!hasAIGatewayCredentials()) {
+    console.error("[generation-follow-up-resume] AI Gateway credentials not configured")
+    return { skipped: true, error: AI_GATEWAY_CONFIG_ERROR }
   }
 
   const { data: claimed, error: claimError } = await supabase
@@ -189,6 +190,7 @@ export async function runGenerationFollowUpResume(options: {
       uiMessages: creativeAgentMessages,
       originalMessages: creativeAgentMessages,
       generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
+      sendReasoning: true,
       onFinish: async ({ messages: responseMessages, isAborted }) => {
         if (isAborted) {
           return

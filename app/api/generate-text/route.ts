@@ -1,19 +1,23 @@
-import { generateText, createGateway } from 'ai';
+import { generateText } from 'ai';
 import { createClient } from '@/lib/supabase/server';
 import { assertAcceptedCurrentTerms } from '@/lib/legal/terms-acceptance';
 import { NextResponse } from 'next/server';
 import { TEXT_GENERATION_SYSTEM_PROMPT } from '@/lib/constants/system-prompts';
 import { enhancePrompt } from '@/lib/prompt-enhancement';
+import {
+  AI_GATEWAY_CONFIG_ERROR,
+  createAIGatewayProvider,
+  hasAIGatewayCredentials,
+} from '@/lib/ai/gateway';
 
 const TEXT_GEN_MODEL = 'google/gemini-2.5-flash' as const
 
 export async function POST(req: Request) {
   try {
-    // Check for API key
-    if (!process.env.AI_GATEWAY_API_KEY) {
-      console.error('[generate-text] AI_GATEWAY_API_KEY not set');
+    if (!hasAIGatewayCredentials()) {
+      console.error('[generate-text] AI Gateway credentials not configured');
       return NextResponse.json(
-        { error: 'AI_GATEWAY_API_KEY environment variable is not set' },
+        { error: AI_GATEWAY_CONFIG_ERROR },
         { status: 500 }
       );
     }
@@ -58,15 +62,11 @@ export async function POST(req: Request) {
     // Optionally enhance prompt for fresh content (not edits)
     let processedPrompt = prompt;
     if (shouldEnhancePrompt && !currentText) {
-      console.log('[generate-text] Enhancing prompt...');
       processedPrompt = await enhancePrompt(prompt, 'generate');
-      console.log('[generate-text] Enhanced prompt:', processedPrompt.substring(0, 100) + '...');
     }
 
     // Create AI Gateway instance
-    const gateway = createGateway({
-      apiKey: process.env.AI_GATEWAY_API_KEY,
-    });
+    const gateway = createAIGatewayProvider();
 
     // Build user message with context
     const userContent: Array<{ type: 'text'; text: string } | { type: 'image'; image: string }> = [];
@@ -108,8 +108,6 @@ export async function POST(req: Request) {
       ],
       temperature: 0.7,
     });
-
-    console.log('[generate-text] Generated:', result.text.substring(0, 100) + '...');
 
     return NextResponse.json({ text: result.text });
   } catch (error) {

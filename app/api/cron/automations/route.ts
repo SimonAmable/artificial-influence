@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { hasAIGatewayCredentials } from "@/lib/ai/gateway"
 import { computeNextRun } from "@/lib/automations/schedule"
 import { runAutomation } from "@/lib/automations/run"
 import type { AutomationRow } from "@/lib/automations/types"
@@ -22,8 +23,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 })
   }
 
-  if (!process.env.AI_GATEWAY_API_KEY) {
-    console.error("[cron/automations] AI_GATEWAY_API_KEY not set")
+  if (!hasAIGatewayCredentials()) {
+    console.error("[cron/automations] AI Gateway credentials not configured")
     return NextResponse.json({ error: "Server configuration error." }, { status: 500 })
   }
 

@@ -13,10 +13,11 @@ interface ModelIconProps {
   identifier: string
   size?: number
   className?: string
+  srcOverride?: string
 }
 
-export function ModelIcon({ identifier, size = 16, className }: ModelIconProps) {
-  const iconPath = getModelIconPath(identifier)
+export function ModelIcon({ identifier, size = 16, className, srcOverride }: ModelIconProps) {
+  const iconPath = srcOverride ?? getModelIconPath(identifier)
   
   if (!iconPath) {
     return (

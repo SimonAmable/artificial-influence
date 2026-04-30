@@ -1,7 +1,9 @@
 export const ALWAYS_AVAILABLE_CREATIVE_CHAT_TOOL_KEYS = [
   "listAutomations",
+  "listSocialConnections",
   "listInstagramConnections",
   "manageAutomation",
+  "prepareSocialPost",
   "prepareInstagramPost",
   "generateAudio",
   "generateImage",

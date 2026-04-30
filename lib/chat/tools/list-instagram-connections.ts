@@ -1,7 +1,8 @@
 import { tool } from "ai"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
-import { parseSavedProfileFromMetadata } from "@/lib/instagram/profile"
+
+import { listSocialConnections } from "@/lib/chat/tools/list-social-connections"
 
 interface CreateListInstagramConnectionsToolOptions {
   supabase: SupabaseClient
@@ -18,35 +19,21 @@ export function createListInstagramConnectionsTool({
     inputSchema: z.object({}),
     strict: true,
     execute: async () => {
-      const { data, error } = await supabase
-        .from("instagram_connections")
-        .select("id, instagram_user_id, instagram_username, token_expires_at, updated_at, metadata")
-        .eq("user_id", userId)
-        .eq("status", "connected")
-        .order("updated_at", { ascending: false })
-
-      if (error) {
-        throw new Error(`Failed to load Instagram connections: ${error.message}`)
-      }
-
-      const connections = (data ?? []).map((row) => {
-        const metadata =
-          row.metadata && typeof row.metadata === "object"
-            ? (row.metadata as Record<string, unknown>)
-            : null
-        const profile = parseSavedProfileFromMetadata(row.metadata)
-
-        return {
-          accountType:
-            metadata && typeof metadata.account_type === "string" ? metadata.account_type : null,
-          id: row.id,
-          instagramUserId: row.instagram_user_id,
-          instagramUsername: row.instagram_username,
-          profileFetchedAt: profile?.fetched_at ?? null,
-          tokenExpiresAt: row.token_expires_at,
-          updatedAt: row.updated_at,
-        }
-      })
+      const connections = (await listSocialConnections({
+        provider: "instagram",
+        supabase,
+        userId,
+      }))
+        .filter((connection) => connection.instagramConnectionId)
+        .map((connection) => ({
+          accountType: connection.accountType,
+          id: connection.instagramConnectionId as string,
+          instagramUserId: connection.instagramUserId,
+          instagramUsername: connection.username,
+          profileFetchedAt: connection.profileFetchedAt,
+          tokenExpiresAt: connection.tokenExpiresAt,
+          updatedAt: connection.updatedAt,
+        }))
 
       return {
         connections,

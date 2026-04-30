@@ -12,12 +12,26 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
-  serverExternalPackages: ["ffmpeg-static", "ffprobe-static"],
+  serverExternalPackages: [
+    "ffmpeg-static",
+    "ffprobe-static",
+    "@remotion/bundler",
+    "@remotion/vercel",
+    "@vercel/functions",
+    "@vercel/sandbox",
+    "esbuild",
+  ],
   outputFileTracingIncludes: {
     "/api/chat": ffmpegTracingIncludes,
     "/api/autopost/publish": ffmpegTracingIncludes,
     "/api/cron/autopost-queue": ffmpegTracingIncludes,
     "/api/free-tools/tiktok-video-fixer": ffmpegTracingIncludes,
+    "/api/editor/render": [
+      "./remotion-renderer/package.json",
+      "./remotion-renderer/package-lock.json",
+      "./remotion-renderer/tsconfig.json",
+      "./remotion-renderer/src/**/*",
+    ],
   },
   async redirects() {
     return [

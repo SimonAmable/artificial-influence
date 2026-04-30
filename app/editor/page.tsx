@@ -12,7 +12,7 @@ function EditorPageInner() {
 
 export default function EditorPage() {
   return (
-    <main className="min-h-0 w-full min-w-0">
+    <main className="h-screen w-full min-w-0 overflow-hidden pt-16">
       <React.Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading editor…</div>}>
         <EditorPageInner />
       </React.Suspense>

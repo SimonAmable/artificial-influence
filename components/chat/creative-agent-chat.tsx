@@ -24,6 +24,7 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from "@/components/ai-elements/conversation"
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning"
 import { SpeechInput } from "@/components/ai-elements/speech-input"
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message"
 import { Shimmer } from "@/components/ai-elements/shimmer"
@@ -61,6 +62,7 @@ import {
 import {
   CHAT_GATEWAY_MODEL_OPTIONS,
   DEFAULT_CHAT_GATEWAY_MODEL,
+  getChatGatewayModelOption,
 } from "@/lib/constants/chat-llm-models"
 import { cn } from "@/lib/utils"
 import { createClient as createSupabaseClient } from "@/lib/supabase/client"
@@ -138,6 +140,7 @@ const RAW_URL_REGEX = /https?:\/\/[^\s<>"')\]]+/gi
 
 type MediaValueType = "image" | "video" | "audio" | "other"
 type FileMessagePart = Extract<UIMessage["parts"][number], { type: "file" }>
+type ReasoningMessagePart = Extract<UIMessage["parts"][number], { type: "reasoning" }>
 
 type GenerateImageToolPart = {
   type: "tool-generateImageWithNanoBanana"
@@ -780,6 +783,46 @@ export type InstagramConnectionToolSummary = {
   updatedAt: string
 }
 
+type SocialProvider = "instagram" | "tiktok"
+
+type SocialConnectionToolSummary = {
+  accountType?: string | null
+  displayName?: string | null
+  id: string
+  instagramConnectionId?: string | null
+  instagramUserId?: string | null
+  profileFetchedAt?: string | null
+  provider: SocialProvider
+  scopes?: string[]
+  status: string
+  tokenExpiresAt?: string | null
+  updatedAt: string
+  username?: string | null
+}
+
+type ListSocialConnectionsToolPart = {
+  type: "tool-listSocialConnections"
+  toolCallId: string
+  state:
+    | "input-streaming"
+    | "input-available"
+    | "approval-requested"
+    | "approval-responded"
+    | "output-available"
+    | "output-error"
+    | "output-denied"
+  input?: {
+    provider?: SocialProvider
+  }
+  output?: {
+    connections?: SocialConnectionToolSummary[]
+    message?: string
+    provider?: SocialProvider | null
+    total?: number
+  }
+  errorText?: string
+}
+
 type ListInstagramConnectionsToolPart = {
   type: "tool-listInstagramConnections"
   toolCallId: string
@@ -851,6 +894,97 @@ type PrepareInstagramPostToolPart = {
       scheduledAt?: string | null
       status: string
     }
+  }
+  approval?: {
+    approved?: boolean
+    id: string
+    reason?: string
+  }
+  errorText?: string
+}
+
+type PrepareSocialPostToolInput =
+  | {
+      provider: "instagram"
+      action: "draft" | "publish" | "schedule"
+      caption?: string
+      carouselItems?: Array<{
+        kind: "image" | "video"
+        url: string
+      }>
+      connectionId: string
+      coverUrl?: string
+      mediaType: "image" | "feed_video" | "reel" | "carousel" | "story"
+      mediaUrl?: string
+      scheduledAt?: string
+      shareToFeed?: boolean
+      storyAssetKind?: "image" | "video"
+      trialParams?: {
+        graduationStrategy: "MANUAL" | "SS_PERFORMANCE"
+      }
+    }
+  | {
+      provider: "tiktok"
+      action: "draft" | "publish" | "schedule"
+      autoAddMusic?: boolean
+      brandContentToggle?: boolean
+      brandOrganicToggle?: boolean
+      caption?: string
+      connectionId: string
+      description?: string
+      disableComment?: boolean
+      disableDuet?: boolean
+      disableStitch?: boolean
+      isAigc?: boolean
+      mediaUrl?: string
+      mode: "upload" | "direct"
+      photoCoverIndex?: number
+      photoItems?: string[]
+      postType?: "video" | "photo"
+      privacyLevel?: string
+      scheduledAt?: string
+    }
+
+type PrepareSocialPostToolPart = {
+  type: "tool-prepareSocialPost"
+  toolCallId: string
+  state:
+    | "input-streaming"
+    | "input-available"
+    | "approval-requested"
+    | "approval-responded"
+    | "output-available"
+    | "output-error"
+    | "output-denied"
+  input?: PrepareSocialPostToolInput
+  output?: {
+    action: "draft" | "publish" | "schedule"
+    account?: SocialConnectionToolSummary
+    message?: string
+    post?: {
+      caption?: string | null
+      createdAt: string
+      id: string
+      instagramConnectionId?: string | null
+      mediaType: string
+      mediaUrl: string
+      metadata?: {
+        assetKind?: "image" | "video"
+        carouselItems?: Array<{
+          kind: "image" | "video"
+          url: string
+        }>
+        tiktok?: {
+          description?: string | null
+          photoCoverIndex?: number
+          photoItems?: Array<{ url: string }>
+        }
+      } | null
+      scheduledAt?: string | null
+      socialConnectionId?: string | null
+      status: string
+    }
+    provider: SocialProvider
   }
   approval?: {
     approved?: boolean
@@ -1939,6 +2073,24 @@ function formatInstagramSchedule(value?: string | null) {
   return date.toLocaleString()
 }
 
+function socialProviderLabel(provider?: SocialProvider | null) {
+  return provider === "tiktok" ? "TikTok" : "Instagram"
+}
+
+function socialAccountLabel(account?: SocialConnectionToolSummary | null, fallbackId?: string | null) {
+  if (!account) {
+    return fallbackId || "Social account"
+  }
+
+  return (
+    account.displayName
+    || account.username
+    || (account.provider === "instagram" ? account.instagramConnectionId : null)
+    || fallbackId
+    || `${socialProviderLabel(account.provider)} account`
+  )
+}
+
 function InstagramMediaPreview({
   input,
 }: {
@@ -1954,6 +2106,55 @@ function InstagramMediaPreview({
       : input.mediaUrl
         ? [{ kind: input.mediaType === "image" ? "image" : "video", url: input.mediaUrl }]
         : []
+
+  if (items.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {items.slice(0, 4).map((item, index) =>
+        item.kind === "image" ? (
+          <img
+            key={`${item.url}-${index}`}
+            src={item.url}
+            alt=""
+            className="max-h-48 w-full rounded-xl border border-border/60 object-cover"
+          />
+        ) : (
+          <video
+            key={`${item.url}-${index}`}
+            src={item.url}
+            controls
+            className="max-h-48 w-full rounded-xl border border-border/60 bg-black"
+          />
+        ),
+      )}
+    </div>
+  )
+}
+
+function SocialPostMediaPreview({
+  input,
+}: {
+  input?: PrepareSocialPostToolInput
+}) {
+  if (!input) {
+    return null
+  }
+
+  const items =
+    input.provider === "instagram"
+      ? input.mediaType === "carousel"
+        ? input.carouselItems ?? []
+        : input.mediaUrl
+          ? [{ kind: input.mediaType === "image" ? "image" : "video", url: input.mediaUrl }]
+          : []
+      : input.postType === "photo"
+        ? (input.photoItems ?? []).map((url) => ({ kind: "image" as const, url }))
+        : input.mediaUrl
+          ? [{ kind: "video" as const, url: input.mediaUrl }]
+          : []
 
   if (items.length === 0) {
     return null
@@ -2079,14 +2280,35 @@ function UserMessageMediaParts({
   )
 }
 
+function collectConsecutiveReasoningParts(
+  parts: UIMessage["parts"],
+  startIndex: number,
+): ReasoningMessagePart[] {
+  const reasoningParts: ReasoningMessagePart[] = []
+
+  for (let index = startIndex; index < parts.length; index += 1) {
+    const part = parts[index]
+
+    if (part.type !== "reasoning") {
+      break
+    }
+
+    reasoningParts.push(part)
+  }
+
+  return reasoningParts
+}
+
 export function MessageParts({
   message,
   instagramConnectionsById,
+  socialConnectionsById = new Map(),
   onEditSkillRequest,
   onToolApprovalResponse,
 }: {
   message: UIMessage
   instagramConnectionsById: Map<string, InstagramConnectionToolSummary>
+  socialConnectionsById?: Map<string, SocialConnectionToolSummary>
   onEditSkillRequest?: (slug: string) => void
   onToolApprovalResponse: (approvalId: string, approved: boolean) => void
 }) {
@@ -2110,6 +2332,31 @@ export function MessageParts({
                 />
               ))}
             </div>
+          )
+        }
+
+        if (part.type === "reasoning") {
+          if (index > 0 && message.parts[index - 1]?.type === "reasoning") {
+            return null
+          }
+
+          const reasoningParts = collectConsecutiveReasoningParts(message.parts, index)
+          const reasoningText = reasoningParts
+            .map((reasoningPart) => reasoningPart.text)
+            .filter((text) => text.trim().length > 0)
+            .join("\n\n")
+          const isStreaming = reasoningParts.some((reasoningPart) => reasoningPart.state === "streaming")
+
+          return (
+            <Reasoning
+              key={`${message.id}-${index}`}
+              className="w-full"
+              defaultOpen={isStreaming}
+              isStreaming={isStreaming}
+            >
+              <ReasoningTrigger />
+              <ReasoningContent>{reasoningText}</ReasoningContent>
+            </Reasoning>
           )
         }
 
@@ -2301,6 +2548,83 @@ export function MessageParts({
           )
         }
 
+        if (part.type === "tool-listSocialConnections") {
+          const toolPart = part as unknown as ListSocialConnectionsToolPart
+          const providerLabel = socialProviderLabel(toolPart.output?.provider ?? toolPart.input?.provider ?? null)
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Checking social connections</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      Looking up connected {toolPart.input?.provider ? providerLabel : "social"} accounts
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Social account lookup failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const connections = toolPart.output?.connections ?? []
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>{toolPart.output?.provider ? `${providerLabel} Accounts` : "Social Accounts"}</Badge>
+                  {typeof toolPart.output?.total === "number" ? (
+                    <Badge variant="outline">
+                      {toolPart.output.total} result{toolPart.output.total === 1 ? "" : "s"}
+                    </Badge>
+                  ) : null}
+                </div>
+                {toolPart.output?.message ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
+                ) : null}
+                <div className="space-y-2">
+                  {connections.map((connection) => (
+                    <div
+                      key={connection.id}
+                      className="rounded-xl border border-border/60 bg-background/80 p-3"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium">
+                          {socialAccountLabel(connection, connection.id.slice(0, 8))}
+                        </p>
+                        <Badge variant="outline">{socialProviderLabel(connection.provider)}</Badge>
+                        {connection.accountType ? <Badge variant="outline">{connection.accountType}</Badge> : null}
+                        <Badge variant="outline">{connection.id.slice(0, 8)}</Badge>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                        <span>Updated {new Date(connection.updatedAt).toLocaleString()}</span>
+                        {connection.tokenExpiresAt ? (
+                          <span>Token expires {new Date(connection.tokenExpiresAt).toLocaleString()}</span>
+                        ) : null}
+                        {connection.profileFetchedAt ? (
+                          <span>Profile fetched {new Date(connection.profileFetchedAt).toLocaleString()}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )
+        }
+
         if (part.type === "tool-listInstagramConnections") {
           const toolPart = part as unknown as ListInstagramConnectionsToolPart
 
@@ -2373,6 +2697,184 @@ export function MessageParts({
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          )
+        }
+
+        if (part.type === "tool-prepareSocialPost") {
+          const toolPart = part as unknown as PrepareSocialPostToolPart
+          const resolvedAccount =
+            toolPart.output?.account
+            ?? (toolPart.input ? socialConnectionsById.get(toolPart.input.connectionId) : undefined)
+          const scheduleLabel =
+            formatInstagramSchedule(toolPart.output?.post?.scheduledAt)
+            ?? formatInstagramSchedule(toolPart.input?.scheduledAt)
+          const providerLabel = socialProviderLabel(toolPart.output?.provider ?? toolPart.input?.provider ?? null)
+          const mediaTypeLabel =
+            toolPart.input?.provider === "instagram"
+              ? toolPart.input.mediaType
+              : toolPart.input?.postType === "photo"
+                ? "photo"
+                : "video"
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Preparing social post</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      Building the post summary for approval
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "approval-requested") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+                <CardContent className="space-y-4 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>{providerLabel} Approval</Badge>
+                    {toolPart.input?.action ? <Badge variant="outline">{toolPart.input.action}</Badge> : null}
+                    {mediaTypeLabel ? <Badge variant="outline">{mediaTypeLabel}</Badge> : null}
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <p className="font-medium">
+                      {socialAccountLabel(resolvedAccount, toolPart.input?.connectionId)}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {toolPart.input?.action === "schedule"
+                        ? `Schedule this ${providerLabel} post${scheduleLabel ? ` for ${scheduleLabel}` : ""}?`
+                        : toolPart.input?.action === "publish"
+                          ? toolPart.input.provider === "tiktok"
+                            ? toolPart.input.mode === "upload"
+                              ? "Send this post to TikTok inbox now?"
+                              : "Submit this post to TikTok now?"
+                            : `Publish this post to ${providerLabel} now?`
+                          : "Save this post as a draft?"}
+                    </p>
+                  </div>
+                  {toolPart.input?.caption ? (
+                    <div className="rounded-xl border border-border/60 bg-background/80 p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Caption</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">
+                        {toolPart.input.caption}
+                      </p>
+                    </div>
+                  ) : null}
+                  {toolPart.input?.provider === "tiktok" && toolPart.input.description ? (
+                    <div className="rounded-xl border border-border/60 bg-background/80 p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Description</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">
+                        {toolPart.input.description}
+                      </p>
+                    </div>
+                  ) : null}
+                  <SocialPostMediaPreview input={toolPart.input} />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => toolPart.approval?.id && onToolApprovalResponse(toolPart.approval.id, true)}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => toolPart.approval?.id && onToolApprovalResponse(toolPart.approval.id, false)}
+                    >
+                      Deny
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "approval-responded") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Processing approval</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {toolPart.approval?.approved ? "Finishing the social post request" : "Recording the denial"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-denied") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+                <CardContent className="space-y-2 p-4 text-sm">
+                  <p className="font-medium">{providerLabel} post not created</p>
+                  <p className="text-muted-foreground">The approval request was denied, so no post was saved.</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">{providerLabel} post failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>
+                    {toolPart.output?.post?.status === "published"
+                      ? `${providerLabel} Published`
+                      : toolPart.output?.post?.status === "queued"
+                        ? `${providerLabel} Scheduled`
+                        : toolPart.output?.post?.status === "processing"
+                          ? `${providerLabel} Submitted`
+                          : `${providerLabel} Draft`}
+                  </Badge>
+                  {toolPart.output?.post?.mediaType ? <Badge variant="outline">{toolPart.output.post.mediaType}</Badge> : null}
+                  {resolvedAccount ? (
+                    <Badge variant="outline">{socialAccountLabel(resolvedAccount, null)}</Badge>
+                  ) : null}
+                </div>
+                {toolPart.output?.message ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
+                ) : null}
+                {toolPart.output?.post ? (
+                  <div className="rounded-xl border border-border/60 bg-background/80 p-3">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                      <span>Job {toolPart.output.post.id.slice(0, 8)}</span>
+                      <span>Created {new Date(toolPart.output.post.createdAt).toLocaleString()}</span>
+                      {scheduleLabel ? <span>Scheduled {scheduleLabel}</span> : null}
+                    </div>
+                    {toolPart.output.post.caption ? (
+                      <p className="mt-3 whitespace-pre-wrap text-sm text-foreground">
+                        {toolPart.output.post.caption}
+                      </p>
+                    ) : null}
+                    {toolPart.output?.provider === "tiktok" && toolPart.output.post.metadata?.tiktok?.description ? (
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
+                        {toolPart.output.post.metadata.tiktok.description}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <SocialPostMediaPreview input={toolPart.input} />
               </CardContent>
             </Card>
           )
@@ -4094,7 +4596,7 @@ export function CreativeAgentChat({
   const [composerValue, setComposerValue] = React.useState("")
   const [attachedFiles, setAttachedFiles] = React.useState<ComposerUploadAttachment[]>([])
   const [attachedRefs, setAttachedRefs] = React.useState<AttachedRef[]>([])
-  const [instagramConnections, setInstagramConnections] = React.useState<InstagramConnectionToolSummary[]>([])
+  const [socialConnections, setSocialConnections] = React.useState<SocialConnectionToolSummary[]>([])
   const [threadId, setThreadId] = React.useState<string | undefined>(initialThreadId)
   const [isCreatingThread, setIsCreatingThread] = React.useState(false)
   const [isEnhancingComposer, setIsEnhancingComposer] = React.useState(false)
@@ -4108,9 +4610,7 @@ export function CreativeAgentChat({
   const [chatGatewayModelId, setChatGatewayModelId] = React.useState<string>(DEFAULT_CHAT_GATEWAY_MODEL)
 
   const selectedChatGatewayOption = React.useMemo(
-    () =>
-      CHAT_GATEWAY_MODEL_OPTIONS.find((option) => option.id === chatGatewayModelId) ??
-      CHAT_GATEWAY_MODEL_OPTIONS[0],
+    () => getChatGatewayModelOption(chatGatewayModelId),
     [chatGatewayModelId],
   )
 
@@ -4209,48 +4709,55 @@ export function CreativeAgentChat({
 
   React.useEffect(() => {
     if (!authReady || !userId) {
-      setInstagramConnections([])
+      setSocialConnections([])
       return
     }
 
     let cancelled = false
 
-    void fetch("/api/instagram/status", { credentials: "same-origin" })
+    void fetch("/api/social-connections/status", { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error("Failed to load Instagram accounts.")
+          throw new Error("Failed to load social accounts.")
         }
         return response.json() as Promise<{
-          connections?: Array<{
-            accountType?: string | null
-            id: string
-            instagramUserId?: string | null
-            instagramUsername?: string | null
-            profileFetchedAt?: string | null
-            tokenExpiresAt?: string | null
-            updatedAt: string
-          }>
+          providers?: {
+            instagram?: {
+              connections?: SocialConnectionToolSummary[]
+            }
+            tiktok?: {
+              connections?: SocialConnectionToolSummary[]
+            }
+          }
         }>
       })
       .then((data) => {
         if (cancelled) return
-        setInstagramConnections(
-          Array.isArray(data.connections)
-            ? data.connections.map((connection) => ({
-                accountType: connection.accountType ?? null,
-                id: connection.id,
-                instagramUserId: connection.instagramUserId ?? null,
-                instagramUsername: connection.instagramUsername ?? null,
-                profileFetchedAt: connection.profileFetchedAt ?? null,
-                tokenExpiresAt: connection.tokenExpiresAt ?? null,
-                updatedAt: connection.updatedAt,
-              }))
-            : [],
+        const connections = [
+          ...(data.providers?.instagram?.connections ?? []),
+          ...(data.providers?.tiktok?.connections ?? []),
+        ]
+
+        setSocialConnections(
+          connections.map((connection) => ({
+            accountType: connection.accountType ?? null,
+            displayName: connection.displayName ?? null,
+            id: connection.id,
+            instagramConnectionId: connection.instagramConnectionId ?? null,
+            instagramUserId: connection.instagramUserId ?? null,
+            profileFetchedAt: connection.profileFetchedAt ?? null,
+            provider: connection.provider,
+            scopes: Array.isArray(connection.scopes) ? connection.scopes : [],
+            status: connection.status,
+            tokenExpiresAt: connection.tokenExpiresAt ?? null,
+            updatedAt: connection.updatedAt,
+            username: connection.username ?? null,
+          })),
         )
       })
       .catch(() => {
         if (cancelled) return
-        setInstagramConnections([])
+        setSocialConnections([])
       })
 
     return () => {
@@ -4258,9 +4765,32 @@ export function CreativeAgentChat({
     }
   }, [authReady, userId])
 
+  const socialConnectionsById = React.useMemo(
+    () => new Map(socialConnections.map((connection) => [connection.id, connection])),
+    [socialConnections],
+  )
+
   const instagramConnectionsById = React.useMemo(
-    () => new Map(instagramConnections.map((connection) => [connection.id, connection])),
-    [instagramConnections],
+    () =>
+      new Map(
+        socialConnections.flatMap((connection) =>
+          connection.provider === "instagram" && connection.instagramConnectionId
+            ? [[
+                connection.instagramConnectionId,
+                {
+                  accountType: connection.accountType ?? null,
+                  id: connection.instagramConnectionId,
+                  instagramUserId: connection.instagramUserId ?? null,
+                  instagramUsername: connection.username ?? connection.displayName ?? null,
+                  profileFetchedAt: connection.profileFetchedAt ?? null,
+                  tokenExpiresAt: connection.tokenExpiresAt ?? null,
+                  updatedAt: connection.updatedAt,
+                } satisfies InstagramConnectionToolSummary,
+              ]]
+            : [],
+        ),
+      ),
+    [socialConnections],
   )
 
   const assetAttachments = React.useMemo<ComposerAssetAttachment[]>(
@@ -4656,6 +5186,7 @@ export function CreativeAgentChat({
     hasPendingUploads,
     initialThreadId,
     isBootstrappingOnboarding,
+    isCreatingThread,
     messages.length,
     onboardingToken,
     sendMessage,
@@ -4690,17 +5221,21 @@ export function CreativeAgentChat({
       threadIdRef.current = nextThreadId
     }
 
-    sendMessage({
-      metadata: refsToChatMetadata(attachedRefs),
-      role: "user",
-      parts,
-    })
+    try {
+      await sendMessage({
+        metadata: refsToChatMetadata(attachedRefs),
+        role: "user",
+        parts,
+      })
 
-    setComposerValue("")
-    setAttachedFiles([])
-    setAttachedRefs([])
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
+      setComposerValue("")
+      setAttachedFiles([])
+      setAttachedRefs([])
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+    } catch (sendError) {
+      toast.error(sendError instanceof Error ? sendError.message : "Could not send message.")
     }
   }, [
     attachedRefs,
@@ -5001,6 +5536,7 @@ export function CreativeAgentChat({
                         <MessageParts
                           message={message}
                           instagramConnectionsById={instagramConnectionsById}
+                          socialConnectionsById={socialConnectionsById}
                           onEditSkillRequest={(slug) => setSkillEditModalSlug(slug)}
                           onToolApprovalResponse={(approvalId, approved) => {
                             void addToolApprovalResponse({
@@ -5196,7 +5732,11 @@ export function CreativeAgentChat({
                         >
                           <SelectValue placeholder="Model">
                             <div className="flex min-w-0 items-center gap-2">
-                              <ModelIcon identifier={selectedChatGatewayOption.id} size={16} />
+                              <ModelIcon
+                                identifier={selectedChatGatewayOption.id}
+                                size={16}
+                                srcOverride={selectedChatGatewayOption.iconPath}
+                              />
                               <span className="truncate">{selectedChatGatewayOption.label}</span>
                             </div>
                           </SelectValue>
@@ -5206,7 +5746,7 @@ export function CreativeAgentChat({
                             <SelectItem key={option.id} value={option.id}>
                               <div className="flex items-center gap-3">
                                 <div className="shrink-0 rounded-md border border-border bg-muted/30 p-1.5">
-                                  <ModelIcon identifier={option.id} size={20} />
+                                  <ModelIcon identifier={option.id} size={20} srcOverride={option.iconPath} />
                                 </div>
                                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                                   <span className="text-sm font-semibold">{option.label}</span>

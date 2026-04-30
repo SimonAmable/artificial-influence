@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+remotion-renderer/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -42,3 +43,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
+.env*.local

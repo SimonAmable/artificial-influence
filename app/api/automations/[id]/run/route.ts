@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { isAutomationServiceError, runAutomationNowForUser } from "@/lib/automations/service"
+import { AI_GATEWAY_CONFIG_ERROR, hasAIGatewayCredentials } from "@/lib/ai/gateway"
 import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 
@@ -10,8 +11,8 @@ type RouteContext = { params: Promise<{ id: string }> }
 
 export async function POST(_req: Request, context: RouteContext) {
   try {
-    if (!process.env.AI_GATEWAY_API_KEY) {
-      return NextResponse.json({ error: "AI gateway not configured" }, { status: 500 })
+    if (!hasAIGatewayCredentials()) {
+      return NextResponse.json({ error: AI_GATEWAY_CONFIG_ERROR }, { status: 500 })
     }
 
     const { id } = await context.params

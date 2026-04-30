@@ -11,9 +11,11 @@ import type {
 import { createGenerateVideoTool } from "@/lib/chat/tools/generate-video"
 import { createGetBrandContextTool } from "@/lib/chat/tools/get-brand-context"
 import { createListInstagramConnectionsTool } from "@/lib/chat/tools/list-instagram-connections"
+import { createListSocialConnectionsTool } from "@/lib/chat/tools/list-social-connections"
 import { createListRecentGenerationsTool } from "@/lib/chat/tools/list-recent-generations"
 import { createSaveGenerationAsAssetTool } from "@/lib/chat/tools/save-generation-as-asset"
 import { createPrepareInstagramPostTool } from "@/lib/chat/tools/prepare-instagram-post"
+import { createPrepareSocialPostTool } from "@/lib/chat/tools/prepare-social-post"
 import { createSearchAssetsTool } from "@/lib/chat/tools/search-assets"
 import { createSearchModelsTool } from "@/lib/chat/tools/search-models"
 import { createSearchStockReferencesTool } from "@/lib/chat/tools/search-stock-references"
@@ -103,9 +105,18 @@ export function createCreativeChatTools({
           }),
         }
       : {}),
+    listSocialConnections: createListSocialConnectionsTool({
+      supabase,
+      userId,
+    }),
     listInstagramConnections: createListInstagramConnectionsTool({
       supabase,
       userId,
+    }),
+    prepareSocialPost: createPrepareSocialPostTool({
+      supabase,
+      userId,
+      requireApproval: source === "chat",
     }),
     prepareInstagramPost: createPrepareInstagramPostTool({
       supabase,

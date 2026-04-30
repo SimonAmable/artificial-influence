@@ -1,7 +1,8 @@
 import { tool } from "ai"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
-import { createInstagramPostJob } from "@/lib/autopost/create-instagram-post-job"
+
+import { prepareInstagramPostFromLegacyInput } from "@/lib/chat/tools/prepare-social-post"
 
 interface CreatePrepareInstagramPostToolOptions {
   supabase: SupabaseClient
@@ -65,41 +66,34 @@ export function createPrepareInstagramPostTool({
     strict: true,
     needsApproval: requireApproval,
     execute: async (input) => {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      if (!supabaseUrl) {
-        throw new Error("Server configuration error.")
-      }
-
-      const result = await createInstagramPostJob({
+      const result = await prepareInstagramPostFromLegacyInput({
         input,
         supabase,
-        supabaseUrl,
         userId,
       })
 
-      if (!result.ok) {
-        throw new Error(result.message)
-      }
-
       return {
         action: input.action,
-        instagramAccount: result.connection,
-        message:
-          input.action === "schedule"
-            ? "Instagram post approved and scheduled."
-            : input.action === "publish"
-              ? "Instagram post approved and published."
-              : "Instagram post approved and saved as a draft.",
+        instagramAccount: {
+          accountType: result.account.accountType,
+          id: result.post.instagramConnectionId ?? result.account.instagramConnectionId ?? result.account.id,
+          instagramUserId: result.account.instagramUserId,
+          instagramUsername: result.account.username,
+          profileFetchedAt: result.account.profileFetchedAt,
+          tokenExpiresAt: result.account.tokenExpiresAt,
+          updatedAt: result.account.updatedAt,
+        },
+        message: result.message,
         post: {
-          caption: result.job.caption,
-          createdAt: result.job.created_at,
-          id: result.job.id,
-          instagramConnectionId: result.job.instagram_connection_id,
-          mediaType: result.job.media_type,
-          mediaUrl: result.job.media_url,
-          metadata: result.job.metadata,
-          scheduledAt: result.job.scheduled_at,
-          status: result.job.status,
+          caption: result.post.caption,
+          createdAt: result.post.createdAt,
+          id: result.post.id,
+          instagramConnectionId: result.post.instagramConnectionId ?? "",
+          mediaType: result.post.mediaType,
+          mediaUrl: result.post.mediaUrl,
+          metadata: result.post.metadata,
+          scheduledAt: result.post.scheduledAt,
+          status: result.post.status,
         },
       }
     },

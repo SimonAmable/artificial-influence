@@ -292,7 +292,7 @@ export function AutomationRunPreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85dvh] min-h-0 max-w-3xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent className="fixed inset-x-0 bottom-0 top-auto flex max-h-[92dvh] min-h-0 w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-t-4xl rounded-b-none p-0 sm:top-1/2 sm:max-h-[85dvh] sm:w-full sm:max-w-3xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-4xl">
         <DialogHeader className="shrink-0 border-b border-border/60 px-6 py-4 text-left">
           <DialogTitle className="pr-8">
             {isCommunity ? "Community preview" : "Run preview"}

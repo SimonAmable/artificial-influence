@@ -8,6 +8,10 @@ import { InspectorPanel } from "@/components/video-editor/inspector/inspector-pa
 import { TimelinePanel } from "@/components/video-editor/timeline/timeline-panel"
 import { VideoEditorProvider, useVideoEditor } from "@/components/video-editor/video-editor-provider"
 import { FEATURE_FLAGS } from "@/lib/video-editor/feature-flags"
+import {
+  editorRenderJobApiResponseSchema,
+  type EditorRenderJobApiResponse,
+} from "@/lib/video-editor/render-jobs"
 import { editorProjectSchema } from "@/lib/video-editor/types"
 import type { EditorProject } from "@/lib/video-editor/types"
 
@@ -22,6 +26,147 @@ function VideoEditorShell({ initialProjectId }: { initialProjectId?: string | nu
     redo,
     hydrateProject,
   } = useVideoEditor()
+  const [isSaving, setIsSaving] = React.useState(false)
+  const [isQueueingRender, setIsQueueingRender] = React.useState(false)
+  const [renderJob, setRenderJob] =
+    React.useState<EditorRenderJobApiResponse | null>(null)
+  const lastRenderedStatusRef = React.useRef<string | null>(null)
+
+  const saveProject = React.useCallback(
+    async (
+      nextProject: EditorProject,
+      options?: { silentSuccess?: boolean }
+    ): Promise<string | null> => {
+      const parsed = editorProjectSchema.safeParse(nextProject)
+      if (!parsed.success) {
+        toast.error("Invalid project state")
+        return null
+      }
+
+      setIsSaving(true)
+
+      try {
+        const body = {
+          name: nextProject.name,
+          state_json: parsed.data,
+        }
+
+        if (nextProject.id) {
+          const res = await fetch(`/api/editor/projects/${nextProject.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          })
+
+          if (!res.ok) {
+            throw new Error("Save failed")
+          }
+
+          if (!options?.silentSuccess) {
+            toast.success("Project saved")
+          }
+
+          return nextProject.id
+        }
+
+        const res = await fetch("/api/editor/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+
+        if (!res.ok) {
+          throw new Error("Save failed")
+        }
+
+        const data = (await res.json()) as { id?: string }
+        if (!data.id) {
+          throw new Error("Project id missing from save response")
+        }
+
+        dispatch({ type: "SET_PROJECT_ID", id: data.id })
+
+        if (!options?.silentSuccess) {
+          toast.success("Project created")
+        }
+
+        return data.id
+      } catch {
+        toast.error("Could not save project")
+        return null
+      } finally {
+        setIsSaving(false)
+      }
+    },
+    [dispatch]
+  )
+
+  const refreshRenderJob = React.useCallback(
+    async (jobId: string): Promise<EditorRenderJobApiResponse | null> => {
+      try {
+        const res = await fetch(`/api/editor/render/${jobId}`, {
+          cache: "no-store",
+        })
+
+        if (!res.ok) {
+          throw new Error("Could not load render job")
+        }
+
+        const parsed = editorRenderJobApiResponseSchema.safeParse(await res.json())
+        if (!parsed.success) {
+          throw new Error("Render job payload was invalid")
+        }
+
+        setRenderJob(parsed.data)
+        return parsed.data
+      } catch {
+        return null
+      }
+    },
+    []
+  )
+
+  const queueRender = React.useCallback(async () => {
+    setIsQueueingRender(true)
+
+    try {
+      const savedProjectId = await saveProject(project, { silentSuccess: true })
+      if (!savedProjectId) {
+        return
+      }
+
+      const res = await fetch("/api/editor/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: savedProjectId }),
+      })
+
+      const payload = (await res.json().catch(() => ({}))) as {
+        jobId?: string
+        error?: string
+      }
+
+      if (!res.ok || !payload.jobId) {
+        throw new Error(payload.error || "Could not queue render")
+      }
+
+      setRenderJob({
+        id: payload.jobId,
+        status: "queued",
+        progress: 0,
+        outputUrl: null,
+        errorMessage: null,
+      })
+      lastRenderedStatusRef.current = "queued"
+      toast.success("Render queued")
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not queue render"
+      )
+    } finally {
+      setIsQueueingRender(false)
+    }
+  }, [project, saveProject])
 
   React.useEffect(() => {
     if (!initialProjectId) return
@@ -100,60 +245,124 @@ function VideoEditorShell({ initialProjectId }: { initialProjectId?: string | nu
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [project, undo, redo, dispatch, setCurrentFrame, setIsPlaying, isPlaying])
+  }, [
+    dispatch,
+    isPlaying,
+    project,
+    redo,
+    saveProject,
+    setCurrentFrame,
+    setIsPlaying,
+    undo,
+  ])
 
-  async function saveProject(p: EditorProject) {
-    const parsed = editorProjectSchema.safeParse(p)
-    if (!parsed.success) {
-      toast.error("Invalid project state")
+  React.useEffect(() => {
+    if (!renderJob) {
+      lastRenderedStatusRef.current = null
       return
     }
-    try {
-      const body = {
-        name: p.name,
-        state_json: parsed.data,
-      }
-      if (p.id) {
-        const res = await fetch(`/api/editor/projects/${p.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        })
-        if (!res.ok) throw new Error("Save failed")
-        toast.success("Project saved")
-      } else {
-        const res = await fetch("/api/editor/projects", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        })
-        if (!res.ok) throw new Error("Save failed")
-        const data = (await res.json()) as { id?: string }
-        if (data.id) {
-          dispatch({ type: "SET_PROJECT_ID", id: data.id })
-        }
-        toast.success("Project created")
-      }
-    } catch {
-      toast.error("Could not save project")
+
+    if (renderJob.status === lastRenderedStatusRef.current) {
+      return
     }
-  }
+
+    if (renderJob.status === "completed") {
+      toast.success("Render completed")
+    } else if (renderJob.status === "failed") {
+      toast.error(renderJob.errorMessage || "Render failed")
+    }
+
+    lastRenderedStatusRef.current = renderJob.status
+  }, [renderJob])
+
+  React.useEffect(() => {
+    if (!renderJob) {
+      return
+    }
+
+    if (
+      renderJob.status !== "queued" &&
+      renderJob.status !== "rendering"
+    ) {
+      return
+    }
+
+    let cancelled = false
+
+    const tick = async () => {
+      const next = await refreshRenderJob(renderJob.id)
+      if (!next || cancelled) {
+        return
+      }
+    }
+
+    void tick()
+    const intervalId = window.setInterval(() => {
+      void tick()
+    }, 2500)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [refreshRenderJob, renderJob])
+
+  const renderButtonLabel = React.useMemo(() => {
+    if (isQueueingRender) {
+      return "Queueing..."
+    }
+
+    if (renderJob?.status === "queued") {
+      return "Queued..."
+    }
+
+    if (renderJob?.status === "rendering") {
+      const progress =
+        typeof renderJob.progress === "number"
+          ? ` ${Math.max(0, Math.round(renderJob.progress))}%`
+          : ""
+      return `Rendering${progress}`
+    }
+
+    return "Render MP4"
+  }, [isQueueingRender, renderJob])
+
+  const renderStatusText = React.useMemo(() => {
+    if (!renderJob) {
+      return null
+    }
+
+    if (renderJob.status === "completed") {
+      return "MP4 ready"
+    }
+
+    if (renderJob.status === "failed") {
+      return renderJob.errorMessage || "Render failed"
+    }
+
+    if (renderJob.status === "rendering") {
+      return typeof renderJob.progress === "number"
+        ? `Rendering ${Math.max(0, Math.round(renderJob.progress))}%`
+        : "Rendering"
+    }
+
+    return "Queued"
+  }, [renderJob])
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] w-full min-w-0 flex-col overflow-hidden">
-      <div className="flex h-10 items-center justify-between border-b border-border px-3">
-        <h1 className="text-sm font-semibold">Video Editor</h1>
-        {FEATURE_FLAGS.FEATURE_SAVE_BUTTON && (
-          <button
-            type="button"
-            className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground"
-            onClick={() => void saveProject(project)}
-          >
-            Save
-          </button>
-        )}
-      </div>
-      <VideoEditorActionRow />
+    <div className="flex h-full w-full min-w-0 flex-col overflow-hidden">
+      <VideoEditorActionRow
+        renderStatusText={renderStatusText}
+        renderOutputUrl={renderJob?.status === "completed" ? renderJob.outputUrl : null}
+        renderButtonLabel={renderButtonLabel}
+        isSaving={isSaving}
+        isQueueingRender={isQueueingRender}
+        isRenderInFlight={
+          renderJob?.status === "queued" || renderJob?.status === "rendering"
+        }
+        onQueueRender={() => void queueRender()}
+        onSaveProject={() => void saveProject(project)}
+      />
       <div className="flex min-h-0 flex-1">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <CanvasPanel className="min-h-0 flex-1" />

@@ -34,7 +34,29 @@ import { useVideoEditor } from "@/components/video-editor/video-editor-provider"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { cn } from "@/lib/utils"
 
-export function VideoEditorActionRow({ className }: { className?: string }) {
+type VideoEditorActionRowProps = {
+  className?: string
+  renderStatusText?: string | null
+  renderOutputUrl?: string | null
+  renderButtonLabel?: string
+  isSaving?: boolean
+  isQueueingRender?: boolean
+  isRenderInFlight?: boolean
+  onQueueRender?: () => void
+  onSaveProject?: () => void
+}
+
+export function VideoEditorActionRow({
+  className,
+  renderStatusText = null,
+  renderOutputUrl = null,
+  renderButtonLabel = "Render MP4",
+  isSaving = false,
+  isQueueingRender = false,
+  isRenderInFlight = false,
+  onQueueRender,
+  onSaveProject,
+}: VideoEditorActionRowProps) {
   const {
     project,
     dispatch,
@@ -222,7 +244,45 @@ export function VideoEditorActionRow({ className }: { className?: string }) {
           <FolderOpen className="size-4" />
         </Button>
       )}
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+        {renderStatusText ? (
+          <div className="mr-1 flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{renderStatusText}</span>
+            {renderOutputUrl ? (
+              <a
+                href={renderOutputUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                Open MP4
+              </a>
+            ) : null}
+          </div>
+        ) : null}
+        {FEATURE_FLAGS.FEATURE_RENDERING ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-8"
+            disabled={isSaving || isQueueingRender || isRenderInFlight}
+            onClick={onQueueRender}
+          >
+            {renderButtonLabel}
+          </Button>
+        ) : null}
+        {FEATURE_FLAGS.FEATURE_SAVE_BUTTON ? (
+          <Button
+            type="button"
+            size="sm"
+            className="h-8"
+            disabled={isSaving}
+            onClick={onSaveProject}
+          >
+            {isSaving ? "Saving..." : "Save"}
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant={isPlaying ? "secondary" : "default"}

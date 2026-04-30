@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { AI_GATEWAY_CONFIG_ERROR, hasAIGatewayCredentials } from "@/lib/ai/gateway"
 import { createClient } from "@/lib/supabase/server"
 import { extractPageForBrand } from "@/lib/brand-kit/analyze-html"
 import { draftBrandFromPage } from "@/lib/brand-kit/analyze-url-llm"
@@ -8,9 +9,9 @@ import { normalizeHttpUrl, fetchUrlSafe } from "@/lib/brand-kit/url-safety"
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.AI_GATEWAY_API_KEY) {
+    if (!hasAIGatewayCredentials()) {
       return NextResponse.json(
-        { error: "AI_GATEWAY_API_KEY is not configured" },
+        { error: AI_GATEWAY_CONFIG_ERROR },
         { status: 500 },
       )
     }
@@ -61,8 +62,6 @@ export async function POST(request: Request) {
       themeColorHint: extraction.themeColorHint,
       extractedColorCandidates: extraction.extractedColorCandidates,
     }
-    console.log("[brand-kit/analyze-url] response body", JSON.stringify(responseBody, null, 2))
-
     return NextResponse.json(responseBody)
   } catch (e) {
     console.error("[brand-kit/analyze-url]", e)

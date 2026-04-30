@@ -1,6 +1,11 @@
-import { createGateway, generateText } from "ai"
+import { generateText } from "ai"
 import { NextResponse } from "next/server"
 
+import {
+  AI_GATEWAY_CONFIG_ERROR,
+  createAIGatewayProvider,
+  hasAIGatewayCredentials,
+} from "@/lib/ai/gateway"
 import { createClient } from "@/lib/supabase/server"
 
 const MODEL = "google/gemini-2.5-flash" as const
@@ -53,8 +58,8 @@ function parseStringListFromModel(raw: string): string[] {
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.AI_GATEWAY_API_KEY) {
-      return NextResponse.json({ error: "AI gateway is not configured" }, { status: 500 })
+    if (!hasAIGatewayCredentials()) {
+      return NextResponse.json({ error: AI_GATEWAY_CONFIG_ERROR }, { status: 500 })
     }
 
     const supabase = await createClient()
@@ -103,7 +108,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const gateway = createGateway({ apiKey: process.env.AI_GATEWAY_API_KEY })
+    const gateway = createAIGatewayProvider()
 
     const othersBlock = otherVariables
       .map(

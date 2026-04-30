@@ -63,10 +63,10 @@ export function CanvasPanel({ className }: { className?: string }) {
           </button>
         </div>
       </div>
-      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
+      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 pb-4 pt-6">
         <div
           ref={viewportRef}
-          className="relative shadow-2xl"
+          className="relative"
           style={{
             transform: `scale(${zoom})`,
             transformOrigin: "center center",

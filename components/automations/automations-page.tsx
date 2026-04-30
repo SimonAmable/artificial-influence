@@ -82,6 +82,8 @@ import {
 import {
   CHAT_GATEWAY_MODEL_OPTIONS,
   DEFAULT_CHAT_GATEWAY_MODEL,
+  getChatGatewayModelOption,
+  normalizeChatGatewayModelSelection,
 } from "@/lib/constants/chat-llm-models"
 import { getDefaultTimeZone, listIanaTimeZones } from "@/lib/constants/timezones"
 import {
@@ -636,7 +638,7 @@ export function AutomationsPage() {
     }
     setUploadQueue([])
     setTimezone(a.timezone || getDefaultTimeZone())
-    setModel(a.model ?? DEFAULT_CHAT_GATEWAY_MODEL)
+    setModel(normalizeChatGatewayModelSelection(a.model ?? DEFAULT_CHAT_GATEWAY_MODEL))
     setIsPublicAutomation(a.is_public === true)
     setVariablesDialogOpen(false)
     const inferred = inferPresetFromCron(a.cron_schedule)
@@ -1451,11 +1453,11 @@ export function AutomationsPage() {
             <SelectTrigger id={`${idPrefix}-model`} className="min-w-[190px] bg-background/80">
               <SelectValue placeholder="Select model">
                 {(() => {
-                  const opt = CHAT_GATEWAY_MODEL_OPTIONS.find((option) => option.id === model)
+                  const opt = getChatGatewayModelOption(model)
                   return (
                     <div className="flex items-center gap-2">
-                      <ModelIcon identifier={model} size={14} />
-                      <span>{opt?.label ?? model}</span>
+                      <ModelIcon identifier={opt.id} size={14} srcOverride={opt.iconPath} />
+                      <span>{opt.label}</span>
                     </div>
                   )
                 })()}
@@ -1466,7 +1468,7 @@ export function AutomationsPage() {
                 <SelectItem key={opt.id} value={opt.id}>
                   <div className="flex items-center gap-3">
                     <div className="shrink-0 rounded-md border border-border bg-muted/30 p-1.5">
-                      <ModelIcon identifier={opt.id} size={18} />
+                      <ModelIcon identifier={opt.id} size={18} srcOverride={opt.iconPath} />
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="text-sm font-semibold">{opt.label}</span>
@@ -2135,7 +2137,7 @@ export function AutomationsPage() {
         }}
       >
         {selected ? (
-          <DialogContent className="max-h-[min(92dvh,920px)] overflow-y-auto sm:max-w-5xl">
+          <DialogContent className="fixed inset-x-0 bottom-0 top-auto flex max-h-[92dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col overflow-y-auto rounded-t-4xl rounded-b-none px-0 sm:top-1/2 sm:max-h-[min(92dvh,920px)] sm:w-full sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-4xl">
             <DialogHeader className="sr-only">
               <DialogTitle>{selected.name}</DialogTitle>
               <DialogDescription>
@@ -2598,7 +2600,7 @@ export function AutomationsPage() {
           }
         }}
       >
-        <DialogContent className="max-h-[min(90dvh,900px)] gap-0 overflow-y-auto sm:max-w-4xl">
+        <DialogContent className="fixed inset-x-0 bottom-0 top-auto flex max-h-[92dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-t-4xl rounded-b-none px-0 sm:top-1/2 sm:max-h-[min(90dvh,900px)] sm:w-full sm:max-w-4xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-4xl">
           <DialogHeader className="sr-only">
             <DialogTitle>New automation</DialogTitle>
             <DialogDescription>

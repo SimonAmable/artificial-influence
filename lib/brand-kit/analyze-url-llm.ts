@@ -1,17 +1,19 @@
-import { createGateway, generateObject, zodSchema } from "ai"
+import { generateObject, zodSchema } from "ai"
 
 import { brandOnboardingObjectSchema, type BrandOnboardingObject } from "@/lib/brand-kit/onboarding-schema"
 import type { PageExtraction } from "@/lib/brand-kit/analyze-html"
 import { BRAND_COLOR_ROLES, type BrandColorToken } from "@/lib/brand-kit/types"
+import { createAIGatewayProvider, hasAIGatewayCredentials } from "@/lib/ai/gateway"
 
 const ONBOARDING_MODEL = "google/gemini-2.5-flash" as const
 
 function gatewayModel() {
-  const apiKey = process.env.AI_GATEWAY_API_KEY
-  if (!apiKey) {
-    throw new Error("AI_GATEWAY_API_KEY is not set")
+  if (!hasAIGatewayCredentials()) {
+    throw new Error(
+      "AI Gateway is not configured. Set AI_GATEWAY_API_KEY or provision VERCEL_OIDC_TOKEN via Vercel.",
+    )
   }
-  return createGateway({ apiKey })(ONBOARDING_MODEL)
+  return createAIGatewayProvider()(ONBOARDING_MODEL)
 }
 
 function sanitizeLogoChoice(

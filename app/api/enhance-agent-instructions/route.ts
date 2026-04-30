@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { enhanceAgentComposerInstructions } from "@/lib/prompt-enhancement"
+import { AI_GATEWAY_CONFIG_ERROR, hasAIGatewayCredentials } from "@/lib/ai/gateway"
 import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 
@@ -8,9 +9,9 @@ const MAX_CHARS = 12_000
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.AI_GATEWAY_API_KEY) {
+    if (!hasAIGatewayCredentials()) {
       return NextResponse.json(
-        { error: "AI_GATEWAY_API_KEY is not configured" },
+        { error: AI_GATEWAY_CONFIG_ERROR },
         { status: 500 }
       )
     }
