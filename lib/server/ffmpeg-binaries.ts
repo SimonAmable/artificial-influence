@@ -1,9 +1,5 @@
 import { execSync } from "node:child_process"
 import { existsSync } from "node:fs"
-import { isAbsolute, resolve } from "node:path"
-
-import ffmpegInstaller from "ffmpeg-static"
-import ffprobeInstaller from "ffprobe-static"
 
 function tryBinaryFromShell(command: string): string | null {
   try {
@@ -23,9 +19,8 @@ function resolveExistingBinary(candidates: Array<string | null | undefined>): st
       continue
     }
 
-    const normalizedCandidate = isAbsolute(candidate) ? candidate : resolve(process.cwd(), candidate)
-    if (existsSync(normalizedCandidate)) {
-      return normalizedCandidate
+    if (existsSync(candidate)) {
+      return candidate
     }
   }
 
@@ -33,13 +28,11 @@ function resolveExistingBinary(candidates: Array<string | null | undefined>): st
 }
 
 function getFfmpegPackagePath() {
-  return typeof ffmpegInstaller === "string" ? ffmpegInstaller : null
+  return `./node_modules/ffmpeg-static/${process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg"}`
 }
 
 function getFfprobePackagePath() {
-  return ffprobeInstaller && typeof ffprobeInstaller === "object" && "path" in ffprobeInstaller
-    ? String((ffprobeInstaller as { path: string }).path)
-    : null
+  return `./node_modules/ffprobe-static/bin/${process.platform}/${process.arch}/${process.platform === "win32" ? "ffprobe.exe" : "ffprobe"}`
 }
 
 export function resolveFfmpegBinaryPath(): string | null {

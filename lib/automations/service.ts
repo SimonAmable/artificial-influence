@@ -11,7 +11,6 @@ import {
   describeCronHumanSummary,
   validateCronExpression,
 } from "@/lib/automations/schedule"
-import { runAutomation } from "@/lib/automations/run"
 import type { AutomationRow } from "@/lib/automations/types"
 import { resolveChatGatewayModel } from "@/lib/constants/chat-llm-models"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
@@ -582,6 +581,7 @@ export async function runAutomationNowForUser(
     })
   }
 
+  const { runAutomation } = await import("@/lib/automations/run")
   const result = await runAutomation(admin, automation, { trigger: "manual" })
   if (!result.ok) {
     throw new AutomationServiceError(result.error, {
