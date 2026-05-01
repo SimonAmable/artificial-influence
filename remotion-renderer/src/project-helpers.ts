@@ -1,11 +1,13 @@
 import type { EditorItem, EditorProject, VideoItem } from "./project-types"
 
+const DEFAULT_DURATION_FRAMES = 30 * 10
+
 export function computeEndFrame(item: EditorItem): number {
   return item.from + item.durationInFrames
 }
 
 export function computeProjectEndFrame(project: EditorProject): number {
-  let maxEnd = project.settings.durationInFrames
+  let maxEnd = 0
 
   for (const track of project.tracks) {
     for (const item of track.items) {
@@ -13,7 +15,7 @@ export function computeProjectEndFrame(project: EditorProject): number {
     }
   }
 
-  return maxEnd
+  return Math.max(maxEnd, DEFAULT_DURATION_FRAMES)
 }
 
 export function videoTrimForRemotion(item: VideoItem): {

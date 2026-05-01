@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { Eye, EyeOff, Volume2, VolumeX } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { useVideoEditor } from "@/components/video-editor/video-editor-provider"
 import { TimelineClip } from "@/components/video-editor/timeline/timeline-clip"
 import { cn } from "@/lib/utils"
@@ -70,7 +69,6 @@ export function TimelinePanel({ className }: { className?: string }) {
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1">
-        {/* Track names + controls, time grid starts in the scroll area so it lines up with clips */}
         <div
           className="flex w-[120px] shrink-0 flex-col border-r border-border bg-muted/25"
           style={{ minWidth: GUTTER_PX }}
@@ -107,7 +105,11 @@ export function TimelinePanel({ className }: { className?: string }) {
                   className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                   onClick={(e) => {
                     e.stopPropagation()
-                    dispatch({ type: "UPDATE_TRACK", trackId: track.id, patch: { hidden: !track.hidden } })
+                    dispatch({
+                      type: "UPDATE_TRACK",
+                      trackId: track.id,
+                      patch: { hidden: !track.hidden },
+                    })
                   }}
                 >
                   {track.hidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
@@ -118,7 +120,11 @@ export function TimelinePanel({ className }: { className?: string }) {
                   className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                   onClick={(e) => {
                     e.stopPropagation()
-                    dispatch({ type: "UPDATE_TRACK", trackId: track.id, patch: { muted: !track.muted } })
+                    dispatch({
+                      type: "UPDATE_TRACK",
+                      trackId: track.id,
+                      patch: { muted: !track.muted },
+                    })
                   }}
                 >
                   {track.muted ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
@@ -133,11 +139,7 @@ export function TimelinePanel({ className }: { className?: string }) {
           className="relative min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden scroll-smooth"
         >
           <div className="relative select-none" style={{ width: totalWidth, minHeight: contentHeight }}>
-            {/* Vertical grid, aligned with time (same origin as ruler + clips) */}
-            <div
-              className="pointer-events-none absolute inset-0 z-0"
-              aria-hidden
-            >
+            <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
               {Array.from({ length: Math.ceil(durationInFrames / fps) + 2 }).map((_, i) => {
                 const f = i * fps
                 if (f > durationInFrames + fps) return null
@@ -151,7 +153,6 @@ export function TimelinePanel({ className }: { className?: string }) {
               })}
             </div>
 
-            {/* Playhead, spans ruler + tracks */}
             <div
               className="pointer-events-none absolute top-0 z-30 w-px bg-primary shadow-[0_0_6px_hsl(var(--primary))]"
               style={{
@@ -159,7 +160,6 @@ export function TimelinePanel({ className }: { className?: string }) {
                 height: contentHeight,
               }}
             />
-            {/* Ruler, same width & origin as track rows */}
             <div
               className="sticky top-0 z-20 flex h-8 cursor-pointer items-end border-b border-border bg-background/95 backdrop-blur-sm"
               style={{ width: totalWidth }}
@@ -174,15 +174,12 @@ export function TimelinePanel({ className }: { className?: string }) {
                     className="absolute bottom-0 flex flex-col justify-end border-l border-primary/25 pl-1"
                     style={{ left: f * px, height: "100%" }}
                   >
-                    <span className="text-[10px] tabular-nums text-muted-foreground">
-                      {i}s
-                    </span>
+                    <span className="text-[10px] tabular-nums text-muted-foreground">{i}s</span>
                   </div>
                 )
               })}
             </div>
 
-            {/* Track rows */}
             {project.tracks.map((track) => (
               <div
                 key={track.id}
@@ -220,9 +217,8 @@ export function TimelinePanel({ className }: { className?: string }) {
       </div>
 
       <div className="shrink-0 border-t border-border px-2 py-1 text-[10px] text-muted-foreground">
-        Frame {currentFrame} / {durationInFrames - 1} · {isPlaying ? "Playing" : "Paused"} · active:{" "}
-        {project.tracks.find((t) => t.id === activeTrackId)?.label ?? "-"} · drag clips between tracks · trim
-        edges
+        Frame {currentFrame} / {durationInFrames - 1} | {isPlaying ? "Playing" : "Paused"} | active:{" "}
+        {project.tracks.find((t) => t.id === activeTrackId)?.label ?? "-"} | clips stay on their matching track
       </div>
     </div>
   )

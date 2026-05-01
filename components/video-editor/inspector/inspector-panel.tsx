@@ -26,9 +26,10 @@ export function InspectorPanel({ className }: { className?: string }) {
   const selected = selectedId ? findItemInProject(project, selectedId)?.item : null
 
   if (!selected) {
-    const dimKey = `${project.settings.width}×${project.settings.height}`
+    const dimKey = `${project.settings.width}x${project.settings.height}`
     const presetMatch = COMPOSITION_ASPECT_PRESETS.find(
-      (p) => p.width === project.settings.width && p.height === project.settings.height
+      (preset) =>
+        preset.width === project.settings.width && preset.height === project.settings.height
     )
 
     return (
@@ -39,13 +40,13 @@ export function InspectorPanel({ className }: { className?: string }) {
             <Label className="text-xs">Frame preset</Label>
             <Select
               value={presetMatch ? `${presetMatch.width}x${presetMatch.height}` : "__custom__"}
-              onValueChange={(v) => {
-                if (v === "__custom__") return
-                const [w, h] = v.split("x").map(Number)
-                if (!w || !h) return
+              onValueChange={(value) => {
+                if (value === "__custom__") return
+                const [width, height] = value.split("x").map(Number)
+                if (!width || !height) return
                 dispatch({
                   type: "SET_SETTINGS",
-                  settings: { width: w, height: h },
+                  settings: { width, height },
                 })
               }}
             >
@@ -58,15 +59,19 @@ export function InspectorPanel({ className }: { className?: string }) {
                     Custom ({dimKey})
                   </SelectItem>
                 )}
-                {COMPOSITION_ASPECT_PRESETS.map((p) => (
-                  <SelectItem key={p.id} value={`${p.width}x${p.height}`} className="text-xs">
-                    {p.label}
+                {COMPOSITION_ASPECT_PRESETS.map((preset) => (
+                  <SelectItem
+                    key={preset.id}
+                    value={`${preset.width}x${preset.height}`}
+                    className="text-xs"
+                  >
+                    {preset.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="mt-1 text-[10px] text-muted-foreground">
-              Default 16:9 1080p. New clips use “contain” to fit inside the frame.
+              Default 9:16 vertical. New clips use contain and the timeline auto-fits your media.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -131,16 +136,10 @@ export function InspectorPanel({ className }: { className?: string }) {
           </div>
           <div>
             <Label className="text-xs">Duration (frames)</Label>
-            <Input
-              type="number"
-              value={project.settings.durationInFrames}
-              onChange={(e) =>
-                dispatch({
-                  type: "SET_SETTINGS",
-                  settings: { durationInFrames: Number(e.target.value) || 1 },
-                })
-              }
-            />
+            <Input type="number" value={project.settings.durationInFrames} readOnly />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Duration is derived from the furthest clip end.
+            </p>
           </div>
         </div>
       </div>
@@ -160,7 +159,9 @@ export function InspectorPanel({ className }: { className?: string }) {
           <Label className="text-xs">Fill</Label>
           <HexColorPicker
             color={selected.fill}
-            onChange={(fill) => dispatch({ type: "UPDATE_ITEM", itemId: selected.id, patch: { fill } })}
+            onChange={(fill) =>
+              dispatch({ type: "UPDATE_ITEM", itemId: selected.id, patch: { fill } })
+            }
             className="mt-1 w-full"
           />
         </div>
@@ -205,7 +206,11 @@ function LayoutSection({
             type="number"
             value={Math.round(item.width)}
             onChange={(e) =>
-              dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { width: Number(e.target.value) } })
+              dispatch({
+                type: "UPDATE_ITEM",
+                itemId: item.id,
+                patch: { width: Number(e.target.value) },
+              })
             }
           />
         </div>
@@ -215,7 +220,11 @@ function LayoutSection({
             type="number"
             value={Math.round(item.height)}
             onChange={(e) =>
-              dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { height: Number(e.target.value) } })
+              dispatch({
+                type: "UPDATE_ITEM",
+                itemId: item.id,
+                patch: { height: Number(e.target.value) },
+              })
             }
           />
         </div>
@@ -227,7 +236,9 @@ function LayoutSection({
           min={0}
           max={1}
           step={0.01}
-          onValueChange={([v]) => dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { opacity: v } })}
+          onValueChange={([value]) =>
+            dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { opacity: value } })
+          }
         />
       </div>
       <div>
@@ -236,7 +247,11 @@ function LayoutSection({
           type="number"
           value={item.rotation}
           onChange={(e) =>
-            dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { rotation: Number(e.target.value) } })
+            dispatch({
+              type: "UPDATE_ITEM",
+              itemId: item.id,
+              patch: { rotation: Number(e.target.value) },
+            })
           }
         />
       </div>
@@ -246,7 +261,11 @@ function LayoutSection({
           id="keep-aspect"
           checked={item.keepAspectRatio}
           onChange={(e) =>
-            dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { keepAspectRatio: e.target.checked } })
+            dispatch({
+              type: "UPDATE_ITEM",
+              itemId: item.id,
+              patch: { keepAspectRatio: e.target.checked },
+            })
           }
           className="rounded border border-input"
         />
@@ -270,7 +289,7 @@ function TextSection({
       <div>
         <Label className="text-xs">Text</Label>
         <textarea
-          className="w-full min-h-[80px] rounded-md border border-input bg-background px-2 py-1 text-sm"
+          className="min-h-[80px] w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
           value={item.text}
           onChange={(e) =>
             dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { text: e.target.value } })
@@ -282,7 +301,11 @@ function TextSection({
         <Input
           value={item.fontFamily}
           onChange={(e) =>
-            dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { fontFamily: e.target.value } })
+            dispatch({
+              type: "UPDATE_ITEM",
+              itemId: item.id,
+              patch: { fontFamily: e.target.value },
+            })
           }
         />
       </div>
@@ -292,7 +315,11 @@ function TextSection({
           type="number"
           value={item.fontSize}
           onChange={(e) =>
-            dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { fontSize: Number(e.target.value) } })
+            dispatch({
+              type: "UPDATE_ITEM",
+              itemId: item.id,
+              patch: { fontSize: Number(e.target.value) },
+            })
           }
         />
       </div>
@@ -300,7 +327,9 @@ function TextSection({
         <Label className="text-xs">Color</Label>
         <HexColorPicker
           color={item.color}
-          onChange={(color) => dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { color } })}
+          onChange={(color) =>
+            dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { color } })
+          }
           className="mt-1 w-full"
         />
       </div>
@@ -324,7 +353,9 @@ function MediaSection({
           min={0}
           max={1}
           step={0.01}
-          onValueChange={([v]) => dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { volume: v } })}
+          onValueChange={([value]) =>
+            dispatch({ type: "UPDATE_ITEM", itemId: item.id, patch: { volume: value } })
+          }
         />
       </div>
       <div>
@@ -345,7 +376,7 @@ function MediaSection({
         />
       </div>
       {item.fileName && (
-        <p className="text-[10px] text-muted-foreground truncate" title={item.fileName}>
+        <p className="truncate text-[10px] text-muted-foreground" title={item.fileName}>
           {item.fileName}
         </p>
       )}

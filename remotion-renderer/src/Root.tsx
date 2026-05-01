@@ -11,7 +11,7 @@ const defaultProject: EditorProject = editorProjectSchema.parse({
     fps: 30,
     width: 1080,
     height: 1920,
-    durationInFrames: 150,
+    durationInFrames: 300,
   },
   tracks: [],
   activeTrackId: null,

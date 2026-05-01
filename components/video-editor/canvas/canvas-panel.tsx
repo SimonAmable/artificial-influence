@@ -38,7 +38,9 @@ export function CanvasPanel({ className }: { className?: string }) {
   return (
     <div className={cn("relative flex min-h-0 flex-1 flex-col bg-background", className)}>
       <div className="flex items-center justify-between border-b border-border px-2 py-1">
-        <span className="text-[10px] text-muted-foreground">Canvas {Math.round(zoom * 100)}%</span>
+        <span className="text-[10px] text-muted-foreground">
+          Canvas {compW}x{compH} | {Math.round(zoom * 100)}%
+        </span>
         <div className="flex gap-1">
           <button
             type="button"
@@ -66,7 +68,7 @@ export function CanvasPanel({ className }: { className?: string }) {
       <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 pb-4 pt-6">
         <div
           ref={viewportRef}
-          className="relative"
+          className="relative overflow-hidden rounded-[24px] border border-white/15 bg-black shadow-[0_18px_40px_rgba(0,0,0,0.32)]"
           style={{
             transform: `scale(${zoom})`,
             transformOrigin: "center center",
@@ -88,6 +90,7 @@ export function CanvasPanel({ className }: { className?: string }) {
               className="h-full w-full"
             />
           </div>
+          <div className="pointer-events-none absolute inset-0 z-10 rounded-[24px] border border-white/20 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]" />
           <CanvasOverlay compositionRef={viewportRef} compW={compW} compH={compH} />
         </div>
       </div>

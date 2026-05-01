@@ -67,7 +67,7 @@ export function createEstimateModelLatencyTool({ supabase, userId }: CreateEstim
     description:
       "Estimate typical wall-clock time for a completed generation for a given model and type (image vs video), using recent completed jobs in this app. Use when setting user expectations before or after starting async generation. Falls back to broad defaults if sample size is small.",
     inputSchema: z.object({
-      model: z.string().min(1).describe("Exact model identifier (e.g. from searchModels)."),
+      model: z.string().min(1).describe("Exact model identifier (e.g. from listModels)."),
       type: z.enum(["image", "video"]).describe("Generation type."),
     }),
     strict: true,

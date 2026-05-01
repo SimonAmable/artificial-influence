@@ -108,6 +108,12 @@ export function VideoEditorProvider({ children }: { children: React.ReactNode })
     dispatchBase(action)
   }, [])
 
+  React.useEffect(() => {
+    setCurrentFrame((frame) =>
+      Math.min(frame, Math.max(0, state.project.settings.durationInFrames - 1))
+    )
+  }, [state.project.settings.durationInFrames])
+
   const hydrateProject = React.useCallback((project: EditorProject) => {
     dispatchBase({ type: "LOAD_PROJECT", project })
   }, [])

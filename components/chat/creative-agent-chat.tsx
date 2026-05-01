@@ -264,8 +264,8 @@ type GenerateAudioToolPart = {
   errorText?: string
 }
 
-type SearchModelsToolPart = {
-  type: "tool-searchModels"
+type ModelsToolPart = {
+  type: "tool-listModels" | "tool-searchModels"
   toolCallId: string
   state: "input-streaming" | "input-available" | "output-available" | "output-error"
   input?: {
@@ -290,6 +290,7 @@ type SearchModelsToolPart = {
     }>
     total?: number
     type?: "image" | "video" | "audio" | "upscale" | null
+    defaultImageModel?: string | null
   }
   errorText?: string
 }
@@ -3033,8 +3034,8 @@ export function MessageParts({
           )
         }
 
-        if (part.type === "tool-searchModels") {
-          const toolPart = part as SearchModelsToolPart
+        if (part.type === "tool-listModels" || part.type === "tool-searchModels") {
+          const toolPart = part as ModelsToolPart
 
           if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
             return (
@@ -3043,11 +3044,7 @@ export function MessageParts({
                   <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium">Loading models</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {toolPart.input?.type
-                        ? `Listing ${toolPart.input.type} models`
-                        : "Listing all active models"}
-                    </p>
+                    <p className="truncate text-xs text-muted-foreground">Listing all active models</p>
                   </div>
                 </CardContent>
               </Card>
@@ -3071,9 +3068,11 @@ export function MessageParts({
               <CardContent className="space-y-4 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge>Models</Badge>
-                  {toolPart.output?.type ? <Badge variant="outline">{toolPart.output.type}</Badge> : null}
                   {typeof toolPart.output?.total === "number" ? (
                     <Badge variant="outline">{toolPart.output.total} result{toolPart.output.total === 1 ? "" : "s"}</Badge>
+                  ) : null}
+                  {toolPart.output?.defaultImageModel ? (
+                    <Badge variant="outline">Default image: {toolPart.output.defaultImageModel}</Badge>
                   ) : null}
                 </div>
                 {toolPart.output?.message ? (
@@ -5221,23 +5220,31 @@ export function CreativeAgentChat({
       threadIdRef.current = nextThreadId
     }
 
+    const draftComposerValue = composerValue
+    const draftAttachedFiles = attachedFiles
+    const draftAttachedRefs = attachedRefs
+
+    setComposerValue("")
+    setAttachedFiles([])
+    setAttachedRefs([])
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+
     try {
       await sendMessage({
         metadata: refsToChatMetadata(attachedRefs),
         role: "user",
         parts,
       })
-
-      setComposerValue("")
-      setAttachedFiles([])
-      setAttachedRefs([])
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""
-      }
     } catch (sendError) {
+      setComposerValue(draftComposerValue)
+      setAttachedFiles(draftAttachedFiles)
+      setAttachedRefs(draftAttachedRefs)
       toast.error(sendError instanceof Error ? sendError.message : "Could not send message.")
     }
   }, [
+    attachedFiles,
     attachedRefs,
     composerAttachments,
     composerValue,

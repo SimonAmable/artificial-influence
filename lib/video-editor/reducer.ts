@@ -59,16 +59,26 @@ export function videoEditorReducer(state: EditorProject, action: VideoEditorActi
       }
 
     case "ADD_ITEM":
-      return syncCompositionToItems({
-        ...state,
-        tracks: state.tracks.map((t) =>
-          t.id === action.trackId && isTrackCompatibleWithItem(t, action.item)
-            ? { ...t, items: [...t.items, action.item] }
-            : t
-        ),
-        selectedItemIds: [action.item.id],
-        activeTrackId: action.trackId,
-      })
+      {
+        const targetTrackId =
+          state.tracks.find(
+            (track) =>
+              track.id === action.trackId && isTrackCompatibleWithItem(track, action.item)
+          )?.id ??
+          state.tracks.find((track) => isTrackCompatibleWithItem(track, action.item))?.id ??
+          null
+        if (!targetTrackId) {
+          return state
+        }
+        return syncCompositionToItems({
+          ...state,
+          tracks: state.tracks.map((t) =>
+            t.id === targetTrackId ? { ...t, items: [...t.items, action.item] } : t
+          ),
+          selectedItemIds: [action.item.id],
+          activeTrackId: targetTrackId,
+        })
+      }
 
     case "UPDATE_ITEM": {
       const found = findItemInProject(state, action.itemId)

@@ -350,13 +350,13 @@ export function createGenerateImageTool({
         .min(1)
         .max(120)
         .optional()
-        .describe("Image model identifier, preferably selected from searchModels. Defaults to openai/gpt-image-2."),
+        .describe("Image model identifier, preferably selected from listModels. Defaults to openai/gpt-image-2."),
       aspectRatio: z
         .string()
         .min(1)
         .max(32)
         .optional()
-        .describe("Preferred aspect ratio. It must match the selected model's supported aspect ratios from searchModels. For `openai/gpt-image-2`, only use `1:1`, `3:2`, or `2:3`."),
+        .describe("Preferred aspect ratio. It must match the selected model's supported aspect ratios from listModels. For `openai/gpt-image-2`, only use `1:1`, `3:2`, or `2:3`."),
       variantCount: z
         .number()
         .int()

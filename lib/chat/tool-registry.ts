@@ -17,6 +17,7 @@ export const ALWAYS_AVAILABLE_CREATIVE_CHAT_TOOL_KEYS = [
   "searchWebImages",
   "capturePageScreenshot",
   "searchAssets",
+  "listModels",
   "searchModels",
   "searchVoices",
   "awaitGeneration",
