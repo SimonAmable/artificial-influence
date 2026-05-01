@@ -561,7 +561,8 @@ export async function POST(request: NextRequest) {
           quality,
           referenceImages: replicateGptImage2ReferenceImages,
         });
-        const { prompt: _ignoredPrompt, ...replicateProviderOptions } = gptImage2Request.input;
+        const replicateProviderOptions = { ...gptImage2Request.input };
+        delete replicateProviderOptions.prompt;
         generateOptions.providerOptions.replicate = replicateProviderOptions as never;
       } else if (modelUsesDimensions(modelData.parameters)) {
         // Model expects width/height (e.g. prunaai/z-image-turbo)

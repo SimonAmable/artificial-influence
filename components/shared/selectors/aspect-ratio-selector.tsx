@@ -13,36 +13,40 @@ import { Model, parseModelParameters, isStringParameter } from "@/lib/types/mode
 
 /** Small frame preview for a ratio string (used in selects and toolbars). */
 export function AspectRatioIcon({ ratio }: { ratio: string }) {
-  const getIconStyle = () => {
-    switch (ratio) {
-      case "1:1":
-        return "w-3 h-3" // Square
-      case "9:16":
-        return "w-2 h-3" // Vertical (portrait)
-      case "16:9":
-        return "w-3 h-2" // Horizontal (landscape)
-      case "4:3":
-        return "w-3 h-2.5" // Slightly horizontal
-      case "3:4":
-        return "w-2.5 h-3" // Slightly vertical
-      case "3:2":
-        return "w-3 h-2" // Landscape
-      case "2:3":
-        return "w-2 h-3" // Portrait
-      case "match_input_image":
-      case "auto":
-        return "w-3 h-3 border-dashed" // Square with dashed border for special values
-      default:
-        return "w-3 h-3"
+  const getIconDimensions = () => {
+    if (ratio === "match_input_image" || ratio === "auto") {
+      return { width: 12, height: 12, dashed: true }
+    }
+
+    const match = ratio.match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/)
+    if (!match) {
+      return { width: 12, height: 12, dashed: false }
+    }
+
+    const widthRatio = Number(match[1])
+    const heightRatio = Number(match[2])
+    if (!Number.isFinite(widthRatio) || !Number.isFinite(heightRatio) || widthRatio <= 0 || heightRatio <= 0) {
+      return { width: 12, height: 12, dashed: false }
+    }
+
+    const maxDimension = 12
+    const scale = maxDimension / Math.max(widthRatio, heightRatio)
+    return {
+      width: Math.max(8, Math.round(widthRatio * scale)),
+      height: Math.max(8, Math.round(heightRatio * scale)),
+      dashed: false,
     }
   }
+
+  const icon = getIconDimensions()
 
   return (
     <div
       className={cn(
         "border-3 border-foreground/60 rounded-[2px] shrink-0",
-        getIconStyle()
+        icon.dashed && "border-dashed"
       )}
+      style={{ width: `${icon.width}px`, height: `${icon.height}px` }}
     />
   )
 }

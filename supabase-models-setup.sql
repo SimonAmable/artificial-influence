@@ -657,57 +657,33 @@ INSERT INTO public.models (
 VALUES (
   'openai/gpt-image-2',
   'GPT Image 2',
-  'Best when you want strong prompt-following from OpenAI, crisp text rendering, or guided image edits with a reference image.',
+  'Fal-hosted GPT Image 2 with one canonical model id for both text-to-image and guided image edits, plus broader aspect ratio support.',
   'image',
-  'replicate',
+  'fal',
   true,
   4,
   '{
-    "replicate_input_defaults": {
-      "quality": "low",
-      "moderation": "low"
-    },
     "parameters": [
       {
-        "name": "background",
+        "name": "quality",
         "type": "string",
-        "label": "Background",
-        "description": "Background treatment. Transparent output is not supported on GPT Image 2.",
-        "required": false,
-        "default": "auto",
-        "enum": ["auto", "opaque"],
-        "ui_type": "select"
-      },
-      {
-        "name": "moderation",
-        "type": "string",
-        "label": "Moderation",
-        "description": "Controls content moderation level",
+        "label": "Quality",
+        "description": "Fal quality preset for GPT Image 2",
         "required": false,
         "default": "low",
-        "enum": ["low", "auto"],
+        "enum": ["low", "medium", "high"],
         "ui_type": "select"
       },
       {
-        "name": "n",
+        "name": "num_images",
         "type": "number",
         "label": "Number of Images",
         "description": "How many image variants to generate",
         "required": false,
         "default": 1,
         "min": 1,
-        "max": 10,
+        "max": 4,
         "ui_type": "number"
-      },
-      {
-        "name": "quality",
-        "type": "string",
-        "label": "Quality",
-        "description": "Generation quality preset",
-        "required": false,
-        "default": "low",
-        "enum": ["low", "medium", "high", "auto"],
-        "ui_type": "select"
       },
       {
         "name": "output_format",
@@ -715,17 +691,27 @@ VALUES (
         "label": "Output Format",
         "description": "Image file format",
         "required": false,
-        "default": "webp",
-        "enum": ["webp", "png", "jpeg"],
+        "default": "png",
+        "enum": ["png", "jpeg", "webp"],
+        "ui_type": "select"
+      },
+      {
+        "name": "image_size",
+        "type": "string",
+        "label": "Image Size",
+        "description": "Fal preset size used for common aspect ratios; custom dimensions are applied automatically for wider ratio support.",
+        "required": false,
+        "default": "square_hd",
+        "enum": ["square_hd", "square", "portrait_4_3", "portrait_16_9", "landscape_4_3", "landscape_16_9"],
         "ui_type": "select"
       }
     ]
   }'::jsonb,
-  ARRAY['1:1', '3:2', '2:3'],
+  ARRAY['match_input_image', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '2:1', '1:2', '19.5:9', '9:19.5', '20:9', '9:20', '21:9'],
   '1:1',
   true,
   false,
-  10
+  4
 )
 ON CONFLICT (identifier) DO NOTHING;
 

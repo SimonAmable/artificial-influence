@@ -139,7 +139,7 @@ function normalizeQuality(value: string | null | undefined): "low" | "medium" | 
     return value
   }
 
-  return "high"
+  return "low"
 }
 
 export function buildFalImageRequest(options: FalImageRequestOptions): {

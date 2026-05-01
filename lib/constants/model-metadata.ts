@@ -277,7 +277,7 @@ export const GPT_IMAGE_2_META: ModelMetadata = {
       name: 'quality',
       label: 'Quality',
       options: ['low', 'medium', 'high'],
-      default: 'high',
+      default: 'low',
       description: 'Fal quality preset for GPT Image 2.',
     },
     {

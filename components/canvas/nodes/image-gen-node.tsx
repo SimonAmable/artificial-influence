@@ -75,17 +75,26 @@ import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
 // Helper function to get dimensions for aspect ratio
 const getImageDimensions = (aspectRatio: string) => {
   const baseSize = 280 // Base width for square
-  const ratios: Record<string, [number, number]> = {
-    "match_input_image": [baseSize, baseSize], // Default to square when no input
-    "1:1": [baseSize, baseSize],
-    "16:9": [baseSize, Math.round((baseSize * 9) / 16)],
-    "9:16": [Math.round((baseSize * 9) / 16), baseSize],
-    "4:3": [baseSize, Math.round((baseSize * 3) / 4)],
-    "3:4": [Math.round((baseSize * 3) / 4), baseSize],
-    "3:2": [baseSize, Math.round((baseSize * 2) / 3)],
-    "2:3": [Math.round((baseSize * 2) / 3), baseSize],
+  if (aspectRatio === "match_input_image" || aspectRatio === "auto") {
+    return [baseSize, baseSize]
   }
-  return ratios[aspectRatio] || [baseSize, baseSize]
+
+  const match = aspectRatio.match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/)
+  if (!match) {
+    return [baseSize, baseSize]
+  }
+
+  const widthRatio = Number(match[1])
+  const heightRatio = Number(match[2])
+  if (!Number.isFinite(widthRatio) || !Number.isFinite(heightRatio) || widthRatio <= 0 || heightRatio <= 0) {
+    return [baseSize, baseSize]
+  }
+
+  if (widthRatio >= heightRatio) {
+    return [baseSize, Math.round((baseSize * heightRatio) / widthRatio)]
+  }
+
+  return [Math.round((baseSize * widthRatio) / heightRatio), baseSize]
 }
 
 const MAX_GENERATED_IMAGES = 20
