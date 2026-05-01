@@ -34,6 +34,11 @@ import { createUploadNodeData } from "@/lib/canvas/types"
 import { useModels } from "@/hooks/use-models"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition } from "@/lib/types/models"
+import {
+  DEFAULT_MOTION_COPY_MODEL_IDENTIFIER,
+  isMotionCopyModelIdentifier,
+  normalizeMotionCopyModelIdentifier,
+} from "@/lib/constants/models"
 import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
 import { VideoModelParameterControls } from "@/components/tools/video/video-model-parameter-controls"
 import { PhotoUpload, type ImageUpload } from "@/components/shared/upload/photo-upload"
@@ -272,7 +277,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
 
   const getModelFromIdentifier = React.useCallback(
     (identifier: string): Model | null => {
-      const m = videoModels.find((x) => x.identifier === identifier) ?? videoModels[0]
+      const resolvedIdentifier =
+        normalizeMotionCopyModelIdentifier(identifier) ?? DEFAULT_MOTION_COPY_MODEL_IDENTIFIER
+      const m = videoModels.find((x) => x.identifier === resolvedIdentifier) ?? videoModels[0]
       if (!m) return null
       return {
         ...m,
@@ -283,7 +290,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   )
 
   const selectedModel = React.useMemo(() => {
-    return getModelFromIdentifier(nodeData.model || "kwaivgi/kling-v2.6-motion-control")
+    return getModelFromIdentifier(nodeData.model || DEFAULT_MOTION_COPY_MODEL_IDENTIFIER)
   }, [getModelFromIdentifier, nodeData.model])
 
   React.useEffect(() => {
@@ -591,7 +598,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       // Check duration first (motion copy: 30s for video orientation, 10s for image)
       const url = URL.createObjectURL(file)
       const duration = await getVideoDuration(url)
-      const isMotionCopy = selectedModel?.identifier === "kwaivgi/kling-v2.6-motion-control" || selectedModel?.identifier === "kwaivgi/kling-v3-motion-control"
+      const isMotionCopy = isMotionCopyModelIdentifier(selectedModel?.identifier)
       const maxDuration =
         isMotionCopy && (nodeData.parameters?.character_orientation ?? "video") === "video" ? 30 : 10
 
@@ -613,7 +620,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       
       if (videoUploadRef.current) videoUploadRef.current.value = ""
       setIsAddMediaOpen(false)
-    } catch (error) {
+    } catch {
       nodeData.onDataChange?.(id, {
         error: "Failed to validate video. Please try again."
       })
@@ -710,7 +717,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     }
 
     const modelIdentifier = selectedModel.identifier
-    const isMotionCopy = modelIdentifier === "kwaivgi/kling-v2.6-motion-control" || modelIdentifier === "kwaivgi/kling-v3-motion-control"
+    const isMotionCopy = isMotionCopyModelIdentifier(modelIdentifier)
     const isLipsync = modelIdentifier === "veed/fabric-1.0"
 
     const finalImageUrl = nodeData.manualImageUrl || nodeData.connectedImageUrl
@@ -882,6 +889,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       if (isMotionCopy) {
         endpoint = "/api/generate-video"
         requestBody = {
+          model: normalizeMotionCopyModelIdentifier(modelIdentifier),
           imageUrl: imageUpload?.url,
           videoUrl: videoUpload?.url,
           imageStoragePath: imageUpload?.storagePath,
@@ -1030,7 +1038,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   }
 
   const hasContent = !!nodeData.generatedVideoUrl
-  const isMotionCopyModel = selectedModel?.identifier === "kwaivgi/kling-v2.6-motion-control" || selectedModel?.identifier === "kwaivgi/kling-v3-motion-control"
+  const isMotionCopyModel = isMotionCopyModelIdentifier(selectedModel?.identifier)
   const isLipsyncModel = selectedModel?.identifier === "veed/fabric-1.0"
   const needsPrompt = !isMotionCopyModel && !isLipsyncModel
   const modelSupportsNegativePrompt = selectedModel?.parameters.parameters?.some(

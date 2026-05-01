@@ -178,9 +178,7 @@ export async function POST(request: NextRequest) {
     }
     console.log('[generate-image] ✓ Model found:', modelData.name);
 
-    const modelProvider = isReplicateGptImage2Model(modelIdentifier)
-      ? 'replicate'
-      : String(modelData.provider ?? '').toLowerCase();
+    const modelProvider = String(modelData.provider ?? '').toLowerCase();
     if (modelProvider === 'fal') {
       if (!process.env.FAL_KEY) {
         console.error('[generate-image] FAL_KEY not set for Fal model');
@@ -423,6 +421,7 @@ export async function POST(request: NextRequest) {
         numImages: effectiveN,
         outputFormat: outputFormatResolved,
         prompt: finalPrompt,
+        quality,
         referenceImageUrls,
         seed: seed != null && !Number.isNaN(seed) ? seed : null,
       });

@@ -159,7 +159,7 @@ Example shape (your real reply: preamble with model + workflow, then fenced JSON
     "things to avoid"
   ],
   "output_specs": {
-    "aspect_ratio": "must match the selected model's supported ratios (for openai/gpt-image-2: 1:1 | 3:2 | 2:3)",
+    "aspect_ratio": "must match the selected model's supported ratios from listModels",
     "resolution": "512 | 1K | 2K | 4K",
     "variant_count": 1
   },

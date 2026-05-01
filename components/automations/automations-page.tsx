@@ -135,6 +135,9 @@ type AutomationRunApi = {
   run_trigger?: "manual" | "scheduled"
 }
 
+const AUTOMATION_SHEET_DIALOG_CLASSNAME =
+  "!left-0 !right-0 !bottom-0 !top-auto !w-screen !max-w-none !translate-x-0 !translate-y-0 flex max-h-[92dvh] flex-col gap-0 overflow-x-hidden rounded-t-4xl rounded-b-none px-0 sm:!top-1/2 sm:!right-auto sm:!bottom-auto sm:!left-1/2 sm:!w-[calc(100vw-2rem)] sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:rounded-4xl"
+
 const WEEKDAYS = [
   { value: "0", label: "Sunday" },
   { value: "1", label: "Monday" },
@@ -2137,7 +2140,12 @@ export function AutomationsPage() {
         }}
       >
         {selected ? (
-          <DialogContent className="fixed inset-x-0 bottom-0 top-auto flex max-h-[92dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col overflow-y-auto rounded-t-4xl rounded-b-none px-0 sm:top-1/2 sm:max-h-[min(92dvh,920px)] sm:w-full sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-4xl">
+          <DialogContent
+            className={cn(
+              AUTOMATION_SHEET_DIALOG_CLASSNAME,
+              "overflow-y-auto sm:max-h-[min(92dvh,920px)] sm:!max-w-5xl",
+            )}
+          >
             <DialogHeader className="sr-only">
               <DialogTitle>{selected.name}</DialogTitle>
               <DialogDescription>
@@ -2600,7 +2608,12 @@ export function AutomationsPage() {
           }
         }}
       >
-        <DialogContent className="fixed inset-x-0 bottom-0 top-auto flex max-h-[92dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-t-4xl rounded-b-none px-0 sm:top-1/2 sm:max-h-[min(90dvh,900px)] sm:w-full sm:max-w-4xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-4xl">
+        <DialogContent
+          className={cn(
+            AUTOMATION_SHEET_DIALOG_CLASSNAME,
+            "overflow-y-auto sm:max-h-[min(90dvh,900px)] sm:!max-w-4xl",
+          )}
+        >
           <DialogHeader className="sr-only">
             <DialogTitle>New automation</DialogTitle>
             <DialogDescription>

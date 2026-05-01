@@ -46,6 +46,25 @@ export const MODEL_IDENTIFIERS = {
 
 /** Default model for image generation (used when no model is specified). */
 export const DEFAULT_IMAGE_MODEL_IDENTIFIER = MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_2;
+/** Default model for motion copy generation. */
+export const DEFAULT_MOTION_COPY_MODEL_IDENTIFIER = MODEL_IDENTIFIERS.KWAIVGI_KLING_V3_MOTION;
+
+export function isMotionCopyModelIdentifier(identifier: string | null | undefined): boolean {
+  return (
+    identifier === MODEL_IDENTIFIERS.KWAIVGI_KLING_V2_6 ||
+    identifier === MODEL_IDENTIFIERS.KWAIVGI_KLING_V3_MOTION
+  );
+}
+
+export function normalizeMotionCopyModelIdentifier(
+  identifier: string | null | undefined,
+): string | null | undefined {
+  if (identifier === MODEL_IDENTIFIERS.KWAIVGI_KLING_V2_6) {
+    return MODEL_IDENTIFIERS.KWAIVGI_KLING_V3_MOTION;
+  }
+
+  return identifier;
+}
 
 // ============================================================================
 // PARAMETER DEFINITIONS

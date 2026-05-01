@@ -30,6 +30,8 @@ const EMPTY_INSTAGRAM_MAP = new Map<string, InstagramConnectionToolSummary>()
 
 const POLL_MS = 1500
 const MAX_POLLS = 200
+const AUTOMATION_SHEET_DIALOG_CLASSNAME =
+  "!left-0 !right-0 !bottom-0 !top-auto !w-screen !max-w-none !translate-x-0 !translate-y-0 flex max-h-[92dvh] min-h-0 flex-col gap-0 overflow-hidden rounded-t-4xl rounded-b-none p-0 sm:!top-1/2 sm:!right-auto sm:!bottom-auto sm:!left-1/2 sm:!w-[calc(100vw-2rem)] sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:rounded-4xl"
 
 type RunRow = {
   id: string
@@ -292,7 +294,12 @@ export function AutomationRunPreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="fixed inset-x-0 bottom-0 top-auto flex max-h-[92dvh] min-h-0 w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-t-4xl rounded-b-none p-0 sm:top-1/2 sm:max-h-[85dvh] sm:w-full sm:max-w-3xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-4xl">
+      <DialogContent
+        className={cn(
+          AUTOMATION_SHEET_DIALOG_CLASSNAME,
+          "sm:max-h-[85dvh] sm:!max-w-3xl",
+        )}
+      >
         <DialogHeader className="shrink-0 border-b border-border/60 px-6 py-4 text-left">
           <DialogTitle className="pr-8">
             {isCommunity ? "Community preview" : "Run preview"}

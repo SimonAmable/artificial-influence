@@ -8,6 +8,7 @@ export const ALWAYS_AVAILABLE_CREATIVE_CHAT_TOOL_KEYS = [
   "generateAudio",
   "generateImage",
   "generateVideo",
+  "falMediaOps",
   "extractVideoFrames",
   "getBrandContext",
   "listRecentGenerations",

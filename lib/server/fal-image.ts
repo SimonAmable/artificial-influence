@@ -1,9 +1,13 @@
 import { fal } from "@fal-ai/client"
+import { aspectRatioToDimensions } from "@/lib/utils/model-parameters"
 
+export const OPENAI_GPT_IMAGE_2_CANONICAL_ID = "openai/gpt-image-2" as const
 export const QWEN_IMAGE2_CANONICAL_ID = "fal-ai/qwen-image-2" as const
 export const WAN_27_IMAGE_CANONICAL_ID = "fal-ai/wan/v2.7" as const
 export const WAN_27_PRO_IMAGE_CANONICAL_ID = "fal-ai/wan/v2.7/pro" as const
 
+export const FAL_OPENAI_GPT_IMAGE_2_T2I = "openai/gpt-image-2" as const
+export const FAL_OPENAI_GPT_IMAGE_2_EDIT = "openai/gpt-image-2/edit" as const
 export const FAL_QWEN_T2I = "fal-ai/qwen-image-2/text-to-image" as const
 export const FAL_QWEN_EDIT = "fal-ai/qwen-image-2/edit" as const
 export const FAL_WAN_27_T2I = "fal-ai/wan/v2.7/text-to-image" as const
@@ -12,11 +16,14 @@ export const FAL_WAN_27_PRO_T2I = "fal-ai/wan/v2.7/pro/text-to-image" as const
 export const FAL_WAN_27_PRO_EDIT = "fal-ai/wan/v2.7/pro/edit" as const
 
 export type SupportedFalImageModelIdentifier =
+  | typeof OPENAI_GPT_IMAGE_2_CANONICAL_ID
   | typeof QWEN_IMAGE2_CANONICAL_ID
   | typeof WAN_27_IMAGE_CANONICAL_ID
   | typeof WAN_27_PRO_IMAGE_CANONICAL_ID
 
 export type FalImageEndpoint =
+  | typeof FAL_OPENAI_GPT_IMAGE_2_T2I
+  | typeof FAL_OPENAI_GPT_IMAGE_2_EDIT
   | typeof FAL_QWEN_T2I
   | typeof FAL_QWEN_EDIT
   | typeof FAL_WAN_27_T2I
@@ -32,6 +39,11 @@ const FAL_IMAGE_MODEL_CONFIG: Record<
     textEndpointId: FalImageEndpoint
   }
 > = {
+  [OPENAI_GPT_IMAGE_2_CANONICAL_ID]: {
+    textEndpointId: FAL_OPENAI_GPT_IMAGE_2_T2I,
+    editEndpointId: FAL_OPENAI_GPT_IMAGE_2_EDIT,
+    maxReferenceImages: 4,
+  },
   [QWEN_IMAGE2_CANONICAL_ID]: {
     textEndpointId: FAL_QWEN_T2I,
     editEndpointId: FAL_QWEN_EDIT,
@@ -58,6 +70,7 @@ export interface FalImageRequestOptions {
   numImages: number
   outputFormat?: "png" | "jpeg" | "webp" | null
   prompt: string
+  quality?: string | null
   referenceImageUrls: string[]
   seed?: number | null
 }
@@ -77,13 +90,40 @@ export function isSupportedFalImageModel(
   return modelIdentifier in FAL_IMAGE_MODEL_CONFIG
 }
 
-export function aspectRatioToFalImageSize(aspectRatio: string | null | undefined) {
+type FalImageSize =
+  | "auto"
+  | "square_hd"
+  | "square"
+  | "portrait_4_3"
+  | "portrait_16_9"
+  | "landscape_4_3"
+  | "landscape_16_9"
+  | { width: number; height: number }
+
+export function aspectRatioToFalImageSize(
+  aspectRatio: string | null | undefined,
+  options?: { allowAuto?: boolean; maxSize?: number },
+): FalImageSize {
   const a = (aspectRatio || "1:1").trim()
-  if (a === "16:9" || a === "21:9") return "landscape_16_9"
+
+  if (options?.allowAuto && (a === "match_input_image" || a === "auto")) {
+    return "auto"
+  }
+
+  if (a === "16:9") return "landscape_16_9"
   if (a === "9:16") return "portrait_16_9"
   if (a === "4:3") return "landscape_4_3"
   if (a === "3:4") return "portrait_4_3"
   if (a === "1:1") return "square_hd"
+
+  if (/^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/.test(a)) {
+    const dims = aspectRatioToDimensions(a, options?.maxSize ?? 1344)
+    return {
+      width: dims.width,
+      height: dims.height,
+    }
+  }
+
   return "square_hd"
 }
 
@@ -92,6 +132,14 @@ function normalizeOutputFormat(
 ): "png" | "jpeg" | "webp" {
   if (outputFormat === "jpeg" || outputFormat === "webp") return outputFormat
   return "png"
+}
+
+function normalizeQuality(value: string | null | undefined): "low" | "medium" | "high" {
+  if (value === "low" || value === "medium" || value === "high") {
+    return value
+  }
+
+  return "high"
 }
 
 export function buildFalImageRequest(options: FalImageRequestOptions): {
@@ -112,9 +160,27 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
   const resolvedAspectRatio =
     options.aspectRatio ?? (isEdit ? "match_input_image" : "1:1")
   const imageSize =
-    resolvedAspectRatio === "match_input_image" && isEdit
-      ? undefined
-      : aspectRatioToFalImageSize(resolvedAspectRatio)
+    aspectRatioToFalImageSize(resolvedAspectRatio, {
+      allowAuto: isEdit,
+      maxSize: 1344,
+    })
+  const shouldIncludeImageSize = imageSize !== "auto"
+
+  if (options.modelIdentifier === OPENAI_GPT_IMAGE_2_CANONICAL_ID) {
+    const input: Record<string, unknown> = {
+      prompt: options.prompt,
+      quality: normalizeQuality(options.quality),
+      num_images: Math.min(4, Math.max(1, options.numImages)),
+      output_format: normalizeOutputFormat(options.outputFormat),
+      image_size: imageSize,
+    }
+
+    if (isEdit) {
+      input.image_urls = referenceImageUrls
+    }
+
+    return { endpointId, input, resolvedAspectRatio }
+  }
 
   if (options.modelIdentifier === QWEN_IMAGE2_CANONICAL_ID) {
     const input: Record<string, unknown> = {
@@ -130,7 +196,7 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
       input.seed = Math.round(Number(options.seed))
     }
 
-    if (imageSize) {
+    if (shouldIncludeImageSize) {
       input.image_size = imageSize
     }
 
@@ -152,7 +218,7 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
       enable_safety_checker: false,
     }
 
-    if (imageSize) {
+    if (shouldIncludeImageSize) {
       input.image_size = imageSize
     }
 

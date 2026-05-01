@@ -1,5 +1,8 @@
 import type { Node, Edge } from "@xyflow/react"
-import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
+import {
+  DEFAULT_IMAGE_MODEL_IDENTIFIER,
+  DEFAULT_MOTION_COPY_MODEL_IDENTIFIER,
+} from "@/lib/constants/models"
 import {
   DEFAULT_AUDIO_PROVIDER,
   DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE,
@@ -164,7 +167,7 @@ export function createVideoGenNodeData(): VideoGenNodeData {
     manualLastFrameFile: null,
     prompt: "",
     negativePrompt: "",
-    model: "kwaivgi/kling-v2.6-motion-control",
+    model: DEFAULT_MOTION_COPY_MODEL_IDENTIFIER,
     parameters: {},
     mode: "pro",
     generatedVideoUrl: null,

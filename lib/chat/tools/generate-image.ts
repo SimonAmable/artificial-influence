@@ -356,7 +356,7 @@ export function createGenerateImageTool({
         .min(1)
         .max(32)
         .optional()
-        .describe("Preferred aspect ratio. It must match the selected model's supported aspect ratios from listModels. For `openai/gpt-image-2`, only use `1:1`, `3:2`, or `2:3`."),
+        .describe("Preferred aspect ratio. It must match the selected model's supported aspect ratios from listModels. For `openai/gpt-image-2`, rely on the model's returned ratio list instead of guessing."),
       variantCount: z
         .number()
         .int()
@@ -449,9 +449,7 @@ export function createGenerateImageTool({
         referenceImageUrls,
         shouldEnhance,
       })
-      const provider = isReplicateGptImage2Model(modelIdentifier)
-        ? "replicate"
-        : String(modelData.provider ?? "").toLowerCase()
+      const provider = String(modelData.provider ?? "").toLowerCase()
       const requiredCredits = Math.max(1, costPerImage * effectiveVariantCount)
 
       if (provider === "xai") {

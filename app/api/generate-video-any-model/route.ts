@@ -10,6 +10,10 @@ import {
   submitFalVideoQueue,
 } from '@/lib/server/fal-video';
 import { resolveWan27Replicate } from '@/lib/server/wan-2.7-replicate';
+import {
+  isMotionCopyModelIdentifier,
+  normalizeMotionCopyModelIdentifier,
+} from '@/lib/constants/models';
 
 function collectStoragePaths(values: unknown[]): string[] {
   const paths = values.flatMap((value) => {
@@ -80,11 +84,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isMotionCopy = model === 'kwaivgi/kling-v2.6-motion-control' || model === 'kwaivgi/kling-v3-motion-control';
+    const normalizedModel =
+      typeof model === 'string' ? normalizeMotionCopyModelIdentifier(model) ?? model : model;
+    const isMotionCopy = isMotionCopyModelIdentifier(normalizedModel);
     const motionCopyImage = image || body.imagePublicUrl;
     const motionCopyVideo = body.video || body.videoPublicUrl;
     const hasMotionCopyInputs = isMotionCopy && motionCopyImage && motionCopyVideo;
-    const isHappyHorse = model === 'alibaba/happy-horse';
+    const isHappyHorse = normalizedModel === 'alibaba/happy-horse';
     const happyHorseReferenceImages = Array.isArray(body.reference_images)
       ? body.reference_images.filter(
           (value: unknown): value is string => typeof value === 'string' && value.length > 0,
@@ -112,16 +118,16 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: modelData, error: modelError } = await supabase
-      .from('models')
-      .select('model_cost, provider')
-      .eq('identifier', model)
-      .eq('type', 'video')
-      .eq('is_active', true)
-      .single();
+        .from('models')
+        .select('model_cost, provider')
+        .eq('identifier', normalizedModel)
+        .eq('type', 'video')
+        .eq('is_active', true)
+        .single();
 
     if (modelError || !modelData) {
       return NextResponse.json(
-        { error: `Model "${model}" not found or is inactive` },
+        { error: `Model "${normalizedModel}" not found or is inactive` },
         { status: 400 }
       );
     }
@@ -137,7 +143,7 @@ export async function POST(request: NextRequest) {
 
     const modelProvider = typeof modelData.provider === 'string' ? modelData.provider : null;
 
-    if (modelProvider === 'fal' && isSupportedFalVideoModel(model)) {
+    if (modelProvider === 'fal' && isSupportedFalVideoModel(normalizedModel)) {
       const referenceImageStoragePaths = collectStoragePaths([
         image,
         first_frame_image,
@@ -156,7 +162,7 @@ export async function POST(request: NextRequest) {
             : typeof first_frame_image === 'string'
               ? first_frame_image
               : null,
-        modelIdentifier: model,
+        modelIdentifier: normalizedModel,
         prompt: typeof prompt === 'string' ? prompt : null,
         referenceImageUrls: happyHorseReferenceImages,
         resolution:
@@ -180,7 +186,7 @@ export async function POST(request: NextRequest) {
           reference_images_supabase_storage_path:
             referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
           reference_videos_supabase_storage_path: null,
-          model,
+          model: normalizedModel,
           type: 'video',
           is_public: true,
           tool: typeof body.tool === 'string' ? body.tool : null,
@@ -210,7 +216,7 @@ export async function POST(request: NextRequest) {
 
     if (modelProvider === 'fal') {
       return NextResponse.json(
-        { error: `Unsupported Fal video model: ${model}` },
+        { error: `Unsupported Fal video model: ${normalizedModel}` },
         { status: 400 },
       );
     }
@@ -235,10 +241,10 @@ export async function POST(request: NextRequest) {
       prompt: typeof effectivePrompt === 'string' ? effectivePrompt : '',
     };
 
-    let replicateApiModel: string = model;
+    let replicateApiModel: string = normalizedModel;
 
     // Add model-specific parameters
-    switch (model) {
+    switch (normalizedModel) {
       case 'minimax/hailuo-2.3-fast':
         if (first_frame_image) replicateInput.first_frame_image = first_frame_image;
         if (otherParams.duration) replicateInput.duration = otherParams.duration;
@@ -440,13 +446,13 @@ export async function POST(request: NextRequest) {
 
       default:
         return NextResponse.json(
-          { error: `Unsupported model: ${model}` },
+          { error: `Unsupported model: ${normalizedModel}` },
           { status: 400 }
         );
     }
 
     console.log('[generate-video-test] Replicate input:', {
-      model,
+      model: normalizedModel,
       replicateApiModel,
       inputKeys: Object.keys(replicateInput),
     });
@@ -498,7 +504,7 @@ export async function POST(request: NextRequest) {
             referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
           reference_videos_supabase_storage_path:
             referenceVideoStoragePaths.length > 0 ? referenceVideoStoragePaths : null,
-          model,
+          model: normalizedModel,
           type: 'video',
           is_public: true,
           tool: typeof body.tool === 'string' ? body.tool : null,
@@ -640,7 +646,7 @@ export async function POST(request: NextRequest) {
           supabase_storage_path: generatedVideoStoragePath,
           reference_images_supabase_storage_path: null,
           reference_videos_supabase_storage_path: null,
-          model,
+          model: normalizedModel,
           type: 'video' as const,
           is_public: true,
           tool,
@@ -671,7 +677,7 @@ export async function POST(request: NextRequest) {
         mimeType: contentType,
       },
       videoUrl: finalVideoUrl,
-      model,
+      model: normalizedModel,
       creditsUsed: requiredCredits,
     });
 

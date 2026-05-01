@@ -3,6 +3,7 @@ import {
   getDefaultAudioModel,
   getDefaultAudioVoiceId,
 } from "@/lib/constants/audio"
+import { DEFAULT_MOTION_COPY_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import {
   executeWorkflowWithRuntime,
   type WorkflowExecutionOptions,
@@ -99,6 +100,7 @@ function createBrowserRuntime(): WorkflowExecutionRuntime {
           videoStoragePath: "",
           prompt,
           mode,
+          model: DEFAULT_MOTION_COPY_MODEL_IDENTIFIER,
       })
       if (!result.video?.url) throw new Error("No video URL in response")
       return { videoUrl: result.video.url as string }

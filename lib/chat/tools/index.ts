@@ -9,6 +9,7 @@ import type {
   AvailableChatVideoReference,
 } from "@/lib/chat/tools/generate-video"
 import { createGenerateVideoTool } from "@/lib/chat/tools/generate-video"
+import { createFalMediaOpsTool } from "@/lib/chat/tools/fal-media-ops"
 import { createGetBrandContextTool } from "@/lib/chat/tools/get-brand-context"
 import { createListInstagramConnectionsTool } from "@/lib/chat/tools/list-instagram-connections"
 import { createListSocialConnectionsTool } from "@/lib/chat/tools/list-social-connections"
@@ -138,6 +139,11 @@ export function createCreativeChatTools({
       availableReferences,
       availableVideoReferences,
       availableAudioReferences,
+      supabase,
+      threadId,
+      userId,
+    }),
+    falMediaOps: createFalMediaOpsTool({
       supabase,
       threadId,
       userId,

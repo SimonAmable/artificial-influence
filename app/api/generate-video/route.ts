@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { assertAcceptedCurrentTerms } from '@/lib/legal/terms-acceptance';
 import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
+import {
+  DEFAULT_MOTION_COPY_MODEL_IDENTIFIER,
+  normalizeMotionCopyModelIdentifier,
+} from '@/lib/constants/models';
 
 export async function POST(request: NextRequest) {
   const requestStartTime = Date.now();
@@ -83,8 +87,9 @@ export async function POST(request: NextRequest) {
     console.log('[generate-video] ✓ URLs validated');
     console.log('[generate-video] ✓ Request processed successfully');
 
-    const model = (body.model as string) || 'kwaivgi/kling-v2.6-motion-control';
-    const isV3Motion = model === 'kwaivgi/kling-v3-motion-control';
+    const requestedModel = (body.model as string) || DEFAULT_MOTION_COPY_MODEL_IDENTIFIER;
+    const model =
+      normalizeMotionCopyModelIdentifier(requestedModel) || DEFAULT_MOTION_COPY_MODEL_IDENTIFIER;
     const { data: modelData, error: modelError } = await supabase
       .from('models')
       .select('model_cost')
@@ -139,7 +144,7 @@ export async function POST(request: NextRequest) {
     if (webhookBase) {
       const webhookUrl = `${webhookBase}/api/webhooks/replicate`;
       const prediction = await replicate.predictions.create({
-        model: (isV3Motion ? 'kwaivgi/kling-v3-motion-control' : 'kwaivgi/kling-v2.6-motion-control') as `${string}/${string}`,
+        model: DEFAULT_MOTION_COPY_MODEL_IDENTIFIER as `${string}/${string}`,
         input: replicateInput,
         webhook: webhookUrl,
         webhook_events_filter: ['completed'],
@@ -180,7 +185,7 @@ export async function POST(request: NextRequest) {
     }
 
     const generationStartTime = Date.now();
-    const output = await replicate.run(isV3Motion ? 'kwaivgi/kling-v3-motion-control' : 'kwaivgi/kling-v2.6-motion-control', {
+    const output = await replicate.run(DEFAULT_MOTION_COPY_MODEL_IDENTIFIER, {
       input: replicateInput,
     });
     const generationTime = Date.now() - generationStartTime;
@@ -346,8 +351,8 @@ export async function POST(request: NextRequest) {
 // GET method for API documentation
 export async function GET() {
   return NextResponse.json({
-    message: 'Video Generation API - Kling Motion Control (V2.6 or V3)',
-    models: ['kwaivgi/kling-v2.6-motion-control', 'kwaivgi/kling-v3-motion-control'],
+    message: 'Video Generation API - Kling 3.0 Motion Control',
+    models: [DEFAULT_MOTION_COPY_MODEL_IDENTIFIER],
     usage: {
       method: 'POST',
       contentType: 'application/json',
