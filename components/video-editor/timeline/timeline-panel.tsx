@@ -1,8 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronDown, ChevronUp, Eye, EyeOff, Plus, Trash2, Volume2, VolumeX } from "lucide-react"
-import { toast } from "sonner"
+import { Eye, EyeOff, Volume2, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useVideoEditor } from "@/components/video-editor/video-editor-provider"
 import { TimelineClip } from "@/components/video-editor/timeline/timeline-clip"
@@ -56,16 +55,6 @@ export function TimelinePanel({ className }: { className?: string }) {
     <div className={cn("flex min-h-0 flex-col border-t border-border bg-muted/15", className)}>
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-2 py-1">
         <span className="text-[10px] text-muted-foreground">Timeline</span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 gap-1 px-2 text-[10px]"
-          onClick={() => dispatch({ type: "ADD_TRACK" })}
-        >
-          <Plus className="size-3.5" />
-          Add track
-        </Button>
         <span className="text-[10px] text-muted-foreground">Zoom</span>
         <input
           type="range"
@@ -92,7 +81,7 @@ export function TimelinePanel({ className }: { className?: string }) {
           >
             Tracks
           </div>
-          {project.tracks.map((track, trackIndex) => {
+          {project.tracks.map((track) => {
             const isActive = track.id === activeTrackId
             return (
               <div
@@ -104,62 +93,13 @@ export function TimelinePanel({ className }: { className?: string }) {
                 )}
                 style={{ height: TRACK_ROW_H }}
               >
-                <div className="flex shrink-0 flex-col gap-px">
-                  <button
-                    type="button"
-                    title="Move track up"
-                    disabled={trackIndex === 0}
-                    className="rounded p-0 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      dispatch({ type: "REORDER_TRACKS", fromIndex: trackIndex, toIndex: trackIndex - 1 })
-                    }}
-                  >
-                    <ChevronUp className="size-3" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Move track down"
-                    disabled={trackIndex >= project.tracks.length - 1}
-                    className="rounded p-0 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      dispatch({ type: "REORDER_TRACKS", fromIndex: trackIndex, toIndex: trackIndex + 1 })
-                    }}
-                  >
-                    <ChevronDown className="size-3" />
-                  </button>
-                </div>
                 <button
                   type="button"
                   className="min-w-0 flex-1 truncate text-left text-[11px] font-medium leading-tight hover:underline"
-                  title="Click to make this the active track for new clips"
+                  title="Click to focus this track"
                   onClick={() => dispatch({ type: "SET_ACTIVE_TRACK", trackId: track.id })}
                 >
                   {track.label}
-                </button>
-                <button
-                  type="button"
-                  title={
-                    track.items.length > 0
-                      ? "Remove clips before deleting track"
-                      : project.tracks.length <= 1
-                        ? "Cannot delete the only track"
-                        : "Delete empty track"
-                  }
-                  disabled={project.tracks.length <= 1 || track.items.length > 0}
-                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-destructive/15 hover:text-destructive disabled:opacity-30"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (track.items.length > 0) {
-                      toast.error("Remove or move clips before deleting this track")
-                      return
-                    }
-                    if (project.tracks.length <= 1) return
-                    dispatch({ type: "DELETE_TRACK", trackId: track.id })
-                  }}
-                >
-                  <Trash2 className="size-3.5" />
                 </button>
                 <button
                   type="button"

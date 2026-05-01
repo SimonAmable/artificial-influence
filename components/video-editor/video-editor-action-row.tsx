@@ -32,6 +32,7 @@ import {
 } from "@/lib/video-editor/media-parser"
 import { useVideoEditor } from "@/components/video-editor/video-editor-provider"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import type { EditorProject, TrackKind } from "@/lib/video-editor/types"
 import { cn } from "@/lib/utils"
 
 type VideoEditorActionRowProps = {
@@ -44,6 +45,10 @@ type VideoEditorActionRowProps = {
   isRenderInFlight?: boolean
   onQueueRender?: () => void
   onSaveProject?: () => void
+}
+
+function findTrackIdByKind(project: EditorProject, kind: TrackKind): string | null {
+  return project.tracks.find((track) => track.kind === kind)?.id ?? null
 }
 
 export function VideoEditorActionRow({
@@ -73,12 +78,11 @@ export function VideoEditorActionRow({
   } = useVideoEditor()
 
   const fileRef = React.useRef<HTMLInputElement>(null)
-  const trackId = project.activeTrackId ?? project.tracks[0]?.id
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ""
-    if (!file || !trackId) return
+    if (!file) return
 
     try {
       const up = await uploadFileToSupabase(file, "editor-assets")
@@ -87,6 +91,8 @@ export function VideoEditorActionRow({
       const fps = project.settings.fps
 
       if (file.type.startsWith("video/")) {
+        const trackId = findTrackIdByKind(project, "video")
+        if (!trackId) return
         const dur = await getVideoDurationSeconds(file)
         const dims = await getVideoDimensions(file).catch(() => ({
           width: project.settings.width,
@@ -98,11 +104,15 @@ export function VideoEditorActionRow({
         item = { ...item, ...fit }
         dispatch({ type: "ADD_ITEM", trackId, item })
       } else if (file.type.startsWith("audio/")) {
+        const trackId = findTrackIdByKind(project, "audio")
+        if (!trackId) return
         const dur = await getAudioDurationSeconds(file)
         const sourceFrames = Math.max(1, Math.ceil(dur * fps))
         const item = createAudioItem(project, url, sourceFrames, { fileName: file.name })
         dispatch({ type: "ADD_ITEM", trackId, item })
       } else if (file.type.startsWith("image/")) {
+        const trackId = findTrackIdByKind(project, "image")
+        if (!trackId) return
         const dims = await getImageDimensionsFromFile(file).catch(() => ({
           width: project.settings.width,
           height: project.settings.height,
@@ -127,11 +137,13 @@ export function VideoEditorActionRow({
   }
 
   const addText = () => {
+    const trackId = findTrackIdByKind(project, "text")
     if (!trackId) return
     dispatch({ type: "ADD_ITEM", trackId, item: createTextItem(project) })
   }
 
   const addSolid = () => {
+    const trackId = findTrackIdByKind(project, "image")
     if (!trackId) return
     dispatch({ type: "ADD_ITEM", trackId, item: createSolidItem(project) })
   }
