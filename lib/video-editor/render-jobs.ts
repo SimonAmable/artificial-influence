@@ -33,6 +33,15 @@ export type EditorRenderJobApiResponse = z.infer<
   typeof editorRenderJobApiResponseSchema
 >
 
+export type EditorRenderDisplayState =
+  | "queued"
+  | "preparing"
+  | "starting"
+  | "rendering"
+  | "finishing"
+  | "completed"
+  | "failed"
+
 export type EditorRenderJobRow = {
   id: string
   status: EditorRenderJobStatus
@@ -71,4 +80,37 @@ export function truncateRenderErrorMessage(
   return message.length > maxLength
     ? `${message.slice(0, maxLength - 3)}...`
     : message
+}
+
+export function getEditorRenderDisplayState(
+  job: Pick<EditorRenderJobApiResponse, "status" | "progress">
+): EditorRenderDisplayState {
+  if (job.status === "queued") {
+    return "queued"
+  }
+
+  if (job.status === "completed") {
+    return "completed"
+  }
+
+  if (job.status === "failed") {
+    return "failed"
+  }
+
+  const progress =
+    typeof job.progress === "number" ? Math.max(0, Math.round(job.progress)) : null
+
+  if (progress === null || progress < 30) {
+    return "preparing"
+  }
+
+  if (progress < 55) {
+    return "starting"
+  }
+
+  if (progress < 97) {
+    return "rendering"
+  }
+
+  return "finishing"
 }

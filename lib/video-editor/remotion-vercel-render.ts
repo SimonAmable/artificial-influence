@@ -1,5 +1,4 @@
 import { promises as fs } from "node:fs"
-import os from "node:os"
 import path from "node:path"
 import { bundle } from "@remotion/bundler"
 import {
@@ -107,6 +106,24 @@ async function updateRenderJob(
   }
 }
 
+async function updateRenderJobWhileRendering(
+  renderJobId: string,
+  values: Record<string, unknown>
+): Promise<boolean> {
+  const supabase = getRequiredServiceRoleClient()
+  const { error, count } = await supabase
+    .from("editor_render_jobs")
+    .update(values, { count: "exact" })
+    .eq("id", renderJobId)
+    .eq("status", "rendering")
+
+  if (error) {
+    throw new Error(`Failed to update render job ${renderJobId}: ${error.message}`)
+  }
+
+  return (count ?? 0) > 0
+}
+
 function clampProgress(progress: number): number {
   return Math.max(0, Math.min(100, Math.round(progress)))
 }
@@ -129,7 +146,9 @@ function mapRenderProgress(progress: RenderMediaOnVercelProgress): number {
 }
 
 async function createBundleDir(renderJobId: string): Promise<string> {
-  const prefix = path.join(os.tmpdir(), `editor-render-${renderJobId}-`)
+  const tempRoot = path.join(process.cwd(), ".tmp")
+  await fs.mkdir(tempRoot, { recursive: true })
+  const prefix = path.join(tempRoot, `editor-render-${renderJobId}-`)
   return fs.mkdtemp(prefix)
 }
 
@@ -149,7 +168,7 @@ async function createRendererBundle(
     entryPoint: REMOTION_ENTRY_POINT,
     outDir: bundleDir,
     onProgress: (progress) => {
-      void updateRenderJob(renderJobId, {
+      void updateRenderJobWhileRendering(renderJobId, {
         status: "rendering",
         progress: clampProgress(5 + progress * 0.2),
       }).catch((error) => {
@@ -189,7 +208,7 @@ async function createRenderSandbox(
     timeoutInMilliseconds: getSandboxTimeoutMs(),
     resources: { vcpus: getSandboxVcpus() },
     onProgress: (update) => {
-      void updateRenderJob(renderJobId, {
+      void updateRenderJobWhileRendering(renderJobId, {
         status: "rendering",
         progress: mapSandboxProgress(update.progress),
       }).catch((error) => {
@@ -278,7 +297,10 @@ async function runRenderJob({
       }),
     })
 
-    await addBundleToSandbox({ sandbox, bundleDir })
+    await addBundleToSandbox({
+      sandbox,
+      bundleDir: path.relative(process.cwd(), bundleDir),
+    })
 
     await updateRenderJob(renderJobId, {
       status: "rendering",
@@ -292,7 +314,7 @@ async function runRenderJob({
       codec: "h264",
       licenseKey: getLicenseKey(),
       onProgress: (progress) => {
-        void updateRenderJob(renderJobId, {
+        void updateRenderJobWhileRendering(renderJobId, {
           status: "rendering",
           progress: mapRenderProgress(progress),
         }).catch((error) => {

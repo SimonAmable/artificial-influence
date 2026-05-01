@@ -1,11 +1,16 @@
 import {
   cloneItemWithNewId,
-  computeProjectEndFrame,
-  extendCompositionToFitItems,
   findItemInProject,
   newId,
+  syncCompositionToItems,
 } from "./project-helpers"
-import type { EditorItem, EditorProject, VideoEditorAction } from "./types"
+import {
+  isTrackCompatibleWithItem,
+  normalizeEditorProject,
+  type EditorItem,
+  type EditorProject,
+  type VideoEditorAction,
+} from "./types"
 
 export function deepCloneProject(p: EditorProject): EditorProject {
   return JSON.parse(JSON.stringify(p)) as EditorProject
@@ -14,11 +19,7 @@ export function deepCloneProject(p: EditorProject): EditorProject {
 export function videoEditorReducer(state: EditorProject, action: VideoEditorAction): EditorProject {
   switch (action.type) {
     case "LOAD_PROJECT": {
-      const p = deepCloneProject(action.project)
-      if (!p.activeTrackId || !p.tracks.some((t) => t.id === p.activeTrackId)) {
-        p.activeTrackId = p.tracks[0]?.id ?? null
-      }
-      return p
+      return deepCloneProject(normalizeEditorProject(action.project))
     }
 
     case "SET_PROJECT_ID":
@@ -29,60 +30,17 @@ export function videoEditorReducer(state: EditorProject, action: VideoEditorActi
 
     case "SET_SETTINGS": {
       const settings = { ...state.settings, ...action.settings }
-      const next = { ...state, settings }
-      const end = computeProjectEndFrame(next)
-      if (end > settings.durationInFrames) {
-        settings.durationInFrames = end
-      }
-      return { ...next, settings }
+      return syncCompositionToItems({ ...state, settings })
     }
 
-    case "ADD_TRACK": {
-      const track = {
-        id: newId(),
-        label: `Track ${state.tracks.length + 1}`,
-        muted: false,
-        hidden: false,
-        items: [],
-      }
-      return { ...state, tracks: [...state.tracks, track], activeTrackId: track.id }
-    }
+    case "ADD_TRACK":
+      return state
 
-    case "DELETE_TRACK": {
-      const tr = state.tracks.find((t) => t.id === action.trackId)
-      if (!tr || state.tracks.length <= 1) return state
-      if (tr.items.length > 0) return state
-      const idx = state.tracks.findIndex((t) => t.id === action.trackId)
-      const nextTracks = state.tracks.filter((t) => t.id !== action.trackId)
-      let activeTrackId = state.activeTrackId
-      if (activeTrackId === action.trackId) {
-        const fallback = nextTracks[Math.max(0, idx - 1)] ?? nextTracks[0]
-        activeTrackId = fallback?.id ?? null
-      }
-      return {
-        ...state,
-        tracks: nextTracks,
-        activeTrackId,
-        selectedItemIds: [],
-      }
-    }
+    case "DELETE_TRACK":
+      return state
 
-    case "REORDER_TRACKS": {
-      const { fromIndex, toIndex } = action
-      if (fromIndex === toIndex) return state
-      if (
-        fromIndex < 0 ||
-        toIndex < 0 ||
-        fromIndex >= state.tracks.length ||
-        toIndex >= state.tracks.length
-      ) {
-        return state
-      }
-      const next = [...state.tracks]
-      const [row] = next.splice(fromIndex, 1)
-      next.splice(toIndex, 0, row!)
-      return { ...state, tracks: next }
-    }
+    case "REORDER_TRACKS":
+      return state
 
     case "SET_ACTIVE_TRACK": {
       if (action.trackId === null) {
@@ -101,14 +59,16 @@ export function videoEditorReducer(state: EditorProject, action: VideoEditorActi
       }
 
     case "ADD_ITEM":
-      return {
+      return syncCompositionToItems({
         ...state,
         tracks: state.tracks.map((t) =>
-          t.id === action.trackId ? { ...t, items: [...t.items, action.item] } : t
+          t.id === action.trackId && isTrackCompatibleWithItem(t, action.item)
+            ? { ...t, items: [...t.items, action.item] }
+            : t
         ),
         selectedItemIds: [action.item.id],
         activeTrackId: action.trackId,
-      }
+      })
 
     case "UPDATE_ITEM": {
       const found = findItemInProject(state, action.itemId)
@@ -121,18 +81,18 @@ export function videoEditorReducer(state: EditorProject, action: VideoEditorActi
           items: t.items.map((i) => (i.id === action.itemId ? nextItem : i)),
         })),
       }
-      return extendCompositionToFitItems(next)
+      return syncCompositionToItems(next)
     }
 
     case "REMOVE_ITEM":
-      return {
+      return syncCompositionToItems({
         ...state,
         tracks: state.tracks.map((t) => ({
           ...t,
           items: t.items.filter((i) => i.id !== action.itemId),
         })),
         selectedItemIds: state.selectedItemIds.filter((id) => id !== action.itemId),
-      }
+      })
 
     case "MOVE_ITEM": {
       const found = findItemInProject(state, action.itemId)
@@ -142,12 +102,21 @@ export function videoEditorReducer(state: EditorProject, action: VideoEditorActi
         ...t,
         items: t.items.filter((i) => i.id !== action.itemId),
       }))
-      const targetTrackId = action.trackId ?? track.id
+      const requestedTrackId = action.trackId ?? track.id
+      const requestedTrack = state.tracks.find((t) => t.id === requestedTrackId)
+      const targetTrackId =
+        requestedTrack && isTrackCompatibleWithItem(requestedTrack, item)
+          ? requestedTrack.id
+          : track.id
       const moved = { ...item, from: action.from } as EditorItem
       const nextTracks = without.map((t) =>
         t.id === targetTrackId ? { ...t, items: [...t.items, moved] } : t
       )
-      return extendCompositionToFitItems({ ...state, tracks: nextTracks })
+      return syncCompositionToItems({
+        ...state,
+        tracks: nextTracks,
+        activeTrackId: targetTrackId,
+      })
     }
 
     case "SET_SELECTED": {
@@ -223,13 +192,13 @@ export function videoEditorReducer(state: EditorProject, action: VideoEditorActi
       const newItems = track.items.flatMap((i) =>
         i.id === item.id ? [left, right] : [i]
       )
-      return {
+      return syncCompositionToItems({
         ...state,
         tracks: state.tracks.map((t) =>
           t.id === track.id ? { ...t, items: newItems } : t
         ),
         selectedItemIds: [left.id, right.id],
-      }
+      })
     }
 
     case "DUPLICATE_ITEMS": {
@@ -247,21 +216,21 @@ export function videoEditorReducer(state: EditorProject, action: VideoEditorActi
           ),
         }
       }
-      return {
+      return syncCompositionToItems({
         ...next,
         selectedItemIds: copies.map((c) => c.id),
-      }
+      })
     }
 
     case "DELETE_SELECTED":
-      return {
+      return syncCompositionToItems({
         ...state,
         tracks: state.tracks.map((t) => ({
           ...t,
           items: t.items.filter((i) => !state.selectedItemIds.includes(i.id)),
         })),
         selectedItemIds: [],
-      }
+      })
 
     case "BRING_FORWARD": {
       const found = findItemInProject(state, action.itemId)

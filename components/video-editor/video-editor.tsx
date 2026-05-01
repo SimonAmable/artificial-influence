@@ -10,6 +10,7 @@ import { VideoEditorProvider, useVideoEditor } from "@/components/video-editor/v
 import { FEATURE_FLAGS } from "@/lib/video-editor/feature-flags"
 import {
   editorRenderJobApiResponseSchema,
+  getEditorRenderDisplayState,
   type EditorRenderJobApiResponse,
 } from "@/lib/video-editor/render-jobs"
 import { editorProjectSchema } from "@/lib/video-editor/types"
@@ -312,16 +313,33 @@ function VideoEditorShell({ initialProjectId }: { initialProjectId?: string | nu
       return "Queueing..."
     }
 
-    if (renderJob?.status === "queued") {
+    if (!renderJob) {
+      return "Render MP4"
+    }
+
+    const displayState = getEditorRenderDisplayState(renderJob)
+
+    if (displayState === "queued") {
       return "Queued..."
     }
 
-    if (renderJob?.status === "rendering") {
-      const progress =
-        typeof renderJob.progress === "number"
-          ? ` ${Math.max(0, Math.round(renderJob.progress))}%`
-          : ""
+    if (displayState === "preparing") {
+      return "Preparing..."
+    }
+
+    if (displayState === "starting") {
+      return "Starting render..."
+    }
+
+    if (displayState === "rendering") {
+      const progress = typeof renderJob.progress === "number"
+        ? ` ${Math.max(0, Math.round(renderJob.progress))}%`
+        : ""
       return `Rendering${progress}`
+    }
+
+    if (displayState === "finishing") {
+      return "Finishing..."
     }
 
     return "Render MP4"
@@ -341,9 +359,31 @@ function VideoEditorShell({ initialProjectId }: { initialProjectId?: string | nu
     }
 
     if (renderJob.status === "rendering") {
-      return typeof renderJob.progress === "number"
-        ? `Rendering ${Math.max(0, Math.round(renderJob.progress))}%`
-        : "Rendering"
+      const displayState = getEditorRenderDisplayState(renderJob)
+      const progress =
+        typeof renderJob.progress === "number"
+          ? Math.max(0, Math.round(renderJob.progress))
+          : null
+
+      if (displayState === "preparing") {
+        return progress === null
+          ? "Preparing your video"
+          : `Preparing your video ${progress}%`
+      }
+
+      if (displayState === "starting") {
+        return progress === null
+          ? "Starting the render"
+          : `Starting the render ${progress}%`
+      }
+
+      if (displayState === "finishing") {
+        return progress === null
+          ? "Finishing your MP4"
+          : `Finishing your MP4 ${progress}%`
+      }
+
+      return progress === null ? "Rendering your video" : `Rendering your video ${progress}%`
     }
 
     return "Queued"

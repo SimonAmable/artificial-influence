@@ -4667,7 +4667,7 @@ export function CreativeAgentChat({
     [enablePersistence, initialChatId, initialMessages, syncUrlOnThreadCreate],
   )
 
-  const { addToolApprovalResponse, messages, sendMessage, setMessages, status, error } = useChat({
+  const { addToolApprovalResponse, messages, sendMessage, setMessages, status, error, stop } = useChat({
     chat,
     experimental_throttle: 50,
   })
@@ -5840,18 +5840,31 @@ export function CreativeAgentChat({
                       <Button
                         type="button"
                         size="icon"
-                        onClick={() => void handleSendMessage()}
+                        aria-label={
+                          status === "submitted" || status === "streaming"
+                            ? "Stop response"
+                            : "Send message"
+                        }
+                        onClick={() => {
+                          if (status === "submitted" || status === "streaming") {
+                            stop()
+                            return
+                          }
+
+                          void handleSendMessage()
+                        }}
                         disabled={
                           isCreatingThread ||
                           isBootstrappingOnboarding ||
                           hasPendingUploads ||
-                          status === "submitted" ||
-                          status === "streaming" ||
-                          (!composerValue.trim() && composerAttachments.length === 0)
+                          ((status !== "submitted" && status !== "streaming") &&
+                            (!composerValue.trim() && composerAttachments.length === 0))
                         }
                       >
-                        {isCreatingThread || hasPendingUploads || status === "submitted" || status === "streaming" ? (
+                        {isCreatingThread || hasPendingUploads ? (
                           <CircleNotch className="h-4 w-4 animate-spin" />
+                        ) : status === "submitted" || status === "streaming" ? (
+                          <X className="h-4 w-4" />
                         ) : (
                           <ArrowUp className="h-4 w-4" />
                         )}

@@ -7,7 +7,14 @@ import {
   DEFAULT_TEXT_DURATION_FRAMES,
   DEFAULT_WIDTH,
 } from "./constants"
-import type { EditorItem, EditorProject, Track, VideoItem } from "./types"
+import {
+  createDefaultTracks,
+  normalizeEditorProject,
+  type EditorItem,
+  type EditorProject,
+  type Track,
+  type VideoItem,
+} from "./types"
 
 export function newId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -17,9 +24,7 @@ export function newId(): string {
 }
 
 export function createEmptyProject(): EditorProject {
-  const firstTrackId = newId()
-  const secondTrackId = newId()
-  return {
+  return normalizeEditorProject({
     id: null,
     name: "Untitled Project",
     settings: {
@@ -28,28 +33,13 @@ export function createEmptyProject(): EditorProject {
       height: DEFAULT_HEIGHT,
       durationInFrames: DEFAULT_DURATION_FRAMES,
     },
-    tracks: [
-      {
-        id: firstTrackId,
-        label: "Track 1",
-        muted: false,
-        hidden: false,
-        items: [],
-      },
-      {
-        id: secondTrackId,
-        label: "Track 2",
-        muted: false,
-        hidden: false,
-        items: [],
-      },
-    ],
-    activeTrackId: firstTrackId,
+    tracks: createDefaultTracks(),
+    activeTrackId: null,
     selectedItemIds: [],
     snappingEnabled: true,
     canvasZoom: 1,
     timelineZoomPxPerFrame: 2,
-  }
+  })
 }
 
 export function findItemInProject(project: EditorProject, itemId: string): { track: Track; item: EditorItem; trackIndex: number; itemIndex: number } | null {
@@ -75,21 +65,22 @@ export function computeProjectEndFrame(project: EditorProject): number {
       if (end > max) max = end
     }
   }
-  return Math.max(max, project.settings.durationInFrames)
+  return Math.max(max, DEFAULT_DURATION_FRAMES)
 }
 
-/** Extends composition duration when clips extend past the current end. */
-export function extendCompositionToFitItems(project: EditorProject): EditorProject {
-  let maxEnd = 0
-  for (const track of project.tracks) {
-    for (const item of track.items) {
-      maxEnd = Math.max(maxEnd, computeEndFrame(item))
-    }
+/** Keeps project duration derived from its clips, with an empty-project fallback. */
+export function syncCompositionToItems(project: EditorProject): EditorProject {
+  const nextDuration = computeProjectEndFrame(project)
+  if (nextDuration === project.settings.durationInFrames) {
+    return project
   }
-  if (maxEnd > project.settings.durationInFrames) {
-    return { ...project, settings: { ...project.settings, durationInFrames: maxEnd } }
+  return {
+    ...project,
+    settings: {
+      ...project.settings,
+      durationInFrames: nextDuration,
+    },
   }
-  return project
 }
 
 export function defaultDurationForType(type: EditorItem["type"], fps: number): number {

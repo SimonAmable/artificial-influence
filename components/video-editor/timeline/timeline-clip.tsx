@@ -9,7 +9,12 @@ import {
   buildMagneticSnapFrames,
   snapTimelineFrame,
 } from "@/lib/video-editor/timeline-clip-math"
-import type { EditorItem, EditorProject, VideoEditorAction } from "@/lib/video-editor/types"
+import {
+  isTrackCompatibleWithItem,
+  type EditorItem,
+  type EditorProject,
+  type VideoEditorAction,
+} from "@/lib/video-editor/types"
 
 function clipLabel(item: EditorItem): string {
   switch (item.type) {
@@ -91,7 +96,12 @@ export function TimelineClip({
         const f = frameFromClientX(e.clientX)
         let newFrom = snap(f - grabOffsetFrames)
         newFrom = Math.max(0, newFrom)
-        const targetTrackId = trackIdAtPointer(e.clientX, e.clientY, tid)
+        const hoveredTrackId = trackIdAtPointer(e.clientX, e.clientY, tid)
+        const hoveredTrack = proj.tracks.find((track) => track.id === hoveredTrackId)
+        const targetTrackId =
+          hoveredTrack && isTrackCompatibleWithItem(hoveredTrack, startItem)
+            ? hoveredTrackId
+            : tid
         dispatch({ type: "MOVE_ITEM", itemId, from: newFrom, trackId: targetTrackId })
         return
       }

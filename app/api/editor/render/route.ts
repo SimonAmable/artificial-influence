@@ -11,7 +11,7 @@ import {
 import { editorProjectSchema } from "@/lib/video-editor/types"
 
 export const runtime = "nodejs"
-export const maxDuration = 3600
+export const maxDuration = 800
 
 type QueueRenderRequest = {
   projectId?: string
