@@ -124,11 +124,15 @@ function VideoPageContent() {
     }
   }, [videoModels, selectedModel])
 
+  const lastLoadedModelParam = React.useRef<string | null>(null)
+
   React.useEffect(() => {
     if (videoModels.length === 0) return
 
     const rawModelParam = searchParams.get("model")
     if (!rawModelParam) return
+    
+    if (rawModelParam === lastLoadedModelParam.current) return
 
     const modelParam = rawModelParam.trim().toLowerCase()
     const targetIdentifier = VIDEO_MODEL_QUERY_ALIASES[modelParam] ?? rawModelParam.trim()
@@ -137,13 +141,14 @@ function VideoPageContent() {
     )
 
     if (!resolvedModel) return
-    if (selectedModel?.identifier === resolvedModel.identifier) return
 
     setSelectedModel({
       ...resolvedModel,
       parameters: { parameters: buildVideoModelParameters(resolvedModel) },
     })
-  }, [searchParams, videoModels, selectedModel?.identifier])
+    
+    lastLoadedModelParam.current = rawModelParam
+  }, [searchParams, videoModels])
   const [prompt, setPrompt] = React.useState("")
   const [negativePrompt, setNegativePrompt] = React.useState("")
   const [inputImage, setInputImage] = React.useState<ImageUpload | null>(null)

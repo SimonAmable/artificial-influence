@@ -218,6 +218,8 @@ function ImagePageContent() {
     }
   }, [effectiveImageModels, selectedModel])
 
+  const lastLoadedModelParam = React.useRef<string | null>(null)
+
   // Apply `?model=` from the URL when the param or catalog changes, not when the user
   // changes the selector (including `selectedModel` here re-ran the effect and reset
   // the choice back to the URL on every pick).
@@ -226,6 +228,8 @@ function ImagePageContent() {
 
     const rawModelParam = searchParams.get("model")
     if (!rawModelParam) return
+    
+    if (rawModelParam === lastLoadedModelParam.current) return
 
     const normalized = rawModelParam.trim().toLowerCase()
     const targetIdentifier = IMAGE_MODEL_QUERY_ALIASES[normalized] ?? rawModelParam.trim()
@@ -238,6 +242,8 @@ function ImagePageContent() {
     setSelectedModel((prev) =>
       prev === resolvedModel.identifier ? prev : resolvedModel.identifier
     )
+    
+    lastLoadedModelParam.current = rawModelParam
   }, [searchParams, effectiveImageModels])
 
   // Update aspect ratio and clamp numImages when model changes

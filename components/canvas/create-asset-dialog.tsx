@@ -26,6 +26,7 @@ import {
   saveAsset,
   updateAsset,
 } from "@/lib/assets/library"
+import { Sparkle, SpinnerGap } from "@phosphor-icons/react"
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
 import { invalidateCommandCache } from "@/lib/commands/cache"
 import { toast } from "sonner"
@@ -61,6 +62,7 @@ export function CreateAssetDialog({
   const [visibility, setVisibility] = React.useState<AssetVisibility>("public")
   const [category, setCategory] = React.useState<AssetCategory>(getDefaultCategoryByType(initial.assetType))
   const [tagsInput, setTagsInput] = React.useState("")
+  const [isAutofilling, setIsAutofilling] = React.useState(false)
 
   React.useEffect(() => {
     if (!open) return
@@ -69,6 +71,34 @@ export function CreateAssetDialog({
     setCategory(initial.category || getDefaultCategoryByType(initial.assetType))
     setTagsInput((initial.tags || []).join(", "))
   }, [initial.assetType, initial.category, initial.tags, initial.title, initial.visibility, open])
+
+  const handleAutofill = async () => {
+    if (!initial.url) return
+    setIsAutofilling(true)
+    
+    try {
+      const res = await fetch("/api/assets/autofill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: initial.url, assetType: initial.assetType, fileName: initial.title }),
+      })
+      if (!res.ok) throw new Error("Autofill failed")
+      const data = await res.json()
+      if (data.result) {
+        if (data.result.title) setTitle(data.result.title)
+        if (data.result.category) setCategory(data.result.category)
+        if (data.result.tags && Array.isArray(data.result.tags)) {
+          setTagsInput(data.result.tags.join(", "))
+        }
+        toast.success("Autofilled asset details")
+      }
+    } catch (err) {
+      console.warn("AI autofill failed:", err)
+      toast.error("Failed to autofill with AI")
+    } finally {
+      setIsAutofilling(false)
+    }
+  }
 
   const handleSave = async () => {
     if (!initial.url) {
@@ -126,7 +156,15 @@ export function CreateAssetDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{mode === "edit" ? "Edit Asset" : "Create Asset"}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {mode === "edit" ? "Edit Asset" : "Create Asset"}
+            {isAutofilling && (
+              <span className="flex items-center gap-1.5 text-xs font-medium text-amber-500 animate-pulse bg-amber-500/10 px-2 py-1 rounded-md">
+                <Sparkle weight="fill" className="h-3 w-3" />
+                Autofilling with AI...
+              </span>
+            )}
+          </DialogTitle>
           <DialogDescription>
             {mode === "edit"
               ? "Update your asset details and preview before saving."
@@ -159,21 +197,23 @@ export function CreateAssetDialog({
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 relative">
             <Label htmlFor="asset-title">Title</Label>
             <Input
               id="asset-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="My TikTok Dance Character"
+              disabled={isAutofilling}
+              className={isAutofilling ? "opacity-70" : ""}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Visibility</Label>
-              <Select value={visibility} onValueChange={(value) => setVisibility(value as AssetVisibility)}>
-                <SelectTrigger>
+              <Select value={visibility} onValueChange={(value) => setVisibility(value as AssetVisibility)} disabled={isAutofilling}>
+                <SelectTrigger className={isAutofilling ? "opacity-70" : ""}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -185,8 +225,8 @@ export function CreateAssetDialog({
 
             <div className="space-y-2">
               <Label>Category</Label>
-              <Select value={category} onValueChange={(value) => setCategory(value as AssetCategory)}>
-                <SelectTrigger>
+              <Select value={category} onValueChange={(value) => setCategory(value as AssetCategory)} disabled={isAutofilling}>
+                <SelectTrigger className={isAutofilling ? "opacity-70" : ""}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -207,15 +247,35 @@ export function CreateAssetDialog({
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
               placeholder="Optional: tiktok, dance, shorts"
+              disabled={isAutofilling}
+              className={isAutofilling ? "opacity-70" : ""}
             />
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+        <DialogFooter className="flex w-full items-center justify-between sm:justify-between">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleAutofill}
+            disabled={isAutofilling}
+            className="gap-2"
+          >
+            {isAutofilling ? (
+              <SpinnerGap className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkle weight="fill" className="h-4 w-4 text-amber-500" />
+            )}
+            Autofill with AI
           </Button>
-          <Button onClick={handleSave}>{mode === "edit" ? "Update Asset" : "Save Asset"}</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={isAutofilling}>
+              {mode === "edit" ? "Update Asset" : "Save Asset"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

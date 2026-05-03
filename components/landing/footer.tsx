@@ -31,7 +31,7 @@ function FooterLinkList({
 }
 
 export function Footer() {
-  const { imageTools, videoTools, otherTools, imageModels, videoModels } =
+  const { imageTools, videoTools, otherTools, imageModels, videoModels, freeTools } =
     getFooterMegaNavColumns()
 
   return (
@@ -66,10 +66,18 @@ export function Footer() {
           </div>
 
           <div className="lg:col-span-2">
-            <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
-              Other tools
-            </p>
-            <FooterLinkList links={otherTools} />
+            <div className="mb-8">
+              <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
+                Other tools
+              </p>
+              <FooterLinkList links={otherTools} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
+                Free Tools
+              </p>
+              <FooterLinkList links={freeTools} />
+            </div>
           </div>
 
           <div className="lg:col-span-2">

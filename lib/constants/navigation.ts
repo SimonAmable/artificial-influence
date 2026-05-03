@@ -412,6 +412,7 @@ export function getFooterMegaNavColumns(): {
   otherTools: FooterMegaNavLink[]
   imageModels: FooterMegaNavLink[]
   videoModels: FooterMegaNavLink[]
+  freeTools: FooterMegaNavLink[]
 } {
   const dedupeLinks = (links: FooterMegaNavLink[]): FooterMegaNavLink[] => {
     const seen = new Set<string>()
@@ -445,15 +446,13 @@ export function getFooterMegaNavColumns(): {
   const videoModels = toLinks(
     videoGroup?.sections?.find((s) => s.title === "Models")?.items ?? [],
   )
+  const freeTools = toLinks(freeToolsGroup?.simpleItems ?? [])
 
   const otherTools: FooterMegaNavLink[] = []
   if (assetsGroup?.simpleItems?.length) {
     for (const item of assetsGroup.simpleItems) {
       otherTools.push({ path: item.path, label: item.label })
     }
-  }
-  if (freeToolsGroup?.path) {
-    otherTools.push({ path: freeToolsGroup.path, label: freeToolsGroup.label })
   }
   for (const g of megaNavGroups) {
     if (g.path && !g.sections?.length && !g.simpleItems?.length) {
@@ -467,6 +466,7 @@ export function getFooterMegaNavColumns(): {
     otherTools: dedupeLinks(otherTools),
     imageModels: dedupeLinks(imageModels),
     videoModels: dedupeLinks(videoModels),
+    freeTools: dedupeLinks(freeTools),
   }
 }
 
