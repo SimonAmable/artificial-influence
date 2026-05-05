@@ -3,12 +3,8 @@ export type AssetVisibility = "private" | "public"
 export type AssetCategory =
   | "character"
   | "scene"
-  | "texture"
-  | "thumbnails"
   | "motion"
-  | "audio"
-  | "shorts"
-  | "product"
+  | "element"
 
 export type AssetType = "image" | "video" | "audio"
 

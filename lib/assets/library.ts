@@ -10,23 +10,15 @@ import { inferStoragePathFromUrl as inferStoragePathFromObjectUrl } from "@/lib/
 export const ASSET_CATEGORIES: AssetCategory[] = [
   "character",
   "scene",
-  "texture",
-  "thumbnails",
   "motion",
-  "audio",
-  "shorts",
-  "product",
+  "element",
 ]
 
 export const ASSET_CATEGORY_LABELS: Record<AssetCategory, string> = {
   character: "Characters",
   scene: "Scenes",
-  texture: "Textures",
-  thumbnails: "Thumbnails",
   motion: "Motion",
-  audio: "Audio",
-  shorts: "Shorts",
-  product: "Product",
+  element: "Elements",
 }
 
 export const STARTER_TAGS = [
@@ -44,7 +36,7 @@ export const STARTER_TAGS = [
 
 export function getDefaultCategoryByType(assetType: AssetType): AssetCategory {
   if (assetType === "video") return "motion"
-  if (assetType === "audio") return "audio"
+  if (assetType === "audio") return "element"
   return "character"
 }
 

@@ -17,14 +17,15 @@ interface CreateSaveGenerationAsAssetToolOptions {
 }
 
 const CATEGORY_KEYWORDS: Record<AssetCategory, string[]> = {
-  audio: ["audio", "voice", "song", "music", "narration", "podcast", "sound"],
   character: ["person", "portrait", "character", "model", "woman", "man", "avatar", "face"],
-  motion: ["motion", "animate", "animation", "cinematic", "camera move", "walk cycle"],
-  product: ["product", "packaging", "bottle", "jar", "can", "mockup", "ecommerce", "shoe", "watch"],
   scene: ["scene", "environment", "interior", "room", "landscape", "background", "street", "set"],
-  shorts: ["shorts", "reel", "tiktok", "vertical", "ugc", "hook", "youtube short"],
-  texture: ["texture", "pattern", "fabric", "material", "surface", "grain"],
-  thumbnails: ["thumbnail", "cover", "poster", "banner", "hero image"],
+  motion: ["motion", "animate", "animation", "cinematic", "camera move", "walk cycle", "shorts", "reel", "tiktok", "vertical", "ugc", "hook", "youtube short"],
+  element: [
+    "audio", "voice", "song", "music", "narration", "podcast", "sound",
+    "product", "packaging", "bottle", "jar", "can", "mockup", "ecommerce", "shoe", "watch",
+    "texture", "pattern", "fabric", "material", "surface", "grain",
+    "thumbnail", "cover", "poster", "banner", "hero image"
+  ],
 }
 
 const TAG_STOP_WORDS = new Set([
@@ -61,14 +62,10 @@ function titleCase(value: string) {
 function inferCategory(type: AssetType, prompt: string): AssetCategory {
   const normalizedPrompt = prompt.toLowerCase()
 
-  if (type === "audio") return "audio"
-  if (type === "video") {
-    return CATEGORY_KEYWORDS.shorts.some((keyword) => normalizedPrompt.includes(keyword))
-      ? "shorts"
-      : "motion"
-  }
+  if (type === "audio") return "element"
+  if (type === "video") return "motion"
 
-  for (const category of ["product", "thumbnails", "texture", "scene", "character"] as const) {
+  for (const category of ["element", "scene", "character"] as const) {
     if (CATEGORY_KEYWORDS[category].some((keyword) => normalizedPrompt.includes(keyword))) {
       return category
     }
@@ -192,7 +189,7 @@ export function createSaveGenerationAsAssetTool({
         .boolean()
         .describe("Must be true only after the user explicitly confirmed they want this generation saved as an asset."),
       category: z
-        .enum(["character", "scene", "texture", "thumbnails", "motion", "audio", "shorts", "product"])
+        .enum(["character", "scene", "motion", "element"])
         .optional()
         .describe("Optional asset category. If omitted, infer the best fit."),
       title: z

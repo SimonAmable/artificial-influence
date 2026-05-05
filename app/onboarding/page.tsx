@@ -19,7 +19,7 @@ export default async function OnboardingPage() {
     .maybeSingle()
 
   if (profile?.onboarding_completed_at) {
-    redirect("/dashboard")
+    redirect("/chat")
   }
 
   return <OnboardingForm userId={user.id} />

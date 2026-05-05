@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
-import { DashboardPage } from "@/components/dashboard/dashboard-page"
 import { CanvasHeroSection } from "@/components/landing/canvas-hero-section"
 // import { WorkflowShowcaseSection } from "@/components/landing/workflow-showcase-section"
 import { PlatformSurfacesSection } from "@/components/landing/platform-surfaces-section"
@@ -71,7 +70,7 @@ export default async function Page() {
       console.error("Home onboarding check failed:", error)
     }
 
-    return <DashboardPage />
+    return redirect("/chat")
   }
 
   return (

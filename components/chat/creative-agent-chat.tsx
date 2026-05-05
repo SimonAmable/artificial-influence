@@ -435,7 +435,7 @@ type SearchAssetsToolPart = {
   state: "input-streaming" | "input-available" | "output-available" | "output-error"
   input?: {
     assetType?: "image" | "video" | "audio"
-    category?: "character" | "scene" | "texture" | "thumbnails" | "motion" | "audio" | "shorts" | "product"
+    category?: "character" | "scene" | "motion" | "element"
     includePublic?: boolean
     limit?: number
     query?: string
@@ -719,7 +719,7 @@ type SaveGenerationAsAssetToolPart = {
   toolCallId: string
   state: "input-streaming" | "input-available" | "output-available" | "output-error"
   input?: {
-    category?: "character" | "scene" | "texture" | "thumbnails" | "motion" | "audio" | "shorts" | "product"
+    category?: "character" | "scene" | "motion" | "element"
     confirmed?: boolean
     description?: string
     generationId?: string

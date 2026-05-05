@@ -194,10 +194,10 @@ export default async function CreditSuccessPage({
 
         <div className="mt-6 space-y-3">
           <Link
-            href="/dashboard"
+            href="/chat"
             className="block w-full rounded-lg bg-primary px-6 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Go to dashboard
+            Go to chat
           </Link>
           <Link
             href="/pricing"

@@ -136,7 +136,7 @@ export function BrandKitEditor({
   className,
   onSaved,
   forcedKitId,
-  backHref = "/dashboard",
+  backHref = "/chat",
 }: BrandKitEditorProps) {
   const router = useRouter()
   const loadInProgressRef = React.useRef(false)

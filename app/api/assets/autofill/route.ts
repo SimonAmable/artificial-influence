@@ -55,12 +55,8 @@ export async function POST(request: NextRequest) {
         category: z.enum([
           "character",
           "scene",
-          "texture",
-          "thumbnails",
           "motion",
-          "audio",
-          "shorts",
-          "product"
+          "element"
         ]).describe("The best matching category for this asset."),
         tags: z.array(z.string()).describe("Up to 5 relevant tags describing the asset."),
       }),

@@ -11,12 +11,8 @@ type AssetTypeFilter = "image" | "video" | "audio"
 type AssetCategoryFilter =
   | "character"
   | "scene"
-  | "texture"
-  | "thumbnails"
   | "motion"
-  | "audio"
-  | "shorts"
-  | "product"
+  | "element"
 
 function scoreAssetMatch(
   asset: { title: string; description: string | null; tags: string[]; category: string; assetType: string },
@@ -62,7 +58,7 @@ export function createSearchAssetsTool({
         .optional()
         .describe("Optional asset type filter."),
       category: z
-        .enum(["character", "scene", "texture", "thumbnails", "motion", "audio", "shorts", "product"])
+        .enum(["character", "scene", "motion", "element"])
         .optional()
         .describe("Optional asset category filter."),
       includePublic: z
