@@ -83,6 +83,7 @@ export function PlatformSurfacesSection() {
   const defaultTab = platformSurfaceCards[0]?.id ?? "generator"
   const [tab, setTab] = React.useState(defaultTab)
   const [reduceMotion, setReduceMotion] = React.useState(false)
+  const sectionGutterClass = "px-4 sm:px-6 lg:px-8"
 
   const prevIndexRef = React.useRef(0)
 
@@ -114,10 +115,10 @@ export function PlatformSurfacesSection() {
 
   return (
     <section className="w-full bg-background py-16 sm:py-24">
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className={`mx-auto w-full max-w-7xl ${sectionGutterClass}`}>
         <div className="max-w-2xl">
           <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
-            Every tool in one place
+            Get every tool in one place
           </h2>
           {activeCard ? (
             <div className="mt-4" aria-live="polite">
@@ -136,13 +137,15 @@ export function PlatformSurfacesSection() {
             </div>
           ) : null}
         </div>
+      </div>
 
-        <div className="relative mt-10 sm:mt-12">
-          <Tabs
-            value={tab}
-            onValueChange={setTab}
-            className="mx-auto flex w-full max-w-4xl flex-col items-stretch"
-          >
+      <div className="relative mt-10 sm:mt-12">
+        <Tabs
+          value={tab}
+          onValueChange={setTab}
+          className="mx-auto flex w-full max-w-7xl flex-col items-stretch"
+        >
+          <div className={`mx-auto w-full max-w-4xl ${sectionGutterClass}`}>
             <TabsList
               variant="default"
               className="!mx-auto grid !h-auto min-h-12 w-full max-w-4xl grid-cols-2 gap-1 rounded-4xl border-0 bg-transparent p-1 sm:min-h-11 sm:grid-cols-4"
@@ -159,39 +162,39 @@ export function PlatformSurfacesSection() {
                 </TabsTrigger>
               ))}
             </TabsList>
+          </div>
 
-            <div
-              role="tabpanel"
-              id="platform-surface-panel"
-              aria-labelledby={`platform-surface-tab-${tab}`}
-              className="relative mt-8 w-full overflow-hidden outline-none sm:mt-10"
+          <div
+            role="tabpanel"
+            id="platform-surface-panel"
+            aria-labelledby={`platform-surface-tab-${tab}`}
+            className="relative mt-8 w-full overflow-hidden outline-none sm:mt-10"
+          >
+            <motion.div
+              className="flex"
+              style={{ width: `${slideCount * 100}%` }}
+              animate={{
+                x: `-${activeIndex * segmentPercent}%`,
+              }}
+              transition={{
+                duration: transitionDuration,
+                ease: [0.22, 1, 0.36, 1],
+              }}
             >
-              <motion.div
-                className="flex"
-                style={{ width: `${slideCount * 100}%` }}
-                animate={{
-                  x: `-${activeIndex * segmentPercent}%`,
-                }}
-                transition={{
-                  duration: transitionDuration,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-              >
-                {platformSurfaceCards.map((card) => (
-                  <div
-                    key={card.id}
-                    className="shrink-0 px-0"
-                    style={{ width: `${segmentPercent}%` }}
-                    aria-hidden={card.id !== tab}
-                    inert={card.id !== tab ? true : undefined}
-                  >
-                    {renderActivePanel(card)}
-                  </div>
-                ))}
-              </motion.div>
-            </div>
-          </Tabs>
-        </div>
+              {platformSurfaceCards.map((card) => (
+                <div
+                  key={card.id}
+                  className="shrink-0 px-0"
+                  style={{ width: `${segmentPercent}%` }}
+                  aria-hidden={card.id !== tab}
+                  inert={card.id !== tab ? true : undefined}
+                >
+                  {renderActivePanel(card)}
+                </div>
+              ))}
+            </motion.div>
+          </div>
+        </Tabs>
       </div>
     </section>
   )

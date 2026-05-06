@@ -143,6 +143,23 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     })
   }
 
+  const getAudioDuration = (url: string): Promise<number> => {
+    return new Promise((resolve, reject) => {
+      const audio = document.createElement("audio")
+      audio.preload = "metadata"
+
+      audio.onloadedmetadata = () => {
+        resolve(audio.duration)
+      }
+
+      audio.onerror = () => {
+        reject(new Error("Failed to load audio metadata"))
+      }
+
+      audio.src = url
+    })
+  }
+
   const { models: videoModels } = useModels("video")
 
   function getImageUrlFromSourceNode(node: Node): string | null {
@@ -737,6 +754,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     const isKlingV3 = modelIdentifier === "kwaivgi/kling-v3-video"
     const isKlingV3Omni = modelIdentifier === "kwaivgi/kling-v3-omni-video"
     const isSeedance2 = modelIdentifier === "bytedance/seedance-2.0"
+    const isPrunaPVideo = modelIdentifier === "prunaai/p-video"
     const isWan27 = modelIdentifier === "wan-video/wan-2.7"
 
     if (isMotionCopy && (!finalImageUrl || !finalVideoUrl)) {
@@ -769,6 +787,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       !isLipsync &&
       modelSupportsImage &&
       !isSeedance2 &&
+      !isPrunaPVideo &&
       !isWan27 &&
       !finalImageUrl &&
       !chipSlots.startImageChipUrl
@@ -828,6 +847,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       let imageUpload: { url: string; storagePath: string } | null = null
       let videoUpload: { url: string; storagePath: string } | null = null
       let audioUpload: { url: string; storagePath: string } | null = null
+      let sourceDurationSeconds: number | null = null
 
       let lipsyncImageUpload: { url: string; storagePath: string } | null = null
       let lipsyncVideoUpload: { url: string; storagePath: string } | null = null
@@ -875,12 +895,24 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         videoUpload = nodeData.manualVideoFile
           ? await uploadFileToSupabase(nodeData.manualVideoFile, "video-gen-videos")
           : await uploadUrlToSupabase(finalVideoUrl, "video-gen-videos")
+        try {
+          sourceDurationSeconds = await getVideoDuration(finalVideoUrl)
+        } catch (durationError) {
+          console.warn("[video-gen-node] Failed to read source video duration:", durationError)
+        }
       }
 
       if (finalAudioUrl) {
         audioUpload = nodeData.manualAudioFile
           ? await uploadFileToSupabase(nodeData.manualAudioFile, "video-gen-audio")
           : await uploadUrlToSupabase(finalAudioUrl, "video-gen-audio")
+        if (sourceDurationSeconds == null) {
+          try {
+            sourceDurationSeconds = await getAudioDuration(finalAudioUrl)
+          } catch (durationError) {
+            console.warn("[video-gen-node] Failed to read source audio duration:", durationError)
+          }
+        }
       }
 
       let endpoint: string
@@ -899,6 +931,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           keep_original_sound: nodeData.parameters?.keep_original_sound ?? true,
           character_orientation: nodeData.parameters?.character_orientation || "video",
           tool: "node",
+          ...(sourceDurationSeconds != null ? { sourceDurationSeconds } : {}),
         }
       } else if (isLipsync) {
         const lipsyncPayload: Record<string, string> = {
@@ -914,6 +947,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           lipsyncPayload.resolution =
             (nodeData.parameters?.resolution as string) || "720p"
         }
+        if (sourceDurationSeconds != null) {
+          lipsyncPayload.sourceDurationSeconds = String(sourceDurationSeconds)
+        }
         endpoint = "/api/generate-lipsync"
         requestBody = lipsyncPayload
       } else {
@@ -922,6 +958,10 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           ...(nodeData.parameters || {}),
           // Apply node prompt after parameters spread so it is never overwritten by parameters.prompt (model default can be null)
           prompt: fullPrompt,
+        }
+
+        if (sourceDurationSeconds != null) {
+          requestBody.sourceDurationSeconds = sourceDurationSeconds
         }
 
         if (nodeData.negativePrompt?.trim()) {
@@ -989,6 +1029,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         if (isSeedance2 && audioUpload?.url) {
           requestBody.reference_audios = [audioUpload.url]
         }
+        if (isPrunaPVideo && audioUpload?.url) {
+          requestBody.audio = audioUpload.url
+        }
         if (isWan27 && audioUpload?.url) {
           requestBody.audio = audioUpload.url
         }
@@ -1055,10 +1098,11 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   )
 
   const isSeedance2Node = selectedModel?.identifier === "bytedance/seedance-2.0"
+  const isPrunaPVideoNode = selectedModel?.identifier === "prunaai/p-video"
   const isWan27Node = selectedModel?.identifier === "wan-video/wan-2.7"
   const showImageUpload = !!(modelSupportsImage || isMotionCopyModel || isLipsyncModel)
   const showVideoUpload = !!isMotionCopyModel || isSeedance2Node
-  const showAudioUpload = !!isLipsyncModel || isSeedance2Node || isWan27Node
+  const showAudioUpload = !!isLipsyncModel || isSeedance2Node || isPrunaPVideoNode || isWan27Node
   const showLastFrameUpload = !!modelSupportsLastFrame
   const hasUploadOptions = showImageUpload || showVideoUpload || showAudioUpload || showLastFrameUpload
   const showDualFrameHandles =
@@ -1560,7 +1604,11 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             ) : (
               <VideoCamera size={14} className="mr-2 shrink-0" />
             )}
-            {isSeedance2Node && !isLipsyncModel ? "Reference audio" : "Upload audio (lip sync)"}
+            {isSeedance2Node && !isLipsyncModel
+              ? "Reference audio"
+              : isLipsyncModel
+                ? "Upload audio (lip sync)"
+                : "Optional audio"}
             {(nodeData.manualAudioUrl || nodeData.connectedAudioUrl) && (
               <span className="ml-1 text-muted-foreground">OK</span>
             )}
@@ -1568,6 +1616,14 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           {isSeedance2Node && !isLipsyncModel ? (
             <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
               .wav / .mp3 / .m4a / .aac (~15s). Use [Audio1] in prompt; needs a frame or reference video.
+            </span>
+          ) : isPrunaPVideoNode ? (
+            <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+              .wav / .mp3. Conditions motion and timing; prompt is still required.
+            </span>
+          ) : isWan27Node ? (
+            <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+              .wav / .mp3, optional sync audio for Wan 2.7.
             </span>
           ) : null}
         </DropdownMenuItem>

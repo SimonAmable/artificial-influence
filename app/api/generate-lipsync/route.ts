@@ -2,9 +2,8 @@ import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
 import { assertAcceptedCurrentTerms } from '@/lib/legal/terms-acceptance';
 import { createClient } from '@/lib/supabase/server';
-import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
-
-const LIPSYNC_CREDITS_COST = 10;
+import { checkUserHasCredits, deductUserCreditsUpTo } from '@/lib/credits';
+import { resolveVideoPricingQuote } from '@/lib/video-pricing';
 
 export async function POST(request: NextRequest) {
   const requestStartTime = Date.now();
@@ -50,6 +49,13 @@ export async function POST(request: NextRequest) {
     const videoStoragePath = body.videoStoragePath as string | undefined;
     const audioStoragePath = body.audioStoragePath as string;
     const resolution = (body.resolution as string) || '720p';
+    const sourceDurationSecondsRaw = body.sourceDurationSeconds as number | string | undefined;
+    const sourceDurationSeconds =
+      typeof sourceDurationSecondsRaw === 'number' && Number.isFinite(sourceDurationSecondsRaw)
+        ? sourceDurationSecondsRaw
+        : typeof sourceDurationSecondsRaw === 'string' && sourceDurationSecondsRaw.trim().length > 0
+          ? Number(sourceDurationSecondsRaw)
+          : null;
 
     const hasImage =
       typeof imagePublicUrl === 'string' && imagePublicUrl.length > 0;
@@ -102,14 +108,22 @@ export async function POST(request: NextRequest) {
 
     console.log('[generate-lipsync] ✓ URLs validated');
 
-    const hasCredits = await checkUserHasCredits(
-      user.id,
-      LIPSYNC_CREDITS_COST
-    );
+    const pricingQuote =
+      hasVideo
+        ? { quotedCredits: 10, predictedDurationSeconds: sourceDurationSeconds }
+        : resolveVideoPricingQuote({
+            modelIdentifier: 'veed/fabric-1.0',
+            modelCost: 10,
+            modelCostPerSecond: null,
+            resolution,
+            sourceDurationSeconds,
+          });
+    const quotedCredits = pricingQuote.quotedCredits;
+    const hasCredits = await checkUserHasCredits(user.id, quotedCredits);
     if (!hasCredits) {
       return NextResponse.json(
         {
-          error: `Insufficient credits. Lip sync requires ${LIPSYNC_CREDITS_COST} credits.`,
+          error: `Insufficient credits. Lip sync requires ${quotedCredits} credits.`,
         },
         { status: 402 }
       );
@@ -245,6 +259,8 @@ export async function POST(request: NextRequest) {
           type: 'video',
           is_public: true,
           tool: 'lipsync',
+          quoted_credits: quotedCredits,
+          predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
         };
 
         const { data: savedData, error: saveError } = await supabase
@@ -267,8 +283,8 @@ export async function POST(request: NextRequest) {
 
     await saveGenerationToDatabase();
 
-    await deductUserCredits(user.id, LIPSYNC_CREDITS_COST);
-    console.log('[generate-lipsync] ✓ Credits deducted:', LIPSYNC_CREDITS_COST);
+    const chargedCredits = await deductUserCreditsUpTo(user.id, quotedCredits);
+    console.log('[generate-lipsync] ✓ Credits deducted:', chargedCredits);
 
     const totalTime = Date.now() - requestStartTime;
     console.log('[generate-lipsync] ===== Request completed successfully in', totalTime, 'ms =====');
@@ -278,7 +294,8 @@ export async function POST(request: NextRequest) {
         url: finalVideoUrl,
         mimeType: 'video/mp4',
       },
-      creditsUsed: LIPSYNC_CREDITS_COST,
+      creditsQuoted: quotedCredits,
+      creditsUsed: chargedCredits,
     });
   } catch (error) {
     const totalTime = Date.now() - requestStartTime;
@@ -326,13 +343,14 @@ export async function GET() {
         resolution:
           'string (optional) - For image mode only: "720p" or "480p" (default: "720p")',
       },
-      credits: 10,
+      credits: 'quoted from request inputs; charged only on successful generation',
       response: {
         video: {
           url: 'string - Public URL of the generated video',
           mimeType: 'string - MIME type (video/mp4)',
         },
-        creditsUsed: 'number - Credits deducted (10 per generation)',
+        creditsQuoted: 'number - Quote computed before generation starts',
+        creditsUsed: 'number - Credits deducted after a successful generation',
       },
     },
   });

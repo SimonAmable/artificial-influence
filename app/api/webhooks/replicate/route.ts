@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
+import { deductUserCredits, deductUserCreditsUpTo } from "@/lib/credits"
 import { runGenerationFollowUpResume } from "@/lib/chat/generation-follow-up-resume"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
 
@@ -28,6 +28,8 @@ type PendingGenerationRow = {
   id: string
   model: string
   prompt: string | null
+  quoted_credits?: number | null
+  predicted_duration_seconds?: number | null
   reference_images_supabase_storage_path?: string[] | null
   reference_videos_supabase_storage_path?: string[] | null
   tool?: string | null
@@ -154,7 +156,7 @@ export async function POST(request: NextRequest) {
     const { data: generation, error: fetchError } = await supabaseAdmin
       .from("generations")
       .select(
-        "id, user_id, prompt, model, reference_images_supabase_storage_path, reference_videos_supabase_storage_path, aspect_ratio, tool, type, chat_thread_id, chat_message_id, chat_tool_call_id",
+        "id, user_id, prompt, model, quoted_credits, predicted_duration_seconds, reference_images_supabase_storage_path, reference_videos_supabase_storage_path, aspect_ratio, tool, type, chat_thread_id, chat_message_id, chat_tool_call_id",
       )
       .eq("replicate_prediction_id", predictionId)
       .eq("status", "pending")
@@ -234,25 +236,10 @@ export async function POST(request: NextRequest) {
     const requiredCredits =
       pendingGeneration.type === "image"
         ? costPerOutput * persistedOutputs.length
-        : costPerOutput
-
-    const hasCredits = await checkUserHasCredits(pendingGeneration.user_id, requiredCredits, supabaseAdmin)
-    if (!hasCredits) {
-      await supabaseAdmin
-        .from("generations")
-        .update({
-          status: "failed",
-          error_message: "Insufficient credits when processing result",
-          finished_at: finishedAt,
-        })
-        .eq("id", pendingGeneration.id)
-      await cancelPendingGenerationFollowUps(pendingGeneration.id)
-      await syncGenerationResultToPersistedChat({
-        predictionId,
-        supabase: supabaseAdmin,
-      })
-      return NextResponse.json({ received: true })
-    }
+        : Math.max(
+            1,
+            Number(pendingGeneration.quoted_credits ?? costPerOutput) || costPerOutput,
+          )
 
     await supabaseAdmin
       .from("generations")
@@ -294,7 +281,11 @@ export async function POST(request: NextRequest) {
       supabase: supabaseAdmin,
     })
 
-    await deductUserCredits(pendingGeneration.user_id, requiredCredits, supabaseAdmin)
+    if (pendingGeneration.type === "image") {
+      await deductUserCredits(pendingGeneration.user_id, requiredCredits, supabaseAdmin)
+    } else {
+      await deductUserCreditsUpTo(pendingGeneration.user_id, requiredCredits, supabaseAdmin)
+    }
     console.log(
       "[webhooks/replicate] Completed prediction",
       predictionId,

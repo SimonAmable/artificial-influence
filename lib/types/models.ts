@@ -91,6 +91,7 @@ export interface Model {
   provider: string | null;
   is_active: boolean;
   model_cost: number;
+  model_cost_per_second?: number | null;
   parameters: ModelParameters;
   created_at: string;
   updated_at: string;

@@ -9,8 +9,10 @@ import { PlatformSurfacesSection } from "@/components/landing/platform-surfaces-
 // import { ProcessSection } from "@/components/landing/process-section"
 import { ModelsBentoSection } from "@/components/landing/models-bento-section"
 import { ProofSection } from "@/components/landing/proof-section"
+import { FounderTestimonialSection } from "@/components/landing/founder-testimonial-section"
 import { FAQSection } from "@/components/landing/faq-section"
 import { TestimonialsSection } from "@/components/landing/testimonials-section"
+import { PricingSection } from "@/components/landing/pricing-section"
 import { FinalCTASection } from "@/components/landing/final-cta-section"
 import { Footer } from "@/components/landing/footer"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
@@ -88,6 +90,7 @@ export default async function Page() {
       <div id="platform-surfaces">
         <ProofSection />
       </div>
+      <FounderTestimonialSection />
       {/* <WorkflowShowcaseSection /> */}
       <PlatformSurfacesSection />
       {/* <ProcessSection /> */}
@@ -96,6 +99,7 @@ export default async function Page() {
         <FAQSection />
       </div>
       <TestimonialsSection />
+      <PricingSection embedded />
       <FinalCTASection />
       <Footer />
     </>

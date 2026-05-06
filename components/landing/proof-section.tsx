@@ -1,21 +1,27 @@
 "use client"
 
 import Image from "next/image"
-import { useRef } from "react"
-import { motion, useInView, useReducedMotion } from "motion/react"
+import type { CSSProperties } from "react"
+
+const PROOF_IMAGES = [
+  "/influencer_proof_showcases/Copy of Screenshot_20260113_150433_Instagram.jpg",
+  "/influencer_proof_showcases/Copy of Screenshot_20260118_112200_Instagram.jpg",
+  "/influencer_proof_showcases/Copy of Screenshot_20260301_172839_Instagram.jpg",
+  "/influencer_proof_showcases/Copy of Screenshot_20260411_223900_TikTok.jpg",
+  "/influencer_proof_showcases/Copy of Screenshot_20260412_010914_Instagram.jpg",
+  "/influencer_proof_showcases/Copy of Screenshot_20260413_101303_TikTok.jpg",
+  "/influencer_proof_showcases/Screenshot_20260312_202935_Instagram (1).jpg",
+  "/influencer_proof_showcases/Screenshot_20260413_101303_TikTok.jpg",
+  "/influencer_proof_showcases/Screenshot_20260426_010555_Instagram.jpg",
+] as const
+
+/*
+Legacy proof section kept commented out per request.
 
 const PROOF_IMAGES = [
   "/insta_proof/insta_proof_showcase_iphone/Screenshot-iPhone15 Pro Max-1-ss1.png",
   "/insta_proof/insta_proof_showcase_iphone/Screenshot-iPhone15 Pro Maxss-ss3.png",
 ] as const
-
-const easeOut = [0.22, 1, 0.36, 1] as const
-
-/** Pause after scroll trigger so the entrance doesn’t feel instant. */
-const baseDelay = 0.22
-
-/** Left image → right image → middle card; slightly longer beats between each. */
-const staggerStep = 0.24
 
 export function ProofSection() {
   const sectionRef = useRef<HTMLElement>(null)
@@ -30,70 +36,123 @@ export function ProofSection() {
       className="relative w-full overflow-x-hidden bg-background py-0"
     >
       <div className="relative aspect-9/18 w-full overflow-x-hidden [--proof-img-w:min(122vw,760px)] md:aspect-9/10 md:[--proof-img-w:min(72vw,480px)] lg:aspect-auto lg:flex lg:min-h-0 lg:flex-row lg:items-center">
-        {PROOF_IMAGES.map((imageSrc, index) => {
-          const innerAnchor =
-            index === 0
-              ? "left-0 w-[var(--proof-img-w)] max-w-none -translate-x-1/2 lg:left-auto lg:w-full lg:max-w-none lg:translate-x-0"
-              : "left-full w-[var(--proof-img-w)] max-w-none -translate-x-1/2 lg:left-auto lg:w-full lg:max-w-none lg:translate-x-0"
-          const fromX = index === 0 ? -56 : 56
-          return (
-            <div
-              key={imageSrc}
-              className={
-                index === 1
-                  ? "absolute inset-x-0 top-1/2 z-10 w-full -translate-y-1/2 overflow-x-hidden lg:static lg:inset-auto lg:z-0 lg:w-1/2 lg:translate-y-0 lg:shrink-0"
-                  : "absolute inset-x-0 top-1/2 z-0 w-full -translate-y-1/2 overflow-x-hidden lg:static lg:inset-auto lg:w-1/2 lg:translate-y-0 lg:shrink-0"
-              }
-            >
-              <div className={`relative ${innerAnchor}`}>
-                <motion.div
-                  className="w-full"
-                  initial={reduceMotion ? { x: 0, opacity: 1 } : { x: fromX, opacity: 0 }}
-                  animate={revealed ? { x: 0, opacity: 1 } : { x: fromX, opacity: 0 }}
-                  transition={{
-                    duration: 0.85,
-                    ease: easeOut,
-                    delay: baseDelay + index * staggerStep,
-                  }}
-                >
-                  <div className="mx-auto aspect-[10/13] w-[72%] overflow-hidden sm:w-[58%] md:w-[52%] lg:w-[78%]">
-                    <Image
-                      src={encodeURI(imageSrc)}
-                      alt={`Instagram profile proof ${index + 1}`}
-                      width={600}
-                      height={600}
-                      className="h-full w-full object-cover object-center drop-shadow-[0_24px_48px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_24px_48px_rgba(0,0,0,0.35)]"
-                      sizes="(min-width: 1024px) 50vw, (min-width: 768px) 480px, 100vw"
-                      priority={index === 0}
-                    />
-                  </div>
-                </motion.div>
-              </div>
-            </div>
-          )
-        })}
+        ...
+      </div>
+    </section>
+  )
+}
+*/
 
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-4">
-          <motion.div
-            className="pointer-events-auto mx-auto w-full max-w-2xl rounded-2xl bg-background/70 p-6 text-center shadow-xl ring-1 ring-border/40 backdrop-blur-md"
-            initial={reduceMotion ? { scale: 1, opacity: 1 } : { scale: 0.94, opacity: 0 }}
-            animate={revealed ? { scale: 1, opacity: 1 } : { scale: 0.94, opacity: 0 }}
-            transition={{
-              duration: 0.65,
-              ease: easeOut,
-              delay: baseDelay + PROOF_IMAGES.length * staggerStep,
-            }}
-          >
-            <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
-              Every week you wait, they&apos;re posting faster
-            </h2>
-            <p className="mt-4 text-muted-foreground">
-              Creators are already using this technology to save time and strip friction, so posting stays easy and daily consistency
-              actually sticks. The gap widens while you&apos;re still <br/> &quot;getting ready.&quot; 
-            </p>
-          </motion.div>
+type ProofMarqueeProps = {
+  images: readonly string[]
+  priority?: boolean
+}
+
+function ProofMarquee({ images, priority = false }: ProofMarqueeProps) {
+  const marqueeImages = [...images, ...images]
+
+  return (
+    <div className="proof-marquee-lane relative h-[var(--proof-card-height)] overflow-hidden" aria-label="Scrolling proof screenshots">
+      <div className="proof-marquee-track proof-marquee-scroll inline-flex h-full min-w-max flex-row flex-nowrap items-stretch gap-[var(--proof-gap)]">
+        {marqueeImages.map((imageSrc, index) => (
+        <article
+          key={`${index}-${imageSrc}`}
+          className="relative h-[var(--proof-card-height)] w-[var(--proof-card-width)] shrink-0 overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur-sm"
+        >
+          <div className="relative h-full w-full overflow-hidden bg-muted/30">
+            <Image
+              src={encodeURI(imageSrc)}
+              alt={`Proof showcase screenshot ${index + 1}`}
+              width={1080}
+              height={1920}
+              className="h-full w-full object-cover object-top"
+              priority={priority && index < 2}
+              sizes="(min-width: 1280px) 16vw, (min-width: 1024px) 18vw, (min-width: 768px) 22vw, 42vw"
+            />
+          </div>
+        </article>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export function ProofSection() {
+  return (
+    <section
+      id="proof"
+      className="relative overflow-hidden bg-background py-16 sm:py-24"
+      style={
+        {
+          "--proof-gap": "1rem",
+          "--proof-card-width": "clamp(160px, 16vw, 210px)",
+          "--proof-card-height": "clamp(285px, 29vw, 373px)",
+        } as CSSProperties
+      }
+    >
+      {/*
+      <section
+        id="proof"
+        className="relative w-full overflow-x-hidden bg-background py-0"
+      >
+        Old proof showcase intentionally kept here and commented out.
+      </section>
+      */}
+
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            Proof
+          </p>
+          <h2 className="mt-3 text-3xl font-semibold text-foreground sm:text-4xl">
+            Creators are already using our tools to create content faster and more consistently
+          </h2>
+        </div>
+
+        <div className="relative mt-10 overflow-hidden">
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-20 w-12 bg-gradient-to-r from-background via-background/85 to-transparent sm:w-20 lg:w-28" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-20 w-12 bg-gradient-to-l from-background via-background/85 to-transparent sm:w-20 lg:w-28" />
+          <ProofMarquee images={PROOF_IMAGES} priority />
         </div>
       </div>
+
+      <style jsx global>{`
+        .proof-marquee-lane {
+          position: relative;
+          height: var(--proof-card-height);
+          overflow: hidden;
+        }
+
+        .proof-marquee-track {
+          min-width: max-content;
+          will-change: transform;
+        }
+
+        .proof-marquee-scroll {
+          animation: proof-marquee-right 34s linear infinite;
+        }
+
+        .proof-marquee-lane:hover .proof-marquee-scroll {
+          animation-play-state: paused;
+        }
+
+        @keyframes proof-marquee-right {
+          from {
+            transform: translate3d(calc(-50% - (var(--proof-gap) / 2)), 0, 0);
+          }
+          to {
+            transform: translate3d(0, 0, 0);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .proof-marquee-scroll {
+            animation-duration: 0.01ms;
+            animation-iteration-count: 1;
+            transform: translate3d(0, 0, 0);
+          }
+        }
+      `}</style>
     </section>
   )
 }

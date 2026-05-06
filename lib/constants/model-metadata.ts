@@ -653,6 +653,39 @@ export const HAPPY_HORSE_META: ModelMetadata = {
   ],
 };
 
+export const P_VIDEO_META: ModelMetadata = {
+  id: 'p-video-meta',
+  identifier: 'prunaai/p-video',
+  name: 'P-Video',
+  description:
+    'Pruna AI unified video model for text-to-video, image-to-video, and audio-conditioned generation with draft mode.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 10,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  supports_reference_audio: true,
+  aspect_ratios: ['16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '1:1'],
+  supports_first_frame: true,
+  customParameters: [
+    {
+      name: 'resolution',
+      label: 'Resolution',
+      options: ['720p', '1080p'],
+      default: '720p',
+      description: 'Output resolution',
+    },
+    {
+      name: 'draft',
+      label: 'Draft Mode',
+      options: ['false', 'true'],
+      default: 'false',
+      description: 'Faster lower-quality preview mode',
+    },
+  ],
+};
+
 export const GOOGLE_GEMINI_3_1_FLASH_TTS_META: ModelMetadata = {
   id: 'google-gemini-3.1-flash-tts-meta',
   identifier: 'google/gemini-3.1-flash-tts',
@@ -718,6 +751,7 @@ export const VIDEO_MODELS_METADATA: ModelMetadata[] = [
   HAILUO_2_3_FAST_META,
   SEEDANCE_2_0_META,
   HAPPY_HORSE_META,
+  P_VIDEO_META,
 ];
 
 export const AUDIO_MODELS_METADATA: ModelMetadata[] = [
@@ -768,6 +802,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     KLING_V2_6_PRO_META,
     HAILUO_2_3_FAST_META,
     SEEDANCE_2_0_META,
+    P_VIDEO_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
   fal: [WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, HAPPY_HORSE_META],

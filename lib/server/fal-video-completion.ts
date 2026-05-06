@@ -1,7 +1,7 @@
 import { fal } from "@fal-ai/client"
 import { createClient } from "@supabase/supabase-js"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
+import { deductUserCreditsUpTo } from "@/lib/credits"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
 import { configureFal } from "./fal-image"
 
@@ -24,6 +24,7 @@ type PendingFalVideoRow = {
   user_id: string
   model: string
   prompt: string | null
+  quoted_credits?: number | null
   tool?: string | null
   reference_images_supabase_storage_path?: string[] | null
   reference_videos_supabase_storage_path?: string[] | null
@@ -42,7 +43,7 @@ export async function tryCompleteFalPendingVideo(
   const { data: generation, error } = await supabaseUser
     .from("generations")
     .select(
-      "id, user_id, model, prompt, tool, reference_images_supabase_storage_path, reference_videos_supabase_storage_path, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type",
+      "id, user_id, model, prompt, quoted_credits, tool, reference_images_supabase_storage_path, reference_videos_supabase_storage_path, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type",
     )
     .eq("replicate_prediction_id", predictionId)
     .eq("user_id", userId)
@@ -125,21 +126,8 @@ export async function tryCompleteFalPendingVideo(
 
   const requiredCredits = Math.max(
     1,
-    Number((modelRow.data as { model_cost?: number } | null)?.model_cost ?? 20) || 20,
+    Number((row.quoted_credits ?? (modelRow.data as { model_cost?: number } | null)?.model_cost ?? 20)) || 20,
   )
-  const hasCredits = await checkUserHasCredits(row.user_id, requiredCredits, supabaseAdmin)
-  if (!hasCredits) {
-    await supabaseAdmin
-      .from("generations")
-      .update({
-        status: "failed",
-        error_message: "Insufficient credits when processing Fal result",
-        finished_at: new Date().toISOString(),
-      })
-      .eq("id", row.id)
-    await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
-    return { status: "failed", error: "Insufficient credits" }
-  }
 
   const response = await fetch(outputUrl)
   if (!response.ok) {
@@ -191,7 +179,7 @@ export async function tryCompleteFalPendingVideo(
     .eq("id", row.id)
 
   await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
-  await deductUserCredits(row.user_id, requiredCredits, supabaseAdmin)
+  await deductUserCreditsUpTo(row.user_id, requiredCredits, supabaseAdmin)
 
   return { status: "completed" }
 }

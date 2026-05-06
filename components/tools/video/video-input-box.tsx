@@ -53,6 +53,7 @@ interface VideoInputBoxProps {
   onInputAudioChange: (audio: AudioUploadValue | null) => void
   parameters: Record<string, unknown>
   onParametersChange: (params: Record<string, unknown>) => void
+  estimatedCredits?: number | null
   isGenerating: boolean
   onGenerate: () => void
   /** When true, Generate stays enabled while jobs are running (queue concurrent requests). */
@@ -91,6 +92,7 @@ export function VideoInputBox({
   onInputAudioChange,
   parameters,
   onParametersChange,
+  estimatedCredits = null,
   isGenerating,
   onGenerate,
   allowConcurrent = false,
@@ -174,6 +176,7 @@ export function VideoInputBox({
   const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
   const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
   const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
+  const isPrunaPVideo = selectedModel.identifier === 'prunaai/p-video'
   const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
   const isHappyHorse = selectedModel.identifier === 'alibaba/happy-horse'
   const isKlingV3OrOmni = isKlingV3 || isKlingV3Omni
@@ -251,9 +254,9 @@ export function VideoInputBox({
   ])
 
   const canAddSeedanceReferenceAudio = React.useMemo(() => {
-    if (!isSeedance2 && !isWan27) return false
+    if (!isSeedance2 && !isPrunaPVideo && !isWan27) return false
     return !(inputAudio?.file || inputAudio?.url)
-  }, [isSeedance2, isWan27, inputAudio])
+  }, [inputAudio, isPrunaPVideo, isSeedance2, isWan27])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'input' | 'lastFrame') => {
     const file = e.target.files?.[0]
@@ -338,6 +341,9 @@ export function VideoInputBox({
       }
       return mergedPromptForReady.length > 0 || !!inputImage
     }
+    if (isPrunaPVideo) {
+      return mergedPromptForReady.length > 0
+    }
     if (isSeedance2 || isWan27) {
       return (
         mergedPromptForReady.length > 0 ||
@@ -372,6 +378,7 @@ export function VideoInputBox({
     lastFrameImage,
     isHappyHorse,
     happyHorseReferenceMode,
+    isPrunaPVideo,
     isSeedance2,
     isWan27,
     referenceImages.length,
@@ -659,11 +666,11 @@ export function VideoInputBox({
               )}
             </span>
             <div className="flex items-center gap-0.5">
-              <Sparkle size={8} weight="fill" />
-              <span className="text-[10px]">
-                {selectedModel.model_cost != null ? selectedModel.model_cost : "-"}
-              </span>
-            </div>
+                <Sparkle size={8} weight="fill" />
+                <span className="text-[10px]">
+                  {estimatedCredits != null ? estimatedCredits : selectedModel.model_cost ?? "-"}
+                </span>
+              </div>
           </div>
         </Button>
       </div>
@@ -758,7 +765,7 @@ export function VideoInputBox({
                     ) : null}
                   </DropdownMenuItem>
                 )}
-                {(isSeedance2 || isWan27) && (
+                {(isSeedance2 || isPrunaPVideo || isWan27) && (
                   <DropdownMenuItem
                     disabled={!canAddSeedanceReferenceAudio}
                     onClick={() => referenceAudioRef.current?.click()}
@@ -766,12 +773,14 @@ export function VideoInputBox({
                   >
                     <span className="flex items-center text-sm font-medium">
                       <Waveform className="mr-2 size-4 shrink-0" weight="duotone" />
-                      {isWan27 ? "Optional audio" : "Reference audio"}
+                      {isSeedance2 ? "Reference audio" : "Optional audio"}
                     </span>
                     <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
                       {isWan27
                         ? ".wav / .mp3, optional sync audio for Wan 2.7 (3–30s per model docs)."
-                        : ".wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a frame or reference video."}
+                        : isPrunaPVideo
+                          ? ".wav / .mp3. Conditions motion and timing for P-Video; prompt is still required."
+                          : ".wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a frame or reference video."}
                     </span>
                   </DropdownMenuItem>
                 )}
@@ -799,7 +808,7 @@ export function VideoInputBox({
               onChange={handleVideoUpload}
               className="hidden"
             />
-            {isWan27 ? (
+            {isSeedance2 || isPrunaPVideo || isWan27 ? (
               <input
                 ref={referenceAudioRef}
                 type="file"
@@ -1108,17 +1117,6 @@ export function VideoInputBox({
             aria-hidden
           />
         ) : null}
-        {isSeedance2 ? (
-          <input
-            ref={referenceAudioRef}
-            type="file"
-            accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac"
-            onChange={handleReferenceAudioAdd}
-            className="hidden"
-            aria-hidden
-          />
-        ) : null}
-
         {/* 2. CUSTOM UPLOAD COMPONENTS IN MIDDLE (only for motion-copy and lipsync) */}
         {isMotionCopyModel && (
           <div className="flex gap-1.5 sm:gap-2 px-2">

@@ -6,6 +6,7 @@ import { inferStoragePathFromUrl } from "@/lib/assets/library"
 import { resolveWan27Replicate } from "@/lib/server/wan-2.7-replicate"
 import { checkUserHasCredits } from "@/lib/credits"
 import { validateExternalReferenceUrl } from "@/lib/server/external-reference-url"
+import { resolveVideoPricingQuote } from "@/lib/video-pricing"
 import type {
   AvailableChatImageReference,
   ChatImageReference,
@@ -294,6 +295,8 @@ export function createGenerateVideoTool({
         .describe("Deprecated alias for referenceIds."),
       aspectRatio: z.string().min(1).max(32).optional(),
       duration: z.number().int().min(1).max(15).optional(),
+      resolution: z.string().min(1).max(32).optional(),
+      draft: z.boolean().optional(),
       negativePrompt: z.string().max(1000).optional(),
       generateAudio: z.boolean().optional(),
       keepOriginalSound: z.boolean().optional(),
@@ -316,6 +319,8 @@ export function createGenerateVideoTool({
       referenceAudioIds = [],
       aspectRatio,
       duration,
+      resolution,
+      draft,
       negativePrompt,
       generateAudio,
       keepOriginalSound,
@@ -470,7 +475,7 @@ export function createGenerateVideoTool({
 
       const { data: modelData, error: modelError } = await supabase
         .from("models")
-        .select("model_cost")
+        .select("model_cost, model_cost_per_second")
         .eq("identifier", resolvedModel)
         .eq("type", "video")
         .eq("is_active", true)
@@ -480,7 +485,21 @@ export function createGenerateVideoTool({
         throw new Error(`Model "${resolvedModel}" not found or is inactive`)
       }
 
-      const requiredCredits = Math.max(1, Number(modelData.model_cost ?? 10) || 10)
+      const pricingQuote = resolveVideoPricingQuote({
+        modelIdentifier: resolvedModel,
+        modelCost: modelData.model_cost,
+        modelCostPerSecond: modelData.model_cost_per_second,
+        duration,
+        resolution: resolution ?? null,
+        draft: draft ?? null,
+        mode,
+        generateAudio:
+          typeof generateAudio === "boolean" ? generateAudio : null,
+        characterOrientation,
+        hasInputVideo: Boolean(primaryVideo),
+        hasReferenceVideo: Boolean(primaryVideo),
+      })
+      const requiredCredits = pricingQuote.quotedCredits
       const hasCredits = await checkUserHasCredits(userId, requiredCredits, supabase)
       if (!hasCredits) {
         throw new Error(`Insufficient credits. This video generation requires ${requiredCredits} credits.`)
@@ -580,6 +599,16 @@ export function createGenerateVideoTool({
           if (referenceAudioUrls.length > 0) replicateInput.reference_audios = referenceAudioUrls
           break
         }
+        case "prunaai/p-video":
+          if (primaryImage) replicateInput.image = primaryImage
+          if (referenceAudioUrls[0]) replicateInput.audio = referenceAudioUrls[0]
+          if (duration != null) replicateInput.duration = duration
+          if (aspectRatio) replicateInput.aspect_ratio = aspectRatio
+          if (resolution) replicateInput.resolution = resolution
+          replicateInput.fps = 24
+          if (draft !== undefined) replicateInput.draft = draft
+          replicateInput.prompt_upsampling = true
+          break
         case "wan-video/wan-2.7": {
           const wan = resolveWan27Replicate(
             {
@@ -649,6 +678,8 @@ export function createGenerateVideoTool({
           tool: "chat-generate-video",
           status: "pending",
           replicate_prediction_id: prediction.id,
+          quoted_credits: requiredCredits,
+          predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
           ...(threadId ? { chat_thread_id: threadId } : {}),
         })
         .select("id")
@@ -666,6 +697,7 @@ export function createGenerateVideoTool({
         nextStepHint:
           "Only call awaitGeneration for short same-turn dependency chains, or scheduleGenerationFollowUp for long video chains that truly require a later automatic step. Otherwise reply to the user and stop.",
         predictionId: prediction.id,
+        creditsQuoted: requiredCredits,
         status: "pending" as const,
         usedImageReferenceCount: uploadedImages.length,
         usedVideoReferenceCount: uploadedVideos.length,

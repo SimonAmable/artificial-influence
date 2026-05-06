@@ -58,6 +58,41 @@ export async function deductUserCredits(
 }
 
 /**
+ * Deduct up to the requested amount, capping the charge at the user's current balance.
+ * Returns the amount that was actually deducted.
+ */
+export async function deductUserCreditsUpTo(
+  userId: string,
+  creditsToDeduct: number,
+  supabaseClient?: SupabaseClient
+): Promise<number> {
+  const requested = Math.max(0, Math.floor(creditsToDeduct));
+  if (requested <= 0) {
+    return 0;
+  }
+
+  const currentCredits = await getUserCredits(userId, supabaseClient);
+  const firstAttempt = Math.min(currentCredits, requested);
+  if (firstAttempt <= 0) {
+    return 0;
+  }
+
+  const firstBalance = await deductUserCredits(userId, firstAttempt, supabaseClient);
+  if (firstBalance !== -1) {
+    return firstAttempt;
+  }
+
+  const refreshedCredits = await getUserCredits(userId, supabaseClient);
+  const retryAttempt = Math.min(refreshedCredits, requested);
+  if (retryAttempt <= 0) {
+    return 0;
+  }
+
+  const retryBalance = await deductUserCredits(userId, retryAttempt, supabaseClient);
+  return retryBalance === -1 ? 0 : retryAttempt;
+}
+
+/**
  * Get user's credit balance and subscription info
  */
 export async function getUserCreditInfo(userId: string) {

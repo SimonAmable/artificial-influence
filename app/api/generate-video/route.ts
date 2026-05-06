@@ -2,11 +2,12 @@ import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
 import { assertAcceptedCurrentTerms } from '@/lib/legal/terms-acceptance';
 import { createClient } from '@/lib/supabase/server';
-import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
+import { checkUserHasCredits, deductUserCreditsUpTo } from '@/lib/credits';
 import {
   DEFAULT_MOTION_COPY_MODEL_IDENTIFIER,
   normalizeMotionCopyModelIdentifier,
 } from '@/lib/constants/models';
+import { resolveVideoPricingQuote } from '@/lib/video-pricing';
 
 export async function POST(request: NextRequest) {
   const requestStartTime = Date.now();
@@ -55,6 +56,13 @@ export async function POST(request: NextRequest) {
     const rawCharacterOrientation = (body.character_orientation as string) || 'video';
     const characterOrientation = (rawCharacterOrientation === 'video' ? 'video' : 'image') as 'image' | 'video';
     const tool = body.tool as string | null;
+    const sourceDurationSecondsRaw = body.sourceDurationSeconds as number | string | undefined;
+    const sourceDurationSeconds =
+      typeof sourceDurationSecondsRaw === 'number' && Number.isFinite(sourceDurationSecondsRaw)
+        ? sourceDurationSecondsRaw
+        : typeof sourceDurationSecondsRaw === 'string' && sourceDurationSecondsRaw.trim().length > 0
+          ? Number(sourceDurationSecondsRaw)
+          : null;
 
     console.log('[generate-video] JSON body parsed:', {
       hasImageUrl: !!imagePublicUrl,
@@ -92,7 +100,7 @@ export async function POST(request: NextRequest) {
       normalizeMotionCopyModelIdentifier(requestedModel) || DEFAULT_MOTION_COPY_MODEL_IDENTIFIER;
     const { data: modelData, error: modelError } = await supabase
       .from('models')
-      .select('model_cost')
+      .select('model_cost, model_cost_per_second')
       .eq('identifier', model)
       .eq('type', 'video')
       .eq('is_active', true)
@@ -105,11 +113,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const requiredCredits = Math.max(1, Number(modelData.model_cost ?? 10) || 10);
-    const hasCredits = await checkUserHasCredits(user.id, requiredCredits, supabase);
+    const pricingQuote = resolveVideoPricingQuote({
+      modelIdentifier: model,
+      modelCost: modelData.model_cost,
+      modelCostPerSecond: modelData.model_cost_per_second,
+      mode,
+      characterOrientation,
+      hasInputVideo: true,
+      hasReferenceVideo: true,
+      sourceDurationSeconds,
+    });
+    const quotedCredits = pricingQuote.quotedCredits;
+    const hasCredits = await checkUserHasCredits(user.id, quotedCredits, supabase);
     if (!hasCredits) {
       return NextResponse.json(
-        { error: `Insufficient credits. Video generation requires ${requiredCredits} credits.` },
+        { error: `Insufficient credits. Video generation requires ${quotedCredits} credits.` },
         { status: 402 }
       );
     }
@@ -164,6 +182,8 @@ export async function POST(request: NextRequest) {
           tool: tool || null,
           status: 'pending',
           replicate_prediction_id: prediction.id,
+          quoted_credits: quotedCredits,
+          predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
         })
         .select('id')
         .single();
@@ -178,6 +198,7 @@ export async function POST(request: NextRequest) {
           status: 'pending',
           predictionId: prediction.id,
           generationId: pendingGeneration.id,
+          creditsQuoted: quotedCredits,
           message: `Video generation started. Poll GET /api/generate-video/status?predictionId=${prediction.id}`,
         },
         { status: 202 }
@@ -291,6 +312,8 @@ export async function POST(request: NextRequest) {
           type: 'video',
           is_public: true,
           tool: tool || null,
+          quoted_credits: quotedCredits,
+          predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
         };
 
         const { data: savedData, error: saveError } = await supabase
@@ -312,7 +335,7 @@ export async function POST(request: NextRequest) {
     };
 
     await saveGenerationToDatabase();
-    await deductUserCredits(user.id, requiredCredits, supabase);
+    const chargedCredits = await deductUserCreditsUpTo(user.id, quotedCredits, supabase);
 
     const totalTime = Date.now() - requestStartTime;
     console.log('[generate-video] ===== Request completed successfully in', totalTime, 'ms =====');
@@ -322,6 +345,8 @@ export async function POST(request: NextRequest) {
         url: finalVideoUrl,
         mimeType: 'video/mp4',
       },
+      creditsQuoted: quotedCredits,
+      creditsUsed: chargedCredits,
     });
   } catch (error) {
     const totalTime = Date.now() - requestStartTime;

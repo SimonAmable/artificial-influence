@@ -95,9 +95,9 @@ export const platformSurfaceCards: LandingPlatformSurfaceCard[] = [
     kind: "image",
     id: "agent",
     name: "Agents",
-    sectionBlurb: "Chat-driven images, video, and edits without a canvas.",
+    sectionBlurb: "Use our creative agent to make or remix standout content with natural language.",
     description:
-      "Plain-language chat for images, video, edits, and multi-step projects. No canvas.",
+      "Create images, video, edits, and multi-step projects in chat without touching a canvas.",
     href: "/chat",
     cta: "Open",
     imageSrc: "/page_screenshots_or_screenrecordings/agent.png",

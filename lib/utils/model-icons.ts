@@ -11,8 +11,7 @@ export function getModelIconPath(identifier: string): string | null {
   
   switch (prefix) {
     case 'prunaai':
-      // Pruna models map to Flux icon
-      return '/ai_icons/flux.svg'
+      return '/ai_icons/prunaai.svg'
     case 'google':
       return '/ai_icons/gemini-color.svg'
     case 'openai':

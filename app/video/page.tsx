@@ -25,6 +25,7 @@ import { brandRefsOnly } from "@/lib/commands/ref-image-pipeline"
 import { validateVideoAttachedRefs } from "@/lib/commands/validate-video-refs"
 import { getVideoChipSlotInfo } from "@/lib/commands/video-chip-slots"
 import { generateVideoAndWait } from "@/lib/generate-video-client"
+import { resolveVideoPricingQuote } from "@/lib/video-pricing"
 import type { VideoGridItem, VideoHistoryItem } from "@/components/shared/display/video-grid"
 import { toast } from "sonner"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
@@ -86,6 +87,9 @@ function mergeRemoteHistoryWithLocal(
 
 const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
   "grok-imagine-video": "xai/grok-imagine-video",
+  "p-video": "prunaai/p-video",
+  "pvideo": "prunaai/p-video",
+  "pruna-p-video": "prunaai/p-video",
   "soul-cinema": "kwaivgi/kling-v3-video",
   "kling-v3-video": "kwaivgi/kling-v3-video",
   "seedance-2": "bytedance/seedance-2.0",
@@ -112,6 +116,8 @@ function VideoPageContent() {
 
   // State management
   const [selectedModel, setSelectedModel] = React.useState<Model | null>(null)
+  const [inputVideoDurationSeconds, setInputVideoDurationSeconds] = React.useState<number | null>(null)
+  const [inputAudioDurationSeconds, setInputAudioDurationSeconds] = React.useState<number | null>(null)
 
   // Set default model when models load
   React.useEffect(() => {
@@ -236,6 +242,86 @@ function VideoPageContent() {
       video.src = URL.createObjectURL(file)
     })
   }
+
+  const getAudioDuration = (file: File): Promise<number> => {
+    return new Promise((resolve, reject) => {
+      const audio = document.createElement("audio")
+      audio.preload = "metadata"
+      audio.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(audio.src)
+        resolve(audio.duration)
+      }
+      audio.onerror = () => {
+        window.URL.revokeObjectURL(audio.src)
+        reject(new Error("Failed to load audio metadata"))
+      }
+      audio.src = URL.createObjectURL(file)
+    })
+  }
+
+  React.useEffect(() => {
+    let cancelled = false
+    if (!inputVideo?.file) {
+      setInputVideoDurationSeconds(null)
+      return
+    }
+
+    void getVideoDuration(inputVideo.file)
+      .then((duration) => {
+        if (!cancelled) setInputVideoDurationSeconds(duration)
+      })
+      .catch(() => {
+        if (!cancelled) setInputVideoDurationSeconds(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [inputVideo])
+
+  React.useEffect(() => {
+    let cancelled = false
+    if (!inputAudio?.file) {
+      setInputAudioDurationSeconds(null)
+      return
+    }
+
+    void getAudioDuration(inputAudio.file)
+      .then((duration) => {
+        if (!cancelled) setInputAudioDurationSeconds(duration)
+      })
+      .catch(() => {
+        if (!cancelled) setInputAudioDurationSeconds(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [inputAudio])
+
+  const estimatedVideoCredits = React.useMemo(() => {
+    if (!selectedModel) return null
+
+    const sourceDurationSeconds = inputVideoDurationSeconds ?? inputAudioDurationSeconds ?? null
+    return resolveVideoPricingQuote({
+      modelIdentifier: selectedModel.identifier,
+      modelCost: selectedModel.model_cost,
+      modelCostPerSecond: selectedModel.model_cost_per_second,
+      duration: parameters.duration as number | string | null | undefined,
+      resolution: typeof parameters.resolution === "string" ? parameters.resolution : null,
+      draft: typeof parameters.draft === "boolean" ? parameters.draft : null,
+      mode: typeof parameters.mode === "string" ? parameters.mode : null,
+      generateAudio:
+        typeof parameters.generate_audio === "boolean" ? parameters.generate_audio : null,
+      characterOrientation:
+        typeof parameters.character_orientation === "string"
+          ? parameters.character_orientation
+          : null,
+      hasInputVideo: Boolean(inputVideo?.file || inputVideo?.url),
+      hasReferenceVideo: Boolean(inputVideo?.file || inputVideo?.url),
+      sourceDurationSeconds,
+    }).quotedCredits
+  }, [inputAudioDurationSeconds, inputVideo?.file, inputVideo?.url, inputVideoDurationSeconds, parameters, selectedModel])
 
   // Upload image to Supabase
   const uploadImageToSupabase = async (
@@ -377,6 +463,7 @@ function VideoPageContent() {
     const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
     const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
     const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
+    const isPrunaPVideo = selectedModel.identifier === 'prunaai/p-video'
     const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
     const isHappyHorse = selectedModel.identifier === 'alibaba/happy-horse'
     const isLipsync =
@@ -506,6 +593,7 @@ function VideoPageContent() {
       isKlingV3,
       isKlingV3Omni,
       isSeedance2,
+      isPrunaPVideo,
       isWan27,
       isHappyHorse,
       happyHorseReferenceMode,
@@ -543,6 +631,7 @@ function VideoPageContent() {
       const isKlingV3 = capture.isKlingV3
       const isKlingV3Omni = capture.isKlingV3Omni
       const isSeedance2 = capture.isSeedance2
+      const isPrunaPVideo = capture.isPrunaPVideo
       const isWan27 = capture.isWan27
       const isHappyHorse = capture.isHappyHorse
       const happyHorseReferenceMode = capture.happyHorseReferenceMode
@@ -558,11 +647,23 @@ function VideoPageContent() {
 
       // Build request body based on model
       // Exclude prompt, image, video from parameters since they're managed separately
-      const { prompt: _prompt, image: _image, video: _video, ...otherParameters } = parameters
+      const otherParameters = { ...parameters }
+      delete otherParameters.prompt
+      delete otherParameters.image
+      delete otherParameters.video
       const requestBody: Record<string, unknown> = {
         model: selectedModel.identifier,
         prompt: mergedPrompt,
         ...otherParameters,
+      }
+      const sourceDurationSeconds =
+        inputVideo?.file
+          ? await getVideoDuration(inputVideo.file)
+          : inputAudio?.file
+            ? await getAudioDuration(inputAudio.file)
+            : null
+      if (sourceDurationSeconds != null && Number.isFinite(sourceDurationSeconds)) {
+        requestBody.sourceDurationSeconds = sourceDurationSeconds
       }
 
       // Handle motion copy uploads
@@ -720,6 +821,14 @@ function VideoPageContent() {
         requestBody.reference_audios = [inputAudio.url]
       }
 
+      if (isPrunaPVideo && inputAudio?.file) {
+        const audioUpload = await uploadImageToSupabase(inputAudio.file, user.id, 'video-gen-pruna-audio')
+        requestBody.audio = audioUpload.url
+      }
+      if (isPrunaPVideo && inputAudio?.url) {
+        requestBody.audio = inputAudio.url
+      }
+
       if (isWan27 && inputAudio?.file) {
         const audioUpload = await uploadImageToSupabase(inputAudio.file, user.id, 'video-gen-wan-audio')
         requestBody.audio = audioUpload.url
@@ -849,6 +958,8 @@ function VideoPageContent() {
   }, [])
 
   const handleDeleteVideo = React.useCallback(async (id: string, _videoUrl: string, _index: number) => {
+    void _videoUrl
+    void _index
     try {
       const response = await fetch(`/api/generations/${id}`, {
         method: "DELETE",
@@ -977,6 +1088,7 @@ function VideoPageContent() {
                     onInputAudioChange={setInputAudio}
                     parameters={parameters}
                     onParametersChange={setParameters}
+                    estimatedCredits={estimatedVideoCredits}
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
                     allowConcurrent={true}
@@ -1021,6 +1133,7 @@ function VideoPageContent() {
                         onInputAudioChange={setInputAudio}
                         parameters={parameters}
                         onParametersChange={setParameters}
+                        estimatedCredits={estimatedVideoCredits}
                         isGenerating={isGenerating}
                         onGenerate={handleGenerate}
                         allowConcurrent={true}
@@ -1066,6 +1179,7 @@ function VideoPageContent() {
                     onInputAudioChange={setInputAudio}
                     parameters={parameters}
                     onParametersChange={setParameters}
+                    estimatedCredits={estimatedVideoCredits}
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
                     allowConcurrent={true}
