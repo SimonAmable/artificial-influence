@@ -636,6 +636,15 @@ const P_VIDEO_PARAMS: ParameterDefinition[] = [
     ui_type: 'text',
   },
   {
+    name: 'last_frame_image',
+    type: 'string',
+    label: 'Last Frame',
+    description: 'Optional last frame reference image for steering the ending shot',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
     name: 'duration',
     type: 'number',
     label: 'Duration',

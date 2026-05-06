@@ -464,6 +464,16 @@ export async function POST(request: NextRequest) {
         if (typeof otherParams.audio === 'string' && otherParams.audio.length > 0) {
           replicateInput.audio = otherParams.audio;
         }
+        if (typeof body.last_frame_image === 'string' && body.last_frame_image.length > 0) {
+          replicateInput.last_frame_image = body.last_frame_image;
+        } else if (typeof last_frame === 'string' && last_frame.length > 0) {
+          replicateInput.last_frame_image = last_frame;
+        } else if (
+          typeof otherParams.last_frame_image === 'string' &&
+          otherParams.last_frame_image.length > 0
+        ) {
+          replicateInput.last_frame_image = otherParams.last_frame_image;
+        }
         if (otherParams.duration != null && otherParams.duration !== undefined) {
           replicateInput.duration = Number(otherParams.duration);
         }

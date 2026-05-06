@@ -51,6 +51,7 @@ export function FounderTestimonialSection() {
   }, [])
 
   const hitVideoPoint = points.find((point) => point.day === 6)
+  const breakoutPoint = points[points.length - 1]
 
   const linePath = points
     .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
@@ -294,6 +295,27 @@ export function FounderTestimonialSection() {
                 </defs>
               </svg>
 
+              <div className="mt-4 grid gap-3 sm:hidden">
+                {breakoutPoint ? (
+                  <div className="rounded-2xl border border-primary/20 bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
+                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
+                      Breakout point
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">250k</p>
+                    <p className="text-xs text-muted-foreground">Total by day 7</p>
+                  </div>
+                ) : null}
+
+                {hitVideoPoint ? (
+                  <div className="rounded-2xl border border-primary/20 bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
+                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
+                      Inflection point
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">Hit video takes off</p>
+                  </div>
+                ) : null}
+              </div>
+
               {hitVideoPoint ? (
                 <motion.div
                   initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
@@ -309,7 +331,7 @@ export function FounderTestimonialSection() {
                       ? { duration: 4.2, times: [0, 0.3, 0.78, 1], delay: 0.72, ease: "linear", repeat: Infinity, repeatDelay: 0.5 }
                       : { duration: 0.38, delay: 0.72, ease: easeOut }
                   }
-                  className="absolute"
+                  className="absolute hidden sm:block"
                   style={{
                     left: `${(hitVideoPoint.x / svgWidth) * 100}%`,
                     top: `${(hitVideoPoint.y / svgHeight) * 100}%`,
@@ -325,7 +347,7 @@ export function FounderTestimonialSection() {
                 </motion.div>
               ) : null}
 
-              {points[points.length - 1] ? (
+              {breakoutPoint ? (
                 <motion.div
                   initial={reduceMotion ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
                   animate={
@@ -340,7 +362,7 @@ export function FounderTestimonialSection() {
                       ? { duration: 4.2, times: [0, 0.34, 0.82, 1], delay: 0.92, ease: "linear", repeat: Infinity, repeatDelay: 0.5 }
                       : { duration: 0.42, delay: 0.92, ease: easeOut }
                   }
-                  className="absolute right-2 top-4 rounded-2xl border border-primary/20 bg-background/95 px-3 py-2 text-right shadow-lg backdrop-blur"
+                  className="absolute right-2 top-4 hidden rounded-2xl border border-primary/20 bg-background/95 px-3 py-2 text-right shadow-lg backdrop-blur sm:block"
                 >
                   <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
                     Breakout point

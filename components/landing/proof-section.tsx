@@ -87,6 +87,7 @@ export function ProofSection() {
           "--proof-gap": "1rem",
           "--proof-card-width": "clamp(160px, 16vw, 210px)",
           "--proof-card-height": "clamp(285px, 29vw, 373px)",
+          "--proof-edge-fade": "clamp(34px, 12vw, 112px)",
         } as CSSProperties
       }
     >
@@ -106,18 +107,38 @@ export function ProofSection() {
           </h2>
         </div>
 
-        <div className="relative mt-10 overflow-hidden">
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-20 w-12 bg-gradient-to-r from-background via-background/85 to-transparent sm:w-20 lg:w-28" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-20 w-12 bg-gradient-to-l from-background via-background/85 to-transparent sm:w-20 lg:w-28" />
+        <div className="proof-marquee-shell relative mt-10 overflow-hidden bg-background">
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-20 w-[var(--proof-edge-fade)] bg-gradient-to-r from-background via-background via-55% to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-20 w-[var(--proof-edge-fade)] bg-gradient-to-l from-background via-background via-55% to-transparent" />
           <ProofMarquee images={PROOF_IMAGES} priority />
         </div>
       </div>
 
       <style jsx global>{`
+        .proof-marquee-shell {
+          isolation: isolate;
+        }
+
         .proof-marquee-lane {
           position: relative;
           height: var(--proof-card-height);
           overflow: hidden;
+          -webkit-mask-image: linear-gradient(
+            90deg,
+            transparent 0,
+            black calc(var(--proof-edge-fade) * 0.92),
+            black calc(100% - (var(--proof-edge-fade) * 0.92)),
+            transparent 100%
+          );
+          mask-image: linear-gradient(
+            90deg,
+            transparent 0,
+            black calc(var(--proof-edge-fade) * 0.92),
+            black calc(100% - (var(--proof-edge-fade) * 0.92)),
+            transparent 100%
+          );
+          -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
         }
 
         .proof-marquee-track {

@@ -3,7 +3,7 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { AnimatePresence, motion } from "motion/react"
+import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react"
 
 import { platformSurfaceCards } from "@/lib/constants/landing-content"
 import type { LandingPlatformSurfaceCard } from "@/lib/types/landing"
@@ -80,20 +80,15 @@ function renderActivePanel(card: LandingPlatformSurfaceCard) {
 }
 
 export function PlatformSurfacesSection() {
+  const sectionRef = React.useRef<HTMLElement>(null)
   const defaultTab = platformSurfaceCards[0]?.id ?? "generator"
   const [tab, setTab] = React.useState(defaultTab)
-  const [reduceMotion, setReduceMotion] = React.useState(false)
+  const [hasInteracted, setHasInteracted] = React.useState(false)
+  const hasEnteredView = useInView(sectionRef, { once: true, margin: "0px 0px -18% 0px" })
+  const reduceMotion = useReducedMotion()
   const sectionGutterClass = "px-4 sm:px-6 lg:px-8"
 
   const prevIndexRef = React.useRef(0)
-
-  React.useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)")
-    const sync = () => setReduceMotion(mq.matches)
-    sync()
-    mq.addEventListener("change", sync)
-    return () => mq.removeEventListener("change", sync)
-  }, [])
 
   const activeIndex = Math.max(
     0,
@@ -112,9 +107,40 @@ export function PlatformSurfacesSection() {
 
   const activeCard = platformSurfaceCards[activeIndex]
   const blurbTransition = { duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] as const }
+  const shouldAutoplay = hasEnteredView && !hasInteracted && !reduceMotion && slideCount > 1
+
+  const markInteracted = React.useCallback(() => {
+    setHasInteracted(true)
+  }, [])
+
+  const advanceToNextTab = React.useCallback(() => {
+    setTab((currentTab) => {
+      const currentIndex = platformSurfaceCards.findIndex((card) => card.id === currentTab)
+      const safeIndex = currentIndex >= 0 ? currentIndex : 0
+      const nextIndex = (safeIndex + 1) % slideCount
+      return platformSurfaceCards[nextIndex]?.id ?? currentTab
+    })
+  }, [slideCount])
+
+  const handleUserTabChange = React.useCallback((nextTab: string) => {
+    markInteracted()
+    setTab(nextTab)
+  }, [markInteracted])
+
+  React.useEffect(() => {
+    if (!shouldAutoplay) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      advanceToNextTab()
+    }, 4000)
+
+    return () => window.clearInterval(intervalId)
+  }, [advanceToNextTab, shouldAutoplay])
 
   return (
-    <section className="w-full bg-background py-16 sm:py-24">
+    <section ref={sectionRef} className="w-full bg-background py-16 sm:py-24">
       <div className={`mx-auto w-full max-w-7xl ${sectionGutterClass}`}>
         <div className="max-w-2xl">
           <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
@@ -142,7 +168,10 @@ export function PlatformSurfacesSection() {
       <div className="relative mt-10 sm:mt-12">
         <Tabs
           value={tab}
-          onValueChange={setTab}
+          onValueChange={handleUserTabChange}
+          onPointerDownCapture={markInteracted}
+          onFocusCapture={markInteracted}
+          onKeyDownCapture={markInteracted}
           className="mx-auto flex w-full max-w-7xl flex-col items-stretch"
         >
           <div className={`mx-auto w-full max-w-4xl ${sectionGutterClass}`}>

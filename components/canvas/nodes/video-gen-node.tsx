@@ -795,7 +795,14 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       nodeData.onDataChange?.(id, { error: "Image input is required" })
       return
     }
-    if (!isMotionCopy && !isLipsync && modelSupportsLastFrame && !finalLastFrameUrl && !chipSlots.lastFrameChipUrl) {
+    if (
+      !isMotionCopy &&
+      !isLipsync &&
+      modelSupportsLastFrame &&
+      !isPrunaPVideo &&
+      !finalLastFrameUrl &&
+      !chipSlots.lastFrameChipUrl
+    ) {
       nodeData.onDataChange?.(id, { error: "Last frame image is required" })
       return
     }
@@ -997,14 +1004,14 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         }
         if (lastFrameUpload?.url) {
           requestBody.last_frame = lastFrameUpload.url
-          if (isSeedance2) requestBody.last_frame_image = lastFrameUpload.url
+          if (isSeedance2 || isPrunaPVideo) requestBody.last_frame_image = lastFrameUpload.url
           if (isKlingV3 || isKlingV3Omni) {
             requestBody.end_image = lastFrameUpload.url
           }
         }
         if (!requestBody.last_frame && chipSlots.lastFrameChipUrl && modelSupportsLastFrame) {
           requestBody.last_frame = chipSlots.lastFrameChipUrl
-          if (isSeedance2) requestBody.last_frame_image = chipSlots.lastFrameChipUrl
+          if (isSeedance2 || isPrunaPVideo) requestBody.last_frame_image = chipSlots.lastFrameChipUrl
           if (isKlingV3 || isKlingV3Omni) {
             requestBody.end_image = chipSlots.lastFrameChipUrl
           }

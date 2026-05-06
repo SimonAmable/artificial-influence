@@ -99,14 +99,14 @@ export function TempHero() {
             >
               Introducing vibe marketing
             </motion.h1>
-            <motion.p
-              {...fadeUp(0.2)}
-              className="mx-auto mt-5 max-w-2xl text-pretty text-sm font-semibold leading-6 text-primary-foreground/80 sm:text-base md:text-base dark:text-white/76"
-            >
-              Like Cursor, but for marketing. Create AI UGC, AI influencer content, brainrot, CGI-style
-              campaigns, and static ads with natural language, and even schedule posts to Instagram
-              automatically.
-            </motion.p>
+            <motion.div {...fadeUp(0.2)} className="relative mt-5 w-full">
+              <div className="pointer-events-none absolute inset-y-0 left-1/2 w-screen -translate-x-1/2 bg-black/28 backdrop-blur-[2px] dark:bg-black/38" />
+              <p className="relative mx-auto max-w-2xl px-4 py-0.5 text-pretty text-sm font-semibold leading-6 text-primary-foreground/90 sm:px-6 sm:text-base md:text-base dark:text-white/84">
+                Like Cursor, but for marketing. Create AI UGC, AI influencer content, brainrot,
+                CGI-style campaigns, and static ads with natural language, and even schedule posts
+                to Instagram automatically.
+              </p>
+            </motion.div>
           </div>
 
           <motion.div

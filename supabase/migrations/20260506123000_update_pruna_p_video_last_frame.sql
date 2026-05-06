@@ -1,35 +1,7 @@
--- Pruna AI P-Video (Replicate), unified text/image/audio-conditioned video model
--- https://replicate.com/prunaai/p-video
-
-INSERT INTO public.models (
-  identifier,
-  name,
-  description,
-  type,
-  provider,
-  is_active,
-  model_cost,
-  model_cost_per_second,
-  parameters,
-  aspect_ratios,
-  default_aspect_ratio,
-  supports_reference_image,
-  supports_reference_video,
-  supports_reference_audio,
-  supports_first_frame,
-  supports_last_frame,
-  duration_options,
-  max_images
-) VALUES (
-  'prunaai/p-video',
-  'P-Video',
-  'Pruna AI unified video model for text-to-video, image-to-video, and audio-conditioned video generation. See https://replicate.com/prunaai/p-video',
-  'video',
-  'replicate',
-  true,
-  10,
-  2,
-  '{
+UPDATE ai_models
+SET
+  supports_last_frame = true,
+  parameters = '{
     "parameters": [
       {
         "name": "image",
@@ -130,32 +102,5 @@ INSERT INTO public.models (
       }
     ]
   }'::jsonb,
-  ARRAY['16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '1:1'],
-  '16:9',
-  true,
-  false,
-  true,
-  true,
-  false,
-  ARRAY[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]::INTEGER[],
-  NULL
-)
-ON CONFLICT (identifier) DO UPDATE SET
-  name = EXCLUDED.name,
-  description = EXCLUDED.description,
-  type = EXCLUDED.type,
-  provider = EXCLUDED.provider,
-  is_active = EXCLUDED.is_active,
-  model_cost = EXCLUDED.model_cost,
-  model_cost_per_second = EXCLUDED.model_cost_per_second,
-  parameters = EXCLUDED.parameters,
-  aspect_ratios = EXCLUDED.aspect_ratios,
-  default_aspect_ratio = EXCLUDED.default_aspect_ratio,
-  supports_reference_image = EXCLUDED.supports_reference_image,
-  supports_reference_video = EXCLUDED.supports_reference_video,
-  supports_reference_audio = EXCLUDED.supports_reference_audio,
-  supports_first_frame = EXCLUDED.supports_first_frame,
-  supports_last_frame = EXCLUDED.supports_last_frame,
-  duration_options = EXCLUDED.duration_options,
-  max_images = EXCLUDED.max_images,
-  updated_at = timezone('utc'::text, now());
+  updated_at = NOW()
+WHERE identifier = 'prunaai/p-video';

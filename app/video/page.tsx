@@ -749,17 +749,22 @@ function VideoPageContent() {
 
       if (
         lastFrameImage?.file &&
-        (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni || isSeedance2 || isWan27)
+        (selectedModel.identifier === 'google/veo-3.1-fast' ||
+          isKlingV3 ||
+          isKlingV3Omni ||
+          isSeedance2 ||
+          isPrunaPVideo ||
+          isWan27)
       ) {
         const lastFrameUpload = await uploadImageToSupabase(lastFrameImage.file, user.id, 'video-gen-last-frames')
         requestBody.last_frame = lastFrameUpload.url
-        if (isSeedance2) requestBody.last_frame_image = lastFrameUpload.url
+        if (isSeedance2 || isPrunaPVideo) requestBody.last_frame_image = lastFrameUpload.url
         if (isKlingV3 || isKlingV3Omni) requestBody.end_image = lastFrameUpload.url
       }
       if (lastFrameImage?.url && (isKlingV3 || isKlingV3Omni)) {
         requestBody.end_image = lastFrameImage.url
       }
-      if (lastFrameImage?.url && isSeedance2) {
+      if (lastFrameImage?.url && (isSeedance2 || isPrunaPVideo)) {
         requestBody.last_frame_image = lastFrameImage.url
       }
       if (lastFrameImage?.url && isWan27 && !requestBody.last_frame) {
@@ -773,10 +778,15 @@ function VideoPageContent() {
       if (
         !requestBody.last_frame &&
         chipSlots.lastFrameChipUrl &&
-        (selectedModel.identifier === 'google/veo-3.1-fast' || isKlingV3 || isKlingV3Omni || isSeedance2 || isWan27)
+        (selectedModel.identifier === 'google/veo-3.1-fast' ||
+          isKlingV3 ||
+          isKlingV3Omni ||
+          isSeedance2 ||
+          isPrunaPVideo ||
+          isWan27)
       ) {
         requestBody.last_frame = chipSlots.lastFrameChipUrl
-        if (isSeedance2) requestBody.last_frame_image = chipSlots.lastFrameChipUrl
+        if (isSeedance2 || isPrunaPVideo) requestBody.last_frame_image = chipSlots.lastFrameChipUrl
         if (isKlingV3 || isKlingV3Omni) requestBody.end_image = chipSlots.lastFrameChipUrl
       }
 

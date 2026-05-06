@@ -602,6 +602,7 @@ export function createGenerateVideoTool({
         case "prunaai/p-video":
           if (primaryImage) replicateInput.image = primaryImage
           if (referenceAudioUrls[0]) replicateInput.audio = referenceAudioUrls[0]
+          if (secondaryImage) replicateInput.last_frame_image = secondaryImage
           if (duration != null) replicateInput.duration = duration
           if (aspectRatio) replicateInput.aspect_ratio = aspectRatio
           if (resolution) replicateInput.resolution = resolution
