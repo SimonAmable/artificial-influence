@@ -165,7 +165,7 @@ function ModeSelector({
   ]
 
   return (
-    <div className="inline-flex rounded-[22px] border border-white/10 bg-black/34 p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+    <div className="inline-flex rounded-[22px] border border-border/60 bg-card/70 p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.28)] backdrop-blur-xl">
       <div className="flex items-center gap-1.5">
         {options.map((option) => {
           const Icon = option.icon
@@ -179,8 +179,8 @@ function ModeSelector({
               className={cn(
                 "flex min-w-0 items-center gap-2 rounded-[16px] px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] transition-colors",
                 active
-                  ? "bg-white/12 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_26px_rgba(0,0,0,0.22)]"
-                  : "text-white/56 hover:bg-white/5 hover:text-white/82"
+                  ? "bg-background/80 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_26px_rgba(0,0,0,0.18)]"
+                  : "text-muted-foreground hover:bg-background/35 hover:text-foreground"
               )}
             >
               <span
@@ -188,13 +188,13 @@ function ModeSelector({
                   "size-2 rounded-full",
                   active
                     ? "bg-primary shadow-[0_0_12px_color-mix(in_oklch,var(--primary)_70%,transparent)]"
-                    : "bg-white/20"
+                    : "bg-border/80"
                 )}
               />
               <Icon
                 size={15}
                 weight={active ? "fill" : "regular"}
-                className={cn(active ? "text-primary" : "text-white/52")}
+                className={cn(active ? "text-primary" : "text-muted-foreground")}
               />
               <span className="truncate">{option.label}</span>
             </button>
@@ -238,21 +238,21 @@ function ReferenceVideoChip({
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={disabled}
-        className="relative w-full overflow-hidden rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] px-3 py-2.5 text-left shadow-[0_20px_45px_rgba(0,0,0,0.35)] transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
+        className="relative w-full overflow-hidden rounded-[20px] border border-border/60 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_92%,transparent),color-mix(in_oklch,var(--muted)_38%,transparent))] px-3 py-2.5 text-left shadow-[0_20px_45px_rgba(0,0,0,0.28)] transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-70"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/34">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Reference Video
             </p>
             <p className="mt-1 truncate font-display text-xl font-bold uppercase tracking-tight text-primary">
               {value ? "Video loaded" : "Upload Video"}
             </p>
-            <p className="mt-1 line-clamp-1 text-[11px] text-white/42">
+            <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">
               {value?.file?.name ?? "Click to upload a talking-head clip"}
             </p>
           </div>
-          <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white text-black">
+          <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background text-foreground">
             <VideoCamera size={15} weight="fill" />
           </span>
         </div>
@@ -262,7 +262,7 @@ function ReferenceVideoChip({
               event.stopPropagation()
               onChange(null)
             }}
-            className="absolute right-2 top-2 inline-flex size-5 items-center justify-center rounded-full border border-white/10 bg-black/45 text-white/70 hover:bg-black/60 hover:text-white"
+            className="absolute right-2 top-2 inline-flex size-5 items-center justify-center rounded-full border border-border/60 bg-background/80 text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <X size={10} />
           </span>
@@ -318,13 +318,13 @@ function DockPromptPanel({
     provider === "google" ? `${basePlaceholder} ${GOOGLE_TAGS_HELPER}` : basePlaceholder
 
   return (
-    <div className="rounded-[18px] border border-white/8 bg-black/18 px-4 py-3">
+    <div className="rounded-[18px] border border-border/60 bg-background/25 px-4 py-3">
       <div className="space-y-3">
         <textarea
           value={script}
           onChange={(event) => onScriptChange(event.target.value)}
           placeholder={scriptPlaceholder}
-          className="min-h-16 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-white/28"
+          className="min-h-16 w-full resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           rows={3}
         />
 
@@ -333,31 +333,31 @@ function DockPromptPanel({
             {showGeminiAdvancedControls ? (
               <div className="grid gap-3 lg:grid-cols-[160px_minmax(0,1fr)]">
                 <div className="space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     Language
                   </p>
                   <Input
                     value={languageCode}
                     onChange={(event) => onLanguageCodeChange(event.target.value)}
                     placeholder={DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE}
-                    className="h-9 border-white/10 bg-white/4 text-xs text-white placeholder:text-white/30"
+                    className="h-9 border-border/60 bg-background/50 text-xs text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     Style Prompt
                   </p>
                   <textarea
                     value={stylePrompt}
                     onChange={(event) => onStylePromptChange(event.target.value)}
                     placeholder={DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT}
-                    className="min-h-20 w-full resize-none rounded-[14px] border border-white/10 bg-white/4 px-3 py-2 text-xs text-white outline-none placeholder:text-white/30"
+                    className="min-h-20 w-full resize-none rounded-[14px] border border-border/60 bg-background/50 px-3 py-2 text-xs text-foreground outline-none placeholder:text-muted-foreground"
                     rows={3}
                   />
                 </div>
               </div>
             ) : (
-              <p className="text-[11px] text-white/45">
+              <p className="text-[11px] text-muted-foreground">
                 Using default Gemini settings. Enhance can auto-fill language and style.
               </p>
             )}
@@ -366,7 +366,7 @@ function DockPromptPanel({
 
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
           <Select value={modelId} onValueChange={onModelChange}>
-            <SelectTrigger className="h-8 min-w-[210px] rounded-[14px] border-white/10 bg-white/4 px-3 text-xs text-white">
+            <SelectTrigger className="h-8 min-w-[210px] rounded-[14px] border-border/60 bg-background/50 px-3 text-xs text-foreground">
               <SelectValue placeholder="Select a model" />
             </SelectTrigger>
             <SelectContent>
@@ -400,7 +400,7 @@ function DockPromptPanel({
             size="sm"
             onClick={onEnhance}
             disabled={isEnhancing || isGenerating || script.trim().length === 0}
-            className="h-8 rounded-[14px] border-white/10 bg-white/4 text-white/78 hover:bg-white/8 hover:text-white"
+            className="h-8 rounded-[14px] border-border/60 bg-background/50 text-foreground hover:bg-accent/40 hover:text-foreground"
           >
             {isEnhancing ? (
               <CircleNotch className="mr-2 size-3.5 animate-spin" />
@@ -416,13 +416,13 @@ function DockPromptPanel({
               variant="ghost"
               size="sm"
               onClick={() => setShowGeminiAdvancedControls((value) => !value)}
-              className="h-8 rounded-[14px] px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/65 hover:bg-white/8 hover:text-white"
+              className="h-8 rounded-[14px] px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground hover:bg-accent/30 hover:text-foreground"
             >
               {showGeminiAdvancedControls ? "Hide advanced" : "Advanced controls"}
             </Button>
           ) : null}
 
-          <span className={cn("ml-auto", error ? "text-red-300/90" : "text-white/34")}>
+          <span className={cn("ml-auto", error ? "text-destructive" : "text-muted-foreground")}>
             {error ?? statusMessage ?? `${script.trim().length} chars`}
           </span>
         </div>
@@ -458,14 +458,14 @@ function VoicePresetCard({
   return (
     <div
       className={cn(
-        "relative overflow-hidden border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] shadow-[0_20px_45px_rgba(0,0,0,0.35)]",
+        "relative overflow-hidden border border-border/60 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_92%,transparent),color-mix(in_oklch,var(--muted)_38%,transparent))] shadow-[0_20px_45px_rgba(0,0,0,0.28)]",
         compact ? "rounded-[20px] px-3 py-2.5" : "rounded-[24px] px-4 py-3"
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           {!minimalist && (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/34">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Voice Preset
             </p>
           )}
@@ -481,7 +481,7 @@ function VoicePresetCard({
           {!minimalist && (
             <p
               className={cn(
-                "mt-1 text-[11px] text-white/42",
+                "mt-1 text-[11px] text-muted-foreground",
                 compact ? "line-clamp-1" : "line-clamp-2"
               )}
             >
@@ -505,7 +505,7 @@ function VoicePresetCard({
             aria-label={previewing ? "Pause voice preview" : "Play voice preview"}
             title={previewing ? "Pause voice preview" : "Play voice preview"}
             className={cn(
-              "flex shrink-0 items-center justify-center rounded-full border border-white/10 bg-white text-black transition-colors enabled:hover:bg-primary enabled:hover:text-primary-foreground disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35",
+              "flex shrink-0 items-center justify-center rounded-full border border-border/60 bg-background text-foreground transition-colors enabled:hover:bg-primary enabled:hover:text-primary-foreground disabled:cursor-not-allowed disabled:bg-background/50 disabled:text-muted-foreground",
               compact ? "size-8" : "size-9"
             )}
           >
@@ -517,7 +517,7 @@ function VoicePresetCard({
         {EQ_BARS.map((height, index) => (
           <span
             key={`${height}-${index}`}
-            className="audio-eq-bar w-1 rounded-full bg-white/70"
+            className="audio-eq-bar w-1 rounded-full bg-primary/70"
             style={{
               height: minimalist ? Math.max(4, Math.round(height * 0.35)) : compact ? Math.max(8, Math.round(height * 0.55)) : height,
               animationDelay: `${index * 70}ms`,
@@ -531,19 +531,19 @@ function VoicePresetCard({
 
 function AudioResultCard({ item }: { item: AudioHistoryItem }) {
   return (
-    <article className="rounded-[28px] border border-white/8 bg-white/[0.045] p-4 shadow-[0_16px_38px_rgba(0,0,0,0.26)] backdrop-blur-sm">
+    <article className="rounded-[28px] border border-border/60 bg-card/70 p-4 shadow-[0_16px_38px_rgba(0,0,0,0.22)] backdrop-blur-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Voiceover
           </p>
-          <p className="mt-1 text-sm font-semibold text-white/90">
+          <p className="mt-1 text-sm font-semibold text-foreground">
             {getAudioModelLabel(item.model) ?? item.model ?? "Text to Speech"}
           </p>
         </div>
-        <span className="text-[11px] text-white/38">{formatTimestamp(item.createdAt)}</span>
+        <span className="text-[11px] text-muted-foreground">{formatTimestamp(item.createdAt)}</span>
       </div>
-      <p className="mt-3 line-clamp-3 text-sm text-white/58">
+      <p className="mt-3 line-clamp-3 text-sm text-muted-foreground">
         {item.prompt || "Generated voice line"}
       </p>
       <audio src={item.url} controls className="mt-4 w-full" preload="metadata" />
@@ -553,26 +553,26 @@ function AudioResultCard({ item }: { item: AudioHistoryItem }) {
 
 function VideoResultCard({ item }: { item: VideoHistoryItem }) {
   return (
-    <article className="overflow-hidden rounded-[28px] border border-white/8 bg-white/[0.045] shadow-[0_16px_38px_rgba(0,0,0,0.26)] backdrop-blur-sm">
+    <article className="overflow-hidden rounded-[28px] border border-border/60 bg-card/70 shadow-[0_16px_38px_rgba(0,0,0,0.22)] backdrop-blur-sm">
       <video
         src={item.url}
         controls
-        className="aspect-video w-full bg-black/40 object-contain"
+        className="aspect-video w-full bg-background/60 object-contain"
         preload="metadata"
       />
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Change Voice
             </p>
-            <p className="mt-1 text-sm font-semibold text-white/90">
+            <p className="mt-1 text-sm font-semibold text-foreground">
               {item.model ?? "Lip Sync"}
             </p>
           </div>
-          <span className="text-[11px] text-white/38">{formatTimestamp(item.createdAt)}</span>
+          <span className="text-[11px] text-muted-foreground">{formatTimestamp(item.createdAt)}</span>
         </div>
-        <p className="mt-3 line-clamp-2 text-sm text-white/58">
+        <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">
           {item.prompt || "Voice-swapped clip created from your reference video."}
         </p>
       </div>
@@ -926,8 +926,8 @@ export function AudioStudioPage() {
   const hasResults = results.length > 0
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#0b0d10] text-white">
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-72 bg-[linear-gradient(180deg,rgba(11,13,16,0),rgba(11,13,16,0.88)_55%,rgba(11,13,16,1))]" />
+    <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-72 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--background)_0%,transparent),color-mix(in_oklch,var(--background)_88%,transparent)_55%,var(--background))]" />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex h-72 items-end justify-between gap-2 px-4 md:px-8">
         {Array.from({ length: 40 }).map((_, index) => {
@@ -935,7 +935,7 @@ export function AudioStudioPage() {
           return (
             <span
               key={index}
-              className="audio-eq-bar w-3 rounded-t-[10px] bg-white/12 opacity-35"
+              className="audio-eq-bar w-3 rounded-t-[10px] bg-primary/12 opacity-35"
               style={{
                 height,
                 animationDelay: `${index * 90}ms`,
@@ -948,7 +948,7 @@ export function AudioStudioPage() {
       <div className="relative mx-auto flex min-h-screen w-full max-w-[1500px] flex-col px-4 pb-44 pt-24 sm:px-6 md:pb-40 lg:px-10">
         {!hasResults && !isHistoryLoading ? (
           <section className="flex min-h-[46vh] flex-1 flex-col items-center justify-center text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-white/48">
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-muted-foreground">
               {heroEyebrow}
             </p>
             <div className="mt-4 max-w-4xl">
@@ -956,7 +956,7 @@ export function AudioStudioPage() {
                 {heroTitle}
               </h1>
             </div>
-            <p className="mt-5 max-w-2xl text-sm text-white/50 sm:text-base">
+            <p className="mt-5 max-w-2xl text-sm text-muted-foreground sm:text-base">
               {mode === "voiceover"
                 ? "Write the line, choose Inworld or Gemini TTS, and generate polished narration that fits the rest of the UniCan workflow."
                 : "Create a new spoken line with Inworld or Gemini TTS, then push it through your existing lip-sync video model to revoice a talking-head clip."}
@@ -966,10 +966,10 @@ export function AudioStudioPage() {
           <section className="relative z-10 mt-8 flex-1">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/36">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   {mode === "voiceover" ? "Recent voiceovers" : "Recent voice changes"}
                 </p>
-                <p className="mt-1 text-sm text-white/54">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {mode === "voiceover"
                     ? "Generated audio stays playable here while the cinematic layout remains intact."
                     : "Recent lip-sync generations created from the Change Voice flow."}
@@ -978,7 +978,7 @@ export function AudioStudioPage() {
             </div>
 
             {error ? (
-              <div className="mb-4 rounded-2xl border border-red-400/18 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+              <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {error}
               </div>
             ) : null}
@@ -988,7 +988,7 @@ export function AudioStudioPage() {
                 {Array.from({ length: mode === "voiceover" ? 3 : 2 }).map((_, index) => (
                   <div
                     key={index}
-                    className="h-48 animate-pulse rounded-[28px] border border-white/6 bg-white/[0.045]"
+                    className="h-48 animate-pulse rounded-[28px] border border-border/50 bg-card/60"
                   />
                 ))}
               </div>
@@ -1009,12 +1009,12 @@ export function AudioStudioPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 sm:px-6 md:px-8 md:pb-6">
         <div className="mx-auto max-w-[1180px]">
-          <div className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(29,31,35,0.96),rgba(21,23,27,0.96))] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+          <div className="rounded-[28px] border border-border/60 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_96%,transparent),color-mix(in_oklch,var(--muted)_62%,transparent))] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.42)] backdrop-blur-xl">
             {/* Mobile: 3-row layout, Desktop: horizontal layout */}
             <div className="flex flex-col gap-3 md:gap-3">
               {/* Row 1: Prompt Box (full width on mobile, flex-1 on desktop) */}
               <div className="min-w-0 md:flex-1">
-                <div className="rounded-[24px] border border-white/8 bg-black/14 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                <div className="rounded-[24px] border border-border/60 bg-background/30 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                   <DockPromptPanel
                     mode={mode}
                     script={script}

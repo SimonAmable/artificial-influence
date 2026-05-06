@@ -47,7 +47,7 @@ export const modelsBentoShowcaseByVendorSlug: Record<string, LandingBentoCardMed
   xai: { mediaType: "image", src: showcase("grok.jpeg") },
   minimax: { mediaType: "image", src: showcase("minimax.jpeg") },
   veed: { mediaType: "image", src: showcase("veed.jpeg") },
-  alibaba: { mediaType: "image", src: showcase("showcase-02.png") },
+  alibaba: { mediaType: "image", src: showcase("alibaba.png") },
   /** Pruna / FLUX & related */
   prunaai: { mediaType: "image", src: showcase("generated-image-1776347735470.jpeg") },
 }
