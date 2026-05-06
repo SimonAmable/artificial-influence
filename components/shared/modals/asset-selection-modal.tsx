@@ -18,6 +18,7 @@ import {
   Check,
   Plus,
   SpeakerHigh,
+  UploadSimple,
 } from "@phosphor-icons/react"
 import Image from "next/image"
 import type {
@@ -29,10 +30,11 @@ import type {
 import {
   ASSET_CATEGORIES,
   ASSET_CATEGORY_LABELS,
-  listAssets,
 } from "@/lib/assets/library"
+import { createClient } from "@/lib/supabase/client"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { PRIVATE_UPLOAD_BUCKET } from "@/lib/uploads/shared"
 import { toast } from "sonner"
 
 interface RawGeneration {
@@ -49,6 +51,122 @@ interface RawGeneration {
 
 interface Generation extends Omit<RawGeneration, "url"> {
   url: string
+}
+
+interface UploadRecord {
+  id: string
+  bucket: string
+  storage_path: string
+  mime_type: string
+  label: string | null
+  created_at: string
+  original_filename?: string | null
+}
+
+interface UploadListItem {
+  id: string
+  url: string
+  title: string
+  createdAt: string
+}
+
+interface PaginationState {
+  limit: number
+  offset: number
+  returned: number
+  total: number
+  hasMore: boolean
+}
+
+interface PaginatedTabState<TItem extends { id: string }> {
+  items: TItem[]
+  hasLoaded: boolean
+  initialLoading: boolean
+  loadingMore: boolean
+  error: string | null
+  nextOffset: number
+  pagination: PaginationState
+}
+
+interface HistoryResponse {
+  generations?: RawGeneration[]
+  pagination?: Partial<PaginationState>
+}
+
+interface AssetsResponse {
+  assets?: AssetRecord[]
+  pagination?: Partial<PaginationState>
+}
+
+type ModalTab = "history" | "assets" | "uploads"
+
+const ASSET_SELECTION_PAGE_LIMIT = 24
+
+function createEmptyPagination(limit = ASSET_SELECTION_PAGE_LIMIT): PaginationState {
+  return {
+    limit,
+    offset: 0,
+    returned: 0,
+    total: 0,
+    hasMore: false,
+  }
+}
+
+function createEmptyTabState<TItem extends { id: string }>(
+  limit = ASSET_SELECTION_PAGE_LIMIT,
+): PaginatedTabState<TItem> {
+  return {
+    items: [],
+    hasLoaded: false,
+    initialLoading: false,
+    loadingMore: false,
+    error: null,
+    nextOffset: 0,
+    pagination: createEmptyPagination(limit),
+  }
+}
+
+function normalizePagination(
+  pagination: Partial<PaginationState> | undefined,
+  fallback: {
+    limit: number
+    offset: number
+    returned: number
+    total?: number
+  },
+): PaginationState {
+  const limit = typeof pagination?.limit === "number" ? pagination.limit : fallback.limit
+  const offset = typeof pagination?.offset === "number" ? pagination.offset : fallback.offset
+  const returned = typeof pagination?.returned === "number" ? pagination.returned : fallback.returned
+  const total =
+    typeof pagination?.total === "number"
+      ? pagination.total
+      : typeof fallback.total === "number"
+        ? fallback.total
+        : offset + returned
+  const hasMore =
+    typeof pagination?.hasMore === "boolean" ? pagination.hasMore : offset + returned < total
+
+  return {
+    limit,
+    offset,
+    returned,
+    total,
+    hasMore,
+  }
+}
+
+function mergeUniqueById<TItem extends { id: string }>(existing: TItem[], incoming: TItem[]) {
+  const seen = new Set(existing.map((item) => item.id))
+  const merged = [...existing]
+
+  for (const item of incoming) {
+    if (seen.has(item.id)) continue
+    seen.add(item.id)
+    merged.push(item)
+  }
+
+  return merged
 }
 
 export type AssetSelectionPick = {
@@ -84,15 +202,18 @@ function formatDate(dateString: string): string {
 }
 
 export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelectionModalProps) {
-  const [activeTab, setActiveTab] = React.useState<"history" | "assets">("assets")
-  const [generations, setGenerations] = React.useState<Generation[]>([])
-  const [assets, setAssets] = React.useState<AssetRecord[]>([])
+  const [activeTab, setActiveTab] = React.useState<ModalTab>("assets")
+  const [historyState, setHistoryState] = React.useState<PaginatedTabState<Generation>>(
+    createEmptyTabState<Generation>(),
+  )
+  const [assetsState, setAssetsState] = React.useState<PaginatedTabState<AssetRecord>>(
+    createEmptyTabState<AssetRecord>(),
+  )
+  const [uploadsState, setUploadsState] = React.useState<PaginatedTabState<UploadListItem>>(
+    createEmptyTabState<UploadListItem>(),
+  )
   const [visibility, setVisibility] = React.useState<AssetVisibility | "all">("all")
   const [category, setCategory] = React.useState<AssetCategory | "all">("all")
-  const [loadingHistory, setLoadingHistory] = React.useState(false)
-  const [loadingAssets, setLoadingAssets] = React.useState(false)
-  const [historyError, setHistoryError] = React.useState<string | null>(null)
-  const [assetsError, setAssetsError] = React.useState<string | null>(null)
   const [copiedId, setCopiedId] = React.useState<string | null>(null)
   const [createAssetOpen, setCreateAssetOpen] = React.useState(false)
   const [createAssetInitial, setCreateAssetInitial] = React.useState<{
@@ -103,63 +224,328 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
     supabaseStoragePath?: string
   } | null>(null)
   const [createAssetUploading, setCreateAssetUploading] = React.useState(false)
+  const [uploadReferenceUploading, setUploadReferenceUploading] = React.useState(false)
   const createAssetFileInputRef = React.useRef<HTMLInputElement>(null)
+  const uploadReferenceInputRef = React.useRef<HTMLInputElement>(null)
+  const historyStateRef = React.useRef(historyState)
+  const assetsStateRef = React.useRef(assetsState)
+  const uploadsStateRef = React.useRef(uploadsState)
+  const historyLoadMoreSentinelRef = React.useRef<HTMLDivElement | null>(null)
+  const assetsLoadMoreSentinelRef = React.useRef<HTMLDivElement | null>(null)
+  const uploadsLoadMoreSentinelRef = React.useRef<HTMLDivElement | null>(null)
 
-  const fetchHistory = React.useCallback(async () => {
-    setLoadingHistory(true)
-    setHistoryError(null)
+  React.useEffect(() => {
+    historyStateRef.current = historyState
+  }, [historyState])
+
+  React.useEffect(() => {
+    assetsStateRef.current = assetsState
+  }, [assetsState])
+
+  React.useEffect(() => {
+    uploadsStateRef.current = uploadsState
+  }, [uploadsState])
+
+  const fetchHistory = React.useCallback(async (append: boolean) => {
+    const currentState = historyStateRef.current
+    if (append ? currentState.loadingMore : currentState.initialLoading) {
+      return
+    }
+
+    setHistoryState((prev) => ({
+      ...prev,
+      error: null,
+      initialLoading: append ? prev.initialLoading : true,
+      loadingMore: append,
+    }))
+
     try {
-      const response = await fetch('/api/generations?type=image&limit=50&excludeFailed=true')
+      const offset = append ? currentState.nextOffset : 0
+      const response = await fetch(
+        `/api/generations?type=image&limit=${ASSET_SELECTION_PAGE_LIMIT}&offset=${offset}&excludeFailed=true`,
+      )
       if (!response.ok) {
-        throw new Error('Failed to fetch history')
+        throw new Error("Failed to fetch history")
       }
-      const data = await response.json()
+      const data = (await response.json()) as HistoryResponse
       const nextGenerations = Array.isArray(data.generations)
-        ? (data.generations as RawGeneration[]).filter(
+        ? data.generations.filter(
             (generation): generation is Generation =>
               generation.status !== "failed" &&
               typeof generation.url === "string" &&
-              generation.url.length > 0
+              generation.url.length > 0,
           )
         : []
-      setGenerations(nextGenerations)
+      const pagination = normalizePagination(data.pagination, {
+        limit: ASSET_SELECTION_PAGE_LIMIT,
+        offset,
+        returned: nextGenerations.length,
+      })
+
+      setHistoryState((prev) => ({
+        ...prev,
+        items: append ? mergeUniqueById(prev.items, nextGenerations) : nextGenerations,
+        hasLoaded: true,
+        initialLoading: false,
+        loadingMore: false,
+        error: null,
+        nextOffset: pagination.offset + pagination.returned,
+        pagination,
+      }))
     } catch (error) {
-      console.error('Error fetching history:', error)
-      setHistoryError(error instanceof Error ? error.message : 'Failed to load history')
-    } finally {
-      setLoadingHistory(false)
+      console.error("Error fetching history:", error)
+      setHistoryState((prev) => ({
+        ...prev,
+        hasLoaded: true,
+        initialLoading: false,
+        loadingMore: false,
+        error: error instanceof Error ? error.message : "Failed to load history",
+      }))
     }
   }, [])
 
-  // Fetch history when tab is opened
-  React.useEffect(() => {
-    if (open && activeTab === "history" && generations.length === 0) {
-      void fetchHistory()
+  const fetchAssets = React.useCallback(async (append: boolean) => {
+    const currentState = assetsStateRef.current
+    if (append ? currentState.loadingMore : currentState.initialLoading) {
+      return
     }
-  }, [activeTab, fetchHistory, generations.length, open])
 
-  const fetchAssets = React.useCallback(async () => {
-    setLoadingAssets(true)
-    setAssetsError(null)
+    setAssetsState((prev) => ({
+      ...prev,
+      error: null,
+      initialLoading: append ? prev.initialLoading : true,
+      loadingMore: append,
+    }))
+
     try {
-      const data = await listAssets({
-        limit: 50,
-        visibility: visibility === "all" ? undefined : visibility,
-        category: category === "all" ? undefined : category,
+      const offset = append ? currentState.nextOffset : 0
+      const params = new URLSearchParams({
+        limit: String(ASSET_SELECTION_PAGE_LIMIT),
+        offset: String(offset),
       })
-      setAssets(data)
+      if (visibility !== "all") {
+        params.set("visibility", visibility)
+      }
+      if (category !== "all") {
+        params.set("category", category)
+      }
+
+      const response = await fetch(`/api/assets?${params.toString()}`)
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload.error || "Failed to fetch assets")
+      }
+
+      const data = (await response.json()) as AssetsResponse
+      const nextAssets = Array.isArray(data.assets) ? data.assets : []
+      const pagination = normalizePagination(data.pagination, {
+        limit: ASSET_SELECTION_PAGE_LIMIT,
+        offset,
+        returned: nextAssets.length,
+      })
+
+      setAssetsState((prev) => ({
+        ...prev,
+        items: append ? mergeUniqueById(prev.items, nextAssets) : nextAssets,
+        hasLoaded: true,
+        initialLoading: false,
+        loadingMore: false,
+        error: null,
+        nextOffset: pagination.offset + pagination.returned,
+        pagination,
+      }))
     } catch (error) {
-      console.error('Error fetching assets:', error)
-      setAssetsError(error instanceof Error ? error.message : 'Failed to load assets')
-    } finally {
-      setLoadingAssets(false)
+      console.error("Error fetching assets:", error)
+      setAssetsState((prev) => ({
+        ...prev,
+        hasLoaded: true,
+        initialLoading: false,
+        loadingMore: false,
+        error: error instanceof Error ? error.message : "Failed to load assets",
+      }))
     }
+  }, [category, visibility])
+
+  const fetchUploads = React.useCallback(async (append: boolean) => {
+    const currentState = uploadsStateRef.current
+    if (append ? currentState.loadingMore : currentState.initialLoading) {
+      return
+    }
+
+    setUploadsState((prev) => ({
+      ...prev,
+      error: null,
+      initialLoading: append ? prev.initialLoading : true,
+      loadingMore: append,
+    }))
+
+    try {
+      const supabase = createClient()
+      const offset = append ? currentState.nextOffset : 0
+      const { data, error, count } = await supabase
+        .from("uploads")
+        .select("id, bucket, storage_path, mime_type, label, created_at, original_filename", {
+          count: "exact",
+        })
+        .like("mime_type", "image/%")
+        .order("created_at", { ascending: false })
+        .range(offset, offset + ASSET_SELECTION_PAGE_LIMIT - 1)
+
+      if (error) {
+        throw new Error(error.message)
+      }
+
+      const rows = (data ?? []) as UploadRecord[]
+      const nextUploads = await Promise.all(
+        rows.map(async (upload) => {
+          let url = ""
+          if (upload.bucket === PRIVATE_UPLOAD_BUCKET) {
+            const signed = await supabase.storage
+              .from(upload.bucket)
+              .createSignedUrl(upload.storage_path, 60 * 60)
+            if (signed.error || !signed.data?.signedUrl) {
+              throw new Error(signed.error?.message || "Failed to load uploaded image")
+            }
+            url = signed.data.signedUrl
+          } else {
+            url = supabase.storage.from(upload.bucket).getPublicUrl(upload.storage_path).data.publicUrl
+          }
+
+          return {
+            id: upload.id,
+            url,
+            title:
+              upload.original_filename?.trim() ||
+              upload.label?.replace(/^Uploaded:\s*/i, "").trim() ||
+              "Uploaded image",
+            createdAt: upload.created_at,
+          } satisfies UploadListItem
+        }),
+      )
+      const pagination = normalizePagination(
+        {
+          limit: ASSET_SELECTION_PAGE_LIMIT,
+          offset,
+          returned: nextUploads.length,
+          total: count ?? offset + nextUploads.length,
+          hasMore: offset + nextUploads.length < (count ?? offset + nextUploads.length),
+        },
+        {
+          limit: ASSET_SELECTION_PAGE_LIMIT,
+          offset,
+          returned: nextUploads.length,
+          total: count ?? offset + nextUploads.length,
+        },
+      )
+
+      setUploadsState((prev) => ({
+        ...prev,
+        items: append ? mergeUniqueById(prev.items, nextUploads) : nextUploads,
+        hasLoaded: true,
+        initialLoading: false,
+        loadingMore: false,
+        error: null,
+        nextOffset: pagination.offset + pagination.returned,
+        pagination,
+      }))
+    } catch (error) {
+      console.error("Error fetching uploads:", error)
+      setUploadsState((prev) => ({
+        ...prev,
+        hasLoaded: true,
+        initialLoading: false,
+        loadingMore: false,
+        error: error instanceof Error ? error.message : "Failed to load uploads",
+      }))
+    }
+  }, [])
+
+  React.useEffect(() => {
+    setAssetsState(createEmptyTabState<AssetRecord>())
   }, [visibility, category])
 
   React.useEffect(() => {
-    if (!open || activeTab !== "assets") return
-    void fetchAssets()
-  }, [open, activeTab, fetchAssets])
+    if (!open) return
+
+    if (activeTab === "history" && !historyState.hasLoaded && !historyState.initialLoading) {
+      void fetchHistory(false)
+      return
+    }
+
+    if (activeTab === "assets" && !assetsState.hasLoaded && !assetsState.initialLoading) {
+      void fetchAssets(false)
+      return
+    }
+
+    if (activeTab === "uploads" && !uploadsState.hasLoaded && !uploadsState.initialLoading) {
+      void fetchUploads(false)
+    }
+  }, [
+    activeTab,
+    assetsState.hasLoaded,
+    assetsState.initialLoading,
+    fetchAssets,
+    fetchHistory,
+    fetchUploads,
+    historyState.hasLoaded,
+    historyState.initialLoading,
+    open,
+    uploadsState.hasLoaded,
+    uploadsState.initialLoading,
+  ])
+
+  React.useEffect(() => {
+    let target: HTMLDivElement | null = null
+    let activeState: PaginatedTabState<{ id: string }> | null = null
+    let loadMore: (() => void) | null = null
+
+    if (activeTab === "history") {
+      target = historyLoadMoreSentinelRef.current
+      activeState = historyState
+      loadMore = () => void fetchHistory(true)
+    } else if (activeTab === "assets") {
+      target = assetsLoadMoreSentinelRef.current
+      activeState = assetsState
+      loadMore = () => void fetchAssets(true)
+    } else if (activeTab === "uploads") {
+      target = uploadsLoadMoreSentinelRef.current
+      activeState = uploadsState
+      loadMore = () => void fetchUploads(true)
+    }
+
+    if (
+      !target ||
+      !activeState ||
+      !activeState.hasLoaded ||
+      activeState.initialLoading ||
+      activeState.loadingMore ||
+      activeState.error ||
+      !activeState.pagination.hasMore ||
+      !loadMore
+    ) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore()
+        }
+      },
+      { rootMargin: "400px 0px" },
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [
+    activeTab,
+    assetsState,
+    fetchAssets,
+    fetchHistory,
+    fetchUploads,
+    historyState,
+    uploadsState,
+  ])
 
   const handleSelect = (pick: AssetSelectionPick) => {
     onSelect(pick)
@@ -211,6 +597,32 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
     }
   }
 
+  const handleUploadReferenceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file")
+      return
+    }
+
+    setUploadReferenceUploading(true)
+    try {
+      const result = await uploadFileToSupabase(file, "reference-uploads")
+      if (!result) return
+      if (result.fileType !== "image") {
+        toast.error("Only image uploads can be used as reference images here")
+        return
+      }
+
+      setUploadsState(createEmptyTabState<UploadListItem>())
+      toast.success("Uploaded image ready to use")
+      void fetchUploads(false)
+    } finally {
+      setUploadReferenceUploading(false)
+    }
+  }
+
   // Handle keyboard navigation
   React.useEffect(() => {
     if (!open) return
@@ -241,7 +653,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
               id="asset-selection-description"
               className="text-left text-sm leading-relaxed text-muted-foreground"
             >
-              Choose an image from your saved assets or generation history
+              Choose an image from your uploads, saved assets, or generation history
             </p>
           </DialogHeader>
           <Button
@@ -256,7 +668,11 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "history" | "assets")} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as ModalTab)}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
           <div className="flex shrink-0 flex-col gap-3 px-6 pt-2 pb-0">
             <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
               <div className="flex min-w-0 flex-col gap-3">
@@ -268,6 +684,10 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                   <TabsTrigger value="history" className="gap-2">
                     <ClockCounterClockwise className="h-4 w-4" />
                     History
+                  </TabsTrigger>
+                  <TabsTrigger value="uploads" className="gap-2">
+                    <UploadSimple className="h-4 w-4" />
+                    Uploads
                   </TabsTrigger>
                 </TabsList>
                 {activeTab === "assets" ? (
@@ -292,20 +712,46 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                 tabIndex={-1}
                 onChange={handleCreateAssetFileChange}
               />
-              <Button
-                type="button"
-                size="sm"
-                className="shrink-0 gap-1.5"
-                disabled={createAssetUploading}
-                onClick={() => createAssetFileInputRef.current?.click()}
-              >
-                {createAssetUploading ? (
-                  <CircleNotch className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4" weight="bold" />
-                )}
-                Create asset
-              </Button>
+              <input
+                ref={uploadReferenceInputRef}
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                aria-hidden
+                tabIndex={-1}
+                onChange={handleUploadReferenceFileChange}
+              />
+              {activeTab === "assets" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  disabled={createAssetUploading}
+                  onClick={() => createAssetFileInputRef.current?.click()}
+                >
+                  {createAssetUploading ? (
+                    <CircleNotch className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" weight="bold" />
+                  )}
+                  Create asset
+                </Button>
+              ) : activeTab === "uploads" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  disabled={uploadReferenceUploading}
+                  onClick={() => uploadReferenceInputRef.current?.click()}
+                >
+                  {uploadReferenceUploading ? (
+                    <CircleNotch className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <UploadSimple className="h-4 w-4" weight="bold" />
+                  )}
+                  Upload image
+                </Button>
+              ) : null}
             </div>
             {activeTab === "assets" ? (
               <div className="min-w-0 w-full">
@@ -335,181 +781,324 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
 
           {/* Assets Tab */}
           <TabsContent value="assets" className="m-0 min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
-            {loadingAssets ? (
+            {assetsState.initialLoading ? (
               <div className="flex min-h-48 items-start justify-center pt-8">
                 <CircleNotch className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-            ) : assetsError ? (
+            ) : assetsState.error && assetsState.items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                <p className="text-sm">{assetsError}</p>
+                <p className="text-sm">{assetsState.error}</p>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => void fetchAssets()}
+                  onClick={() => void fetchAssets(false)}
                   className="mt-4"
                 >
                   Try Again
                 </Button>
               </div>
-            ) : assets.length === 0 ? (
+            ) : assetsState.items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                 <FolderOpen className="h-12 w-12 mb-3 opacity-50" />
                 <p className="text-sm">No saved assets</p>
                 <p className="text-xs mt-1">Try another category or save an asset to see it here</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {assets.map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="overflow-hidden rounded-md"
-                  >
-                    <div 
-                      className="group/image relative aspect-square cursor-pointer hover:ring-2 hover:ring-primary transition-all rounded-md"
-                       onClick={() =>
-                         handleSelect({
-                           id: asset.id,
-                           previewUrl: asset.thumbnailUrl || asset.url,
-                           title: asset.title,
-                           url: asset.url,
-                           assetType: asset.assetType,
-                         })
-                       }
-                       role="button"
-                       tabIndex={0}
-                       aria-label={`Select ${asset.assetType} asset`}
-                    >
-                      {asset.assetType === "image" && (
-                        <Image
-                          src={asset.thumbnailUrl || asset.url}
-                          alt={asset.title}
-                          fill
-                          className="object-cover rounded-md"
+              <div className="space-y-6">
+                <div className="text-sm text-muted-foreground">
+                  Showing {assetsState.items.length} of {assetsState.pagination.total}
+                </div>
 
-                        />
-                      )}
-                      {asset.assetType === "video" && (
-                        <video
-                          src={asset.url}
-                          poster={asset.thumbnailUrl ?? undefined}
-                          className="absolute inset-0 h-full w-full object-cover rounded-md"
-                          preload="metadata"
-                          muted
-                          playsInline
-                        />
-                      )}
-                      {asset.assetType === "audio" && (
-                        <div className="absolute inset-0 flex items-center justify-center rounded-md bg-muted">
-                          <SpeakerHigh
-                            className="h-12 w-12 text-muted-foreground"
-                            weight="duotone"
-                            aria-hidden
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {assetsState.items.map((asset) => (
+                    <div
+                      key={asset.id}
+                      className="overflow-hidden rounded-md"
+                    >
+                      <div
+                        className="group/image relative aspect-square cursor-pointer hover:ring-2 hover:ring-primary transition-all rounded-md"
+                        onClick={() =>
+                          handleSelect({
+                            id: asset.id,
+                            previewUrl: asset.thumbnailUrl || asset.url,
+                            title: asset.title,
+                            url: asset.url,
+                            assetType: asset.assetType,
+                          })
+                        }
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Select ${asset.assetType} asset`}
+                      >
+                        {asset.assetType === "image" && (
+                          <Image
+                            src={asset.thumbnailUrl || asset.url}
+                            alt={asset.title}
+                            fill
+                            className="object-cover rounded-md"
                           />
+                        )}
+                        {asset.assetType === "video" && (
+                          <video
+                            src={asset.url}
+                            poster={asset.thumbnailUrl ?? undefined}
+                            className="absolute inset-0 h-full w-full object-cover rounded-md"
+                            preload="metadata"
+                            muted
+                            playsInline
+                          />
+                        )}
+                        {asset.assetType === "audio" && (
+                          <div className="absolute inset-0 flex items-center justify-center rounded-md bg-muted">
+                            <SpeakerHigh
+                              className="h-12 w-12 text-muted-foreground"
+                              weight="duotone"
+                              aria-hidden
+                            />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center rounded-md">
+                          <span className="text-white text-sm font-medium">Select</span>
                         </div>
-                      )}
-                      {/* Overlay on hover */}
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center rounded-md">
-                        <span className="text-white text-sm font-medium">Select</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5 mt-2 px-1">
+                        <p className="text-xs text-foreground truncate font-medium">
+                          {asset.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {formatDate(asset.createdAt)}
+                        </p>
                       </div>
                     </div>
-                    {/* Metadata */}
-                    <div className="flex flex-col gap-0.5 mt-2 px-1">
-                      <p className="text-xs text-foreground truncate font-medium">
-                        {asset.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {formatDate(asset.createdAt)}
-                      </p>
+                  ))}
+                </div>
+
+                {assetsState.error ? (
+                  <div className="text-center text-sm text-destructive">{assetsState.error}</div>
+                ) : null}
+
+                {assetsState.pagination.hasMore ? (
+                  <div className="space-y-3">
+                    <div ref={assetsLoadMoreSentinelRef} className="h-px w-full" aria-hidden />
+                    <div className="flex justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() => void fetchAssets(true)}
+                        disabled={assetsState.loadingMore}
+                      >
+                        {assetsState.loadingMore ? "Loading more..." : "Load more"}
+                      </Button>
                     </div>
                   </div>
-                ))}
+                ) : null}
               </div>
             )}
           </TabsContent>
 
           {/* History Tab */}
           <TabsContent value="history" className="m-0 min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
-            {loadingHistory ? (
+            {historyState.initialLoading ? (
               <div className="flex min-h-48 items-start justify-center pt-8">
                 <CircleNotch className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-            ) : historyError ? (
+            ) : historyState.error && historyState.items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                <p className="text-sm">{historyError}</p>
+                <p className="text-sm">{historyState.error}</p>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={fetchHistory}
+                  onClick={() => void fetchHistory(false)}
                   className="mt-4"
                 >
                   Try Again
                 </Button>
               </div>
-            ) : generations.length === 0 ? (
+            ) : historyState.items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                 <ClockCounterClockwise className="h-12 w-12 mb-3 opacity-50" />
                 <p className="text-sm">No generation history</p>
                 <p className="text-xs mt-1">Generate your first image to see it here</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {generations.map((generation) => (
-                  <div
-                    key={generation.id}
-                    className="overflow-hidden rounded-md"
-                  >
-                    <div 
-                      className="group/image relative aspect-square cursor-pointer hover:ring-2 hover:ring-primary transition-all rounded-md"
-                      onClick={() =>
-                        handleSelect({
-                          previewUrl: generation.url,
-                          title: generation.prompt || "Generated media",
-                          url: generation.url,
-                          assetType: generation.type,
-                        })
-                      }
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Select ${generation.type}`}
-                    >
-                      <Image
-                        src={generation.url}
-                        alt={generation.prompt || 'Generated image'}
-                        fill
-                        className="object-cover rounded-md"
+              <div className="space-y-6">
+                <div className="text-sm text-muted-foreground">
+                  Showing {historyState.items.length} of {historyState.pagination.total}
+                </div>
 
-                      />
-                      {/* Overlay on hover */}
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center rounded-md">
-                        <span className="text-white text-sm font-medium">Select</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {historyState.items.map((generation) => (
+                    <div
+                      key={generation.id}
+                      className="overflow-hidden rounded-md"
+                    >
+                      <div
+                        className="group/image relative aspect-square cursor-pointer hover:ring-2 hover:ring-primary transition-all rounded-md"
+                        onClick={() =>
+                          handleSelect({
+                            id: generation.id,
+                            previewUrl: generation.url,
+                            title: generation.prompt || "Generated media",
+                            url: generation.url,
+                            assetType: generation.type,
+                          })
+                        }
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Select ${generation.type}`}
+                      >
+                        <Image
+                          src={generation.url}
+                          alt={generation.prompt || "Generated image"}
+                          fill
+                          className="object-cover rounded-md"
+                        />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center rounded-md">
+                          <span className="text-white text-sm font-medium">Select</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-0.5 mt-2 px-1">
+                        <p className="text-xs text-muted-foreground truncate">
+                          {formatDate(generation.created_at)}
+                        </p>
+                        {generation.prompt && (
+                          <div
+                            className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors group/prompt"
+                            onClick={(e) => handleCopyPrompt(e, generation.prompt!, generation.id)}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Copy prompt"
+                          >
+                            <p className="text-xs text-foreground truncate flex-1">
+                              {generation.prompt}
+                            </p>
+                            {copiedId === `${generation.id}-prompt` ? (
+                              <Check className="h-3 w-3 flex-shrink-0 text-primary" weight="bold" />
+                            ) : (
+                              <Copy className="h-3 w-3 flex-shrink-0 opacity-0 group-hover/prompt:opacity-100 transition-opacity" />
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    {/* Metadata */}
-                    <div className="flex flex-col gap-0.5 mt-2 px-1">
-                      <p className="text-xs text-muted-foreground truncate">
-                        {formatDate(generation.created_at)}
-                      </p>
-                      {generation.prompt && (
-                        <div 
-                          className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors group/prompt"
-                          onClick={(e) => handleCopyPrompt(e, generation.prompt!, generation.id)}
-                          role="button"
-                          tabIndex={0}
-                          aria-label="Copy prompt"
-                        >
-                          <p className="text-xs text-foreground truncate flex-1">
-                            {generation.prompt}
-                          </p>
-                          {copiedId === `${generation.id}-prompt` ? (
-                            <Check className="h-3 w-3 flex-shrink-0 text-primary" weight="bold" />
-                          ) : (
-                            <Copy className="h-3 w-3 flex-shrink-0 opacity-0 group-hover/prompt:opacity-100 transition-opacity" />
-                          )}
-                        </div>
-                      )}
+                  ))}
+                </div>
+
+                {historyState.error ? (
+                  <div className="text-center text-sm text-destructive">{historyState.error}</div>
+                ) : null}
+
+                {historyState.pagination.hasMore ? (
+                  <div className="space-y-3">
+                    <div ref={historyLoadMoreSentinelRef} className="h-px w-full" aria-hidden />
+                    <div className="flex justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() => void fetchHistory(true)}
+                        disabled={historyState.loadingMore}
+                      >
+                        {historyState.loadingMore ? "Loading more..." : "Load more"}
+                      </Button>
                     </div>
                   </div>
-                ))}
+                ) : null}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Uploads Tab */}
+          <TabsContent value="uploads" className="m-0 min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
+            {uploadsState.initialLoading ? (
+              <div className="flex min-h-48 items-start justify-center pt-8">
+                <CircleNotch className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : uploadsState.error && uploadsState.items.length === 0 ? (
+              <div className="flex h-64 flex-col items-center justify-center text-muted-foreground">
+                <p className="text-sm">{uploadsState.error}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void fetchUploads(false)}
+                  className="mt-4"
+                >
+                  Try Again
+                </Button>
+              </div>
+            ) : uploadsState.items.length === 0 ? (
+              <div className="flex h-64 flex-col items-center justify-center text-muted-foreground">
+                <UploadSimple className="mb-3 h-12 w-12 opacity-50" />
+                <p className="text-sm">No uploaded reference images</p>
+                <p className="mt-1 text-xs">Upload an image here to use it without saving it as an asset</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 gap-1.5"
+                  onClick={() => uploadReferenceInputRef.current?.click()}
+                >
+                  <UploadSimple className="h-4 w-4" />
+                  Upload image
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="text-sm text-muted-foreground">
+                  Showing {uploadsState.items.length} of {uploadsState.pagination.total}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  {uploadsState.items.map((upload) => (
+                    <div key={upload.id} className="overflow-hidden rounded-md">
+                      <div
+                        className="group/image relative aspect-square cursor-pointer rounded-md transition-all hover:ring-2 hover:ring-primary"
+                        onClick={() =>
+                          handleSelect({
+                            id: upload.id,
+                            previewUrl: upload.url,
+                            title: upload.title,
+                            url: upload.url,
+                            assetType: "image",
+                          })
+                        }
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Select uploaded reference image"
+                      >
+                        <Image
+                          src={upload.url}
+                          alt={upload.title}
+                          fill
+                          className="rounded-md object-cover"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/60 opacity-0 transition-opacity group-hover/image:opacity-100">
+                          <span className="text-sm font-medium text-white">Select</span>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex flex-col gap-0.5 px-1">
+                        <p className="truncate text-xs font-medium text-foreground">{upload.title}</p>
+                        <p className="truncate text-xs text-muted-foreground">{formatDate(upload.createdAt)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {uploadsState.error ? (
+                  <div className="text-center text-sm text-destructive">{uploadsState.error}</div>
+                ) : null}
+
+                {uploadsState.pagination.hasMore ? (
+                  <div className="space-y-3">
+                    <div ref={uploadsLoadMoreSentinelRef} className="h-px w-full" aria-hidden />
+                    <div className="flex justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() => void fetchUploads(true)}
+                        disabled={uploadsState.loadingMore}
+                      >
+                        {uploadsState.loadingMore ? "Loading more..." : "Load more"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
           </TabsContent>
@@ -531,7 +1120,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
               sourceNodeType: "asset-selection",
             }}
             onSaved={() => {
-              void fetchAssets()
+              void fetchAssets(false)
             }}
           />
         )}

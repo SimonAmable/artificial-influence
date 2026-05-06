@@ -496,9 +496,10 @@ function EnterprisePlanCard({ className }: { className?: string }) {
 
 type PricingSectionProps = {
   embedded?: boolean;
+  compact?: boolean;
 };
 
-export function PricingSection({ embedded = false }: PricingSectionProps) {
+export function PricingSection({ embedded = false, compact = false }: PricingSectionProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [activePricingTab, setActivePricingTab] = useState<PricingTab>('monthly');
   const reduceMotion = useReducedMotion();
@@ -511,28 +512,24 @@ export function PricingSection({ embedded = false }: PricingSectionProps) {
 
   const isSubscriptionTab = activePricingTab === 'monthly' || activePricingTab === 'yearly';
   const pricingPlans = activePricingTab === 'yearly' ? yearlyPlans : monthlyPlans;
-  const headerCopy: Record<PricingTab, { title: string; description: string; footer: string }> = {
+  const staticHeaderCopy = {
+    title: 'Pick Your Plan',
+    description: 'Choose the perfect option depending on your needs',
+  };
+  const headerCopy: Record<PricingTab, { footer: string }> = {
     monthly: {
-      title: 'Pick Your Plan',
-      description: 'Monthly credits, priority access, and integrations for steady creation.',
       footer:
         'Create consistently with credits that stay in your balance, plus priority access and Instagram integrations on higher tiers. Cancel anytime.',
     },
     yearly: {
-      title: 'Pick Your Plan',
-      description: 'Lock in the best subscription value while receiving credits each month.',
       footer:
         'Get the best value, keep receiving credits each month, and use your balance when your workflow is ready. Manage renewal anytime.',
     },
     'one-time': {
-      title: 'Buy Credits',
-      description: 'One-time credits for extra generations. They do not expire or change your plan.',
       footer:
         'Top up once and create on your own schedule. Credits do not expire, do not renew, and do not change your current plan.',
     },
     enterprise: {
-      title: 'Enterprise',
-      description: 'Custom credit volume, support, and terms for teams operating at scale.',
       footer:
         'Enterprise pricing is scoped with your team and can include custom credit volume, security review, invoicing, and implementation support.',
     },
@@ -588,23 +585,32 @@ export function PricingSection({ embedded = false }: PricingSectionProps) {
       id={embedded ? 'pricing' : undefined}
       className={cn(
         'bg-background px-4 sm:px-6 lg:px-8',
-        embedded ? 'w-full py-16 sm:py-24' : 'min-h-[90vh] pt-20 py-4'
+        embedded
+          ? compact
+            ? 'w-full py-4 sm:py-6'
+            : 'w-full py-16 sm:py-24'
+          : 'min-h-[90vh] pt-28 sm:pt-32 py-4'
       )}
     >
       <div className="max-w-7xl mx-auto">
         <motion.div
-          className="text-center mb-6 sm:mb-8"
+          className={cn('text-center', compact ? 'mb-4 sm:mb-6' : 'mb-6 sm:mb-8')}
           initial={reduceMotion ? false : 'hidden'}
           animate="visible"
           variants={pageFade}
           transition={motionTransition}
         >
-          <div className="mx-auto mb-6 flex min-h-[116px] max-w-5xl flex-col items-center justify-center">
-            <h1 className="mb-4 text-4xl font-bold uppercase tracking-tight">
-              {activeCopy.title}
+          <div
+            className={cn(
+              'mx-auto flex max-w-5xl flex-col items-center justify-center',
+              compact ? 'mb-3 min-h-0' : 'mb-6 min-h-[116px]'
+            )}
+          >
+            <h1 className={cn('font-bold uppercase tracking-tight', compact ? 'mb-3 text-3xl sm:text-4xl' : 'mb-4 text-4xl')}>
+              {staticHeaderCopy.title}
             </h1>
-            <p className="max-w-5xl text-xl text-muted-foreground">
-              {activeCopy.description}
+            <p className={cn('max-w-5xl text-muted-foreground', compact ? 'text-base sm:text-lg' : 'text-xl')}>
+              {staticHeaderCopy.description}
             </p>
           </div>
 

@@ -26,6 +26,24 @@ function mapAssetRow(row: Record<string, unknown>) {
   }
 }
 
+function parseLimit(rawLimit: string | null) {
+  const parsed = Number.parseInt(rawLimit ?? "100", 10)
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return 100
+  }
+
+  return Math.min(Math.floor(parsed), 300)
+}
+
+function parseOffset(rawOffset: string | null) {
+  const parsed = Number.parseInt(rawOffset ?? "0", 10)
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0
+  }
+
+  return Math.floor(parsed)
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -39,8 +57,8 @@ export async function GET(request: NextRequest) {
     const visibility = searchParams.get("visibility") as AssetVisibility | null
     const category = searchParams.get("category") as AssetCategory | null
     const search = (searchParams.get("search") || "").trim().toLowerCase()
-    const limit = Math.min(parseInt(searchParams.get("limit") || "100", 10), 300)
-    const offset = parseInt(searchParams.get("offset") || "0", 10)
+    const limit = parseLimit(searchParams.get("limit"))
+    const offset = parseOffset(searchParams.get("offset"))
 
     let query = supabase
       .from("assets")
@@ -71,8 +89,46 @@ export async function GET(request: NextRequest) {
       return title.includes(search) || tags.includes(search)
     })
 
+    let total = offset + rows.length
+    let hasMore = rows.length === limit
+
+    if (!search) {
+      let countQuery = supabase
+        .from("assets")
+        .select("id", { count: "exact", head: true })
+
+      if (visibility === "private") {
+        countQuery = countQuery.eq("user_id", user.id)
+      } else if (visibility === "public") {
+        countQuery = countQuery.eq("visibility", "public")
+      }
+
+      if (category) {
+        countQuery = countQuery.eq("category", category)
+      }
+
+      const { count, error: countError } = await countQuery
+      if (countError) {
+        console.error("[assets] GET count failed:", countError)
+        return NextResponse.json(
+          { error: "Failed to fetch assets", message: countError.message },
+          { status: 500 },
+        )
+      }
+
+      total = count ?? 0
+      hasMore = offset + rows.length < total
+    }
+
     return NextResponse.json({
       assets: rows.map((row) => mapAssetRow(row as Record<string, unknown>)),
+      pagination: {
+        limit,
+        offset,
+        returned: rows.length,
+        total,
+        hasMore,
+      },
     })
   } catch (error) {
     console.error("[assets] GET exception:", error)

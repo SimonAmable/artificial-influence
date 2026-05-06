@@ -11,6 +11,7 @@ import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
 import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { PricingPlansDialog } from "@/components/pricing/pricing-plans-dialog"
 import { cn } from "@/lib/utils"
 import { useModels } from "@/hooks/use-models"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
@@ -204,10 +205,30 @@ function ImagePageContent() {
   // Create asset dialog state
   const [createAssetDialogOpen, setCreateAssetDialogOpen] = React.useState(false)
   const [selectedImageForAsset, setSelectedImageForAsset] = React.useState<{ url: string; index: number } | null>(null)
+  const [pricingDialogOpen, setPricingDialogOpen] = React.useState(false)
 
   // Upscale: which image is currently upscaling (by URL)
   const [upscalingImageUrl, setUpscalingImageUrl] = React.useState<string | null>(null)
   const [removingMetadataImageUrl, setRemovingMetadataImageUrl] = React.useState<string | null>(null)
+
+  const openPricingDialog = React.useCallback(() => {
+    setPricingDialogOpen(true)
+  }, [])
+
+  const showCreditsUpsellToast = React.useCallback(
+    (message: string, description = "Upgrade your plan to continue generating images") => {
+      openPricingDialog()
+      toast.dismiss("image-credits-upsell")
+      window.setTimeout(() => {
+        toast.error(message, {
+          id: "image-credits-upsell",
+          description,
+          action: undefined,
+        })
+      }, 180)
+    },
+    [openPricingDialog]
+  )
 
   // Set default model when models load.
   React.useEffect(() => {
@@ -555,16 +576,14 @@ function ImagePageContent() {
       }
       setPendingRequests((currentRequests) => removeSlotByClientId(currentRequests, clientRequestId))
       if (isCredits) {
-        toast.error(message, {
-          description: 'Upgrade your plan to continue generating images',
-          action: { label: 'View Plans', onClick: () => window.open('/pricing', '_blank') },
-        })
+        showCreditsUpsellToast(message)
       } else if (message.includes('Concurrency limit reached')) {
         toast.error('Too many active generations', {
           description: `${message} Wait for one to finish, then try again.`,
         })
+      } else {
+        setError(message)
       }
-      setError(message)
       void fetchImageHistory(20, { silent: true, replace: false })
     }
   }
@@ -689,12 +708,10 @@ function ImagePageContent() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         const msg = data.error ?? data.message ?? 'Upscale failed'
-        toast.error(msg)
         if (res.status === 402) {
-          toast.error(msg, {
-            description: 'Get more credits to continue',
-            action: { label: 'View Plans', onClick: () => window.open('/pricing', '_blank') },
-          })
+          showCreditsUpsellToast(msg, 'Get more credits to continue')
+        } else {
+          toast.error(msg)
         }
         return
       }
@@ -716,7 +733,7 @@ function ImagePageContent() {
     } finally {
       setUpscalingImageUrl(null)
     }
-  }, [])
+  }, [showCreditsUpsellToast])
 
   const handleRemoveMetadata = React.useCallback(async (imageUrl: string, _index: number) => {
     setRemovingMetadataImageUrl(imageUrl)
@@ -842,6 +859,7 @@ function ImagePageContent() {
         "mx-auto overflow-hidden flex-1 min-h-0 flex flex-col",
         isRowLayout ? "w-full pt-10" : "max-w-7xl pt-12"
       )}>
+        <PricingPlansDialog open={pricingDialogOpen} onOpenChange={setPricingDialogOpen} />
         <GeneratorLayout layoutMode={layoutMode} className="h-full flex-1 min-h-0">
           {isRowLayout ? (
             // Row layout: Full-screen grid fills entire screen excluding header with left history column
