@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { filterPublicCatalogModels } from "@/lib/server/model-catalog-visibility"
+import { parseAgentUsageGuide } from "@/lib/types/agent-usage"
+import type { AgentUsageGuide } from "@/lib/types/models"
 
 interface CreateModelsToolOptions {
   supabase: SupabaseClient
@@ -25,7 +27,7 @@ type ListedModel = {
   supportsReferenceImage: boolean
   supportsReferenceVideo: boolean
   type: ModelTypeFilter
-  usageGuide: Record<string, unknown> | null
+  usageGuide: AgentUsageGuide | null
 }
 
 async function loadActiveModels(supabase: SupabaseClient): Promise<ListedModel[]> {
@@ -71,10 +73,7 @@ async function loadActiveModels(supabase: SupabaseClient): Promise<ListedModel[]
     supportsReferenceImage: Boolean(model.supports_reference_image),
     supportsReferenceVideo: Boolean(model.supports_reference_video),
     type: model.type as ModelTypeFilter,
-    usageGuide:
-      model.agent_usage && typeof model.agent_usage === "object" && !Array.isArray(model.agent_usage)
-        ? model.agent_usage
-        : null,
+    usageGuide: parseAgentUsageGuide(model.agent_usage),
   }))
 }
 
@@ -93,7 +92,7 @@ function buildListModelsResponse(models: ListedModel[]) {
 export function createListModelsTool({ supabase }: CreateModelsToolOptions) {
   return tool({
     description:
-      "List UniCan's active models. Use this when the user asks which models are available, which one supports a capability, or when you need a valid model identifier before generating an image, video, or audio asset. This tool accepts no search or filter parameters. Inspect the returned list and match by name or identifier yourself. For image models, the default image generation model is returned as `defaultImageModel` and is currently `openai/gpt-image-2`. The response includes model-specific `aspectRatios` and `usageGuide` when available, so use those instead of guessing supported ratios, input semantics, and model-specific routing rules.",
+      "List UniCan's active models. Use this when the user asks which models are available, which one supports a capability, or when you need a valid model identifier before generating an image, video, or audio asset. This tool accepts no search or filter parameters. Inspect the returned list and match by name or identifier yourself. For image models, the default image generation model is returned as `defaultImageModel` and is currently `openai/gpt-image-2`. The response includes model-specific `aspectRatios` and `usageGuide` when available, including optional workflow playbooks, so use those instead of guessing supported ratios, input semantics, and model-specific routing rules.",
     inputSchema: z.object({}),
     strict: true,
     execute: async () => buildListModelsResponse(await loadActiveModels(supabase)),

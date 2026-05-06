@@ -21,6 +21,7 @@ import {
   VoiceSelectorTrigger,
 } from "@/components/ai-elements/voice-selector"
 import {
+  buildFallbackGoogleGeminiVoices,
   formatAudioLangCode,
   getAudioProviderLabel,
   getAudioVoiceSearchText,
@@ -111,6 +112,22 @@ export function AudioVoiceSelector({
 
   React.useEffect(() => {
     const controller = new AbortController()
+    const fallbackGoogleVoices =
+      provider === "google" ? buildFallbackGoogleGeminiVoices() : []
+
+    function syncSelectedVoice(nextVoices: AudioVoice[]) {
+      const hasCurrentValue = nextVoices.some((voice) => voice.voiceId === value)
+      if (!hasCurrentValue) {
+        const defaultVoice =
+          nextVoices.find(
+            (voice) => voice.voiceId === getDefaultAudioVoiceId(provider)
+          ) ?? nextVoices[0]
+
+        if (defaultVoice) {
+          onValueChangeRef.current(defaultVoice.voiceId)
+        }
+      }
+    }
 
     async function loadVoices() {
       setIsLoading(true)
@@ -121,6 +138,12 @@ export function AudioVoiceSelector({
           cache: "no-store",
           signal: controller.signal,
         })
+        const contentType = response.headers.get("content-type") ?? ""
+
+        if (!contentType.includes("application/json")) {
+          throw new Error("Voice catalog returned HTML instead of JSON")
+        }
+
         const data = (await response.json()) as {
           voices?: AudioVoice[]
           error?: string
@@ -131,22 +154,21 @@ export function AudioVoiceSelector({
           throw new Error(data.error || data.message || "Failed to load voices")
         }
 
-        const nextVoices = Array.isArray(data.voices) ? data.voices : []
+        const nextVoices =
+          Array.isArray(data.voices) && data.voices.length > 0
+            ? data.voices
+            : fallbackGoogleVoices
         setVoices(nextVoices)
-
-        const hasCurrentValue = nextVoices.some((voice) => voice.voiceId === value)
-        if (!hasCurrentValue) {
-          const defaultVoice =
-            nextVoices.find(
-              (voice) => voice.voiceId === getDefaultAudioVoiceId(provider)
-            ) ?? nextVoices[0]
-
-          if (defaultVoice) {
-            onValueChangeRef.current(defaultVoice.voiceId)
-          }
-        }
+        syncSelectedVoice(nextVoices)
       } catch (fetchError) {
         if (controller.signal.aborted) {
+          return
+        }
+
+        if (provider === "google" && fallbackGoogleVoices.length > 0) {
+          console.warn("Falling back to built-in Gemini voices.", fetchError)
+          setVoices(fallbackGoogleVoices)
+          syncSelectedVoice(fallbackGoogleVoices)
           return
         }
 

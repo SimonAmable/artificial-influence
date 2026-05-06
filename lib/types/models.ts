@@ -2,6 +2,9 @@
  * TypeScript types for the models database schema
  */
 
+export type JsonPrimitive = string | number | boolean | null
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
+
 /**
  * Model generation types
  */
@@ -79,6 +82,36 @@ export interface ModelParameters {
   parameters: ParameterDefinition[];
 }
 
+export interface AgentWorkflowPromptTemplate {
+  mode?: string;
+  template?: JsonValue;
+}
+
+export interface AgentWorkflowGuide {
+  id: string;
+  name: string;
+  active?: boolean;
+  priority?: number | null;
+  bestFor?: string[];
+  whenToUse?: string[];
+  requiredInputs?: string[];
+  followupQuestions?: string[];
+  inputRoleRules?: string[];
+  promptTemplate?: AgentWorkflowPromptTemplate | null;
+  pitfalls?: string[];
+}
+
+export interface AgentUsageGuide {
+  agentSummary?: string;
+  bestFor?: string[];
+  avoidFor?: string[];
+  inputSemantics?: Record<string, string>;
+  routingRules?: string[];
+  promptGuidance?: string[];
+  pitfalls?: string[];
+  workflows?: AgentWorkflowGuide[];
+}
+
 /**
  * Database model record
  */
@@ -108,6 +141,7 @@ export interface Model {
   supports_last_frame?: boolean;
   duration_options?: number[];
   max_images?: number;
+  agent_usage?: AgentUsageGuide | null;
 }
 
 /**
@@ -255,12 +289,12 @@ export function parseModelParameters(parameters: unknown): ParameterDefinition[]
   if (!parameters || typeof parameters !== 'object') {
     return [];
   }
-  
+
   const params = parameters as { parameters?: unknown[] };
   if (!Array.isArray(params.parameters)) {
     return [];
   }
-  
+
   return params.parameters.filter((p): p is ParameterDefinition => {
     return (
       typeof p === 'object' &&
