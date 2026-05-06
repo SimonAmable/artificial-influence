@@ -8,7 +8,7 @@ import type { XaiLanguageModelChatOptions } from "@ai-sdk/xai"
  * @see https://vercel.com/ai-gateway/models/grok-4.1-fast-reasoning
  * @see https://vercel.com/ai-gateway/models/gemini-3.1-flash-lite-preview
  */
-export const DEFAULT_CHAT_GATEWAY_MODEL = "google/gemini-2.5-flash" as const
+export const DEFAULT_CHAT_GATEWAY_MODEL = "google/gemini-3.1-flash-lite-preview" as const
 
 type ChatGatewayTier = "fast" | "balanced" | "max"
 

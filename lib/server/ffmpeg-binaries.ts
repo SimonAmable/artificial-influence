@@ -75,7 +75,7 @@ export function createMissingFfmpegMessage() {
   const details = describeFfmpegBinaryResolution()
   return [
     "ffmpeg/ffprobe are unavailable on the server.",
-    "For Next.js production deploys, include the runtime files with next.config outputFileTracingIncludes for node_modules/ffmpeg-static/**/* and node_modules/ffprobe-static/**/*.",
+    "For Vercel Linux deploys, include only the runtime binaries with next.config outputFileTracingIncludes for node_modules/ffmpeg-static/ffmpeg and node_modules/ffprobe-static/bin/linux/x64/ffprobe.",
     "If your host provides system binaries instead, set FFMPEG_BINARY and FFPROBE_BINARY to their absolute paths.",
     `Resolution details: ${JSON.stringify(details)}`,
   ].join(" ")
