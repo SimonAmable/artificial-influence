@@ -14,6 +14,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { createClient } from "@/lib/supabase/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -25,32 +27,29 @@ type SelectedVideo = {
 }
 
 type FixedVideo = {
-  blob: Blob
   fileName: string
   previewUrl: string
+  sizeBytes: number | null
 }
 
-function formatBytes(bytes?: number) {
+type TikTokVideoFixerJob = {
+  id: string
+  status: "queued" | "processing" | "completed" | "failed"
+  sourceFileName: string | null
+  outputFileName: string | null
+  outputUrl: string | null
+  outputSizeBytes: number | null
+  profile: string | null
+  errorMessage: string | null
+}
+
+const MAX_TIKTOK_FIXER_FILE_BYTES = 250 * 1024 * 1024
+
+function formatBytes(bytes?: number | null) {
   if (!bytes || bytes <= 0) return "0 B"
   const units = ["B", "KB", "MB", "GB"]
   const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
   return `${(bytes / 1024 ** unitIndex).toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
-}
-
-function parseFileNameFromDisposition(disposition: string | null, fallback: string) {
-  if (!disposition) return fallback
-
-  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
-  if (utf8Match?.[1]) {
-    try {
-      return decodeURIComponent(utf8Match[1])
-    } catch {
-      return fallback
-    }
-  }
-
-  const plainMatch = disposition.match(/filename="([^"]+)"/i)
-  return plainMatch?.[1]?.trim() || fallback
 }
 
 export function TikTokVideoFixerTool() {
@@ -59,22 +58,31 @@ export function TikTokVideoFixerTool() {
   const [isDragging, setIsDragging] = React.useState(false)
   const [isProcessing, setIsProcessing] = React.useState(false)
   const [serverMessage, setServerMessage] = React.useState<string | null>(null)
+  const [authState, setAuthState] = React.useState<
+    "loading" | "authenticated" | "unauthenticated"
+  >("loading")
+  const [currentJobId, setCurrentJobId] = React.useState<string | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const dragCounterRef = React.useRef(0)
 
   React.useEffect(() => {
+    const supabase = createClient()
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      setAuthState(user ? "authenticated" : "unauthenticated")
+    })
+  }, [])
+
+  React.useEffect(() => {
     return () => {
       if (selectedVideo?.previewUrl) URL.revokeObjectURL(selectedVideo.previewUrl)
-      if (fixedVideo?.previewUrl) URL.revokeObjectURL(fixedVideo.previewUrl)
     }
-  }, [fixedVideo?.previewUrl, selectedVideo?.previewUrl])
+  }, [selectedVideo?.previewUrl])
 
-  const clearFixedVideo = React.useCallback(() => {
-    setFixedVideo((current) => {
-      if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl)
-      return null
-    })
+  const clearConversionState = React.useCallback(() => {
+    setFixedVideo(null)
     setServerMessage(null)
+    setCurrentJobId(null)
+    setIsProcessing(false)
   }, [])
 
   const selectFile = React.useCallback((file?: File | null) => {
@@ -92,8 +100,8 @@ export function TikTokVideoFixerTool() {
         previewUrl: URL.createObjectURL(file),
       }
     })
-    clearFixedVideo()
-  }, [clearFixedVideo])
+    clearConversionState()
+  }, [clearConversionState])
 
   const handleFileInput = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     selectFile(event.target.files?.[0] ?? null)
@@ -136,59 +144,144 @@ export function TikTokVideoFixerTool() {
       if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl)
       return null
     })
-    clearFixedVideo()
-  }, [clearFixedVideo])
+    clearConversionState()
+    setIsProcessing(false)
+  }, [clearConversionState])
+
+  React.useEffect(() => {
+    if (!currentJobId) {
+      return
+    }
+
+    let isCancelled = false
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    const pollJob = async () => {
+      try {
+        const response = await fetch(`/api/free-tools/tiktok-video-fixer/${currentJobId}`, {
+          cache: "no-store",
+        })
+
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string
+          job?: TikTokVideoFixerJob
+        }
+
+        if (!response.ok || !payload.job) {
+          throw new Error(payload.error || "Could not load the conversion status")
+        }
+
+        const { job } = payload
+
+        if (job.status === "completed" && job.outputUrl) {
+          if (isCancelled) return
+          setFixedVideo({
+            fileName:
+              job.outputFileName ||
+              `${selectedVideo?.file.name.replace(/\.[^.]+$/, "") || "video"}-tiktok.mp4`,
+            previewUrl: job.outputUrl,
+            sizeBytes:
+              typeof job.outputSizeBytes === "number" ? job.outputSizeBytes : null,
+          })
+          setServerMessage(job.profile || "TikTok-compatible MP4 ready")
+          setCurrentJobId(null)
+          setIsProcessing(false)
+          toast.success("TikTok-compatible MP4 ready")
+          return
+        }
+
+        if (job.status === "failed") {
+          throw new Error(job.errorMessage || "Could not convert the video")
+        }
+
+        if (isCancelled) return
+        setServerMessage(
+          job.status === "processing"
+            ? "Converting your uploaded video on the server..."
+            : "Upload saved. Waiting for the converter to start..."
+        )
+      } catch (error) {
+        if (isCancelled) return
+        const message = error instanceof Error ? error.message : "Could not convert the video"
+        setServerMessage(message)
+        setCurrentJobId(null)
+        setIsProcessing(false)
+        toast.error(message)
+        return
+      }
+
+      if (!isCancelled) {
+        timeoutId = setTimeout(() => {
+          void pollJob()
+        }, 2500)
+      }
+    }
+
+    void pollJob()
+
+    return () => {
+      isCancelled = true
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
+  }, [currentJobId, selectedVideo?.file.name])
 
   const handleFix = React.useCallback(async () => {
     if (!selectedVideo) return
+    if (authState !== "authenticated") {
+      toast.error("Sign in to use the TikTok video fixer")
+      return
+    }
 
     setIsProcessing(true)
+    setFixedVideo(null)
     setServerMessage(null)
+
     try {
-      const formData = new FormData()
-      formData.append("file", selectedVideo.file)
+      const uploadResult = await uploadFileToSupabase(
+        selectedVideo.file,
+        "tiktok-video-fixer-inputs",
+        { maxSizeBytes: MAX_TIKTOK_FIXER_FILE_BYTES }
+      )
+
+      if (!uploadResult) {
+        setIsProcessing(false)
+        return
+      }
 
       const response = await fetch("/api/free-tools/tiktok-video-fixer", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceStoragePath: uploadResult.storagePath,
+        }),
       })
 
-      if (!response.ok) {
-        let errorMessage = "Could not convert the video"
-        try {
-          const payload = (await response.json()) as { error?: string }
-          errorMessage = payload.error || errorMessage
-        } catch {
-          // keep fallback
-        }
-        throw new Error(errorMessage)
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string
+        jobId?: string
       }
 
-      const blob = await response.blob()
-      const fileName = parseFileNameFromDisposition(
-        response.headers.get("Content-Disposition"),
-        `${selectedVideo.file.name.replace(/\.[^.]+$/, "") || "video"}-tiktok.mp4`,
-      )
-      const previewUrl = URL.createObjectURL(blob)
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not queue the video conversion")
+      }
 
-      setFixedVideo((current) => {
-        if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl)
-        return {
-          blob,
-          fileName,
-          previewUrl,
-        }
-      })
-      setServerMessage(response.headers.get("X-TikTok-Compatibility-Profile"))
-      toast.success("TikTok-compatible MP4 ready")
+      if (!payload.jobId) {
+        throw new Error("The server did not return a conversion job id")
+      }
+
+      setCurrentJobId(payload.jobId)
+      setServerMessage("Upload finished. Preparing the TikTok-compatible MP4...")
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not convert the video"
       setServerMessage(message)
       toast.error(message)
-    } finally {
       setIsProcessing(false)
     }
-  }, [selectedVideo])
+  }, [authState, selectedVideo])
 
   const handleDownload = React.useCallback(() => {
     if (!fixedVideo) return
@@ -200,9 +293,10 @@ export function TikTokVideoFixerTool() {
     link.remove()
   }, [fixedVideo])
 
-  const savingsPercent = selectedVideo && fixedVideo
-    ? Math.round((1 - fixedVideo.blob.size / selectedVideo.file.size) * 100)
-    : null
+  const savingsPercent =
+    selectedVideo && fixedVideo?.sizeBytes
+      ? Math.round((1 - fixedVideo.sizeBytes / selectedVideo.file.size) * 100)
+      : null
 
   return (
     <div className="min-h-screen bg-background px-4 pb-12 pt-24 sm:px-6 lg:px-8">
@@ -211,13 +305,15 @@ export function TikTokVideoFixerTool() {
           <div className="max-w-3xl">
             <Badge variant="secondary" className="mb-3 w-fit gap-1.5">
               <ShieldCheck className="size-3.5" weight="duotone" />
-              Free TikTok fixer
+              Sign-in required
             </Badge>
             <h1 className="text-3xl font-bold leading-tight sm:text-5xl">
               TikTok Video Fixer
             </h1>
             <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">
-              Re-encode a clip into a safer TikTok upload profile when you hit <span className="font-mono">file_format_check_failed</span>.
+              Upload a clip to your account storage, then re-encode it into a safer
+              TikTok upload profile when you hit{" "}
+              <span className="font-mono">file_format_check_failed</span>.
             </p>
           </div>
           <Button variant="outline" asChild>
@@ -291,7 +387,9 @@ export function TikTokVideoFixerTool() {
                           />
                         ) : (
                           <div className="max-w-xs text-center text-sm leading-6 text-muted-foreground">
-                            The converter forces a conservative TikTok-friendly MP4 profile with H.264 video and AAC audio.
+                            {authState === "unauthenticated"
+                              ? "Sign in first, then upload a video. The converter stores the source in your account before running FFmpeg."
+                              : "The converter uploads the source to your account first, then forces a conservative TikTok-friendly MP4 profile with H.264 video and AAC audio."}
                           </div>
                         )}
                       </div>
@@ -312,7 +410,8 @@ export function TikTokVideoFixerTool() {
                       Drop or choose a video
                     </span>
                     <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-                      Best for clips that TikTok rejected with a format error.
+                      Best for clips that TikTok rejected with a format error. Signed-in users can upload up to{" "}
+                      {formatBytes(MAX_TIKTOK_FIXER_FILE_BYTES)}.
                     </span>
                   </span>
                 </button>
@@ -329,7 +428,7 @@ export function TikTokVideoFixerTool() {
                     What it changes
                   </p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Server-side FFmpeg conversion to a safer upload profile.
+                    Account-scoped upload plus async server-side FFmpeg conversion to a safer upload profile.
                   </p>
                 </div>
 
@@ -343,14 +442,16 @@ export function TikTokVideoFixerTool() {
                   <div className="rounded-lg border bg-muted/20 p-3">
                     <p className="text-xs text-muted-foreground">Fixed</p>
                     <p className="mt-1 text-sm font-semibold">
-                      {fixedVideo ? formatBytes(fixedVideo.blob.size) : "-"}
+                      {fixedVideo ? formatBytes(fixedVideo.sizeBytes) : "-"}
                     </p>
                   </div>
                 </div>
 
                 <div className="rounded-lg border bg-muted/20 p-4 text-xs leading-5 text-muted-foreground">
                   <p className="font-semibold text-foreground">Output profile</p>
-                  <p className="mt-1">MP4 container, H.264 video, AAC audio, yuv420p pixel format, faststart enabled.</p>
+                  <p className="mt-1">
+                    MP4 container, H.264 video, AAC audio, yuv420p pixel format, faststart enabled.
+                  </p>
                 </div>
 
                 {fixedVideo ? (
@@ -371,15 +472,30 @@ export function TikTokVideoFixerTool() {
                   </div>
                 ) : null}
 
+                {authState === "unauthenticated" ? (
+                  <div className="rounded-lg border border-border bg-muted/20 p-4 text-xs leading-5 text-muted-foreground">
+                    Sign in to upload a source video, queue a conversion job, and download the TikTok-safe MP4 from your account storage.
+                  </div>
+                ) : null}
+
                 <div className="flex flex-col gap-2">
                   <Button onClick={handleFix} disabled={!selectedVideo || isProcessing}>
                     <VideoCamera className="mr-2 size-4" weight="duotone" />
                     {isProcessing ? "Fixing video..." : fixedVideo ? "Fix again" : "Make TikTok-compatible MP4"}
                   </Button>
-                  <Button variant="outline" onClick={handleDownload} disabled={!fixedVideo || isProcessing}>
+                  <Button
+                    variant="outline"
+                    onClick={handleDownload}
+                    disabled={!fixedVideo || isProcessing}
+                  >
                     <DownloadSimple className="mr-2 size-4" />
                     Download fixed video
                   </Button>
+                  {authState === "unauthenticated" ? (
+                    <Button variant="ghost" asChild>
+                      <Link href="/login">Sign in to use this tool</Link>
+                    </Button>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>

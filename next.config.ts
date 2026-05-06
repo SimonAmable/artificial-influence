@@ -1,11 +1,8 @@
 import type { NextConfig } from "next";
 
-const ffmpegBinaryPath =
-  process.platform === "win32" ? "./node_modules/ffmpeg-static/ffmpeg.exe" : "./node_modules/ffmpeg-static/ffmpeg"
-
 const ffmpegTracingIncludes = [
-  ffmpegBinaryPath,
-  `./node_modules/ffprobe-static/bin/${process.platform}/${process.arch}/${process.platform === "win32" ? "ffprobe.exe" : "ffprobe"}`,
+  "./node_modules/ffmpeg-static/**/*",
+  "./node_modules/ffprobe-static/**/*",
 ]
 
 const nextConfig: NextConfig = {

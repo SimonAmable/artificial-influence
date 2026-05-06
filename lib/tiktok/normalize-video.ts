@@ -33,6 +33,7 @@ type NormalizeTikTokVideoUploadResult = {
   fileName: string
   mimeType: typeof TIKTOK_COMPATIBLE_MIME_TYPE
   profile: typeof TIKTOK_COMPATIBILITY_PROFILE
+  sizeBytes: number
   reused: boolean
 }
 
@@ -208,6 +209,7 @@ export async function normalizeTikTokVideoUrlToStorage(input: {
     fileName: normalized.fileName,
     mimeType: normalized.mimeType,
     profile: normalized.profile,
+    sizeBytes: normalized.buffer.byteLength,
     reused: alreadyExists,
   }
 }

@@ -25,6 +25,14 @@ export interface UploadResult {
 
 export interface UploadHelperOptions {
   bucket?: UploadBucket
+  maxSizeBytes?: number
+}
+
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B"
+  const units = ["B", "KB", "MB", "GB"]
+  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${(bytes / 1024 ** unitIndex).toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
 }
 
 async function hashFile(file: Blob) {
@@ -55,9 +63,11 @@ export async function uploadFileToSupabase(
   folder: string = 'uploads',
   options?: UploadHelperOptions,
 ): Promise<UploadResult | null> {
+  const maxSizeBytes = options?.maxSizeBytes ?? MAX_FILE_SIZE
+
   // Validate file size
-  if (file.size > MAX_FILE_SIZE) {
-    toast.error(`File size exceeds 10MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`)
+  if (file.size > maxSizeBytes) {
+    toast.error(`File size exceeds ${formatBytes(maxSizeBytes)} limit (${formatBytes(file.size)})`)
     return null
   }
 

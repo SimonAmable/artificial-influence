@@ -1,5 +1,7 @@
 import { execSync } from "node:child_process"
 import { existsSync } from "node:fs"
+import ffmpegStatic from "ffmpeg-static"
+import ffprobeStatic from "ffprobe-static"
 
 function tryBinaryFromShell(command: string): string | null {
   try {
@@ -28,11 +30,11 @@ function resolveExistingBinary(candidates: Array<string | null | undefined>): st
 }
 
 function getFfmpegPackagePath() {
-  return `./node_modules/ffmpeg-static/${process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg"}`
+  return typeof ffmpegStatic === "string" ? ffmpegStatic : null
 }
 
 function getFfprobePackagePath() {
-  return `./node_modules/ffprobe-static/bin/${process.platform}/${process.arch}/${process.platform === "win32" ? "ffprobe.exe" : "ffprobe"}`
+  return typeof ffprobeStatic?.path === "string" ? ffprobeStatic.path : null
 }
 
 export function resolveFfmpegBinaryPath(): string | null {
