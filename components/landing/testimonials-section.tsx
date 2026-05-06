@@ -5,15 +5,15 @@ const testimonialData = [
     title: "30 days of content queued in seconds with automations",
     quote:
       "Automations seriously changed how we post. We can queue up 30 days of content in seconds, keep everything moving, and skip the weekly rush that used to take hours.",
-    name: "Jessica Moore",
-    initials: "JM",
+    name: "Daniel",
+    initials: "D",
   },
   {
     title: "It helped us grow an AI influencer faster than our manual workflow",
     quote:
       "We used UniCan to grow an AI influencer account way more smoothly. Posting got faster, testing got easier, and views started going up once we found what worked.",
-    name: "Daniel Harris",
-    initials: "DH",
+    name: "Luna",
+    initials: "L",
   },
   {
     title: "Our weekly thumbnail queue now takes minutes, not days",
@@ -28,6 +28,11 @@ export function TestimonialsSection() {
   return (
     <section className="w-full bg-background py-16 sm:py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto mb-12 max-w-2xl text-center">
+          <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
+            Testimonials
+          </h2>
+        </div>
         <div className="grid gap-10 md:grid-cols-3 md:gap-0">
           {testimonialData.map((testimonial, index) => (
             <article

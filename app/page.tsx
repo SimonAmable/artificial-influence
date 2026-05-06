@@ -95,11 +95,11 @@ export default async function Page() {
       <PlatformSurfacesSection />
       {/* <ProcessSection /> */}
       <ModelsBentoSection />
+      <TestimonialsSection />
+      <PricingSection embedded />
       <div id="faq">
         <FAQSection />
       </div>
-      <TestimonialsSection />
-      <PricingSection embedded />
       <FinalCTASection />
       <Footer />
     </>

@@ -101,11 +101,8 @@ export function ProofSection() {
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Proof
-          </p>
-          <h2 className="mt-3 text-3xl font-semibold text-foreground sm:text-4xl">
-            Creators are already using our tools to create content faster and more consistently
+          <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
+            Creators are already using this technology to get an unfair advantage
           </h2>
         </div>
 
