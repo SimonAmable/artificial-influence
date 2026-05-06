@@ -302,6 +302,7 @@ export async function storeUploadedFileFromServer(input: {
     const upload = await storageClient.storage.from(bucket).upload(storagePath, buffer, {
       contentType: input.mimeType,
       upsert: false,
+      cacheControl: "31536000",
     })
 
     if (upload.error) {

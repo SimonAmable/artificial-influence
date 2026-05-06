@@ -623,7 +623,7 @@ export function BrandKitEditor({
                         alt=""
                         fill
                         className="object-contain object-top-left p-2"
-                        unoptimized
+
                       />
                       <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/45">
                         <span className="rounded-full bg-zinc-900/95 px-3 py-1.5 text-xs font-medium text-zinc-100 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
@@ -751,7 +751,7 @@ export function BrandKitEditor({
                       playsInline
                     />
                   ) : (
-                    <Image src={item.url} alt="" fill className="object-cover" unoptimized />
+                    <Image src={item.url} alt="" fill className="object-cover" />
                   )}
                   <button
                     type="button"

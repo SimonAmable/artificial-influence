@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     const limit = parseLimit(searchParams.get('limit'));
     const offset = parseOffset(searchParams.get('offset'));
     const includePending = searchParams.get('includePending') === 'true';
-    const excludeFailed = searchParams.get('excludeFailed') === 'true';
+    const excludeFailed = searchParams.get('excludeFailed') !== 'false';
 
     let query = supabase
       .from('generations')

@@ -475,7 +475,7 @@ export function CanvasSidebar({
                             alt={asset.title}
                             fill
                             className="object-cover"
-                            unoptimized
+
                           />
                         ) : asset.assetType === "video" ? (
                           <video src={asset.url} className="w-full h-full object-cover" preload="metadata" />
@@ -566,7 +566,7 @@ export function CanvasSidebar({
                                   alt={gen.prompt || 'Generated image'}
                                   fill
                                   className="object-cover"
-                                  unoptimized
+
                                 />
                               ) : gen.type === 'video' ? (
                                 <video

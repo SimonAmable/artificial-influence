@@ -250,7 +250,7 @@ export default function AssetsPage() {
                 alt={asset.title}
                 fill
                 className="object-cover rounded-lg"
-                unoptimized
+
               />
             </div>
           )}

@@ -26,24 +26,31 @@ const SHOWCASE_DURATION_MS = 7000
 
 const showcaseItems: ShowcaseItem[] = [
   {
-    id: "image-generation",
-    media: {
-      type: "image",
-      src: "/hero_showcase_images/influencer_generation_showcase.png",
-    },
-  },
-  {
-    id: "kling-2-6-motion-control",
+    id: "demo-hero-1",
     media: {
       type: "video",
-      src: "/hero_showcase_images/motion_copy.mp4",
+      src: "/hero_showcase_images/demo_hero_vids/compressed/d1.webm",
     },
   },
   {
-    id: "banana-banano-pro-image-editing",
+    id: "demo-hero-2",
     media: {
-      type: "image",
-      src: "/hero_showcase_images/image_editing_wide.png",
+      type: "video",
+      src: "/hero_showcase_images/demo_hero_vids/compressed/d2.webm",
+    },
+  },
+  {
+    id: "demo-hero-3",
+    media: {
+      type: "video",
+      src: "/hero_showcase_images/demo_hero_vids/compressed/d3.webm",
+    },
+  },
+  {
+    id: "demo-hero-4",
+    media: {
+      type: "video",
+      src: "/hero_showcase_images/demo_hero_vids/compressed/d4.webm",
     },
   },
 ]
@@ -56,12 +63,32 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
   const [googleLoading, setGoogleLoading] = React.useState(false)
   const [showEmailForm, setShowEmailForm] = React.useState(false)
   const [activeShowcase, setActiveShowcase] = React.useState(0)
+  const [showcaseDurationsMs, setShowcaseDurationsMs] = React.useState<Record<string, number>>({})
   const [error, setError] = React.useState<string | null>(null)
   const [message, setMessage] = React.useState<string | null>(null)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const supabase = createClient()
+  const activeItem = showcaseItems[activeShowcase]
+  const activeDurationMs =
+    activeItem.media.type === "video" ? showcaseDurationsMs[activeItem.id] ?? SHOWCASE_DURATION_MS : SHOWCASE_DURATION_MS
+  const nextPath = React.useMemo(() => {
+    const requestedNext = searchParams.get("next")
+    return requestedNext && requestedNext.startsWith("/") ? requestedNext : "/"
+  }, [searchParams])
+
+  const authCallbackUrl = React.useMemo(() => {
+    if (typeof window === "undefined") {
+      return nextPath === "/" ? "/auth/callback" : `/auth/callback?next=${encodeURIComponent(nextPath)}`
+    }
+
+    const url = new URL("/auth/callback", window.location.origin)
+    if (nextPath !== "/") {
+      url.searchParams.set("next", nextPath)
+    }
+    return url.toString()
+  }, [nextPath])
 
   React.useEffect(() => {
     setMode(defaultMode)
@@ -71,14 +98,18 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
   }, [defaultMode])
 
   React.useEffect(() => {
+    if (activeItem.media.type !== "image") {
+      return
+    }
+
     const timeout = window.setTimeout(() => {
       setActiveShowcase((current) => (current + 1) % showcaseItems.length)
-    }, SHOWCASE_DURATION_MS)
+    }, activeDurationMs)
 
     return () => {
       window.clearTimeout(timeout)
     }
-  }, [activeShowcase])
+  }, [activeDurationMs, activeItem.media.type, activeShowcase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -102,7 +133,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: authCallbackUrl,
           },
         })
 
@@ -122,7 +153,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
 
         toast.dismiss(loadingToast)
         toast.success("Logged in successfully.")
-        router.push("/")
+        router.push(nextPath)
         router.refresh()
       }
     } catch (err: unknown) {
@@ -160,11 +191,10 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
     setMessage(null)
 
     try {
-      const redirectTo = `${window.location.origin}/auth/callback`
       const { data, error: signInError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo,
+          redirectTo: authCallbackUrl,
         },
       })
 
@@ -194,8 +224,6 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
 
     router.back()
   }
-
-  const activeItem = showcaseItems[activeShowcase]
 
   return (
     <main className="h-svh overflow-hidden bg-background pt-14 text-foreground">
@@ -367,10 +395,24 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                 className="h-full w-full object-cover"
                 autoPlay
                 muted
-                loop
                 playsInline
+                preload="metadata"
+                onLoadedMetadata={(event) => {
+                  const durationMs = Math.round(event.currentTarget.duration * 1000)
+                  if (!Number.isFinite(durationMs) || durationMs <= 0) return
+
+                  setShowcaseDurationsMs((current) =>
+                    current[activeItem.id] === durationMs ? current : { ...current, [activeItem.id]: durationMs },
+                  )
+                }}
+                onEnded={() => {
+                  setActiveShowcase((current) => (current + 1) % showcaseItems.length)
+                }}
               >
-                <source src={activeItem.media.src} type="video/mp4" />
+                <source
+                  src={activeItem.media.src}
+                  type={activeItem.media.src.endsWith(".webm") ? "video/webm" : "video/mp4"}
+                />
               </video>
             )}
 
@@ -392,6 +434,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                         className="absolute inset-y-0 left-0 rounded-full bg-primary"
                         style={{
                           animation: `showcase-progress ${SHOWCASE_DURATION_MS}ms linear forwards`,
+                          animationDuration: `${activeDurationMs}ms`,
                         }}
                       />
                     ) : (

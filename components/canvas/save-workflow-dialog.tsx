@@ -196,7 +196,7 @@ export function SaveWorkflowDialog({
                     width={128}
                     height={128}
                     className="object-cover w-full h-full"
-                    unoptimized
+
                   />
                 ) : (
                   <p className="text-xs text-zinc-500">Auto screenshot</p>

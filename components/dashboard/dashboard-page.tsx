@@ -110,7 +110,7 @@ function WorkflowsSection() {
                         alt={workflow.name}
                         fill
                         className="object-cover"
-                        unoptimized
+
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-muted-foreground">

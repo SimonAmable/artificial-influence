@@ -111,7 +111,7 @@ export function WorkflowsMenu({ onInstantiate, onEdit, onPublish, isOpen }: Work
                       alt={workflow.name}
                       fill
                       className="object-cover"
-                      unoptimized
+
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-zinc-400">

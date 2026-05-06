@@ -125,6 +125,7 @@ export async function uploadFileToSupabase(
       .uploadToSignedUrl(registerJson.storagePath, registerJson.token, file, {
         contentType: file.type,
         upsert: false,
+        cacheControl: "31536000",
       })
 
     if (uploadToSigned.error) {

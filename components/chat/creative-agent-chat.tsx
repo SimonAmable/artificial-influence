@@ -4608,6 +4608,17 @@ export function CreativeAgentChat({
   const chatGatewayModelRef = React.useRef<string>(DEFAULT_CHAT_GATEWAY_MODEL)
   const [chatGatewayModelId, setChatGatewayModelId] = React.useState<string>(DEFAULT_CHAT_GATEWAY_MODEL)
 
+  const getLoginHref = React.useCallback(() => {
+    if (typeof window === "undefined") {
+      return "/login"
+    }
+
+    const next = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    const params = new URLSearchParams()
+    params.set("next", next)
+    return `/login?${params.toString()}`
+  }, [])
+
   const selectedChatGatewayOption = React.useMemo(
     () => getChatGatewayModelOption(chatGatewayModelId),
     [chatGatewayModelId],
@@ -4876,6 +4887,11 @@ export function CreativeAgentChat({
 
   const handleAttachFiles = React.useCallback(async (files: File[]) => {
     if (files.length === 0) return
+    if (!authReady) return
+    if (!userId) {
+      router.push(getLoginHref())
+      return
+    }
 
     const nextAttachments: ComposerUploadAttachment[] = files.map((file) => ({
       file,
@@ -4910,7 +4926,7 @@ export function CreativeAgentChat({
         )
       }),
     )
-  }, [])
+  }, [authReady, getLoginHref, router, userId])
 
   const handleAssetLibrarySelect = React.useCallback((pick: AssetSelectionPick) => {
     setAttachedRefs((prev) => [...prev, attachedRefFromDroppedMediaUrl(pick.url, pick.assetType)])
@@ -4918,22 +4934,30 @@ export function CreativeAgentChat({
   }, [])
 
   const handleComposerDragEnter = React.useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!authReady || !userId) return
     if (!composerDropTypesAccept(event.dataTransfer)) return
     event.preventDefault()
     setComposerDropActive(true)
-  }, [])
+  }, [authReady, userId])
 
   const handleComposerDragLeave = React.useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!authReady || !userId) return
     if (!composerDropTypesAccept(event.dataTransfer)) return
     const next = event.relatedTarget as Node | null
     if (next && event.currentTarget.contains(next)) return
     setComposerDropActive(false)
-  }, [])
+  }, [authReady, userId])
 
   const processComposerDrop = React.useCallback(
     (event: React.DragEvent) => {
       event.preventDefault()
       setComposerDropActive(false)
+
+      if (!authReady) return
+      if (!userId) {
+        router.push(getLoginHref())
+        return
+      }
 
       const rawNode = event.dataTransfer.getData(REACTFLOW_NODE_MIME)
       if (rawNode) {
@@ -4954,24 +4978,26 @@ export function CreativeAgentChat({
         void handleAttachFiles(files)
       }
     },
-    [handleAttachFiles],
+    [authReady, getLoginHref, handleAttachFiles, router, userId],
   )
 
   const handleComposerDropCapture = React.useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
+      if (!authReady || !userId) return
       if (!composerDropTypesAccept(event.dataTransfer)) return
       event.preventDefault()
       event.stopPropagation()
       processComposerDrop(event)
     },
-    [processComposerDrop],
+    [authReady, processComposerDrop, userId],
   )
 
   const handleComposerDragOverCapture = React.useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!authReady || !userId) return
     if (!composerDropTypesAccept(event.dataTransfer)) return
     event.preventDefault()
     event.dataTransfer.dropEffect = "copy"
-  }, [])
+  }, [authReady, userId])
 
   const removeAttachedRef = React.useCallback((ref: AttachedRef) => {
     setAttachedRefs((prev) => prev.filter((item) => item.chipId !== ref.chipId))
@@ -5025,6 +5051,12 @@ export function CreativeAgentChat({
   }, [])
 
   const handleEnhanceComposerInstructions = React.useCallback(async () => {
+    if (!authReady) return
+    if (!userId) {
+      router.push(getLoginHref())
+      return
+    }
+
     const trimmed = composerValue.trim()
     if (!trimmed) {
       toast.message("Add a message to enhance")
@@ -5059,7 +5091,7 @@ export function CreativeAgentChat({
     } finally {
       setIsEnhancingComposer(false)
     }
-  }, [composerValue])
+  }, [authReady, composerValue, getLoginHref, router, userId])
 
   const ensurePersistedThread = React.useCallback(
     async (title: string): Promise<string | undefined> => {
@@ -5194,7 +5226,11 @@ export function CreativeAgentChat({
   ])
 
   const handleSendMessage = React.useCallback(async () => {
-    if (!userId) return
+    if (!authReady) return
+    if (!userId) {
+      router.push(getLoginHref())
+      return
+    }
     if (!composerValue.trim() && composerAttachments.length === 0) return
     if (hasPendingUploads) return
     if (isCreatingThread) return
@@ -5246,12 +5282,15 @@ export function CreativeAgentChat({
   }, [
     attachedFiles,
     attachedRefs,
+    authReady,
     composerAttachments,
     composerValue,
     ensurePersistedThread,
     hasPendingUploads,
     isBootstrappingOnboarding,
     isCreatingThread,
+    getLoginHref,
+    router,
     sendMessage,
     userId,
   ])
@@ -5259,7 +5298,7 @@ export function CreativeAgentChat({
   const handleRequestSkillLoad = React.useCallback(
     async (slug: string) => {
       if (!userId) {
-        toast.error("Sign in to load skills.")
+        router.push(getLoginHref())
         return
       }
       if (hasPendingUploads) {
@@ -5296,6 +5335,8 @@ export function CreativeAgentChat({
       hasPendingUploads,
       isBootstrappingOnboarding,
       isCreatingThread,
+      getLoginHref,
+      router,
       sendMessage,
       status,
       userId,
@@ -5322,7 +5363,7 @@ export function CreativeAgentChat({
     }
   }, [enablePersistence, onThreadIdChange, router, setMessages, threadId])
 
-  const showLoggedInEmptyState = authReady && userId && messages.length === 0
+  const showEmptyState = messages.length === 0
   const showSubmittedLoading = status === "submitted" && messages.length > 0
 
   return (
@@ -5456,28 +5497,7 @@ export function CreativeAgentChat({
               </div>
             ) : null}
 
-            {authReady && !userId ? (
-              <Card className="w-full max-w-lg border-border/60 bg-muted/20">
-                <CardContent className="space-y-4 p-6 text-center">
-                  <div className="space-y-2">
-                    <p className="text-lg font-semibold">Log in to use chat</p>
-                    <p className="text-sm text-muted-foreground">
-                      Chat currently uses your authenticated session for model access.
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-center gap-3">
-                    <Button asChild>
-                      <a href="/login">Login</a>
-                    </Button>
-                    <Button asChild variant="outline">
-                      <a href="/login?mode=signup">Signup</a>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null}
-
-            {showLoggedInEmptyState ? (
+            {showEmptyState ? (
               <div className="flex w-full max-w-2xl flex-col items-center gap-2">
                 <ConversationEmptyState
                   className="pb-0"
@@ -5493,7 +5513,11 @@ export function CreativeAgentChat({
                     </span>
                   )}
                   title="Start a conversation"
-                  description="Ask a question, attach references, brainstorm ideas, or talk through a creative direction."
+                  description={
+                    userId
+                      ? "Ask a question, attach references, brainstorm ideas, or talk through a creative direction."
+                      : "Draft your message here. When you send it, we'll take you to login or signup first."
+                  }
                 />
                 <Suggestions className="justify-center">
                   {STARTER_PROMPTS.map((item) => (
@@ -5591,7 +5615,7 @@ export function CreativeAgentChat({
 
         <div className="z-10 shrink-0 bg-transparent px-4 pb-5 pt-3">
           <div className="mx-auto max-w-4xl space-y-3">
-            {userId && (composerAttachments.length > 0 || attachedRefs.some((ref) => ref.category === "brand")) ? (
+            {composerAttachments.length > 0 || attachedRefs.some((ref) => ref.category === "brand") ? (
               <div className="flex flex-wrap items-start gap-2">
                 {composerAttachments.length > 0 ? (
                   <ComposerAttachmentPreviews
@@ -5628,8 +5652,7 @@ export function CreativeAgentChat({
               </div>
             ) : null}
 
-            {userId ? (
-              <>
+            <>
               <div
                 className={cn(
                   "rounded-[26px] p-2 transition-[box-shadow,ring-color]",
@@ -5682,6 +5705,8 @@ export function CreativeAgentChat({
                             size="icon"
                             aria-label="Attach files or assets"
                             disabled={
+                              !authReady ||
+                              !userId ||
                               isCreatingThread ||
                               isBootstrappingOnboarding ||
                               status === "submitted" ||
@@ -5696,6 +5721,8 @@ export function CreativeAgentChat({
                           <DropdownMenuItem
                             onClick={() => fileInputRef.current?.click()}
                             disabled={
+                              !authReady ||
+                              !userId ||
                               isCreatingThread ||
                               isBootstrappingOnboarding ||
                               status === "submitted" ||
@@ -5708,6 +5735,8 @@ export function CreativeAgentChat({
                           <DropdownMenuItem
                             onClick={() => setAssetModalOpen(true)}
                             disabled={
+                              !authReady ||
+                              !userId ||
                               isCreatingThread ||
                               isBootstrappingOnboarding ||
                               status === "submitted" ||
@@ -5726,6 +5755,7 @@ export function CreativeAgentChat({
                           setChatGatewayModelId(value)
                         }}
                         disabled={
+                          !authReady ||
                           isCreatingThread ||
                           isBootstrappingOnboarding ||
                           status === "submitted" ||
@@ -5775,6 +5805,8 @@ export function CreativeAgentChat({
                             className="h-9 shrink-0 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
                             aria-label={`Skills loaded in this chat: ${loadedSkillsCount}. Open skill picker.`}
                             disabled={
+                              !authReady ||
+                              !userId ||
                               isCreatingThread ||
                               isBootstrappingOnboarding ||
                               status === "submitted" ||
@@ -5806,6 +5838,8 @@ export function CreativeAgentChat({
                             aria-label="Enhance instructions"
                             onClick={() => void handleEnhanceComposerInstructions()}
                             disabled={
+                              !authReady ||
+                              !userId ||
                               isCreatingThread ||
                               isBootstrappingOnboarding ||
                               hasPendingUploads ||
@@ -5838,6 +5872,8 @@ export function CreativeAgentChat({
                         onTranscriptionChange={handleSpeechTranscription}
                         onTranscriptionError={handleSpeechError}
                         disabled={
+                          !authReady ||
+                          !userId ||
                           isCreatingThread ||
                           isBootstrappingOnboarding ||
                           status === "submitted" ||
@@ -5861,6 +5897,7 @@ export function CreativeAgentChat({
                           void handleSendMessage()
                         }}
                         disabled={
+                          !authReady ||
                           isCreatingThread ||
                           isBootstrappingOnboarding ||
                           hasPendingUploads ||
@@ -5878,17 +5915,22 @@ export function CreativeAgentChat({
                       </Button>
                     </div>
                   </InputGroupAddon>
-                </InputGroup>
-              </div>
-              <AssetSelectionModal
-                open={assetModalOpen}
-                onOpenChange={setAssetModalOpen}
-                onSelect={handleAssetLibrarySelect}
-              />
-              <SkillLoadModal
-                open={skillLoadModalOpen}
-                onOpenChange={setSkillLoadModalOpen}
-                onRequestLoad={handleRequestSkillLoad}
+                  </InputGroup>
+                </div>
+                {!userId && authReady ? (
+                  <p className="px-1 text-xs text-muted-foreground">
+                    You can draft a message now. Sending it will open login or signup first.
+                  </p>
+                ) : null}
+                <AssetSelectionModal
+                  open={assetModalOpen}
+                  onOpenChange={setAssetModalOpen}
+                  onSelect={handleAssetLibrarySelect}
+                />
+                <SkillLoadModal
+                  open={skillLoadModalOpen}
+                  onOpenChange={setSkillLoadModalOpen}
+                  onRequestLoad={handleRequestSkillLoad}
                 disabled={
                   isCreatingThread ||
                   isBootstrappingOnboarding ||
@@ -5896,18 +5938,17 @@ export function CreativeAgentChat({
                   status === "submitted" ||
                   status === "streaming"
                 }
-              />
-              <SkillEditModal
-                open={Boolean(skillEditModalSlug)}
-                onOpenChange={(nextOpen) => {
-                  if (!nextOpen) {
+                />
+                <SkillEditModal
+                  open={Boolean(skillEditModalSlug)}
+                  onOpenChange={(nextOpen) => {
+                    if (!nextOpen) {
                     setSkillEditModalSlug(null)
                   }
                 }}
                 slug={skillEditModalSlug}
-              />
-               </>
-             ) : null}
+                />
+            </>
           </div>
         </div>
       </div>

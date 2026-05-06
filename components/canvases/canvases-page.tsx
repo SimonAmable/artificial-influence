@@ -120,7 +120,7 @@ export function CanvasesPage() {
                       alt={canvas.name}
                       fill
                       className="object-cover rounded-[24px]"
-                      unoptimized
+
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50 rounded-[24px]">

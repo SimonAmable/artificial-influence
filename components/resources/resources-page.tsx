@@ -47,7 +47,7 @@ function ResourcePreview({ result }: { result: StockReferenceResult }) {
       src={result.previewUrl}
       alt={result.title}
       fill
-      unoptimized
+
       sizes="(min-width: 1280px) 30vw, (min-width: 640px) 45vw, 100vw"
       className="object-cover"
     />

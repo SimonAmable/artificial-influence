@@ -385,7 +385,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                           alt={asset.title}
                           fill
                           className="object-cover rounded-md"
-                          unoptimized
+
                         />
                       )}
                       {asset.assetType === "video" && (
@@ -477,7 +477,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                         alt={generation.prompt || 'Generated image'}
                         fill
                         className="object-cover rounded-md"
-                        unoptimized
+
                       />
                       {/* Overlay on hover */}
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center rounded-md">

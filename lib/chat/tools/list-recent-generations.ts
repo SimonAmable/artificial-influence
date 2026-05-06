@@ -101,6 +101,7 @@ export function createListRecentGenerationsTool({
       if (!includePending) {
         dbQuery = dbQuery.neq("status", "pending")
       }
+      dbQuery = dbQuery.neq("status", "failed")
 
       const { data, error } = await dbQuery
 

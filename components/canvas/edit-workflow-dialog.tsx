@@ -156,7 +156,7 @@ export function EditWorkflowDialog({
                     width={128}
                     height={128}
                     className="object-cover w-full h-full"
-                    unoptimized
+
                   />
                 ) : (
                   <p className="text-xs text-zinc-500">No thumbnail</p>

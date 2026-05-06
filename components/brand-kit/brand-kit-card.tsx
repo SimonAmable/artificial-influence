@@ -59,7 +59,7 @@ export function BrandKitCard({ kit, className, onDeleted }: BrandKitCardProps) {
         <div className="relative flex h-40 w-full flex-col overflow-hidden rounded-t-2xl px-4">
           <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl bg-background">
             {thumb ? (
-              <Image src={thumb} alt="" fill className="object-contain p-6" unoptimized />
+              <Image src={thumb} alt="" fill className="object-contain p-6" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                 <Stack size={36} weight="thin" />

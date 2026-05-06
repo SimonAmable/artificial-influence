@@ -1,13 +1,16 @@
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
-import { CanvasHeroSection } from "@/components/landing/canvas-hero-section"
+// import { CanvasHeroSection } from "@/components/landing/canvas-hero-section"
+// import { MockChatHero } from "@/components/landing/mock-chat-hero"
+import { TempHero } from "@/components/landing/temp-hero"
 // import { WorkflowShowcaseSection } from "@/components/landing/workflow-showcase-section"
 import { PlatformSurfacesSection } from "@/components/landing/platform-surfaces-section"
 // import { ProcessSection } from "@/components/landing/process-section"
 import { ModelsBentoSection } from "@/components/landing/models-bento-section"
 import { ProofSection } from "@/components/landing/proof-section"
 import { FAQSection } from "@/components/landing/faq-section"
+import { TestimonialsSection } from "@/components/landing/testimonials-section"
 import { FinalCTASection } from "@/components/landing/final-cta-section"
 import { Footer } from "@/components/landing/footer"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
@@ -75,13 +78,24 @@ export default async function Page() {
 
   return (
     <>
-      <CanvasHeroSection />
-      <ProofSection />
+      <div className="flex min-h-dvh bg-background pt-16 md:pt-[60px]">
+        <main className="min-w-0 flex-1">
+          {/* <MockChatHero starterPrompts={heroStarterPrompts} /> */}
+          <TempHero />
+        </main>
+      </div>
+      {/* <CanvasHeroSection /> */}
+      <div id="platform-surfaces">
+        <ProofSection />
+      </div>
       {/* <WorkflowShowcaseSection /> */}
       <PlatformSurfacesSection />
       {/* <ProcessSection /> */}
       <ModelsBentoSection />
-      <FAQSection />
+      <div id="faq">
+        <FAQSection />
+      </div>
+      <TestimonialsSection />
       <FinalCTASection />
       <Footer />
     </>

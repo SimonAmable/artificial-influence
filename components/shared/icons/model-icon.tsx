@@ -31,7 +31,7 @@ export function ModelIcon({ identifier, size = 16, className, srcOverride }: Mod
           isAiMonochromeIconPath(FALLBACK_ICON_PATH) && "brightness-0 dark:invert",
           className
         )}
-        unoptimized
+
         aria-hidden
       />
     )
@@ -50,7 +50,7 @@ export function ModelIcon({ identifier, size = 16, className, srcOverride }: Mod
         needsDarkContrast && "brightness-0 dark:invert",
         className
       )}
-      unoptimized
+
     />
   )
 }

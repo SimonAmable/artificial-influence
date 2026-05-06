@@ -11,12 +11,13 @@ export function FinalCTASection() {
     <section className="w-full bg-background py-16 sm:py-20">
       <div className="mx-auto w-full max-w-4xl px-4 text-center sm:px-6 lg:px-8">
         <h2 className="text-balance text-3xl font-semibold text-foreground sm:text-4xl">
-          Launch your next creative campaign faster
+          Built to make content creation feel easier
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-          Build once, iterate visually, and ship ready-to-publish assets from a single workspace.
-          Custom support for teams and small businesses. Talk to us when you need onboarding help,
-          billing questions, or a tailored setup.
+          I&apos;m building UniCan to make organic marketing and faceless content easier for everyone.
+          I want it to save you time, help you grow, and create more opportunities to make money.
+          If there&apos;s something that would help you reach your goals faster, please reach out.
+          I&apos;m happy to help.
         </p>
         <div className="mt-8 flex flex-row flex-wrap items-center justify-center gap-3">
           <Link href="/login?mode=signup">
