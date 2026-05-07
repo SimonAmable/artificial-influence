@@ -763,10 +763,10 @@ function VideoPageContent() {
         if (isSeedance2 || isPrunaPVideo) requestBody.last_frame_image = lastFrameUpload.url
         if (isKlingV3 || isKlingV3Omni) requestBody.end_image = lastFrameUpload.url
       }
-      if (lastFrameImage?.url && (isKlingV3 || isKlingV3Omni)) {
+      if (!lastFrameImage?.file && lastFrameImage?.url && (isKlingV3 || isKlingV3Omni)) {
         requestBody.end_image = lastFrameImage.url
       }
-      if (lastFrameImage?.url && (isSeedance2 || isPrunaPVideo)) {
+      if (!lastFrameImage?.file && lastFrameImage?.url && (isSeedance2 || isPrunaPVideo)) {
         requestBody.last_frame_image = lastFrameImage.url
       }
       if (lastFrameImage?.url && isWan27 && !requestBody.last_frame) {
@@ -807,7 +807,7 @@ function VideoPageContent() {
         const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'video-gen-reference-videos')
         requestBody.reference_video = videoUpload.url
       }
-      if (isKlingV3Omni && inputVideo?.url) {
+      if (!inputVideo?.file && isKlingV3Omni && inputVideo?.url) {
         requestBody.reference_video = inputVideo.url
       }
       if (isKlingV3Omni && !requestBody.reference_video && chipSlots.referenceVideoChipUrl) {
@@ -818,7 +818,7 @@ function VideoPageContent() {
         const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'video-gen-reference-videos')
         requestBody.reference_videos = [videoUpload.url]
       }
-      if (isSeedance2 && inputVideo?.url) {
+      if (!inputVideo?.file && isSeedance2 && inputVideo?.url) {
         requestBody.reference_videos = [inputVideo.url]
       }
       if (isSeedance2 && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
@@ -829,7 +829,7 @@ function VideoPageContent() {
         const audioUpload = await uploadImageToSupabase(inputAudio.file, user.id, 'video-gen-reference-audios')
         requestBody.reference_audios = [audioUpload.url]
       }
-      if (isSeedance2 && inputAudio?.url) {
+      if (!inputAudio?.file && isSeedance2 && inputAudio?.url) {
         requestBody.reference_audios = [inputAudio.url]
       }
 
@@ -837,7 +837,7 @@ function VideoPageContent() {
         const audioUpload = await uploadImageToSupabase(inputAudio.file, user.id, 'video-gen-pruna-audio')
         requestBody.audio = audioUpload.url
       }
-      if (isPrunaPVideo && inputAudio?.url) {
+      if (!inputAudio?.file && isPrunaPVideo && inputAudio?.url) {
         requestBody.audio = inputAudio.url
       }
 
@@ -845,7 +845,7 @@ function VideoPageContent() {
         const audioUpload = await uploadImageToSupabase(inputAudio.file, user.id, 'video-gen-wan-audio')
         requestBody.audio = audioUpload.url
       }
-      if (isWan27 && inputAudio?.url) {
+      if (!inputAudio?.file && isWan27 && inputAudio?.url) {
         requestBody.audio = inputAudio.url
       }
 

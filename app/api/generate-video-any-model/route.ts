@@ -15,6 +15,10 @@ import {
   normalizeMotionCopyModelIdentifier,
 } from '@/lib/constants/models';
 import { resolveVideoPricingQuote } from '@/lib/video-pricing';
+import {
+  getVideoReferenceAudioConfig,
+  isSupportedVideoReferenceAudioUrl,
+} from '@/lib/utils/video-reference-audio';
 
 function collectStoragePaths(values: unknown[]): string[] {
   const paths = values.flatMap((value) => {
@@ -462,6 +466,13 @@ export async function POST(request: NextRequest) {
       case 'prunaai/p-video':
         if (image) replicateInput.image = image;
         if (typeof otherParams.audio === 'string' && otherParams.audio.length > 0) {
+          const audioConfig = getVideoReferenceAudioConfig(normalizedModel);
+          if (audioConfig && !isSupportedVideoReferenceAudioUrl(normalizedModel, otherParams.audio)) {
+            return NextResponse.json(
+              { error: audioConfig.validationMessage },
+              { status: 400 },
+            );
+          }
           replicateInput.audio = otherParams.audio;
         }
         if (typeof body.last_frame_image === 'string' && body.last_frame_image.length > 0) {

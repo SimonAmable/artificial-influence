@@ -32,6 +32,10 @@ import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { BrandKitNewFlowDialog } from "@/components/brand-kit/brand-kit-new-flow-dialog"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import type { AssetType } from "@/lib/assets/types"
+import {
+  getVideoReferenceAudioConfig,
+  isSupportedVideoReferenceAudioFile,
+} from "@/lib/utils/video-reference-audio"
 import { toast } from "sonner"
 
 interface VideoInputBoxProps {
@@ -258,6 +262,14 @@ export function VideoInputBox({
     return !(inputAudio?.file || inputAudio?.url)
   }, [inputAudio, isPrunaPVideo, isSeedance2, isWan27])
 
+  const referenceAudioConfig = React.useMemo(
+    () => getVideoReferenceAudioConfig(selectedModel.identifier),
+    [selectedModel.identifier],
+  )
+
+  const showReferenceAudioCard =
+    !!referenceAudioConfig && !!inputAudio?.url && !isMotionCopyModel && !isLipsyncModel
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'input' | 'lastFrame') => {
     const file = e.target.files?.[0]
     if (file) {
@@ -310,10 +322,12 @@ export function VideoInputBox({
     const file = e.target.files?.[0]
     e.target.value = ""
     if (!file) return
-    const byMime = file.type.startsWith("audio/")
-    const byName = /\.(wav|mp3|mpeg|m4a|aac)$/i.test(file.name)
-    if (!byMime && !byName) {
-      toast.error("Use a supported audio file (.wav, .mp3, .m4a, or .aac).")
+    if (!file.type.startsWith("audio/")) {
+      toast.error(referenceAudioConfig?.validationMessage ?? "Use a supported audio file.")
+      return
+    }
+    if (referenceAudioConfig && !isSupportedVideoReferenceAudioFile(selectedModel.identifier, file)) {
+      toast.error(referenceAudioConfig.validationMessage)
       return
     }
     onInputAudioChange({ file, url: URL.createObjectURL(file) })
@@ -773,14 +787,14 @@ export function VideoInputBox({
                   >
                     <span className="flex items-center text-sm font-medium">
                       <Waveform className="mr-2 size-4 shrink-0" weight="duotone" />
-                      {isSeedance2 ? "Reference audio" : "Optional audio"}
+                      {referenceAudioConfig?.title ?? "Optional audio"}
                     </span>
                     <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
-                      {isWan27
+                      {referenceAudioConfig?.description ?? (isWan27
                         ? ".wav / .mp3, optional sync audio for Wan 2.7 (3–30s per model docs)."
                         : isPrunaPVideo
                           ? ".wav / .mp3. Conditions motion and timing for P-Video; prompt is still required."
-                          : ".wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a frame or reference video."}
+                          : ".wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a frame or reference video.")}
                     </span>
                   </DropdownMenuItem>
                 )}
@@ -812,7 +826,10 @@ export function VideoInputBox({
               <input
                 ref={referenceAudioRef}
                 type="file"
-                accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac"
+                accept={
+                  referenceAudioConfig?.accept ??
+                  "audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac"
+                }
                 onChange={handleReferenceAudioAdd}
                 className="hidden"
                 aria-hidden
@@ -1042,6 +1059,18 @@ export function VideoInputBox({
                 <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-medium border border-border">
                   Background source
                 </div>
+              </div>
+            )}
+            {showReferenceAudioCard && referenceAudioConfig && (
+              <div className="w-[240px] max-w-full shrink-0">
+                <AudioUpload
+                  value={inputAudio}
+                  onChange={onInputAudioChange}
+                  title={referenceAudioConfig.title}
+                  description={referenceAudioConfig.description}
+                  accept={referenceAudioConfig.accept}
+                  minHeight="min-h-[88px]"
+                />
               </div>
             )}
           </div>

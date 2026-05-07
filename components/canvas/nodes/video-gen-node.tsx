@@ -65,6 +65,10 @@ import { VIDEO_PRESET_COMMANDS } from "@/lib/commands/presets-video"
 import { validateVideoAttachedRefs } from "@/lib/commands/validate-video-refs"
 import { BrandKitNewFlowDialog } from "@/components/brand-kit/brand-kit-new-flow-dialog"
 import type { AssetType } from "@/lib/assets/types"
+import {
+  getVideoReferenceAudioConfig,
+  isSupportedVideoReferenceAudioFile,
+} from "@/lib/utils/video-reference-audio"
 import { toast } from "sonner"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
@@ -664,6 +668,14 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !file.type.startsWith("audio/")) return
+    const modelIdentifier = selectedModel?.identifier ?? ""
+    const audioConfig = getVideoReferenceAudioConfig(modelIdentifier)
+    if (audioConfig && !isSupportedVideoReferenceAudioFile(modelIdentifier, file)) {
+      nodeData.onDataChange?.(id, { error: audioConfig.validationMessage })
+      if (audioUploadRef.current) audioUploadRef.current.value = ""
+      setIsAddMediaOpen(false)
+      return
+    }
 
     const url = URL.createObjectURL(file)
     nodeData.onDataChange?.(id, {
@@ -1107,6 +1119,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const isSeedance2Node = selectedModel?.identifier === "bytedance/seedance-2.0"
   const isPrunaPVideoNode = selectedModel?.identifier === "prunaai/p-video"
   const isWan27Node = selectedModel?.identifier === "wan-video/wan-2.7"
+  const referenceAudioConfig = selectedModel
+    ? getVideoReferenceAudioConfig(selectedModel.identifier)
+    : null
   const showImageUpload = !!(modelSupportsImage || isMotionCopyModel || isLipsyncModel)
   const showVideoUpload = !!isMotionCopyModel || isSeedance2Node
   const showAudioUpload = !!isLipsyncModel || isSeedance2Node || isPrunaPVideoNode || isWan27Node
@@ -1664,7 +1679,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           <input
             ref={audioUploadRef}
             type="file"
-            accept="audio/*"
+            accept={referenceAudioConfig?.accept ?? "audio/*"}
             onChange={handleAudioUpload}
             className="hidden"
           />
