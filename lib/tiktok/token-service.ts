@@ -39,7 +39,7 @@ function addSeconds(seconds: number | undefined): string | null {
 
 function parseScopes(scope: string | undefined, fallback: string[] | null): string[] {
   const parsed = (scope ?? "")
-    .split(",")
+    .split(/[,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean)
   return parsed.length > 0 ? parsed : fallback ?? []

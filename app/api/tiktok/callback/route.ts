@@ -38,7 +38,7 @@ function addSeconds(seconds: number | undefined): string | null {
 
 function scopeList(scope: string | undefined): string[] {
   return (scope ?? "")
-    .split(",")
+    .split(/[,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean)
 }

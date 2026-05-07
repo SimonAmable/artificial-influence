@@ -89,13 +89,19 @@ export function TempHero() {
             animate={{ opacity: 1 }}
             transition={{ duration: prefersReducedMotion ? 0.01 : 0.7, delay: prefersReducedMotion ? 0 : 0.12, ease: heroEase }}
           />
+          <motion.div
+            className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-background"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: prefersReducedMotion ? 0.01 : 0.7, delay: prefersReducedMotion ? 0 : 0.16, ease: heroEase }}
+          />
         </motion.div>
 
         <div className="relative z-20 flex w-full flex-1 flex-col items-center px-4 pb-20 pt-20 text-center sm:px-6 sm:pt-24 md:px-7 md:pb-24 md:pt-14 lg:px-8">
           <div className="mx-auto mt-7 max-w-5xl">
             <motion.h1
               {...fadeUp(0.08)}
-              className="text-balance text-4xl font-semibold leading-[0.94] tracking-[-0.05em] text-primary-foreground sm:text-5xl md:text-5xl lg:text-6xl xl:text-6xl dark:text-white"
+              className="text-balance text-3xl font-semibold leading-[0.94] tracking-[-0.05em] text-primary-foreground sm:text-4xl md:text-4xl lg:text-5xl xl:text-5xl dark:text-white"
             >
               Introducing vibe marketing
             </motion.h1>

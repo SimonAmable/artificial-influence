@@ -45,6 +45,10 @@ export type AnalyzeUrlResponse = {
   themeColorHint?: string | null
   /** Exact #RRGGBB literals scraped from HTML/CSS */
   extractedColorCandidates?: string[]
+  /** Reference images scraped from JSON-LD, OG tags, and `<img>`/`<picture>` markup. */
+  referenceImages?: string[]
+  /** Reference videos scraped from JSON-LD, OG tags, `<video>`, and known embed iframes. */
+  referenceVideos?: string[]
 }
 
 /** Stored in sessionStorage between URL analyze and opening `/brand/[id]` with a fresh kit. */

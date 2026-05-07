@@ -6,6 +6,7 @@ import {
   mergeColorCandidateLists,
   parseThemeColorMeta,
 } from "@/lib/brand-kit/extract-colors-from-html"
+import { extractMedia } from "@/lib/brand-kit/extract-media"
 import { fetchSameOriginStylesheetTexts } from "@/lib/brand-kit/fetch-same-origin-stylesheets"
 
 export type PageExtraction = {
@@ -13,6 +14,10 @@ export type PageExtraction = {
   description: string | null
   visibleText: string
   logoCandidates: string[]
+  /** Reference image URLs scraped from JSON-LD, OG tags, and `<img>`/`<picture>` markup. */
+  referenceImages: string[]
+  /** Reference video URLs scraped from JSON-LD, OG tags, `<video>`, and known embed iframes. */
+  referenceVideos: string[]
   /** From meta theme-color when parseable */
   themeColorHint: string | null
   /** #RRGGBB from theme meta, semantic CSS variables on same-origin CSS, and inline `<style>` / `style=""` */
@@ -87,6 +92,12 @@ export async function extractPageForBrand(html: string, finalUrl: string): Promi
     pushUnique(logoCandidates, absUrl(base, href))
   })
 
+  // Extract reference media before stripping `<script>` (JSON-LD lives there).
+  const media = extractMedia(html, finalUrl)
+  const logoSet = new Set(logoCandidates)
+  const referenceImages = media.images.filter((u) => !logoSet.has(u))
+  const referenceVideos = media.videos
+
   $("script, style, noscript").remove()
   const main = $("main").length ? $("main") : $("body")
   let text = main.text().replace(/\s+/g, " ").trim()
@@ -100,6 +111,8 @@ export async function extractPageForBrand(html: string, finalUrl: string): Promi
     description,
     visibleText: text,
     logoCandidates: logoCandidates.filter(Boolean),
+    referenceImages,
+    referenceVideos,
     themeColorHint,
     extractedColorCandidates,
   }

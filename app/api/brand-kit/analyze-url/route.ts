@@ -52,6 +52,13 @@ export async function POST(request: Request) {
 
     const draft = await draftBrandFromPage(extraction, finalUrl, extraction.logoCandidates)
 
+    console.info("[brand-kit/analyze-url] media", {
+      finalUrl,
+      images: extraction.referenceImages.length,
+      videos: extraction.referenceVideos.length,
+      logos: extraction.logoCandidates.length,
+    })
+
     // Use `responseBody` (not `body`); request JSON already uses `requestBody` above.
     const responseBody = {
       draft,
@@ -61,6 +68,8 @@ export async function POST(request: Request) {
       finalUrl,
       themeColorHint: extraction.themeColorHint,
       extractedColorCandidates: extraction.extractedColorCandidates,
+      referenceImages: extraction.referenceImages,
+      referenceVideos: extraction.referenceVideos,
     }
     return NextResponse.json(responseBody)
   } catch (e) {

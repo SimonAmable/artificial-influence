@@ -241,6 +241,20 @@ export function BrandKitEditor({
     if (draft.selectedLogoUrl) setLogoUrl(draft.selectedLogoUrl)
     const colorTokens = mapSuggestedColorsToTokens(draft.suggestedColors ?? [])
     if (colorTokens.length) setColors(colorTokens)
+
+    const extractedImages = payload.referenceImages ?? []
+    const extractedVideos = payload.referenceVideos ?? []
+    if (extractedImages.length || extractedVideos.length) {
+      const skipUrls = new Set<string>()
+      if (draft.selectedLogoUrl) skipUrls.add(draft.selectedLogoUrl)
+      const items: BrandReferenceMediaItem[] = [
+        ...extractedImages
+          .filter((u) => !skipUrls.has(u))
+          .map((url) => ({ url, kind: "image" as const })),
+        ...extractedVideos.map((url) => ({ url, kind: "video" as const })),
+      ]
+      if (items.length) setReferenceMedia(items)
+    }
   }, [])
 
   const load = React.useCallback(async () => {
