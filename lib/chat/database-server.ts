@@ -8,6 +8,10 @@ export interface ChatThread {
   user_id: string
   title: string
   messages: UIMessage[]
+  /** When true, message sync must not overwrite `title` with derived truncation @see migrations/20260506154000_chat_thread_title_intent_once.sql */
+  title_locked?: boolean
+  /** CAS for single intent-title LLM attempt */
+  intent_title_started_at?: string | null
   created_at: string
   updated_at: string
   source?: "user" | "automation"
@@ -187,13 +191,22 @@ export async function replaceChatThreadMessages(
 ): Promise<void> {
   const sanitized = sanitizeToolErrorPartsInMessages(messages)
   const nextMessages = sanitized.messages
-  const title = deriveChatTitleFromMessages(nextMessages)
+
+  const { data: flagsRow } = await supabase
+    .from("chat_threads")
+    .select("title_locked")
+    .eq("id", threadId)
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  const titleLocked = Boolean(flagsRow?.title_locked)
+  const derivedTitle = deriveChatTitleFromMessages(nextMessages)
 
   const { error } = await supabase
     .from("chat_threads")
     .update({
       messages: nextMessages,
-      title,
+      ...(titleLocked ? {} : { title: derivedTitle }),
       updated_at: new Date().toISOString(),
     })
     .eq("id", threadId)

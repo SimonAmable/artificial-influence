@@ -24,13 +24,13 @@ export interface AudioVoice {
 
 export const AUDIO_PROVIDER_OPTIONS = [
   { id: "inworld", label: "Inworld" },
-  { id: "google", label: "Google Gemini TTS" },
+  { id: "google", label: "Gemini" },
 ] as const
 
 export const DEFAULT_AUDIO_PROVIDER: AudioProvider = "inworld"
 
 export const GOOGLE_GEMINI_TTS_MODEL = "google/gemini-3.1-flash-tts" as const
-export const GOOGLE_GEMINI_TTS_MODEL_LABEL = "Google Gemini 3.1 Flash TTS" as const
+export const GOOGLE_GEMINI_TTS_MODEL_LABEL = "Gemini 3.1" as const
 export const DEFAULT_GOOGLE_GEMINI_VOICE_ID = "Kore" as const
 export const DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE = "en-US" as const
 export const DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT =
@@ -121,6 +121,13 @@ export function getAudioModelOption(modelId?: string | null) {
 
 export function getAudioProviderForModel(modelId?: string | null): AudioProvider {
   return getAudioModelOption(modelId)?.provider ?? DEFAULT_AUDIO_PROVIDER
+}
+
+/** Icon shown next to TTS model options (brand logo for Inworld, Gemini mark for Google). */
+export function getAudioModelIconSrc(modelId?: string | null) {
+  return getAudioProviderForModel(modelId) === "google"
+    ? "/ai_icons/gemini-color.svg"
+    : "/logo.svg"
 }
 
 export function getAudioModelLabel(modelId?: string | null) {

@@ -4607,6 +4607,8 @@ export function CreativeAgentChat({
   const onboardingBootstrapCompletedRef = React.useRef(false)
   const chatGatewayModelRef = React.useRef<string>(DEFAULT_CHAT_GATEWAY_MODEL)
   const [chatGatewayModelId, setChatGatewayModelId] = React.useState<string>(DEFAULT_CHAT_GATEWAY_MODEL)
+  /** One `router.refresh()` per thread ID so sidebar thread titles reflect async intent renaming. */
+  const intentSidebarRefreshedForThreadIdsRef = React.useRef(new Set<string>())
 
   const getLoginHref = React.useCallback(() => {
     if (typeof window === "undefined") {
@@ -4639,6 +4641,18 @@ export function CreativeAgentChat({
             window.location.pathname !== `/chat/${activeThreadId}`
           ) {
             window.history.replaceState(window.history.state, "", `/chat/${activeThreadId}`)
+          }
+
+          if (enablePersistence && activeThreadId) {
+            const refreshed = intentSidebarRefreshedForThreadIdsRef.current
+            if (!refreshed.has(activeThreadId)) {
+              refreshed.add(activeThreadId)
+              router.refresh()
+              /** Second pass after intent-title LLM (waitUntil) updates the DB. */
+              window.setTimeout(() => {
+                router.refresh()
+              }, 3200)
+            }
           }
         },
         sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
@@ -4674,7 +4688,7 @@ export function CreativeAgentChat({
           },
         }),
       }),
-    [enablePersistence, initialChatId, initialMessages, syncUrlOnThreadCreate],
+    [enablePersistence, initialChatId, initialMessages, router, syncUrlOnThreadCreate],
   )
 
   const { addToolApprovalResponse, messages, sendMessage, setMessages, status, error, stop } = useChat({
@@ -5781,11 +5795,11 @@ export function CreativeAgentChat({
                         <SelectContent align="start" position="popper" sideOffset={4} className="w-[min(calc(100vw-2rem),22rem)]">
                           {CHAT_GATEWAY_MODEL_OPTIONS.map((option) => (
                             <SelectItem key={option.id} value={option.id}>
-                              <div className="flex items-center gap-3">
-                                <div className="shrink-0 rounded-md border border-border bg-muted/30 p-1.5">
+                              <div className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
+                                <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border bg-muted/30">
                                   <ModelIcon identifier={option.id} size={20} srcOverride={option.iconPath} />
                                 </div>
-                                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                <div className="flex min-w-0 flex-col gap-0.5">
                                   <span className="text-sm font-semibold">{option.label}</span>
                                   {option.description ? (
                                     <span className="text-xs text-muted-foreground">{option.description}</span>

@@ -14,6 +14,7 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { AudioModelOptionLabel } from "@/components/audio/audio-model-option-label"
 import { AudioVoiceSelector } from "@/components/audio/voice-selector"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -290,6 +291,7 @@ function DockPromptPanel({
   onModelChange,
   referenceVideo,
   onReferenceVideoChange,
+  embedInDock = false,
 }: {
   mode: AudioMode
   script: string
@@ -308,6 +310,7 @@ function DockPromptPanel({
   onModelChange: (value: string) => void
   referenceVideo: ReferenceVideo | null
   onReferenceVideoChange: (video: ReferenceVideo | null) => void
+  embedInDock?: boolean
 }) {
   const [showGeminiAdvancedControls, setShowGeminiAdvancedControls] = React.useState(false)
   const basePlaceholder =
@@ -317,9 +320,8 @@ function DockPromptPanel({
   const scriptPlaceholder =
     provider === "google" ? `${basePlaceholder} ${GOOGLE_TAGS_HELPER}` : basePlaceholder
 
-  return (
-    <div className="rounded-[18px] border border-border/60 bg-background/25 px-4 py-3">
-      <div className="space-y-3">
+  const body = (
+    <div className="space-y-3">
         <textarea
           value={script}
           onChange={(event) => onScriptChange(event.target.value)}
@@ -366,7 +368,7 @@ function DockPromptPanel({
 
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
           <Select value={modelId} onValueChange={onModelChange}>
-            <SelectTrigger className="h-8 min-w-[210px] rounded-[14px] border-border/60 bg-background/50 px-3 text-xs text-foreground">
+            <SelectTrigger className="h-8 w-fit max-w-[min(100%,240px)] rounded-[14px] border-border/60 bg-background/50 px-3 text-xs text-foreground">
               <SelectValue placeholder="Select a model" />
             </SelectTrigger>
             <SelectContent>
@@ -375,7 +377,9 @@ function DockPromptPanel({
                 {AUDIO_MODEL_OPTIONS.filter((option) => option.group === "Current").map(
                   (option) => (
                     <SelectItem key={option.id} value={option.id}>
-                      {option.label}
+                      <AudioModelOptionLabel modelId={option.id}>
+                        {option.label}
+                      </AudioModelOptionLabel>
                     </SelectItem>
                   )
                 )}
@@ -386,7 +390,9 @@ function DockPromptPanel({
                 {AUDIO_MODEL_OPTIONS.filter((option) => option.group === "Legacy").map(
                   (option) => (
                     <SelectItem key={option.id} value={option.id}>
-                      {option.label}
+                      <AudioModelOptionLabel modelId={option.id}>
+                        {option.label}
+                      </AudioModelOptionLabel>
                     </SelectItem>
                   )
                 )}
@@ -426,7 +432,16 @@ function DockPromptPanel({
             {error ?? statusMessage ?? `${script.trim().length} chars`}
           </span>
         </div>
-      </div>
+    </div>
+  )
+
+  if (embedInDock) {
+    return body
+  }
+
+  return (
+    <div className="rounded-[18px] border border-border/60 bg-background/25 px-4 py-3">
+      {body}
     </div>
   )
 }
@@ -440,6 +455,7 @@ function VoicePresetCard({
   compact = false,
   showPreviewButton = true,
   minimalist = false,
+  fillHeight = false,
 }: {
   provider: AudioProvider
   voice: AudioVoice | null
@@ -449,6 +465,7 @@ function VoicePresetCard({
   compact?: boolean
   showPreviewButton?: boolean
   minimalist?: boolean
+  fillHeight?: boolean
 }) {
   const name = voice?.displayName || voiceId || getDefaultAudioVoiceId(provider)
   const subtitle =
@@ -459,10 +476,16 @@ function VoicePresetCard({
     <div
       className={cn(
         "relative overflow-hidden border border-border/60 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_92%,transparent),color-mix(in_oklch,var(--muted)_38%,transparent))] shadow-[0_20px_45px_rgba(0,0,0,0.28)]",
+        fillHeight && "flex h-full min-h-0 flex-col",
         compact ? "rounded-[20px] px-3 py-2.5" : "rounded-[24px] px-4 py-3"
       )}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div
+        className={cn(
+          "flex items-start justify-between gap-3",
+          fillHeight && "min-h-0 flex-1"
+        )}
+      >
         <div className="min-w-0">
           {!minimalist && (
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -513,7 +536,12 @@ function VoicePresetCard({
           </button>
         ) : null}
       </div>
-      <div className={cn("flex items-end gap-1", minimalist ? "mt-2" : compact ? "mt-3" : "mt-4")}>
+      <div
+        className={cn(
+          "flex items-end gap-1",
+          fillHeight ? "mt-auto" : minimalist ? "mt-2" : compact ? "mt-3" : "mt-4"
+        )}
+      >
         {EQ_BARS.map((height, index) => (
           <span
             key={`${height}-${index}`}
@@ -925,6 +953,44 @@ export function AudioStudioPage() {
   const results = mode === "voiceover" ? audioHistory : changeVoiceHistory
   const hasResults = results.length > 0
 
+  const renderDockPromptPanel = () => (
+    <DockPromptPanel
+      mode={mode}
+      script={script}
+      onScriptChange={(value) => {
+        setScript(value)
+        if (error) setError(null)
+      }}
+      provider={provider}
+      stylePrompt={stylePrompt}
+      onStylePromptChange={(value) => {
+        setStylePrompt(value)
+        if (error) setError(null)
+      }}
+      languageCode={languageCode}
+      onLanguageCodeChange={(value) => {
+        setLanguageCode(value)
+        if (error) setError(null)
+      }}
+      onEnhance={handleEnhance}
+      isEnhancing={isEnhancing}
+      isGenerating={isGenerating}
+      error={error}
+      statusMessage={statusMessage}
+      modelId={modelId}
+      onModelChange={(value) => {
+        setModelId(value)
+        if (error) setError(null)
+      }}
+      referenceVideo={referenceVideo}
+      onReferenceVideoChange={(video) => {
+        setReferenceVideo(video)
+        if (error) setError(null)
+      }}
+      embedInDock
+    />
+  )
+
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground">
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-72 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--background)_0%,transparent),color-mix(in_oklch,var(--background)_88%,transparent)_55%,var(--background))]" />
@@ -947,7 +1013,7 @@ export function AudioStudioPage() {
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-[1500px] flex-col px-4 pb-44 pt-24 sm:px-6 md:pb-40 lg:px-10">
         {!hasResults && !isHistoryLoading ? (
-          <section className="flex min-h-[46vh] flex-1 flex-col items-center justify-center text-center">
+          <section className="relative z-10 mt-8 flex flex-1 flex-col items-center text-center">
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-muted-foreground">
               {heroEyebrow}
             </p>
@@ -1009,52 +1075,14 @@ export function AudioStudioPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 sm:px-6 md:px-8 md:pb-6">
         <div className="mx-auto max-w-[1180px]">
-          <div className="rounded-[28px] border border-border/60 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_96%,transparent),color-mix(in_oklch,var(--muted)_62%,transparent))] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.42)] backdrop-blur-xl">
-            {/* Mobile: 3-row layout, Desktop: horizontal layout */}
-            <div className="flex flex-col gap-3 md:gap-3">
-              {/* Row 1: Prompt Box (full width on mobile, flex-1 on desktop) */}
-              <div className="min-w-0 md:flex-1">
-                <div className="rounded-[24px] border border-border/60 bg-background/30 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                  <DockPromptPanel
-                    mode={mode}
-                    script={script}
-                    onScriptChange={(value) => {
-                      setScript(value)
-                      if (error) setError(null)
-                    }}
-                    provider={provider}
-                    stylePrompt={stylePrompt}
-                    onStylePromptChange={(value) => {
-                      setStylePrompt(value)
-                      if (error) setError(null)
-                    }}
-                    languageCode={languageCode}
-                    onLanguageCodeChange={(value) => {
-                      setLanguageCode(value)
-                      if (error) setError(null)
-                    }}
-                    onEnhance={handleEnhance}
-                    isEnhancing={isEnhancing}
-                    isGenerating={isGenerating}
-                    error={error}
-                    statusMessage={statusMessage}
-                    modelId={modelId}
-                    onModelChange={(value) => {
-                      setModelId(value)
-                      if (error) setError(null)
-                    }}
-                    referenceVideo={referenceVideo}
-                    onReferenceVideoChange={(video) => {
-                      setReferenceVideo(video)
-                      if (error) setError(null)
-                    }}
-                  />
-                </div>
+          <div className="rounded-[28px] border border-border/60 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_96%,transparent),color-mix(in_oklch,var(--muted)_62%,transparent))] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.42),0_14px_44px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-xl">
+            <div className="flex flex-col gap-3">
+              <div className="flex justify-start">
+                <ModeSelector mode={mode} onChange={setMode} />
               </div>
 
-              {/* Desktop: Reference Video Chip */}
               {mode === "change-voice" ? (
-                <div className="hidden md:block md:w-[220px] md:shrink-0">
+                <div className="hidden md:block">
                   <ReferenceVideoChip
                     value={referenceVideo}
                     onChange={(video) => {
@@ -1066,13 +1094,14 @@ export function AudioStudioPage() {
                 </div>
               ) : null}
 
-              {/* Row 2 (Mobile): Voice Selector + Mode Selector (stacked column) */}
-              <div className="flex flex-col gap-2 md:hidden">
-                {/* Voice Selector */}
-                <div className="min-w-0">
+              <div className="hidden md:grid md:min-h-[112px] md:grid-cols-[minmax(0,1fr)_min(240px,26vw)_160px] md:gap-3 md:items-stretch">
+                <div className="h-full min-h-0 min-w-0 overflow-y-auto rounded-[24px] border border-border/60 bg-background/30 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                  {renderDockPromptPanel()}
+                </div>
+                <div className="flex h-full min-h-0 min-w-0 flex-col">
                   <AudioVoiceSelector
                     provider={provider}
-                    className="min-w-0 flex-1"
+                    className="flex h-full min-h-0 flex-1 flex-col gap-0"
                     value={voiceId}
                     onSelectedVoiceChange={setSelectedVoice}
                     onValueChange={(nextVoiceId) => {
@@ -1083,7 +1112,7 @@ export function AudioStudioPage() {
                       <div
                         aria-disabled={disabled}
                         className={cn(
-                          "w-full text-left",
+                          "flex h-full min-h-0 w-full min-w-0 flex-1 flex-col text-left",
                           disabled ? "cursor-not-allowed opacity-70" : undefined
                         )}
                       >
@@ -1096,27 +1125,52 @@ export function AudioStudioPage() {
                             void handlePreviewToggle()
                           }}
                           compact
-                          minimalist
+                          fillHeight
                         />
                       </div>
                     )}
                   />
                 </div>
-
-                {/* Mode Selector */}
-                <div>
-                  <ModeSelector mode={mode} onChange={setMode} />
-                </div>
+                <Button
+                  onClick={() => {
+                    void handleGenerate()
+                  }}
+                  disabled={!canGenerate || isGenerating || isEnhancing}
+                  className="flex h-full min-h-[112px] shrink-0 flex-row items-center justify-center gap-2 self-stretch rounded-[22px] bg-primary px-4 py-4 font-display text-lg font-bold uppercase tracking-[0.08em] text-primary-foreground shadow-lg transition-transform hover:-translate-y-px hover:bg-primary/90 disabled:translate-y-0 disabled:bg-primary/55 disabled:text-primary-foreground/60"
+                >
+                  {isGenerating ? (
+                    <>
+                      <CircleNotch className="size-5 animate-spin" />
+                      {mode === "voiceover" ? "Generating" : "Processing"}
+                    </>
+                  ) : (
+                    <>
+                      Generate
+                      <Sparkle className="size-5" weight="fill" />
+                    </>
+                  )}
+                </Button>
               </div>
 
-              {/* Desktop layout: Voice + Mode + Reference Video + Generate */}
-              <div className="hidden md:flex md:flex-row md:items-stretch md:gap-3">
-                {/* Voice Selector */}
-                <div className="md:w-[220px] md:shrink-0">
-                  <div className="flex items-stretch">
+              <div className="flex flex-col gap-3 md:hidden">
+                {mode === "change-voice" ? (
+                  <ReferenceVideoChip
+                    value={referenceVideo}
+                    onChange={(video) => {
+                      setReferenceVideo(video)
+                      if (error) setError(null)
+                    }}
+                    disabled={isGenerating}
+                  />
+                ) : null}
+                <div className="rounded-[24px] border border-border/60 bg-background/30 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                  {renderDockPromptPanel()}
+                </div>
+                <div className="flex items-stretch gap-2">
+                  <div className="flex min-h-[104px] min-w-0 flex-1 basis-0 flex-col">
                     <AudioVoiceSelector
                       provider={provider}
-                      className="min-w-0 flex-1"
+                      className="flex h-full min-h-0 flex-1 flex-col gap-0"
                       value={voiceId}
                       onSelectedVoiceChange={setSelectedVoice}
                       onValueChange={(nextVoiceId) => {
@@ -1127,7 +1181,7 @@ export function AudioStudioPage() {
                         <div
                           aria-disabled={disabled}
                           className={cn(
-                            "w-full text-left",
+                            "flex h-full min-h-0 w-full min-w-0 flex-1 flex-col text-left",
                             disabled ? "cursor-not-allowed opacity-70" : undefined
                           )}
                         >
@@ -1140,62 +1194,36 @@ export function AudioStudioPage() {
                               void handlePreviewToggle()
                             }}
                             compact
+                            minimalist
+                            fillHeight
                           />
                         </div>
                       )}
                     />
                   </div>
+                  <Button
+                    onClick={() => {
+                      void handleGenerate()
+                    }}
+                    disabled={!canGenerate || isGenerating || isEnhancing}
+                    className="flex h-full min-h-[104px] min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-1 self-stretch rounded-[20px] bg-primary px-2 py-3 font-display text-xs font-bold uppercase tracking-[0.08em] text-primary-foreground shadow-lg transition-transform hover:-translate-y-px hover:bg-primary/90 disabled:translate-y-0 disabled:bg-primary/55 disabled:text-primary-foreground/60 sm:text-sm"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <CircleNotch className="size-4 shrink-0 animate-spin" />
+                        <span className="text-center leading-tight">
+                          {mode === "voiceover" ? "Generating" : "Processing"}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Generate</span>
+                        <Sparkle className="size-4 shrink-0" weight="fill" />
+                      </>
+                    )}
+                  </Button>
                 </div>
-
-                {/* Mode Selector (Desktop) */}
-                <div className="md:w-auto md:shrink-0 md:flex md:items-center">
-                  <div className="px-2">
-                    <ModeSelector mode={mode} onChange={setMode} />
-                  </div>
-                </div>
-
-                {/* Generate Button */}
-                <Button
-                  onClick={() => {
-                    void handleGenerate()
-                  }}
-                  disabled={!canGenerate || isGenerating || isEnhancing}
-                  className="md:min-h-[112px] md:w-[160px] md:shrink-0 rounded-[22px] bg-primary px-6 py-6 font-display text-lg font-bold uppercase tracking-[0.08em] text-primary-foreground shadow-lg transition-transform hover:translate-y-[-1px] hover:bg-primary/90 disabled:translate-y-0 disabled:bg-primary/55 disabled:text-primary-foreground/60"
-                >
-                  {isGenerating ? (
-                    <>
-                      <CircleNotch className="mr-2 size-5 animate-spin" />
-                      {mode === "voiceover" ? "Generating" : "Processing"}
-                    </>
-                  ) : (
-                    <>
-                      Generate
-                      <Sparkle className="ml-2 size-5" weight="fill" />
-                    </>
-                  )}
-                </Button>
               </div>
-
-              {/* Row 3 (Mobile): Generate Button (smaller, full width) */}
-              <Button
-                onClick={() => {
-                  void handleGenerate()
-                }}
-                disabled={!canGenerate || isGenerating || isEnhancing}
-                className="md:hidden rounded-[20px] bg-primary px-4 py-3 font-display font-bold uppercase tracking-[0.08em] text-primary-foreground shadow-lg transition-transform hover:translate-y-[-1px] hover:bg-primary/90 disabled:translate-y-0 disabled:bg-primary/55 disabled:text-primary-foreground/60 text-sm"
-              >
-                {isGenerating ? (
-                  <>
-                    <CircleNotch className="mr-2 size-4 animate-spin inline" />
-                    {mode === "voiceover" ? "Generating" : "Processing"}
-                  </>
-                ) : (
-                  <>
-                    Generate
-                    <Sparkle className="ml-2 size-4 inline" weight="fill" />
-                  </>
-                )}
-              </Button>
             </div>
           </div>
         </div>

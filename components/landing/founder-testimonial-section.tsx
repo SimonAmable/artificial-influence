@@ -17,8 +17,8 @@ const chartData = [
 
 const yAxisLabels = [0, 50000, 100000, 150000, 200000, 250000] as const
 
-const svgWidth = 560
-const svgHeight = 320
+const svgWidth = 608
+const svgHeight = 348
 const padding = { top: 28, right: 26, bottom: 38, left: 54 }
 const chartWidth = svgWidth - padding.left - padding.right
 const chartHeight = svgHeight - padding.top - padding.bottom
@@ -88,19 +88,13 @@ export function FounderTestimonialSection() {
             See the proof on X
           </Link>
 
-          <div className="mt-8 flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card/70 px-4 py-3 shadow-sm">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/12 text-primary">
-                <TrendingUp className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">7-day sprint</p>
-                <p className="text-sm text-muted-foreground">2 organic channels to 250k total views</p>
-              </div>
+          <div className="mt-8 flex items-center gap-3 rounded-2xl border border-border/70 bg-card/70 px-4 py-3 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/12 text-primary">
+              <TrendingUp className="h-5 w-5" />
             </div>
-
-            <div className="rounded-2xl border border-border/70 bg-card/70 px-4 py-3 text-sm text-muted-foreground shadow-sm">
-              UniCan agent automations for organic marketing
+            <div>
+              <p className="text-sm font-semibold text-foreground">7-day sprint</p>
+              <p className="text-sm text-muted-foreground">2 organic channels to 250k total views</p>
             </div>
           </div>
         </div>
@@ -109,17 +103,16 @@ export function FounderTestimonialSection() {
           initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 26 }}
           animate={revealed ? { opacity: 1, y: 0 } : { opacity: 0, y: 26 }}
           transition={{ duration: 0.7, ease: easeOut }}
-          className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-gradient-to-br from-card via-card to-primary/[0.05] p-4 shadow-[0_28px_80px_rgba(15,23,42,0.10)] dark:shadow-[0_28px_90px_rgba(0,0,0,0.35)] sm:p-6"
+          className="relative overflow-hidden rounded-[2rem] border border-border/60 bg-background/85 p-6 backdrop-blur-sm sm:p-7 lg:p-8 dark:bg-background/82 shadow-[0_4px_6px_-1px_rgba(59,130,246,0.06),0_32px_64px_-20px_rgba(15,23,42,0.18),0_12px_28px_-8px_rgba(15,23,42,0.12)] dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.5),0_40px_80px_-24px_rgba(0,0,0,0.55)]"
         >
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.18),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.12),transparent_28%)]" />
-
-          <div className="relative rounded-[1.5rem] border border-border/60 bg-background/78 p-4 backdrop-blur-sm sm:p-5">
-            <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+          <div className="mb-6 flex flex-wrap items-start justify-between gap-3 sm:mb-7">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Views growth
                 </p>
-                <p className="mt-1 text-2xl font-semibold text-foreground">250,000 total views</p>
+                <p className="mt-1 text-2xl font-semibold text-foreground sm:text-3xl">
+                  250,000 total views
+                </p>
               </div>
               <div className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-600 dark:text-emerald-400">
                 Hit video on Day 6
@@ -372,7 +365,6 @@ export function FounderTestimonialSection() {
                 </motion.div>
               ) : null}
             </div>
-          </div>
         </motion.div>
       </div>
     </section>

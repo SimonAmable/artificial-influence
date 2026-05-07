@@ -281,7 +281,7 @@ export function AudioVoiceSelector({
     selectedVoice?.voiceId || value || getDefaultAudioVoiceId(provider)
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("flex min-h-0 flex-col gap-2", className)}>
       <VoiceSelector
         onOpenChange={(nextOpen) => {
           setOpen(nextOpen)
@@ -301,7 +301,7 @@ export function AudioVoiceSelector({
       >
         <VoiceSelectorTrigger asChild>
           {renderTrigger ? (
-            <div>
+            <div className="flex h-full min-h-0 w-full flex-1 flex-col outline-none">
               {renderTrigger({
                 selectedVoice,
                 triggerLabel,

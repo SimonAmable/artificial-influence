@@ -15,7 +15,7 @@ export const landingHero = {
   primaryCtaLabel: "Get Started Free",
   primaryCtaHref: "/login?mode=signup",
   secondaryCtaLabel: "View pricing",
-  secondaryCtaHref: "/pricing",
+  secondaryCtaHref: "/#pricing",
 }
 
 export const canvasSeeds: LandingCanvasNodeSeed[] = [

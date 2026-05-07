@@ -44,6 +44,7 @@ import {
   isInsufficientCreditsError,
   isInsufficientCreditsMessage,
 } from "@/lib/generate-image-client"
+import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 
 type CanvasWithMaskStore = FabricCanvas & {
   __maskWorkCanvas?: FabricCanvas
@@ -378,9 +379,10 @@ export function ImageEditorPromptBar({
         console.error("Generation failed:", error)
       }
       if (isCredits) {
-        toast.error(message, {
+        showCreditsUpsellToast({
+          message,
           description: "Upgrade your plan to continue generating images",
-          action: { label: "View Plans", onClick: () => window.open("/pricing", "_blank") },
+          toastId: "image-editor-credits-upsell",
         })
       }
     } finally {

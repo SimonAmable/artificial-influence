@@ -15,6 +15,7 @@ import {
   isInsufficientCreditsMessage,
 } from "@/lib/generate-image-client"
 import { toast } from "sonner"
+import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 
 const CHARACTER_SWAP_PROMPT =
   "Character swap task using two reference images. First image is the reference character. " +
@@ -186,16 +187,18 @@ export default function CharacterSwapPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to generate character swap image"
       if (isInsufficientCreditsError(err) || isInsufficientCreditsMessage(message)) {
-        toast.error(message, {
+        showCreditsUpsellToast({
+          message,
           description: "Upgrade your plan to continue generating images",
-          action: { label: "View Plans", onClick: () => window.open("/pricing", "_blank") },
+          toastId: "character-swap-credits-upsell",
         })
       } else if (message.includes("Concurrency limit reached")) {
         toast.error("Too many active generations", {
           description: `${message} Wait for one to finish, then try again.`,
         })
+      } else {
+        setError(message)
       }
-      setError(message)
     } finally {
       setIsGenerating(false)
     }

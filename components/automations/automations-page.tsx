@@ -1469,11 +1469,11 @@ export function AutomationsPage() {
             <SelectContent position="popper" side="top" sideOffset={6}>
               {CHAT_GATEWAY_MODEL_OPTIONS.map((opt) => (
                 <SelectItem key={opt.id} value={opt.id}>
-                  <div className="flex items-center gap-3">
-                    <div className="shrink-0 rounded-md border border-border bg-muted/30 p-1.5">
+                  <div className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border bg-muted/30">
                       <ModelIcon identifier={opt.id} size={18} srcOverride={opt.iconPath} />
                     </div>
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <div className="flex min-w-0 flex-col gap-0.5">
                       <span className="text-sm font-semibold">{opt.label}</span>
                       <span className="text-xs text-muted-foreground">{opt.description}</span>
                     </div>

@@ -1,28 +1,28 @@
 export const INWORLD_TTS_MODEL_OPTIONS = [
   {
     id: "inworld-tts-1.5-max",
-    label: "Inworld TTS 1.5 Max",
+    label: "Inworld 1.5 Max",
     description: "Flagship quality and speed with enhanced timestamps",
     group: "Current",
     deprecated: false,
   },
   {
     id: "inworld-tts-1.5-mini",
-    label: "Inworld TTS 1.5 Mini",
+    label: "Inworld 1.5 Mini",
     description: "Lowest latency and most cost-efficient option",
     group: "Current",
     deprecated: false,
   },
   {
     id: "inworld-tts-1-max",
-    label: "Inworld TTS 1 Max",
+    label: "Inworld 1 Max",
     description: "Previous generation high-quality model with basic timestamps",
     group: "Legacy",
     deprecated: true,
   },
   {
     id: "inworld-tts-1",
-    label: "Inworld TTS 1",
+    label: "Inworld 1",
     description: "Previous generation fast model with basic timestamps",
     group: "Legacy",
     deprecated: true,

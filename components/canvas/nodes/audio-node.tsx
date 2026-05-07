@@ -42,11 +42,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { AudioModelOptionLabel } from "@/components/audio/audio-model-option-label"
 import { AudioVoiceSelector } from "@/components/audio/voice-selector"
 import {
   AUDIO_PROVIDER_OPTIONS,
   DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE,
+  GOOGLE_GEMINI_TTS_MODEL,
   GOOGLE_GEMINI_TTS_MODEL_LABEL,
+  getAudioModelIconSrc,
   getDefaultAudioModel,
   type AudioProvider,
 } from "@/lib/constants/audio"
@@ -594,7 +597,7 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
                   nodeData.onDataChange?.(id, { model: value, error: null })
                 }
               >
-                <SelectTrigger className="h-8 min-w-[140px] shrink-0 bg-zinc-800/80 border-white/10 text-xs">
+                <SelectTrigger className="h-8 w-fit max-w-[180px] shrink-0 bg-zinc-800/80 border-white/10 text-xs">
                   <SelectValue placeholder="Select model" />
                 </SelectTrigger>
                 <SelectContent>
@@ -604,7 +607,9 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
                       (option) => option.group === "Current"
                     ).map((option) => (
                       <SelectItem key={option.id} value={option.id}>
-                        {option.label}
+                        <AudioModelOptionLabel modelId={option.id}>
+                          {option.label}
+                        </AudioModelOptionLabel>
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -615,15 +620,24 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
                       (option) => option.group === "Legacy"
                     ).map((option) => (
                       <SelectItem key={option.id} value={option.id}>
-                        {option.label}
+                        <AudioModelOptionLabel modelId={option.id}>
+                          {option.label}
+                        </AudioModelOptionLabel>
                       </SelectItem>
                     ))}
                   </SelectGroup>
                 </SelectContent>
               </Select>
             ) : (
-              <div className="inline-flex h-8 min-w-[150px] shrink-0 items-center rounded-md border border-white/10 bg-zinc-800/80 px-3 text-xs text-zinc-200">
-                {GOOGLE_GEMINI_TTS_MODEL_LABEL}
+              <div className="inline-flex h-8 w-fit max-w-[180px] shrink-0 items-center gap-1.5 rounded-md border border-white/10 bg-zinc-800/80 px-2 text-xs text-zinc-200">
+                <img
+                  src={getAudioModelIconSrc(GOOGLE_GEMINI_TTS_MODEL)}
+                  alt=""
+                  className="size-4 shrink-0"
+                  width={16}
+                  height={16}
+                />
+                <span className="min-w-0 truncate">{GOOGLE_GEMINI_TTS_MODEL_LABEL}</span>
               </div>
             )}
 

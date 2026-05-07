@@ -2,21 +2,18 @@ import { Star } from "lucide-react"
 
 const testimonialData = [
   {
-    title: "30 days of content queued in seconds with automations",
     quote:
-      "Automations seriously changed how we post. We can queue up 30 days of content in seconds, keep everything moving, and skip the weekly rush that used to take hours.",
+      "They set up automations for me. I queue posts in seconds now instead of burning whole afternoons every week.",
     name: "Daniel",
     initials: "D",
   },
   {
-    title: "It helped us grow an AI influencer faster than our manual workflow",
     quote:
       "We used UniCan to grow an AI influencer account way more smoothly. Posting got faster, testing got easier, and views started going up once we found what worked.",
     name: "Luna",
     initials: "L",
   },
   {
-    title: "Our weekly thumbnail queue now takes minutes, not days",
     quote:
       "The agent saves us about 7 hours a week. We can make 20 custom thumbnails in minutes, move faster on every upload, and skip a lot of the usual back and forth.",
     name: "Sohan",
@@ -41,10 +38,7 @@ export function TestimonialsSection() {
                 index > 0 ? "md:border-l md:border-border/60" : ""
               }`}
             >
-              <h3 className="mt-8 max-w-sm text-2xl font-semibold leading-tight text-foreground">
-                {testimonial.title}
-              </h3>
-              <p className="mt-5 max-w-md text-base leading-8 text-muted-foreground">
+              <p className="mt-8 max-w-md text-base leading-8 text-muted-foreground">
                 {testimonial.quote}
               </p>
               <div className="mt-auto flex items-center gap-3 pt-14">

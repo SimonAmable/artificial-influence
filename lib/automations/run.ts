@@ -68,6 +68,7 @@ export async function runAutomation(
       source: "automation",
       automation_id: automation.id,
       automation_trigger: trigger,
+      title_locked: true,
     })
     .select("id")
     .single()

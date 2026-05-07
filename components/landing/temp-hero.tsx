@@ -122,7 +122,7 @@ export function TempHero() {
                 <ArrowRight className="ml-2 size-4" />
               </Button>
             </Link>
-            <Link href="/pricing" className="w-full sm:w-auto">
+            <Link href="/#pricing" className="w-full sm:w-auto">
               <Button
                 size="lg"
                 variant="outline"

@@ -32,7 +32,7 @@ export function FinalCTASection() {
           <Link href="/login?mode=signup">
             <Button size="lg">Get Started Free</Button>
           </Link>
-          <Link href="/pricing">
+          <Link href="/#pricing">
             <Button variant="outline" size="lg">
               View Pricing
             </Button>

@@ -16,7 +16,7 @@ export const modelsBentoCopy = {
   primaryCtaLabel: "Get started free",
   primaryCtaHref: "/login?mode=signup",
   secondaryCtaLabel: "View pricing",
-  secondaryCtaHref: "/pricing",
+  secondaryCtaHref: "/#pricing",
 } as const
 
 /** Curated homepage cards so the landing page shows actual supported model names, not backend/provider buckets. */

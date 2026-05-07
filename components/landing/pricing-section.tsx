@@ -582,9 +582,10 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
 
   return (
     <section
-      id={embedded ? 'pricing' : undefined}
+      id={embedded && !compact ? 'pricing' : undefined}
       className={cn(
         'bg-background px-4 sm:px-6 lg:px-8',
+        embedded && !compact && 'scroll-mt-24',
         embedded
           ? compact
             ? 'w-full py-4 sm:py-6'

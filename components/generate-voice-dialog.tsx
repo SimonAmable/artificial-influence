@@ -3,6 +3,7 @@
 import * as React from "react"
 import { CircleNotch, Sparkle } from "@phosphor-icons/react"
 
+import { AudioModelOptionLabel } from "@/components/audio/audio-model-option-label"
 import { AudioVoiceSelector } from "@/components/audio/voice-selector"
 import { Button } from "@/components/ui/button"
 import {
@@ -31,7 +32,9 @@ import {
   AUDIO_PROVIDER_OPTIONS,
   DEFAULT_AUDIO_PROVIDER,
   DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE,
+  GOOGLE_GEMINI_TTS_MODEL,
   GOOGLE_GEMINI_TTS_MODEL_LABEL,
+  getAudioModelIconSrc,
   getDefaultAudioModel,
   getDefaultAudioVoiceId,
   type AudioProvider,
@@ -320,7 +323,9 @@ export function GenerateVoiceDialog({
                           (option) => option.group === "Current"
                         ).map((option) => (
                           <SelectItem key={option.id} value={option.id}>
-                            {option.label}
+                            <AudioModelOptionLabel modelId={option.id}>
+                              {option.label}
+                            </AudioModelOptionLabel>
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -331,7 +336,9 @@ export function GenerateVoiceDialog({
                           (option) => option.group === "Legacy"
                         ).map((option) => (
                           <SelectItem key={option.id} value={option.id}>
-                            {option.label}
+                            <AudioModelOptionLabel modelId={option.id}>
+                              {option.label}
+                            </AudioModelOptionLabel>
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -346,8 +353,15 @@ export function GenerateVoiceDialog({
                 <>
                   <div className="grid gap-2">
                     <Label>Model</Label>
-                    <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-foreground">
-                      {GOOGLE_GEMINI_TTS_MODEL_LABEL}
+                    <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm text-foreground">
+                      <img
+                        src={getAudioModelIconSrc(GOOGLE_GEMINI_TTS_MODEL)}
+                        alt=""
+                        className="size-4 shrink-0"
+                        width={16}
+                        height={16}
+                      />
+                      <span>{GOOGLE_GEMINI_TTS_MODEL_LABEL}</span>
                     </div>
                   </div>
 

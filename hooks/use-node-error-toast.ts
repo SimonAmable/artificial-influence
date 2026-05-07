@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { isInsufficientCreditsMessage } from "@/lib/generate-image-client"
+import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 
 /** Show `nodeData.error` as a Sonner toast (in addition to inline UI in the prompt toolbar). */
 export function useNodeErrorToast(nodeId: string, error: string | null | undefined) {
@@ -14,13 +15,10 @@ export function useNodeErrorToast(nodeId: string, error: string | null | undefin
 
     if (normalized && normalized !== prevRef.current) {
       if (isInsufficientCreditsMessage(normalized)) {
-        toast.error(normalized, {
-          id: toastId,
+        showCreditsUpsellToast({
+          message: normalized,
           description: "Upgrade your plan to continue generating.",
-          action: {
-            label: "View Plans",
-            onClick: () => window.open("/pricing", "_blank"),
-          },
+          toastId,
         })
       } else if (normalized.includes("Concurrency limit reached")) {
         toast.error("Too many active generations", {

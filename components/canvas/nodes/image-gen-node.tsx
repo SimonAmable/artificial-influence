@@ -71,6 +71,7 @@ import {
   hasVideoOrAudioAssetRefs,
 } from "@/lib/commands/ref-image-pipeline"
 import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
+import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 
 // Helper function to get dimensions for aspect ratio
 const getImageDimensions = (aspectRatio: string) => {
@@ -555,12 +556,14 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         const msg = data.error ?? data.message ?? 'Remove background failed'
-        toast.error(msg)
         if (res.status === 402) {
-          toast.error('Insufficient credits', {
-            description: 'Remove background costs 1 credit.',
-            action: { label: 'View Plans', onClick: () => window.open('/pricing', '_blank') },
+          showCreditsUpsellToast({
+            message: msg,
+            description: "Remove background costs 1 credit.",
+            toastId: `canvas-image-node-credits-upsell-${id}`,
           })
+        } else {
+          toast.error(msg)
         }
         return
       }

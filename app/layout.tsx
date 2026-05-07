@@ -10,6 +10,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { AffiliateRefCapture } from "@/components/affiliate/affiliate-ref-capture"
 import { SitewideJsonLd } from "@/components/seo/sitewide-jsonld"
 import { getSiteBaseUrl } from "@/lib/seo/site-url"
+import { PricingUpsellController } from "@/components/pricing/pricing-upsell-controller"
 
 const siteBase = getSiteBaseUrl()
 
@@ -55,6 +56,7 @@ export default function RootLayout({
             <main>{children}</main>
           </LayoutModeProviderWrapper>
           <Toaster />
+          <PricingUpsellController />
           <AIChat />
           <TermsAcceptanceGate />
         </ThemeProvider>

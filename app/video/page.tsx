@@ -25,6 +25,8 @@ import { brandRefsOnly } from "@/lib/commands/ref-image-pipeline"
 import { validateVideoAttachedRefs } from "@/lib/commands/validate-video-refs"
 import { getVideoChipSlotInfo } from "@/lib/commands/video-chip-slots"
 import { generateVideoAndWait } from "@/lib/generate-video-client"
+import { isInsufficientCreditsMessage } from "@/lib/generate-image-client"
+import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 import { resolveVideoPricingQuote } from "@/lib/video-pricing"
 import type { VideoGridItem, VideoHistoryItem } from "@/components/shared/display/video-grid"
 import { toast } from "sonner"
@@ -945,12 +947,19 @@ function VideoPageContent() {
         const message = err instanceof Error ? err.message : "An error occurred"
         console.error("Generation error:", err)
         setPendingRequests((current) => removeSlotByClientId(current, clientRequestId))
-        if (message.includes("Concurrency limit reached")) {
+        if (isInsufficientCreditsMessage(message)) {
+          showCreditsUpsellToast({
+            message,
+            description: "Upgrade your plan to continue generating videos",
+            toastId: "video-credits-upsell",
+          })
+        } else if (message.includes("Concurrency limit reached")) {
           toast.error("Too many active generations", {
             description: `${message} Wait for one to finish, then try again.`,
           })
+        } else {
+          setError(message)
         }
-        setError(message)
         void fetchVideoHistory(20, { silent: true, replace: false })
       }
     })()

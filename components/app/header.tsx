@@ -32,7 +32,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { SettingsDropdown } from "@/components/app/settings-dropdown"
+import { SettingsDropdown, SettingsMenuContent } from "@/components/app/settings-dropdown"
 import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -232,7 +232,6 @@ export function Header() {
   const isMotionCopyPage = pathname === "/motion-copy"
   const isLipsyncPage = pathname === "/lipsync"
   const isAuthPage = pathname === "/login"
-  const isHomePage = pathname === "/"
   const isCanvasPage = pathname === "/canvas"
   const isCanvasDetailPage = pathname?.startsWith("/canvas/")
   const isOnboardingPage =
@@ -657,16 +656,20 @@ export function Header() {
                     <span className="sr-only">User menu</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end" className="w-64">
                   <DropdownMenuLabel className="font-normal">
-                    <div className="space-y-1">
-                      <div>{credits !== null ? `${credits} credits available` : "Credits unavailable"}</div>
-                      {user?.email ? (
-                        <div className="text-xs text-muted-foreground">{user.email}</div>
-                      ) : null}
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
+                   <div className="space-y-1">
+                     <div>{credits !== null ? `${credits} credits available` : "Credits unavailable"}</div>
+                     {user?.email ? (
+                       <div className="text-xs text-muted-foreground">{user.email}</div>
+                     ) : null}
+                   </div>
+                 </DropdownMenuLabel>
+                 <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push("/profile")}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/affiliate")}>
                     <HandCoins className="mr-2 h-4 w-4" />
                     <span>Affiliate program</span>
@@ -675,6 +678,13 @@ export function Header() {
                     <ChatCircleDots className="mr-2 h-4 w-4" />
                     <span>Send Feedback</span>
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <div className="p-2">
+                    <SettingsMenuContent
+                      layoutMode={(isCustomComponentsPage || isInpaintPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.layoutMode : undefined}
+                      onLayoutModeChange={(isCustomComponentsPage || isInpaintPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.setLayoutMode : undefined}
+                    />
+                  </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} variant="destructive">
                     <SignOut className="mr-2 h-4 w-4" />
@@ -696,10 +706,12 @@ export function Header() {
               </Button>
             </>
           )}
-          <SettingsDropdown
-            layoutMode={(isCustomComponentsPage || isInpaintPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.layoutMode : undefined}
-            onLayoutModeChange={(isCustomComponentsPage || isInpaintPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.setLayoutMode : undefined}
-          />
+          {!loading && !user ? (
+            <SettingsDropdown
+              layoutMode={(isCustomComponentsPage || isInpaintPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.layoutMode : undefined}
+              onLayoutModeChange={(isCustomComponentsPage || isInpaintPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.setLayoutMode : undefined}
+            />
+          ) : null}
         </div>
       </div>
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
