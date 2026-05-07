@@ -159,8 +159,8 @@ export function SkillLoadModal({
             />
           </div>
 
-          <ScrollArea className="min-h-0 flex-1 px-4 sm:px-6">
-            <div className="flex flex-col gap-2 pb-4 pr-3">
+          <ScrollArea className="**:data-[slot=scroll-area-viewport]:min-w-0 min-h-0 min-w-0 flex-1 px-4 sm:px-6">
+            <div className="flex min-w-0 flex-col gap-2 pb-4 pr-3">
               {loading ? (
                 <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
                   <CircleNotch className="size-4 animate-spin" />
@@ -174,23 +174,29 @@ export function SkillLoadModal({
                 filtered.map((skill) => (
                   <div
                     key={skill.slug}
-                    className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/10 p-3 md:flex-row md:items-center md:justify-between"
+                    className="flex min-w-0 flex-col gap-2 overflow-hidden rounded-lg border border-border/60 bg-muted/10 p-3 md:flex-row md:items-center md:justify-between"
                   >
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate font-medium">{skill.title ?? skill.slug}</span>
+                    <div className="min-w-0 max-w-full flex-1 space-y-1">
+                      <div className="flex min-w-0 items-start gap-2">
+                        <span className="min-w-0 flex-1 font-medium line-clamp-2 wrap-break-word">
+                          {skill.title ?? skill.slug}
+                        </span>
                         {skill.isMine ? (
-                          <Badge variant="secondary" className="text-[10px]">
+                          <Badge variant="secondary" className="shrink-0 text-[10px]">
                             Yours
                           </Badge>
                         ) : skill.isPublic ? (
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="shrink-0 text-[10px]">
                             Public
                           </Badge>
                         ) : null}
                       </div>
-                      <p className="font-mono text-xs text-muted-foreground">{skill.slug}</p>
-                      <p className="line-clamp-2 text-xs text-muted-foreground">{skill.description}</p>
+                      <p className="min-w-0 truncate font-mono text-xs text-muted-foreground" title={skill.slug}>
+                        {skill.slug}
+                      </p>
+                      <p className="line-clamp-2 min-w-0 wrap-break-word text-xs text-muted-foreground">
+                        {skill.description}
+                      </p>
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2 self-start md:self-center">

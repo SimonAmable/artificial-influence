@@ -618,12 +618,10 @@ export function BrandKitEditor({
                   </span>
                   {logoUrl ? (
                     <>
-                      <Image
+                      <img
                         src={logoUrl}
                         alt=""
-                        fill
-                        className="object-contain object-top-left p-2"
-
+                        className="absolute inset-0 h-full w-full object-contain object-top-left p-2"
                       />
                       <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/45">
                         <span className="rounded-full bg-zinc-900/95 px-3 py-1.5 text-xs font-medium text-zinc-100 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
