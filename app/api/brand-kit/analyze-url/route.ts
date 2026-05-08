@@ -3,8 +3,9 @@ import { NextResponse } from "next/server"
 import { AI_GATEWAY_CONFIG_ERROR, hasAIGatewayCredentials } from "@/lib/ai/gateway"
 import { createClient } from "@/lib/supabase/server"
 import { extractPageForBrand } from "@/lib/brand-kit/analyze-html"
-import { draftBrandFromPage } from "@/lib/brand-kit/analyze-url-llm"
+import { buildFallbackBrandDraft, draftBrandFromPage } from "@/lib/brand-kit/analyze-url-llm"
 import { maybeFetchReaderMarkdown } from "@/lib/brand-kit/analyze-url-phase2"
+import type { BrandOnboardingObject } from "@/lib/brand-kit/onboarding-schema"
 import { normalizeHttpUrl, fetchUrlSafe } from "@/lib/brand-kit/url-safety"
 
 export async function POST(request: Request) {
@@ -50,13 +51,22 @@ export async function POST(request: Request) {
       }
     }
 
-    const draft = await draftBrandFromPage(extraction, finalUrl, extraction.logoCandidates)
+    let draft: BrandOnboardingObject
+    let llmFailed = false
+    try {
+      draft = await draftBrandFromPage(extraction, finalUrl, extraction.logoCandidates)
+    } catch (llmError) {
+      llmFailed = true
+      console.error("[brand-kit/analyze-url] LLM draft failed; using static fallback", llmError)
+      draft = buildFallbackBrandDraft(extraction, finalUrl)
+    }
 
     console.info("[brand-kit/analyze-url] media", {
       finalUrl,
       images: extraction.referenceImages.length,
       videos: extraction.referenceVideos.length,
       logos: extraction.logoCandidates.length,
+      llmFailed,
     })
 
     // Use `responseBody` (not `body`); request JSON already uses `requestBody` above.

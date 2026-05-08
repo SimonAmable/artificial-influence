@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
+import { EditableDisplayName } from "@/components/profile/editable-display-name"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/server"
 import { getUserSubscription } from "@/lib/subscription-server"
@@ -55,7 +56,7 @@ export default async function ProfilePage() {
         <section className="p-1">
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground">Profile</p>
-            <h1 className="text-3xl font-semibold tracking-tight">{displayName}</h1>
+            <EditableDisplayName initialName={displayName} />
             <p className="text-sm text-muted-foreground">{email}</p>
           </div>
 

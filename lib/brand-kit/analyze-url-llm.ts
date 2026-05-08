@@ -52,6 +52,64 @@ export function mapSuggestedColorsToTokens(hexes: string[]): BrandColorToken[] {
   return out
 }
 
+function deriveNameFromUrl(finalUrl: string): string {
+  try {
+    const host = new URL(finalUrl).hostname.replace(/^www\./, "")
+    const root = host.split(".")[0] ?? host
+    if (!root) return "My brand"
+    return root.charAt(0).toUpperCase() + root.slice(1)
+  } catch {
+    return "My brand"
+  }
+}
+
+function cleanTitleAsName(title: string): string {
+  // Strip common suffix separators ("Site Title | Tagline", "Brand - Description") and keep the head.
+  const head = title.split(/\s+[|·•—–-]\s+/)[0] ?? title
+  return head.trim().slice(0, 80)
+}
+
+/**
+ * Static fallback draft used when the LLM call fails (e.g. AI Gateway ECONNRESET).
+ * Produces a minimal-but-valid `BrandOnboardingObject` from the static extraction so the
+ * user still lands in the editor with their colors, logos, and reference media populated.
+ */
+export function buildFallbackBrandDraft(
+  extraction: PageExtraction,
+  finalUrl: string,
+): BrandOnboardingObject {
+  const name = extraction.title?.trim()
+    ? cleanTitleAsName(extraction.title.trim())
+    : deriveNameFromUrl(finalUrl)
+
+  const colors: string[] = []
+  const themeHex = extraction.themeColorHint ? normalizeHex6(extraction.themeColorHint) : null
+  if (themeHex) colors.push(themeHex)
+  for (const c of extraction.extractedColorCandidates ?? []) {
+    const h = normalizeHex6(c)
+    if (h && !colors.includes(h)) colors.push(h)
+    if (colors.length >= BRAND_COLOR_ROLES.length) break
+  }
+
+  return {
+    suggestedName: name,
+    tagline: null,
+    brandValues: [],
+    aestheticTags: [],
+    toneTags: [],
+    notes: extraction.description?.trim() || null,
+    websiteUrl: finalUrl,
+    suggestedColors: colors,
+    selectedLogoUrl: extraction.logoCandidates[0] ?? null,
+    suggestedFontFamily: null,
+    suggestedMonoFont: null,
+    avoidWords: [],
+    audience: null,
+    layoutNotes: null,
+    warnings: ["AI draft was unavailable; fields filled from page metadata only."],
+  }
+}
+
 export async function draftBrandFromPage(
   extraction: PageExtraction,
   finalUrl: string,
@@ -99,6 +157,8 @@ Rules:
     schema: zodSchema(brandOnboardingObjectSchema),
     prompt,
     temperature: 0.3,
+    // Default is 2; bump to handle transient AI Gateway ECONNRESETs without 500ing the route.
+    maxRetries: 4,
   })
 
   let suggestedColors = [...(object.suggestedColors ?? [])]

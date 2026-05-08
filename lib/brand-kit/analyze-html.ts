@@ -7,7 +7,7 @@ import {
   parseThemeColorMeta,
 } from "@/lib/brand-kit/extract-colors-from-html"
 import { extractMedia } from "@/lib/brand-kit/extract-media"
-import { fetchSameOriginStylesheetTexts } from "@/lib/brand-kit/fetch-same-origin-stylesheets"
+import { fetchSameOriginStylesheets } from "@/lib/brand-kit/fetch-same-origin-stylesheets"
 
 export type PageExtraction = {
   title: string | null
@@ -67,10 +67,10 @@ export async function extractPageForBrand(html: string, finalUrl: string): Promi
   const themeColorHint = parseThemeColorMeta(themeMeta)
 
   const fromStylesheets: string[] = []
+  const cssSheets = await fetchSameOriginStylesheets(html, finalUrl)
   try {
-    const cssTexts = await fetchSameOriginStylesheetTexts(html, finalUrl)
-    for (const css of cssTexts) {
-      fromStylesheets.push(...extractColorsFromCssText(css))
+    for (const { text } of cssSheets) {
+      fromStylesheets.push(...extractColorsFromCssText(text))
     }
   } catch (e) {
     console.error("[extractPageForBrand] stylesheet colors:", e)
@@ -93,7 +93,7 @@ export async function extractPageForBrand(html: string, finalUrl: string): Promi
   })
 
   // Extract reference media before stripping `<script>` (JSON-LD lives there).
-  const media = extractMedia(html, finalUrl)
+  const media = extractMedia(html, finalUrl, cssSheets)
   const logoSet = new Set(logoCandidates)
   const referenceImages = media.images.filter((u) => !logoSet.has(u))
   const referenceVideos = media.videos

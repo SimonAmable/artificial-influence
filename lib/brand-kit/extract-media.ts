@@ -5,8 +5,9 @@ export type ExtractedMedia = {
   videos: string[]
 }
 
-const MAX_IMAGES = 12
-const MAX_VIDEOS = 4
+/** Raised cap so product galleries / carousels are not truncated at a dozen. */
+const MAX_IMAGES = 32
+const MAX_VIDEOS = 6
 
 const TRACKER_HOST_FRAGMENTS = [
   "googletagmanager.com",
@@ -118,6 +119,60 @@ function dedupeKey(url: string): string {
   }
 }
 
+/** Decode `/_next/image?url=…` wrappers so we also capture the underlying CDN asset. */
+function expandImageUrlVariants(base: string, raw: string | undefined | null): string[] {
+  const out: string[] = []
+  const primary = abs(base, raw)
+  if (!primary) return out
+  out.push(primary)
+  try {
+    const u = new URL(primary)
+    if (!u.pathname.includes("/_next/image")) return out
+    const inner = u.searchParams.get("url")
+    if (!inner) return out
+    const decoded = abs(base, decodeURIComponent(inner))
+    if (decoded && decoded !== primary) out.push(decoded)
+  } catch {
+    /* ignore */
+  }
+  return out
+}
+
+function pushImageVariants(out: string[], seen: Set<string>, base: string, raw: string | null | undefined): void {
+  for (const href of expandImageUrlVariants(base, raw)) {
+    pushImage(out, seen, href)
+  }
+}
+
+/** Pull `url(...)` targets from CSS; `base` should be the stylesheet URL for correct relative resolution. */
+function extractImageUrlsFromCss(css: string, base: string): string[] {
+  const found: string[] = []
+  const re = /url\(\s*(["']?)([^"')]+)\1\s*\)/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(css)) !== null) {
+    const raw = m[2]?.trim()
+    if (!raw || raw.startsWith("data:") || raw.startsWith("#")) continue
+    if (/\.(woff2?|ttf|eot|otf)(\?|#|$)/i.test(raw)) continue
+    const u = abs(base, raw)
+    if (u && /\.(png|jpe?g|webp|gif|avif|svg)(\?|#|$)/i.test(u)) {
+      found.push(u)
+    }
+  }
+  return found
+}
+
+function urlsFromInlineStyle(styleAttr: string | undefined): string[] {
+  if (!styleAttr?.includes("url(")) return []
+  const out: string[] = []
+  const re = /url\(\s*(["']?)([^"')]+)\1\s*\)/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(styleAttr)) !== null) {
+    const raw = m[2]?.trim()
+    if (raw && !raw.startsWith("data:") && !raw.startsWith("#")) out.push(raw)
+  }
+  return out
+}
+
 /** Pick the highest-resolution candidate from an `srcset` string. */
 function largestFromSrcset(base: string, srcset: string | undefined | null): string | null {
   if (!srcset) return null
@@ -165,7 +220,15 @@ function pushVideo(out: string[], seen: Set<string>, url: string | null): void {
 
 // ----- JSON-LD -----
 
-const JSONLD_IMAGE_FIELDS = ["image", "logo", "thumbnailUrl", "primaryImageOfPage"]
+const JSONLD_IMAGE_FIELDS = [
+  "image",
+  "logo",
+  "thumbnailUrl",
+  "primaryImageOfPage",
+  "photo",
+  "screenshot",
+  "associatedMedia",
+]
 const JSONLD_VIDEO_FIELDS = ["video", "trailer", "videoObject"]
 
 function collectImageLike(v: unknown, out: Set<string>): void {
@@ -254,17 +317,24 @@ function extractFromJsonLd($: CheerioAPI): { images: string[]; videos: string[] 
  * Extract reference image and video URLs from page HTML.
  *
  * Priority order (higher signal first):
- *   1. JSON-LD `Product`, `ImageObject`, `VideoObject`, `Organization.logo`
- *   2. Open Graph: every `og:image*`, `product:image`, `og:video*`, `twitter:image`
- *   3. `<picture><source srcset>` and `<img srcset|src|data-src>` (largest descriptor wins)
- *   4. `<video src>`, `<video poster>`, nested `<source src>`
- *   5. Embedded YouTube / Vimeo / Wistia iframes
+ *   1. JSON-LD (`Product`, `ImageObject`, `VideoObject`, `photo`, `screenshot`, …)
+ *   2. Open Graph / Twitter / `article:image` meta tags
+ *   3. `<link rel="preload" as="image">` (`href` + `imagesrcset`)
+ *   4. `<picture><source>` (`srcset` + `src`) and `<img>` (lazy attributes + `srcset`)
+ *   5. `<noscript>` fallbacks (SEO / no-JS real `<img>` URLs)
+ *   6. Inline `style="…url(…)…"` on elements
+ *   7. `<video>` / `<iframe>` embeds
+ *   8. Optional same-origin CSS `url(...)` (hero backgrounds, etc.)
  *
- * Tracker hosts and obvious UI chrome (favicons, sprites, 1x1 pixels, `_thumb`) are dropped.
- * URLs are deduped by canonical key (resize tokens and cache busters stripped). Caps at
- * `MAX_IMAGES` images and `MAX_VIDEOS` videos so the editor doesn't get flooded.
+ * Next.js `/_next/image?url=…` URLs are expanded to the underlying asset where possible.
+ * Tracker hosts and obvious chrome are dropped. Deduped by canonical key. Capped at
+ * `MAX_IMAGES` / `MAX_VIDEOS`.
  */
-export function extractMedia(html: string, finalUrl: string): ExtractedMedia {
+export function extractMedia(
+  html: string,
+  finalUrl: string,
+  cssSheets?: { href: string; text: string }[],
+): ExtractedMedia {
   const $ = load(html)
 
   const images: string[] = []
@@ -273,13 +343,13 @@ export function extractMedia(html: string, finalUrl: string): ExtractedMedia {
   const vidSeen = new Set<string>()
 
   const ld = extractFromJsonLd($)
-  for (const u of ld.images) pushImage(images, imgSeen, abs(finalUrl, u))
+  for (const u of ld.images) pushImageVariants(images, imgSeen, finalUrl, u)
   for (const u of ld.videos) pushVideo(videos, vidSeen, abs(finalUrl, u))
 
   $(
-    'meta[property="og:image"], meta[property="og:image:secure_url"], meta[property="product:image"], meta[name="twitter:image"], meta[name="twitter:image:src"]',
+    'meta[property="og:image"], meta[property="og:image:secure_url"], meta[property="product:image"], meta[property="article:image"], meta[name="twitter:image"], meta[name="twitter:image:src"]',
   ).each((_, el) => {
-    pushImage(images, imgSeen, abs(finalUrl, $(el).attr("content")))
+    pushImageVariants(images, imgSeen, finalUrl, $(el).attr("content"))
   })
 
   $(
@@ -288,28 +358,77 @@ export function extractMedia(html: string, finalUrl: string): ExtractedMedia {
     pushVideo(videos, vidSeen, abs(finalUrl, $(el).attr("content")))
   })
 
-  $("picture source").each((_, el) => {
-    pushImage(images, imgSeen, largestFromSrcset(finalUrl, $(el).attr("srcset")))
+  $('link[rel="preload"][as="image"][href]').each((_, el) => {
+    const $el = $(el)
+    pushImageVariants(images, imgSeen, finalUrl, $el.attr("href"))
+    pushImageVariants(images, imgSeen, finalUrl, largestFromSrcset(finalUrl, $el.attr("imagesrcset")))
   })
+
+  $("picture source").each((_, el) => {
+    const $el = $(el)
+    pushImageVariants(images, imgSeen, finalUrl, largestFromSrcset(finalUrl, $el.attr("srcset")))
+    pushImageVariants(images, imgSeen, finalUrl, $el.attr("src"))
+  })
+
+  const imgSrcAttrs = [
+    "data-src",
+    "data-lazy-src",
+    "data-original",
+    "data-large_image",
+    "data-full",
+    "data-hi-res",
+    "data-zoom",
+    "data-zoom-image",
+    "data-image",
+    "src",
+  ]
 
   $("img").each((_, el) => {
     const $el = $(el)
     const w = Number($el.attr("width") ?? "")
     const h = Number($el.attr("height") ?? "")
-    if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 && w < 200 && h < 200) {
+    if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 && w <= 48 && h <= 48) {
       return
     }
-    const fromSet = largestFromSrcset(finalUrl, $el.attr("srcset"))
-    const fromSrc = abs(
-      finalUrl,
-      $el.attr("src") ?? $el.attr("data-src") ?? $el.attr("data-lazy-src") ?? $el.attr("data-original"),
-    )
-    pushImage(images, imgSeen, fromSet ?? fromSrc)
+    const fromSet =
+      largestFromSrcset(finalUrl, $el.attr("srcset")) ??
+      largestFromSrcset(finalUrl, $el.attr("data-srcset")) ??
+      largestFromSrcset(finalUrl, $el.attr("data-lazy-srcset"))
+    if (fromSet) {
+      pushImageVariants(images, imgSeen, finalUrl, fromSet)
+    }
+    for (const attr of imgSrcAttrs) {
+      const v = $el.attr(attr)
+      if (v) pushImageVariants(images, imgSeen, finalUrl, v)
+    }
+  })
+
+  $("noscript").each((_, el) => {
+    const inner = $(el).html()
+    if (!inner?.trim()) return
+    const $n = load(inner)
+    $n("img").each((_2, img) => {
+      const $img = $n(img)
+      const fromSet =
+        largestFromSrcset(finalUrl, $img.attr("srcset")) ??
+        largestFromSrcset(finalUrl, $img.attr("data-srcset"))
+      if (fromSet) {
+        pushImageVariants(images, imgSeen, finalUrl, fromSet)
+      } else {
+        pushImageVariants(images, imgSeen, finalUrl, $img.attr("src"))
+      }
+    })
+  })
+
+  $('[style*="url("]').each((_, el) => {
+    for (const raw of urlsFromInlineStyle($(el).attr("style"))) {
+      pushImageVariants(images, imgSeen, finalUrl, raw)
+    }
   })
 
   $("video").each((_, el) => {
     const $el = $(el)
-    pushImage(images, imgSeen, abs(finalUrl, $el.attr("poster")))
+    pushImageVariants(images, imgSeen, finalUrl, $el.attr("poster"))
     const direct = abs(finalUrl, $el.attr("src"))
     if (direct && (VIDEO_EXT_RE.test(direct) || direct.includes(".m3u8"))) {
       pushVideo(videos, vidSeen, direct)
@@ -334,6 +453,14 @@ export function extractMedia(html: string, finalUrl: string): ExtractedMedia {
       lower.includes("fast.wistia.com/embed/")
     if (isEmbed) pushVideo(videos, vidSeen, u)
   })
+
+  if (cssSheets?.length) {
+    for (const { href, text } of cssSheets) {
+      for (const u of extractImageUrlsFromCss(text, href)) {
+        pushImageVariants(images, imgSeen, finalUrl, u)
+      }
+    }
+  }
 
   return { images, videos }
 }

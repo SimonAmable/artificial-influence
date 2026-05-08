@@ -1,5 +1,4 @@
 import type { GoogleLanguageModelOptions } from "@ai-sdk/google"
-import type { XaiLanguageModelChatOptions } from "@ai-sdk/xai"
 
 /**
  * Creative chat model tiers routed through Vercel AI Gateway.
@@ -14,7 +13,6 @@ type ChatGatewayTier = "fast" | "balanced" | "max"
 
 type ChatGatewayProviderOptions = {
   google?: GoogleLanguageModelOptions
-  xai?: XaiLanguageModelChatOptions
 }
 
 export type ChatGatewayModelOption = {
@@ -50,11 +48,8 @@ export const CHAT_GATEWAY_MODEL_OPTIONS: readonly ChatGatewayModelOption[] = [
     description: "The best mix of speed and depth for most conversations and creative work.",
     iconPath: "/logo-balanced.svg",
     legacyIds: ["xai/grok-4.1-fast-non-reasoning"],
-    providerOptions: {
-      xai: {
-        reasoningEffort: "low",
-      } satisfies XaiLanguageModelChatOptions,
-    },
+    // Do not pass reasoningEffort for Grok 4.x / 4.1: xAI rejects unsupported models with
+    // "Invalid arguments passed to the model" (reasoning is intrinsic to these variants).
   },
   {
     id: "google/gemini-3.1-flash-lite-preview",

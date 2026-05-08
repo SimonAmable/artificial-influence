@@ -17,10 +17,11 @@ const siteBase = getSiteBaseUrl()
 export const metadata: Metadata = {
   metadataBase: new URL(siteBase),
   title: {
-    default: "UniCan",
+    default: "UniCan - Automate faceless content and Instagram marketing with AI",
     template: "%s | UniCan",
   },
-  description: "Create and manage AI-powered content with uncanny AI generation tools",
+  description:
+    "Create more content in less time with easy-to-use AI agents trained for high-quality image, video, and audio generation, plus TikTok and Instagram autoposting to put growth on autopilot.",
   openGraph: {
     siteName: "UniCan",
     type: "website",

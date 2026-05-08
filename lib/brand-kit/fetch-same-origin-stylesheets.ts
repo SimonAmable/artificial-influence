@@ -4,10 +4,16 @@ import { fetchCssTextSafe } from "@/lib/brand-kit/url-safety"
 
 const MAX_STYLESHEETS = 10
 
+export type SameOriginStylesheet = { href: string; text: string }
+
 /**
  * Load linked stylesheet bodies from the same origin as `pageUrl` (SSRF-safe per fetch).
+ * Returns `{ href, text }` so callers can resolve relative `url(...)` inside CSS against `href`.
  */
-export async function fetchSameOriginStylesheetTexts(html: string, pageUrl: string): Promise<string[]> {
+export async function fetchSameOriginStylesheets(
+  html: string,
+  pageUrl: string,
+): Promise<SameOriginStylesheet[]> {
   let pageOrigin: string
   try {
     pageOrigin = new URL(pageUrl).origin
@@ -44,11 +50,11 @@ export async function fetchSameOriginStylesheetTexts(html: string, pageUrl: stri
     }
   })
 
-  const texts: string[] = []
+  const out: SameOriginStylesheet[] = []
   for (const href of hrefs.slice(0, MAX_STYLESHEETS)) {
     const css = await fetchCssTextSafe(href)
-    if (css?.trim()) texts.push(css)
+    if (css?.trim()) out.push({ href, text: css })
   }
 
-  return texts
+  return out
 }

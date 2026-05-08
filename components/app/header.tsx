@@ -9,27 +9,12 @@ import {
   SignOut,
   CaretDownIcon,
   ChatCircleDots,
-  CurrencyDollar,
-  ClockCounterClockwise,
+  Coin,
   HandCoins,
-  Image as ImageIcon,
-  Video as VideoIcon,
-  PaintBrush as PaintBrushIcon,
-  FilmStrip,
-  FolderSimple,
-  FlowArrow,
-  House,
-  Microphone as MicrophoneIcon,
-  Palette,
-  PaperPlaneTilt,
-  PencilSimple,
-  Robot as RobotIcon,
-  ShieldCheck,
-  SquaresFour,
-  Users,
-  ArrowsLeftRight,
 } from "@phosphor-icons/react"
 
+import { MegaNavItemBody, MenuBadge } from "@/components/app/mega-nav-item-body"
+import { MobileMegaNavSheet } from "@/components/app/mobile-mega-nav-sheet"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { SettingsDropdown, SettingsMenuContent } from "@/components/app/settings-dropdown"
@@ -43,99 +28,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { isAiMonochromeIconPath } from "@/lib/constants/ai-vendor-icons"
 import {
   megaNavGroups,
-  navigationItems,
-  type MegaNavBadge,
   type MegaNavGroup,
   type MegaNavItem,
-  type MegaNavPhosphorIcon,
 } from "@/lib/constants/navigation"
 import { FeedbackDialog } from "@/components/app/feedback-dialog"
+import { openPricingPlansModal } from "@/lib/pricing-upsell"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
 import { clearOnboardingCompletedLocal } from "@/lib/onboarding/client-storage"
-
-const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
-  image: ImageIcon,
-  video: VideoIcon,
-  "paint-brush": PaintBrushIcon,
-  "film-strip": FilmStrip,
-  "flow-arrow": FlowArrow,
-  microphone: MicrophoneIcon,
-  "chat-circle-dots": ChatCircleDots,
-  robot: RobotIcon,
-  "shield-check": ShieldCheck,
-}
-
-const MOBILE_NAV_ICON_MAP: Record<string, typeof ImageIcon> = {
-  "/": House,
-  "/chat": ChatCircleDots,
-  "/automations": RobotIcon,
-  "/image": ImageIcon,
-  "/video": VideoIcon,
-  "/audio": MicrophoneIcon,
-  "/brand": Palette,
-  "/motion-copy": Users,
-  "/lipsync": MicrophoneIcon,
-  "/inpaint": PaintBrushIcon,
-  "/character-swap": ArrowsLeftRight,
-  "/canvases": FlowArrow,
-  "/apps": SquaresFour,
-  "/editor": FilmStrip,
-  "/autopost": PaperPlaneTilt,
-  "/history": ClockCounterClockwise,
-  "/assets": FolderSimple,
-  "/resources": ImageIcon,
-  "/free-tools": ShieldCheck,
-  "/pricing": CurrencyDollar,
-  "/pricing-test": CurrencyDollar,
-}
-
-function getBadgeClasses(badge: MegaNavBadge) {
-  switch (badge) {
-    case "new":
-      return {
-        pill: "bg-primary text-primary-foreground",
-        ring: "ring-1 ring-primary/70 border-primary/60",
-      }
-    case "popular":
-      return {
-        pill: "bg-destructive text-destructive-foreground",
-        ring: "ring-1 ring-destructive/70 border-destructive/60",
-      }
-    case "beta":
-      return {
-        pill: "bg-amber-500 text-white dark:bg-amber-400 dark:text-black",
-        ring: "ring-1 ring-amber-500/70 border-amber-500/60 dark:ring-amber-400/70 dark:border-amber-400/60",
-      }
-  }
-}
-
-function getBadgeLabel(badge: MegaNavBadge) {
-  switch (badge) {
-    case "new":
-      return "New"
-    case "popular":
-      return "Top"
-    case "beta":
-      return "Beta"
-  }
-}
-
-function MenuBadge({ badge }: { badge: MegaNavBadge }) {
-  const classes = getBadgeClasses(badge)
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide leading-none",
-        classes.pill
-      )}
-    >
-      {getBadgeLabel(badge)}
-    </span>
-  )
-}
 
 function isGroupActive(pathname: string, group: MegaNavGroup) {
   if (group.path && pathname === group.path) return true
@@ -147,58 +48,13 @@ function isGroupActive(pathname: string, group: MegaNavGroup) {
 }
 
 function HeaderMenuItem({ item, onSelect }: { item: MegaNavItem; onSelect: (path: string) => void }) {
-  const classes = item.badge ? getBadgeClasses(item.badge) : null
-  const PhosphorIcon = item.iconPhosphor ? MEGA_NAV_PHOSPHOR[item.iconPhosphor] : null
   return (
     <DropdownMenuItem
       onClick={() => onSelect(item.path)}
       className="py-2.5"
       {...(item.modelIdentifier ? { "data-model-identifier": item.modelIdentifier } : {})}
     >
-      <div className="flex w-full items-start gap-3">
-        <div className="relative">
-          <div
-            className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-muted text-[10px] font-bold text-foreground shadow-sm",
-              classes?.ring
-            )}
-          >
-            {item.path === "/history" ? (
-              <ClockCounterClockwise className="h-[18px] w-[18px] text-foreground" weight="duotone" />
-            ) : PhosphorIcon ? (
-              <PhosphorIcon className="h-[18px] w-[18px] text-foreground" weight="duotone" />
-            ) : item.iconSrc ? (
-              <Image
-                src={item.iconSrc}
-                alt={`${item.label} icon`}
-                width={18}
-                height={18}
-                className={cn(
-                  "h-[18px] w-[18px] object-contain",
-                  isAiMonochromeIconPath(item.iconSrc) && "brightness-0 dark:invert",
-                  item.path === "/brand" && "invert"
-                )}
-              />
-            ) : (
-              item.iconText ?? item.label.slice(0, 2).toUpperCase()
-            )}
-          </div>
-          {item.badge ? (
-            <span
-              className={cn(
-                "absolute left-1/2 -top-1 -translate-x-1/2 inline-flex rounded-full px-1 py-0.5 text-[8px] font-extrabold uppercase leading-none",
-                classes?.pill
-              )}
-            >
-              {getBadgeLabel(item.badge)}
-            </span>
-          ) : null}
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-foreground">{item.label}</p>
-          <p className="line-clamp-1 text-xs text-muted-foreground">{item.description}</p>
-        </div>
-      </div>
+      <MegaNavItemBody item={item} />
     </DropdownMenuItem>
   )
 }
@@ -252,9 +108,6 @@ export function Header() {
     []
   )
   const assetsMenuItems = assetsMegaGroup?.simpleItems ?? []
-
-  const currentPage = navigationItems.find(item => item.path === pathname)?.path || pathname
-  const isPageInDropdown = navigationItems.some(item => item.path === pathname)
 
   // Scroll detection
   React.useEffect(() => {
@@ -523,68 +376,52 @@ export function Header() {
               )
             })}
           </nav>
-          {/* Mobile/Tablet Dropdown - visible on tablet and smaller */}
+          {/* Mobile/Tablet: left sheet reuses mega menu groups (useSearchParams inside) */}
           <div className="lg:hidden">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="justify-between gap-2 shadow-md"
-                >
-                  <span>
-                    {isPageInDropdown 
-                      ? navigationItems.find(item => item.path === currentPage)?.label || "Select a page"
-                      : "Tools"}
-                  </span>
+            <React.Suspense
+              fallback={
+                <Button variant="outline" className="justify-between gap-2 shadow-md" disabled type="button">
+                  <span className="min-w-16 select-none text-muted-foreground">Menu</span>
                   <CaretDownIcon className="h-4 w-4 opacity-50" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  className="mobile-nav-scrollless relative isolate z-[70] w-80 overflow-x-hidden overflow-y-auto border border-border/70 bg-popover/98 p-3 shadow-[inset_0_1px_2px_rgba(255,255,255,0.8),0_18px_40px_rgba(0,0,0,0.38),0_6px_18px_rgba(0,0,0,0.24)] backdrop-blur-sm"
-                >
-                  <div className="relative z-0 space-y-1">
-                    {navigationItems.map((item) => {
-                      const Icon = MOBILE_NAV_ICON_MAP[item.path] ?? PencilSimple
-
-                      return (
-                        <DropdownMenuItem
-                          key={item.path}
-                          onClick={() => router.push(item.path)}
-                          className={cn(
-                            "rounded-[22px] bg-transparent px-0 py-0 shadow-none data-[highlighted]:bg-transparent data-[highlighted]:shadow-none",
-                          )}
-                        >
-                          <div
-                            className={cn(
-                              "flex w-full items-center gap-3 rounded-[20px] border border-border/60 bg-background/92 px-2 py-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.24),0_2px_8px_rgba(0,0,0,0.14)] transition-[box-shadow,border-color,background-color]",
-                              "group-data-[highlighted]/dropdown-menu-item:border-border/80 group-data-[highlighted]/dropdown-menu-item:bg-accent/90 group-data-[highlighted]/dropdown-menu-item:shadow-[0_14px_28px_rgba(0,0,0,0.3),0_4px_12px_rgba(0,0,0,0.18)]",
-                              pathname === item.path && "border-border/80 bg-accent/85 shadow-[0_14px_28px_rgba(0,0,0,0.32),0_4px_12px_rgba(0,0,0,0.2)]"
-                            )}
-                          >
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[24px] bg-muted text-foreground shadow-sm">
-                              <Icon size={20} weight="duotone" className="shrink-0" />
-                            </div>
-                            <span
-                              className={cn(
-                                "min-w-0 flex-1 text-sm font-semibold text-foreground",
-                                item.className
-                              )}
-                            >
-                              {item.label}
-                            </span>
-                          </div>
-                        </DropdownMenuItem>
-                      )
-                    })}
-                  </div>
-                </DropdownMenuContent>
-             </DropdownMenu>
-           </div>
+                </Button>
+              }
+            >
+              <MobileMegaNavSheet authenticated={Boolean(user)} />
+            </React.Suspense>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {loading ? null : user ? (
             <>
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-secondary/40 px-3 py-1.5 text-sm font-semibold tabular-nums text-foreground shadow-sm",
+                  "transition-colors hover:bg-secondary/70 hover:text-foreground"
+                )}
+                aria-label={
+                  credits !== null
+                    ? `${credits.toLocaleString()} credits — open plans and buy more`
+                    : "Credits — open plans and buy more"
+                }
+                onClick={() => {
+                  void refreshCredits()
+                  openPricingPlansModal()
+                }}
+              >
+                <Coin
+                  className="h-4 w-4 shrink-0 text-muted-foreground"
+                  weight="duotone"
+                />
+                {credits !== null ? (
+                  <span>{credits.toLocaleString()}</span>
+                ) : (
+                  <span
+                    className="inline-block h-4 w-9 animate-pulse rounded bg-muted"
+                    aria-hidden
+                  />
+                )}
+              </button>
               <DropdownMenu
                 open={assetsMenuOpen}
                 onOpenChange={(open) => {
@@ -669,6 +506,10 @@ export function Header() {
                   <DropdownMenuItem onClick={() => router.push("/profile")}>
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/pricing")}>
+                    <Coin className="mr-2 h-4 w-4" />
+                    <span>Pricing</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/affiliate")}>
                     <HandCoins className="mr-2 h-4 w-4" />

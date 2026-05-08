@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -763,7 +762,11 @@ export function BrandKitEditor({
                       playsInline
                     />
                   ) : (
-                    <Image src={item.url} alt="" fill className="object-cover" />
+                    // Reference media comes from arbitrary external brand CDNs, so we render
+                    // with a native `<img>` instead of `next/image` (which requires whitelisting
+                    // each hostname under `images.remotePatterns`).
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.url} alt="" className="h-full w-full object-cover" />
                   )}
                   <button
                     type="button"
