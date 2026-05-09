@@ -1,6 +1,5 @@
 import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
-import { assertAcceptedCurrentTerms } from '@/lib/legal/terms-acceptance';
 import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCreditsUpTo } from '@/lib/credits';
 import { resolveVideoPricingQuote } from '@/lib/video-pricing';
@@ -33,11 +32,6 @@ export async function POST(request: NextRequest) {
       );
     }
     console.log('[generate-lipsync] ✓ User authenticated:', { userId: user.id, email: user.email });
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id);
-    if (termsResponse) {
-      return termsResponse;
-    }
 
     // Parse JSON body (files are already uploaded to Supabase by client)
     console.log('[generate-lipsync] Parsing request body...');

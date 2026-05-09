@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { assertAcceptedCurrentTerms } from '@/lib/legal/terms-acceptance';
 import { validateCreditPackCredits, CREDIT_PACK_CURRENCY } from '@/lib/credit-packs';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
@@ -53,11 +52,6 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id);
-    if (termsResponse) {
-      return termsResponse;
     }
 
     const admin = createServiceRoleClient();

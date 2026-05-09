@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { ASSET_CATEGORIES, inferStoragePathFromUrl, normalizeTags } from "@/lib/assets/library"
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
-import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { resolveStoredObjectUrl } from "@/lib/uploads/server"
 
@@ -35,11 +34,6 @@ export async function PATCH(
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 })
-    }
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-    if (termsResponse) {
-      return termsResponse
     }
 
     const resolvedParams = await Promise.resolve(params)
@@ -142,11 +136,6 @@ export async function DELETE(
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 })
-    }
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-    if (termsResponse) {
-      return termsResponse
     }
 
     const resolvedParams = await Promise.resolve(params)

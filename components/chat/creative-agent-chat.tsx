@@ -1483,6 +1483,15 @@ function PromptLengthBadge({ prompt }: { prompt?: string | null }) {
   )
 }
 
+/** Tool outputs used to repeat agent instructions — hide so the card stays end-user readable. */
+function shouldHideGenerateImageToolMessage(message: string | undefined | null) {
+  if (message === undefined || message === null || message.trim().length === 0) return true
+  return (
+    message.includes("no later tool in this same turn") ||
+    message.startsWith("Started an image generation with")
+  )
+}
+
 function ImageGenerationResultCard({
   badgeLabel,
   messageId,
@@ -1652,7 +1661,6 @@ function ImageGenerationResultCard({
   if (part.state === "output-available") {
     const effectiveStatus = polledState?.status ?? part.output?.status ?? "completed"
     const effectiveImages = polledState?.images ?? part.output?.images ?? []
-    const effectiveGenerationId = polledState?.generationId ?? part.output?.generationId
     const creditsUsed =
       part.output && "creditsUsed" in part.output
         ? (part.output as UniversalGenerateImageToolPart["output"])?.creditsUsed
@@ -1687,13 +1695,12 @@ function ImageGenerationResultCard({
               />
               <PromptLengthBadge prompt={part.input?.prompt} />
             </div>
-            {part.output?.message ? (
-              <p className="text-sm text-muted-foreground">{part.output.message}</p>
+            {!shouldHideGenerateImageToolMessage(part.output?.message ?? null) ? (
+              <p className="text-sm text-muted-foreground">{part.output?.message}</p>
             ) : null}
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <CircleNotch className="h-4 w-4 animate-spin" />
               <span>Image generation is still running.</span>
-              {effectiveGenerationId ? <Badge variant="outline">job {effectiveGenerationId.slice(0, 8)}</Badge> : null}
             </div>
           </CardContent>
         </Card>
@@ -1726,8 +1733,8 @@ function ImageGenerationResultCard({
             />
             <PromptLengthBadge prompt={part.input?.prompt} />
           </div>
-          {part.output?.message ? (
-            <p className="text-sm text-muted-foreground">{part.output.message}</p>
+          {!shouldHideGenerateImageToolMessage(part.output?.message ?? null) ? (
+            <p className="text-sm text-muted-foreground">{part.output?.message}</p>
           ) : null}
           {effectiveImages.length > 0 ? (
             <div className="overflow-hidden rounded-2xl border border-border/60 bg-background">

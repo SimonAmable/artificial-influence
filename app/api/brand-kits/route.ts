@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 
 import { brandKitFromRow } from "@/lib/brand-kit/database-server"
@@ -92,14 +91,6 @@ export async function POST(request: NextRequest) {
     }
 
 
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-
-    if (termsResponse) {
-
-      return termsResponse
-
-    }
 
     const body = await request.json().catch(() => ({}))
 

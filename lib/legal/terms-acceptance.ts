@@ -2,11 +2,9 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
-import { NextResponse } from "next/server"
 
 import { loadLegalDoc } from "@/lib/legal/load-legal-doc"
 
-export const TERMS_ACCEPTANCE_REQUIRED_CODE = "terms_acceptance_required" as const
 export const TERMS_VERSION_COOKIE = "terms_version" as const
 
 export type TermsAcceptanceSource = "onboarding" | "blocking_modal"
@@ -131,12 +129,6 @@ export async function getTermsAcceptanceStatus(
   }
 }
 
-export async function readTermsVersionCookie() {
-  const cookieStore = await cookies()
-  const value = cookieStore.get(TERMS_VERSION_COOKIE)?.value
-  return typeof value === "string" && value.length > 0 ? value : null
-}
-
 export async function setTermsVersionCookie(version: string) {
   const cookieStore = await cookies()
   cookieStore.set(TERMS_VERSION_COOKIE, version, termsCookieOptions())
@@ -178,34 +170,4 @@ export async function recordCurrentTermsAcceptance(
     acceptedAt,
     currentTerms,
   }
-}
-
-export async function assertAcceptedCurrentTerms(
-  supabase: SupabaseClient,
-  userId: string
-) {
-  const currentTerms = getCurrentTermsDocument()
-  const cookieVersion = await readTermsVersionCookie()
-
-  if (cookieVersion === currentTerms.version) {
-    return null
-  }
-
-  const status = await getTermsAcceptanceStatus(supabase, userId)
-  if (!status.needsAcceptance) {
-    await setTermsVersionCookie(currentTerms.version)
-    return null
-  }
-
-  await clearTermsVersionCookie()
-
-  return NextResponse.json(
-    {
-      error: "You must accept the current Terms of Use before continuing.",
-      code: TERMS_ACCEPTANCE_REQUIRED_CODE,
-      reason: status.reason,
-      currentTerms: status.currentTerms,
-    },
-    { status: 403 }
-  )
 }

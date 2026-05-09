@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { getAffiliateProgramAgreementText } from '@/lib/affiliate/get-affiliate-agreement-text'
-import { assertAcceptedCurrentTerms } from '@/lib/legal/terms-acceptance'
 import {
   normalizeAffiliateCode,
   validateAffiliateCodeFormat,
@@ -17,11 +16,6 @@ export async function POST(request: Request) {
 
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-  if (termsResponse) {
-    return termsResponse
   }
 
   let body: { code?: string }

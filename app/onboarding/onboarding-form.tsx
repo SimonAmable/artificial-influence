@@ -51,7 +51,7 @@ import { setOnboardingCompletedLocal } from "@/lib/onboarding/client-storage"
 import type { CompleteOnboardingPayload } from "@/lib/onboarding/payload-schema"
 import { cn } from "@/lib/utils"
 
-const STEPS = 9
+const STEPS = 8
 
 const TEAM_OPTIONS: {
   id: CompleteOnboardingPayload["teamSize"]
@@ -266,39 +266,6 @@ function OnboardingProgressBar({ step }: { step: number }) {
   )
 }
 
-function ThemeMiniPreview({ variant }: { variant: "light" | "dark" }) {
-  const isDark = variant === "dark"
-  return (
-    <div
-      className={cn(
-        "flex h-24 w-full gap-1 rounded-lg border p-1.5 shadow-inner",
-        isDark ? "border-border bg-muted" : "border-border bg-card"
-      )}
-    >
-      <div
-        className={cn(
-          "w-[28%] rounded-md",
-          isDark ? "bg-muted-foreground/25" : "bg-muted"
-        )}
-      />
-      <div className="flex flex-1 flex-col gap-1">
-        <div
-          className={cn(
-            "h-2 rounded",
-            isDark ? "bg-muted-foreground/20" : "bg-muted-foreground/15"
-          )}
-        />
-        <div
-          className={cn(
-            "flex-1 rounded-md",
-            isDark ? "bg-muted-foreground/15" : "bg-background"
-          )}
-        />
-      </div>
-    </div>
-  )
-}
-
 function choiceGlowLayoutId(step: number, suffix = "") {
   return `onboarding-choice-glow-step-${step}${suffix}`
 }
@@ -438,13 +405,10 @@ export function OnboardingForm({
   userId: string
 }) {
   const router = useRouter()
-  const { setTheme } = useTheme()
+  const { resolvedTheme } = useTheme()
   const [step, setStep] = React.useState(0)
   const [pending, setPending] = React.useState(false)
 
-  const [themeChoice, setThemeChoice] = React.useState<
-    CompleteOnboardingPayload["theme"] | null
-  >(null)
   const [creationGoals, setCreationGoals] = React.useState<
     CompleteOnboardingPayload["creationGoals"]
   >([])
@@ -466,11 +430,6 @@ export function OnboardingForm({
   >(null)
   const [acceptedTerms, setAcceptedTerms] = React.useState(false)
 
-  const pickTheme = (t: CompleteOnboardingPayload["theme"]) => {
-    setThemeChoice(t)
-    setTheme(t)
-  }
-
   const toggleCreationGoal = (id: CompleteOnboardingPayload["creationGoals"][number]) => {
     setCreationGoals((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -490,13 +449,12 @@ export function OnboardingForm({
 
   const canGoNext = () => {
     if (step === 0) return true
-    if (step === 1) return themeChoice !== null
-    if (step === 2) return creationGoals.length >= 1
-    if (step === 3) return aiExperience !== null
-    if (step === 4) return fullName.trim().length >= 1
-    if (step === 5) return referralSource !== null
-    if (step === 6) return priorities.length >= 1 && priorities.length <= 3
-    if (step === 7) return teamSize !== null && role !== null
+    if (step === 1) return creationGoals.length >= 1
+    if (step === 2) return aiExperience !== null
+    if (step === 3) return fullName.trim().length >= 1
+    if (step === 4) return referralSource !== null
+    if (step === 5) return priorities.length >= 1 && priorities.length <= 3
+    if (step === 6) return teamSize !== null && role !== null
     return false
   }
 
@@ -511,7 +469,6 @@ export function OnboardingForm({
 
   const onFinish = async () => {
     if (
-      themeChoice === null ||
       creationGoals.length < 1 ||
       aiExperience === null ||
       referralSource === null ||
@@ -523,10 +480,12 @@ export function OnboardingForm({
       toast.error("Complete all steps")
       return
     }
+    const theme: CompleteOnboardingPayload["theme"] =
+      resolvedTheme === "dark" ? "dark" : "light"
     setPending(true)
     try {
       const result = await completeOnboarding({
-        theme: themeChoice,
+        theme,
         fullName: fullName.trim(),
         teamSize,
         role,
@@ -596,9 +555,6 @@ export function OnboardingForm({
                     Welcome to UniCan
                   </h1>
                   <p className="text-foreground">
-                    Let&apos;s set up your creative space
-                  </p>
-                  <p className="text-sm text-muted-foreground">
                     Answer a few quick questions so we can personalize your
                     experience.
                   </p>
@@ -607,49 +563,6 @@ export function OnboardingForm({
             )}
 
             {step === 1 && (
-              <>
-                <div className="w-full max-w-md space-y-1 text-center">
-                  <h1 className="text-2xl font-semibold tracking-tight text-primary">
-                    Pick your style
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    Light or dark — you can change this anytime
-                  </p>
-                </div>
-                <LayoutGroup id="onboarding-theme">
-                  <div className="grid w-full max-w-md grid-cols-2 gap-4">
-                    {(["light", "dark"] as const).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => pickTheme(t)}
-                        className="relative overflow-hidden rounded-2xl border border-border bg-card/50 p-3 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        {themeChoice === t && (
-                          <motion.div
-                            layoutId={glowId}
-                            className="pointer-events-none absolute inset-0 rounded-2xl bg-primary/12 shadow-[0_0_28px_-2px] shadow-primary/50 ring-2 ring-primary/45"
-                            transition={{
-                              type: "spring",
-                              stiffness: 380,
-                              damping: 34,
-                            }}
-                          />
-                        )}
-                        <div className="relative z-10 flex flex-col gap-3">
-                          <ThemeMiniPreview variant={t} />
-                          <span className="text-center text-sm font-medium capitalize text-foreground">
-                            {t === "light" ? "Light" : "Dark"}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </LayoutGroup>
-              </>
-            )}
-
-            {step === 2 && (
               <>
                 <div className="w-full max-w-md space-y-1 text-center">
                   <h1 className="text-2xl font-semibold tracking-tight text-primary">
@@ -674,7 +587,7 @@ export function OnboardingForm({
               </>
             )}
 
-            {step === 3 && (
+            {step === 2 && (
               <>
                 <div className="w-full max-w-md space-y-1 text-center">
                   <h1 className="text-2xl font-semibold tracking-tight text-primary">
@@ -702,7 +615,7 @@ export function OnboardingForm({
               </>
             )}
 
-            {step === 4 && (
+            {step === 3 && (
               <>
                 <div className="w-full max-w-md space-y-1 text-center">
                   <h1 className="text-2xl font-semibold tracking-tight text-primary">
@@ -714,7 +627,7 @@ export function OnboardingForm({
                 </div>
                 <div className="w-full max-w-md space-y-2">
                   <Label htmlFor="onboarding-name" className="text-foreground">
-                    Full name
+                    Name
                   </Label>
                   <Input
                     id="onboarding-name"
@@ -728,7 +641,7 @@ export function OnboardingForm({
               </>
             )}
 
-            {step === 5 && (
+            {step === 4 && (
               <>
                 <div className="w-full max-w-md space-y-1 text-center">
                   <h1 className="text-2xl font-semibold tracking-tight text-primary">
@@ -755,7 +668,7 @@ export function OnboardingForm({
               </>
             )}
 
-            {step === 6 && (
+            {step === 5 && (
               <>
                 <div className="w-full max-w-md space-y-1 text-center">
                   <h1 className="text-2xl font-semibold tracking-tight text-primary">
@@ -777,7 +690,7 @@ export function OnboardingForm({
               </>
             )}
 
-            {step === 7 && (
+            {step === 6 && (
               <>
                 <div className="w-full max-w-md space-y-1 text-center">
                   <h1 className="text-2xl font-semibold tracking-tight text-primary">
@@ -862,7 +775,7 @@ export function OnboardingForm({
               </>
             )}
 
-            {step === 8 && (
+            {step === 7 && (
               <>
                 <div className="w-full max-w-md space-y-1 text-center">
                   <h1 className="text-2xl font-semibold tracking-tight text-primary">

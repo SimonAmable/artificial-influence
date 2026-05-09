@@ -3,7 +3,6 @@ import { replicate } from '@ai-sdk/replicate';
 import { xai } from '@ai-sdk/xai';
 import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
-import { assertAcceptedCurrentTerms } from '@/lib/legal/terms-acceptance';
 import { enhancePrompt, enhancePromptForJSONModels } from '@/lib/prompt-enhancement';
 import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
@@ -44,11 +43,6 @@ export async function POST(request: NextRequest) {
       );
     }
     console.log('[generate-image] ✓ User authenticated:', { userId: user.id, email: user.email });
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id);
-    if (termsResponse) {
-      return termsResponse;
-    }
 
     // Clean stale pending requests so users are not blocked forever by abandoned runs.
     const staleCutoff = new Date(Date.now() - STALE_PENDING_MINUTES * 60 * 1000).toISOString();

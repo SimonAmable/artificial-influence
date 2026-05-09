@@ -5,7 +5,6 @@ import {
   getDefaultAudioModel,
   getDefaultAudioVoiceId,
 } from "@/lib/constants/audio"
-import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { resolveAudioProvider, synthesizeSpeech } from "@/lib/server/audio-tts"
 import { createClient } from "@/lib/supabase/server"
 
@@ -29,11 +28,6 @@ export async function POST(request: NextRequest) {
         { error: "Unauthorized. Please log in to generate audio." },
         { status: 401 }
       )
-    }
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-    if (termsResponse) {
-      return termsResponse
     }
 
     const body = await request.json()

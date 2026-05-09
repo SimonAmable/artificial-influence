@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 
 import { brandKitFromRow } from "@/lib/brand-kit/database-server"
@@ -78,14 +77,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
 
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-
-    if (termsResponse) {
-
-      return termsResponse
-
-    }
 
     const body = await request.json().catch(() => ({}))
 
@@ -312,14 +303,6 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     }
 
 
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-
-    if (termsResponse) {
-
-      return termsResponse
-
-    }
 
     const { data: victim, error: vErr } = await supabase
 

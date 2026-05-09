@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 
 import { enhanceAgentComposerInstructions } from "@/lib/prompt-enhancement"
 import { AI_GATEWAY_CONFIG_ERROR, hasAIGatewayCredentials } from "@/lib/ai/gateway"
-import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 
 const MAX_CHARS = 12_000
@@ -27,11 +26,6 @@ export async function POST(req: Request) {
         { error: "Unauthorized. Please log in." },
         { status: 401 }
       )
-    }
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-    if (termsResponse) {
-      return termsResponse
     }
 
     const body = await req.json()

@@ -8,7 +8,6 @@ import {
   isAutomationServiceError,
   listOwnedAutomations,
 } from "@/lib/automations/service"
-import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 
 function parseVisibilityParam(value: string | null): "mine" | "community" {
@@ -103,11 +102,6 @@ export async function POST(req: Request) {
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-    if (termsResponse) {
-      return termsResponse
     }
 
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>

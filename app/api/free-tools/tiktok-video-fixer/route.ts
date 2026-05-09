@@ -5,7 +5,6 @@ import {
   processTikTokVideoFixerJob,
   TIKTOK_VIDEO_FIXER_JOB_TABLE,
 } from "@/lib/free-tools/tiktok-video-fixer-jobs"
-import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import {
   createMissingFfmpegMessage,
   resolveFfmpegBinaryPath,
@@ -34,11 +33,6 @@ export async function POST(request: Request) {
         { error: "Sign in to use the TikTok video fixer." },
         { status: 401 }
       )
-    }
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-    if (termsResponse) {
-      return termsResponse
     }
 
     const body = (await request.json().catch(() => ({}))) as QueueTikTokVideoFixerRequest

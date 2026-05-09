@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 
 import { computeNextRun, validateCronExpression } from "@/lib/automations/schedule"
 import type { AutomationRow } from "@/lib/automations/types"
-import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -18,11 +17,6 @@ export async function POST(_req: Request, context: RouteContext) {
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-    if (termsResponse) {
-      return termsResponse
     }
 
     const { data: src, error: fetchError } = await supabase

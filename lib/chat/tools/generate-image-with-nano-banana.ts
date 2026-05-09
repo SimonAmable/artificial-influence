@@ -382,7 +382,6 @@ export function createGenerateImageWithNanoBananaTool({
         return {
           aspectRatio: resolvedAspectRatio,
           generationId: pendingGeneration.id,
-          message: `Started an image generation with ${NANO_BANANA_MODEL}. If no later tool in this same turn needs the finished image, stop here and let the UI update asynchronously.`,
           model: NANO_BANANA_MODEL,
           nextStepHint:
             "Only call awaitGeneration when a later tool in this same turn needs the finished image (for example image -> video or image -> extract frames). Otherwise reply to the user and stop.",

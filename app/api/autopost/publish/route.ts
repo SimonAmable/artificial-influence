@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 
 import { publishAutopostJob } from "@/lib/autopost/publish-job"
-import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 
 /** Reels wait on Instagram container status; raise on Vercel Pro+ if publishes time out. */
@@ -17,11 +16,6 @@ export async function POST(request: Request) {
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 })
-    }
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-    if (termsResponse) {
-      return termsResponse
     }
 
     let json: unknown

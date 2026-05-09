@@ -1,6 +1,5 @@
 import { createHash } from "crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import {
@@ -59,11 +58,6 @@ async function getAuthenticatedUser() {
 
   if (error || !user) {
     throw new Error("Unauthorized")
-  }
-
-  const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-  if (termsResponse) {
-    throw new Error("Terms acceptance required")
   }
 
   return { supabase, user }

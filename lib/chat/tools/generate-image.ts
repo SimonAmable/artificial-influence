@@ -617,7 +617,6 @@ export function createGenerateImageTool({
         return {
           aspectRatio: falRequest.resolvedAspectRatio,
           generationId: pendingGeneration.id,
-          message: `Started an image generation with ${modelIdentifier}. If no later tool in this same turn needs the finished image, stop here and let the UI update asynchronously.`,
           model: modelIdentifier,
           nextStepHint:
             "Only call awaitGeneration when a later tool in this same turn needs the finished image (for example image -> video or image -> draft). Otherwise reply to the user and stop.",
@@ -730,7 +729,6 @@ export function createGenerateImageTool({
         return {
           aspectRatio: resolvedAspectRatio,
           generationId: pendingGeneration.id,
-          message: `Started an image generation with ${modelIdentifier}. If no later tool in this same turn needs the finished image, stop here and let the UI update asynchronously.`,
           model: modelIdentifier,
           nextStepHint:
             "Only call awaitGeneration when a later tool in this same turn needs the finished image (for example image -> video or image -> draft). Otherwise reply to the user and stop.",

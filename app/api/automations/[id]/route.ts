@@ -8,7 +8,6 @@ import {
   isAutomationServiceError,
   updateAutomationForUser,
 } from "@/lib/automations/service"
-import { assertAcceptedCurrentTerms } from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -24,11 +23,6 @@ export async function PATCH(req: Request, context: RouteContext) {
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-    if (termsResponse) {
-      return termsResponse
     }
 
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
@@ -97,11 +91,6 @@ export async function DELETE(_req: Request, context: RouteContext) {
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const termsResponse = await assertAcceptedCurrentTerms(supabase, user.id)
-    if (termsResponse) {
-      return termsResponse
     }
 
     await deleteAutomationForUser(supabase, user.id, id)
