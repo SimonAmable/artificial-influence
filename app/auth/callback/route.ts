@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
-import { clearTermsVersionCookie, getCurrentTermsDocument, setTermsVersionCookie } from "@/lib/legal/terms-acceptance"
+import {
+  applyTermsVersionCookieToResponse,
+  clearTermsVersionCookieOnResponse,
+  getCurrentTermsDocument,
+} from "@/lib/legal/terms-acceptance"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
 import { NextResponse } from "next/server"
 
@@ -74,9 +78,9 @@ export async function GET(request: Request) {
           typeof profile?.terms_accepted_at === "string" ? profile.terms_accepted_at : null
 
         if (acceptedAt && acceptedVersion === currentTerms.version) {
-          await setTermsVersionCookie(currentTerms.version)
+          applyTermsVersionCookieToResponse(response, currentTerms.version)
         } else {
-          await clearTermsVersionCookie()
+          clearTermsVersionCookieOnResponse(response)
         }
       }
 

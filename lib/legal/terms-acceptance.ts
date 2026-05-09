@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import type { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
 import { loadLegalDoc } from "@/lib/legal/load-legal-doc"
@@ -28,7 +29,7 @@ export type TermsAcceptanceStatus = {
 
 let cachedCurrentTerms: CurrentTermsDocument | null = null
 
-function termsCookieOptions() {
+export function getTermsVersionCookieOptions() {
   return {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
@@ -36,6 +37,18 @@ function termsCookieOptions() {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
   }
+}
+
+/** Use in Route Handlers so Set-Cookie is attached to the returned response. */
+export function applyTermsVersionCookieToResponse(response: NextResponse, version: string): void {
+  response.cookies.set(TERMS_VERSION_COOKIE, version, getTermsVersionCookieOptions())
+}
+
+export function clearTermsVersionCookieOnResponse(response: NextResponse): void {
+  response.cookies.set(TERMS_VERSION_COOKIE, "", {
+    ...getTermsVersionCookieOptions(),
+    maxAge: 0,
+  })
 }
 
 function previewTerms(content: string) {
@@ -131,13 +144,13 @@ export async function getTermsAcceptanceStatus(
 
 export async function setTermsVersionCookie(version: string) {
   const cookieStore = await cookies()
-  cookieStore.set(TERMS_VERSION_COOKIE, version, termsCookieOptions())
+  cookieStore.set(TERMS_VERSION_COOKIE, version, getTermsVersionCookieOptions())
 }
 
 export async function clearTermsVersionCookie() {
   const cookieStore = await cookies()
   cookieStore.set(TERMS_VERSION_COOKIE, "", {
-    ...termsCookieOptions(),
+    ...getTermsVersionCookieOptions(),
     maxAge: 0,
   })
 }
@@ -150,7 +163,7 @@ export async function recordCurrentTermsAcceptance(
   const currentTerms = getCurrentTermsDocument()
   const acceptedAt = new Date().toISOString()
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("profiles")
     .update({
       terms_accepted_at: acceptedAt,
@@ -159,12 +172,15 @@ export async function recordCurrentTermsAcceptance(
       terms_acceptance_source: source,
     })
     .eq("id", userId)
+    .select("id")
+    .maybeSingle()
 
   if (error) {
     throw new Error(error.message)
   }
-
-  await setTermsVersionCookie(currentTerms.version)
+  if (!updated) {
+    throw new Error("Profile update affected no rows.")
+  }
 
   return {
     acceptedAt,

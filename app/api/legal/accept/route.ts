@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
 
-import { recordCurrentTermsAcceptance } from "@/lib/legal/terms-acceptance"
+import {
+  applyTermsVersionCookieToResponse,
+  recordCurrentTermsAcceptance,
+} from "@/lib/legal/terms-acceptance"
 import { createClient } from "@/lib/supabase/server"
 
 export async function POST() {
@@ -16,7 +19,7 @@ export async function POST() {
     }
 
     const record = await recordCurrentTermsAcceptance(supabase, user.id, "blocking_modal")
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
       acceptedAt: record.acceptedAt,
       currentTerms: {
@@ -25,6 +28,8 @@ export async function POST() {
         lastUpdated: record.currentTerms.lastUpdated,
       },
     })
+    applyTermsVersionCookieToResponse(response, record.currentTerms.version)
+    return response
   } catch (error) {
     console.error("[legal] accept", error)
     return NextResponse.json({ error: "Failed to save terms acceptance." }, { status: 500 })
