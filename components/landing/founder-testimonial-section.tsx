@@ -4,8 +4,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { useMemo, useRef } from "react"
 import { motion, useInView, useReducedMotion } from "motion/react"
-import { TrendingUp } from "lucide-react"
-
 const chartData = [
   { day: 1, label: "Day 1", views: 1500 },
   { day: 2, label: "Day 2", views: 4000 },
@@ -99,23 +97,13 @@ export function FounderTestimonialSection() {
           >
             See the proof on X
           </Link>
-
-          <div className="mt-8 flex items-center gap-3 rounded-2xl border border-border/70 bg-card/70 px-4 py-3 shadow-sm">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/12 text-primary">
-              <TrendingUp className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">7-day sprint</p>
-              <p className="text-sm text-muted-foreground">2 organic channels to 250k total views</p>
-            </div>
-          </div>
         </div>
 
         <motion.div
           initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 26 }}
           animate={revealed ? { opacity: 1, y: 0 } : { opacity: 0, y: 26 }}
           transition={{ duration: 0.7, ease: easeOut }}
-          className="relative overflow-hidden rounded-[2rem] border border-border/60 bg-background/85 p-6 backdrop-blur-sm sm:p-7 lg:p-8 dark:bg-background/82 shadow-[0_4px_6px_-1px_rgba(59,130,246,0.06),0_32px_64px_-20px_rgba(15,23,42,0.18),0_12px_28px_-8px_rgba(15,23,42,0.12)] dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.5),0_40px_80px_-24px_rgba(0,0,0,0.55)]"
+          className="relative overflow-visible rounded-[2rem] border border-border/60 bg-background/85 p-6 backdrop-blur-sm sm:p-7 lg:p-8 dark:bg-background/82 shadow-[0_4px_6px_-1px_rgba(59,130,246,0.06),0_32px_64px_-20px_rgba(15,23,42,0.18),0_12px_28px_-8px_rgba(15,23,42,0.12)] dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.5),0_40px_80px_-24px_rgba(0,0,0,0.55)]"
         >
           <div className="mb-6 flex flex-wrap items-start justify-between gap-3 sm:mb-7">
               <div>
@@ -300,27 +288,6 @@ export function FounderTestimonialSection() {
                 </defs>
               </svg>
 
-              <div className="mt-4 grid gap-3 sm:hidden">
-                {breakoutPoint ? (
-                  <div className="rounded-2xl border border-primary/20 bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
-                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
-                      Breakout point
-                    </p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">250k</p>
-                    <p className="text-xs text-muted-foreground">Total by day 7</p>
-                  </div>
-                ) : null}
-
-                {hitVideoPoint ? (
-                  <div className="rounded-2xl border border-primary/20 bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
-                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
-                      Inflection point
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-foreground">Hit video takes off</p>
-                  </div>
-                ) : null}
-              </div>
-
               {hitVideoPoint ? (
                 <motion.div
                   initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
@@ -336,12 +303,13 @@ export function FounderTestimonialSection() {
                       ? { duration: 4.2, times: [0, 0.3, 0.78, 1], delay: 0.72, ease: "linear", repeat: Infinity, repeatDelay: 0.5 }
                       : { duration: 0.38, delay: 0.72, ease: easeOut }
                   }
-                  className="absolute hidden sm:block"
-                  style={{
-                    left: `${(hitVideoPoint.x / svgWidth) * 100}%`,
-                    top: `${(hitVideoPoint.y / svgHeight) * 100}%`,
-                    transform: "translate(-38%, -115%)",
-                  }}
+                  className="absolute left-[var(--inflection-left)] top-[var(--inflection-top)] z-10 -translate-x-1/2 -translate-y-[115%] sm:-translate-x-[38%]"
+                  style={
+                    {
+                      "--inflection-left": `${(hitVideoPoint.x / svgWidth) * 100}%`,
+                      "--inflection-top": `${(hitVideoPoint.y / svgHeight) * 100}%`,
+                    } as React.CSSProperties
+                  }
                 >
                   <div className="rounded-2xl border border-primary/20 bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
                     <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
@@ -367,7 +335,13 @@ export function FounderTestimonialSection() {
                       ? { duration: 4.2, times: [0, 0.34, 0.82, 1], delay: 0.92, ease: "linear", repeat: Infinity, repeatDelay: 0.5 }
                       : { duration: 0.42, delay: 0.92, ease: easeOut }
                   }
-                  className="absolute right-2 top-4 hidden rounded-2xl border border-primary/20 bg-background/95 px-3 py-2 text-right shadow-lg backdrop-blur sm:block"
+                  className="absolute z-10 max-sm:left-[var(--breakout-left)] max-sm:right-auto max-sm:top-[var(--breakout-top)] max-sm:-translate-x-1/2 max-sm:-translate-y-[115%] sm:left-auto sm:right-2 sm:top-4 sm:translate-x-0 sm:translate-y-0 rounded-2xl border border-primary/20 bg-background/95 px-3 py-2 text-center shadow-lg backdrop-blur sm:text-right"
+                  style={
+                    {
+                      "--breakout-left": `${(breakoutPoint.x / svgWidth) * 100}%`,
+                      "--breakout-top": `${(breakoutPoint.y / svgHeight) * 100}%`,
+                    } as React.CSSProperties
+                  }
                 >
                   <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
                     Breakout point
