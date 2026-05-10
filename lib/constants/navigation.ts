@@ -80,7 +80,6 @@ export interface DashboardToolNavItem {
 const baseNavigationItems: NavigationItem[] = [
   { path: "/", label: "Home" },
   { path: "/chat", label: "Agent" },
-  { path: "/automations", label: "Automations" },
   { path: "/image", label: "Image" },
   { path: "/video", label: "Video" },
   { path: "/audio", label: "Audio" },
@@ -331,7 +330,6 @@ export const megaNavGroups: MegaNavGroup[] = [
   {
     label: "Audio",
     path: "/audio",
-    badge: "new",
   },
   {
     label: "Assets",
@@ -340,12 +338,6 @@ export const megaNavGroups: MegaNavGroup[] = [
       { path: "/assets", label: "Assets", description: "Store and sort your generated assets", iconSrc: "/window.svg", badge: "new" },
       { path: "/history", label: "History", description: "Past generations and edits", iconSrc: "/file.svg" },
       { path: "/resources", label: "Resources", description: "Search live stock and meme references", iconPhosphor: "image", badge: "new" },
-      {
-        path: "/automations",
-        label: "Automations",
-        description: "Easily set up automated creation and posting to Instagram",
-        iconSrc: "/globe.svg",
-      },
       { path: "/brand", label: "Brand", description: "Manage brand settings", iconSrc: "/logo.svg", badge: "new" },
     ],
   },
@@ -392,7 +384,6 @@ export const megaNavGroups: MegaNavGroup[] = [
   },
   { label: "Apps", path: "/apps" },
   { label: "Autopost", path: "/autopost", badge: "new" },
-  { label: "Automations", path: "/automations", badge: "beta" },
   { label: "Pricing", path: "/pricing" },
 ]
 
@@ -404,7 +395,7 @@ export interface FooterMegaNavLink {
 
 /**
  * Footer columns aligned with the desktop mega menu: Image tools, Video tools,
- * Other tools (Assets + top-level links), and split Image / Video models.
+ * Other tools (Agent + Assets + top-level links), and split Image / Video models.
  */
 export function getFooterMegaNavColumns(): {
   imageTools: FooterMegaNavLink[]
@@ -431,6 +422,7 @@ export function getFooterMegaNavColumns(): {
 
   const imageGroup = megaNavGroups.find((g) => g.label === "Image")
   const videoGroup = megaNavGroups.find((g) => g.label === "Video")
+  const agentGroup = megaNavGroups.find((g) => g.label === "Agent")
   const assetsGroup = megaNavGroups.find((g) => g.label === "Assets")
   const freeToolsGroup = megaNavGroups.find((g) => g.label === "Free Tools")
 
@@ -449,6 +441,11 @@ export function getFooterMegaNavColumns(): {
   const freeTools = toLinks(freeToolsGroup?.simpleItems ?? [])
 
   const otherTools: FooterMegaNavLink[] = []
+  if (agentGroup?.simpleItems?.length) {
+    for (const item of agentGroup.simpleItems) {
+      otherTools.push({ path: item.path, label: item.label })
+    }
+  }
   if (assetsGroup?.simpleItems?.length) {
     for (const item of assetsGroup.simpleItems) {
       otherTools.push({ path: item.path, label: item.label })

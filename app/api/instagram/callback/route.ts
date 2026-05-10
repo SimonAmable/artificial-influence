@@ -2,8 +2,9 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
 import { encryptAutopostToken } from "@/lib/autopost/crypto"
-import { fetchInstagramMeForLink, type InstagramMeResponse, type InstagramSavedProfile } from "@/lib/instagram/profile"
 import { resolveInstagramOAuthRedirectUri } from "@/lib/instagram/oauth-redirect"
+import { fetchInstagramMeForLink, type InstagramMeResponse, type InstagramSavedProfile } from "@/lib/instagram/profile"
+import { persistSocialAvatarUrl } from "@/lib/social/persist-social-avatar"
 import { upsertInstagramSocialConnection } from "@/lib/social-connections"
 import { createClient } from "@/lib/supabase/server"
 
@@ -186,6 +187,16 @@ export async function GET(request: Request) {
       })
     }
 
+    const persistedAvatarUrl = await persistSocialAvatarUrl({
+      userId: user.id,
+      provider: "instagram",
+      accountId: instagramUserId,
+      sourceUrl: savedProfile.profile_picture_url,
+    })
+    const profileForStorage: InstagramSavedProfile = persistedAvatarUrl
+      ? { ...savedProfile, profile_picture_url: persistedAvatarUrl }
+      : savedProfile
+
     const encryptedToken = encryptAutopostToken(tokenPayload.access_token)
     const tokenExpiresAt =
       typeof tokenPayload.expires_in === "number"
@@ -209,7 +220,7 @@ export async function GET(request: Request) {
           connection_method: "instagram_login",
           token_type: tokenPayload.token_type || null,
           token_strategy: tokenStrategy,
-          profile: savedProfile,
+          profile: profileForStorage,
         },
         updated_at: new Date().toISOString(),
       },

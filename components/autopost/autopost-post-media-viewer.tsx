@@ -3,16 +3,22 @@
 import * as React from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import {
   ChevronLeft,
   ChevronRight,
+  Download,
+  GripVertical,
   Film,
   ImageIcon,
   Layers,
+  Loader2,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react"
+import { toast } from "sonner"
 
 export type AutopostViewerMediaItem = {
   url: string
@@ -50,6 +56,21 @@ type AutopostPostMediaViewerProps = {
   title?: string
   updatedAt: string
   actions?: AutopostViewerAction[]
+  onDeletePost?: () => void
+  deletePostDisabled?: boolean
+  deletePostBusy?: boolean
+  onRemoveGalleryItem?: (index: number) => Promise<void>
+  /** When set, spinner on matching gallery tile plus disables other controls while removal runs */
+  removingGalleryIndex?: number | null
+  showGalleryRemoveButtons?: boolean
+  /** Draft / queued carousel / TikTok photo (2+ slides): reorder via drag handle */
+  galleryReorderable?: boolean
+  onReorderGallery?: (fromIndex: number, toIndex: number) => Promise<void>
+  reorderingGallery?: boolean
+  /** Draft / scheduled / failed: show caption editor + Save */
+  captionEditable?: boolean
+  onCaptionCommit?: (nextCaption: string) => Promise<void>
+  captionCommitBusy?: boolean
 }
 
 function formatViewerDate(value: string | null | undefined) {
@@ -57,6 +78,75 @@ function formatViewerDate(value: string | null | undefined) {
   const date = new Date(value)
   if (!Number.isFinite(date.getTime())) return value
   return date.toLocaleString()
+}
+
+function parseFilenameFromUrl(url: string): string | null {
+  try {
+    const pathname = decodeURIComponent(new URL(url).pathname.split("?")[0] ?? "")
+    const safe = pathname.split("/").filter(Boolean).pop()
+    return safe?.includes(".") ? safe.slice(-200) : null
+  } catch {
+    return null
+  }
+}
+
+function defaultDownloadName(item: AutopostViewerMediaItem, fallbackIndex: number): string {
+  const fromUrl = parseFilenameFromUrl(item.url)
+  if (fromUrl) {
+    return fromUrl
+  }
+  const suffix = item.kind === "video" ? "mp4" : "jpg"
+  const labelNum = fallbackIndex.toString().padStart(2, "0")
+  return `media-${labelNum}.${suffix}`
+}
+
+function mapGalleryActiveAfterReorder(active: number, fromIndex: number, toIndex: number): number {
+  if (active === fromIndex) {
+    return toIndex
+  }
+  if (fromIndex < toIndex) {
+    if (active > fromIndex && active <= toIndex) {
+      return active - 1
+    }
+    return active
+  }
+  if (fromIndex > toIndex) {
+    if (active >= toIndex && active < fromIndex) {
+      return active + 1
+    }
+    return active
+  }
+  return active
+}
+
+async function downloadMediaBlob(url: string, filename: string): Promise<boolean> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+    const blob = await response.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    try {
+      const anchor = document.createElement("a")
+      anchor.href = blobUrl
+      anchor.download = filename
+      anchor.rel = "noopener"
+      anchor.style.display = "none"
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+    } finally {
+      URL.revokeObjectURL(blobUrl)
+    }
+    return true
+  } catch {
+    window.open(url, "_blank", "noopener,noreferrer")
+    toast.message("Opened media in a new tab", {
+      description: "If the download did not start, save the file from the new tab.",
+    })
+    return false
+  }
 }
 
 function ViewerTypeIcon({ type }: { type: AutopostPostMediaViewerProps["mediaTypeIcon"] }) {
@@ -93,10 +183,152 @@ export function AutopostPostMediaViewer({
   title,
   updatedAt,
   actions = [],
+  onDeletePost,
+  deletePostDisabled,
+  deletePostBusy,
+  onRemoveGalleryItem,
+  removingGalleryIndex = null,
+  showGalleryRemoveButtons = false,
+  galleryReorderable = false,
+  onReorderGallery,
+  reorderingGallery = false,
+  captionEditable = false,
+  onCaptionCommit,
+  captionCommitBusy = false,
 }: AutopostPostMediaViewerProps) {
   const [activeIndex, setActiveIndex] = React.useState(0)
+  const [downloadingAll, setDownloadingAll] = React.useState(false)
+  const [downloadingIndex, setDownloadingIndex] = React.useState<number | null>(null)
   const activeItem = mediaItems[activeIndex] ?? mediaItems[0]
   const canNavigate = mediaItems.length > 1
+
+  const handleDownloadMediaAtIndex = React.useCallback(
+    async (index: number, event?: React.SyntheticEvent) => {
+      event?.preventDefault()
+      event?.stopPropagation()
+      const item = mediaItems[index]
+      if (!item) {
+        return
+      }
+      setDownloadingIndex(index)
+      try {
+        const ok = await downloadMediaBlob(item.url, defaultDownloadName(item, index + 1))
+        if (ok) {
+          toast.success("Download started.")
+        }
+      } catch {
+        toast.error("Could not download this file.")
+      } finally {
+        setDownloadingIndex(null)
+      }
+    },
+    [mediaItems],
+  )
+
+  const handleDownloadAllMedia = React.useCallback(async () => {
+    if (mediaItems.length === 0) {
+      return
+    }
+    setDownloadingAll(true)
+    try {
+      let started = 0
+      for (let i = 0; i < mediaItems.length; i += 1) {
+        const item = mediaItems[i]
+        const ok = await downloadMediaBlob(item.url, defaultDownloadName(item, i + 1))
+        if (ok) {
+          started += 1
+        }
+        if (i < mediaItems.length - 1) {
+          await new Promise((resolve) => {
+            window.setTimeout(resolve, 280)
+          })
+        }
+      }
+      if (started === 0 && mediaItems.length > 0) {
+        toast.message("Check new tabs", { description: "Files opened in-browser when download is blocked." })
+      } else {
+        toast.success(started === 1 ? "Download started." : `${started} downloads started.`)
+      }
+    } catch {
+      toast.error("Downloads did not finish.")
+    } finally {
+      setDownloadingAll(false)
+    }
+  }, [mediaItems])
+
+  const showActionsFooter = actions.length > 0 || mediaItems.length > 0 || Boolean(onDeletePost)
+
+  const removingSlideBusy = removingGalleryIndex !== null
+
+  const [galleryDropHoverIndex, setGalleryDropHoverIndex] = React.useState<number | null>(null)
+
+  const committedCaption = caption ?? ""
+  const [captionDraft, setCaptionDraft] = React.useState(committedCaption)
+
+  React.useEffect(() => {
+    setCaptionDraft(committedCaption)
+  }, [committedCaption])
+
+  const captionDirty = captionDraft !== committedCaption
+
+  const captionControlsLocked =
+    captionCommitBusy || removingSlideBusy || reorderingGallery
+  const footerBusy =
+    captionCommitBusy || removingSlideBusy || reorderingGallery
+
+  const handleCaptionSave = React.useCallback(async () => {
+    if (!onCaptionCommit || captionCommitBusy || !captionDirty) {
+      return
+    }
+    try {
+      await onCaptionCommit(captionDraft.trim())
+      toast.success("Caption saved.")
+    } catch {
+      toast.error("Could not save caption.")
+    }
+  }, [onCaptionCommit, captionCommitBusy, captionDirty, captionDraft])
+
+  const handleRemoveGalleryItemClick = React.useCallback(
+    async (index: number, event?: React.MouseEvent) => {
+      event?.preventDefault()
+      event?.stopPropagation()
+      if (!onRemoveGalleryItem) {
+        return
+      }
+      const beforeLen = mediaItems.length
+      try {
+        await onRemoveGalleryItem(index)
+        setActiveIndex((prev) => {
+          const nextLen = beforeLen - 1
+          if (nextLen <= 0) {
+            return 0
+          }
+          if (index < prev) {
+            return prev - 1
+          }
+          return Math.min(prev, nextLen - 1)
+        })
+      } catch {
+        // Parent surfaces errors via toast.
+      }
+    },
+    [onRemoveGalleryItem, mediaItems.length],
+  )
+
+  const handleGalleryReorderDrop = React.useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      if (!onReorderGallery || fromIndex === toIndex) {
+        return
+      }
+      try {
+        await onReorderGallery(fromIndex, toIndex)
+        setActiveIndex((prev) => mapGalleryActiveAfterReorder(prev, fromIndex, toIndex))
+      } catch {
+        // Parent surfaces errors via toast.
+      }
+    },
+    [onReorderGallery],
+  )
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -230,17 +462,64 @@ export function AutopostPostMediaViewer({
 
               {canNavigate ? (
                 <div className="space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Gallery</p>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Gallery
+                    </p>
+                    {galleryReorderable && onReorderGallery && !footerBusy ? (
+                      <span className="text-[10px] font-medium normal-case tracking-normal text-muted-foreground">
+                        Drag the grip (lower-left) to reorder
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="grid grid-cols-4 gap-2">
                     {mediaItems.map((item, index) => (
-                      <button
-                        key={`${item.url}-${index}`}
-                        type="button"
+                      <div
+                        key={`${item.kind}-${item.url}`}
+                        role="button"
+                        tabIndex={reorderingGallery ? -1 : 0}
+                        aria-label={`Show media ${item.label ?? index + 1}`}
                         className={cn(
-                          "relative aspect-square overflow-hidden rounded-xl border bg-muted/30 transition hover:border-primary/60",
+                          "relative aspect-square cursor-pointer overflow-hidden rounded-xl border bg-muted/30 outline-none transition hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring",
                           activeIndex === index && "border-primary ring-2 ring-primary/20",
+                          galleryDropHoverIndex === index &&
+                            galleryReorderable &&
+                            onReorderGallery &&
+                            "ring-2 ring-primary/40",
                         )}
-                        onClick={() => setActiveIndex(index)}
+                        onClick={() => {
+                          if (footerBusy) return
+                          setActiveIndex(index)
+                        }}
+                        onKeyDown={(event) => {
+                          if (footerBusy) return
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault()
+                            setActiveIndex(index)
+                          }
+                        }}
+                        onDragOver={(event) => {
+                          if (!galleryReorderable || footerBusy || !onReorderGallery) return
+                          event.preventDefault()
+                          event.dataTransfer.dropEffect = "move"
+                          setGalleryDropHoverIndex(index)
+                        }}
+                        onDragLeave={(event) => {
+                          const next = event.relatedTarget as Node | null
+                          if (next && event.currentTarget.contains(next)) return
+                          setGalleryDropHoverIndex((current) =>
+                            current === index ? null : current,
+                          )
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          setGalleryDropHoverIndex(null)
+                          if (!galleryReorderable || footerBusy || !onReorderGallery) return
+                          const raw = event.dataTransfer.getData("text/plain").trim()
+                          const from = Number.parseInt(raw, 10)
+                          if (!Number.isInteger(from) || from < 0) return
+                          void handleGalleryReorderDrop(from, index)
+                        }}
                       >
                         {item.kind === "video" ? (
                           <video className="h-full w-full object-cover" src={item.url} muted playsInline preload="metadata" />
@@ -248,21 +527,130 @@ export function AutopostPostMediaViewer({
                           // eslint-disable-next-line @next/next/no-img-element
                           <img className="h-full w-full object-cover" src={item.url} alt="" />
                         )}
-                        <span className="absolute left-1 top-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                        <span className="pointer-events-none absolute left-1 top-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
                           {item.label ?? index + 1}
                         </span>
-                      </button>
+                        {galleryReorderable && onReorderGallery ? (
+                          <div
+                            role="presentation"
+                            draggable={!footerBusy}
+                            aria-label={`Drag to reorder slide ${index + 1}`}
+                            title="Drag to reorder slides"
+                            onDragStart={(event) => {
+                              if (footerBusy) {
+                                event.preventDefault()
+                                return
+                              }
+                              event.dataTransfer.effectAllowed = "move"
+                              event.dataTransfer.setData("text/plain", String(index))
+                              event.stopPropagation()
+                            }}
+                            onDragEnd={() => setGalleryDropHoverIndex(null)}
+                            onClick={(event) => event.stopPropagation()}
+                            className={cn(
+                              "absolute bottom-1 left-1 z-10 cursor-grab touch-none rounded-md bg-black/55 p-0.5 active:cursor-grabbing",
+                              footerBusy && "pointer-events-none opacity-40",
+                            )}
+                          >
+                            <GripVertical className="h-3.5 w-3.5 text-white" aria-hidden />
+                          </div>
+                        ) : null}
+                        <div className="absolute right-0 top-0 z-10 flex flex-col gap-0.5 p-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-full bg-black/55 text-white hover:bg-black/75 hover:text-white"
+                            aria-label={`Download media ${item.label ?? index + 1}`}
+                            disabled={downloadingIndex === index || downloadingAll || footerBusy}
+                            onClick={(event) => void handleDownloadMediaAtIndex(index, event)}
+                          >
+                            {downloadingIndex === index ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          {showGalleryRemoveButtons && onRemoveGalleryItem ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 rounded-full bg-black/55 text-white hover:bg-destructive hover:text-destructive-foreground"
+                              aria-label={`Remove slide ${item.label ?? index + 1}`}
+                              disabled={footerBusy}
+                              onClick={(event) => void handleRemoveGalleryItemClick(index, event)}
+                            >
+                              {removingGalleryIndex === index ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
               ) : null}
 
-              {caption ? (
+              {captionEditable || caption ? (
                 <div className="space-y-2">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Caption</p>
-                  <div className="max-h-40 overflow-y-auto rounded-2xl border border-border/70 bg-muted/20 p-3 text-sm leading-relaxed text-foreground">
-                    {caption}
-                  </div>
+                  {mediaTypeIcon === "story" && captionEditable ? (
+                    <p className="text-xs text-muted-foreground">
+                      Story posts may ignore caption text when publishing via Instagram&apos;s API.
+                    </p>
+                  ) : null}
+                  {captionEditable && onCaptionCommit ? (
+                    <div className="space-y-2">
+                      <Textarea
+                        value={captionDraft}
+                        onChange={(event) => setCaptionDraft(event.target.value)}
+                        disabled={captionControlsLocked}
+                        maxLength={4096}
+                        rows={6}
+                        placeholder={
+                          providerLabel === "TikTok"
+                            ? "Title and description sent with this TikTok post…"
+                            : "Write your caption…"
+                        }
+                        className="min-h-[100px] resize-y rounded-2xl border-border/70 bg-muted/15 text-sm"
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={!captionDirty || captionCommitBusy || captionControlsLocked}
+                          onClick={() => void handleCaptionSave()}
+                        >
+                          {captionCommitBusy ? (
+                            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                          ) : null}
+                          Save caption
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={!captionDirty || captionCommitBusy || captionControlsLocked}
+                          onClick={() => setCaptionDraft(committedCaption)}
+                        >
+                          Reset
+                        </Button>
+                        <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                          {captionDraft.length}/4096
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="max-h-40 overflow-y-auto rounded-2xl border border-border/70 bg-muted/20 p-3 text-sm leading-relaxed text-foreground">
+                      {caption ? caption : (
+                        <span className="text-muted-foreground">No caption</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : null}
 
@@ -314,24 +702,67 @@ export function AutopostPostMediaViewer({
             </div>
           </div>
 
-          {actions.length > 0 ? (
+          {showActionsFooter ? (
             <div className="border-t border-border/70 px-4 py-4">
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Actions</p>
               <div className="flex flex-col gap-2">
+                {mediaItems.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="justify-start gap-2"
+                    disabled={downloadingAll || downloadingIndex !== null || footerBusy}
+                    onClick={() => void handleDownloadAllMedia()}
+                  >
+                    <span className="shrink-0">
+                      {downloadingAll ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5" />
+                      )}
+                    </span>
+                    {mediaItems.length === 1 ? "Download media" : "Download all media"}
+                  </Button>
+                ) : null}
                 {actions.map((action) => (
                   <Button
                     key={action.id}
                     type="button"
                     variant={action.variant ?? "outline"}
                     size="sm"
-                    className="justify-start"
-                    disabled={action.disabled}
+                    className="justify-start gap-2"
+                    disabled={action.disabled || footerBusy}
                     onClick={action.onClick}
                   >
-                    {action.icon}
+                    {action.icon ? <span className="shrink-0">{action.icon}</span> : null}
                     {action.label}
                   </Button>
                 ))}
+                {Boolean(onDeletePost) ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="justify-start gap-2"
+                    disabled={
+                      Boolean(deletePostDisabled) ||
+                      downloadingAll ||
+                      downloadingIndex !== null ||
+                      footerBusy
+                    }
+                    onClick={onDeletePost}
+                  >
+                    <span className="shrink-0">
+                      {deletePostBusy ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </span>
+                    Delete post
+                  </Button>
+                ) : null}
               </div>
             </div>
           ) : null}

@@ -15,9 +15,9 @@ const testimonialData = [
   },
   {
     quote:
-      "The agent saves us about 7 hours a week. We can make 20 custom thumbnails in minutes, move faster on every upload, and skip a lot of the usual back and forth.",
-    name: "Sohan",
-    initials: "SO",
+      "Simon made my team custom tools for thumbnail creation, and we save about 7 hours a week, can make 20 custom thumbnails in minutes, move faster on every upload, and skip a lot of the usual back and forth.",
+    name: "Simon",
+    initials: "S",
   },
 ] as const
 
@@ -27,21 +27,21 @@ export function TestimonialsSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto mb-12 max-w-2xl text-center">
           <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
-            Testimonials
+            What our users say about us
           </h2>
         </div>
-        <div className="grid gap-10 md:grid-cols-3 md:gap-0">
+        <div className="grid gap-10 md:grid-cols-3 md:items-stretch md:gap-0">
           {testimonialData.map((testimonial, index) => (
             <article
               key={testimonial.name}
-              className={`flex min-h-[320px] flex-col px-0 md:px-12 ${
+              className={`flex h-full min-h-0 flex-col gap-5 px-0 md:px-12 ${
                 index > 0 ? "md:border-l md:border-border/60" : ""
               }`}
             >
-              <p className="mt-8 max-w-md text-base leading-8 text-muted-foreground">
-                {testimonial.quote}
+              <p className="max-w-md flex-1 text-base leading-8 text-muted-foreground">
+                {`"${testimonial.quote}"`}
               </p>
-              <div className="mt-auto flex items-center gap-3 pt-14">
+              <div className="flex shrink-0 items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary ring-1 ring-primary/25">
                   {testimonial.initials}
                 </div>

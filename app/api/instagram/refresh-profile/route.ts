@@ -7,6 +7,7 @@ import {
   type InstagramMeResponse,
   type InstagramSavedProfile,
 } from "@/lib/instagram/profile"
+import { persistSocialAvatarUrl } from "@/lib/social/persist-social-avatar"
 import { upsertInstagramSocialConnection } from "@/lib/social-connections"
 import { createClient } from "@/lib/supabase/server"
 
@@ -95,6 +96,17 @@ export async function POST(request: Request) {
       )
     }
 
+    const nextIgUserId = me.id ?? row.instagram_user_id
+    const persistedAvatarUrl = await persistSocialAvatarUrl({
+      userId: user.id,
+      provider: "instagram",
+      accountId: nextIgUserId || row.instagram_user_id,
+      sourceUrl: savedProfile.profile_picture_url,
+    })
+    const profileForStorage: InstagramSavedProfile = persistedAvatarUrl
+      ? { ...savedProfile, profile_picture_url: persistedAvatarUrl }
+      : savedProfile
+
     const baseMeta =
       row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
         ? { ...(row.metadata as Record<string, unknown>) }
@@ -103,7 +115,7 @@ export async function POST(request: Request) {
     const nextMetadata = {
       ...baseMeta,
       account_type: me.account_type ?? baseMeta.account_type ?? null,
-      profile: savedProfile,
+      profile: profileForStorage,
     }
 
     const { error: updateError } = await supabase

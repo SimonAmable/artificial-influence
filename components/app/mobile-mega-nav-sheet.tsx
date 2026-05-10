@@ -63,7 +63,6 @@ const GROUP_STANDALONE_BLURB: Partial<Record<string, string>> = {
   Canvas: "Composable node workflows",
   Apps: "Integrated tools and experiences",
   Autopost: "Schedule and publish",
-  Automations: "Hands-off creation and posting",
   Pricing: "Plans and billing",
 }
 

@@ -15,7 +15,7 @@ import { createClient } from "@/lib/supabase/client"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { useModels } from "@/hooks/use-models"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
-import type { Model, ParameterDefinition } from "@/lib/types/models"
+import type { Model, ParameterDefinition, StringParameterDefinition } from "@/lib/types/models"
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
 import type { AudioUploadValue } from "@/components/shared/upload/audio-upload"
 import type { MultiShotItem } from "@/components/tools/video/multi-shot-editor"
@@ -31,6 +31,7 @@ import { resolveVideoPricingQuote } from "@/lib/video-pricing"
 import type { VideoGridItem, VideoHistoryItem } from "@/components/shared/display/video-grid"
 import { toast } from "sonner"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { pickRetainedAspectRatio } from "@/lib/utils/aspect-ratios"
 
 interface PendingVideoRequest {
   clientRequestId: string
@@ -179,6 +180,7 @@ function VideoPageContent() {
   )
   const historyAbortRef = React.useRef<AbortController | null>(null)
   const historyRequestIdRef = React.useRef(0)
+  const prevVideoModelIdForParamsRef = React.useRef<string | null>(null)
   const isGenerating = pendingRequests.length > 0
 
   // Handle pre-loaded start frame from URL parameter (only load once)
@@ -198,14 +200,47 @@ function VideoPageContent() {
     }
   }, [searchParams])
 
-  // Initialize parameters when model changes
+  // Initialize parameters when model changes; keep aspect ratio if the new model supports the same option.
   React.useEffect(() => {
     if (!selectedModel) return
-    const defaultParams: Record<string, unknown> = {}
-    selectedModel.parameters.parameters.forEach((param: ParameterDefinition) => {
-      defaultParams[param.name] = param.default
+
+    const modelId = selectedModel.identifier
+    const prevModelId = prevVideoModelIdForParamsRef.current
+    prevVideoModelIdForParamsRef.current = modelId
+
+    const paramList = selectedModel.parameters.parameters
+
+    setParameters((prev) => {
+      const next: Record<string, unknown> = {}
+      paramList.forEach((param: ParameterDefinition) => {
+        next[param.name] = param.default
+      })
+
+      const aspectParam = paramList.find(
+        (p): p is StringParameterDefinition =>
+          (p.name === "aspect_ratio" || p.name === "aspectRatio") &&
+          p.type === "string" &&
+          Array.isArray(p.enum) &&
+          p.enum.length > 0
+      )
+
+      if (!aspectParam?.enum?.length || prevModelId === null) {
+        return next
+      }
+
+      const supported = aspectParam.enum.map(String)
+      const prevAspectRaw = prev.aspect_ratio ?? prev.aspectRatio
+      if (prevAspectRaw === undefined || prevAspectRaw === null) {
+        return next
+      }
+
+      const kept = pickRetainedAspectRatio(String(prevAspectRaw), supported)
+      if (kept) {
+        next[aspectParam.name] = kept
+      }
+
+      return next
     })
-    setParameters(defaultParams)
   }, [selectedModel])
 
   // Kling Omni / Seedance: when reference video is added, cap extra reference images

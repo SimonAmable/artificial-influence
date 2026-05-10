@@ -9,7 +9,6 @@ const PROOF_IMAGES = [
   "/influencer_proof_showcases/Copy of Screenshot_20260301_172839_Instagram.jpg",
   "/influencer_proof_showcases/Copy of Screenshot_20260411_223900_TikTok.jpg",
   "/influencer_proof_showcases/Copy of Screenshot_20260412_010914_Instagram.jpg",
-  "/influencer_proof_showcases/Copy of Screenshot_20260413_101303_TikTok.jpg",
   "/influencer_proof_showcases/Screenshot_20260312_202935_Instagram (1).jpg",
   "/influencer_proof_showcases/Screenshot_20260413_101303_TikTok.jpg",
   "/influencer_proof_showcases/Screenshot_20260426_010555_Instagram.jpg",

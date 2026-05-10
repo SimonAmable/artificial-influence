@@ -9,6 +9,7 @@ import {
   CalendarClock,
   ChevronDown,
   Film,
+  Globe,
   ImageIcon,
   Layers,
   LayoutList,
@@ -22,7 +23,7 @@ import {
   UserRound,
   Zap,
 } from "lucide-react"
-import { format, isBefore, startOfDay, startOfToday } from "date-fns"
+import { format, isBefore, startOfDay, startOfMonth, startOfToday } from "date-fns"
 import { toast } from "sonner"
 
 import type { AutopostJobMetadata } from "@/lib/autopost/types"
@@ -75,6 +76,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
@@ -82,6 +84,7 @@ import {
   AutopostPostMediaViewer,
   type AutopostViewerAction,
 } from "@/components/autopost/autopost-post-media-viewer"
+import { AutopostPostsCalendar } from "@/components/autopost/autopost-posts-calendar"
 
 const AUTOPOST_MEDIA_FOLDER = "autopost-drafts"
 
@@ -320,6 +323,50 @@ function getJobMediaItems(job: AutopostJobRow): ComposerMediaItem[] {
         },
       ]
     : []
+}
+
+function jobAllowsPerSlideRemoval(job: AutopostJobRow): boolean {
+  if (job.status !== "draft" && job.status !== "queued") {
+    return false
+  }
+  const items = getJobMediaItems(job)
+  if (job.media_type === "carousel") {
+    return items.length > 2
+  }
+  if (job.media_type === "tiktok_photo_upload" || job.media_type === "tiktok_photo_direct") {
+    return items.length > 1
+  }
+  return false
+}
+
+function jobAllowsGalleryReorder(job: AutopostJobRow): boolean {
+  if (job.status !== "draft" && job.status !== "queued") {
+    return false
+  }
+  const items = getJobMediaItems(job)
+  if (items.length < 2) {
+    return false
+  }
+  const t = job.media_type
+  return t === "carousel" || t === "tiktok_photo_upload" || t === "tiktok_photo_direct"
+}
+
+function jobCaptionForViewer(job: AutopostJobRow): string | null {
+  const cap = job.caption
+  const capTrimmed = typeof cap === "string" ? cap.trim() : ""
+  if (capTrimmed.length > 0) {
+    return cap
+  }
+  const tiktokDesc = job.metadata?.tiktok?.description
+  const descTrimmed = typeof tiktokDesc === "string" ? tiktokDesc.trim() : ""
+  if (descTrimmed.length > 0 && job.provider === "tiktok") {
+    return tiktokDesc ?? null
+  }
+  return null
+}
+
+function jobAllowsCaptionEdit(job: AutopostJobRow): boolean {
+  return job.status === "draft" || job.status === "queued" || job.status === "failed"
 }
 
 function getJobViewerIcon(job: AutopostJobRow): "image" | "video" | "carousel" | "story" {
@@ -676,7 +723,7 @@ function BrandIcon({ provider, className }: { provider: SocialProvider; classNam
     <Image
       alt=""
       aria-hidden
-      className={className}
+      className={cn(provider === "instagram" && "dark:invert", className)}
       height={20}
       src={providerIconSrc(provider)}
       width={20}
@@ -724,10 +771,17 @@ export function AutopostPage() {
     job: AutopostJobRow
     mediaItems: ComposerMediaItem[]
   } | null>(null)
+  const [galleryRemovalIndex, setGalleryRemovalIndex] = React.useState<number | null>(null)
+  const [galleryReorderBusy, setGalleryReorderBusy] = React.useState(false)
+  const [captionSaveBusy, setCaptionSaveBusy] = React.useState(false)
   const [composerOpen, setComposerOpen] = React.useState(false)
   const [repurposeDialog, setRepurposeDialog] = React.useState<RepurposeDialogState | null>(null)
   const [repurposeSource, setRepurposeSource] = React.useState<RepurposeSource | null>(null)
   const [connectIconProvider, setConnectIconProvider] = React.useState<SocialProvider>("instagram")
+
+  const [postsViewMode, setPostsViewMode] = React.useState<"list" | "calendar">("list")
+  const [postsCalendarMonth, setPostsCalendarMonth] = React.useState(() => startOfMonth(new Date()))
+  const [postsAccountFilterId, setPostsAccountFilterId] = React.useState<string | null>(null)
 
   const [disconnectTarget, setDisconnectTarget] = React.useState<DisconnectTarget | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -772,6 +826,14 @@ export function AutopostPage() {
       previewUrls.forEach((u) => URL.revokeObjectURL(u))
     }
   }, [previewUrls])
+
+  React.useEffect(() => {
+    if (!activeViewerJob) {
+      setGalleryRemovalIndex(null)
+      setCaptionSaveBusy(false)
+      setGalleryReorderBusy(false)
+    }
+  }, [activeViewerJob])
 
   React.useEffect(() => {
     let cancelled = false
@@ -1761,6 +1823,133 @@ export function AutopostPage() {
     }
   }
 
+  const handleRemoveGallerySlide = async (slideIndex: number) => {
+    if (!activeViewerJob) {
+      return
+    }
+    const { job } = activeViewerJob
+    setGalleryRemovalIndex(slideIndex)
+    try {
+      const response = await fetch(`/api/autopost/jobs/${job.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ removeSlideAt: slideIndex }),
+      })
+      const data = (await response.json()) as {
+        error?: string
+        metadata?: AutopostJobMetadata
+        media_url?: string
+      }
+      if (!response.ok) {
+        throw new Error(data.error || "Could not remove slide.")
+      }
+      toast.success("Slide removed.")
+      setActiveViewerJob((current) => {
+        if (!current || current.job.id !== job.id) {
+          return current
+        }
+        const nextJob: AutopostJobRow = {
+          ...current.job,
+          metadata: data.metadata ?? current.job.metadata,
+          media_url: data.media_url ?? current.job.media_url,
+        }
+        return { job: nextJob, mediaItems: getJobMediaItems(nextJob) }
+      })
+      void fetchJobs()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not remove slide.")
+    } finally {
+      setGalleryRemovalIndex(null)
+    }
+  }
+
+  const handleReorderGallery = async (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) {
+      return
+    }
+    if (!activeViewerJob) {
+      return
+    }
+    const { job } = activeViewerJob
+    setGalleryReorderBusy(true)
+    try {
+      const response = await fetch(`/api/autopost/jobs/${job.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reorderSlide: { fromIndex, toIndex },
+        }),
+      })
+      const data = (await response.json()) as {
+        error?: string
+        metadata?: AutopostJobMetadata
+        media_url?: string
+      }
+      if (!response.ok) {
+        throw new Error(data.error || "Could not reorder slides.")
+      }
+      toast.success("Gallery order updated.")
+      setActiveViewerJob((current) => {
+        if (!current || current.job.id !== job.id) {
+          return current
+        }
+        const nextJob: AutopostJobRow = {
+          ...current.job,
+          metadata: data.metadata ?? current.job.metadata,
+          media_url: data.media_url ?? current.job.media_url,
+        }
+        return { job: nextJob, mediaItems: getJobMediaItems(nextJob) }
+      })
+      void fetchJobs()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not reorder slides.")
+      throw error instanceof Error ? error : new Error("Could not reorder slides.")
+    } finally {
+      setGalleryReorderBusy(false)
+    }
+  }
+
+  const handleCommitViewerCaption = async (nextCaption: string) => {
+    if (!activeViewerJob) {
+      return
+    }
+    const { job } = activeViewerJob
+    setCaptionSaveBusy(true)
+    try {
+      const response = await fetch(`/api/autopost/jobs/${job.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caption: nextCaption }),
+      })
+      const data = (await response.json()) as {
+        error?: string
+        caption?: string | null
+        metadata?: AutopostJobMetadata
+      }
+      if (!response.ok) {
+        throw new Error(data.error || "Could not save caption.")
+      }
+      setActiveViewerJob((current) => {
+        if (!current || current.job.id !== job.id) {
+          return current
+        }
+        const resolvedCaption =
+          typeof data.caption === "undefined" ? (nextCaption.length > 0 ? nextCaption : null) : data.caption
+        const nextJob: AutopostJobRow = {
+          ...current.job,
+          caption: resolvedCaption,
+          metadata: data.metadata ?? current.job.metadata,
+        }
+        return { job: nextJob, mediaItems: getJobMediaItems(nextJob) }
+      })
+      void fetchJobs()
+    } catch (error) {
+      throw error instanceof Error ? error : new Error("Could not save caption.")
+    } finally {
+      setCaptionSaveBusy(false)
+    }
+  }
+
   const handleRetryFailed = async (jobId: string) => {
     setActionJobId(jobId)
     try {
@@ -1805,6 +1994,46 @@ export function AutopostPage() {
 
   const instagramConnections = status?.instagram?.connections ?? []
   const tiktokConnections = status?.tiktok?.connections ?? []
+  const postsAccountFilterOptions = React.useMemo(() => {
+    const opts: { value: string; label: string }[] = []
+    for (const c of instagramConnections) {
+      if (c.status !== "connected" || !c.instagramConnectionId) {
+        continue
+      }
+      const label = c.instagramUsername ? `@${c.instagramUsername}` : c.displayName || "Instagram"
+      opts.push({ value: c.instagramConnectionId as string, label })
+    }
+    for (const c of tiktokConnections) {
+      if (c.status !== "connected") {
+        continue
+      }
+      const label = c.username ? `@${c.username}` : c.displayName || "TikTok"
+      opts.push({ value: c.id, label })
+    }
+    return opts
+  }, [instagramConnections, tiktokConnections])
+
+  const postsDisplayJobs = React.useMemo(() => {
+    if (!postsAccountFilterId) {
+      return jobs
+    }
+    return jobs.filter((job) => {
+      if (job.provider === "tiktok") {
+        return job.social_connection_id === postsAccountFilterId
+      }
+      return job.instagram_connection_id === postsAccountFilterId
+    })
+  }, [jobs, postsAccountFilterId])
+
+  React.useEffect(() => {
+    if (postsAccountFilterId === null) {
+      return
+    }
+    if (!postsAccountFilterOptions.some((o) => o.value === postsAccountFilterId)) {
+      setPostsAccountFilterId(null)
+    }
+  }, [postsAccountFilterId, postsAccountFilterOptions])
+
   const isConnected = instagramConnections.some((connection) => connection.status === "connected")
   const selectedTikTokConnection = tiktokConnections.find((connection) => connection.id === selectedTikTokConnectionId)
   const isTikTokConnected = tiktokConnections.some((connection) => connection.status === "connected")
@@ -1920,17 +2149,6 @@ export function AutopostPage() {
           void handlePublishJobFromList(job)
         },
       })
-      actions.push({
-        id: "cancel",
-        label: "Cancel",
-        icon: <Trash2 className="h-3.5 w-3.5" />,
-        variant: "ghost",
-        disabled: busy,
-        onClick: () => {
-          setActiveViewerJob(null)
-          void handleCancelJob(job.id)
-        },
-      })
     }
 
     if (job.status === "draft") {
@@ -1942,17 +2160,6 @@ export function AutopostPage() {
         onClick: () => {
           setActiveViewerJob(null)
           void handlePublishJobFromList(job)
-        },
-      })
-      actions.push({
-        id: "discard",
-        label: "Discard",
-        icon: <Trash2 className="h-3.5 w-3.5" />,
-        variant: "ghost",
-        disabled: busy,
-        onClick: () => {
-          setActiveViewerJob(null)
-          void handleCancelJob(job.id)
         },
       })
     }
@@ -1985,6 +2192,12 @@ export function AutopostPage() {
 
     return actions
   })()
+
+  const getJobMediaPreviewForCalendar = React.useCallback((job: AutopostJobRow) => {
+    const items = getJobMediaItems(job)
+    const first = items[0]
+    return first ? { url: first.url, kind: first.kind } : null
+  }, [])
 
   return (
     <div className="min-h-screen bg-background px-4 pb-8 pt-20 md:pt-24">
@@ -2915,14 +3128,67 @@ export function AutopostPage() {
 
         <section className="space-y-4">
           <Card className="flex flex-col rounded-[30px] border-border/70 bg-muted/10 py-4 sm:py-5">
-            <CardHeader className="shrink-0">
-              <CardTitle className="flex items-center gap-2">
-                <LayoutList className="h-4 w-4" />
-                Posts
-              </CardTitle>
-              <CardDescription>
-                View your drafts, scheduled posts, and published posts in one place.
-              </CardDescription>
+            <CardHeader className="shrink-0 space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1.5">
+                  <CardTitle className="flex items-center gap-2">
+                    <LayoutList className="h-4 w-4" />
+                    Posts
+                  </CardTitle>
+                  <CardDescription>
+                    View your drafts, scheduled posts, and published posts in one place.
+                  </CardDescription>
+                </div>
+                {jobs.length > 0 ? (
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+                    <ToggleGroup
+                      type="single"
+                      value={postsViewMode}
+                      onValueChange={(v) => {
+                        if (v === "list" || v === "calendar") {
+                          setPostsViewMode(v)
+                        }
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-stretch sm:w-auto"
+                      aria-label="Posts view"
+                    >
+                      <ToggleGroupItem value="list" aria-label="List view" className="flex-1 gap-1.5 px-3 sm:flex-initial">
+                        <LayoutList className="h-3.5 w-3.5" />
+                        List
+                      </ToggleGroupItem>
+                      <ToggleGroupItem
+                        value="calendar"
+                        aria-label="Calendar view"
+                        className="flex-1 gap-1.5 px-3 sm:flex-initial"
+                      >
+                        <CalendarIcon className="h-3.5 w-3.5" />
+                        Calendar
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                    {postsAccountFilterOptions.length > 0 ? (
+                      <Select
+                        value={postsAccountFilterId ?? "all"}
+                        onValueChange={(v) => setPostsAccountFilterId(v === "all" ? null : v)}
+                      >
+                        <SelectTrigger className="h-9 w-full sm:w-[220px]">
+                          <Globe className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          <SelectValue placeholder="All accounts" />
+                        </SelectTrigger>
+                        <SelectContent position="popper">
+                          <SelectItem value="all">All accounts</SelectItem>
+                          {postsAccountFilterOptions.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             </CardHeader>
             <CardContent className="flex min-h-0 flex-1 flex-col px-2 sm:px-6">
               {isLoadingJobs ? (
@@ -2938,10 +3204,32 @@ export function AutopostPage() {
                     Create your first post
                   </Button>
                 </div>
+              ) : postsDisplayJobs.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 py-10 text-center">
+                  <p className="text-sm text-muted-foreground">No posts for this account.</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full"
+                    onClick={() => setPostsAccountFilterId(null)}
+                  >
+                    Show all accounts
+                  </Button>
+                </div>
+              ) : postsViewMode === "calendar" ? (
+                <div className="min-h-0 flex-1 overflow-auto pr-1">
+                  <AutopostPostsCalendar
+                    jobs={postsDisplayJobs}
+                    month={postsCalendarMonth}
+                    onMonthChange={setPostsCalendarMonth}
+                    onPostClick={(job) => setActiveViewerJob({ job, mediaItems: getJobMediaItems(job) })}
+                    getJobMediaPreview={getJobMediaPreviewForCalendar}
+                  />
+                </div>
               ) : (
                 <ScrollArea className="h-[min(640px,calc(100vh-16rem))] pr-3 lg:flex-1">
                   <ul className="flex flex-col gap-3">
-                    {jobs.map((job) => {
+                    {postsDisplayJobs.map((job) => {
                       const busy = actionJobId === job.id
                       const mediaItems = getJobMediaItems(job)
                       const primaryMedia = mediaItems[0]
@@ -3147,7 +3435,7 @@ export function AutopostPage() {
       {activeViewerJob ? (
         <AutopostPostMediaViewer
           accountLabel={jobAccountLabel(activeViewerJob.job)}
-          caption={activeViewerJob.job.caption}
+          caption={jobCaptionForViewer(activeViewerJob.job)}
           createdAt={activeViewerJob.job.created_at}
           lastError={activeViewerJob.job.status === "failed" ? activeViewerJob.job.last_error : null}
           mediaItems={activeViewerJob.mediaItems}
@@ -3165,6 +3453,31 @@ export function AutopostPage() {
           timestampsLabel={postStatusTimeLine(activeViewerJob.job)}
           updatedAt={activeViewerJob.job.updated_at}
           actions={activeViewerActions}
+          onDeletePost={
+            activeViewerJob.job.status === "draft" || activeViewerJob.job.status === "queued"
+              ? () => {
+                  setActiveViewerJob(null)
+                  void handleCancelJob(activeViewerJob.job.id)
+                }
+              : undefined
+          }
+          deletePostDisabled={actionJobId === activeViewerJob.job.id}
+          deletePostBusy={actionJobId === activeViewerJob.job.id}
+          showGalleryRemoveButtons={jobAllowsPerSlideRemoval(activeViewerJob.job)}
+          onRemoveGalleryItem={
+            jobAllowsPerSlideRemoval(activeViewerJob.job) ? handleRemoveGallerySlide : undefined
+          }
+          removingGalleryIndex={galleryRemovalIndex}
+          galleryReorderable={jobAllowsGalleryReorder(activeViewerJob.job)}
+          onReorderGallery={
+            jobAllowsGalleryReorder(activeViewerJob.job) ? handleReorderGallery : undefined
+          }
+          reorderingGallery={galleryReorderBusy}
+          captionEditable={jobAllowsCaptionEdit(activeViewerJob.job)}
+          onCaptionCommit={
+            jobAllowsCaptionEdit(activeViewerJob.job) ? handleCommitViewerCaption : undefined
+          }
+          captionCommitBusy={captionSaveBusy}
         />
       ) : null}
 

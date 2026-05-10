@@ -80,7 +80,7 @@ export default async function Page() {
 
   return (
     <>
-      <div className="flex min-h-dvh bg-background pt-16 md:pt-[60px]">
+      <div className="flex min-h-dvh bg-background">
         <main className="min-w-0 flex-1">
           {/* <MockChatHero starterPrompts={heroStarterPrompts} /> */}
           <TempHero />

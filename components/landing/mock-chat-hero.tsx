@@ -81,7 +81,7 @@ export function MockChatHero({
                   onRefsChange={setAttachedRefs}
                   rows={3}
                   className="min-h-[72px] max-h-[180px] flex-1 px-3 py-2"
-                  placeholder="You can start anywhere: say what you want to create, paste ideas, attach references, or just ask a question. Type / to open agent shortcuts, and @ to mention a brand or pull in assets."
+                  placeholder="Describe what you want. / for shortcuts, @ for brands & assets."
                   slashCommands={CHAT_AGENT_COMMANDS}
                   slashCommandsContext="Agent"
                   onPromptKeyDown={(event) => {

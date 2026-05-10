@@ -97,12 +97,17 @@ export async function POST(req: Request) {
 
     const hasCrossVariableContext = otherVariables.length >= 2
     const hasEnoughLocalTextSamples = existingTextValues.length >= 3
+    const hasExplicitPrompt = userHint.length > 0 || promptContext.length > 0
 
-    if (!hasCrossVariableContext && !hasEnoughLocalTextSamples) {
+    if (
+      !hasExplicitPrompt &&
+      !hasCrossVariableContext &&
+      !hasEnoughLocalTextSamples
+    ) {
       return NextResponse.json(
         {
           error:
-            "Add at least 3 non-empty text values in this variable, or add 3+ variables to the automation for cross-context expansion.",
+            "Either add automation prompt text, type a suggestion in the expand dialog, add at least 3 non-empty text values here, or add 3+ variables for cross-variable context.",
         },
         { status: 400 },
       )
@@ -129,8 +134,13 @@ ${othersBlock}
       : ""
 
     const singleVarNote = !hasCrossVariableContext
-      ? `There are no other variables yet — infer what kind of list this is from the samples below and add NEW entries in the same spirit (same category, style, and length; avoid duplicates).
+      ? hasEnoughLocalTextSamples
+        ? `There are no other variables yet — infer what kind of list this is from the samples below and add NEW entries in the same spirit (same category, style, and length; avoid duplicates).
 `
+        : hasExplicitPrompt
+          ? `There are no other variables yet and no samples in this list yet — propose diverse new entries that fit the user's request and the automation prompt excerpt (matching category, style, and sensible length).
+`
+          : ""
       : ""
 
     const userMessage = `You are helping fill a TEXT-ONLY rotation list for one placeholder in an automation prompt.

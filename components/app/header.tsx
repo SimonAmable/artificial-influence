@@ -273,8 +273,8 @@ export function Header() {
               className="relative z-10 h-6 w-6 dark:invert"
             />
           </Link>
-          {/* Desktop Navigation - hidden on tablet and smaller */}
-          <nav className="hidden min-w-0 lg:flex items-center gap-2 whitespace-nowrap">
+          {/* Desktop navigation — sheet below xl to avoid cramped tablets */}
+          <nav className="hidden min-w-0 xl:flex items-center gap-2 whitespace-nowrap">
             {megaNavGroups.map((group) => {
               const active = isGroupActive(pathname, group)
 
@@ -381,7 +381,7 @@ export function Header() {
             })}
           </nav>
           {/* Mobile/Tablet: left sheet reuses mega menu groups (useSearchParams inside) */}
-          <div className="lg:hidden">
+          <div className="xl:hidden">
             <React.Suspense
               fallback={
                 <Button variant="outline" className="justify-between gap-2 shadow-md" disabled type="button">

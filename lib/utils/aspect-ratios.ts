@@ -33,6 +33,21 @@ export function getPreferredAutoAspectRatio(model?: Model | null): string | null
   return null
 }
 
+/**
+ * If the user had an aspect ratio selected and switches model, keep the same
+ * option when the new model lists it. Treat `auto` and `match_input_image`
+ * as interchangeable when both are "auto-style".
+ */
+export function pickRetainedAspectRatio(previous: string, supported: string[]): string | null {
+  if (supported.length === 0) return null
+  if (supported.includes(previous)) return previous
+  if (isAutoAspectRatio(previous)) {
+    const autoPick = supported.find(isAutoAspectRatio)
+    if (autoPick) return autoPick
+  }
+  return null
+}
+
 export function getDefaultAspectRatioForModel(
   model?: Model | null,
   fallback = "1:1"

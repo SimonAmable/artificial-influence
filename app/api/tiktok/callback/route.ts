@@ -2,6 +2,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
 import { encryptAutopostToken } from "@/lib/autopost/crypto"
+import { persistSocialAvatarUrl } from "@/lib/social/persist-social-avatar"
 import { upsertTikTokSocialConnection } from "@/lib/social-connections"
 import { exchangeTikTokCodeForToken } from "@/lib/tiktok/oauth"
 import { resolveTikTokOAuthRedirectUri } from "@/lib/tiktok/oauth-redirect"
@@ -100,13 +101,22 @@ export async function GET(request: Request) {
     }
 
     const profile = await fetchTikTokUserProfile(token.access_token)
+    const persistedAvatarUrl = await persistSocialAvatarUrl({
+      userId: user.id,
+      provider: "tiktok",
+      accountId: token.open_id,
+      sourceUrl: profile.avatar_url,
+    })
+    const profileForStorage = persistedAvatarUrl
+      ? { ...profile, avatar_url: persistedAvatarUrl }
+      : profile
     const refreshToken = token.refresh_token ?? null
     const { error: upsertError } = await upsertTikTokSocialConnection(supabase, {
       userId: user.id,
       openId: token.open_id,
       username: null,
-      displayName: profile.display_name,
-      avatarUrl: profile.avatar_url,
+      displayName: profileForStorage.display_name,
+      avatarUrl: profileForStorage.avatar_url,
       accessTokenEncrypted: encryptAutopostToken(token.access_token),
       accessTokenLast4: token.access_token.slice(-4),
       refreshTokenEncrypted: refreshToken ? encryptAutopostToken(refreshToken) : null,
@@ -115,7 +125,7 @@ export async function GET(request: Request) {
       refreshTokenExpiresAt: addSeconds(token.refresh_expires_in),
       scopes: scopeList(token.scope),
       metadata: {
-        profile,
+        profile: profileForStorage,
         token_type: token.token_type ?? null,
       },
     })

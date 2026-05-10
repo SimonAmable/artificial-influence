@@ -24,7 +24,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Select,
   SelectContent,
@@ -74,8 +73,8 @@ function nonEmptyTextValueCount(v: AutomationPromptVariable): number {
   return v.items.filter((it) => it.kind === "text" && it.value.trim().length > 0).length
 }
 
-/** Expand when there are 3+ variables (cross-context), or 3+ text values in this variable. */
-function canAutoExpandVariableCard(
+/** Samples / multi-variable context — required only when there is no automation prompt and no user hint. */
+function hasStructuralExpandContext(
   v: AutomationPromptVariable,
   allVariables: AutomationPromptVariable[],
 ): boolean {
@@ -128,6 +127,14 @@ export function VariablesEditor({
   const [expandModalVariableId, setExpandModalVariableId] = React.useState<string | null>(null)
   const [expandUserHint, setExpandUserHint] = React.useState("")
   const [expandLoading, setExpandLoading] = React.useState(false)
+
+  const expandTargetVariable =
+    expandModalVariableId !== null ? variables.find((x) => x.id === expandModalVariableId) : undefined
+  const canSubmitExpand =
+    expandTargetVariable !== undefined &&
+    (promptContext.trim().length > 0 ||
+      expandUserHint.trim().length > 0 ||
+      hasStructuralExpandContext(expandTargetVariable, variables))
 
   const addVariable = () => {
     onChange([...variables, makeNewVariable(variables)])
@@ -215,6 +222,15 @@ export function VariablesEditor({
     if (!expandModalVariableId) return
     const v = variables.find((x) => x.id === expandModalVariableId)
     if (!v) return
+    if (
+      !(
+        promptContext.trim().length > 0 ||
+        expandUserHint.trim().length > 0 ||
+        hasStructuralExpandContext(v, variables)
+      )
+    ) {
+      return
+    }
     const existingTextValues = v.items
       .filter((it): it is { kind: "text"; value: string } => it.kind === "text")
       .map((it) => it.value.trim())
@@ -288,7 +304,6 @@ export function VariablesEditor({
 
       <div className="space-y-3">
         {variables.map((v) => {
-          const canExpandThis = canAutoExpandVariableCard(v, variables)
           const token = `{{${v.id}}}`
           const seqHint =
             v.mode === "sequential" && v.items.length > 0 ? (
@@ -499,7 +514,7 @@ export function VariablesEditor({
                     <Plus className="mr-1 size-3" />
                     Add value
                   </Button>
-                  {!disabled && canExpandThis ? (
+                  {!disabled ? (
                     <Button
                       type="button"
                       size="sm"
@@ -513,22 +528,6 @@ export function VariablesEditor({
                       <Wand2 className="mr-1 size-3" />
                       Auto expand list
                     </Button>
-                  ) : null}
-                  {!disabled && !canExpandThis ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="inline-flex">
-                          <Button type="button" size="sm" variant="outline" className="h-8 text-xs" disabled>
-                            <Wand2 className="mr-1 size-3" />
-                            Auto expand list
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-[260px]">
-                        Add at least three non-empty text values here, or create three variables in this automation
-                        (for cross-variable context).
-                      </TooltipContent>
-                    </Tooltip>
                   ) : null}
                 </div>
               </CardContent>
@@ -550,9 +549,9 @@ export function VariablesEditor({
           <DialogHeader>
             <DialogTitle>Auto-expand text list</DialogTitle>
             <DialogDescription>
-              Optional hint for what to generate (themes, examples, constraints). When you have three or more
-              variables, other lists are used as cross-context; otherwise the model uses at least three existing
-              text values here. New entries are appended as text values.
+              If your automation already has prompt text, you can generate from that alone. Otherwise add a suggestion
+              below, or give the model examples: three non-empty values in this variable, or three variables for
+              cross-context. New rows are appended as text values.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
@@ -566,6 +565,12 @@ export function VariablesEditor({
               className="resize-y text-sm"
               disabled={expandLoading}
             />
+            {expandTargetVariable && !canSubmitExpand ? (
+              <p className="text-xs text-muted-foreground">
+                Add automation prompt text, type a suggestion above, three non-empty values in this variable,
+                or three variables total.
+              </p>
+            ) : null}
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
@@ -576,7 +581,16 @@ export function VariablesEditor({
             >
               Cancel
             </Button>
-            <Button type="button" onClick={() => void runExpandList()} disabled={expandLoading}>
+            <Button
+              type="button"
+              onClick={() => void runExpandList()}
+              disabled={expandLoading || !canSubmitExpand}
+              title={
+                !canSubmitExpand && !expandLoading
+                  ? "Need automation prompt text, a suggestion, three example values in this variable, or three variables"
+                  : undefined
+              }
+            >
               {expandLoading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Wand2 className="mr-2 size-4" />}
               Generate
             </Button>

@@ -1,9 +1,10 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { useMemo, useRef } from "react"
 import { motion, useInView, useReducedMotion } from "motion/react"
-import { Quote, TrendingUp } from "lucide-react"
+import { TrendingUp } from "lucide-react"
 
 const chartData = [
   { day: 1, label: "Day 1", views: 1500 },
@@ -63,9 +64,20 @@ export function FounderTestimonialSection() {
     <section ref={sectionRef} className="w-full bg-background py-16 sm:py-24">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center lg:gap-14 lg:px-8">
         <div className="max-w-xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            <Quote className="h-3.5 w-3.5" />
-            Founder testimonial
+          <div className="flex flex-wrap items-center gap-2 py-1">
+            <p className="text-sm font-medium lowercase leading-snug text-muted-foreground sm:text-base">
+              founder testimonial
+            </p>
+            <Image
+              src="/founder_photo/20260105_103146.jpg"
+              alt="Founder"
+              width={40}
+              height={40}
+              className="h-9 w-9 shrink-0 rounded-full border-2 border-border object-cover sm:h-10 sm:w-10"
+            />
+            <span className="text-base font-medium text-muted-foreground sm:text-lg" aria-hidden>
+              .
+            </span>
           </div>
 
           <h2 className="mt-5 text-3xl font-semibold leading-tight text-foreground sm:text-4xl">

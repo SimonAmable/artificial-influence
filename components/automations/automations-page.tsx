@@ -136,7 +136,7 @@ type AutomationRunApi = {
 }
 
 const AUTOMATION_SHEET_DIALOG_CLASSNAME =
-  "!left-0 !right-0 !bottom-0 !top-auto !w-screen !max-w-none !translate-x-0 !translate-y-0 flex max-h-[92dvh] flex-col gap-0 overflow-x-hidden rounded-t-4xl rounded-b-none px-0 sm:!top-1/2 sm:!right-auto sm:!bottom-auto sm:!left-1/2 sm:!w-[calc(100vw-2rem)] sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:rounded-4xl"
+  "flex !bottom-auto !left-1/2 !right-auto !top-1/2 !max-w-none !w-[calc(100vw-2rem)] !-translate-x-1/2 !-translate-y-1/2 max-h-[92dvh] flex-col gap-0 overflow-x-hidden rounded-4xl px-0"
 
 const WEEKDAYS = [
   { value: "0", label: "Sunday" },
@@ -364,6 +364,8 @@ export function AutomationsPage() {
   const [editDetailsOpen, setEditDetailsOpen] = React.useState(false)
   const [autoSaveStatus, setAutoSaveStatus] = React.useState<'saving' | 'saved'>('saved')
   const autoSaveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
+  /** When switching from summary → editor (mine), closing details must not clear `editDetailsOpen`. */
+  const skipResetEditOnDetailsCloseRef = React.useRef(false)
 
   const [name, setName] = React.useState("")
   const [description, setDescription] = React.useState("")
@@ -485,13 +487,11 @@ export function AutomationsPage() {
   }, [scope])
 
   // Load list when auth resolves (fetch-on-mount pattern).
-  /* eslint-disable react-hooks/set-state-in-effect -- intentional data fetch after userId */
   React.useEffect(() => {
     if (userId) {
       void loadAutomations()
     }
   }, [userId, loadAutomations])
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const goToCommunity = React.useCallback(() => {
     setSelectedId(null)
@@ -526,7 +526,6 @@ export function AutomationsPage() {
     }
   }, [])
 
-  /* eslint-disable react-hooks/set-state-in-effect -- fetch runs when selection changes */
   React.useEffect(() => {
     if (selectedId && !isCommunityScope) {
       void loadRuns(selectedId)
@@ -534,7 +533,6 @@ export function AutomationsPage() {
       setRuns([])
     }
   }, [selectedId, loadRuns, isCommunityScope])
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const effectiveCron = React.useMemo(() => {
     if (presetTab === "custom") {
@@ -832,11 +830,9 @@ export function AutomationsPage() {
     needsEditBaselineCaptureRef.current = false
   }, [persistSnapshot, selectedId])
 
-  /* eslint-disable react-hooks/set-state-in-effect -- reset autosave baseline when switching automations */
   React.useEffect(() => {
     setEditBaselineSnapshot("")
   }, [selectedId])
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const performAutoSave = React.useCallback(
     async (currentPersistSnapshot: string) => {
@@ -1207,9 +1203,12 @@ export function AutomationsPage() {
     const showVariableControls = !readOnly || automationVariables.length > 0
     return (
       <>
-      <fieldset disabled={readOnly} className="min-w-0 border-0 p-0 disabled:opacity-[0.92]">
-      <div className="overflow-hidden rounded-[30px] border border-border/60 bg-background/95 shadow-[0_28px_80px_-40px_rgba(0,0,0,0.7)]">
-      <div className="space-y-4 px-5 pt-5 sm:px-6 sm:pt-6">
+      <fieldset
+        disabled={readOnly}
+        className="min-w-0 rounded-[30px] border-0 p-0 -outline-offset-1 outline-1 outline-foreground/15 disabled:opacity-[0.92]"
+      >
+      <div className="min-w-0 overflow-hidden rounded-[30px] border border-border/60 bg-background/95 shadow-[0_28px_80px_-40px_rgba(0,0,0,0.7)]">
+      <div className="space-y-4 px-5 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-6">
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-name`} className="sr-only">
             Automation title
@@ -1333,7 +1332,7 @@ export function AutomationsPage() {
               refs={attachedRefs}
               onRefsChange={setAttachedRefs}
               rows={10}
-              className="min-h-[240px] max-h-[420px] rounded-none border-0 bg-transparent px-0 py-0 font-mono text-sm leading-6 shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
+              className="min-h-[240px] max-h-[420px] rounded-none border-0 bg-transparent px-0 py-0 pr-3 font-mono text-sm leading-6 shadow-none placeholder:text-muted-foreground/75 focus-visible:ring-0"
               placeholder="Add prompt e.g. create tomorrow's post ideas, captions, and image directions. Type / for templates, @ for brands and assets."
               slashCommands={AUTOMATION_SLASH_COMMANDS}
               slashCommandsContext="Automation"
@@ -1357,7 +1356,7 @@ export function AutomationsPage() {
         </div>
       </div>
 
-      <div className="border-t border-border/50 px-4 py-3 sm:px-6">
+      <div className="border-t border-border/50 px-5 py-3 sm:px-6">
         <input
           ref={fileInputRef}
           type="file"
@@ -2062,12 +2061,13 @@ export function AutomationsPage() {
                     setNewDialogOpen(false)
                     setSelectedId(a.id)
                     setEditDetailsOpen(false)
+                    skipResetEditOnDetailsCloseRef.current = false
                     setAutomationDetailsOpen(true)
                     setRecentRunsOpen(false)
                   }}
                   className={cn(
                     "group flex h-full min-h-[156px] w-full flex-col justify-between rounded-2xl border p-4 text-left transition-colors",
-                    selectedId === a.id && automationDetailsOpen
+                    selectedId === a.id && (automationDetailsOpen || editDetailsOpen)
                       ? "border-primary/40 bg-primary/10"
                       : "border-border/50 bg-card/45 hover:border-border hover:bg-muted/25",
                   )}
@@ -2136,6 +2136,10 @@ export function AutomationsPage() {
           if (!open) {
             setRecentRunsOpen(false)
             setVariablesDialogOpen(false)
+            if (!skipResetEditOnDetailsCloseRef.current) {
+              setEditDetailsOpen(false)
+            }
+            skipResetEditOnDetailsCloseRef.current = false
           }
         }}
       >
@@ -2152,21 +2156,18 @@ export function AutomationsPage() {
                 Review, edit, run, or inspect this automation.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-border/50 bg-card/70 p-4 sm:p-5">
-            <div className="flex flex-row flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 space-y-4 px-4 sm:px-6">
+              <div className="flex flex-row flex-wrap items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold">{selected.name}</h2>
                 {selected.description?.trim() ? (
-                  <p className="mt-1 whitespace-pre-line text-sm leading-snug text-muted-foreground">
+                  <p
+                    className="mt-1 line-clamp-3 whitespace-pre-line text-sm leading-snug text-muted-foreground"
+                    title={selected.description.trim()}
+                  >
                     {selected.description.trim()}
                   </p>
                 ) : null}
-                <div className="my-3 border-t border-border/40" />
-                <p className="text-sm text-muted-foreground">
-                  Runs on its own, on the schedule you pick. Each run becomes a chat you can open to see
-                  the results, tweak the prompt, or run it again right away.
-                </p>
                 {isCommunityScope ? (
                   <p className="mt-2 text-xs text-muted-foreground">
                     {selected.hasPreview
@@ -2185,7 +2186,7 @@ export function AutomationsPage() {
                       onClick={() => setEditDetailsOpen((o) => !o)}
                     >
                       <Eye className="h-3.5 w-3.5" />
-                      {editDetailsOpen ? "Hide details" : "Details"}
+                      {editDetailsOpen ? "Close details" : "Details"}
                       <ChevronDown
                         className={cn("h-3.5 w-3.5 transition-transform", editDetailsOpen && "rotate-180")}
                       />
@@ -2241,16 +2242,17 @@ export function AutomationsPage() {
                 ) : (
                   <>
                     <Button
-                      variant={editDetailsOpen ? "secondary" : "outline"}
+                      variant="outline"
                       size="sm"
                       className="gap-1.5"
-                      onClick={() => setEditDetailsOpen((o) => !o)}
+                      onClick={() => {
+                        skipResetEditOnDetailsCloseRef.current = true
+                        setEditDetailsOpen(true)
+                        setAutomationDetailsOpen(false)
+                      }}
                     >
                       <Pencil className="h-3.5 w-3.5" />
-                      {editDetailsOpen ? "Hide edit" : "Edit"}
-                      <ChevronDown
-                        className={cn("h-3.5 w-3.5 transition-transform", editDetailsOpen && "rotate-180")}
-                      />
+                      Edit
                     </Button>
                     {false ? (
                       <Button
@@ -2368,109 +2370,6 @@ export function AutomationsPage() {
                 )}
               </div>
             </div>
-            <div className="pt-4">
-              <CollapsiblePrimitive.Root open={editDetailsOpen} onOpenChange={setEditDetailsOpen}>
-                <CollapsiblePrimitive.Content
-                  className={cn(
-                    "overflow-hidden text-sm transition-all data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-top-1 data-[state=open]:slide-in-from-top-1",
-                    "data-[state=closed]:hidden",
-                  )}
-                >
-                  <div className="space-y-6 border-t border-border/40 pt-6">
-                    <div className="space-y-6">
-                      {renderAutomationFormFields("edit", {
-                        readOnly: isCommunityScope,
-                        showVisibility: !isCommunityScope,
-                      })}
-                    </div>
-
-                    <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
-                      {selected.next_run_at ? (
-                        <p>
-                          <span className="text-muted-foreground">Next scheduled:</span>{" "}
-                          {new Date(selected.next_run_at).toLocaleString(undefined, {
-                            timeZone: timezone,
-                          })}
-                        </p>
-                      ) : null}
-                      {selected.last_run_at ? (
-                        <p className="mt-1">
-                          <span className="text-muted-foreground">Last run:</span>{" "}
-                          {formatDistanceToNow(new Date(selected.last_run_at), { addSuffix: true })}
-                        </p>
-                      ) : null}
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Schedule:{" "}
-                        <code className="rounded bg-muted px-1">{selected.cron_schedule}</code>
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Timezone:{" "}
-                        <span className="font-mono text-foreground/80">{timezone}</span>
-                        {!isCommunityScope ? (
-                          <>
-                            {" · "}
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <button
-                                  type="button"
-                                  className="text-primary underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
-                                >
-                                  Change
-                                </button>
-                              </PopoverTrigger>
-                              <PopoverContent align="start" className="w-[280px] p-3">
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit-tz-popover" className="text-xs">
-                                    Timezone
-                                  </Label>
-                                  <Select value={timezone} onValueChange={setTimezone}>
-                                    <SelectTrigger
-                                      id="edit-tz-popover"
-                                      className="w-full font-mono text-xs"
-                                    >
-                                      <SelectValue placeholder="Select timezone" />
-                                    </SelectTrigger>
-                                    <SelectContent className="max-h-[min(60dvh,320px)]">
-                                      {ianaZones.map((tz) => (
-                                        <SelectItem
-                                          key={tz}
-                                          value={tz}
-                                          className="font-mono text-xs"
-                                        >
-                                          {tz}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              </PopoverContent>
-                            </Popover>
-                          </>
-                        ) : null}
-                      </p>
-                    </div>
-
-                    {false ? (
-                      <div className="flex flex-col gap-3 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <p className="text-sm text-muted-foreground">
-                          Changes are kept only after you save.
-                        </p>
-                        <Button
-                          type="button"
-                          size="lg"
-                          className="w-full shadow-sm sm:w-auto"
-                          onClick={() => void save()}
-                        >
-                          <Save className="mr-2 h-4 w-4" />
-                          Save changes
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-                </CollapsiblePrimitive.Content>
-              </CollapsiblePrimitive.Root>
-            </div>
-              </div>
 
             {!isCommunityScope ? (
               <CollapsiblePrimitive.Root open={recentRunsOpen} onOpenChange={setRecentRunsOpen}>
@@ -2598,6 +2497,97 @@ export function AutomationsPage() {
         ) : null}
       </Dialog>
 
+      {selected ? (
+        <Dialog
+          open={Boolean(
+            editDetailsOpen &&
+              (!isCommunityScope || automationDetailsOpen),
+          )}
+          onOpenChange={setEditDetailsOpen}
+        >
+          <DialogContent
+            className={cn(
+              AUTOMATION_SHEET_DIALOG_CLASSNAME,
+              "overflow-y-auto sm:max-h-[min(92dvh,920px)] sm:!max-w-5xl",
+            )}
+          >
+            <DialogHeader className="sr-only">
+              <DialogTitle>{isCommunityScope ? selected.name : `Edit · ${selected.name}`}</DialogTitle>
+              <DialogDescription>
+                {isCommunityScope
+                  ? "Prompt, schedule, and attachments for this public automation."
+                  : "Update prompt, schedule, attachments, and visibility. Changes save automatically."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="min-w-0 space-y-6 px-4 py-4 sm:px-6">
+              <div className="space-y-6">
+                {renderAutomationFormFields("edit", {
+                  readOnly: isCommunityScope,
+                  showVisibility: !isCommunityScope,
+                })}
+              </div>
+
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
+                {selected.next_run_at ? (
+                  <p>
+                    <span className="text-muted-foreground">Next scheduled:</span>{" "}
+                    {new Date(selected.next_run_at).toLocaleString(undefined, {
+                      timeZone: timezone,
+                    })}
+                  </p>
+                ) : null}
+                {selected.last_run_at ? (
+                  <p className="mt-1">
+                    <span className="text-muted-foreground">Last run:</span>{" "}
+                    {formatDistanceToNow(new Date(selected.last_run_at), { addSuffix: true })}
+                  </p>
+                ) : null}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Schedule: <code className="rounded bg-muted px-1">{selected.cron_schedule}</code>
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Timezone: <span className="font-mono text-foreground/80">{timezone}</span>
+                  {!isCommunityScope ? (
+                    <>
+                      {" · "}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className="text-primary underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+                          >
+                            Change
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="w-[280px] p-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-form-tz-popover" className="text-xs">
+                              Timezone
+                            </Label>
+                            <Select value={timezone} onValueChange={setTimezone}>
+                              <SelectTrigger id="edit-form-tz-popover" className="w-full font-mono text-xs">
+                                <SelectValue placeholder="Select timezone" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-[min(60dvh,320px)]">
+                                {ianaZones.map((tz) => (
+                                  <SelectItem key={tz} value={tz} className="font-mono text-xs">
+                                    {tz}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </>
+                  ) : null}
+                </p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
       <Dialog
         open={newDialogOpen}
         onOpenChange={(open) => {
@@ -2621,7 +2611,7 @@ export function AutomationsPage() {
               review the results or take them further.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-6 py-4">
+          <div className="min-w-0 space-y-6 px-4 py-4 sm:px-6">
             {renderAutomationFormFields("new", { readOnly: false, showVisibility: true, showInlineActions: true })}
           </div>
         </DialogContent>

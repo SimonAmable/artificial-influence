@@ -20,7 +20,7 @@ function PlatformSurfaceImagePanel({
   card: Extract<LandingPlatformSurfaceCard, { kind: "image" }>
 }) {
   return (
-    <div className="flex w-full flex-col gap-4">
+    <div className="flex w-full flex-col gap-4 px-4">
       <Link
         href={card.href}
         className="relative block w-full rounded-xl outline-none transition-opacity hover:opacity-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"

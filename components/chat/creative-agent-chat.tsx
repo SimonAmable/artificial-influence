@@ -108,6 +108,13 @@ function formatThreadUpdatedAt(value: string) {
   })
 }
 
+function firstNameFromDisplayName(displayName: string): string {
+  const trimmed = displayName.trim()
+  if (!trimmed) return displayName
+  const first = trimmed.split(/\s+/)[0]
+  return first ?? trimmed
+}
+
 const STARTER_PROMPTS: { label: string; prompt: string }[] = [
   {
     label: "What can this agent do?",
@@ -4757,6 +4764,7 @@ export function CreativeAgentChat({
   const [skillEditModalSlug, setSkillEditModalSlug] = React.useState<string | null>(null)
   const [composerDropActive, setComposerDropActive] = React.useState(false)
   const [userId, setUserId] = React.useState<string | null>(null)
+  const [accountDisplayName, setAccountDisplayName] = React.useState<string | null>(null)
   const [authReady, setAuthReady] = React.useState(false)
   const [composerValue, setComposerValue] = React.useState("")
   const [attachedFiles, setAttachedFiles] = React.useState<ComposerUploadAttachment[]>([])
@@ -4896,6 +4904,41 @@ export function CreativeAgentChat({
       subscription.unsubscribe()
     }
   }, [])
+
+  React.useEffect(() => {
+    if (!authReady || !userId) {
+      setAccountDisplayName(null)
+      return
+    }
+
+    let cancelled = false
+    const supabase = createSupabaseClient()
+
+    void Promise.all([
+      supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+      supabase.auth.getUser(),
+    ])
+      .then(([profileResult, userResult]) => {
+        if (cancelled) return
+        const profile = profileResult.data
+        const user = userResult.data.user
+        const metaName = user?.user_metadata?.full_name
+        const displayName =
+          profile?.full_name?.trim() ||
+          (typeof metaName === "string" ? metaName.trim() : "") ||
+          user?.email?.split("@")[0] ||
+          ""
+        setAccountDisplayName(displayName.trim() || null)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setAccountDisplayName(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [authReady, userId])
 
   React.useEffect(() => {
     if (!authReady || !userId) {
@@ -5692,7 +5735,11 @@ export function CreativeAgentChat({
                       />
                     </span>
                   )}
-                  title="Start a conversation"
+                  title={
+                    userId && accountDisplayName
+                      ? `Hi, ${firstNameFromDisplayName(accountDisplayName)}`
+                      : "Start a conversation"
+                  }
                   description={
                     userId
                       ? "Ask a question, attach references, brainstorm ideas, or talk through a creative direction."
@@ -5793,8 +5840,8 @@ export function CreativeAgentChat({
           <ConversationScrollButton />
         </Conversation>
 
-        <div className="z-10 shrink-0 bg-transparent px-4 pb-5 pt-3">
-          <div className="mx-auto max-w-4xl space-y-3">
+        <div className="z-10 shrink-0 bg-transparent px-0 pb-5 pt-3 sm:px-4">
+          <div className="mx-auto w-full max-w-4xl space-y-3">
             {composerAttachments.length > 0 || attachedRefs.some((ref) => ref.category === "brand") ? (
               <div className="flex flex-wrap items-start gap-2">
                 {composerAttachments.length > 0 ? (
@@ -5835,7 +5882,7 @@ export function CreativeAgentChat({
             <>
               <div
                 className={cn(
-                  "rounded-[26px] p-2 transition-[box-shadow,ring-color]",
+                  "rounded-[26px] p-1 transition-[box-shadow,ring-color] sm:p-2",
                   composerDropActive && "ring-2 ring-primary/50 ring-offset-2 ring-offset-transparent",
                 )}
                 onDragEnter={handleComposerDragEnter}
@@ -5851,7 +5898,7 @@ export function CreativeAgentChat({
                     onRefsChange={setAttachedRefs}
                     rows={3}
                     className="min-h-[72px] max-h-[180px] flex-1 px-3 py-2"
-                    placeholder="You can start anywhere: say what you want to create, paste ideas, attach references, or just ask a question. Type / to open agent shortcuts, and @ to mention a brand or pull in assets."
+                    placeholder="Describe what you want. / for shortcuts, @ for brands & assets."
                     slashCommands={CHAT_AGENT_COMMANDS}
                     slashCommandsContext="Agent"
                     onPasteImage={(file) => void handleAttachFiles([file])}

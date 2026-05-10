@@ -24,6 +24,8 @@ import {
 import { toast } from "sonner"
 import {
   getDefaultAspectRatioForModel,
+  getSupportedAspectRatios,
+  pickRetainedAspectRatio,
   resolveAspectRatioForRequest,
 } from "@/lib/utils/aspect-ratios"
 import type { AttachedRef } from "@/lib/commands/types"
@@ -200,6 +202,7 @@ function ImagePageContent() {
   const [selectedModel, setSelectedModel] = React.useState<string>("")
   const [selectedAspectRatio, setSelectedAspectRatio] = React.useState<string>("match_input_image")
   const [selectedNumImages, setSelectedNumImages] = React.useState<number>(1)
+  const prevModelForAspectRef = React.useRef<string | null>(null)
   const isCharacterSwapModel = selectedModel === CHARACTER_SWAP_UI_MODEL_IDENTIFIER
   
   // Create asset dialog state
@@ -247,16 +250,28 @@ function ImagePageContent() {
     lastLoadedModelParam.current = rawModelParam
   }, [searchParams, effectiveImageModels])
 
-  // Update aspect ratio and clamp numImages when model changes
+  // When the model (or catalog) changes: keep aspect ratio if the new model supports it; else default.
+  // First time we bind to a model, always apply that model's default (don't "retain" initial state).
   React.useEffect(() => {
-    if (selectedModel && effectiveImageModels.length > 0) {
-      const model = effectiveImageModels.find(m => m.identifier === selectedModel)
-      if (model) {
-        setSelectedAspectRatio(getDefaultAspectRatioForModel(model))
-      }
-      const maxImages = model?.max_images ?? 1
-      setSelectedNumImages((prev) => (maxImages >= 1 ? Math.min(prev, maxImages) : 1))
+    if (!selectedModel || effectiveImageModels.length === 0) return
+
+    const model = effectiveImageModels.find((m) => m.identifier === selectedModel)
+    if (!model) return
+
+    const prevModel = prevModelForAspectRef.current
+    prevModelForAspectRef.current = selectedModel
+
+    if (prevModel === null) {
+      setSelectedAspectRatio(getDefaultAspectRatioForModel(model))
+    } else {
+      setSelectedAspectRatio((current) => {
+        const supported = getSupportedAspectRatios(model)
+        return pickRetainedAspectRatio(current, supported) ?? getDefaultAspectRatioForModel(model)
+      })
     }
+
+    const maxImages = model.max_images ?? 1
+    setSelectedNumImages((prev) => (maxImages >= 1 ? Math.min(prev, maxImages) : 1))
   }, [selectedModel, effectiveImageModels])
 
   type FetchHistoryOptions = { silent?: boolean; replace?: boolean }

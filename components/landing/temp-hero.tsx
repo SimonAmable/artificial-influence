@@ -42,7 +42,7 @@ export function TempHero() {
   )
 
   return (
-    <section className="relative isolate overflow-visible bg-background px-0 pb-[10rem] pt-0 text-foreground md:px-6 md:pb-[24rem] md:pt-10">
+    <section className="relative isolate overflow-visible bg-background px-0 pb-[10rem] pt-0 text-foreground md:px-6 md:pb-[24rem] md:pt-[60px]">
       <div className="relative mx-auto flex min-h-[100svh] w-full flex-col items-center overflow-hidden rounded-none border-0 bg-background shadow-none md:h-[calc(100svh-7.5rem)] md:min-h-0 md:w-[min(calc((100svh-7.5rem)*0.62),42rem)] md:rounded-[2.5rem] md:border md:border-border/60 md:shadow-[0_28px_90px_rgba(15,23,42,0.12)] dark:md:shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
         <motion.div
           className="absolute inset-0"
