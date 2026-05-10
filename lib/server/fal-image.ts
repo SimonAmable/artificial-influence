@@ -142,6 +142,28 @@ function normalizeQuality(value: string | null | undefined): "low" | "medium" | 
   return "low"
 }
 
+/**
+ * WAN 2.x image APIs expect a plain text prompt. Users sometimes paste JSON blobs
+ * (e.g. from other tools) with "summary" / "prompt" fields — coerce when obvious.
+ */
+export function coerceWanImagePrompt(prompt: string): string {
+  const trimmed = prompt.trimStart()
+  if (!trimmed.startsWith("{")) return prompt
+  try {
+    const parsed: unknown = JSON.parse(trimmed)
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const o = parsed as Record<string, unknown>
+      for (const key of ["prompt", "summary", "description", "text"]) {
+        const v = o[key]
+        if (typeof v === "string" && v.trim().length > 0) return v.trim()
+      }
+    }
+  } catch {
+    /* keep original */
+  }
+  return prompt
+}
+
 export function buildFalImageRequest(options: FalImageRequestOptions): {
   endpointId: FalImageEndpoint
   input: Record<string, unknown>
@@ -211,11 +233,14 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
     options.modelIdentifier === WAN_27_IMAGE_CANONICAL_ID ||
     options.modelIdentifier === WAN_27_PRO_IMAGE_CANONICAL_ID
   ) {
+    const wanPrompt = coerceWanImagePrompt(options.prompt)
+    const wanNegative = String(options.negativePrompt ?? "").slice(0, 500)
     const boundedImageCount = Math.min(4, Math.max(1, options.numImages))
     const input: Record<string, unknown> = {
-      prompt: options.prompt,
-      negative_prompt: options.negativePrompt ?? "",
+      prompt: wanPrompt,
+      negative_prompt: wanNegative,
       enable_safety_checker: false,
+      output_format: normalizeOutputFormat(options.outputFormat),
     }
 
     if (shouldIncludeImageSize) {
@@ -229,7 +254,10 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
     if (isEdit) {
       input.image_urls = referenceImageUrls
       input.num_images = boundedImageCount
-      input.enable_prompt_expansion = options.enablePromptExpansion ?? true
+      // DashScope expansion can choke on huge / structured prompts; disable for very long inputs.
+      const expansionDefault = options.enablePromptExpansion ?? true
+      input.enable_prompt_expansion =
+        expansionDefault && wanPrompt.length <= 3500 ? true : false
     } else {
       input.max_images = boundedImageCount
     }

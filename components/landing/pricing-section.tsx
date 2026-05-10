@@ -590,7 +590,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
           ? compact
             ? 'w-full py-4 sm:py-6'
             : 'w-full py-16 sm:py-24'
-          : 'min-h-[90vh] pt-28 sm:pt-32 py-4'
+          : 'min-h-[90vh] pt-8 pb-4 sm:pt-12'
       )}
     >
       <div className="max-w-7xl mx-auto">

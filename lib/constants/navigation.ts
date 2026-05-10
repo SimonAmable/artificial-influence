@@ -338,8 +338,8 @@ export const megaNavGroups: MegaNavGroup[] = [
     path: "/assets",
     simpleItems: [
       { path: "/assets", label: "Assets", description: "Store and sort your generated assets", iconSrc: "/window.svg", badge: "new" },
-      { path: "/resources", label: "Resources", description: "Search live stock and meme references", iconPhosphor: "image", badge: "new" },
       { path: "/history", label: "History", description: "Past generations and edits", iconSrc: "/file.svg" },
+      { path: "/resources", label: "Resources", description: "Search live stock and meme references", iconPhosphor: "image", badge: "new" },
       {
         path: "/automations",
         label: "Automations",

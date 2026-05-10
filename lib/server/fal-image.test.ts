@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 
 const {
   buildFalImageRequest,
+  coerceWanImagePrompt,
   FAL_OPENAI_GPT_IMAGE_2_EDIT,
   FAL_OPENAI_GPT_IMAGE_2_T2I,
   FAL_WAN_27_PRO_EDIT,
@@ -19,6 +20,25 @@ function runTest(name: string, fn: () => void) {
     throw error
   }
 }
+
+runTest("coerceWanImagePrompt extracts summary string from pasted JSON", () => {
+  const coerced = coerceWanImagePrompt(`{ "summary": "plain grey wall, flash aesthetic", "meta": true }`)
+  assert.equal(coerced, "plain grey wall, flash aesthetic")
+})
+
+runTest("Wan 2.7 Pro edit disables prompt expansion when prompt exceeds expansion threshold", () => {
+  const long = "x".repeat(3501)
+  const result = buildFalImageRequest({
+    aspectRatio: null,
+    enablePromptExpansion: true,
+    modelIdentifier: WAN_27_PRO_IMAGE_CANONICAL_ID,
+    numImages: 1,
+    outputFormat: "png",
+    prompt: long,
+    referenceImageUrls: ["https://example.com/ref-1.png"],
+  })
+  assert.equal(result.input.enable_prompt_expansion, false)
+})
 
 runTest("Wan 2.7 Pro routes prompt-only generations to text-to-image", () => {
   const result = buildFalImageRequest({

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
 import { configureFal } from "./fal-image"
+import { formatFalClientError } from "./fal-client-error"
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -95,7 +96,7 @@ export async function tryCompleteFalPendingImage(
   try {
     result = await fal.queue.result(endpointId, { requestId })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Fal result error"
+    const msg = formatFalClientError(e)
     await supabaseAdmin
       .from("generations")
       .update({ status: "failed", error_message: msg, finished_at: new Date().toISOString() })

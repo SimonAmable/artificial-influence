@@ -38,6 +38,10 @@ import { openPricingPlansModal } from "@/lib/pricing-upsell"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
 import { clearOnboardingCompletedLocal } from "@/lib/onboarding/client-storage"
 
+/** Matches signed-in header pills (credits, assets) for one surface style. */
+const signedInHeaderPillClassName =
+  "h-auto min-h-9 rounded-full border border-border/70 bg-secondary/40 px-3 py-1.5 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-secondary/70 hover:text-foreground aria-expanded:bg-secondary/50"
+
 function isGroupActive(pathname: string, group: MegaNavGroup) {
   if (group.path && pathname === group.path) return true
   const items = [
@@ -396,8 +400,8 @@ export function Header() {
               <button
                 type="button"
                 className={cn(
-                  "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-secondary/40 px-3 py-1.5 text-sm font-semibold tabular-nums text-foreground shadow-sm",
-                  "transition-colors hover:bg-secondary/70 hover:text-foreground"
+                  "inline-flex shrink-0 items-center gap-1.5 tabular-nums",
+                  signedInHeaderPillClassName
                 )}
                 aria-label={
                   credits !== null
@@ -438,6 +442,7 @@ export function Header() {
                     <Button
                       variant="secondary"
                       asChild
+                      className={signedInHeaderPillClassName}
                       onPointerEnter={() => {
                         clearAssetsCloseTimer()
                         setAssetsMenuOpen(true)
@@ -447,7 +452,12 @@ export function Header() {
                       <Link href="/assets">Assets</Link>
                     </Button>
                   ) : (
-                    <Button type="button" variant="secondary" aria-expanded={assetsMenuOpen}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className={signedInHeaderPillClassName}
+                      aria-expanded={assetsMenuOpen}
+                    >
                       Assets
                     </Button>
                   )}
