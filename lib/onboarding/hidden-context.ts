@@ -35,14 +35,12 @@ const TEAM_SIZE_LABELS: Record<OnboardingTeamSize, string> = {
 }
 
 const CREATION_GOAL_LABELS: Record<OnboardingCreationGoal, string> = {
-  ai_ugc: "AI UGC",
-  ai_influencer_content: "AI influencer content",
-  automated_tiktok_instagram: "TikTok / Instagram automation",
-  memes_brainrot: "Memes / brainrot content",
-  motion_control_videos: "Motion videos",
-  product_ads: "Product ads",
-  artistic_cinematic: "Cinematic / artistic work",
-  other: "Other creative work",
+  ugc_social: "UGC & Social",
+  ai_influencer: "AI Influencers",
+  product_ads: "Product Ads",
+  memes_brainrot: "Memes & Brainrot",
+  carousel_posts: "Carousel Posts",
+  fashion_lifestyle: "Fashion & Lifestyle",
 }
 
 const AI_EXPERIENCE_LABELS: Record<OnboardingAiExperience, string> = {

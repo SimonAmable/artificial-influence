@@ -2,6 +2,10 @@ import { randomBytes } from "crypto"
 import { NextResponse } from "next/server"
 
 import { resolveInstagramOAuthRedirectUri } from "@/lib/instagram/oauth-redirect"
+import {
+  parseSocialOAuthReturnPath,
+  SOCIAL_OAUTH_RETURN_COOKIE,
+} from "@/lib/social/oauth-return"
 import { createClient } from "@/lib/supabase/server"
 
 const OAUTH_STATE_COOKIE = "instagram_oauth_state"
@@ -75,6 +79,17 @@ export async function GET(request: Request) {
     })
 
     const response = NextResponse.redirect(`${INSTAGRAM_OAUTH_URL}?${params.toString()}`, 302)
+
+    const returnPath = parseSocialOAuthReturnPath(requestUrl.searchParams.get("next"))
+    if (returnPath) {
+      response.cookies.set(SOCIAL_OAUTH_RETURN_COOKIE, returnPath, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 10,
+        path: "/",
+      })
+    }
 
     response.cookies.set(OAUTH_STATE_COOKIE, state, {
       httpOnly: true,

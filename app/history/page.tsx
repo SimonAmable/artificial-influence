@@ -517,7 +517,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="container mx-auto min-h-screen px-4 py-8 pt-24">
+    <div className="container mx-auto min-h-screen px-4 pb-8 pt-16">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-3xl font-bold">Generation History</h1>

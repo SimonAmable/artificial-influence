@@ -8,7 +8,13 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import type { BrandColorToken } from "@/lib/brand-kit/types"
 
-const MAX_COLORS = 8
+const MAX_COLORS_FULL = 8
+
+const MINIMAL_ROLE_LABELS: Record<string, string> = {
+  primary: "Primary",
+  background: "Background",
+  text: "Text (foreground)",
+}
 
 function normalizeHex(raw: string): string {
   const s = raw.trim().replace(/^#/, "")
@@ -24,9 +30,13 @@ type BrandKitColorsProps = {
   colors: BrandColorToken[]
   onChange: (next: BrandColorToken[]) => void
   className?: string
+  /** Fixed palette: primary, background, text — no add/remove. */
+  variant?: "full" | "minimal"
 }
 
-export function BrandKitColors({ colors, onChange, className }: BrandKitColorsProps) {
+export function BrandKitColors({ colors, onChange, className, variant = "full" }: BrandKitColorsProps) {
+  const minimal = variant === "minimal"
+  const maxColors = minimal ? 3 : MAX_COLORS_FULL
   const [openIndex, setOpenIndex] = React.useState<number | "add" | null>(null)
   const [draftHex, setDraftHex] = React.useState("#000000")
 
@@ -40,6 +50,7 @@ export function BrandKitColors({ colors, onChange, className }: BrandKitColorsPr
     if (!isValidHex(hex)) return
 
     if (openIndex === "add") {
+      if (minimal) return
       onChange([...colors, { hex, role: "other", label: "" }])
     } else if (typeof openIndex === "number") {
       const next = [...colors]
@@ -93,7 +104,7 @@ export function BrandKitColors({ colors, onChange, className }: BrandKitColorsPr
   return (
     <div className={cn("flex flex-wrap items-end gap-6", className)}>
       {colors.map((c, i) => (
-        <div key={`${c.hex}-${i}`} className="relative flex flex-col items-center gap-2">
+        <div key={minimal ? `${c.role}-${i}` : `${c.hex}-${i}`} className="relative flex flex-col items-center gap-2">
           <Popover
             open={openIndex === i}
             onOpenChange={(o) => {
@@ -106,7 +117,11 @@ export function BrandKitColors({ colors, onChange, className }: BrandKitColorsPr
                 type="button"
                 className="group relative h-14 w-14 shrink-0 rounded-full border-2 border-white/10 shadow-inner"
                 style={{ backgroundColor: safeColorHex(c.hex) }}
-                aria-label={`Color ${i + 1}, open picker`}
+                aria-label={
+                  minimal
+                    ? `${MINIMAL_ROLE_LABELS[c.role] ?? c.role}, open picker`
+                    : `Color ${i + 1}, open picker`
+                }
               />
             </PopoverTrigger>
             <PopoverContent
@@ -120,7 +135,13 @@ export function BrandKitColors({ colors, onChange, className }: BrandKitColorsPr
             </PopoverContent>
           </Popover>
 
-          <div className="flex items-center gap-1">
+          {minimal ? (
+            <p className="max-w-28 text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {MINIMAL_ROLE_LABELS[c.role] ?? c.role}
+            </p>
+          ) : null}
+
+          <div className={cn("flex items-center gap-1", minimal && "justify-center")}>
             <Input
               value={c.hex}
               onChange={(e) => setHexAt(i, e.target.value)}
@@ -135,22 +156,24 @@ export function BrandKitColors({ colors, onChange, className }: BrandKitColorsPr
               }}
               className={cn(
                 "h-8 min-w-28 rounded-full border-zinc-600 bg-zinc-950/90 px-3 text-center font-mono text-xs text-zinc-100",
-                !isValidHex(c.hex) && "border-destructive/50"
+                !isValidHex(c.hex) && "border-destructive/50",
               )}
             />
-            <button
-              type="button"
-              className="rounded-full p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-              aria-label="Remove color"
-              onClick={() => removeAt(i)}
-            >
-              <Trash className="h-3.5 w-3.5" />
-            </button>
+            {!minimal ? (
+              <button
+                type="button"
+                className="rounded-full p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+                aria-label="Remove color"
+                onClick={() => removeAt(i)}
+              >
+                <Trash className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
           </div>
         </div>
       ))}
 
-      {empty ? (
+      {!minimal && empty ? (
         <Popover
           open={openIndex === "add"}
           onOpenChange={(o) => {
@@ -184,7 +207,7 @@ export function BrandKitColors({ colors, onChange, className }: BrandKitColorsPr
         </Popover>
       ) : null}
 
-      {!empty && colors.length < MAX_COLORS ? (
+      {!minimal && !empty && colors.length < maxColors ? (
         <Popover
           open={openIndex === "add"}
           onOpenChange={(o) => {

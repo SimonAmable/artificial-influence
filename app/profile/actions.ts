@@ -1,8 +1,10 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { cookies } from "next/headers"
 
 import { createClient } from "@/lib/supabase/server"
+import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
 
 export type UpdateProfileDisplayNameResult =
   | { ok: true }
@@ -44,5 +46,46 @@ export async function updateProfileDisplayName(
   }
 
   revalidatePath("/profile")
+  return { ok: true }
+}
+
+export type RestartOnboardingResult =
+  | { ok: true }
+  | { ok: false; error: string }
+
+/** Clears completion so `/onboarding` is reachable again; keeps `onboarding_json_data` for safe prefill. */
+export async function restartOnboarding(): Promise<RestartOnboardingResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { ok: false, error: "Not signed in" }
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ onboarding_completed_at: null })
+    .eq("id", user.id)
+
+  if (error) {
+    console.error("[profile] restartOnboarding", error)
+    return { ok: false, error: error.message }
+  }
+
+  const cookieStore = await cookies()
+  cookieStore.set(ONBOARDING_DONE_COOKIE, "", {
+    path: "/",
+    maxAge: 0,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: false,
+  })
+
+  revalidatePath("/", "layout")
+  revalidatePath("/profile")
+  revalidatePath("/onboarding")
+  revalidatePath("/chat", "layout")
   return { ok: true }
 }

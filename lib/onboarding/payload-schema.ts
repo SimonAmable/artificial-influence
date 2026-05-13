@@ -16,14 +16,12 @@ export const onboardingRoleSchema = z.enum([
 ])
 
 export const onboardingCreationGoalSchema = z.enum([
-  "ai_ugc",
-  "ai_influencer_content",
-  "automated_tiktok_instagram",
-  "memes_brainrot",
-  "motion_control_videos",
+  "ugc_social",
+  "ai_influencer",
   "product_ads",
-  "artistic_cinematic",
-  "other",
+  "memes_brainrot",
+  "carousel_posts",
+  "fashion_lifestyle",
 ])
 
 export const onboardingAiExperienceSchema = z.enum([
@@ -53,6 +51,35 @@ export const onboardingPrioritySchema = z.enum([
   "unique_models",
 ])
 
+export const onboardingInfluencerModeSchema = z.enum(["preset", "upload", "skip"])
+
+/** Whether the user saved a hero character during onboarding or skipped that step. */
+export const onboardingCharacterOnboardingSchema = z.enum(["saved", "skipped"])
+
+/** Stored on `onboarding_json_data.aiInfluencer` when the user picks AI Influencers. */
+export const onboardingInfluencerSchema = z
+  .object({
+    mode: onboardingInfluencerModeSchema,
+    presetId: z.string().trim().min(1).max(120).optional(),
+    assetIds: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.mode === "preset" && !value.presetId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Pick a preset character",
+        path: ["presetId"],
+      })
+    }
+    if (value.mode === "upload" && (!value.assetIds || value.assetIds.length < 1)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Upload at least one reference asset",
+        path: ["assetIds"],
+      })
+    }
+  })
+
 export const completeOnboardingPayloadSchema = z.object({
   theme: onboardingThemeSchema,
   fullName: z.string().trim().min(1, "Enter your name").max(200),
@@ -67,6 +94,8 @@ export const completeOnboardingPayloadSchema = z.object({
     .array(onboardingPrioritySchema)
     .min(1, "Pick at least one priority")
     .max(3, "Pick at most 3 priorities"),
+  aiInfluencer: onboardingInfluencerSchema.optional(),
+  characterOnboarding: onboardingCharacterOnboardingSchema.optional(),
   acceptedTerms: z
     .boolean()
     .refine((value) => value === true, "You must accept the current Terms of Use."),

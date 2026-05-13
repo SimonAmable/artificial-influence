@@ -15,7 +15,7 @@ const testimonialData = [
   },
   {
     quote:
-      "Sohan made my team custom tools for thumbnail creation, and we save about 7 hours a week, can make 20 custom thumbnails in minutes, move faster on every upload, and skip a lot of the usual back and forth.",
+      "Simon made my team custom tools for thumbnail creation, and we save about 7 hours a week because now we can make our weekly 20 custom thumbnails in minutes and they look better then ever",
     name: "Sohan",
     initials: "S",
   },

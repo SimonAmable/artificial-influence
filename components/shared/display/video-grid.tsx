@@ -30,6 +30,7 @@ export interface VideoHistoryItem {
   /** Client-only fallback when createdAt is missing */
   timestamp?: number
   parameters?: Record<string, unknown>
+  referenceImageUrls?: string[]
 }
 
 export type VideoGridItem =
@@ -279,12 +280,16 @@ export function VideoGrid({
 
   const handleCopyVideo = React.useCallback(async (videoUrl: string) => {
     try {
-      await copyMediaToClipboard({ url: videoUrl, kind: "video" })
-      toast.success("Video URL copied to clipboard")
+      const result = await copyMediaToClipboard({ url: videoUrl, kind: "video" })
+      if (result === "media") {
+        toast.success("Video copied to clipboard")
+      } else {
+        toast.success("Video URL copied to clipboard")
+      }
       setCopiedVideoUrl(videoUrl)
       window.setTimeout(() => setCopiedVideoUrl(null), 1500)
     } catch {
-      toast.error("Failed to copy video URL")
+      toast.error("Failed to copy video")
     }
   }, [])
 
@@ -388,6 +393,7 @@ export function VideoGrid({
             type: "video",
             createdAt: fullscreenVideo.item.createdAt ?? null,
           }}
+          referenceImages={(fullscreenVideo.item.referenceImageUrls ?? []).map((imageUrl) => ({ imageUrl }))}
           copiedUrl={copiedVideoUrl}
           onClose={() => setFullscreenVideo(null)}
           actions={({ url }): FullscreenMediaViewerAction[] => {
@@ -400,7 +406,7 @@ export function VideoGrid({
               },
               {
                 id: "copy",
-                label: "Copy URL",
+                label: "Copy",
                 icon: <Copy className="size-4" />,
                 onClick: () => void handleCopyVideo(url),
               },
@@ -418,7 +424,7 @@ export function VideoGrid({
             if (onUseVideoAsReference) {
               actions.push({
                 id: "use-as-reference",
-                label: "Use as Reference",
+                label: "Edit Video",
                 icon: <FilmStrip className="size-4" />,
                 onClick: () => onUseVideoAsReference(url, fullscreenVideo.index),
               })

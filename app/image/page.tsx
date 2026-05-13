@@ -58,6 +58,8 @@ interface PendingImageRequest {
   tool: string
   aspectRatio: string | null
   referenceImageUrls: string[]
+  /** Batch size for this request (`n` / selectedNumImages); one grid placeholder per image. */
+  numImages: number
   generationId?: string | null
   predictionId?: string | null
 }
@@ -454,6 +456,7 @@ function ImagePageContent() {
       tool: capturedTool,
       aspectRatio: capturedAspectRatio,
       referenceImageUrls: capturedRefUrls,
+      numImages: isCharacterSwapModel ? 1 : Math.max(1, selectedNumImages),
     }
 
     setPendingRequests((prev) => [optimisticPendingRequest, ...prev])
@@ -610,6 +613,11 @@ function ImagePageContent() {
     }
   }, [])
 
+  const activeGenerationSlotCount = React.useMemo(
+    () => pendingRequests.reduce((total, request) => total + request.numImages, 0),
+    [pendingRequests],
+  )
+
   const renderInputBox = React.useCallback((forceRowLayout: boolean) => {
     if (!isCharacterSwapModel) {
       return (
@@ -625,6 +633,7 @@ function ImagePageContent() {
           enhancePrompt={enhancePrompt}
           onEnhancePromptChange={setEnhancePrompt}
           isGenerating={isGenerating}
+          activeGenerationSlotCount={activeGenerationSlotCount}
           onGenerate={handleGenerate}
           allowConcurrent={true}
           allowOptionsDuringGeneration={true}
@@ -662,6 +671,7 @@ function ImagePageContent() {
       />
     )
   }, [
+    activeGenerationSlotCount,
     characterSwapMode,
     characterSwapCharacterImage,
     characterSwapSceneImage,
@@ -779,11 +789,12 @@ function ImagePageContent() {
       ...img,
       referenceImageUrls: img.reference_image_urls ?? (img as { referenceImageUrls?: string[] }).referenceImageUrls ?? [],
     })
-    const generating = pendingRequests.map((request) => ({
-      type: "generating" as const,
-      // Stable key for the lifetime of this request (do not switch to predictionId, avoids remount/flicker).
-      id: `slot-${request.clientRequestId}`,
-    }))
+    const generating = pendingRequests.flatMap((request) =>
+      Array.from({ length: request.numImages }, (_, i) => ({
+        type: "generating" as const,
+        id: `slot-${request.clientRequestId}-${i}`,
+      }))
+    )
     const completed = historyImages.map((img) => ({ type: "image" as const, data: toImageData(img) }))
     return [...generating, ...completed]
   }, [historyImages, pendingRequests])

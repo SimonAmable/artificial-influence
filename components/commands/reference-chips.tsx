@@ -8,7 +8,7 @@ import { Image, Palette, VideoCamera, Waveform } from "@phosphor-icons/react"
 
 function ChipIcon({ refItem }: { refItem: AttachedRef }) {
   if (refItem.category === "brand") {
-    return <Palette className="size-3.5 shrink-0 text-violet-400" weight="duotone" aria-hidden />
+    return <Palette className="size-3.5 shrink-0 text-foreground" weight="duotone" aria-hidden />
   }
   if (refItem.assetType === "video") {
     return <VideoCamera className="size-3.5 shrink-0 text-zinc-400" weight="duotone" aria-hidden />

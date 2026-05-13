@@ -12,6 +12,7 @@ import { loadChatThreadMessagesForServiceRole, replaceChatThreadMessages } from 
 import { bindPendingGenerationsToChatMessages } from "@/lib/chat/media-persistence"
 import { sanitizeToolErrorPartsInMessages } from "@/lib/chat/sanitize-ui-messages"
 import { createCreativeAgent } from "@/lib/chat/creative-agent"
+import { loadPinnedSkillInstructionsForUser } from "@/lib/chat/skills/pins"
 import { createCreativeChatTools } from "@/lib/chat/tools"
 import {
   getAvailableConversationAudioReferences,
@@ -169,12 +170,18 @@ export async function runGenerationFollowUpResume(options: {
       validatedMessages,
     )
 
+    const pinnedSkillInstructions = await loadPinnedSkillInstructionsForUser(
+      supabase,
+      row.user_id,
+    )
+
     const creativeAgent = createCreativeAgent({
       availableReferences: getAvailableConversationImageReferences(validatedMessages),
       availableVideoReferences: getAvailableConversationVideoReferences(validatedMessages),
       availableAudioReferences: getAvailableConversationAudioReferences(validatedMessages),
       model: DEFAULT_CHAT_GATEWAY_MODEL,
       selectedReferenceContext,
+      pinnedSkillInstructions,
       skillsCatalog: [],
       supabase,
       threadId: row.thread_id,

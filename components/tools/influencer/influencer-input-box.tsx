@@ -90,6 +90,8 @@ interface InfluencerInputBoxProps {
   onAttachedRefsChange?: (refs: AttachedRef[]) => void
   /** Restrict @ → assets (e.g. `["image"]` on /image) */
   allowedAssetTypes?: AssetType[]
+  /** Optional: parent tracks pending generation slots for layout/UX */
+  activeGenerationSlotCount?: number
 }
 
 export function InfluencerInputBox({
@@ -131,6 +133,7 @@ export function InfluencerInputBox({
   allowOptionsDuringGeneration = false,
   onAttachedRefsChange,
   allowedAssetTypes,
+  activeGenerationSlotCount: _activeGenerationSlotCount,
 }: InfluencerInputBoxProps) {
   const [localPrompt, setLocalPrompt] = React.useState(promptValue)
   const [attachedRefs, setAttachedRefs] = React.useState<AttachedRef[]>([])

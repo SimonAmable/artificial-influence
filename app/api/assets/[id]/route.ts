@@ -89,7 +89,6 @@ export async function PATCH(
 
     const updateData: Record<string, unknown> = {
       title,
-      description: typeof body.description === "string" ? body.description.trim() || null : null,
       asset_type: assetType,
       category,
       visibility,
@@ -101,6 +100,11 @@ export async function PATCH(
       source_generation_id: typeof body.sourceGenerationId === "string" ? body.sourceGenerationId : null,
       metadata: typeof body.metadata === "object" && body.metadata !== null ? body.metadata : {},
       updated_at: new Date().toISOString(),
+    }
+
+    if ("description" in body) {
+      updateData.description =
+        typeof body.description === "string" ? body.description.trim() || null : null
     }
 
     if (uploadId !== undefined) {

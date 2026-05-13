@@ -72,7 +72,7 @@ export function FullscreenMediaViewer({
 }: FullscreenMediaViewerProps) {
   const [activeReferenceIndex, setActiveReferenceIndex] = React.useState<number | null>(null)
 
-  const hasReferences = kind === "image" && referenceImages.length > 0
+  const hasReferences = referenceImages.length > 0
   const currentUrl =
     activeReferenceIndex === null
       ? url

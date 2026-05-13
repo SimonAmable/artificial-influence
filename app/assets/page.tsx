@@ -330,7 +330,7 @@ export default function AssetsPage() {
 
   return (
     <div
-      className="relative min-h-screen w-full pt-10"
+      className="relative min-h-screen w-full"
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -355,7 +355,7 @@ export default function AssetsPage() {
         )}
       </AnimatePresence>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 pb-8 pt-16">
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div className="min-w-0">
             <h1 className="text-3xl font-bold">Asset Library</h1>
@@ -476,6 +476,7 @@ export default function AssetsPage() {
             visibility: editingAsset.visibility,
             category: editingAsset.category,
             tags: editingAsset.tags,
+            description: editingAsset.description ?? undefined,
             sourceNodeType: editingAsset.sourceNodeType || undefined,
           }}
           onSaved={() => void refreshAssets()}

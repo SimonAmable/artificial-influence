@@ -196,66 +196,71 @@ export function BrandKitNewFlowDialog({ open, onOpenChange }: BrandKitNewFlowDia
                 "before:pointer-events-none before:absolute before:inset-y-0 before:right-0 before:w-1/2 before:bg-linear-to-l before:from-primary/15 before:to-transparent",
               )}
             >
-              <h2 className="text-center font-serif text-lg italic leading-tight tracking-tight text-foreground">
-                Generating your Business DNA
-              </h2>
-              <p className="mx-auto mt-3 max-w-md text-center text-[13px] leading-relaxed text-muted-foreground">
-                <span className="text-foreground">Business DNA</span> is your brand snapshot for AI and campaigns. Enter your
-                URL. We&apos;ll pull what&apos;s public and draft your kit (may take a few minutes).
-              </p>
+              {busy ? (
+                <h2 className="text-center font-serif text-lg italic leading-tight tracking-tight text-foreground">
+                  Generating your Business DNA
+                </h2>
+              ) : null}
 
               <div className="mt-6 space-y-3">
-                <div
-                  className={cn(
-                    "inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-2.5 text-sm text-primary",
-                  )}
-                  aria-live={busy ? "polite" : undefined}
-                >
-                  <Sparkle
-                    className={cn("h-4 w-4 shrink-0 text-primary", busy && "animate-pulse")}
-                    weight="fill"
-                    aria-hidden
+                {busy ? (
+                  <div
+                    className={cn(
+                      "inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-2.5 text-sm text-primary",
+                    )}
+                    aria-live="polite"
+                  >
+                    <Sparkle
+                      className="h-4 w-4 shrink-0 animate-pulse text-primary"
+                      weight="fill"
+                      aria-hidden
+                    />
+                    <span key={analysisStatusIndex} className="text-center">
+                      {ANALYSIS_STATUS_MESSAGES[analysisStatusIndex]}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="flex items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+                    <Sparkle className="h-4 w-4 shrink-0 text-primary/70" weight="fill" aria-hidden />
+                    Add your URL below (public pages only).
+                  </p>
+                )}
+
+                {busy ? (
+                  <div className="flex w-full items-center gap-2 rounded-full border border-border bg-muted/70 px-4 py-2.5 text-sm text-primary/90">
+                    <LinkSimple className="h-4 w-4 shrink-0 text-primary/80" />
+                    <span className="min-w-0 truncate font-mono text-xs">{displayUrl}</span>
+                  </div>
+                ) : null}
+              </div>
+
+              {!busy ? (
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <Input
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void submitUrl()
+                    }}
+                    placeholder="yoursite.com"
+                    className="h-11 flex-1 rounded-full border-input bg-background text-sm text-foreground placeholder:text-muted-foreground"
+                    autoComplete="url"
                   />
-                  <span key={busy ? analysisStatusIndex : "idle"} className="text-center">
-                    {busy
-                      ? ANALYSIS_STATUS_MESSAGES[analysisStatusIndex]
-                      : "Enter your website URL. We'll analyze it next"}
-                  </span>
+                  <Button
+                    type="button"
+                    onClick={() => void submitUrl()}
+                    className="h-11 shrink-0 rounded-full bg-primary px-6 text-primary-foreground hover:bg-primary/90"
+                  >
+                    Analyze
+                  </Button>
                 </div>
-
-                <div className="flex w-full items-center gap-2 rounded-full border border-border bg-muted/70 px-4 py-2.5 text-sm text-primary/90">
-                  <LinkSimple className="h-4 w-4 shrink-0 text-primary/80" />
-                  <span className="min-w-0 truncate font-mono text-xs">{displayUrl}</span>
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Input
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void submitUrl()
-                  }}
-                  placeholder="yoursite.com"
-                  disabled={busy}
-                  className="h-11 flex-1 rounded-full border-input bg-background text-sm text-foreground placeholder:text-muted-foreground"
-                  autoComplete="url"
-                />
-                <Button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void submitUrl()}
-                  className="h-11 shrink-0 rounded-full bg-primary px-6 text-primary-foreground hover:bg-primary/90"
-                >
-                  {busy ? "Working…" : "Analyze"}
-                </Button>
-              </div>
+              ) : null}
 
               <p className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-primary/70">
                 <Circle className="h-3 w-3 shrink-0 text-primary/70" weight="regular" aria-hidden />
                 {busy
-                  ? "Hang tight: status above updates as we work through your site"
-                  : "Analysis usually takes one to several minutes depending on the page"}
+                  ? "Hang tight: status above updates as we work"
+                  : "~30s for most pages"}
               </p>
             </div>
           </>

@@ -17,7 +17,9 @@ import {
 import { createClient } from "@/lib/supabase/server"
 import { PROMPT_RECREATE_SYSTEM_PROMPT } from "@/lib/constants/system-prompts"
 import { createCreativeAgent } from "@/lib/chat/creative-agent"
+import { loadActiveModels } from "@/lib/chat/tools/search-models"
 import { loadSkillsCatalog } from "@/lib/chat/skills/catalog"
+import { loadPinnedSkillInstructionsForUser } from "@/lib/chat/skills/pins"
 import { bindPendingGenerationsToChatMessages } from "@/lib/chat/media-persistence"
 import { sanitizeToolErrorPartsInMessages } from "@/lib/chat/sanitize-ui-messages"
 import { createCreativeChatTools } from "@/lib/chat/tools"
@@ -29,7 +31,7 @@ import {
 } from "@/lib/chat/conversation-references"
 import { resolveChatGatewayModel } from "@/lib/constants/chat-llm-models"
 import { buildSelectedReferenceContext } from "@/lib/chat/selected-reference-context"
-import { registerThreadMediaFromUserMessageParts } from "@/lib/chat/thread-media/server"
+import { registerThreadMediaFromUserMessage } from "@/lib/chat/thread-media/server"
 import { buildOnboardingHiddenContext } from "@/lib/onboarding/hidden-context"
 import {
   AI_GATEWAY_CONFIG_ERROR,
@@ -123,7 +125,10 @@ export async function POST(req: Request) {
       }
     }
 
-    const skillsCatalog = await loadSkillsCatalog(supabase, user.id)
+    const [skillsCatalog, pinnedSkillInstructions] = await Promise.all([
+      loadSkillsCatalog(supabase, user.id),
+      loadPinnedSkillInstructionsForUser(supabase, user.id),
+    ])
     const automationDefaults = getAutomationDefaultsFromMessages(requestMessages)
 
     const validationTools = createCreativeChatTools({
@@ -165,12 +170,7 @@ export async function POST(req: Request) {
     const lastUserMessageForMedia = [...validatedMessages].reverse().find((m) => m.role === "user")
     if (threadId && lastUserMessageForMedia) {
       try {
-        await registerThreadMediaFromUserMessageParts(
-          supabase,
-          user.id,
-          threadId,
-          lastUserMessageForMedia.parts,
-        )
+        await registerThreadMediaFromUserMessage(supabase, user.id, threadId, lastUserMessageForMedia)
       } catch (registerError) {
         console.error("[chat] Thread media registration failed:", registerError)
       }
@@ -224,6 +224,12 @@ export async function POST(req: Request) {
       user.id,
       validatedMessages,
     )
+
+    const preloadedModels = await loadActiveModels(supabase).catch((preloadError) => {
+      console.error("[chat] Failed to pre-load active models for system prompt:", preloadError)
+      return undefined
+    })
+
     let onboardingContext = ""
 
     if (onboardingHandoff === true && isOpeningThreadTurn) {
@@ -251,10 +257,12 @@ export async function POST(req: Request) {
       model,
       selectedReferenceContext,
       onboardingContext,
+      pinnedSkillInstructions,
       skillsCatalog,
       supabase,
       threadId,
       userId: user.id,
+      preloadedModels,
     })
     type CreativeAgentUIMessage = InferAgentUIMessage<typeof creativeAgent>
     const creativeAgentMessages = validatedMessages as CreativeAgentUIMessage[]

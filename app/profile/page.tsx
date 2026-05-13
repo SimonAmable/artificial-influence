@@ -2,6 +2,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { EditableDisplayName } from "@/components/profile/editable-display-name"
+import { RestartOnboardingButton } from "@/components/profile/restart-onboarding-button"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/server"
 import { getUserSubscription } from "@/lib/subscription-server"
@@ -28,7 +29,7 @@ export default async function ProfilePage() {
   const [{ data: profile }, subscription] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, email, credits, created_at")
+      .select("full_name, email, credits, created_at, onboarding_completed_at")
       .eq("id", user.id)
       .maybeSingle(),
     getUserSubscription(user.id),
@@ -49,6 +50,7 @@ export default async function ProfilePage() {
   const renewalDate = subscription?.current_period_end
     ? new Date(subscription.current_period_end).toLocaleDateString()
     : "Not subscribed"
+  const hasCompletedOnboarding = Boolean(profile?.onboarding_completed_at)
 
   return (
     <main className="min-h-screen bg-background px-4 py-20 sm:px-6">
@@ -80,6 +82,9 @@ export default async function ProfilePage() {
             <Button asChild variant="outline">
               <Link href="/history">View history</Link>
             </Button>
+            {hasCompletedOnboarding ? (
+              <RestartOnboardingButton userId={user.id} />
+            ) : null}
           </div>
         </section>
       </div>

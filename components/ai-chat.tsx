@@ -55,15 +55,24 @@ function AIChatSidebar() {
   const [chatRenderKey, setChatRenderKey] = React.useState(0)
   const userIdRef = React.useRef<string | null>(null)
 
+  /** When the sheet closes we clear hydration flags so the next open refetches DB (parent never receives live messages from the child). */
+  const setSidebarOpen = React.useCallback((next: boolean) => {
+    setOpen(next)
+    if (!next) {
+      setHasHydratedStoredThread(false)
+      setIsHydratingThread(false)
+    }
+  }, [])
+
   React.useEffect(() => {
-    const handleOpen = () => setOpen(true)
+    const handleOpen = () => setSidebarOpen(true)
 
     window.addEventListener("chat-open", handleOpen as EventListener)
 
     return () => {
       window.removeEventListener("chat-open", handleOpen as EventListener)
     }
-  }, [])
+  }, [setSidebarOpen])
 
   React.useEffect(() => {
     if (!open) {
@@ -83,13 +92,13 @@ function AIChatSidebar() {
 
       setUserId(nextUserId)
       setAuthReady(true)
-      setIsHydratingThread(false)
 
       if (previousUserId !== nextUserId) {
         setInitialMessages([])
         setInitialThreadId(undefined)
         setChatRenderKey((value) => value + 1)
         setHasHydratedStoredThread(false)
+        setIsHydratingThread(false)
       }
     }
 
@@ -212,24 +221,24 @@ function AIChatSidebar() {
     setInitialThreadId(undefined)
     setHasHydratedStoredThread(true)
     setChatRenderKey((value) => value + 1)
-    setOpen(true)
-  }, [])
+    setSidebarOpen(true)
+  }, [setSidebarOpen])
 
   const handleOpenFullChat = React.useCallback(() => {
-    setOpen(false)
+    setSidebarOpen(false)
     router.push(initialThreadId ? `/chat/${initialThreadId}` : "/chat")
-  }, [initialThreadId, router])
+  }, [initialThreadId, router, setSidebarOpen])
 
   const handleOpenHistory = React.useCallback(() => {
-    setOpen(false)
+    setSidebarOpen(false)
     router.push("/chat")
-  }, [router])
+  }, [router, setSidebarOpen])
 
   return (
     <>
       {!open ? (
         <Button
-          onClick={() => setOpen(true)}
+          onClick={() => setSidebarOpen(true)}
           className="fixed right-6 bottom-6 z-60 h-14 w-14 rounded-full shadow-depth-l"
           size="icon"
         >
@@ -237,7 +246,7 @@ function AIChatSidebar() {
         </Button>
       ) : null}
 
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet open={open} onOpenChange={setSidebarOpen}>
         {open ? (
           <SheetContent
             side="right"
@@ -316,7 +325,7 @@ function AIChatSidebar() {
                 </div>
               ) : (
                 <SidebarCreativeAgentChat
-                  key={`${chatRenderKey}:${initialThreadId ?? "draft"}`}
+                  key={chatRenderKey}
                   compact
                   enablePersistence
                   initialMessages={initialMessages}

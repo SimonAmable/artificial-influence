@@ -10,6 +10,7 @@ export type SkillCatalogEntry = {
 /** Catalog row for UI pickers (manual skill load, etc.). */
 export type SkillPickerEntry = SkillCatalogEntry & {
   isMine: boolean
+  isPinned: boolean
   isPublic: boolean
 }
 
@@ -91,7 +92,9 @@ export async function loadSkillsCatalog(
 export async function loadSkillsCatalogForPicker(
   supabase: SupabaseClient,
   userId: string,
+  pinnedSlugs?: Iterable<string>,
 ): Promise<SkillPickerEntry[]> {
+  const pinnedSlugSet = new Set(pinnedSlugs ?? [])
   const { data, error } = await supabase
     .from("skills")
     .select("slug, title, skill_document, user_id, is_public")
@@ -117,6 +120,7 @@ export async function loadSkillsCatalogForPicker(
         title: row.title,
         description,
         isMine: row.user_id === userId,
+        isPinned: pinnedSlugSet.has(row.slug),
         isPublic: row.is_public === true,
       })
     } catch {
@@ -125,6 +129,7 @@ export async function loadSkillsCatalogForPicker(
         title: row.title,
         description: "(Could not parse skill document.)",
         isMine: row.user_id === userId,
+        isPinned: pinnedSlugSet.has(row.slug),
         isPublic: row.is_public === true,
       })
     }

@@ -431,6 +431,7 @@ function VideoPageContent() {
             id?: string
             tool?: string | null
             created_at?: string | null
+            reference_image_urls?: string[] | null
           }>)
         : []
 
@@ -445,6 +446,7 @@ function VideoPageContent() {
           prompt: generation.prompt ?? null,
           tool: generation.tool ?? null,
           createdAt: generation.created_at ?? null,
+          referenceImageUrls: generation.reference_image_urls?.filter((u): u is string => typeof u === "string" && u.length > 0) ?? [],
         })
         return items
       }, [])
@@ -1144,6 +1146,7 @@ function VideoPageContent() {
                     onParametersChange={setParameters}
                     estimatedCredits={estimatedVideoCredits}
                     isGenerating={isGenerating}
+                    activeGenerationCount={pendingRequests.length}
                     onGenerate={handleGenerate}
                     allowConcurrent={true}
                     allowOptionsDuringGeneration={true}
@@ -1189,6 +1192,7 @@ function VideoPageContent() {
                         onParametersChange={setParameters}
                         estimatedCredits={estimatedVideoCredits}
                         isGenerating={isGenerating}
+                        activeGenerationCount={pendingRequests.length}
                         onGenerate={handleGenerate}
                         allowConcurrent={true}
                         allowOptionsDuringGeneration={true}
@@ -1235,6 +1239,7 @@ function VideoPageContent() {
                     onParametersChange={setParameters}
                     estimatedCredits={estimatedVideoCredits}
                     isGenerating={isGenerating}
+                    activeGenerationCount={pendingRequests.length}
                     onGenerate={handleGenerate}
                     allowConcurrent={true}
                     allowOptionsDuringGeneration={true}

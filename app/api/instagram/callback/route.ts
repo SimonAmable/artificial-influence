@@ -5,6 +5,10 @@ import { encryptAutopostToken } from "@/lib/autopost/crypto"
 import { resolveInstagramOAuthRedirectUri } from "@/lib/instagram/oauth-redirect"
 import { fetchInstagramMeForLink, type InstagramMeResponse, type InstagramSavedProfile } from "@/lib/instagram/profile"
 import { persistSocialAvatarUrl } from "@/lib/social/persist-social-avatar"
+import {
+  createSocialOAuthFinishRedirect,
+  SOCIAL_OAUTH_RETURN_COOKIE,
+} from "@/lib/social/oauth-return"
 import { upsertInstagramSocialConnection } from "@/lib/social-connections"
 import { createClient } from "@/lib/supabase/server"
 
@@ -59,28 +63,16 @@ function normalizeInstagramShortLivedToken(data: unknown): MetaInstagramTokenRes
   throw new Error("Unexpected Instagram token response shape.")
 }
 
-function buildAutopostRedirect(appUrl: string, params: Record<string, string>) {
-  const redirectUrl = new URL("/autopost", appUrl)
-
-  for (const [key, value] of Object.entries(params)) {
-    redirectUrl.searchParams.set(key, value)
-  }
-
-  const response = NextResponse.redirect(redirectUrl, 302)
-  response.cookies.set(OAUTH_STATE_COOKIE, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 0,
-    path: "/",
-  })
-
-  return response
-}
-
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || requestUrl.origin
+  const cookieStore = await cookies()
+  const socialReturnCookie = cookieStore.get(SOCIAL_OAUTH_RETURN_COOKIE)?.value
+
+  const finish = (params: Record<string, string>) =>
+    createSocialOAuthFinishRedirect(appUrl, socialReturnCookie, params, [
+      { name: OAUTH_STATE_COOKIE },
+    ])
 
   try {
     const code = requestUrl.searchParams.get("code")
@@ -89,13 +81,13 @@ export async function GET(request: Request) {
     const errorDescription = requestUrl.searchParams.get("error_description")
 
     if (error) {
-      return buildAutopostRedirect(appUrl, {
+      return finish({
         error: errorDescription || error,
       })
     }
 
     if (!code || !state) {
-      return buildAutopostRedirect(appUrl, {
+      return finish({
         error: "Missing Instagram OAuth code or state.",
       })
     }
@@ -110,11 +102,10 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${appUrl}/login?next=/autopost`, 302)
     }
 
-    const cookieStore = await cookies()
     const stateCookieValue = cookieStore.get(OAUTH_STATE_COOKIE)?.value
 
     if (!stateCookieValue || stateCookieValue !== state) {
-      return buildAutopostRedirect(appUrl, {
+      return finish({
         error: "Invalid Instagram OAuth state.",
       })
     }
@@ -124,7 +115,7 @@ export async function GET(request: Request) {
     const redirectUri = resolveInstagramOAuthRedirectUri(requestUrl)
 
     if (!appId || !appSecret) {
-      return buildAutopostRedirect(appUrl, {
+      return finish({
         error: "Instagram env vars are not configured.",
       })
     }
@@ -164,7 +155,7 @@ export async function GET(request: Request) {
       savedProfile = fetched.profile
     } catch (profileError) {
       console.error("[instagram/callback] /me profile fetch failed:", profileError)
-      return buildAutopostRedirect(appUrl, {
+      return finish({
         error:
           profileError instanceof Error
             ? profileError.message
@@ -176,13 +167,13 @@ export async function GET(request: Request) {
     const instagramUserId = me.id || String(shortLivedToken.user_id || "")
 
     if (!instagramUserId || !me.username) {
-      return buildAutopostRedirect(appUrl, {
+      return finish({
         error: "Instagram Login succeeded, but we could not read your account profile.",
       })
     }
 
     if (accountType && !PROFESSIONAL_ACCOUNT_TYPES.has(accountType)) {
-      return buildAutopostRedirect(appUrl, {
+      return finish({
         error: "Only Instagram professional accounts can connect right now.",
       })
     }
@@ -232,7 +223,7 @@ export async function GET(request: Request) {
 
     if (upsertError) {
       console.error("[instagram/callback] upsert failed:", upsertError)
-      return buildAutopostRedirect(appUrl, {
+      return finish({
         error: "Failed to save Instagram connection.",
       })
     }
@@ -255,10 +246,10 @@ export async function GET(request: Request) {
       }
     }
 
-    return buildAutopostRedirect(appUrl, { connected: "1" })
+    return finish({ connected: "1" })
   } catch (error) {
     console.error("[instagram/callback] GET exception:", error)
-    return buildAutopostRedirect(appUrl, {
+    return finish({
       error: error instanceof Error ? error.message : "Instagram callback failed.",
     })
   }

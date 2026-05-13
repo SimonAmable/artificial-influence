@@ -8,9 +8,9 @@ import {
   ArrowUp,
   LinkSimple,
   PencilSimple,
-  Plus,
   Trash,
   UploadSimple,
+  Warning,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,7 @@ import {
   BRAND_ONBOARDING_SESSION_KEY,
   type BrandOnboardingClientPayload,
 } from "@/lib/brand-kit/onboarding-schema"
+import { normalizeMinimalBrandColors } from "@/lib/brand-kit/normalize-minimal-colors"
 import type { BrandColorToken, BrandKit, BrandReferenceMediaItem } from "@/lib/brand-kit/types"
 import { BrandKitColors } from "@/components/brand-kit/brand-kit-colors"
 import { BrandFontPicker } from "@/components/brand-kit/brand-font-picker"
@@ -61,64 +62,9 @@ function normalizeHex(raw: string): string {
   return raw.startsWith("#") ? raw : `#${raw}`
 }
 
-function TagPills({
-  label,
-  values,
-  onChange,
-  placeholder,
-}: {
-  label: string
-  values: string[]
-  onChange: (next: string[]) => void
-  placeholder?: string
-}) {
-  const [draft, setDraft] = React.useState("")
-  const add = () => {
-    const t = draft.trim()
-    if (!t || values.includes(t)) return
-    onChange([...values, t])
-    setDraft("")
-  }
-  return (
-    <div>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{label}</p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {values.map((v, i) => (
-          <span
-            key={`${v}-${i}`}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-transparent px-3 py-1 text-xs text-zinc-200"
-          >
-            {v}
-            <button
-              type="button"
-              className="text-zinc-500 hover:text-white"
-              onClick={() => onChange(values.filter((_, j) => j !== i))}
-              aria-label={`Remove ${v}`}
-            >
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
-      <div className="mt-3 flex gap-2">
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault()
-              add()
-            }
-          }}
-          placeholder={placeholder}
-          className="h-9 border-zinc-700 bg-zinc-950/50 text-sm text-zinc-100 placeholder:text-zinc-600"
-        />
-        <Button type="button" size="sm" variant="outline" className="shrink-0 border-zinc-700" onClick={add}>
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  )
+export type BrandKitEditorHandle = {
+  /** Persists the form; toasts on errors. Returns whether the save succeeded. */
+  save: () => Promise<boolean>
 }
 
 export type BrandKitEditorProps = {
@@ -128,15 +74,29 @@ export type BrandKitEditorProps = {
   /** When set (e.g. from `/brand/[id]`), locks the editor to one kit and hides the kit switcher. */
   forcedKitId?: string | null
   backHref?: string
+  /** When false, hides Delete next to Save (e.g. embedded onboarding). Default true. */
+  showSaveBarDelete?: boolean
+  /**
+   * Embedded in onboarding: parent supplies the title; hide duplicate dialog header,
+   * hide “default for Creative Agent” toggle (always default on save), and show a
+   * one-line warning about reference media.
+   */
+  onboardingEmbed?: boolean
 }
 
-export function BrandKitEditor({
-  variant = "page",
-  className,
-  onSaved,
-  forcedKitId,
-  backHref = "/chat",
-}: BrandKitEditorProps) {
+export const BrandKitEditor = React.forwardRef<BrandKitEditorHandle, BrandKitEditorProps>(
+  function BrandKitEditor(
+    {
+      variant = "page",
+      className,
+      onSaved,
+      forcedKitId,
+      backHref = "/chat",
+      showSaveBarDelete = true,
+      onboardingEmbed = false,
+    },
+    ref,
+  ) {
   const router = useRouter()
   const loadInProgressRef = React.useRef(false)
   const [loading, setLoading] = React.useState(true)
@@ -180,7 +140,7 @@ export function BrandKitEditor({
       (k.fontFamily ?? k.typography?.bodyFont ?? k.typography?.headingFont ?? "").trim(),
     )
     setMonoFont(k.typography?.monoFont)
-    setColors(k.colors?.length ? k.colors : [])
+    setColors(normalizeMinimalBrandColors(k.colors ?? []))
     setTagline(k.tagline ?? "")
     setWebsiteUrl((k.websiteUrl ?? "").trim())
     setFreeformNotes(k.notes ?? "")
@@ -201,7 +161,7 @@ export function BrandKitEditor({
     setWebsiteUrl("")
     setLogoUrl(null)
     setFontFamily("")
-    setColors([])
+    setColors(normalizeMinimalBrandColors([]))
     setTagline("")
     setBrandValues([])
     setAestheticKeywords([])
@@ -239,7 +199,7 @@ export function BrandKitEditor({
     if (draft.websiteUrl?.trim()) setWebsiteUrl(draft.websiteUrl.trim())
     if (draft.selectedLogoUrl) setLogoUrl(draft.selectedLogoUrl)
     const colorTokens = mapSuggestedColorsToTokens(draft.suggestedColors ?? [])
-    if (colorTokens.length) setColors(colorTokens)
+    if (colorTokens.length) setColors(normalizeMinimalBrandColors(colorTokens))
 
     const extractedImages = payload.referenceImages ?? []
     const extractedVideos = payload.referenceVideos ?? []
@@ -349,10 +309,11 @@ export function BrandKitEditor({
     if (k) applyKit(k)
   }
 
-  const save = async () => {
+  const saveRef = React.useRef<() => Promise<boolean>>(async () => false)
+  saveRef.current = async (): Promise<boolean> => {
     if (!name.trim()) {
       toast.error("Add a business name")
-      return
+      return false
     }
     setSaving(true)
     try {
@@ -364,7 +325,7 @@ export function BrandKitEditor({
       }
       const body = {
         name: name.trim(),
-        isDefault,
+        isDefault: onboardingEmbed ? true : isDefault,
         websiteUrl: websiteUrl.trim() || null,
         fontFamily: fontFamily.trim() || null,
         referenceMedia,
@@ -376,7 +337,7 @@ export function BrandKitEditor({
         logoDarkUrl,
         iconUrl,
         iconDarkUrl,
-        colors: colors.map((c) => ({ ...c, hex: normalizeHex(c.hex) })),
+        colors: normalizeMinimalBrandColors(colors).map((c) => ({ ...c, hex: normalizeHex(c.hex) })),
         typography,
         tagline: tagline.trim() || null,
         avoidWords,
@@ -410,13 +371,17 @@ export function BrandKitEditor({
       invalidateCommandCache()
       await load()
       onSaved?.()
+      return true
     } catch (e) {
       console.error(e)
       toast.error(e instanceof Error ? e.message : "Save failed")
+      return false
     } finally {
       setSaving(false)
     }
   }
+
+  React.useImperativeHandle(ref, () => ({ save: () => saveRef.current() }), [])
 
   const deleteCurrentKit = async () => {
     if (!kitId) return
@@ -528,7 +493,7 @@ export function BrandKitEditor({
           </div>
           <div className="hidden w-[120px] sm:block sm:order-3" aria-hidden />
         </div>
-      ) : (
+      ) : onboardingEmbed ? null : (
         <div className="mb-4 text-center">
           <h2 className="font-serif text-xl italic text-foreground">Your Business DNA</h2>
           <p className="mt-1 text-xs text-muted-foreground">Snapshot used for campaigns and the Creative Agent.</p>
@@ -536,15 +501,17 @@ export function BrandKitEditor({
       )}
 
       {forcedKitId ? (
-        <label className="mb-4 flex items-center gap-2 text-xs text-zinc-500">
-          <input
-            type="checkbox"
-            checked={isDefault}
-            onChange={(e) => setIsDefault(e.target.checked)}
-            className="rounded border-zinc-600"
-          />
-          Use as default for Creative Agent
-        </label>
+        onboardingEmbed ? null : (
+          <label className="mb-4 flex items-center gap-2 text-xs text-zinc-500">
+            <input
+              type="checkbox"
+              checked={isDefault}
+              onChange={(e) => setIsDefault(e.target.checked)}
+              className="rounded border-zinc-600"
+            />
+            Use as default for Creative Agent
+          </label>
+        )
       ) : kits.length > 1 || isNew ? (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Select value={isNew ? "__new__" : kitId ?? "__new__"} onValueChange={selectKit}>
@@ -583,6 +550,18 @@ export function BrandKitEditor({
         </label>
       )}
 
+      {onboardingEmbed ? (
+        <div
+          role="alert"
+          className="mb-4 flex min-h-10 items-center gap-2 rounded-xl border border-amber-500/45 bg-amber-500/10 px-3 py-2 text-sm text-amber-100"
+        >
+          <Warning className="h-5 w-5 shrink-0 text-amber-400" weight="fill" aria-hidden />
+          <p className="min-w-0 truncate leading-tight">
+            Delete any reference images or videos you don&apos;t want steering the Creative Agent.
+          </p>
+        </div>
+      ) : null}
+
       <div className={cn("rounded-3xl border border-border p-4 shadow-2xl md:p-6", INNER)}>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-8">
           {/* Left column */}
@@ -610,6 +589,27 @@ export function BrandKitEditor({
                   autoComplete="url"
                 />
               </div>
+            </div>
+
+            {/* Summary + voice */}
+            <div className={CARD}>
+              <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                One-line summary
+              </p>
+              <Input
+                value={tagline}
+                onChange={(e) => setTagline(e.target.value)}
+                placeholder="What you do and who it's for — one sentence."
+                className="mt-2 border-0 bg-transparent px-2 py-1.5 text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
+              />
+              <p className="mt-4 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Voice</p>
+              <Textarea
+                value={freeformNotes}
+                onChange={(e) => setFreeformNotes(e.target.value)}
+                rows={3}
+                placeholder="Tone and style for copy (e.g. direct, playful, no jargon)."
+                className="mt-2 resize-none rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+              />
             </div>
 
             {/* Logo + Fonts */}
@@ -674,63 +674,12 @@ export function BrandKitEditor({
 
             {/* Colors */}
             <div className={CARD}>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Colors</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                Colors - click to edit
+              </p>
               <div className="mt-4">
-                <BrandKitColors colors={colors} onChange={setColors} />
+                <BrandKitColors colors={colors} onChange={setColors} variant="minimal" />
               </div>
-            </div>
-
-            {/* Tagline + Brand values */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className={CARD}>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Tagline</p>
-                <Textarea
-                  value={tagline}
-                  onChange={(e) => setTagline(e.target.value)}
-                  placeholder="Your hero line…"
-                  rows={4}
-                  className="mt-2 resize-none border-0 bg-transparent px-2 py-1.5 font-serif text-base italic leading-relaxed text-primary/90 placeholder:text-zinc-600 focus-visible:ring-0"
-                />
-              </div>
-              <div className={CARD}>
-                <TagPills
-                  label="Brand values"
-                  values={brandValues}
-                  onChange={setBrandValues}
-                  placeholder="Add a value, Enter"
-                />
-              </div>
-            </div>
-
-            {/* Aesthetic + Tone */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className={CARD}>
-                <TagPills
-                  label="Brand aesthetic"
-                  values={aestheticKeywords}
-                  onChange={setAestheticKeywords}
-                  placeholder="e.g. Dark Mode Minimalism"
-                />
-              </div>
-              <div className={CARD}>
-                <TagPills
-                  label="Brand tone of voice"
-                  values={toneTags}
-                  onChange={setToneTags}
-                  placeholder="e.g. Modern"
-                />
-              </div>
-            </div>
-
-            <div className={CARD}>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Extra notes (optional)</p>
-              <Textarea
-                value={freeformNotes}
-                onChange={(e) => setFreeformNotes(e.target.value)}
-                rows={2}
-                placeholder="Anything else models should know…"
-                className="mt-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-              />
             </div>
           </div>
 
@@ -788,7 +737,7 @@ export function BrandKitEditor({
             Next we&apos;ll use your Business DNA to generate on-brand content and campaigns.
           </p>
           <div className="flex items-center gap-2 self-end">
-            {!isNew && kitId ? (
+            {showSaveBarDelete && !isNew && kitId ? (
               <Button
                 type="button"
                 variant="outline"
@@ -802,7 +751,7 @@ export function BrandKitEditor({
             <Button
               type="button"
               disabled={saving || deleting}
-              onClick={() => void save()}
+              onClick={() => void saveRef.current()}
               className={cn("rounded-full px-8 py-6 text-base font-semibold", ACCENT)}
             >
               {saving ? "Saving…" : "Save"}
@@ -813,3 +762,7 @@ export function BrandKitEditor({
     </div>
   )
 }
+
+)
+
+BrandKitEditor.displayName = "BrandKitEditor"

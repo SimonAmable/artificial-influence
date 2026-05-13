@@ -232,7 +232,8 @@ export default function CharacterSwapPage() {
       return (
         <ImageGrid
           images={historyImages}
-          isGenerating={isGenerating && hasImages}
+          isGenerating={isGenerating}
+          generatingCount={1}
           isLoadingSkeleton={isHistoryLoading && !hasImages}
           onDelete={handleDelete}
         />

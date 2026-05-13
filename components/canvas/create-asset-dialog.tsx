@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   ASSET_CATEGORIES,
   ASSET_CATEGORY_LABELS,
@@ -29,6 +30,7 @@ import {
 import { Sparkle, SpinnerGap } from "@phosphor-icons/react"
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
 import { invalidateCommandCache } from "@/lib/commands/cache"
+import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
 interface CreateAssetDialogProps {
@@ -45,9 +47,16 @@ interface CreateAssetDialogProps {
     visibility?: AssetVisibility
     category?: AssetCategory
     tags?: string[]
+    description?: string | null
     sourceNodeType?: string
   }
   onSaved?: () => void
+  /** When the dialog opens, call the same AI autofill used by the manual button (e.g. onboarding upload). */
+  autofillOnOpen?: boolean
+  showAutofillButton?: boolean
+  headerTitle?: string
+  headerDescription?: string
+  saveButtonLabel?: string
 }
 
 export function CreateAssetDialog({
@@ -57,11 +66,17 @@ export function CreateAssetDialog({
   assetId,
   initial,
   onSaved,
+  autofillOnOpen = false,
+  showAutofillButton = true,
+  headerTitle,
+  headerDescription,
+  saveButtonLabel,
 }: CreateAssetDialogProps) {
   const [title, setTitle] = React.useState("")
   const [visibility, setVisibility] = React.useState<AssetVisibility>("public")
   const [category, setCategory] = React.useState<AssetCategory>(getDefaultCategoryByType(initial.assetType))
   const [tagsInput, setTagsInput] = React.useState("")
+  const [description, setDescription] = React.useState("")
   const [isAutofilling, setIsAutofilling] = React.useState(false)
 
   React.useEffect(() => {
@@ -70,12 +85,13 @@ export function CreateAssetDialog({
     setVisibility(initial.visibility || "public")
     setCategory(initial.category || getDefaultCategoryByType(initial.assetType))
     setTagsInput((initial.tags || []).join(", "))
-  }, [initial.assetType, initial.category, initial.tags, initial.title, initial.visibility, open])
+    setDescription((initial.description ?? "").trim() ? String(initial.description) : "")
+  }, [initial.assetType, initial.category, initial.description, initial.tags, initial.title, initial.visibility, open])
 
-  const handleAutofill = async () => {
+  const runAutofill = React.useCallback(async () => {
     if (!initial.url) return
     setIsAutofilling(true)
-    
+
     try {
       const res = await fetch("/api/assets/autofill", {
         method: "POST",
@@ -90,6 +106,9 @@ export function CreateAssetDialog({
         if (data.result.tags && Array.isArray(data.result.tags)) {
           setTagsInput(data.result.tags.join(", "))
         }
+        if (typeof data.result.description === "string" && data.result.description.trim()) {
+          setDescription(data.result.description.trim())
+        }
         toast.success("Autofilled asset details")
       }
     } catch (err) {
@@ -98,7 +117,20 @@ export function CreateAssetDialog({
     } finally {
       setIsAutofilling(false)
     }
-  }
+  }, [initial.assetType, initial.title, initial.url])
+
+  React.useEffect(() => {
+    if (!open || !autofillOnOpen || !initial.url) return
+    let cancelled = false
+    const id = requestAnimationFrame(() => {
+      if (cancelled) return
+      void runAutofill()
+    })
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(id)
+    }
+  }, [autofillOnOpen, initial.url, open, runAutofill])
 
   const handleSave = async () => {
     if (!initial.url) {
@@ -119,6 +151,7 @@ export function CreateAssetDialog({
         }
         await updateAsset(assetId, {
           title,
+          description: description.trim() || null,
           assetType: initial.assetType,
           category,
           visibility,
@@ -133,6 +166,7 @@ export function CreateAssetDialog({
       } else {
         await saveAsset({
           title,
+          description: description.trim() || null,
           assetType: initial.assetType,
           category,
           visibility,
@@ -157,7 +191,7 @@ export function CreateAssetDialog({
       <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {mode === "edit" ? "Edit Asset" : "Create Asset"}
+            {headerTitle ?? (mode === "edit" ? "Edit Asset" : "Create Asset")}
             {isAutofilling && (
               <span className="flex items-center gap-1.5 text-xs font-medium text-amber-500 animate-pulse bg-amber-500/10 px-2 py-1 rounded-md">
                 <Sparkle weight="fill" className="h-3 w-3" />
@@ -166,9 +200,10 @@ export function CreateAssetDialog({
             )}
           </DialogTitle>
           <DialogDescription>
-            {mode === "edit"
-              ? "Update your asset details and preview before saving."
-              : "Save this output as a reusable reference asset."}
+            {headerDescription ??
+              (mode === "edit"
+                ? "Update your asset details and preview before saving."
+                : "Save this output as a reusable reference asset.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -251,29 +286,46 @@ export function CreateAssetDialog({
               className={isAutofilling ? "opacity-70" : ""}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="asset-description">Agent context (optional)</Label>
+            <Textarea
+              id="asset-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Rich notes the creative agent can use when this asset is attached or searched."
+              disabled={isAutofilling}
+              rows={5}
+              className={cn("min-h-[120px] resize-y", isAutofilling ? "opacity-70" : "")}
+            />
+          </div>
         </div>
 
         <DialogFooter className="flex w-full items-center justify-between sm:justify-between">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleAutofill}
-            disabled={isAutofilling}
-            className="gap-2"
-          >
-            {isAutofilling ? (
-              <SpinnerGap className="h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkle weight="fill" className="h-4 w-4 text-amber-500" />
-            )}
-            Autofill with AI
-          </Button>
+          {showAutofillButton ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void runAutofill()}
+              disabled={isAutofilling}
+              className="gap-2"
+            >
+              {isAutofilling ? (
+                <SpinnerGap className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkle weight="fill" className="h-4 w-4 text-amber-500" />
+              )}
+              Autofill with AI
+            </Button>
+          ) : (
+            <span />
+          )}
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={isAutofilling}>
-              {mode === "edit" ? "Update Asset" : "Save Asset"}
+              {saveButtonLabel ?? (mode === "edit" ? "Update Asset" : "Save Asset")}
             </Button>
           </div>
         </DialogFooter>

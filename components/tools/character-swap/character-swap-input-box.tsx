@@ -128,6 +128,11 @@ export function CharacterSwapInputBox({
   const activeSwapMode = onSwapModeChange ? selectedSwapMode : localSwapMode
   const hasBothImages = Boolean(characterImage && sceneImage)
 
+  const selectedModelObject = React.useMemo(
+    () => models.find((m) => m.identifier === selectedModel) ?? null,
+    [models, selectedModel],
+  )
+
   const handleSwapImages = React.useCallback(() => {
     if (!characterImage || !sceneImage) return
     onCharacterImageChange?.(sceneImage)
@@ -353,21 +358,24 @@ export function CharacterSwapInputBox({
             <Button
               onClick={onGenerate}
               disabled={!isReady || (isGenerating && !allowConcurrent)}
-              className={cn("min-h-[50px] min-w-[110px] text-sm font-semibold", !isReady && "opacity-50 cursor-not-allowed")}
+              className={cn(
+                "flex h-[60px] min-w-[110px] items-center justify-center gap-2 px-4 text-sm font-semibold",
+                !isReady && "cursor-not-allowed opacity-50",
+              )}
             >
-              {false ? (
+              {isGenerating && !allowConcurrent ? (
                 <>
-                  <CircleNotch className="size-4 mr-2 animate-spin" />
-                  Generating...
+                  <CircleNotch className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                  <span>Generating...</span>
                 </>
               ) : (
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="text-sm font-semibold">Generate</span>
-                  <div className="flex items-center gap-0.5">
-                    <Sparkle size={8} weight="fill" />
-                    <span className="text-[10px]">4 credits</span>
-                  </div>
-                </div>
+                <>
+                  <span className="shrink-0 font-semibold">Generate</span>
+                  <Sparkle className="size-2.5 shrink-0" weight="fill" aria-hidden />
+                  <span className="text-[10px] font-medium leading-none tabular-nums opacity-95">
+                    {selectedModelObject?.model_cost != null ? selectedModelObject.model_cost : "-"}
+                  </span>
+                </>
               )}
             </Button>
           </div>

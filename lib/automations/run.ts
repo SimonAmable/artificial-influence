@@ -24,7 +24,7 @@ import {
 import { loadSkillsCatalog } from "@/lib/chat/skills/catalog"
 import { sanitizeToolErrorPartsInMessages } from "@/lib/chat/sanitize-ui-messages"
 import { buildSelectedReferenceContext } from "@/lib/chat/selected-reference-context"
-import { registerThreadMediaFromUserMessageParts } from "@/lib/chat/thread-media/server"
+import { registerThreadMediaFromUserMessage } from "@/lib/chat/thread-media/server"
 import { createCreativeChatTools } from "@/lib/chat/tools"
 import { resolveChatGatewayModel } from "@/lib/constants/chat-llm-models"
 import { captureAutomationPreview } from "@/lib/automations/preview"
@@ -142,7 +142,7 @@ export async function runAutomation(
   const lastUser = [...validatedMessages].reverse().find((m) => m.role === "user")
   if (lastUser) {
     try {
-      await registerThreadMediaFromUserMessageParts(admin, userId, threadId, lastUser.parts)
+      await registerThreadMediaFromUserMessage(admin, userId, threadId, lastUser)
     } catch (registerError) {
       console.error("[automations/run] Thread media registration failed:", registerError)
     }

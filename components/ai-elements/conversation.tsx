@@ -54,7 +54,7 @@ export const ConversationEmptyState = ({
       <>
         {icon ? <div className="text-muted-foreground">{icon}</div> : null}
         <div className="space-y-1">
-          <h3 className="text-sm font-medium">{title}</h3>
+          <h3 className="text-sm font-bold normal-case md:text-lg">{title}</h3>
           {description ? (
             <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
           ) : null}

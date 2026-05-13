@@ -34,7 +34,7 @@ function BrandPaletteIcon({ previewUrl }: { previewUrl?: string | null }) {
   return (
     <PreviewOrIcon
       src={previewUrl}
-      fallback={<Palette className="mt-0.5 size-9 shrink-0 text-violet-400" weight="duotone" aria-hidden />}
+      fallback={<Palette className="mt-0.5 size-9 shrink-0 text-foreground" weight="duotone" aria-hidden />}
     />
   )
 }

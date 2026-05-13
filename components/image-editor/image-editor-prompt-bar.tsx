@@ -526,27 +526,26 @@ export function ImageEditorPromptBar({
                 onClick={handleGenerate}
                 disabled={!isReady || isGenerating}
                 className={cn(
-                  "bg-primary hover:bg-primary/80 text-primary-foreground font-semibold h-10 min-w-[100px] text-sm px-4 py-6 transition-all duration-300 relative z-0",
-                  !isReady && "opacity-50 cursor-not-allowed"
+                  "relative z-0 flex h-[60px] min-w-[100px] items-center justify-center gap-2 px-4 text-sm font-semibold transition-all duration-300",
+                  "bg-primary text-primary-foreground hover:bg-primary/80",
+                  !isReady && "cursor-not-allowed opacity-50"
                 )}
               >
                 {isGenerating ? (
                   <>
-                    <CircleNotch className="size-3 mr-1.5 animate-spin" />
-                    Generating...
+                    <CircleNotch className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                    <span>Generating...</span>
                   </>
                 ) : (
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="text-sm font-semibold">Generate</span>
-                    <div className="flex items-center gap-0.5">
-                      <Sparkle size={8} weight="fill" />
-                      <span className="text-[10px]">
-                        {displayModelObject?.model_cost != null
-                          ? displayModelObject.model_cost
-                          : "-"}
-                      </span>
-                    </div>
-                  </div>
+                  <>
+                    <span className="shrink-0 font-semibold">Generate</span>
+                    <Sparkle className="size-2.5 shrink-0" weight="fill" aria-hidden />
+                    <span className="text-[10px] font-medium leading-none tabular-nums opacity-95">
+                      {displayModelObject?.model_cost != null
+                        ? displayModelObject.model_cost
+                        : "-"}
+                    </span>
+                  </>
                 )}
               </Button>
             </div>

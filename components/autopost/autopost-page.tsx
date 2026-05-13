@@ -779,7 +779,7 @@ export function AutopostPage() {
   const [repurposeSource, setRepurposeSource] = React.useState<RepurposeSource | null>(null)
   const [connectIconProvider, setConnectIconProvider] = React.useState<SocialProvider>("instagram")
 
-  const [postsViewMode, setPostsViewMode] = React.useState<"list" | "calendar">("list")
+  const [postsViewMode, setPostsViewMode] = React.useState<"list" | "calendar">("calendar")
   const [postsCalendarMonth, setPostsCalendarMonth] = React.useState(() => startOfMonth(new Date()))
   const [postsAccountFilterId, setPostsAccountFilterId] = React.useState<string | null>(null)
 
@@ -3154,10 +3154,6 @@ export function AutopostPage() {
                       className="w-full justify-stretch sm:w-auto"
                       aria-label="Posts view"
                     >
-                      <ToggleGroupItem value="list" aria-label="List view" className="flex-1 gap-1.5 px-3 sm:flex-initial">
-                        <LayoutList className="h-3.5 w-3.5" />
-                        List
-                      </ToggleGroupItem>
                       <ToggleGroupItem
                         value="calendar"
                         aria-label="Calendar view"
@@ -3165,6 +3161,10 @@ export function AutopostPage() {
                       >
                         <CalendarIcon className="h-3.5 w-3.5" />
                         Calendar
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="list" aria-label="List view" className="flex-1 gap-1.5 px-3 sm:flex-initial">
+                        <LayoutList className="h-3.5 w-3.5" />
+                        List
                       </ToggleGroupItem>
                     </ToggleGroup>
                     {postsAccountFilterOptions.length > 0 ? (

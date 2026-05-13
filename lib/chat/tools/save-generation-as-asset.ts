@@ -74,20 +74,55 @@ function inferCategory(type: AssetType, prompt: string): AssetCategory {
   return "character"
 }
 
-function buildDescription({
+function buildAgentContextDescription({
+  category,
   model,
   prompt,
   type,
 }: {
+  category: AssetCategory
   model: string | null
   prompt: string
   type: AssetType
 }) {
+  const lines: string[] = []
+
+  if (model) {
+    lines.push(`Recorded from model: ${model}.`)
+  }
+  lines.push(`Asset type: ${type}. Library category: ${category}.`)
+
   if (prompt.length > 0) {
-    return prompt.slice(0, 280)
+    lines.push("Generation prompt (verbatim):", prompt)
+  } else {
+    lines.push("No generation prompt text was stored on this run.")
   }
 
-  return `Saved ${type} generation${model ? ` created with ${model}` : ""}.`
+  switch (category) {
+    case "motion":
+      lines.push(
+        "Agent context: Use as a motion/video reference—match movement, rhythm, camera dynamics, and energy. Identity or exact likeness may come from separate character or face assets.",
+      )
+      break
+    case "character":
+      lines.push(
+        "Agent context: Use as a generalized character reference—silhouette, styling, wardrobe palette, body type, personality vibe. Pair with dedicated face or portrait assets when likeness must be exact.",
+      )
+      break
+    case "scene":
+      lines.push(
+        "Agent context: Use for environment, layout, lighting direction, palette, and establishing mood in new compositions.",
+      )
+      break
+    case "element":
+      lines.push(
+        "Agent context: Use as a discrete element—describe role (product shot, texture, VO/music bed, etc.) so it can slot into larger workflows.",
+      )
+      break
+  }
+
+  const text = lines.join("\n\n")
+  return text.length > 8000 ? `${text.slice(0, 7997)}...` : text
 }
 
 function buildTitle({
@@ -179,7 +214,7 @@ export function createSaveGenerationAsAssetTool({
 }: CreateSaveGenerationAsAssetToolOptions) {
   return tool({
     description:
-      "Save a completed generation as a reusable library asset. Only use this after the user clearly confirms they want that generation saved. If the user does not specify metadata, choose a sensible category, title, and short description yourself.",
+      "Save a completed generation as a reusable library asset. Only use this after the user clearly confirms they want that generation saved. If the user does not specify metadata, choose a sensible category, title, and rich agent-context description (see the description field): motion = detailed movement/camera/pacing; character = generalized styling and vibe without hyper-specific face detail; scene/element analogous.",
     inputSchema: z.object({
       generationId: z
         .string()
@@ -199,9 +234,11 @@ export function createSaveGenerationAsAssetTool({
         .describe("Optional asset title. If omitted, generate a short descriptive title."),
       description: z
         .string()
-        .max(400)
+        .max(8000)
         .optional()
-        .describe("Optional asset description. If omitted, derive it from the generation prompt."),
+        .describe(
+          "Rich agent-context notes (editable later in the asset modal; not shown on the library grid). Motion: movement, rhythm, camera. Character: generalized look—pair with face assets for likeness. If omitted, build from prompt + category.",
+        ),
       visibility: z
         .enum(["private", "public"])
         .optional()
@@ -269,7 +306,8 @@ export function createSaveGenerationAsAssetTool({
       const resolvedDescription =
         typeof description === "string" && description.trim().length > 0
           ? description.trim()
-          : buildDescription({
+          : buildAgentContextDescription({
+              category: resolvedCategory,
               model: typeof generation.model === "string" ? generation.model : null,
               prompt,
               type: assetType,

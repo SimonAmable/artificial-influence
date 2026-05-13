@@ -1011,7 +1011,7 @@ export function AudioStudioPage() {
         })}
       </div>
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-[1500px] flex-col px-4 pb-44 pt-24 sm:px-6 md:pb-40 lg:px-10">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-[1500px] flex-col px-4 pb-44 pt-14 sm:px-6 md:pb-40 lg:px-10">
         {!hasResults && !isHistoryLoading ? (
           <section className="relative z-10 mt-8 flex flex-1 flex-col items-center text-center">
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-muted-foreground">
@@ -1035,11 +1035,11 @@ export function AudioStudioPage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   {mode === "voiceover" ? "Recent voiceovers" : "Recent voice changes"}
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {mode === "voiceover"
-                    ? "Generated audio stays playable here while the cinematic layout remains intact."
-                    : "Recent lip-sync generations created from the Change Voice flow."}
-                </p>
+                {mode === "change-voice" ? (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Recent lip-sync generations created from the Change Voice flow.
+                  </p>
+                ) : null}
               </div>
             </div>
 

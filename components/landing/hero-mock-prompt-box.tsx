@@ -136,6 +136,7 @@ export function HeroMockPromptBox({ className, sendHref = DEFAULT_SEND_HREF }: H
               className={cn(
                 "relative inline-block transition-all duration-300",
                 "before:absolute before:inset-[-12px] before:-z-10 before:rounded-full before:bg-primary before:blur-[15px] before:content-[''] before:transition-opacity before:duration-300",
+                "max-md:before:inset-[-6px] max-md:before:blur-[8px]",
                 hasPromptText ? "before:opacity-55" : "before:opacity-0"
               )}
             >
@@ -144,8 +145,9 @@ export function HeroMockPromptBox({ className, sendHref = DEFAULT_SEND_HREF }: H
                 size="icon-lg"
                 className={cn(
                   "relative z-0 bg-primary text-primary-foreground transition-all duration-300 hover:bg-primary/80",
+                  "max-md:size-5 max-md:rounded-full [&_svg]:max-md:size-3",
                   hasPromptText &&
-                    "shadow-[0_0_28px_hsl(var(--primary)/0.55)] ring-2 ring-primary/35 ring-offset-2 ring-offset-background dark:ring-offset-background"
+                    "shadow-[0_0_28px_hsl(var(--primary)/0.55)] ring-2 ring-primary/35 ring-offset-2 ring-offset-background dark:ring-offset-background max-md:ring-1 max-md:ring-offset-1"
                 )}
               >
                 <Link href={sendHref} aria-label="Send, opens sign-in">
@@ -163,7 +165,7 @@ export function HeroMockPromptBox({ className, sendHref = DEFAULT_SEND_HREF }: H
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-full bg-muted hover:bg-muted/80"
+                className="h-9 w-9 rounded-full bg-muted hover:bg-muted/80 max-md:size-[18px] max-md:min-h-0 [&_svg]:max-md:size-2.5"
                 aria-label="Add reference image"
               >
                 <Plus className="size-3.5" weight="bold" />

@@ -60,6 +60,8 @@ export async function GET(request: NextRequest) {
 
     if (!includePending) {
       query = query.neq('status', 'pending');
+      // Completed (or legacy) rows sometimes have no stored file; listing them breaks image/video previews.
+      query = query.not('supabase_storage_path', 'is', null).neq('supabase_storage_path', '');
     }
 
     if (excludeFailed) {
@@ -91,6 +93,7 @@ export async function GET(request: NextRequest) {
 
     if (!includePending) {
       countQuery = countQuery.neq('status', 'pending');
+      countQuery = countQuery.not('supabase_storage_path', 'is', null).neq('supabase_storage_path', '');
     }
 
     if (excludeFailed) {

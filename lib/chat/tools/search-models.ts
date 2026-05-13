@@ -6,13 +6,15 @@ import { filterPublicCatalogModels } from "@/lib/server/model-catalog-visibility
 import { parseAgentUsageGuide } from "@/lib/types/agent-usage"
 import type { AgentUsageGuide } from "@/lib/types/models"
 
+export type { AgentUsageGuide }
+
 interface CreateModelsToolOptions {
   supabase: SupabaseClient
 }
 
 type ModelTypeFilter = "image" | "video" | "audio" | "upscale"
 
-type ListedModel = {
+export type ListedModel = {
   aspectRatios: string[]
   defaultAspectRatio: string | null
   description: string | null
@@ -30,7 +32,7 @@ type ListedModel = {
   usageGuide: AgentUsageGuide | null
 }
 
-async function loadActiveModels(supabase: SupabaseClient): Promise<ListedModel[]> {
+export async function loadActiveModels(supabase: SupabaseClient): Promise<ListedModel[]> {
   const { data, error } = await supabase
     .from("models")
     .select(
@@ -87,6 +89,76 @@ function buildListModelsResponse(models: ListedModel[]) {
     models,
     total: models.length,
   }
+}
+
+/**
+ * Serialises the active model list into a compact text block for direct
+ * injection into the agent system prompt. This removes the need for the
+ * agent to call listModels before every generation turn — the data is
+ * already in context from step 0.
+ */
+export function buildActiveModelsSnapshotText(models: ListedModel[]): string {
+  if (models.length === 0) {
+    return `<active_models_snapshot>\nNo active models available.\n</active_models_snapshot>`
+  }
+
+  const groups: Partial<Record<string, ListedModel[]>> = {}
+  for (const model of models) {
+    if (!groups[model.type]) groups[model.type] = []
+    groups[model.type]!.push(model)
+  }
+
+  const lines: string[] = [
+    `default_image_model: ${DEFAULT_IMAGE_MODEL_IDENTIFIER}`,
+    `total: ${models.length} active models`,
+  ]
+
+  for (const type of ["image", "video", "audio", "upscale"] as const) {
+    const group = groups[type]
+    if (!group || group.length === 0) continue
+
+    lines.push(`\n[${type}]`)
+    for (const model of group) {
+      const caps: string[] = []
+      if (model.supportsReferenceImage) caps.push("ref_image")
+      if (model.supportsReferenceVideo) caps.push("ref_video")
+      if (model.supportsReferenceAudio) caps.push("ref_audio")
+      if (model.supportsFirstFrame) caps.push("first_frame")
+      if (model.supportsLastFrame) caps.push("last_frame")
+
+      const parts: string[] = [model.identifier, `"${model.name}"`]
+      if (caps.length > 0) parts.push(`caps: ${caps.join(",")}`)
+      if (model.aspectRatios.length > 0) parts.push(`aspects: ${model.aspectRatios.join(",")}`)
+      if (model.defaultAspectRatio) parts.push(`default: ${model.defaultAspectRatio}`)
+      if (model.maxImages != null && model.maxImages > 1) parts.push(`max: ${model.maxImages}`)
+
+      lines.push(parts.join(" | "))
+
+      if (model.usageGuide) {
+        const g = model.usageGuide
+        if (g.agentSummary) lines.push(`  summary: ${g.agentSummary}`)
+        if (g.bestFor?.length) lines.push(`  best_for: ${g.bestFor.join(", ")}`)
+        if (g.avoidFor?.length) lines.push(`  avoid_for: ${g.avoidFor.join(", ")}`)
+        if (g.routingRules?.length) lines.push(`  routing: ${g.routingRules.join("; ")}`)
+        if (g.promptGuidance?.length) lines.push(`  prompt_guidance: ${g.promptGuidance.join("; ")}`)
+        if (g.pitfalls?.length) lines.push(`  pitfalls: ${g.pitfalls.join("; ")}`)
+        if (g.inputSemantics) {
+          const semantics = Object.entries(g.inputSemantics)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(", ")
+          lines.push(`  input_semantics: ${semantics}`)
+        }
+        if (g.workflows?.length) {
+          const activeWorkflows = g.workflows.filter((w) => w.active !== false)
+          if (activeWorkflows.length > 0) {
+            lines.push(`  workflows: ${activeWorkflows.map((w) => w.id).join(", ")}`)
+          }
+        }
+      }
+    }
+  }
+
+  return `<active_models_snapshot>\n${lines.join("\n")}\n</active_models_snapshot>`
 }
 
 export function createListModelsTool({ supabase }: CreateModelsToolOptions) {

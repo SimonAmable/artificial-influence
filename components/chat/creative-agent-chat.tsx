@@ -19,6 +19,7 @@ import {
   Palette,
   PencilSimple,
   Plus,
+  SpeakerHigh,
   Sparkle,
   X,
 } from "@phosphor-icons/react"
@@ -87,6 +88,12 @@ type MobileChatThreadListItem = {
   automation_trigger?: "manual" | "scheduled" | null
 }
 
+type PinnedSkillSummary = {
+  slug: string
+  title: string | null
+  description: string
+}
+
 function formatThreadUpdatedAt(value: string) {
   const date = new Date(value)
   const now = new Date()
@@ -108,12 +115,10 @@ function formatThreadUpdatedAt(value: string) {
   })
 }
 
-function firstNameFromDisplayName(displayName: string): string {
-  const trimmed = displayName.trim()
-  if (!trimmed) return displayName
-  const first = trimmed.split(/\s+/)[0]
-  return first ?? trimmed
-}
+const EMPTY_STATE_TITLE = "What will we create today?"
+
+const EMPTY_STATE_DESCRIPTION =
+  "Copy the best carousels, ads, AI influencers, and AI UGC, all by chatting."
 
 const STARTER_PROMPTS: { label: string; prompt: string }[] = [
   {
@@ -121,21 +126,14 @@ const STARTER_PROMPTS: { label: string; prompt: string }[] = [
     prompt: "What can this agent do?",
   },
   {
-    label: "Generate Image",
-    prompt: "Based on my input, generate the best image possible. Decide on the optimal prompt, style, and settings.",
-  },
-  {
-    label: "Generate Video",
-    prompt: "Based on my input, generate the best video possible. Decide on the optimal prompt, duration, and settings.",
-  },
-  {
-    label: "Generate Audio",
-    prompt: "Based on my input, generate the best audio possible. Decide on the optimal voice, tone, and settings.",
-  },
-  {
-    label: "Visual traits as JSON",
+    label: "Recommend best model & workflow",
     prompt:
-      "I’ll attach an image. Extract detailed visual traits as JSON for a Nano Banana prompt.",
+      "For my goal below, recommend the best model plus the workflow (steps, what to attach, and order). Keep it short and actionable.\n\nGoal: ",
+  },
+  {
+    label: "Copy reference video or image",
+    prompt:
+      "I’m attaching a reference (image or video). Deeply analyze every important detail: subject, wardrobe, props, environment, lighting, color, composition, camera/lens feel, motion/pace, edits, text/UI, audio vibe if video. Output (1) if it’s an image: a rich, valid JSON prompt package I can reuse (structured fields, not vague labels); (2) if it’s video: a tight shot-by-shot script (beats, duration hints, motion, dialogue/voiceover if any, captions/SFX). Then (3) a concise but detailed plan to recreate it with our tools (order of steps, what to generate vs edit, what to attach next). Do not skip fine-grained elements that materially affect the look.",
   },
 ]
 
@@ -1423,6 +1421,43 @@ function ChatBrandPills({
               className="rounded-full p-0.5 text-muted-foreground hover:bg-background/80 hover:text-foreground"
               onClick={() => onRemove(ref.id)}
               aria-label={`Remove ${ref.label}`}
+            >
+              <X className="size-3" weight="bold" />
+            </button>
+          ) : null}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function PinnedSkillPills({
+  skills,
+  onRemove,
+}: {
+  skills: PinnedSkillSummary[]
+  onRemove?: (slug: string) => void
+}) {
+  if (skills.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="list" aria-label="Pinned skills">
+      <span className="text-xs font-medium text-muted-foreground">Pinned skills</span>
+      {skills.map((skill) => (
+        <span
+          key={skill.slug}
+          role="listitem"
+          className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-muted/30 px-2 py-1 text-xs text-foreground"
+          title={skill.description}
+        >
+          <Books className="size-3.5 shrink-0 text-muted-foreground" weight="duotone" />
+          <span className="truncate font-medium">{skill.title?.trim() || skill.slug}</span>
+          {onRemove ? (
+            <button
+              type="button"
+              className="rounded-full p-0.5 text-muted-foreground hover:bg-background/80 hover:text-foreground"
+              onClick={() => onRemove(skill.slug)}
+              aria-label={`Unpin ${skill.title?.trim() || skill.slug}`}
             >
               <X className="size-3" weight="bold" />
             </button>
@@ -3263,39 +3298,24 @@ export function MessageParts({
                       <AccordionContent className="pb-3">
                         <div className="space-y-2">
                           {models.map((model) => (
-                            <div key={model.identifier} className="rounded-xl border border-border/60 bg-background/80 p-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-medium">{model.name}</p>
-                                <Badge variant="outline">{model.identifier}</Badge>
-                                <Badge variant="outline">{model.provider || "unknown"}</Badge>
+                            <div
+                              key={model.identifier}
+                              className="flex items-start gap-3 rounded-xl border border-border/60 bg-background/80 p-3"
+                            >
+                              <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border bg-muted/30">
+                                <ModelIcon identifier={model.identifier} size={20} />
                               </div>
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                <Badge variant="outline">{model.type}</Badge>
-                                {model.defaultAspectRatio ? (
-                                  <Badge variant="outline">{model.defaultAspectRatio}</Badge>
-                                ) : null}
-                                {typeof model.modelCost === "number" ? (
-                                  <Badge variant="outline">{model.modelCost} credits</Badge>
-                                ) : null}
-                                {model.supportsReferenceImage ? (
-                                  <Badge variant="outline">ref image</Badge>
-                                ) : null}
-                                {model.supportsReferenceVideo ? (
-                                  <Badge variant="outline">ref video</Badge>
-                                ) : null}
-                                {model.supportsReferenceAudio ? (
-                                  <Badge variant="outline">ref audio</Badge>
-                                ) : null}
-                                {model.supportsFirstFrame ? (
-                                  <Badge variant="outline">first frame</Badge>
-                                ) : null}
-                                {model.supportsLastFrame ? (
-                                  <Badge variant="outline">last frame</Badge>
-                                ) : null}
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold leading-snug">{model.name}</p>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  <Badge variant="outline" className="capitalize">
+                                    {model.type}
+                                  </Badge>
+                                  {typeof model.modelCost === "number" ? (
+                                    <Badge variant="outline">{formatCredits(model.modelCost)} credits</Badge>
+                                  ) : null}
+                                </div>
                               </div>
-                              {model.description ? (
-                                <p className="mt-2 text-xs text-muted-foreground">{model.description}</p>
-                              ) : null}
                             </div>
                           ))}
                         </div>
@@ -3815,21 +3835,80 @@ export function MessageParts({
                 {toolPart.output?.message ? (
                   <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
                 ) : null}
-                <div className="space-y-2">
-                  {assets.map((asset) => (
-                    <div key={asset.id} className="rounded-xl border border-border/60 bg-background/80 p-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-medium">{asset.title}</p>
-                        <Badge variant="outline">{asset.assetType}</Badge>
-                        <Badge variant="outline">{asset.category}</Badge>
-                        <Badge variant="outline">{asset.visibility}</Badge>
-                      </div>
-                      {asset.description ? (
-                        <p className="mt-2 text-xs text-muted-foreground">{asset.description}</p>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
+                {assets.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {assets.map((asset) => {
+                      const imagePreviewUrl = (asset.thumbnailUrl || asset.url || "").trim()
+                      return (
+                        <div
+                          key={asset.id}
+                          className="overflow-hidden rounded-xl border border-border/60 bg-background/80"
+                        >
+                          <div className="relative aspect-square bg-muted">
+                            {asset.assetType === "image" && imagePreviewUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- remote storage URLs not in next/image domains
+                              <img
+                                src={imagePreviewUrl}
+                                alt={asset.title}
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : asset.assetType === "video" && asset.url.trim() ? (
+                              <video
+                                src={asset.url}
+                                poster={asset.thumbnailUrl ?? undefined}
+                                className="h-full w-full object-cover"
+                                preload="metadata"
+                                muted
+                                playsInline
+                                controls
+                              />
+                            ) : asset.assetType === "video" &&
+                              typeof asset.thumbnailUrl === "string" &&
+                              asset.thumbnailUrl.trim() ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={asset.thumbnailUrl}
+                                alt={asset.title}
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : asset.assetType === "audio" ? (
+                              <div className="flex h-full flex-col items-center justify-center gap-2 bg-muted/80 p-2">
+                                <SpeakerHigh className="size-9 shrink-0 text-muted-foreground" weight="duotone" aria-hidden />
+                                {asset.url.trim() ? (
+                                  <audio src={asset.url} controls className="h-8 w-full min-w-0 max-w-[200px]" />
+                                ) : (
+                                  <p className="text-center text-[11px] text-muted-foreground">No audio URL</p>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex h-full items-center justify-center px-2 text-center text-[11px] text-muted-foreground">
+                                No preview available
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-1.5 p-2.5">
+                            <p className="line-clamp-2 text-xs font-medium leading-snug">{asset.title}</p>
+                            <div className="flex flex-wrap gap-1">
+                              <Badge variant="outline" className="rounded-md px-1.5 py-0 text-[10px] font-normal capitalize">
+                                {asset.assetType}
+                              </Badge>
+                              <Badge variant="outline" className="rounded-md px-1.5 py-0 text-[10px] font-normal capitalize">
+                                {asset.category}
+                              </Badge>
+                              <Badge variant="outline" className="rounded-md px-1.5 py-0 text-[10px] font-normal capitalize">
+                                {asset.visibility}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No saved assets in this result.</p>
+                )}
               </CardContent>
             </Card>
           )
@@ -4344,9 +4423,6 @@ export function MessageParts({
                 {asset ? (
                   <div className="rounded-xl border border-border/60 bg-background/80 p-3">
                     <p className="text-sm font-medium">{asset.title}</p>
-                    {asset.description ? (
-                      <p className="mt-2 text-xs text-muted-foreground">{asset.description}</p>
-                    ) : null}
                     {asset.tags.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {asset.tags.map((tag) => (
@@ -4491,7 +4567,7 @@ export function MessageParts({
               <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
                 <CardContent className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
                   <CircleNotch className="h-4 w-4 animate-spin" />
-                  Saving skill{toolPart.input?.slug ? ` “${toolPart.input.slug}”` : ""}…
+                  Saving skill…
                 </CardContent>
               </Card>
             )
@@ -4523,11 +4599,6 @@ export function MessageParts({
               >
                 <CardContent className="space-y-1 p-4 text-sm">
                   <p className="font-medium">{ok ? "Skill saved" : "Skill not saved"}</p>
-                  {output?.slug ? (
-                    <p className="text-muted-foreground">
-                      <span className="font-mono text-xs">{output.slug}</span>
-                    </p>
-                  ) : null}
                   {output?.message ? <p className="text-muted-foreground">{output.message}</p> : null}
                 </CardContent>
               </Card>
@@ -4543,7 +4614,7 @@ export function MessageParts({
               <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
                 <CardContent className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
                   <CircleNotch className="h-4 w-4 animate-spin" />
-                  Loading skill{toolPart.input?.slug ? ` “${toolPart.input.slug}”` : ""}…
+                  Loading skill…
                 </CardContent>
               </Card>
             )
@@ -4575,14 +4646,11 @@ export function MessageParts({
               >
                 <CardContent className="space-y-3 p-4 text-sm">
                   <div className="space-y-1">
-                  <p className="font-medium">{ok ? "Skill loaded" : "Skill not loaded"}</p>
-                  {output?.slug ? (
-                    <p className="text-muted-foreground">
-                      {output.title ? `${output.title} · ` : null}
-                      <span className="font-mono text-xs">{output.slug}</span>
-                    </p>
-                  ) : null}
-                  {output?.message ? <p className="text-muted-foreground">{output.message}</p> : null}
+                    <p className="font-medium">{ok ? "Skill loaded" : "Skill not loaded"}</p>
+                    {output?.title?.trim() ? (
+                      <p className="text-muted-foreground">{output.title.trim()}</p>
+                    ) : null}
+                    {output?.message ? <p className="text-muted-foreground">{output.message}</p> : null}
                   </div>
                   {ok && output?.isMine && typeof output.slug === "string" ? (
                     <div className="flex justify-start">
@@ -4760,11 +4828,11 @@ export function CreativeAgentChat({
   const searchParams = useSearchParams()
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
   const [assetModalOpen, setAssetModalOpen] = React.useState(false)
+  const [pinnedSkills, setPinnedSkills] = React.useState<PinnedSkillSummary[]>([])
   const [skillLoadModalOpen, setSkillLoadModalOpen] = React.useState(false)
   const [skillEditModalSlug, setSkillEditModalSlug] = React.useState<string | null>(null)
   const [composerDropActive, setComposerDropActive] = React.useState(false)
   const [userId, setUserId] = React.useState<string | null>(null)
-  const [accountDisplayName, setAccountDisplayName] = React.useState<string | null>(null)
   const [authReady, setAuthReady] = React.useState(false)
   const [composerValue, setComposerValue] = React.useState("")
   const [attachedFiles, setAttachedFiles] = React.useState<ComposerUploadAttachment[]>([])
@@ -4774,7 +4842,18 @@ export function CreativeAgentChat({
   const [isCreatingThread, setIsCreatingThread] = React.useState(false)
   const [isEnhancingComposer, setIsEnhancingComposer] = React.useState(false)
   const [isBootstrappingOnboarding, setIsBootstrappingOnboarding] = React.useState(false)
-  const initialChatId = React.useMemo(() => initialThreadId ?? "creative-chat-draft", [initialThreadId])
+
+  /** AI SDK Chat `id`; must stay stable while a draft thread upgrades to DB id or `useChat` wipes messages mid-send (see `@ai-sdk/react` use-chat). */
+  const embedPersistBootstrapRef = React.useRef<string | null>(null)
+  const sidebarLikeEmbed =
+    compact && enablePersistence && !syncUrlOnThreadCreate /* sheet chat only; `/chat` page sets syncUrl */
+  const resolvedUiChatBootstrapId = sidebarLikeEmbed
+    ? (embedPersistBootstrapRef.current ??=
+        typeof initialThreadId === "string" && initialThreadId.length > 0
+          ? initialThreadId
+          : `embed-draft-${typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`)
+    : (initialThreadId ?? "creative-chat-draft")
+
   const threadIdRef = React.useRef<string | undefined>(initialThreadId)
   const onboardingBootstrapInFlightRef = React.useRef(false)
   const onboardingHandoffPendingRef = React.useRef(false)
@@ -4803,7 +4882,7 @@ export function CreativeAgentChat({
   const chat = React.useMemo(
     () =>
       new Chat({
-        id: initialChatId,
+        id: resolvedUiChatBootstrapId,
         messages: initialMessages,
         onFinish: () => {
           const activeThreadId = threadIdRef.current
@@ -4862,7 +4941,13 @@ export function CreativeAgentChat({
           },
         }),
       }),
-    [enablePersistence, initialChatId, initialMessages, router, syncUrlOnThreadCreate],
+    [
+      enablePersistence,
+      initialMessages,
+      resolvedUiChatBootstrapId,
+      router,
+      syncUrlOnThreadCreate,
+    ],
   )
 
   const { addToolApprovalResponse, messages, sendMessage, setMessages, status, error, stop } = useChat({
@@ -4874,6 +4959,25 @@ export function CreativeAgentChat({
     () => countUniqueSkillsLoadedInMessages(messages),
     [messages],
   )
+
+  const refreshPinnedSkills = React.useCallback(async () => {
+    if (!userId) {
+      setPinnedSkills([])
+      return
+    }
+
+    const response = await fetch("/api/skills/pins", { credentials: "same-origin" })
+    const data = (await response.json().catch(() => ({}))) as {
+      error?: string
+      pinnedSkills?: PinnedSkillSummary[]
+    }
+
+    if (!response.ok) {
+      throw new Error(typeof data.error === "string" ? data.error : "Could not load pinned skills.")
+    }
+
+    setPinnedSkills(Array.isArray(data.pinnedSkills) ? data.pinnedSkills : [])
+  }, [userId])
 
   React.useEffect(() => {
     const supabase = createSupabaseClient()
@@ -4906,39 +5010,20 @@ export function CreativeAgentChat({
   }, [])
 
   React.useEffect(() => {
-    if (!authReady || !userId) {
-      setAccountDisplayName(null)
+    if (!authReady) {
       return
     }
 
-    let cancelled = false
-    const supabase = createSupabaseClient()
-
-    void Promise.all([
-      supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
-      supabase.auth.getUser(),
-    ])
-      .then(([profileResult, userResult]) => {
-        if (cancelled) return
-        const profile = profileResult.data
-        const user = userResult.data.user
-        const metaName = user?.user_metadata?.full_name
-        const displayName =
-          profile?.full_name?.trim() ||
-          (typeof metaName === "string" ? metaName.trim() : "") ||
-          user?.email?.split("@")[0] ||
-          ""
-        setAccountDisplayName(displayName.trim() || null)
-      })
-      .catch(() => {
-        if (cancelled) return
-        setAccountDisplayName(null)
-      })
-
-    return () => {
-      cancelled = true
+    if (!userId) {
+      setPinnedSkills([])
+      return
     }
-  }, [authReady, userId])
+
+    void refreshPinnedSkills().catch((error: unknown) => {
+      console.error("[chat] Failed to load pinned skills:", error)
+      setPinnedSkills([])
+    })
+  }, [authReady, refreshPinnedSkills, userId])
 
   React.useEffect(() => {
     if (!authReady || !userId) {
@@ -5566,6 +5651,36 @@ export function CreativeAgentChat({
     ],
   )
 
+  const handleUnpinSkill = React.useCallback(
+    async (slug: string) => {
+      if (!userId) {
+        router.push(getLoginHref())
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/skills/pins/${slug}`, {
+          method: "DELETE",
+          credentials: "same-origin",
+        })
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string
+          pinnedSkills?: PinnedSkillSummary[]
+        }
+
+        if (!response.ok) {
+          throw new Error(typeof data.error === "string" ? data.error : "Could not unpin skill.")
+        }
+
+        setPinnedSkills(Array.isArray(data.pinnedSkills) ? data.pinnedSkills : [])
+        toast.success("Skill unpinned.")
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not unpin skill.")
+      }
+    },
+    [getLoginHref, router, userId],
+  )
+
   const clearChat = React.useCallback(() => {
     const shouldNavigateToDraft = enablePersistence && Boolean(threadId)
 
@@ -5587,7 +5702,36 @@ export function CreativeAgentChat({
   }, [enablePersistence, onThreadIdChange, router, setMessages, threadId])
 
   const showEmptyState = messages.length === 0
-  const showSubmittedLoading = status === "submitted" && messages.length > 0
+
+  /**
+   * Extra row below messages: only when there is no assistant placeholder yet (`submitted`),
+   * or streaming before an assistant message exists (rare). Once the SDK appends the
+   * assistant message, that row owns the avatar — a second row would duplicate it.
+   */
+  const showSubmittedLoading = React.useMemo(() => {
+    if (messages.length === 0) return false
+    if (status !== "submitted" && status !== "streaming") return false
+
+    let lastUserIndex = -1
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === "user") {
+        lastUserIndex = i
+        break
+      }
+    }
+
+    for (let i = lastUserIndex + 1; i < messages.length; i++) {
+      const m = messages[i]
+      if (m?.role !== "assistant") continue
+      const hasAnswerText = m.parts.some(
+        (part) => part.type === "text" && typeof part.text === "string" && part.text.trim().length > 0,
+      )
+      if (hasAnswerText) return false
+      return false
+    }
+
+    return status === "submitted" || status === "streaming"
+  }, [messages, status])
 
   return (
     <div
@@ -5735,16 +5879,8 @@ export function CreativeAgentChat({
                       />
                     </span>
                   )}
-                  title={
-                    userId && accountDisplayName
-                      ? `Hi, ${firstNameFromDisplayName(accountDisplayName)}`
-                      : "Start a conversation"
-                  }
-                  description={
-                    userId
-                      ? "Ask a question, attach references, brainstorm ideas, or talk through a creative direction."
-                      : "Draft your message here. When you send it, we'll take you to login or signup first."
-                  }
+                  title={EMPTY_STATE_TITLE}
+                  description={EMPTY_STATE_DESCRIPTION}
                 />
                 <Suggestions className="justify-center">
                   {STARTER_PROMPTS.map((item) => (
@@ -5763,6 +5899,12 @@ export function CreativeAgentChat({
 
             {messages.map((message) => {
               const isUserMessage = message.role === "user"
+              const isLastMessage = message.id === messages.at(-1)?.id
+              const showEmptyAssistantThinking =
+                !isUserMessage &&
+                isLastMessage &&
+                message.parts.length === 0 &&
+                (status === "submitted" || status === "streaming")
 
               return (
                 <Message
@@ -5803,6 +5945,11 @@ export function CreativeAgentChat({
                             })
                           }}
                         />
+                        {showEmptyAssistantThinking ? (
+                          <div className="text-sm text-foreground">
+                            <Shimmer className="leading-none">Thinking...</Shimmer>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   )}
@@ -5877,6 +6024,19 @@ export function CreativeAgentChat({
                   }}
                 />
               </div>
+            ) : null}
+
+            {pinnedSkills.length > 0 ? (
+              <PinnedSkillPills
+                skills={pinnedSkills}
+                onRemove={
+                  status === "submitted" || status === "streaming"
+                    ? undefined
+                    : (slug) => {
+                        void handleUnpinSkill(slug)
+                      }
+                }
+              />
             ) : null}
 
             <>
@@ -6158,13 +6318,20 @@ export function CreativeAgentChat({
                   open={skillLoadModalOpen}
                   onOpenChange={setSkillLoadModalOpen}
                   onRequestLoad={handleRequestSkillLoad}
-                disabled={
-                  isCreatingThread ||
-                  isBootstrappingOnboarding ||
-                  hasPendingUploads ||
-                  status === "submitted" ||
-                  status === "streaming"
-                }
+                  onBuildWithAI={() => {
+                    setSkillLoadModalOpen(false)
+                    setComposerValue(
+                      "Build me a new skill. Ask me what it should do, what situations trigger it, and what to call it — then create it for me.",
+                    )
+                  }}
+                  onPinnedSkillsChange={refreshPinnedSkills}
+                  disabled={
+                    isCreatingThread ||
+                    isBootstrappingOnboarding ||
+                    hasPendingUploads ||
+                    status === "submitted" ||
+                    status === "streaming"
+                  }
                 />
                 <SkillEditModal
                   open={Boolean(skillEditModalSlug)}

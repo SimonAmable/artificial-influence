@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { UIMessage } from "ai"
 import { inferStoragePathFromUrl } from "@/lib/assets/library"
+import { getSelectedReferencesFromMessage } from "@/lib/chat/reference-metadata"
 import { DEFAULT_UPLOAD_BUCKET } from "@/lib/uploads/shared"
 import { extractStorageObjectRef } from "@/lib/uploads/storage-ref"
 import { formatGenerationMediaId, formatUploadMediaId } from "@/lib/chat/media-id"
@@ -66,6 +67,141 @@ function getPublicUrlForPath(supabase: SupabaseClient, bucket: string, storagePa
 function isHttpSupabasePublicUrl(url: string) {
   if (!url.startsWith("http://") && !url.startsWith("https://")) return false
   return inferStoragePathFromUrl(url) != null
+}
+
+function mimeTypeForLibraryAssetType(assetType: string) {
+  if (assetType === "video") return "video/mp4"
+  if (assetType === "audio") return "audio/mpeg"
+  return "image/png"
+}
+
+function extractLibraryAssetId(prefixedId: string) {
+  if (!prefixedId.startsWith("asset:")) return null
+  const value = prefixedId.slice("asset:".length).trim()
+  return value || null
+}
+
+/**
+ * Link library assets from message metadata to this thread's uploads so listThreadMedia sees them.
+ * File-part registration alone skips URLs that are not Supabase object URLs (CDN, transforms, etc.).
+ */
+async function registerThreadMediaFromSelectedLibraryAssets(
+  supabase: SupabaseClient,
+  userId: string,
+  threadId: string,
+  message: UIMessage,
+) {
+  const refs = getSelectedReferencesFromMessage(message)
+  const assetIds = [
+    ...new Set(
+      refs
+        .filter((r) => r.category === "asset")
+        .map((r) => extractLibraryAssetId(r.id))
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ]
+
+  if (assetIds.length === 0) {
+    return
+  }
+
+  const { data: assetRows, error: assetError } = await supabase
+    .from("assets")
+    .select("id, title, asset_type, upload_id, supabase_storage_path, asset_url")
+    .eq("user_id", userId)
+    .in("id", assetIds)
+
+  if (assetError) {
+    console.error("[uploads] Failed to load assets for thread media:", assetError.message)
+    return
+  }
+
+  for (const raw of assetRows ?? []) {
+    const row = raw as {
+      id: string
+      title: string
+      asset_type: string
+      upload_id: string | null
+      supabase_storage_path: string | null
+      asset_url: string
+    }
+    const label = `Asset: ${row.title}`
+
+    if (row.upload_id) {
+      const { error: patchError } = await supabase
+        .from("uploads")
+        .update({
+          chat_thread_id: threadId,
+          source: "chat",
+          label,
+        })
+        .eq("user_id", userId)
+        .eq("id", row.upload_id)
+
+      if (patchError) {
+        console.error("[uploads] Failed to link asset upload row to thread:", patchError.message)
+      }
+      continue
+    }
+
+    const storagePath =
+      row.supabase_storage_path?.trim() ||
+      inferStoragePathFromUrl(row.asset_url) ||
+      null
+
+    if (!storagePath) {
+      console.warn("[uploads] Asset missing storage path for thread registration:", row.id)
+      continue
+    }
+
+    const bucket =
+      row.asset_url?.trim().length > 0
+        ? extractStorageObjectRef(row.asset_url)?.bucket ?? DEFAULT_UPLOAD_BUCKET
+        : DEFAULT_UPLOAD_BUCKET
+    const mimeType = inferMimeFromStoragePath(storagePath, mimeTypeForLibraryAssetType(row.asset_type))
+
+    const { error } = await supabase.from("uploads").insert({
+      user_id: userId,
+      chat_thread_id: threadId,
+      source: "chat",
+      bucket,
+      mime_type: mimeType,
+      storage_path: storagePath,
+      label,
+    })
+
+    if (!error) continue
+
+    if (error.code === "23505") {
+      const { error: patchError } = await supabase
+        .from("uploads")
+        .update({
+          chat_thread_id: threadId,
+          source: "chat",
+          label,
+        })
+        .eq("user_id", userId)
+        .eq("storage_path", storagePath)
+
+      if (patchError) {
+        console.error("[uploads] Failed to attach existing upload to thread:", patchError.message)
+      }
+      continue
+    }
+
+    console.error("[uploads] Failed to register asset-derived upload:", error.message)
+  }
+}
+
+/** Registers chat attachments + library asset refs for listThreadMedia. */
+export async function registerThreadMediaFromUserMessage(
+  supabase: SupabaseClient,
+  userId: string,
+  threadId: string,
+  message: UIMessage,
+) {
+  await registerThreadMediaFromUserMessageParts(supabase, userId, threadId, message.parts)
+  await registerThreadMediaFromSelectedLibraryAssets(supabase, userId, threadId, message)
 }
 
 /**

@@ -17,6 +17,11 @@ import type {
   AvailableChatAudioReference,
   AvailableChatVideoReference,
 } from "@/lib/chat/tools/generate-video"
+import {
+  buildActiveModelsSnapshotText,
+  type ListedModel,
+} from "@/lib/chat/tools/search-models"
+import type { PinnedSkillInstructionEntry } from "@/lib/chat/skills/pins"
 import type { AttachedRef } from "@/lib/commands/types"
 
 function buildReferenceManifest(
@@ -104,6 +109,7 @@ Agent rules:
 - When you decide to execute, do not output a prompt package, JSON block, recommended_model block, workflow block, or copy-paste-ready prompt first.
 - In execution mode, either ask a brief clarifying question or call the tool directly.
 - After execution, respond in short natural language only. Do not dump the internal prompt unless the user explicitly asks to see it.
+- **User-facing voice:** In analysis, plans, and recreation steps, do not name tools (\`generateImage\`, \`listThreadMedia\`, etc.), tool arguments (\`rawPrompt\`, \`referenceIds\`, \`mediaId\`), or internal ids (\`upl_...\`, \`gen_...\`, \`ref_1\`) unless the user explicitly asked for developer/debug detail. Put those only in tool calls; use plain-language descriptions for the user.
 - After a successful tool run, briefly explain what you made and suggest the next refinement move.
 - Never claim you generated an image unless the tool actually succeeded.
 - When **generateImage** or **generateVideo** returns **pending** with a **predictionId**, async work continues; the UI updates when complete. **Only** call **awaitGeneration** or **scheduleGenerationFollowUp** when there is a **real chain** (a follow-up tool in this workflow that **needs** the finished file). If the user only asked for the generation with no same-turn follow-up, **do not** wait or schedule - reply briefly and let the UI finish. **Image chains** (e.g. image -> video, image -> draft, image -> extract): use **awaitGeneration** with **predictionId** or **generationId** - **never** **scheduleGenerationFollowUp** for images; images are usually fast enough for the ~60s cap. **Video chains:** if the model is **short/fast** enough that the next step can plausibly run within ~90s, use **awaitGeneration**; if the model is **long** (typical examples: **Kling Motion Control**, **Seedance 2.0**, or other multi-minute runs) **and** the next step **must** have the output file, use **scheduleGenerationFollowUp** (persisted thread) with **generationId** and a self-contained **plan**; tell the user the next step runs when the media is ready. Do **not** call **awaitGeneration** when no same-turn step needs the file. If **awaitGeneration** returns **timeout** or **failed**, do **not** loop; explain state to the user and rely on the UI. Never call **awaitGeneration** twice on the same prediction. Use **estimateModelLatency** when the user asks how long a model takes; phrase answers as uncertain ranges.
@@ -114,7 +120,7 @@ Agent rules:
 - Use **searchWeb** when the user asks to find links, sources, examples, references, current pages, or content ideas from the web. Use **readWebPage** when they give one URL to inspect/summarize/extract. Use **searchWebImages** for visual inspiration/reference discovery from the web, use **searchStockReferences** for live external meme/GIF/sticker and future stock-provider searches, and clearly treat external results as license-unverified unless the source says otherwise. Use **capturePageScreenshot** only when they explicitly ask to screenshot, capture, preview, or visually save a web page; default to viewport capture, not full-page capture, unless the user explicitly says full page. Screenshots saved to the thread can be reused as image references via **listThreadMedia**.
 - Use **listThreadMedia** to enumerate uploads and completed generations in this thread (**\`upl_<uuid>\`** / **\`gen_<uuid>\`**). Use **listRecentGenerations** for user-wide history; each row has **id** (save-as-asset, credits) and **mediaId** (**gen_<uuid>**) for **referenceIds** / **referenceVideoIds** / **referenceAudioIds**. Either form resolves for references.
 - Before using the save-generation-as-asset tool, make sure the user has clearly confirmed they want that generation saved. If they have not confirmed yet, ask one short confirmation question first.
-- When you save a generation as an asset, choose a sensible category and short description yourself unless the user explicitly asks for something else.
+- When you save a generation as an asset, choose a sensible category and a rich agent-context description yourself unless the user explicitly asks for something else. Motion assets: describe movement, pacing, camera. Character assets: generalized styling and vibe—not hyper-specific facial detail (face can be separate assets).
 - Use **listSocialConnections** when the user wants to post to Instagram or TikTok and the exact connected account is not already clear. If multiple accounts exist, do not guess.
 - Use **prepareSocialPost** only when the user clearly wants to save a social post draft, publish a social post now, or schedule one for later.
 - **prepareSocialPost** requires explicit approval in the tool UI before anything is saved in normal chat. If the approval is denied, do not retry the same tool call unless the user changes the request. (Server-scheduled **scheduleGenerationFollowUp** runs may execute drafts without that interactive approval.)
@@ -151,7 +157,13 @@ function buildCreativeAgentAppendixV2(
   audioReferences: AvailableChatAudioReference[],
   selectedReferenceContext?: string,
   onboardingContext?: string,
+  preloadedModels?: ListedModel[],
 ) {
+  const modelsBlock =
+    preloadedModels !== undefined
+      ? `\n\n${buildActiveModelsSnapshotText(preloadedModels)}`
+      : ""
+
   return `
 <runtime_context>
 - You are operating as a creative tool-calling agent inside UniCan chat.
@@ -159,6 +171,7 @@ function buildCreativeAgentAppendixV2(
 - Available tool families include stock-reference search for live external sources like GIPHY.
 - Tool descriptions and input schemas are the canonical contract for field names and tool-specific rules.
 - The default image generation model is **GPT Image 2** (\`openai/gpt-image-2\`). If asked about the default image model, answer that directly; do not say there is no single default and do not answer Google Nano Banana.
+- Active models are pre-loaded in \`<active_models_snapshot>\` below. Use ONLY those identifiers when calling generation tools — never use model ids from training memory alone.${modelsBlock}
 </runtime_context>
 
 <reference_rules>
@@ -185,9 +198,15 @@ ${onboardingContext}
 - If a generation tool returns \`status: "pending"\` and no later tool in this same turn needs that result, stop tool-calling and reply briefly. Do not wait just to confirm completion.
 </execution_rules>
 
+<user_facing_voice>
+- The blocks above use tool names and field names **for your tool calls only**. In **all user-visible text** (including analysis, JSON preamble, and recreation plans), do **not** repeat those names or internal ids (\`upl_...\`, \`gen_...\`, \`ref_1\`, \`mediaId\`, \`referenceIds\`, \`rawPrompt\`, etc.). Describe actions and references in plain language (“your upload”, “the last image in this thread”, “the 9:16 render”).
+- When you output a JSON prompt package the user asked for, prose around the fence should read like a creative brief, not setup instructions for tools.
+- Only break this rule if the user explicitly asks for technical/debug details.
+</user_facing_voice>
+
 <tool_routing>
 - For generic image generation or editing, default to **GPT Image 2** (\`openai/gpt-image-2\`) unless the user explicitly names another model or the request is the dedicated character-swap workflow.
-- Before the first image generation in a conversation, or whenever a fuzzy model name must be resolved, use listModels to confirm the live model id.
+- Model identifiers are pre-loaded in \`<active_models_snapshot>\` above. Pick from those — do NOT call listModels before every generation. Only call listModels when the user explicitly asks to list or browse available models, or when the pre-loaded snapshot is missing.
 - Use searchVoices when the user asks for a voice by qualities instead of an exact voice id.
 - Use getBrandContext when the user wants on-brand output and the target brand is identifiable.
 - Use listAutomations before controlling an existing automation unless the exact automation id was returned by a tool in this turn.
@@ -220,12 +239,16 @@ interface CreateCreativeAgentOptions {
   model: string
   selectedReferenceContext?: string
   onboardingContext?: string
+  pinnedSkillInstructions?: PinnedSkillInstructionEntry[]
   skillsCatalog?: SkillCatalogEntry[]
   supabase: SupabaseClient
   threadId?: string
   userId: string
   source?: "chat" | "automation" | "resume"
   promptVersion?: PromptVersion
+  /** Pre-fetched active model list to inject into the system prompt so the agent
+   * always has the full catalog in context without needing a listModels tool call. */
+  preloadedModels?: ListedModel[]
 }
 
 interface BuildCreativeAgentInstructionsOptions {
@@ -234,8 +257,31 @@ interface BuildCreativeAgentInstructionsOptions {
   availableAudioReferences: AvailableChatAudioReference[]
   selectedReferenceContext?: string
   onboardingContext?: string
+  pinnedSkillInstructions?: PinnedSkillInstructionEntry[]
   skillsCatalog?: SkillCatalogEntry[]
   promptVersion?: PromptVersion
+  /** Pre-fetched active model list to inject into the system prompt. */
+  preloadedModels?: ListedModel[]
+}
+
+function buildPinnedSkillsAppendix(entries: PinnedSkillInstructionEntry[]) {
+  if (entries.length === 0) {
+    return ""
+  }
+
+  const blocks = entries.map((entry) => {
+    const label = entry.title ? `${entry.title} (\`${entry.slug}\`)` : `\`${entry.slug}\``
+    return `### ${label}\n${entry.instructions}`
+  })
+
+  return `
+
+## Pinned Skills (already active)
+
+These user-pinned skills are already loaded into your instructions for every turn in this chat. Follow them automatically. Do not call **activateSkill** for these slugs unless the user explicitly asks to reload or inspect them.
+
+${blocks.join("\n\n")}
+`.trimEnd()
 }
 
 export function getCreativeAgentInstructions({
@@ -244,8 +290,10 @@ export function getCreativeAgentInstructions({
   availableAudioReferences,
   selectedReferenceContext,
   onboardingContext,
+  pinnedSkillInstructions = [],
   skillsCatalog = [],
   promptVersion,
+  preloadedModels,
 }: BuildCreativeAgentInstructionsOptions): {
   promptVersion: PromptVersion
   promptDefinition: ChatPromptDefinition
@@ -254,6 +302,7 @@ export function getCreativeAgentInstructions({
 } {
   const resolvedPromptVersion = getChatPromptVersion(promptVersion)
   const promptDefinition = getChatPromptDefinition(resolvedPromptVersion)
+  const pinnedSkillsAppendix = buildPinnedSkillsAppendix(pinnedSkillInstructions)
   const skillsAppendix = buildSkillsCatalogAppendix(skillsCatalog)
   const baseAppendix =
     resolvedPromptVersion === "v1"
@@ -270,9 +319,19 @@ export function getCreativeAgentInstructions({
           availableAudioReferences,
           selectedReferenceContext,
           onboardingContext,
+          preloadedModels,
         )
-  const appendix =
-    skillsAppendix.length > 0 ? `${baseAppendix}\n\n${skillsAppendix}` : baseAppendix
+  const appendixParts = [baseAppendix]
+
+  if (pinnedSkillsAppendix.length > 0) {
+    appendixParts.push(pinnedSkillsAppendix)
+  }
+
+  if (skillsAppendix.length > 0) {
+    appendixParts.push(skillsAppendix)
+  }
+
+  const appendix = appendixParts.join("\n\n")
 
   return {
     promptVersion: resolvedPromptVersion,
@@ -291,12 +350,14 @@ export function createCreativeAgent({
   model,
   selectedReferenceContext,
   onboardingContext,
+  pinnedSkillInstructions = [],
   skillsCatalog = [],
   supabase,
   threadId,
   userId,
   source = "chat",
   promptVersion,
+  preloadedModels,
 }: CreateCreativeAgentOptions) {
   const gateway = createAIGatewayProvider()
 
@@ -306,8 +367,10 @@ export function createCreativeAgent({
     availableAudioReferences,
     selectedReferenceContext,
     onboardingContext,
+    pinnedSkillInstructions,
     skillsCatalog,
     promptVersion,
+    preloadedModels,
   })
   const turnStartedAtMs = Date.now()
 

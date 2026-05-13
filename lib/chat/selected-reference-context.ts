@@ -59,7 +59,7 @@ export async function buildSelectedReferenceContext(
   if (assetIds.length > 0) {
     const { data: assetRows, error: assetError } = await supabase
       .from("assets")
-      .select("id, title, asset_type, category, asset_url")
+      .select("id, title, description, asset_type, category, asset_url")
       .eq("user_id", userId)
       .in("id", assetIds)
 
@@ -76,8 +76,13 @@ export async function buildSelectedReferenceContext(
               asset_url: string
               category: string
               title: string
+              description: string | null
             }
-            return `- ${asset.title} (${asset.asset_type}, ${asset.category}): ${asset.asset_url}`
+            const desc =
+              typeof asset.description === "string" && asset.description.trim()
+                ? `\n  Agent context: ${asset.description.trim()}`
+                : ""
+            return `- ${asset.title} (${asset.asset_type}, ${asset.category}): ${asset.asset_url}${desc}`
           })
           .join("\n")}`,
       )

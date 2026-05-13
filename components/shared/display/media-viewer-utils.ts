@@ -111,27 +111,25 @@ export async function copyMediaToClipboard({
   url: string
   kind: FullscreenMediaKind
 }): Promise<"media" | "url"> {
-  if (kind === "image") {
-    try {
-      const response = await fetch(url)
-      if (!response.ok) {
-        throw new Error("Failed to fetch image for clipboard copy")
-      }
-
-      const blob = await response.blob()
-      const canWriteImage =
-        typeof navigator !== "undefined" &&
-        Boolean(navigator.clipboard) &&
-        typeof ClipboardItem !== "undefined" &&
-        blob.type.startsWith("image/")
-
-      if (canWriteImage) {
-        await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
-        return "media"
-      }
-    } catch {
-      // Fall through to URL copy.
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error("Failed to fetch media for clipboard copy")
     }
+
+    const blob = await response.blob()
+    const canWriteMedia =
+      typeof navigator !== "undefined" &&
+      Boolean(navigator.clipboard) &&
+      typeof ClipboardItem !== "undefined" &&
+      (blob.type.startsWith("image/") || blob.type.startsWith("video/"))
+
+    if (canWriteMedia) {
+      await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
+      return "media"
+    }
+  } catch {
+    // Fall through to URL copy.
   }
 
   if (!navigator?.clipboard) {

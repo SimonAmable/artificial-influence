@@ -337,13 +337,14 @@ export function createGenerateImageTool({
 
   return tool({
     description:
-      "Generate or edit an image using any active UniCan image model. Use this when the user explicitly wants an image created now, especially if they name a model, ask for non-Nano output, or want you to use saved asset references. Pass reference images via **referenceIds** (`ref_1`…`ref_N` from the transcript manifest, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or **mediaId** from listRecentGenerations). Deprecated alias: **mediaIds**. Attachments are not auto-included. If this returns **pending**, do not call awaitGeneration unless another tool in this same turn immediately needs the generated result.",
+      "Generate or edit an image using any active UniCan image model. Use this when the user explicitly wants an image created now, especially if they name a model, ask for non-Nano output, or want you to use saved asset references. Pass reference images via **referenceIds** (`ref_1`…`ref_N` from the transcript manifest, `upl_<uuid>` / `gen_<uuid>`, raw UUID, or **mediaId** from listRecentGenerations). Deprecated alias: **mediaIds**. Attachments are not auto-included. If this returns **pending**, do not call awaitGeneration unless another tool in this same turn immediately needs the generated result.\n\n" +
+      "Some models (including GPT Image 2) handle long, structured text well—including **stringified JSON** visual recipes. When the user supplies a full JSON recipe, blueprint, or asks for **full JSON** / **verbatim** / **no condensation**, pass that **entire** string as `prompt` and set **`rawPrompt: true`** so nothing rewrites or shortens it server-side. Do not summarize JSON into prose unless they asked for a shorter prompt.",
     inputSchema: z.object({
       prompt: z
         .string()
         .min(2)
         .describe(
-          "Image brief for the model. If the user gave detailed or explicit wording, or asked for exact/literal use, paste it verbatim (same meaning and phrasing). Only rewrite or expand when the user message was vague and they did not forbid changes.",
+          "Image brief for the model—plain prose or stringified JSON, depending on the model and user intent. If the user gave detailed or explicit wording, a full JSON recipe, or asked for exact/literal/full JSON use, paste it verbatim. Only rewrite or expand when the user message was vague and they did not forbid changes.",
         ),
       modelIdentifier: z
         .string()
@@ -385,7 +386,13 @@ export function createGenerateImageTool({
         .boolean()
         .optional()
         .describe(
-          "Server-side prompt rewrite pass. Omit or false when the user supplied a finished prompt or asked for exact/verbatim/literal/no-rewrite. True only for brief underspecified asks where enhancement is appropriate.",
+          "Server-side prompt rewrite pass. Omit or false when the user supplied a finished prompt or asked for exact/verbatim/literal/no-rewrite. True only for brief underspecified asks where enhancement is appropriate. Ignored when rawPrompt is true.",
+        ),
+      rawPrompt: z
+        .boolean()
+        .optional()
+        .describe(
+          "Literal pass-through: the `prompt` string is sent to the image API with no server-side enhancement or rewriting. Use for stringified JSON visual recipes, copy-pasted prompt packs, or whenever the user asked for full JSON / verbatim / no condensation. When true, overrides enhancePrompt.",
         ),
     }),
     strict: true,
@@ -396,6 +403,7 @@ export function createGenerateImageTool({
       modelIdentifier = DEFAULT_IMAGE_MODEL,
       prompt,
       mediaIds = [],
+      rawPrompt = false,
       referenceIds = [],
       variantCount = 1,
     }) => {
@@ -443,12 +451,14 @@ export function createGenerateImageTool({
       const referenceImageStoragePaths = allReferences
         .map((reference) => reference.storagePath)
         .filter((value): value is string => Boolean(value))
-      const finalPrompt = await maybeEnhancePrompt({
-        modelIdentifier,
-        prompt,
-        referenceImageUrls,
-        shouldEnhance,
-      })
+      const finalPrompt = rawPrompt
+        ? prompt
+        : await maybeEnhancePrompt({
+            modelIdentifier,
+            prompt,
+            referenceImageUrls,
+            shouldEnhance,
+          })
       const provider = String(modelData.provider ?? "").toLowerCase()
       const requiredCredits = Math.max(1, costPerImage * effectiveVariantCount)
 

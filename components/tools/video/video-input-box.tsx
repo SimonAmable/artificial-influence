@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CircleNotch, Plus, FilePlus, X, Sparkle, Check, Waveform } from "@phosphor-icons/react"
+import { Plus, FilePlus, X, Sparkle, Check, Waveform } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import type { Model } from "@/lib/types/models"
 import { PhotoUpload, ImageUpload } from "@/components/shared/upload/photo-upload"
@@ -37,6 +37,7 @@ import {
   isSupportedVideoReferenceAudioFile,
 } from "@/lib/utils/video-reference-audio"
 import { toast } from "sonner"
+import { GenerationLoadingSlots } from "@/components/shared/display/generation-loading-slots"
 
 interface VideoInputBoxProps {
   videoModels: Model[]
@@ -59,6 +60,8 @@ interface VideoInputBoxProps {
   onParametersChange: (params: Record<string, unknown>) => void
   estimatedCredits?: number | null
   isGenerating: boolean
+  /** Active jobs count for compact shimmer tiles (defaults to 1 while isGenerating when omitted). */
+  activeGenerationCount?: number
   onGenerate: () => void
   /** When true, Generate stays enabled while jobs are running (queue concurrent requests). */
   allowConcurrent?: boolean
@@ -98,6 +101,7 @@ export function VideoInputBox({
   onParametersChange,
   estimatedCredits = null,
   isGenerating,
+  activeGenerationCount,
   onGenerate,
   allowConcurrent = false,
   allowOptionsDuringGeneration = false,
@@ -651,6 +655,9 @@ export function VideoInputBox({
     )
     : "Describe the video you want to generate..."
 
+  const displayGenerationSlotCount =
+    activeGenerationCount ?? (isGenerating ? 1 : 0)
+
   const generateButtonEl = (
     <div className="shrink-0">
       <div
@@ -670,10 +677,16 @@ export function VideoInputBox({
         >
           <div className="flex flex-col items-center gap-0.5">
             <span className="text-sm font-semibold">
-              {isGenerating && !allowConcurrent ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <CircleNotch className="size-3 animate-spin" />
-                  Generating...
+              {isGenerating && displayGenerationSlotCount > 0 ? (
+                <span className="inline-flex flex-wrap items-center justify-center gap-2">
+                  <GenerationLoadingSlots
+                    count={displayGenerationSlotCount}
+                    tone="video"
+                    maxVisible={6}
+                  />
+                  <span className="whitespace-nowrap">
+                    {allowConcurrent ? "Generate" : "Generating..."}
+                  </span>
                 </span>
               ) : (
                 "Generate"

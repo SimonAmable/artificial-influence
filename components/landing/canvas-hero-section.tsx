@@ -89,12 +89,19 @@ export function CanvasHeroSection() {
             className="mt-8 flex w-full max-w-3xl flex-row flex-wrap items-center justify-center gap-3"
           >
             <Link href={landingHero.primaryCtaHref}>
-              <Button size="lg" className="w-auto">
+              <Button
+                size="lg"
+                className="w-auto max-md:h-5 max-md:gap-1 max-md:px-3 max-md:text-xs"
+              >
                 {landingHero.primaryCtaLabel}
               </Button>
             </Link>
             <Link href={landingHero.secondaryCtaHref}>
-              <Button variant="outline" size="lg" className="w-auto">
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-auto max-md:h-5 max-md:gap-1 max-md:px-3 max-md:text-xs"
+              >
                 {landingHero.secondaryCtaLabel}
               </Button>
             </Link>

@@ -13,6 +13,7 @@ export interface AssetRecord {
   userId: string
   uploadId?: string | null
   title: string
+  /** Detailed agent-facing context (maintained in the create/edit asset modal only; used for search/tools, not shown in the library grid). */
   description?: string | null
   assetType: AssetType
   category: AssetCategory
@@ -28,7 +29,8 @@ export interface AssetRecord {
 
 export interface CreateAssetInput {
   title: string
-  description?: string
+  /** Rich notes for the creative agent (modal-only UX; persists on the asset). */
+  description?: string | null
   assetType: AssetType
   category: AssetCategory
   visibility: AssetVisibility

@@ -622,7 +622,13 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
           >
             <TabsList
               variant="default"
-              className="!mx-auto grid !h-auto min-h-11 w-full max-w-xl grid-cols-4 gap-1 rounded-4xl border-0 bg-transparent p-1"
+              className={cn(
+                '!mx-auto grid !h-auto min-h-11 w-full max-w-xl grid-cols-4 gap-1 rounded-4xl p-1',
+                'border border-border/65 bg-muted/95',
+                'shadow-[inset_0_2px_6px_rgba(0,0,0,0.10),inset_0_1px_2px_rgba(0,0,0,0.06),inset_0_-1px_1px_rgba(255,255,255,0.35)]',
+                'dark:border-border/45 dark:bg-muted/55',
+                'dark:shadow-[inset_0_2px_12px_rgba(0,0,0,0.55),inset_0_1px_2px_rgba(0,0,0,0.45),inset_0_-1px_0_rgba(255,255,255,0.04)]'
+              )}
             >
               <TabsTrigger
                 value="monthly"
