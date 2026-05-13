@@ -4,8 +4,11 @@ import { ASSET_CATEGORIES, inferStoragePathFromUrl, normalizeTags } from "@/lib/
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { resolveStoredObjectUrl } from "@/lib/uploads/server"
+import { normalizeSameOriginAssetUrl } from "@/lib/assets/normalize-same-origin-asset-url"
 
-function mapAssetRow(row: Record<string, unknown>) {
+function mapAssetRow(row: Record<string, unknown>, siteOrigin: string) {
+  const rawUrl = row.asset_url as string
+  const rawThumb = (row.thumbnail_url as string | null) || null
   return {
     id: row.id as string,
     userId: row.user_id as string,
@@ -16,8 +19,8 @@ function mapAssetRow(row: Record<string, unknown>) {
     category: row.category as AssetCategory,
     visibility: row.visibility as AssetVisibility,
     tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
-    url: row.asset_url as string,
-    thumbnailUrl: (row.thumbnail_url as string | null) || null,
+    url: normalizeSameOriginAssetUrl(rawUrl, siteOrigin),
+    thumbnailUrl: rawThumb ? normalizeSameOriginAssetUrl(rawThumb, siteOrigin) : null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
     sourceNodeType: (row.source_node_type as string | null) || null,
@@ -119,8 +122,9 @@ export async function GET(request: NextRequest) {
       hasMore = offset + rows.length < total
     }
 
+    const siteOrigin = request.nextUrl.origin
     return NextResponse.json({
-      assets: rows.map((row) => mapAssetRow(row as Record<string, unknown>)),
+      assets: rows.map((row) => mapAssetRow(row as Record<string, unknown>, siteOrigin)),
       pagination: {
         limit,
         offset,
@@ -171,6 +175,8 @@ export async function POST(request: NextRequest) {
         ? body.supabaseStoragePath
         : inferStoragePathFromUrl(url)
 
+    const siteOrigin = request.nextUrl.origin
+
     if (typeof body.uploadId === "string" && body.uploadId.trim().length > 0) {
       const { data: uploadRow, error: uploadError } = await supabase
         .from("uploads")
@@ -192,6 +198,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    assetUrl = normalizeSameOriginAssetUrl(assetUrl, siteOrigin)
+    const thumbnailUrl =
+      typeof body.thumbnailUrl === "string" && body.thumbnailUrl.trim().length > 0
+        ? normalizeSameOriginAssetUrl(body.thumbnailUrl.trim(), siteOrigin)
+        : null
+
     const insertData = {
       user_id: user.id,
       title,
@@ -201,7 +213,7 @@ export async function POST(request: NextRequest) {
       visibility,
       tags,
       asset_url: assetUrl,
-      thumbnail_url: typeof body.thumbnailUrl === "string" ? body.thumbnailUrl : null,
+      thumbnail_url: thumbnailUrl,
       upload_id: uploadId,
       supabase_storage_path: supabaseStoragePath,
       source_node_type: typeof body.sourceNodeType === "string" ? body.sourceNodeType : null,
@@ -220,7 +232,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create asset", message: error?.message }, { status: 500 })
     }
 
-    return NextResponse.json({ asset: mapAssetRow(data as Record<string, unknown>) })
+    return NextResponse.json({ asset: mapAssetRow(data as Record<string, unknown>, siteOrigin) })
   } catch (error) {
     console.error("[assets] POST exception:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

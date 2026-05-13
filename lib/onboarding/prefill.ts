@@ -5,7 +5,7 @@ import {
   onboardingInfluencerSchema,
   onboardingPrioritySchema,
   onboardingReferralSourceSchema,
-  onboardingRoleSchema,
+  parseOnboardingRoleFromStorage,
   onboardingTeamSizeSchema,
   onboardingThemeSchema,
   type CompleteOnboardingPayload,
@@ -34,8 +34,8 @@ export function parseStoredOnboardingPrefill(
   const team = onboardingTeamSizeSchema.safeParse(record.teamSize)
   if (team.success) out.teamSize = team.data
 
-  const role = onboardingRoleSchema.safeParse(record.role)
-  if (role.success) out.role = role.data
+  const role = parseOnboardingRoleFromStorage(record.role)
+  if (role !== undefined) out.role = role
 
   const ai = onboardingAiExperienceSchema.safeParse(record.aiExperience)
   if (ai.success) out.aiExperience = ai.data
@@ -69,7 +69,7 @@ export function parseStoredOnboardingPrefill(
       if (parsed.success && !seen.has(parsed.data)) {
         seen.add(parsed.data)
         priorities.push(parsed.data)
-        if (priorities.length >= 3) break
+        if (priorities.length >= 1) break
       }
     }
     if (priorities.length > 0) {

@@ -640,7 +640,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="!fixed !inset-0 !left-0 !top-0 !m-0 !flex !h-screen !w-screen !max-w-none !translate-x-0 !translate-y-0 !flex-col !gap-0 overflow-hidden !rounded-none border-0 !p-0"
+        className="fixed! inset-0! left-0! top-0! m-0! flex! h-dvh! max-h-dvh! w-screen! max-w-none! translate-x-0! translate-y-0! flex-col! gap-0! overflow-y-auto overflow-x-hidden rounded-none! border-0 p-0!"
         aria-describedby="asset-selection-description"
       >
         {/* Header */}
@@ -972,9 +972,9 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                               {generation.prompt}
                             </p>
                             {copiedId === `${generation.id}-prompt` ? (
-                              <Check className="h-3 w-3 flex-shrink-0 text-primary" weight="bold" />
+                              <Check className="h-3 w-3 shrink-0 text-primary" weight="bold" />
                             ) : (
-                              <Copy className="h-3 w-3 flex-shrink-0 opacity-0 group-hover/prompt:opacity-100 transition-opacity" />
+                              <Copy className="h-3 w-3 shrink-0 opacity-0 group-hover/prompt:opacity-100 transition-opacity" />
                             )}
                           </div>
                         )}

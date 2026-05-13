@@ -5,36 +5,34 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
-import { LayoutGroup, motion } from "framer-motion"
+import {
+  AnimatePresence,
+  LayoutGroup,
+  motion,
+  useReducedMotion,
+} from "framer-motion"
 import {
   ArrowLeft,
   ArrowRight,
   Baby,
   Buildings,
-  ChartBar,
   Check,
   Circle,
-  Code,
   Crown,
-  CurrencyDollar,
   Diamond,
   DotsThree,
   Gauge,
-  Gear,
   Globe,
   Hand,
   InstagramLogo,
   Lightning,
   LinkSimple,
-  MagicWand,
   MagnifyingGlass,
-  PencilLine,
   Plus,
   Sliders,
   Sparkle,
   Stack,
   Target,
-  TreeStructure,
   TwitterLogo,
   UploadSimple,
   User,
@@ -48,7 +46,6 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { completeOnboarding } from "@/app/onboarding/actions"
 import {
   BrandKitEditor,
@@ -72,6 +69,8 @@ import {
   FOUNDER_NOTE_TITLE,
 } from "@/lib/onboarding/founder-note"
 import {
+  buildPresetCharacterLibraryDescription,
+  findInfluencerPreset,
   INFLUENCER_PRESETS,
   type InfluencerPreset,
 } from "@/lib/onboarding/influencer-presets"
@@ -106,12 +105,12 @@ const TEAM_OPTIONS: {
   {
     id: "2-20",
     label: "2 – 20",
-    icon: <UsersThree className="size-7" weight="duotone" />,
+    icon: <Users className="size-7" weight="duotone" />,
   },
   {
     id: "21-200",
     label: "21 – 200",
-    icon: <Users className="size-7" weight="duotone" />,
+    icon: <UsersThree className="size-7" weight="duotone" />,
   },
   {
     id: "200+",
@@ -125,18 +124,28 @@ const ROLE_OPTIONS: {
   label: string
   icon: React.ReactNode
 }[] = [
-  { id: "founder", label: "Founder", icon: <Buildings className="size-5" /> },
-  { id: "product", label: "Product", icon: <TreeStructure className="size-5" /> },
-  { id: "designer", label: "Designer", icon: <PencilLine className="size-5" /> },
-  { id: "engineer", label: "Engineer", icon: <Code className="size-5" /> },
-  { id: "consultant", label: "Consultant", icon: <ChartBar className="size-5" /> },
   {
-    id: "marketing_sales",
-    label: "Marketing / Sales",
+    id: "ai_influencer",
+    label: "AI influencer",
+    icon: <Sparkle className="size-5" weight="duotone" />,
+  },
+  {
+    id: "ai_agency",
+    label: "AI agency",
+    icon: <UsersThree className="size-5" weight="duotone" />,
+  },
+  { id: "founder", label: "Founder / owner", icon: <Buildings className="size-5" /> },
+  {
+    id: "marketer",
+    label: "Marketing & growth",
     icon: <Target className="size-5" />,
   },
-  { id: "operations", label: "Operations", icon: <Gear className="size-5" /> },
-  { id: "other", label: "Other", icon: <User className="size-5" /> },
+  {
+    id: "creator",
+    label: "Content creator",
+    icon: <VideoCamera className="size-5" weight="duotone" />,
+  },
+  { id: "other", label: "Other", icon: <DotsThree className="size-5" weight="bold" /> },
 ]
 
 const CREATION_GOAL_OPTIONS: {
@@ -210,40 +219,35 @@ const REFERRAL_OPTIONS: {
   { id: "other", label: "Other", icon: <DotsThree className="size-6" weight="bold" /> },
 ]
 
-const PRIORITY_OPTIONS: {
+const ONBOARDING_PRIORITY_OPTIONS: {
   id: CompleteOnboardingPayload["priorities"][number]
   label: string
+  description: string
   icon: React.ReactNode
 }[] = [
   {
     id: "video_quality",
-    label: "Video quality",
+    label: "Output quality",
+    description: "Sharp visuals, motion, and detail",
     icon: <Diamond className="size-6" weight="duotone" />,
   },
   {
     id: "generation_speed",
-    label: "Fast generation speed",
+    label: "Speed",
+    description: "Get ideas out fast with short waits",
     icon: <Gauge className="size-6" weight="duotone" />,
   },
   {
     id: "ease_of_use",
-    label: "Easy to use",
+    label: "Simplicity",
+    description: "Clear flows without a steep learning curve",
     icon: <Hand className="size-6" weight="duotone" />,
-  },
-  {
-    id: "affordable_pricing",
-    label: "Affordable pricing",
-    icon: <CurrencyDollar className="size-6" weight="duotone" />,
   },
   {
     id: "creative_control",
     label: "Creative control",
+    description: "Fine-grained steering over style and edits",
     icon: <Sliders className="size-6" weight="duotone" />,
-  },
-  {
-    id: "unique_models",
-    label: "Unique AI models",
-    icon: <MagicWand className="size-6" weight="duotone" />,
   },
 ]
 
@@ -347,15 +351,6 @@ function SelectableRowSingle({
   )
 }
 
-type SelectableRowMultiProps = {
-  selected: boolean
-  onToggle: () => void
-  icon: React.ReactNode
-  label: string
-  description?: string
-  compact?: boolean
-}
-
 type CreationGoalMediaTileProps = {
   label: string
   selected: boolean
@@ -410,7 +405,7 @@ function CreationGoalMediaTile({
     >
       <div
         className={cn(
-          "relative aspect-9/16 w-full overflow-hidden rounded-2xl border bg-muted/40 shadow-sm transition",
+          "relative aspect-9/16 w-full max-h-[min(58dvh,calc(100dvh-13rem))] overflow-hidden rounded-2xl border bg-muted/40 shadow-sm transition",
           selected
             ? "border-primary ring-2 ring-primary/50 ring-offset-2 ring-offset-background"
             : "border-border hover:border-primary/35"
@@ -462,57 +457,6 @@ function CreationGoalMediaTile({
           </span>
         ) : null}
       </div>
-    </button>
-  )
-}
-
-function SelectableRowMulti({
-  selected,
-  onToggle,
-  icon,
-  label,
-  description,
-  compact = false,
-}: SelectableRowMultiProps) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={cn(
-        "relative flex w-full items-center overflow-hidden rounded-2xl border bg-card/50 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-ring",
-        compact ? "gap-2.5 px-4 py-3" : "gap-3 px-4 py-3.5",
-        selected ? "border-primary/45" : "border-border"
-      )}
-    >
-      {selected ? (
-        <span className="pointer-events-none absolute inset-px rounded-[calc(theme(borderRadius.2xl)-1px)] bg-primary/12 shadow-[0_0_28px_-2px] shadow-primary/50 ring-1 ring-primary/45" />
-      ) : null}
-      <span
-        className={cn(
-          "relative z-10 shrink-0",
-          selected ? "text-primary" : "text-muted-foreground"
-        )}
-      >
-        {icon}
-      </span>
-      <span className="relative z-10 min-w-0 flex-1">
-        <span
-          className={cn(
-            "block font-medium",
-            selected ? "text-foreground" : "text-muted-foreground"
-          )}
-        >
-          {label}
-        </span>
-        {description ? (
-          <span className="mt-0.5 block text-sm text-muted-foreground">
-            {description}
-          </span>
-        ) : null}
-      </span>
-      {selected ? (
-        <Check className="relative z-10 size-5 shrink-0 text-primary" weight="bold" />
-      ) : null}
     </button>
   )
 }
@@ -715,8 +659,39 @@ export function OnboardingForm({
   const router = useRouter()
   const searchParams = useSearchParams()
   const { resolvedTheme, setTheme } = useTheme()
+  const reduceMotion = useReducedMotion()
   const [step, setStep] = React.useState(0)
+  const stepRef = React.useRef(step)
+  stepRef.current = step
+  /** 1 = forward (exit left, enter from right); -1 = back (mirror). */
+  const [direction, setDirection] = React.useState(1)
   const [pending, setPending] = React.useState(false)
+
+  const stepTransition = reduceMotion
+    ? { duration: 0.12 }
+    : { duration: 0.28, ease: [0.32, 0.72, 0, 1] as const }
+
+  const stepVariants = {
+    initial: (d: number) =>
+      reduceMotion
+        ? { opacity: 0 }
+        : {
+            x: d > 0 ? "22%" : "-22%",
+            opacity: 0,
+            scale: 0.985,
+          },
+    animate: reduceMotion
+      ? { opacity: 1 }
+      : { x: 0, opacity: 1, scale: 1 },
+    exit: (d: number) =>
+      reduceMotion
+        ? { opacity: 0 }
+        : {
+            x: d > 0 ? "-22%" : "22%",
+            opacity: 0,
+            scale: 0.985,
+          },
+  }
 
   const [creationGoals, setCreationGoals] = React.useState<
     CompleteOnboardingPayload["creationGoals"]
@@ -730,7 +705,7 @@ export function OnboardingForm({
   >(() => initialPrefill?.referralSource ?? null)
   const [priorities, setPriorities] = React.useState<
     CompleteOnboardingPayload["priorities"]
-  >(() => initialPrefill?.priorities ?? [])
+  >(() => initialPrefill?.priorities?.slice(0, 1) ?? [])
   const [teamSize, setTeamSize] = React.useState<
     CompleteOnboardingPayload["teamSize"] | null
   >(() => initialPrefill?.teamSize ?? null)
@@ -764,6 +739,8 @@ export function OnboardingForm({
   const [characterDialogInitial, setCharacterDialogInitial] = React.useState<
     React.ComponentProps<typeof CreateAssetDialog>["initial"] | null
   >(null)
+  /** When true, library fields were seeded from a preset (skip AI autofill on open). */
+  const [characterDialogFromPreset, setCharacterDialogFromPreset] = React.useState(false)
   const [characterDialogOpen, setCharacterDialogOpen] = React.useState(false)
   const [characterDialogKey, setCharacterDialogKey] = React.useState(0)
   const [characterUploadBusy, setCharacterUploadBusy] = React.useState(false)
@@ -917,6 +894,8 @@ export function OnboardingForm({
       if (raw !== null && raw !== "") {
         const n = Number.parseInt(raw, 10)
         if (Number.isFinite(n) && n >= 0 && n <= termsStepIndex) {
+          const cur = stepRef.current
+          if (n !== cur) setDirection(n > cur ? 1 : -1)
           setStep(n)
         }
         sessionStorage.removeItem(onboardingOAuthResumeStepKey(userId))
@@ -962,6 +941,7 @@ export function OnboardingForm({
         return []
       })
       setCharacterDialogInitial(null)
+      setCharacterDialogFromPreset(false)
       setCharacterDialogOpen(false)
       setCharacterAssetSaved(false)
       setCharacterOnboardingSkipped(false)
@@ -970,6 +950,8 @@ export function OnboardingForm({
       setInfluencerMode(null)
       setInfluencerPresetId(null)
       setInfluencerBusy(false)
+      const cur = stepRef.current
+      if (cur > termsStepIndex) setDirection(-1)
       setStep((s) => (s > termsStepIndex ? termsStepIndex : s))
     }
   }, [wantsCharacter, termsStepIndex])
@@ -977,6 +959,8 @@ export function OnboardingForm({
   React.useEffect(() => {
     if (!wantsCharacter) return
     const prev = prevOnboardingStepRef.current
+    let cancelPresetToSupabase: (() => void) | undefined
+
     if (step === INFLUENCER_ONBOARDING_STEP && prev === SOCIAL_CONNECT_STEP) {
       const prefillMode = initialPrefill?.aiInfluencer?.mode ?? null
       const prefillPreset = initialPrefill?.aiInfluencer?.presetId ?? null
@@ -988,14 +972,110 @@ export function OnboardingForm({
       setInfluencerBusy(false)
     }
     if (step === CHARACTER_ONBOARDING_STEP && prev === INFLUENCER_ONBOARDING_STEP) {
-      setCharacterDialogInitial(null)
-      setCharacterDialogOpen(false)
       setCharacterAssetSaved(false)
       setCharacterOnboardingSkipped(false)
-      setCharacterUploadBusy(false)
+
+      if (influencerMode === "preset" && influencerPresetId) {
+        const preset = findInfluencerPreset(influencerPresetId)
+        const thumb = preset?.thumbnailUrl?.trim()
+        if (preset && thumb) {
+          let cancelled = false
+          cancelPresetToSupabase = () => {
+            cancelled = true
+          }
+          const tagExtras = ["onboarding", "preset", preset.id] as const
+          setCharacterDialogFromPreset(true)
+          setCharacterDialogInitial(null)
+          setCharacterDialogOpen(false)
+          setCharacterUploadBusy(true)
+
+          void (async () => {
+            try {
+              const fetchUrl = /^https?:\/\//i.test(thumb) ? thumb : thumb.startsWith("/") ? thumb : `/${thumb}`
+              const res = await fetch(fetchUrl)
+              if (!res.ok) {
+                throw new Error(`Could not load preset image (${res.status})`)
+              }
+              const blob = await res.blob()
+              const extFromPath = thumb.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase()
+              const ext =
+                extFromPath === "jpg" || extFromPath === "jpeg"
+                  ? "jpg"
+                  : extFromPath === "webp"
+                    ? "webp"
+                    : "png"
+              const mime =
+                blob.type && blob.type.startsWith("image/")
+                  ? blob.type
+                  : ext === "jpg"
+                    ? "image/jpeg"
+                    : ext === "webp"
+                      ? "image/webp"
+                      : "image/png"
+              const safeId = preset.id.replace(/[^a-z0-9_-]/gi, "_")
+              const file = new File([blob], `${safeId}-preset-reference.${ext}`, { type: mime })
+
+              const uploaded = await uploadFileToSupabase(file, "asset-library")
+              if (cancelled) return
+              if (!uploaded || uploaded.fileType !== "image") {
+                throw new Error(uploaded ? "Only image files are supported for this step." : "Upload failed")
+              }
+
+              setCharacterDialogInitial({
+                url: uploaded.url,
+                assetType: "image",
+                title: preset.assetDefaults.title,
+                description: buildPresetCharacterLibraryDescription(preset),
+                tags: [...preset.assetDefaults.tags, ...tagExtras],
+                category: "character",
+                visibility: "private",
+                uploadId: uploaded.uploadId,
+                supabaseStoragePath: uploaded.storagePath,
+              })
+              setCharacterDialogKey((k) => k + 1)
+              setCharacterDialogOpen(true)
+            } catch (e) {
+              if (!cancelled) {
+                console.error(e)
+                toast.error(
+                  e instanceof Error
+                    ? e.message
+                    : "Could not copy the preset image to your library. Upload your own photo below.",
+                )
+                setCharacterDialogFromPreset(false)
+                setCharacterDialogInitial(null)
+                setCharacterDialogOpen(false)
+              }
+            } finally {
+              setCharacterUploadBusy(false)
+            }
+          })()
+        } else {
+          setCharacterUploadBusy(false)
+          setCharacterDialogFromPreset(false)
+          setCharacterDialogInitial(null)
+          setCharacterDialogOpen(false)
+        }
+      } else {
+        setCharacterUploadBusy(false)
+        setCharacterDialogFromPreset(false)
+        setCharacterDialogInitial(null)
+        setCharacterDialogOpen(false)
+      }
     }
+
     prevOnboardingStepRef.current = step
-  }, [step, wantsCharacter, initialPrefill?.aiInfluencer?.mode, initialPrefill?.aiInfluencer?.presetId])
+    return () => {
+      cancelPresetToSupabase?.()
+    }
+  }, [
+    step,
+    wantsCharacter,
+    influencerMode,
+    influencerPresetId,
+    initialPrefill?.aiInfluencer?.mode,
+    initialPrefill?.aiInfluencer?.presetId,
+  ])
 
   React.useEffect(() => {
     return () => {
@@ -1014,17 +1094,6 @@ export function OnboardingForm({
     setCreationGoals((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
-  }
-
-  const togglePriority = (id: CompleteOnboardingPayload["priorities"][number]) => {
-    setPriorities((prev) => {
-      if (prev.includes(id)) return prev.filter((x) => x !== id)
-      if (prev.length >= 3) {
-        toast.message("Pick at most 3")
-        return prev
-      }
-      return [...prev, id]
-    })
   }
 
   const presignOnboardingSocialOAuthReturn = () => {
@@ -1046,6 +1115,7 @@ export function OnboardingForm({
   }
 
   const socialConnectSkip = () => {
+    setDirection(1)
     setStep(wantsCharacter ? INFLUENCER_ONBOARDING_STEP : brandStepIndex)
   }
 
@@ -1066,6 +1136,7 @@ export function OnboardingForm({
   }, [brandPendingKitId])
 
   const brandSkipToFounder = () => {
+    setDirection(1)
     setStep(founderStepIndex)
   }
 
@@ -1121,6 +1192,7 @@ export function OnboardingForm({
     try {
       const ok = (await brandEditorRef.current?.save()) ?? false
       if (ok) {
+        setDirection(1)
         setStep(founderStepIndex)
       }
     } finally {
@@ -1244,6 +1316,7 @@ export function OnboardingForm({
     setInfluencerPresetId(null)
     setInfluencerPhase("pick")
     setCharacterOnboardingSkipped(false)
+    setDirection(1)
     setStep(CHARACTER_ONBOARDING_STEP)
   }
 
@@ -1253,12 +1326,14 @@ export function OnboardingForm({
     setInfluencerPresetId(null)
     setInfluencerPhase("pick")
     setCharacterOnboardingSkipped(true)
+    setDirection(1)
     setStep(brandStepIndex)
   }
 
   const characterSkipToFounder = () => {
     if (characterUploadBusy) return
     setCharacterOnboardingSkipped(true)
+    setDirection(1)
     setStep(brandStepIndex)
   }
 
@@ -1268,6 +1343,7 @@ export function OnboardingForm({
       return
     }
     setInfluencerMode("preset")
+    setDirection(1)
     setStep(CHARACTER_ONBOARDING_STEP)
   }
 
@@ -1327,6 +1403,7 @@ export function OnboardingForm({
         return
       }
       setInfluencerMode("upload")
+      setDirection(1)
       setStep(CHARACTER_ONBOARDING_STEP)
     } finally {
       setInfluencerBusy(false)
@@ -1339,7 +1416,7 @@ export function OnboardingForm({
     if (step === 2) return aiExperience !== null
     if (step === 3) return fullName.trim().length >= 1
     if (step === 4) return referralSource !== null
-    if (step === 5) return priorities.length >= 1 && priorities.length <= 3
+    if (step === 5) return priorities.length === 1
     if (step === 6) return teamSize !== null && role !== null
     if (step === SOCIAL_CONNECT_STEP) return true
     if (step === brandStepIndex) return false
@@ -1351,12 +1428,22 @@ export function OnboardingForm({
 
   const goNext = () => {
     if (!canGoNext()) return
-    if (step < termsStepIndex) setStep((s) => s + 1)
+    if (step < termsStepIndex) {
+      setDirection(1)
+      setStep((s) => s + 1)
+    }
   }
+
+  /** Single-choice steps: advance immediately after selection (multi-select steps keep manual Continue). */
+  const advanceSingleSelectStep = React.useCallback((fromStep: number) => {
+    setDirection(1)
+    setStep((s) => (s === fromStep ? s + 1 : s))
+  }, [])
 
   const goBack = () => {
     if (step === brandStepIndex) {
       if (brandPhase === "input") {
+        setDirection(-1)
         setStep(wantsCharacter ? CHARACTER_ONBOARDING_STEP : SOCIAL_CONNECT_STEP)
         return
       }
@@ -1372,6 +1459,7 @@ export function OnboardingForm({
       if (influencerBusy) return
       const phase = influencerPhase
       if (phase === "pick") {
+        setDirection(-1)
         setStep(SOCIAL_CONNECT_STEP)
         return
       }
@@ -1383,6 +1471,7 @@ export function OnboardingForm({
       return
     }
     if (step > 0) {
+      setDirection(-1)
       setStep((s) => s - 1)
     }
   }
@@ -1392,7 +1481,7 @@ export function OnboardingForm({
       creationGoals.length < 1 ||
       aiExperience === null ||
       referralSource === null ||
-      priorities.length < 1 ||
+      priorities.length !== 1 ||
       teamSize === null ||
       role === null ||
       !acceptedTerms
@@ -1494,6 +1583,7 @@ export function OnboardingForm({
         }
         return
       }
+      setCharacterDialogFromPreset(false)
       setCharacterDialogInitial({
         url: result.url,
         assetType: "image",
@@ -1513,6 +1603,7 @@ export function OnboardingForm({
     setCharacterAssetSaved(true)
     setCharacterOnboardingSkipped(false)
     setCharacterDialogOpen(false)
+    setDirection(1)
     setStep(brandStepIndex)
   }
 
@@ -1544,7 +1635,18 @@ export function OnboardingForm({
             ) : null}
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col items-center gap-6">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden">
+            <AnimatePresence initial={false} mode="wait" custom={direction}>
+              <motion.div
+                key={step}
+                custom={direction}
+                variants={stepVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={stepTransition}
+                className="flex min-h-0 flex-1 flex-col items-center gap-6"
+              >
             {step === 0 && (
               <div className="flex w-full max-w-md flex-col items-center gap-8 py-4 text-center">
                 <div className="flex size-24 shrink-0 items-center justify-center rounded-full border-2 border-primary/50 bg-card/30 p-4 shadow-[0_0_32px_-4px] shadow-primary/25">
@@ -1608,7 +1710,10 @@ export function OnboardingForm({
                       <SelectableRowSingle
                         key={opt.id}
                         selected={aiExperience === opt.id}
-                        onSelect={() => setAiExperience(opt.id)}
+                        onSelect={() => {
+                          setAiExperience(opt.id)
+                          advanceSingleSelectStep(2)
+                        }}
                         icon={opt.icon}
                         label={opt.label}
                         description={opt.description}
@@ -1631,14 +1736,18 @@ export function OnboardingForm({
                   </p>
                 </div>
                 <div className="w-full max-w-md space-y-2">
-                  <Label htmlFor="onboarding-name" className="text-foreground">
-                    Name
-                  </Label>
                   <Input
                     id="onboarding-name"
+                    aria-label="Your name"
                     autoComplete="name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return
+                      if (e.nativeEvent.isComposing) return
+                      e.preventDefault()
+                      goNext()
+                    }}
                     placeholder="Jane Doe"
                     className="h-12 rounded-xl"
                   />
@@ -1662,7 +1771,10 @@ export function OnboardingForm({
                       <SelectableRowSingle
                         key={opt.id}
                         selected={referralSource === opt.id}
-                        onSelect={() => setReferralSource(opt.id)}
+                        onSelect={() => {
+                          setReferralSource(opt.id)
+                          advanceSingleSelectStep(4)
+                        }}
                         icon={opt.icon}
                         label={opt.label}
                         layoutId={glowId}
@@ -1679,19 +1791,26 @@ export function OnboardingForm({
                   <h1 className="text-2xl font-semibold tracking-tight text-primary">
                     What matters most to you?
                   </h1>
-                  <p className="text-sm text-muted-foreground">Pick up to 3</p>
+                  <p className="text-sm text-muted-foreground">Pick one</p>
                 </div>
-                <div className="flex w-full max-w-md flex-col gap-3">
-                  {PRIORITY_OPTIONS.map((opt) => (
-                    <SelectableRowMulti
-                      key={opt.id}
-                      selected={priorities.includes(opt.id)}
-                      onToggle={() => togglePriority(opt.id)}
-                      icon={opt.icon}
-                      label={opt.label}
-                    />
-                  ))}
-                </div>
+                <LayoutGroup id="onboarding-priority">
+                  <div className="flex w-full max-w-md flex-col gap-3">
+                    {ONBOARDING_PRIORITY_OPTIONS.map((opt) => (
+                      <SelectableRowSingle
+                        key={opt.id}
+                        selected={priorities[0] === opt.id}
+                        onSelect={() => {
+                          setPriorities([opt.id])
+                          advanceSingleSelectStep(5)
+                        }}
+                        icon={opt.icon}
+                        label={opt.label}
+                        description={opt.description}
+                        layoutId={glowId}
+                      />
+                    ))}
+                  </div>
+                </LayoutGroup>
               </>
             )}
 
@@ -1716,7 +1835,13 @@ export function OnboardingForm({
                           <button
                             key={opt.id}
                             type="button"
-                            onClick={() => setTeamSize(opt.id)}
+                            onClick={() => {
+                              setTeamSize(opt.id)
+                              if (role !== null) {
+                                setDirection(1)
+                                setStep(SOCIAL_CONNECT_STEP)
+                              }
+                            }}
                             className="relative overflow-hidden rounded-2xl border border-border bg-card/50 px-2 py-4 text-center outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                           >
                             {teamSize === opt.id && (
@@ -1746,12 +1871,18 @@ export function OnboardingForm({
                       Which role fits you best?
                     </h2>
                     <LayoutGroup id="onboarding-role">
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                         {ROLE_OPTIONS.map((opt) => (
                           <button
                             key={opt.id}
                             type="button"
-                            onClick={() => setRole(opt.id)}
+                            onClick={() => {
+                              setRole(opt.id)
+                              if (teamSize !== null) {
+                                setDirection(1)
+                                setStep(SOCIAL_CONNECT_STEP)
+                              }
+                            }}
                             className="relative overflow-hidden rounded-xl border border-border bg-card/50 px-2 py-3 text-center outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                           >
                             {role === opt.id && (
@@ -1986,7 +2117,9 @@ export function OnboardingForm({
                     Onboard your character
                   </h1>
                   <p className="text-sm text-muted-foreground">
-                    Upload one clear hero photo (face in full view). Next you&apos;ll review details, then we save to your Characters library.
+                    {characterDialogFromPreset
+                      ? "We're copying your preset reference into your account, then opening a full character brief to review. You can still replace the image with your own hero photo below."
+                      : "Upload one clear hero photo (face in full view). Next you&apos;ll review details, then we save to your Characters library."}
                   </p>
                 </div>
                 <input
@@ -2071,7 +2204,7 @@ export function OnboardingForm({
               <>
                 <div className="w-full max-w-lg space-y-1 text-center">
                   <h1 className="text-2xl font-semibold tracking-tight text-primary">
-                    Brand for your ads
+                    Import your product
                   </h1>
                   <p className="text-sm text-muted-foreground">
                     Paste a public link to your site, app store listing, or product page.
@@ -2286,6 +2419,8 @@ export function OnboardingForm({
                 </div>
               </>
             ) : null}
+              </motion.div>
+            </AnimatePresence>
           </div>
 
         </div>
@@ -2549,10 +2684,14 @@ export function OnboardingForm({
           open={characterDialogOpen}
           onOpenChange={setCharacterDialogOpen}
           initial={characterDialogInitial}
-          autofillOnOpen
-          showAutofillButton={false}
+          autofillOnOpen={!characterDialogFromPreset}
+          showAutofillButton={characterDialogFromPreset}
           headerTitle="Review your character"
-          headerDescription="We prefilled details from your photo using AI. Adjust anything, then save to add this character to your library."
+          headerDescription={
+            characterDialogFromPreset
+              ? "We filled in a detailed character brief from your preset (title, description, tags). Tweak anything, or use Autofill to re-analyze the reference image with AI."
+              : "We prefilled details from your photo using AI. Adjust anything, then save to add this character to your library."
+          }
           saveButtonLabel="Save to Characters library"
           onSaved={handleCharacterAssetSaved}
         />

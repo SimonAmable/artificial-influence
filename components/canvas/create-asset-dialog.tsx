@@ -188,7 +188,7 @@ export function CreateAssetDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl">
+      <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-2rem)] flex-col overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {headerTitle ?? (mode === "edit" ? "Edit Asset" : "Create Asset")}
@@ -207,7 +207,7 @@ export function CreateAssetDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <div className="space-y-2">
             <Label>Preview</Label>
             <div className="overflow-hidden rounded-lg border border-border bg-muted/20 p-2">
@@ -276,7 +276,7 @@ export function CreateAssetDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="asset-tags">Tags (comma separated)</Label>
+            <Label htmlFor="asset-tags">Tags (comma separated, optional)</Label>
             <Input
               id="asset-tags"
               value={tagsInput}
@@ -288,7 +288,7 @@ export function CreateAssetDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="asset-description">Agent context (optional)</Label>
+            <Label htmlFor="asset-description">Description (optional)</Label>
             <Textarea
               id="asset-description"
               value={description}
@@ -296,12 +296,12 @@ export function CreateAssetDialog({
               placeholder="Rich notes the creative agent can use when this asset is attached or searched."
               disabled={isAutofilling}
               rows={5}
-              className={cn("min-h-[120px] resize-y", isAutofilling ? "opacity-70" : "")}
+              className={cn("min-h-[120px] max-h-[280px] resize-y", isAutofilling ? "opacity-70" : "")}
             />
           </div>
         </div>
 
-        <DialogFooter className="flex w-full items-center justify-between sm:justify-between">
+        <DialogFooter className="flex w-full shrink-0 items-center justify-between pt-4 sm:justify-between">
           {showAutofillButton ? (
             <Button
               type="button"

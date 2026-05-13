@@ -5,15 +5,41 @@ export const onboardingThemeSchema = z.enum(["light", "dark"])
 export const onboardingTeamSizeSchema = z.enum(["solo", "2-20", "21-200", "200+"])
 
 export const onboardingRoleSchema = z.enum([
+  "ai_influencer",
+  "ai_agency",
   "founder",
-  "product",
-  "designer",
-  "engineer",
-  "consultant",
-  "marketing_sales",
-  "operations",
+  "marketer",
+  "creator",
   "other",
 ])
+
+export type OnboardingRole = z.infer<typeof onboardingRoleSchema>
+
+/**
+ * Maps role strings from older onboarding payloads to the current enum so
+ * `onboarding_json_data` and partial prefill still parse after the role list changed.
+ */
+export const LEGACY_ONBOARDING_ROLE_TO_NEW: Readonly<Record<string, OnboardingRole>> = {
+  product: "marketer",
+  designer: "creator",
+  engineer: "other",
+  consultant: "other",
+  marketing_sales: "marketer",
+  operations: "other",
+}
+
+function preprocessStoredOnboardingRole(input: unknown): unknown {
+  if (typeof input !== "string") return input
+  return LEGACY_ONBOARDING_ROLE_TO_NEW[input] ?? input
+}
+
+/** Parse a stored role string (including legacy values) into the current enum, or undefined. */
+export function parseOnboardingRoleFromStorage(raw: unknown): OnboardingRole | undefined {
+  if (typeof raw !== "string") return undefined
+  const coerced = LEGACY_ONBOARDING_ROLE_TO_NEW[raw] ?? raw
+  const parsed = onboardingRoleSchema.safeParse(coerced)
+  return parsed.success ? parsed.data : undefined
+}
 
 export const onboardingCreationGoalSchema = z.enum([
   "ugc_social",
@@ -92,8 +118,8 @@ export const completeOnboardingPayloadSchema = z.object({
   referralSource: onboardingReferralSourceSchema,
   priorities: z
     .array(onboardingPrioritySchema)
-    .min(1, "Pick at least one priority")
-    .max(3, "Pick at most 3 priorities"),
+    .min(1, "Pick one priority")
+    .max(1, "Pick one priority"),
   aiInfluencer: onboardingInfluencerSchema.optional(),
   characterOnboarding: onboardingCharacterOnboardingSchema.optional(),
   acceptedTerms: z
@@ -104,8 +130,13 @@ export const completeOnboardingPayloadSchema = z.object({
 export type CompleteOnboardingPayload = z.infer<typeof completeOnboardingPayloadSchema>
 
 /** Persisted in profiles.onboarding_json_data (metrics + profile fields snapshot). */
-export const onboardingJsonDataSchema = completeOnboardingPayloadSchema.extend({
-  completedAt: z.string().datetime(),
-})
+export const onboardingJsonDataSchema = completeOnboardingPayloadSchema
+  .omit({ priorities: true, role: true })
+  .extend({
+    /** Legacy rows may include up to 3; new completions store exactly one. */
+    priorities: z.array(onboardingPrioritySchema).min(1).max(3),
+    role: z.preprocess(preprocessStoredOnboardingRole, onboardingRoleSchema),
+    completedAt: z.string().datetime(),
+  })
 
 export type OnboardingJsonData = z.infer<typeof onboardingJsonDataSchema>
