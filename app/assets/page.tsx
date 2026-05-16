@@ -360,7 +360,7 @@ export default function AssetsPage() {
           <div className="min-w-0">
             <h1 className="text-3xl font-bold">Asset Library</h1>
             <p className="text-muted-foreground mt-1 max-w-2xl">
-              Your saved library of reusable references, characters, scenes, textures, thumbnails, motion clips, and audio to drop into any project.
+              Your saved library of reusable references, characters, scenes, textures, thumbnails, shorts clips, and audio to drop into any project.
             </p>
           </div>
           <input

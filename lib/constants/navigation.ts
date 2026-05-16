@@ -28,6 +28,8 @@ export type MegaNavPhosphorIcon =
   | "chat-circle-dots"
   | "robot"
   | "shield-check"
+  | "magnifying-glass"
+  | "download-simple"
 
 export interface MegaNavItem {
   path: string
@@ -271,6 +273,20 @@ export const megaNavGroups: MegaNavGroup[] = [
             iconPhosphor: "microphone",
           },
           {
+            path: "/free-tools/tiktok-reference-downloader",
+            label: "TikTok reference downloader",
+            description: "Fetch an MP4 from a TikTok URL for Motion Control",
+            badge: "new",
+            iconPhosphor: "download-simple",
+          },
+          {
+            path: "/free-tools/tiktok-trend-search",
+            label: "TikTok trend search",
+            description: "Search TikTok clips with sorting and timeframe filters",
+            badge: "new",
+            iconPhosphor: "magnifying-glass",
+          },
+          {
             path: "/free-tools/tiktok-video-fixer",
             label: "TikTok Video Fixer",
             description: "Repair videos for safer TikTok uploads",
@@ -365,6 +381,20 @@ export const megaNavGroups: MegaNavGroup[] = [
         description: "Resize and compress images locally",
         badge: "new",
         iconPhosphor: "image",
+      },
+      {
+        path: "/free-tools/tiktok-reference-downloader",
+        label: "TikTok reference downloader",
+        description: "Download a TikTok clip as MP4 for motion transfer",
+        badge: "new",
+        iconPhosphor: "download-simple",
+      },
+      {
+        path: "/free-tools/tiktok-trend-search",
+        label: "TikTok trend search",
+        description: "Filter TikTok search by popularity and date",
+        badge: "new",
+        iconPhosphor: "magnifying-glass",
       },
       {
         path: "/free-tools/tiktok-video-fixer",

@@ -1,8 +1,8 @@
 # Scripts
 
-## create_motion_assets.py
+## create_shorts_assets.py
 
-Creates motion asset records from a folder of video files. Uses an LLM to infer a short name from each filename. Outputs JSON with **title only** (no description, no tags); all assets are motion category.
+Creates shorts-category asset records from a folder of video files. Uses an LLM to infer a short name from each filename. Outputs JSON with **title only** (no description, no tags); all assets are shorts category.
 
 ### Setup
 
@@ -16,10 +16,10 @@ Set `OPENAI_API_KEY` in your environment for LLM name inference.
 
 ```bash
 # With LLM (recommended)
-python scripts/create_motion_assets.py path/to/videos -o motion_assets.json
+python scripts/create_shorts_assets.py path/to/videos -o shorts_assets.json
 
 # Without LLM (uses sanitized filename)
-python scripts/create_motion_assets.py path/to/videos --no-llm -o motion_assets.json
+python scripts/create_shorts_assets.py path/to/videos --no-llm -o shorts_assets.json
 ```
 
 ### Output
@@ -28,7 +28,7 @@ JSON array of assets, each with:
 - `title`, LLM-inferred or sanitized name
 - `filePath`, full path to file
 - `fileName`, basename
-- `category`, always `"motion"`
+- `category`, always `"shorts"`
 - `assetType`, always `"video"`
 
 Import the output into your asset library or use it for bulk upload workflows.

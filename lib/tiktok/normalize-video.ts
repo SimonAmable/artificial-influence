@@ -18,6 +18,9 @@ const PUBLIC_BUCKET = "public-bucket"
 
 export const TIKTOK_COMPATIBLE_MIME_TYPE = "video/mp4"
 export const TIKTOK_COMPATIBILITY_PROFILE = "MP4, H.264, AAC, yuv420p, faststart"
+/** Saved when FFmpeg normalization fails but the source bytes still upload to Storage. */
+export const TIKTOK_REFERENCE_RAW_PROFILE = "MP4 (stored as-is, no re-encode)" as const
+export const TIKTOK_REFERENCE_IMAGE_PROFILE = "Image collection (stored as-is)" as const
 
 type NormalizeTikTokVideoResult = {
   buffer: Buffer
@@ -32,7 +35,17 @@ type NormalizeTikTokVideoUploadResult = {
   storagePath: string
   fileName: string
   mimeType: typeof TIKTOK_COMPATIBLE_MIME_TYPE
-  profile: typeof TIKTOK_COMPATIBILITY_PROFILE
+  profile: string
+  sizeBytes: number
+  reused: boolean
+}
+
+type NormalizeTikTokImageUploadResult = {
+  publicUrl: string
+  storagePath: string
+  fileName: string
+  mimeType: string
+  profile: string
   sizeBytes: number
   reused: boolean
 }
@@ -44,6 +57,14 @@ function sanitizeTikTokOutputFileName(fileName: string) {
 
 function buildStoragePath(userId: string, sourceHash: string) {
   return `${userId}/autopost/tiktok-compatible/${sourceHash}-${TIKTOK_NORMALIZATION_VERSION}.mp4`
+}
+
+function buildTikTokReferenceRawStoragePath(userId: string, sourceHash: string) {
+  return `${userId}/tiktok-references/${sourceHash}-source.mp4`
+}
+
+function buildTikTokReferenceImageRawStoragePath(userId: string, sourceHash: string, extension: string) {
+  return `${userId}/tiktok-references/slides/${sourceHash}.${extension}`
 }
 
 function bufferFromBytes(bytes: ArrayBuffer | Buffer) {
@@ -69,8 +90,26 @@ function runFfmpeg(ffmpegPath: string, args: string[], cwd?: string) {
   })
 }
 
-async function readSourceBufferFromUrl(mediaUrl: string) {
-  const response = await fetch(mediaUrl, { cache: "no-store" })
+type DownloadedSource = {
+  buffer: Buffer
+  contentType: string | null
+}
+
+async function readSourceBufferFromUrl(mediaUrl: string): Promise<DownloadedSource> {
+  const headers: HeadersInit = {}
+  try {
+    const parsedUrl = new URL(mediaUrl)
+    if (parsedUrl.hostname === "api.apify.com") {
+      const apifyToken = process.env.APIFY_API_TOKEN?.trim()
+      if (apifyToken) {
+        headers.Authorization = `Bearer ${apifyToken}`
+      }
+    }
+  } catch {
+    /* malformed URL surfaced by fetch below */
+  }
+
+  const response = await fetch(mediaUrl, { cache: "no-store", headers })
   if (!response.ok) {
     throw new Error(`Could not download the source video (${response.status}).`)
   }
@@ -84,7 +123,11 @@ async function readSourceBufferFromUrl(mediaUrl: string) {
     throw new Error("The source video is too large to normalize for TikTok.")
   }
 
-  return buffer
+  const contentType = response.headers.get("content-type")
+  return {
+    buffer,
+    contentType,
+  }
 }
 
 export async function normalizeTikTokVideoBuffer(input: {
@@ -179,9 +222,9 @@ export async function normalizeTikTokVideoUrlToStorage(input: {
   supabase: SupabaseClient
   fileName?: string
 }): Promise<NormalizeTikTokVideoUploadResult> {
-  const sourceBuffer = await readSourceBufferFromUrl(input.mediaUrl)
+  const source = await readSourceBufferFromUrl(input.mediaUrl)
   const normalized = await normalizeTikTokVideoBuffer({
-    bytes: sourceBuffer,
+    bytes: source.buffer,
     fileName: input.fileName ?? "video.mp4",
   })
 
@@ -210,6 +253,110 @@ export async function normalizeTikTokVideoUrlToStorage(input: {
     mimeType: normalized.mimeType,
     profile: normalized.profile,
     sizeBytes: normalized.buffer.byteLength,
+    reused: alreadyExists,
+  }
+}
+
+/** Upload fetched bytes without FFmpeg (fallback when TikTok-compat transcode fails). */
+export async function uploadTikTokReferenceVideoRawToStorage(input: {
+  mediaUrl: string
+  userId: string
+  supabase: SupabaseClient
+  fileName?: string
+}): Promise<NormalizeTikTokVideoUploadResult> {
+  const source = await readSourceBufferFromUrl(input.mediaUrl)
+  const sourceBuffer = source.buffer
+  const sourceHash = createHash("sha256").update(sourceBuffer).digest("hex")
+  const storagePath = buildTikTokReferenceRawStoragePath(input.userId, sourceHash)
+  const storageClient = createServiceRoleClient() ?? input.supabase
+  const bucket = storageClient.storage.from(PUBLIC_BUCKET)
+
+  const existing = await bucket.exists(storagePath)
+  const alreadyExists = !existing.error && Boolean(existing.data)
+
+  if (!alreadyExists) {
+    const upload = await bucket.upload(storagePath, sourceBuffer, {
+      contentType: TIKTOK_COMPATIBLE_MIME_TYPE,
+      upsert: false,
+    })
+    if (upload.error) {
+      throw new Error(`Could not upload the TikTok reference video: ${upload.error.message}`)
+    }
+  }
+
+  const publicUrl = bucket.getPublicUrl(storagePath).data.publicUrl
+  const baseName =
+    sanitizeTikTokOutputFileName(input.fileName?.trim() ? input.fileName : "tiktok-reference.mp4")
+
+  return {
+    publicUrl,
+    storagePath,
+    fileName: baseName,
+    mimeType: TIKTOK_COMPATIBLE_MIME_TYPE,
+    profile: TIKTOK_REFERENCE_RAW_PROFILE,
+    sizeBytes: sourceBuffer.byteLength,
+    reused: alreadyExists,
+  }
+}
+
+function normalizeImageMimeType(contentType: string | null) {
+  const value = contentType?.split(";")[0]?.trim().toLowerCase() ?? ""
+  if (value === "image/jpeg" || value === "image/jpg") return "image/jpeg"
+  if (value === "image/png") return "image/png"
+  if (value === "image/webp") return "image/webp"
+  return "image/jpeg"
+}
+
+function inferImageExtension(mimeType: string, mediaUrl: string) {
+  if (mimeType === "image/png") return "png"
+  if (mimeType === "image/webp") return "webp"
+  try {
+    const path = new URL(mediaUrl).pathname.toLowerCase()
+    if (path.endsWith(".png")) return "png"
+    if (path.endsWith(".webp")) return "webp"
+  } catch {
+    /* noop */
+  }
+  return "jpg"
+}
+
+export async function uploadTikTokReferenceImageRawToStorage(input: {
+  mediaUrl: string
+  userId: string
+  supabase: SupabaseClient
+  fileName?: string
+}): Promise<NormalizeTikTokImageUploadResult> {
+  const source = await readSourceBufferFromUrl(input.mediaUrl)
+  const sourceHash = createHash("sha256").update(source.buffer).digest("hex")
+  const mimeType = normalizeImageMimeType(source.contentType)
+  const extension = inferImageExtension(mimeType, input.mediaUrl)
+  const storagePath = buildTikTokReferenceImageRawStoragePath(input.userId, sourceHash, extension)
+  const storageClient = createServiceRoleClient() ?? input.supabase
+  const bucket = storageClient.storage.from(PUBLIC_BUCKET)
+
+  const existing = await bucket.exists(storagePath)
+  const alreadyExists = !existing.error && Boolean(existing.data)
+
+  if (!alreadyExists) {
+    const upload = await bucket.upload(storagePath, source.buffer, {
+      contentType: mimeType,
+      upsert: false,
+    })
+    if (upload.error) {
+      throw new Error(`Could not upload the TikTok slideshow image: ${upload.error.message}`)
+    }
+  }
+
+  const publicUrl = bucket.getPublicUrl(storagePath).data.publicUrl
+  const finalName = input.fileName?.trim() ? input.fileName.trim() : `tiktok-slide.${extension}`
+
+  return {
+    publicUrl,
+    storagePath,
+    fileName: finalName,
+    mimeType,
+    profile: TIKTOK_REFERENCE_IMAGE_PROFILE,
+    sizeBytes: source.buffer.byteLength,
     reused: alreadyExists,
   }
 }

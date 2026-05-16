@@ -26,9 +26,9 @@ function inferMediaType(assetType: AssetType, url: string): string {
 }
 
 function narrativeGuidance(category: AssetCategory, assetType: AssetType): string {
-  const motion =
-    category === "motion"
-      ? "This asset is categorized as MOTION: write a detailed description of movement over time—tempo, choreography, body mechanics, gestures, transitions, camera motion, framing changes, energy, and notable beats. If the media is short, infer likely intent."
+  const shorts =
+    category === "shorts"
+      ? "This asset is categorized as SHORTS: write a detailed description of movement over time—tempo, choreography, body mechanics, gestures, transitions, camera motion, framing changes, energy, and notable beats. If the media is short, infer likely intent."
       : ""
   const character =
     category === "character"
@@ -50,7 +50,7 @@ function narrativeGuidance(category: AssetCategory, assetType: AssetType): strin
         ? "Use the video (visuals and motion; note audio if present)."
         : "Use the image pixels."
 
-  return [motion, character, scene, element, modality].filter(Boolean).join("\n\n")
+  return [shorts, character, scene, element, modality].filter(Boolean).join("\n\n")
 }
 
 export async function POST(request: NextRequest) {
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       schema: z.object({
         title: z.string().describe("A concise, user-facing title for this asset. Max 5 words."),
         category: z
-          .enum(["character", "scene", "motion", "element"])
+          .enum(["character", "scene", "shorts", "element"])
           .describe("The best matching category for this asset."),
         tags: z.array(z.string()).describe("Up to 5 relevant tags describing the asset."),
         description: z

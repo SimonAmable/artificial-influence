@@ -19,7 +19,7 @@ interface CreateSaveGenerationAsAssetToolOptions {
 const CATEGORY_KEYWORDS: Record<AssetCategory, string[]> = {
   character: ["person", "portrait", "character", "model", "woman", "man", "avatar", "face"],
   scene: ["scene", "environment", "interior", "room", "landscape", "background", "street", "set"],
-  motion: ["motion", "animate", "animation", "cinematic", "camera move", "walk cycle", "shorts", "reel", "tiktok", "vertical", "ugc", "hook", "youtube short"],
+  shorts: ["motion", "animate", "animation", "cinematic", "camera move", "walk cycle", "shorts", "reel", "tiktok", "vertical", "ugc", "hook", "youtube short"],
   element: [
     "audio", "voice", "song", "music", "narration", "podcast", "sound",
     "product", "packaging", "bottle", "jar", "can", "mockup", "ecommerce", "shoe", "watch",
@@ -63,7 +63,7 @@ function inferCategory(type: AssetType, prompt: string): AssetCategory {
   const normalizedPrompt = prompt.toLowerCase()
 
   if (type === "audio") return "element"
-  if (type === "video") return "motion"
+  if (type === "video") return "shorts"
 
   for (const category of ["element", "scene", "character"] as const) {
     if (CATEGORY_KEYWORDS[category].some((keyword) => normalizedPrompt.includes(keyword))) {
@@ -99,9 +99,9 @@ function buildAgentContextDescription({
   }
 
   switch (category) {
-    case "motion":
+    case "shorts":
       lines.push(
-        "Agent context: Use as a motion/video reference—match movement, rhythm, camera dynamics, and energy. Identity or exact likeness may come from separate character or face assets.",
+        "Agent context: Use as a shorts/video reference—match movement, rhythm, camera dynamics, and energy. Identity or exact likeness may come from separate character or face assets.",
       )
       break
     case "character":
@@ -214,7 +214,7 @@ export function createSaveGenerationAsAssetTool({
 }: CreateSaveGenerationAsAssetToolOptions) {
   return tool({
     description:
-      "Save a completed generation as a reusable library asset. Only use this after the user clearly confirms they want that generation saved. If the user does not specify metadata, choose a sensible category, title, and rich agent-context description (see the description field): motion = detailed movement/camera/pacing; character = generalized styling and vibe without hyper-specific face detail; scene/element analogous.",
+      "Save a completed generation as a reusable library asset. Only use this after the user clearly confirms they want that generation saved. If the user does not specify metadata, choose a sensible category, title, and rich agent-context description (see the description field): shorts = detailed movement/camera/pacing for vertical or reference clips; character = generalized styling and vibe without hyper-specific face detail; scene/element analogous.",
     inputSchema: z.object({
       generationId: z
         .string()
@@ -224,7 +224,7 @@ export function createSaveGenerationAsAssetTool({
         .boolean()
         .describe("Must be true only after the user explicitly confirmed they want this generation saved as an asset."),
       category: z
-        .enum(["character", "scene", "motion", "element"])
+        .enum(["character", "scene", "shorts", "element"])
         .optional()
         .describe("Optional asset category. If omitted, infer the best fit."),
       title: z
@@ -237,7 +237,7 @@ export function createSaveGenerationAsAssetTool({
         .max(8000)
         .optional()
         .describe(
-          "Rich agent-context notes (editable later in the asset modal; not shown on the library grid). Motion: movement, rhythm, camera. Character: generalized look—pair with face assets for likeness. If omitted, build from prompt + category.",
+          "Rich agent-context notes (editable later in the asset modal; not shown on the library grid). Shorts: movement, rhythm, camera. Character: generalized look—pair with face assets for likeness. If omitted, build from prompt + category.",
         ),
       visibility: z
         .enum(["private", "public"])

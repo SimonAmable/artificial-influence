@@ -46,3 +46,14 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# build / lint artifact files (never commit these)
+lint-errors.txt
+ts-errors.txt
+build-output.txt
+temp_*.html
+temp_*.json
+.next-dev.*.log
+
+# misc generated
+skills-lock.json

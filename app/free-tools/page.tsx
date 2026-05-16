@@ -2,7 +2,9 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import {
   ArrowRight,
+  DownloadSimple,
   ImageSquare,
+  MagnifyingGlass,
   ShieldCheck,
   VideoCamera,
   MagicWand,
@@ -31,6 +33,21 @@ const freeTools = [
     description: "Resize and compress images locally before uploading or publishing.",
     badge: "Free",
     icon: ImageSquare,
+  },
+  {
+    href: "/free-tools/tiktok-reference-downloader",
+    label: "TikTok & Instagram Downloader",
+    description:
+      "Turn a TikTok or Instagram post/reel URL into a hosted file you can copy or open in Motion Control (signed-in).",
+    badge: "New",
+    icon: DownloadSimple,
+  },
+  {
+    href: "/free-tools/tiktok-trend-search",
+    label: "TikTok trend search",
+    description: "Search TikTok video results with sort and date filters for inspiration clips (signed-in).",
+    badge: "New",
+    icon: MagnifyingGlass,
   },
   {
     href: "/free-tools/tiktok-video-fixer",

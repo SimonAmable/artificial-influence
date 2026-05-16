@@ -139,6 +139,12 @@ if (newBalance === -1) {
 // Proceed with feature usage
 ```
 
+## TikTok reference tools (Apify)
+
+Server routes under `/api/tiktok-references/*` power the TikTok downloader and trend search pages. Configure:
+
+- **`APIFY_API_TOKEN`** — server-only Apify secret; never expose to the browser or client bundles.
+
 ## Troubleshooting
 
 ### Credits not being granted

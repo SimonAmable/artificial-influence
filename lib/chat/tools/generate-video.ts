@@ -16,7 +16,7 @@ import { resolveToolAudioReferences } from "@/lib/chat/resolve-tool-audio-refere
 import { resolveToolImageReferences } from "@/lib/chat/resolve-tool-references"
 import { resolveToolVideoReferences } from "@/lib/chat/resolve-tool-video-references"
 
-const DEFAULT_TEXT_TO_VIDEO_MODEL = "kwaivgi/kling-v2.6" as const
+const DEFAULT_TEXT_TO_VIDEO_MODEL = "prunaai/p-video" as const
 const DEFAULT_MOTION_COPY_MODEL = "kwaivgi/kling-v3-motion-control" as const
 const MAX_REFERENCE_IMAGES = 4
 const MAX_REFERENCE_VIDEOS = 2
@@ -259,7 +259,7 @@ export function createGenerateVideoTool({
         .min(1)
         .max(120)
         .optional()
-        .describe("Active video model identifier. Defaults to kling-v2.6, or kwaivgi/kling-v3-motion-control (Kling 3.0 motion copy) when both image and video references are present."),
+        .describe("Active video model identifier. Defaults to prunaai/p-video, or kwaivgi/kling-v3-motion-control (Kling 3.0 motion copy) when both image and video references are present."),
       assetIds: z
         .array(z.string().uuid())
         .max(6)

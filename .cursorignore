@@ -1,0 +1,28 @@
+# Build & lint artifacts — never useful for AI context
+lint-errors.txt
+ts-errors.txt
+build-output.txt
+*.tsbuildinfo
+
+# Temporary / dumped files
+temp_*.html
+temp_*.json
+
+# Dev server logs
+.next-dev.*.log
+
+# Next.js build output
+.next/
+
+# Dependencies
+node_modules/
+remotion-renderer/node_modules/
+
+# Archived SQL scripts (not canonical -- see supabase/migrations/ instead)
+supabase/manual/
+
+# Agent skill reference bundles (large third-party markdown packs)
+.agents/skills/ai-elements/references/
+
+# Env files (secrets)
+.env*

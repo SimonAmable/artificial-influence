@@ -49,7 +49,7 @@ export const FALLBACK_ONBOARDING_LEARN_AUTOMATION: OnboardingLearnAutomation = {
   promptPayload: FALLBACK_PROMPT_PAYLOAD,
   cronSchedule: "0 0 9 * * *",
   timezone: "America/Toronto",
-  model: "xai/grok-4.1-fast-non-reasoning",
+  model: "xai/grok-4.3",
   isActive: true,
   lastRunAt: "2026-04-19 04:41:05.641+00",
   nextRunAt: "2026-04-19 13:00:00+00",

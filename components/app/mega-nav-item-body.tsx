@@ -4,9 +4,11 @@ import Image from "next/image"
 import { ClockCounterClockwise } from "@phosphor-icons/react"
 import {
   ChatCircleDots,
+  DownloadSimple,
   FilmStrip,
   FlowArrow,
   Image as ImageIcon,
+  MagnifyingGlass,
   Microphone as MicrophoneIcon,
   PaintBrush as PaintBrushIcon,
   Robot as RobotIcon,
@@ -32,6 +34,8 @@ const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
   "chat-circle-dots": ChatCircleDots,
   robot: RobotIcon,
   "shield-check": ShieldCheck,
+  "magnifying-glass": MagnifyingGlass,
+  "download-simple": DownloadSimple,
 }
 
 function getBadgeClasses(badge: MegaNavBadge) {

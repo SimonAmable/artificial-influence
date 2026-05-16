@@ -4,7 +4,7 @@ import type { GoogleLanguageModelOptions } from "@ai-sdk/google"
  * Creative chat model tiers routed through Vercel AI Gateway.
  * Canonical model ids stay server-facing while UI only shows tier labels.
  * @see https://vercel.com/ai-gateway/models/gemini-2.5-flash
- * @see https://vercel.com/ai-gateway/models/grok-4.1-fast-reasoning
+ * @see https://vercel.com/ai-gateway/models/grok-4.3
  * @see https://vercel.com/ai-gateway/models/gemini-3.1-flash-lite-preview
  */
 export const DEFAULT_CHAT_GATEWAY_MODEL = "google/gemini-3.1-flash-lite-preview" as const
@@ -42,14 +42,17 @@ export const CHAT_GATEWAY_MODEL_OPTIONS: readonly ChatGatewayModelOption[] = [
     },
   },
   {
-    id: "xai/grok-4.1-fast-reasoning",
+    id: "xai/grok-4.3",
     tier: "balanced",
     label: "Balanced",
     description: "The best mix of speed and depth for most conversations and creative work.",
     iconPath: "/logo-balanced.svg",
-    legacyIds: ["xai/grok-4.1-fast-non-reasoning"],
-    // Do not pass reasoningEffort for Grok 4.x / 4.1: xAI rejects unsupported models with
-    // "Invalid arguments passed to the model" (reasoning is intrinsic to these variants).
+    legacyIds: [
+      "xai/grok-4.1-fast-reasoning",
+      "xai/grok-4.1-fast-non-reasoning",
+    ],
+    // Do not pass reasoningEffort for Grok via Gateway unless documented: xAI may reject
+    // unsupported provider options with "Invalid arguments passed to the model".
   },
   {
     id: "google/gemini-3.1-flash-lite-preview",

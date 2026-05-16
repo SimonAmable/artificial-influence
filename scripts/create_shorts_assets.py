@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Create motion asset records from a folder of video files.
+Create shorts-category asset records from a folder of video files.
 Uses an LLM to infer a short name from each filename.
-Output: JSON with title only (no description, no tags), all assets are motion category.
+Output: JSON with title only (no description, no tags), all assets are shorts category.
 
 Usage:
-  python scripts/create_motion_assets.py <folder_path> [-o output.json]
+  python scripts/create_shorts_assets.py <folder_path> [-o output.json]
 
 Requires: OPENAI_API_KEY in environment
 """
@@ -27,10 +27,10 @@ VIDEO_EXT = {".mp4", ".mov", ".webm", ".avi", ".mkv", ".m4v"}
 
 def infer_name_with_llm(filename: str, client: OpenAI) -> str:
     """Use LLM to infer a short asset name from the filename."""
-    prompt = f"""Given this motion/video filename: {filename}
+    prompt = f"""Given this shorts/video filename: {filename}
 
 Infer a short, descriptive asset name (2-6 words). Consider:
-- Motion type (dance, walk, gesture, etc.)
+- Movement type (dance, walk, gesture, etc.)
 - Style or context if hinted by filename
 - No filename extension or paths
 
@@ -51,10 +51,10 @@ Return ONLY the asset name, nothing else. No quotes, no description."""
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Create motion assets from folder. LLM infers names; outputs title only (no description/tags)."
+        description="Create shorts assets from folder. LLM infers names; outputs title only (no description/tags)."
     )
     parser.add_argument("folder", type=str, help="Path to folder containing video files")
-    parser.add_argument("-o", "--output", type=str, default="motion_assets.json", help="Output JSON file")
+    parser.add_argument("-o", "--output", type=str, default="shorts_assets.json", help="Output JSON file")
     parser.add_argument("--no-llm", action="store_true", help="Use sanitized filename as name (skip LLM)")
     args = parser.parse_args()
 
@@ -89,7 +89,7 @@ def main() -> int:
             "title": name,
             "filePath": str(f),
             "fileName": f.name,
-            "category": "motion",
+            "category": "shorts",
             "assetType": "video",
         })
 
@@ -97,7 +97,7 @@ def main() -> int:
     with open(out_path, "w", encoding="utf-8") as out:
         json.dump(assets, out, indent=2)
 
-    print(f"\nWrote {len(assets)} motion assets to {out_path}")
+    print(f"\nWrote {len(assets)} shorts assets to {out_path}")
     return 0
 
 

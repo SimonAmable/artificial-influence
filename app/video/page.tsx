@@ -200,6 +200,22 @@ function VideoPageContent() {
     }
   }, [searchParams])
 
+  const hasLoadedReferenceVideoFromUrl = React.useRef(false)
+  React.useEffect(() => {
+    if (hasLoadedReferenceVideoFromUrl.current) return
+
+    const referenceVideoUrl = searchParams.get("referenceVideoUrl")
+    if (!referenceVideoUrl) return
+
+    if (
+      referenceVideoUrl.startsWith("http://") ||
+      referenceVideoUrl.startsWith("https://")
+    ) {
+      setInputVideo({ url: referenceVideoUrl })
+      hasLoadedReferenceVideoFromUrl.current = true
+    }
+  }, [searchParams])
+
   // Initialize parameters when model changes; keep aspect ratio if the new model supports the same option.
   React.useEffect(() => {
     if (!selectedModel) return
