@@ -54,10 +54,8 @@ function MentionTokenSpan({
       data-mention-end={String(end)}
       title={refItem.label}
       className={cn(
-        "inline-flex max-w-max shrink-0 items-baseline gap-0 whitespace-nowrap rounded-md py-px pr-0.5 [line-height:inherit] [box-decoration-break:clone]",
-        isBrand
-          ? "bg-violet-500/20 text-violet-300 ring-1 ring-inset ring-violet-500/25"
-          : "bg-muted/80 text-foreground ring-1 ring-inset ring-border/40"
+        "rounded-sm [line-height:inherit] [box-decoration-break:clone]",
+        isBrand ? "bg-violet-500/20 text-violet-300" : "bg-muted/70 text-foreground"
       )}
     >
       {/** Visible @ by default; hidden on hover while the remove control draws in the same slot. */}

@@ -28,6 +28,7 @@ import { toast } from "sonner"
 
 import type { AutopostJobMetadata } from "@/lib/autopost/types"
 import { ensureJpegForInstagramFeed } from "@/lib/autopost/convert-image-for-instagram"
+import { isTikTokDirectPostFeatureEnabled } from "@/lib/tiktok/direct-post-feature"
 import type { InstagramSavedProfile } from "@/lib/instagram/profile"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import {
@@ -787,6 +788,13 @@ export function AutopostPage() {
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const searchParams = useSearchParams()
   const hasHandledAuthParams = React.useRef(false)
+  const tikTokDirectPostEnabled = isTikTokDirectPostFeatureEnabled()
+
+  React.useEffect(() => {
+    if (!tikTokDirectPostEnabled && tiktokMode === "direct") {
+      setTikTokMode("upload")
+    }
+  }, [tikTokDirectPostEnabled, tiktokMode])
 
   const localComposerMediaItems = React.useMemo<ComposerMediaItem[]>(
     () =>
@@ -2103,7 +2111,10 @@ export function AutopostPage() {
           href: null,
           avatarUrl: connection.avatarUrl ?? profile?.avatar_url,
           status: connection.status,
-          meta: hasScope(connection, "video.publish") ? "Direct Post ready" : "Profile connected",
+          meta:
+            tikTokDirectPostEnabled && hasScope(connection, "video.publish")
+              ? "Direct Post ready"
+              : "Profile connected",
           secondaryMeta: `${connection.providerAccountId.slice(0, 12)}...`,
           refreshId: null,
           disconnectId: connection.id,
@@ -2490,7 +2501,19 @@ export function AutopostPage() {
                   <div className="grid gap-2 sm:grid-cols-3">
                     <div className="space-y-2">
                       <Label htmlFor="autopost-tiktok-mode">TikTok action</Label>
-                      <Select value={tiktokMode} onValueChange={(value) => setTikTokMode(value as TikTokMode)}>
+                      <Select
+                        value={tiktokMode}
+                        onValueChange={(value) => {
+                          if (value === "direct" && !tikTokDirectPostEnabled) {
+                            toast.info("Coming soon: TikTok Direct Post", {
+                              description:
+                                "For now, use “Send to inbox draft” — content opens in TikTok as a draft so you can review and publish from the app.",
+                            })
+                            return
+                          }
+                          setTikTokMode(value as TikTokMode)
+                        }}
+                      >
                         <SelectTrigger id="autopost-tiktok-mode" className="w-full">
                           <SelectValue />
                         </SelectTrigger>

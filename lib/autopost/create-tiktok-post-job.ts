@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import type { AutopostJobMetadata } from "@/lib/autopost/types"
 import { isUserPublicBucketMediaUrl } from "@/lib/autopost/validate-media-url"
+import { isTikTokDirectPostFeatureEnabled } from "@/lib/tiktok/direct-post-feature"
 
 export type PrepareTikTokPostAction = "draft" | "schedule"
 export type TikTokPostMode = "upload" | "direct"
@@ -82,6 +83,13 @@ export async function createTikTokPostJob({
 }): Promise<CreateTikTokPostJobResult> {
   const connectionId = input.tiktokConnectionId?.trim()
   const mode = input.mode === "direct" ? "direct" : "upload"
+  if (mode === "direct" && !isTikTokDirectPostFeatureEnabled()) {
+    return {
+      ok: false,
+      message: "TikTok Direct Post is not available yet. Use Send to inbox draft instead.",
+      statusCode: 400,
+    }
+  }
   const postType = input.postType === "photo" ? "photo" : "video"
   const caption = input.caption?.trim() || null
   const description = input.description?.trim() || null

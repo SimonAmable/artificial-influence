@@ -13,6 +13,7 @@ import {
   TikTokApiError,
 } from "@/lib/tiktok/publish"
 import { normalizeTikTokVideoUrlToStorage } from "@/lib/tiktok/normalize-video"
+import { isTikTokDirectPostFeatureEnabled } from "@/lib/tiktok/direct-post-feature"
 import { getValidTikTokAccessToken } from "@/lib/tiktok/token-service"
 
 export type PublishAutopostJobResult =
@@ -178,6 +179,13 @@ async function publishTikTokAutopostJob(
   const metadata = parseMetadata(row.metadata)
   const postType = getTikTokPostType(row)
   const mode = getTikTokMode(row)
+  if (mode === "direct" && !isTikTokDirectPostFeatureEnabled()) {
+    return {
+      ok: false,
+      error: "TikTok Direct Post is not enabled. Save as an inbox draft or contact support when this feature ships.",
+      statusCode: 400,
+    }
+  }
   const requiredScope = mode === "direct" ? "video.publish" : "video.upload"
 
   let token

@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto"
 import { NextResponse } from "next/server"
 
+import { resolveTikTokOAuthScopeParam } from "@/lib/tiktok/oauth-scopes"
 import { resolveTikTokOAuthRedirectUri } from "@/lib/tiktok/oauth-redirect"
 import {
   parseSocialOAuthReturnPath,
@@ -10,7 +11,6 @@ import { createClient } from "@/lib/supabase/server"
 
 const OAUTH_STATE_COOKIE = "tiktok_oauth_state"
 const TIKTOK_OAUTH_URL = "https://www.tiktok.com/v2/auth/authorize/"
-const TIKTOK_V1_SCOPE = "user.info.basic,user.info.profile,user.info.stats,video.list,video.publish,video.upload"
 
 export async function GET(request: Request) {
   try {
@@ -36,11 +36,12 @@ export async function GET(request: Request) {
     }
 
     const state = randomBytes(24).toString("base64url")
+    const scope = resolveTikTokOAuthScopeParam()
     const params = new URLSearchParams({
       client_key: clientKey,
       redirect_uri: redirectUri,
       response_type: "code",
-      scope: TIKTOK_V1_SCOPE,
+      scope,
       state,
     })
 
