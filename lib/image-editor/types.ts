@@ -19,9 +19,16 @@ export interface BrushSettings {
   opacity: number
 }
 
+/** Horizontal alignment for image editor text (Fabric `textAlign`). */
+export type EditorTextAlign = "left" | "center" | "right"
+
 export interface TextSettings {
   fontSize: number
   fontFamily: string
+  textAlign: EditorTextAlign
+  /** Text outline width in px (0 = no outline). */
+  textStrokeWidth: number
+  textStrokeColor: string
 }
 
 export interface ShapeSettings {
@@ -79,6 +86,9 @@ export type ImageEditorAction =
   | { type: "SET_BRUSH_OPACITY"; opacity: number }
   | { type: "SET_TEXT_SIZE"; size: number }
   | { type: "SET_TEXT_FONT"; fontFamily: string }
+  | { type: "SET_TEXT_ALIGN"; textAlign: EditorTextAlign }
+  | { type: "SET_TEXT_STROKE_WIDTH"; width: number }
+  | { type: "SET_TEXT_STROKE_COLOR"; color: string }
   | { type: "SET_SHAPE_STROKE_WIDTH"; width: number }
   | { type: "SET_RECTANGLE_FILLED"; filled: boolean }
   | { type: "LOAD_IMAGE"; url: string }

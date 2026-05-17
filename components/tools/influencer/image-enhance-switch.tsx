@@ -8,7 +8,7 @@ import { Sparkle } from "@phosphor-icons/react"
 export interface ImageEnhanceSwitchProps {
   checked: boolean
   onCheckedChange: (checked: boolean) => void
-  /** "page" = full label; "toolbar" = short label, compact */
+  /** Reserved for layout variants; label is icon-only below `sm`. */
   variant?: "page" | "toolbar"
   className?: string
   id?: string
@@ -17,12 +17,10 @@ export interface ImageEnhanceSwitchProps {
 export function ImageEnhanceSwitch({
   checked,
   onCheckedChange,
-  variant = "page",
+  variant: _variant = "page",
   className,
   id = "image-enhance-switch",
 }: ImageEnhanceSwitchProps) {
-  const isToolbar = variant === "toolbar"
-
   return (
     <Toggle
       id={id}
@@ -34,12 +32,12 @@ export function ImageEnhanceSwitch({
         "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary/30",
         "data-[state=on]:hover:bg-primary/90 data-[state=on]:hover:text-primary-foreground",
         "aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/90",
-        isToolbar ? "gap-1.5" : "gap-1.5",
+        "gap-1.5",
         className
       )}
     >
       <Sparkle className="size-3.5 shrink-0" weight={checked ? "fill" : "regular"} />
-      <span className="text-xs font-medium">{isToolbar ? "Enhance" : "Enhance"}</span>
+      <span className="hidden text-xs font-medium sm:inline">Enhance</span>
     </Toggle>
   )
 }

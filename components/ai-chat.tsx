@@ -45,6 +45,7 @@ export function AIChat() {
 
 function AIChatSidebar() {
   const router = useRouter()
+  const pathname = usePathname()
   const [open, setOpen] = React.useState(false)
   const [authReady, setAuthReady] = React.useState(false)
   const [userId, setUserId] = React.useState<string | null>(null)
@@ -64,15 +65,35 @@ function AIChatSidebar() {
     }
   }, [])
 
+  const toggleSidebarOpen = React.useCallback(() => {
+    setOpen((prev) => {
+      const next = !prev
+      if (!next) {
+        setHasHydratedStoredThread(false)
+        setIsHydratingThread(false)
+      }
+      return next
+    })
+  }, [])
+
+  React.useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("chat-visibility", { detail: { open } }),
+    )
+  }, [open])
+
   React.useEffect(() => {
     const handleOpen = () => setSidebarOpen(true)
+    const handleToggle = () => toggleSidebarOpen()
 
     window.addEventListener("chat-open", handleOpen as EventListener)
+    window.addEventListener("chat-toggle", handleToggle as EventListener)
 
     return () => {
       window.removeEventListener("chat-open", handleOpen as EventListener)
+      window.removeEventListener("chat-toggle", handleToggle as EventListener)
     }
-  }, [setSidebarOpen])
+  }, [setSidebarOpen, toggleSidebarOpen])
 
   React.useEffect(() => {
     if (!open) {
@@ -234,9 +255,14 @@ function AIChatSidebar() {
     router.push("/chat")
   }, [router, setSidebarOpen])
 
+  const hideFloatingChatLauncher =
+    pathname === "/image-editor" ||
+    pathname === "/inpaint" ||
+    pathname?.startsWith("/image-editor/")
+
   return (
     <>
-      {!open ? (
+      {!open && !hideFloatingChatLauncher ? (
         <Button
           onClick={() => setSidebarOpen(true)}
           className="fixed right-6 bottom-6 z-60 h-14 w-14 rounded-full shadow-depth-l"

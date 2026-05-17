@@ -21,10 +21,64 @@ const ROW_H = 44
 const LIST_H = 280
 const LIST_W = 332
 
+/** Sentinel: current font is from the Google list, not a device-font option */
+const GOOGLE_LIST_SENTINEL = "__brand_font_picker_google_list__"
+
+export type BrandFontPickerSystemFontOption = {
+  label: string
+  fontFamilyCss: string
+}
+
+function primaryFontFaceFromCss(fontFamilyCss: string): string {
+  const token = fontFamilyCss.split(",")[0]?.trim() ?? ""
+  if (
+    (token.startsWith('"') && token.endsWith('"')) ||
+    (token.startsWith("'") && token.endsWith("'"))
+  ) {
+    return token.slice(1, -1)
+  }
+  return token
+}
+
+function fontStacksEqual(a: string, b: string): boolean {
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/['"]/g, "")
+      .replace(/\s*,\s*/g, ",")
+      .replace(/\s+/g, " ")
+      .trim()
+  return norm(a) === norm(b)
+}
+
+function matchSystemFontOption(
+  rawValue: string | undefined,
+  options: readonly BrandFontPickerSystemFontOption[] | undefined,
+): BrandFontPickerSystemFontOption | null {
+  if (!options?.length || !rawValue?.trim()) return null
+  const v = rawValue.trim()
+  const vl = v.toLowerCase()
+  for (const o of options) {
+    if (o.label.trim().toLowerCase() === vl) return o
+  }
+  const vPrimary = primaryFontFaceFromCss(v).toLowerCase()
+  for (const o of options) {
+    if (o.label.trim().toLowerCase() === vPrimary) return o
+  }
+  for (const o of options) {
+    const op = primaryFontFaceFromCss(o.fontFamilyCss).toLowerCase()
+    if (op === vPrimary || op === vl) return o
+  }
+  for (const o of options) {
+    if (fontStacksEqual(v, o.fontFamilyCss)) return o
+  }
+  return null
+}
+
 type VirtualFontRowData = {
   filtered: GoogleFont[]
   value?: string
-  onPick: (family: string) => void
+  onPick: (font: GoogleFont) => void
 }
 
 function VirtualFontRow({
@@ -43,7 +97,7 @@ function VirtualFontRow({
       <FontRow
         font={font}
         isSelected={isSelected}
-        onSelect={() => onPick(font.family)}
+        onSelect={() => onPick(font)}
       />
     </div>
   )
@@ -85,9 +139,15 @@ function FontRow({
 
 export type BrandFontPickerProps = {
   value?: string
-  onChange: (fontFamily: string) => void
+  onChange: (
+    fontFamily: string,
+    font?: GoogleFont,
+    systemFontCss?: string,
+  ) => void
   className?: string
   showFilters?: boolean
+  /** Local / web-safe stacks; shown as a compact select above the Google list */
+  systemFontOptions?: readonly BrandFontPickerSystemFontOption[]
 }
 
 export function BrandFontPicker({
@@ -95,6 +155,7 @@ export function BrandFontPicker({
   onChange,
   className,
   showFilters = true,
+  systemFontOptions,
 }: BrandFontPickerProps) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
@@ -127,9 +188,26 @@ export function BrandFontPicker({
     }
   }, [])
 
+  const valuePrimary = React.useMemo(
+    () => (value?.trim() ? primaryFontFaceFromCss(value.trim()) : ""),
+    [value],
+  )
+
+  const matchedSystemFont = React.useMemo(
+    () => matchSystemFontOption(value, systemFontOptions),
+    [systemFontOptions, value],
+  )
+
+  const googleListSelectedFamily = React.useMemo(() => {
+    if (!value?.trim() || matchedSystemFont) return undefined
+    return valuePrimary || undefined
+  }, [value, valuePrimary, matchedSystemFont])
+
   React.useEffect(() => {
-    if (value && open) void loadFont(value)
-  }, [value, open])
+    if (!value?.trim() || !open || matchedSystemFont) return
+    const face = valuePrimary || value.trim()
+    void loadFont(face)
+  }, [value, open, matchedSystemFont, valuePrimary])
 
   const categories = React.useMemo(() => {
     const u = new Set(fonts.map((f) => f.category))
@@ -146,9 +224,13 @@ export function BrandFontPicker({
     })
   }, [fonts, search, category, showFilters])
 
+  const triggerLabel =
+    matchedSystemFont?.label ??
+    (value?.trim() ? valuePrimary || value.trim() : undefined)
+
   const onPick = React.useCallback(
-    (family: string) => {
-      onChange(family)
+    (font: GoogleFont) => {
+      onChange(font.family, font)
       setOpen(false)
     },
     [onChange],
@@ -167,7 +249,9 @@ export function BrandFontPicker({
             className,
           )}
         >
-          <span className="min-w-0 truncate text-left">{value || "Select font…"}</span>
+          <span className="min-w-0 truncate text-left">
+            {triggerLabel ?? "Select font…"}
+          </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -182,20 +266,59 @@ export function BrandFontPicker({
             onChange={(e) => setSearch(e.target.value)}
             className="border-zinc-700 bg-zinc-900 text-sm"
           />
-          {showFilters ? (
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="h-9 border-zinc-700 bg-zinc-900 text-xs">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All categories</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {showFilters || (systemFontOptions && systemFontOptions.length > 0) ? (
+            <div className="flex w-full flex-row gap-2">
+              {showFilters ? (
+                <div className="min-w-0 flex-1">
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger className="h-9 w-full border-zinc-700 bg-zinc-900 text-xs">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All categories</SelectItem>
+                      {categories.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+              {systemFontOptions && systemFontOptions.length > 0 ? (
+                <div className="min-w-0 flex-1">
+                  <Select
+                    value={matchedSystemFont?.label ?? GOOGLE_LIST_SENTINEL}
+                    onValueChange={(v) => {
+                      if (v === GOOGLE_LIST_SENTINEL) return
+                      const opt = systemFontOptions.find((o) => o.label === v)
+                      if (opt) {
+                        onChange(opt.label, undefined, opt.fontFamilyCss)
+                        setOpen(false)
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-9 w-full border-zinc-700 bg-zinc-900 text-xs">
+                      <SelectValue placeholder="Device / web fonts" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={GOOGLE_LIST_SENTINEL}>
+                        Google Fonts (list below)
+                      </SelectItem>
+                      {systemFontOptions.map((o) => (
+                        <SelectItem
+                          key={o.label}
+                          value={o.label}
+                          style={{ fontFamily: o.fontFamilyCss }}
+                        >
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+            </div>
           ) : null}
           <p className="text-[10px] text-zinc-500">{filtered.length} fonts</p>
           {loading ? (
@@ -216,7 +339,7 @@ export function BrandFontPicker({
               rowHeight={ROW_H}
               rowProps={{
                 filtered,
-                value,
+                value: googleListSelectedFamily,
                 onPick,
               }}
               overscanCount={8}

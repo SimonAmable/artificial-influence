@@ -4,6 +4,7 @@ import type {
   ImageEditorState,
   TextSettings,
   ShapeSettings,
+  EditorTextAlign,
 } from "./types"
 
 // Tool definitions for toolbar
@@ -26,7 +27,10 @@ export const DEFAULT_BRUSH_SETTINGS: BrushSettings = {
 
 export const DEFAULT_TEXT_SETTINGS: TextSettings = {
   fontSize: 24,
-  fontFamily: "Inter, sans-serif",
+  fontFamily: '"Inter", sans-serif',
+  textAlign: "center",
+  textStrokeWidth: 5,
+  textStrokeColor: "#000000",
 }
 
 export const DEFAULT_SHAPE_SETTINGS: ShapeSettings = {
@@ -114,5 +118,8 @@ export const SHAPE_DEFAULTS = {
 export const TEXT_DEFAULTS = {
   fill: "#ffffff",
   fontSize: 24,
-  fontFamily: "Inter, sans-serif",
+  fontFamily: '"Inter", sans-serif',
+  textAlign: "center" as EditorTextAlign,
+  textStrokeWidth: 5,
+  textStrokeColor: "#000000",
 }

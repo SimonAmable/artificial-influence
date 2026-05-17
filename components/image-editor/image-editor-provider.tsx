@@ -59,6 +59,24 @@ function imageEditorReducer(
         textSettings: { ...state.textSettings, fontFamily: action.fontFamily },
       }
 
+    case "SET_TEXT_ALIGN":
+      return {
+        ...state,
+        textSettings: { ...state.textSettings, textAlign: action.textAlign },
+      }
+
+    case "SET_TEXT_STROKE_WIDTH":
+      return {
+        ...state,
+        textSettings: { ...state.textSettings, textStrokeWidth: action.width },
+      }
+
+    case "SET_TEXT_STROKE_COLOR":
+      return {
+        ...state,
+        textSettings: { ...state.textSettings, textStrokeColor: action.color },
+      }
+
     case "SET_SHAPE_STROKE_WIDTH":
       return {
         ...state,

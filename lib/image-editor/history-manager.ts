@@ -1,4 +1,11 @@
-import type { Canvas as FabricCanvas } from "fabric"
+import type { Canvas as FabricCanvas, Textbox } from "fabric"
+import {
+  applyTextStrokeAppearance,
+  ensureEditorTextboxHaloPatch,
+  getEffectiveTextStrokeColor,
+  getLogicalTextStrokeWidth,
+  type EditorTextboxWithHalo,
+} from "@/lib/image-editor/text-stroke-appearance"
 
 /**
  * Serializes the current canvas state to JSON string
@@ -7,7 +14,9 @@ export function serializeCanvas(canvas: FabricCanvas): string {
   const canvasWithCustomSerializer = canvas as FabricCanvas & {
     toJSON: (propertiesToInclude?: string[]) => unknown
   }
-  return JSON.stringify(canvasWithCustomSerializer.toJSON(["id", "name", "layerId"]))
+  return JSON.stringify(
+    canvasWithCustomSerializer.toJSON(["id", "name", "layerId", "editorTextStrokeWidth"])
+  )
 }
 
 /**
@@ -20,7 +29,19 @@ export async function deserializeCanvas(
   return new Promise((resolve, reject) => {
     try {
       const json = JSON.parse(state)
+      ensureEditorTextboxHaloPatch()
       canvas.loadFromJSON(json).then(() => {
+        canvas.forEachObject((obj) => {
+          if (obj.type !== "textbox" && obj.type !== "i-text") return
+          const t = obj as Textbox
+          const logical = getLogicalTextStrokeWidth(t as EditorTextboxWithHalo)
+          if (logical <= 0) return
+          const color = getEffectiveTextStrokeColor(
+            t as EditorTextboxWithHalo,
+            "#000000"
+          )
+          applyTextStrokeAppearance(t, logical, color)
+        })
         canvas.renderAll()
         resolve()
       }).catch(reject)

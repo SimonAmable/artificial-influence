@@ -310,11 +310,6 @@ export function ImageEditorPromptBar({
 
           finalPrompt = `${finalPrompt}\n\nThe first reference image is the clean base. The second reference image is the edited composite with accessories/overlays. Apply the edit intent from the composite while preserving identity and realism.`
 
-          if (exports?.hadMask) {
-            finalPrompt = `${finalPrompt}\n\nEdit only the masked area from the provided mask image. Preserve everything outside the mask exactly unchanged.`
-            formData.append("hasMask", "true")
-          }
-
           formData.append("prompt", finalPrompt)
           formData.append("n", "1")
           formData.append("aspect_ratio", selectedAspectRatio)
@@ -345,14 +340,6 @@ export function ImageEditorPromptBar({
               "composite-image.png"
             )
             formData.append("referenceImages", compositeFile)
-          }
-
-          if (exports?.maskDataUrl) {
-            const maskFile = await dataUrlToFile(
-              exports.maskDataUrl,
-              "mask-image.png"
-            )
-            formData.append("referenceImages", maskFile)
           }
 
           referenceFiles.forEach((file) => {

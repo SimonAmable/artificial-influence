@@ -102,7 +102,7 @@ export function ImageEditorEmptyState({ className }: ImageEditorEmptyStateProps)
   return (
     <div
       className={cn(
-        "absolute inset-0 flex items-center justify-center z-10 bg-transparent",
+        "absolute inset-0 flex items-center justify-center z-10 bg-transparent rounded-xl border-2 border-dashed border-border/60",
         isDragging && "ring-2 ring-inset ring-primary/40 rounded-xl",
         className
       )}

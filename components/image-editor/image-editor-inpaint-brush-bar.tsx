@@ -12,12 +12,26 @@ export function ImageEditorInpaintBrushBar({
   className,
   /** Sits beside the toolbar: same chrome height, no shadow */
   inline = false,
+  /** Inpaint tab uses "Mask"; full editor uses "Mask" for lasso vs "Stroke" for brush */
+  sizeLabel = "Brush",
+  /** aria / slider label */
+  sliderAriaLabel,
 }: {
   className?: string
   inline?: boolean
+  sizeLabel?: "Brush" | "Mask" | "Stroke"
+  sliderAriaLabel?: string
 }) {
   const { state, setBrushSize } = useImageEditor()
   const size = state.brushSettings.size
+
+  const aria =
+    sliderAriaLabel ??
+    (sizeLabel === "Mask"
+      ? "Mask brush size"
+      : sizeLabel === "Stroke"
+        ? "Paint brush size"
+        : "Brush size")
 
   return (
     <div
@@ -29,7 +43,9 @@ export function ImageEditorInpaintBrushBar({
         className
       )}
     >
-      <span className="text-xs font-medium text-muted-foreground shrink-0">Brush</span>
+      <span className="text-xs font-medium text-muted-foreground shrink-0">
+        {sizeLabel}
+      </span>
       <Slider
         value={[size]}
         min={MIN}
@@ -37,7 +53,7 @@ export function ImageEditorInpaintBrushBar({
         step={1}
         onValueChange={([v]) => setBrushSize(v)}
         className="flex-1 py-1"
-        aria-label="Mask brush size"
+        aria-label={aria}
       />
       <span className="text-xs tabular-nums text-foreground w-9 text-right shrink-0">
         {size}px

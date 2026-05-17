@@ -27,7 +27,7 @@ function InpaintPageContent() {
   }
 
   return (
-    <main className="h-screen w-full min-w-0 bg-background p-2 sm:p-4 pt-20 overflow-hidden flex flex-col">
+    <main className="flex h-screen min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background px-2 pb-2 pt-[52px] sm:px-4 sm:pb-4">
       <ImageEditor
         initialImage={initialImage}
         mode="page"
@@ -41,7 +41,7 @@ function InpaintPageContent() {
 export default function InpaintPage() {
   return (
     <React.Suspense
-      fallback={<main className="h-screen w-full bg-background p-4 pt-20" />}
+      fallback={<main className="flex h-screen min-h-0 w-full flex-col bg-background px-4 pb-4 pt-[52px]" />}
     >
       <InpaintPageContent />
     </React.Suspense>

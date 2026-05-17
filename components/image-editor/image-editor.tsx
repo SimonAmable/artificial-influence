@@ -1,7 +1,9 @@
 "use client"
 
 import * as React from "react"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ImageEditorProvider, useImageEditor } from "./image-editor-provider"
 import { ImageEditorCanvas } from "./image-editor-canvas"
 import { ImageEditorToolbar } from "./image-editor-toolbar"
@@ -10,9 +12,12 @@ import { ImageEditorInpaintBrushBar } from "./image-editor-inpaint-brush-bar"
 import { ImageEditorLayers } from "./image-editor-layers"
 import { ImageEditorPromptBar } from "./image-editor-prompt-bar"
 import { ImageEditorEmptyState } from "./image-editor-empty-state"
+import { ImageEditorGoogleFontsLink } from "./image-editor-google-fonts-link"
 import { uploadEditedImage } from "@/lib/image-editor/export-utils"
 import { KEYBOARD_SHORTCUTS } from "@/lib/image-editor/constants"
 import type { ImageEditorProps, EditorTool } from "@/lib/image-editor/types"
+
+type EditorSurfaceTab = "inpaint" | "image-editor"
 
 // Inner component that uses the context
 function ImageEditorInner({
@@ -23,11 +28,113 @@ function ImageEditorInner({
   className,
   variant = "full",
 }: ImageEditorProps) {
-  const { state, setTool, undo, redo } = useImageEditor()
-  const { currentImage, showLayers, canvas } = state
+  const pathname = usePathname()
+  const { state, setTool, setMaskMode, undo, redo, dispatch } = useImageEditor()
+  const { currentImage, showLayers, canvas, activeTool } = state
   const [isFullscreen, setIsFullscreen] = React.useState(false)
   const [isGenerating, setIsGenerating] = React.useState(false)
+  const [surfaceTab, setSurfaceTab] = React.useState<EditorSurfaceTab>("inpaint")
+  const [sidebarChatOpen, setSidebarChatOpen] = React.useState(false)
+  const [generateBarOpen, setGenerateBarOpen] = React.useState(true)
   const containerRef = React.useRef<HTMLDivElement>(null)
+
+  /** `/inpaint` and `/image-editor` pages use two tabs; this selects full tools vs inpaint-only */
+  const splitInpaintPage = mode === "page" && variant === "inpaint"
+  const fullEditorSurface =
+    variant === "full" || (splitInpaintPage && surfaceTab === "image-editor")
+
+  /** Inpaint tab or standalone inpaint — mask / lasso workflow */
+  const inpaintMaskSurface =
+    variant === "inpaint" && (!splitInpaintPage || surfaceTab === "inpaint")
+
+  const showColorLayersStrip = fullEditorSurface || inpaintMaskSurface
+
+  const showInpaintTabBrushBar =
+    variant === "inpaint" && (!splitInpaintPage || surfaceTab === "inpaint")
+
+  const showFullSurfaceStrokeBar =
+    fullEditorSurface &&
+    activeTool === "brush" &&
+    !(variant === "inpaint" && surfaceTab === "inpaint")
+
+  const canvasBottomPadding = React.useMemo(() => {
+    if (sidebarChatOpen) return "pb-52 sm:pb-60"
+    if (fullEditorSurface && !generateBarOpen) return "pb-28 sm:pb-36"
+    return "pb-40 sm:pb-48"
+  }, [fullEditorSurface, generateBarOpen, sidebarChatOpen])
+
+  const toolCanvasHint = React.useMemo(() => {
+    if (inpaintMaskSurface && activeTool === "lasso") {
+      return "Paint on the canvas to define the inpaint mask."
+    }
+    if (!fullEditorSurface) return null
+    switch (activeTool) {
+      case "rectangle":
+      case "arrow":
+        return "Drag on the canvas to draw."
+      case "text":
+        return "Drag to set text width; the box stays centered on your click."
+      case "brush":
+        return "Paint on the canvas."
+      case "lasso":
+        return null
+      case "image":
+        return "Choose an image to add as a layer."
+      case "select":
+        return null
+      default: {
+        const _never: never = activeTool
+        return _never
+      }
+    }
+  }, [activeTool, fullEditorSurface, inpaintMaskSurface])
+
+  React.useLayoutEffect(() => {
+    if (!pathname) return
+    if (pathname.includes("/image-editor")) {
+      setSurfaceTab("image-editor")
+    } else if (pathname.includes("/inpaint")) {
+      setSurfaceTab("inpaint")
+    }
+  }, [pathname])
+
+  React.useEffect(() => {
+    const onChatVisibility = (e: Event) => {
+      const detail = (e as CustomEvent<{ open?: boolean }>).detail
+      if (typeof detail?.open === "boolean") {
+        setSidebarChatOpen(detail.open)
+      }
+    }
+    window.addEventListener("chat-visibility", onChatVisibility as EventListener)
+    return () =>
+      window.removeEventListener(
+        "chat-visibility",
+        onChatVisibility as EventListener,
+      )
+  }, [])
+
+  React.useEffect(() => {
+    if (!splitInpaintPage) return
+    if (surfaceTab === "image-editor") {
+      setTool("select")
+      if (!showLayers) {
+        dispatch({ type: "TOGGLE_LAYERS" })
+      }
+    } else {
+      setTool("lasso")
+      setMaskMode("add")
+      if (showLayers) {
+        dispatch({ type: "TOGGLE_LAYERS" })
+      }
+    }
+  }, [
+    dispatch,
+    setMaskMode,
+    setTool,
+    showLayers,
+    splitInpaintPage,
+    surfaceTab,
+  ])
 
   // Track if we have an image (either initial or loaded)
   const hasImage = !!(currentImage || initialImage)
@@ -87,10 +194,16 @@ function ImageEditorInner({
         shortcut !== "redo" &&
         shortcut !== "delete"
       ) {
-        if (variant === "inpaint" && shortcut !== "lasso") {
+        if (!fullEditorSurface && variant === "inpaint" && shortcut !== "lasso") {
+          return
+        }
+        if (fullEditorSurface && shortcut === "lasso") {
           return
         }
         e.preventDefault()
+        if (shortcut === "lasso") {
+          setMaskMode("add")
+        }
         setTool(shortcut as EditorTool)
         return
       }
@@ -99,15 +212,33 @@ function ImageEditorInner({
       if (e.key === "Escape") {
         if (isFullscreen) {
           setIsFullscreen(false)
-        } else if (mode === "modal" && onClose) {
+          return
+        }
+        if (mode === "modal" && onClose) {
           onClose()
+          return
+        }
+        if (fullEditorSurface) {
+          e.preventDefault()
+          setTool("select")
         }
       }
     }
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [undo, redo, setTool, isFullscreen, mode, onClose, toggleFullscreen, variant])
+  }, [
+    fullEditorSurface,
+    undo,
+    redo,
+    setTool,
+    setMaskMode,
+    isFullscreen,
+    mode,
+    onClose,
+    toggleFullscreen,
+    variant,
+  ])
 
   // Handle fullscreen change
   React.useEffect(() => {
@@ -140,28 +271,91 @@ function ImageEditorInner({
         className
       )}
     >
-      {/* Top-left: color UI (inpaint brush lives on the bottom toolbar row) */}
-      {variant === "full" && (
-        <div className="absolute left-4 top-4 z-20">
-          <ImageEditorColorPicker />
-        </div>
-      )}
-
-      {/* Right side: Layers/object panel - hidden on mobile */}
-      {variant === "full" && showLayers && (
-        <div className="absolute right-4 top-4 z-20 hidden md:block">
-          <ImageEditorLayers />
-        </div>
-      )}
-
       {/* Main canvas area - always render canvas so it can receive images */}
       <div
         className={cn(
-          "flex-1 min-h-0 min-w-0 relative px-2 sm:px-4 md:px-6 py-4 sm:py-6 pb-52 sm:pb-60",
-          variant === "inpaint" ? "pt-4 sm:pt-6" : "pt-16 sm:pt-20"
+          "relative flex min-h-0 w-full min-w-0 flex-1 flex-col px-2 py-4 sm:px-4 sm:py-6 md:px-6",
+          canvasBottomPadding
         )}
       >
-        <div className="relative h-full w-full rounded-xl  overflow-hidden">
+        {mode === "page" && variant === "inpaint" && (
+          <div className="mb-3 flex w-full shrink-0 justify-center">
+            <Tabs
+              value={surfaceTab}
+              onValueChange={(v) => setSurfaceTab(v as EditorSurfaceTab)}
+              className="mx-auto flex w-full max-w-md flex-col items-stretch sm:max-w-lg"
+            >
+              <TabsList
+                variant="default"
+                className={cn(
+                  "!mx-auto grid !h-auto min-h-11 w-full max-w-md grid-cols-2 gap-1 rounded-4xl p-1 sm:max-w-lg",
+                  "border border-border/65 bg-muted/95",
+                  "shadow-[inset_0_2px_6px_rgba(0,0,0,0.10),inset_0_1px_2px_rgba(0,0,0,0.06),inset_0_-1px_1px_rgba(255,255,255,0.35)]",
+                  "dark:border-border/45 dark:bg-muted/55",
+                  "dark:shadow-[inset_0_2px_12px_rgba(0,0,0,0.55),inset_0_1px_2px_rgba(0,0,0,0.45),inset_0_-1px_0_rgba(255,255,255,0.04)]"
+                )}
+              >
+                <TabsTrigger
+                  value="inpaint"
+                  className="flex min-h-9 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
+                >
+                  Inpaint
+                </TabsTrigger>
+                <TabsTrigger
+                  value="image-editor"
+                  className="flex min-h-9 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
+                >
+                  Image Editor
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
+
+        {/* Color + layers: full editor, or inpaint mask surface (mask colors / brush tuning) */}
+        {showColorLayersStrip && (
+          <div className="mb-2 flex w-full min-w-0 shrink-0 flex-col items-stretch gap-1.5">
+            <div className="flex min-h-8 w-full min-w-0 flex-col gap-2 sm:h-8 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+              <div className="flex min-h-8 min-w-0 flex-1 flex-col gap-1 sm:max-w-[min(100%,calc(100%-12rem))]">
+                <div className="flex min-h-8 w-full min-w-0 flex-row items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <ImageEditorColorPicker />
+                  </div>
+                  {showLayers && (
+                    <div className="shrink-0 md:hidden">
+                      <ImageEditorLayers variant="sheet" />
+                    </div>
+                  )}
+                </div>
+                {toolCanvasHint ? (
+                  <p className="text-[10px] leading-snug text-muted-foreground sm:hidden">
+                    {toolCanvasHint}
+                  </p>
+                ) : null}
+              </div>
+              {showLayers && (
+                <div className="hidden shrink-0 justify-end md:flex">
+                  <ImageEditorLayers variant="dropdown" />
+                </div>
+              )}
+            </div>
+            <div className="hidden w-full shrink-0 sm:block">
+              <p
+                className={cn(
+                  "text-[11px] leading-snug",
+                  toolCanvasHint
+                    ? "text-muted-foreground"
+                    : "select-none text-transparent",
+                )}
+                aria-hidden={!toolCanvasHint}
+              >
+                {toolCanvasHint ?? "\u00a0"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="relative flex-1 min-h-0 w-full rounded-xl overflow-hidden">
           <ImageEditorCanvas
             className="absolute inset-0"
             initialImage={initialImage}
@@ -196,22 +390,42 @@ function ImageEditorInner({
 
       {/* Bottom controls */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3 w-full max-w-5xl px-2 sm:px-4">
-        <div className="flex flex-row flex-wrap items-center justify-center gap-2 sm:gap-3 w-full min-w-0">
-          {variant === "inpaint" && (
-            <ImageEditorInpaintBrushBar inline className="shrink min-w-[min(100%,12rem)]" />
+        <div className="flex w-full min-w-0 flex-row flex-nowrap items-center justify-center gap-2 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] sm:gap-3">
+          {showInpaintTabBrushBar && (
+            <ImageEditorInpaintBrushBar
+              inline
+              sizeLabel="Mask"
+              className="min-w-[min(100%,10rem)] shrink sm:min-w-48"
+            />
           )}
-          <ImageEditorToolbar
-            onToggleFullscreen={toggleFullscreen}
-            isFullscreen={isFullscreen}
-            className="shrink-0"
-          />
+          {showFullSurfaceStrokeBar && (
+            <ImageEditorInpaintBrushBar
+              inline
+              sizeLabel="Stroke"
+              className="min-w-[min(100%,10rem)] shrink sm:min-w-48 sm:max-w-xs"
+            />
+          )}
+          <div className="flex shrink-0 items-center justify-center gap-2">
+            <ImageEditorToolbar
+              extendedTools={fullEditorSurface}
+              onToggleFullscreen={toggleFullscreen}
+              isFullscreen={isFullscreen}
+              showGenerateBarToggle={mode === "page" && fullEditorSurface}
+              generateBarOpen={generateBarOpen}
+              onToggleGenerateBar={() => setGenerateBarOpen((v) => !v)}
+              showMaskModeToggle={inpaintMaskSurface}
+              className="min-w-0 shrink"
+            />
+          </div>
         </div>
 
-        {/* Prompt bar */}
-        <ImageEditorPromptBar
-          onGeneratingChange={setIsGenerating}
-          variant={variant}
-        />
+        {/* Prompt bar (full editor surface only: toolbar can hide for more canvas) */}
+        {(!fullEditorSurface || generateBarOpen) && (
+          <ImageEditorPromptBar
+            onGeneratingChange={setIsGenerating}
+            variant={fullEditorSurface ? "full" : variant}
+          />
+        )}
       </div>
 
       {/* Save button (modal mode) */}
@@ -245,6 +459,7 @@ export function ImageEditor({
 }: ImageEditorProps) {
   return (
     <ImageEditorProvider initialImage={initialImage} variant={variant}>
+      <ImageEditorGoogleFontsLink />
       <ImageEditorInner
         initialImage={initialImage}
         mode={mode}

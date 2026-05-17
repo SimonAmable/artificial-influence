@@ -20,9 +20,18 @@ import {
   deleteSelected,
   loadImageOntoCanvas,
 } from "@/lib/image-editor/fabric-utils"
+import {
+  clearCanvasCenterSnapGuides,
+  drawCanvasCenterSnapGuides,
+  updateCanvasCenterSnap,
+  type CanvasCenterSnapGuides,
+} from "@/lib/image-editor/canvas-center-snap"
 import { resolveImageUrlForFabric } from "@/lib/image-editor/canvas-image-url"
 import { serializeCanvas } from "@/lib/image-editor/history-manager"
 import { CANVAS_SETTINGS, SHAPE_DEFAULTS } from "@/lib/image-editor/constants"
+import {
+  applyTextStrokeAppearance,
+} from "@/lib/image-editor/text-stroke-appearance"
 import type { EditorTool } from "@/lib/image-editor/types"
 
 interface ImageEditorCanvasProps {
@@ -40,6 +49,13 @@ type FabricPathCreatedEvent = {
 
 type EditableFabricObject = FabricObject & {
   isEditing?: boolean
+  exitEditing?: () => void
+}
+
+function isFabricTextObject(obj: FabricObject | null | undefined): obj is EditableFabricObject {
+  if (!obj) return false
+  const t = obj.type
+  return t === "i-text" || t === "textbox" || t === "IText" || t === "Textbox"
 }
 
 type MetaFabricObject = FabricObject & {
@@ -49,7 +65,8 @@ type MetaFabricObject = FabricObject & {
 }
 
 type BaseImageObject = FabricObject & {
-  type: "image"
+  /** Fabric v6 uses `"Image"`; older JSON may use `"image"`. */
+  type: "Image" | "image"
   name?: string
   layerId?: string
   width?: number
@@ -57,6 +74,35 @@ type BaseImageObject = FabricObject & {
   scaleX?: number
   scaleY?: number
   set: (key: string | Record<string, unknown>, value?: unknown) => void
+}
+
+function isFabricBitmapImage(obj: FabricObject): obj is BaseImageObject {
+  return obj.type === "Image" || obj.type === "image"
+}
+
+function getBitmapImageIntrinsicSize(image: BaseImageObject): {
+  width: number
+  height: number
+} {
+  const width = image.width ?? 0
+  const height = image.height ?? 0
+  if (width > 0 && height > 0) {
+    return { width, height }
+  }
+
+  const maybeGetElement = image as BaseImageObject & {
+    getElement?: () => HTMLImageElement | undefined
+  }
+  const el =
+    typeof maybeGetElement.getElement === "function"
+      ? maybeGetElement.getElement()
+      : (image as unknown as { _element?: HTMLImageElement })._element
+
+  if (el && el.naturalWidth > 0 && el.naturalHeight > 0) {
+    return { width: el.naturalWidth, height: el.naturalHeight }
+  }
+
+  return { width: 0, height: 0 }
 }
 
 type MaskOverlayObject = FabricObject & {
@@ -92,6 +138,10 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
   const maskModeRef = React.useRef<"add" | "erase">("add")
   const maskWorkCanvasRef = React.useRef<FabricCanvas | null>(null)
   const maskRenderVersionRef = React.useRef(0)
+  const snapGuidesRef = React.useRef<CanvasCenterSnapGuides>({
+    verticalX: null,
+    horizontalY: null,
+  })
 
   const { state, dispatch, saveToHistory, loadImage, setTool } = useImageEditor()
   const {
@@ -108,11 +158,31 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
   }, [activeTool])
 
   React.useEffect(() => {
+    let onWindowFocus: (() => void) | null = null
+
     if (activeTool === "image" && previousToolRef.current !== "image") {
       imageUploadInputRef.current?.click()
+
+      onWindowFocus = () => {
+        window.removeEventListener("focus", onWindowFocus!)
+        window.setTimeout(() => {
+          const file = imageUploadInputRef.current?.files?.[0]
+          if (activeToolRef.current === "image" && !file) {
+            setTool("select")
+          }
+        }, 200)
+      }
+      window.addEventListener("focus", onWindowFocus)
     }
+
     previousToolRef.current = activeTool
-  }, [activeTool])
+
+    return () => {
+      if (onWindowFocus) {
+        window.removeEventListener("focus", onWindowFocus)
+      }
+    }
+  }, [activeTool, setTool])
 
   React.useEffect(() => {
     maskModeRef.current = maskMode
@@ -189,6 +259,7 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
       })
 
       canvas.add(image)
+      image.set("visible", activeToolRef.current === "lasso")
       ensureMaskOnTop(canvas)
       canvas.requestRenderAll()
     },
@@ -227,9 +298,9 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
       const baseImage =
         objects.find(
           (obj) =>
-            obj.type === "image" &&
+            isFabricBitmapImage(obj) &&
             (obj.name === "Background Image" || obj.layerId === "base")
-        ) || objects.find((obj) => obj.type === "image")
+        ) || objects.find((obj) => isFabricBitmapImage(obj))
 
       return baseImage ?? null
     },
@@ -315,8 +386,9 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
 
     const imageObject = getPrimaryImageObject(canvas)
 
-    const imageWidth = imageObject?.width ?? 0
-    const imageHeight = imageObject?.height ?? 0
+    const intrinsic = imageObject ? getBitmapImageIntrinsicSize(imageObject) : { width: 0, height: 0 }
+    const imageWidth = intrinsic.width
+    const imageHeight = intrinsic.height
     const autoAspectRatio =
       imageWidth > 0 && imageHeight > 0
         ? imageWidth / imageHeight
@@ -406,6 +478,50 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
     canvas.on("path:created", handlePathCreated)
     canvas.on("object:added", handleObjectAdded)
 
+    const handleObjectMoving = (e: { target?: FabricObject }) => {
+      const target = e.target
+      if (!target) return
+
+      const overlayish = target as MaskOverlayObject
+      if (
+        overlayish.__isMaskOverlay === true ||
+        overlayish.id === MASK_OVERLAY_ID ||
+        overlayish.name === MASK_OVERLAY_NAME
+      ) {
+        clearCanvasCenterSnapGuides(snapGuidesRef)
+        return
+      }
+
+      const layerish = target as FabricObject & {
+        layerId?: string
+        name?: string
+      }
+      if (layerish.layerId === "base" || layerish.name === "Background Image") {
+        return
+      }
+
+      updateCanvasCenterSnap(canvas, target, snapGuidesRef)
+    }
+
+    const handleAfterRender = (e: { ctx: CanvasRenderingContext2D }) => {
+      drawCanvasCenterSnapGuides(e.ctx, canvas, snapGuidesRef.current, getPrimaryColor())
+    }
+
+    const handleSnapGuidesEnd = () => {
+      const had =
+        snapGuidesRef.current.verticalX !== null ||
+        snapGuidesRef.current.horizontalY !== null
+      clearCanvasCenterSnapGuides(snapGuidesRef)
+      if (had) {
+        canvas.requestRenderAll()
+      }
+    }
+
+    canvas.on("object:moving", handleObjectMoving)
+    canvas.on("after:render", handleAfterRender)
+    canvas.on("mouse:up", handleSnapGuidesEnd)
+    canvas.on("selection:cleared", handleSnapGuidesEnd)
+
     const syncCanvasThemeBackground = () => {
       canvas.set({ backgroundColor: getThemeWorkspaceBackgroundColor() })
       canvas.requestRenderAll()
@@ -443,6 +559,10 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
       canvas.off("object:modified", handleModified)
       canvas.off("path:created", handlePathCreated)
       canvas.off("object:added", handleObjectAdded)
+      canvas.off("object:moving", handleObjectMoving)
+      canvas.off("after:render", handleAfterRender)
+      canvas.off("mouse:up", handleSnapGuidesEnd)
+      canvas.off("selection:cleared", handleSnapGuidesEnd)
       canvas.dispose()
       maskWorkCanvas.dispose()
       fabricCanvasRef.current = null
@@ -459,6 +579,17 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
 
     setCanvasMode(canvas, activeTool)
   }, [activeTool])
+
+  // Inpaint mask overlay is only shown while the lasso tool is active (full editor / other tools hide it).
+  React.useEffect(() => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas) return
+    const overlay = getMaskOverlay(canvas)
+    if (!overlay?.set) return
+    overlay.set("visible", activeTool === "lasso")
+    overlay.dirty = true
+    canvas.requestRenderAll()
+  }, [activeTool, getMaskOverlay])
 
   // Handle brush settings changes
   React.useEffect(() => {
@@ -524,13 +655,21 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
             left: pointer.x,
             top: pointer.y,
             width: 1,
+            originX: "center",
+            originY: "center",
             fill: brushSettings.color,
             fontSize: textSettings.fontSize,
             fontFamily: textSettings.fontFamily,
+            textAlign: textSettings.textAlign,
             selectable: false,
             evented: false,
             editable: true,
           })
+          applyTextStrokeAppearance(
+            textBox,
+            textSettings.textStrokeWidth,
+            textSettings.textStrokeColor
+          )
           assignMeta(textBox as MetaFabricObject, "text", "Text")
           canvas.add(textBox)
           draftTextRef.current = textBox
@@ -566,7 +705,8 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
       } else if (activeTool === "text" && draftTextRef.current) {
         const width = Math.max(40, Math.abs(pointer.x - start.x))
         draftTextRef.current.set({
-          left: pointer.x >= start.x ? start.x : pointer.x,
+          left: start.x,
+          top: start.y,
           width,
         })
         draftTextRef.current.setCoords()
@@ -636,6 +776,7 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
           }, 0)
 
           saveToHistory()
+          setTool("select")
         }
       }
 
@@ -660,10 +801,14 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
     assignMeta,
     brushSettings.color,
     saveToHistory,
+    setTool,
     shapeSettings.rectangleFilled,
     shapeSettings.strokeWidth,
     textSettings.fontFamily,
     textSettings.fontSize,
+    textSettings.textAlign,
+    textSettings.textStrokeColor,
+    textSettings.textStrokeWidth,
   ])
 
   // Handle keyboard shortcuts
@@ -671,6 +816,22 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
     const handleKeyDown = (e: KeyboardEvent) => {
       const canvas = fabricCanvasRef.current
       if (!canvas) return
+
+      if (e.key === "Escape") {
+        const active = canvas.getActiveObject() as EditableFabricObject | null
+        if (isFabricTextObject(active) && active.isEditing && typeof active.exitEditing === "function") {
+          active.exitEditing()
+          canvas.requestRenderAll()
+          e.preventDefault()
+          return
+        }
+        if (canvas.getActiveObjects().length > 0) {
+          canvas.discardActiveObject()
+          canvas.requestRenderAll()
+          e.preventDefault()
+        }
+        return
+      }
 
       // Don't handle shortcuts when typing in input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -803,6 +964,12 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
       ref={containerRef}
       className={cn(
         "relative flex items-center justify-center bg-background overflow-hidden",
+        // Fabric stacks lower + upper canvas flush to the container edges; a real border on
+        // `.canvas-container` sits under those layers on the right/bottom. Draw the frame in a
+        // `::after` above the canvases (still pointer-events-none).
+        "[&_.canvas-container]:relative [&_.canvas-container]:rounded-lg",
+        "[&_.canvas-container]:after:pointer-events-none [&_.canvas-container]:after:absolute [&_.canvas-container]:after:inset-0 [&_.canvas-container]:after:z-10 [&_.canvas-container]:after:box-border",
+        "[&_.canvas-container]:after:rounded-lg [&_.canvas-container]:after:border [&_.canvas-container]:after:border-dashed [&_.canvas-container]:after:border-foreground/50 [&_.canvas-container]:after:content-['']",
         className
       )}
       style={{ cursor: getCursor() }}
