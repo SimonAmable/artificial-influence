@@ -24,6 +24,7 @@ import { createSearchVoicesTool } from "@/lib/chat/tools/search-voices"
 import { createActivateSkillTool, createSaveSkillTool } from "@/lib/chat/tools/skills"
 import { createExtractVideoFramesTool } from "@/lib/chat/tools/extract-video-frames"
 import { createComposeTimelineVideoTool } from "@/lib/chat/tools/compose-timeline-video"
+import { createDownloadSocialReferenceTool } from "@/lib/chat/tools/download-social-reference"
 import { createAwaitGenerationTool } from "@/lib/chat/tools/await-generation"
 import { createEstimateModelLatencyTool } from "@/lib/chat/tools/estimate-model-latency"
 import { createListThreadMediaTool } from "@/lib/chat/tools/list-thread-media"
@@ -175,6 +176,7 @@ export function createCreativeChatTools({
       threadId,
       userId,
     }),
+    downloadSocialReference: createDownloadSocialReferenceTool({ supabase, userId }),
     searchAssets: createSearchAssetsTool({
       supabase,
       userId,

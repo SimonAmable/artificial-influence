@@ -9,6 +9,9 @@ import { makeMentionToken, mentionReserveTail } from "./mention-token"
 import { valueToParts } from "./mention-segments"
 import type { AssetRecord, AssetType } from "@/lib/assets/types"
 import type { BrandKit } from "@/lib/brand-kit/types"
+import { createClient } from "@/lib/supabase/client"
+
+export type ReferencesScope = "mine" | "all"
 
 export type TriggerState =
   | { type: "slash"; start: number; end: number; filter: string }
@@ -92,6 +95,17 @@ export function useCommandInput(options: {
   const [brandKits, setBrandKits] = React.useState<BrandKit[] | null>(null)
   const [assets, setAssets] = React.useState<AssetRecord[] | null>(null)
   const [assetsLoading, setAssetsLoading] = React.useState(false)
+  const [referencesScope, setReferencesScope] = React.useState<ReferencesScope>("all")
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    void createClient()
+      .auth.getUser()
+      .then(({ data: { user } }) => {
+        setCurrentUserId(user?.id ?? null)
+      })
+      .catch(() => setCurrentUserId(null))
+  }, [])
 
   React.useEffect(() => {
     void getCachedBrandKits()
@@ -123,6 +137,9 @@ export function useCommandInput(options: {
     }
     if (assets) {
       for (const asset of assets) {
+        if (referencesScope === "mine") {
+          if (!currentUserId || asset.userId !== currentUserId) continue
+        }
         if (allowedAssetTypes !== undefined) {
           if (allowedAssetTypes.length === 0) continue
           if (!allowedAssetTypes.includes(asset.assetType)) continue
@@ -134,7 +151,7 @@ export function useCommandInput(options: {
       }
     }
     return rows
-  }, [trigger, brandKits, assets, allowedAssetTypes])
+  }, [trigger, brandKits, assets, allowedAssetTypes, referencesScope, currentUserId])
 
   React.useEffect(() => {
     if (trigger?.type !== "at") return
@@ -152,7 +169,7 @@ export function useCommandInput(options: {
 
   React.useEffect(() => {
     setActiveIndex(0)
-  }, [trigger?.type, trigger?.filter, flatItems.length])
+  }, [trigger?.type, trigger?.filter, flatItems.length, referencesScope])
 
   React.useEffect(() => {
     if (activeIndex >= flatItems.length && flatItems.length > 0) {
@@ -363,6 +380,8 @@ export function useCommandInput(options: {
     activeIndex,
     setActiveIndex,
     assetsLoading,
+    referencesScope,
+    setReferencesScope,
     handleChange,
     handleSelect,
     handleKeyDown,

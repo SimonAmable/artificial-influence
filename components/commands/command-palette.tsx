@@ -3,8 +3,9 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import type { CommandItem } from "@/lib/commands/types"
-import type { AtPaletteRow } from "@/lib/commands/use-command-input"
+import type { AtPaletteRow, ReferencesScope } from "@/lib/commands/use-command-input"
 import { Badge } from "@/components/ui/badge"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Image, Palette, VideoCamera, Waveform } from "@phosphor-icons/react"
 
 function PreviewOrIcon({
@@ -74,6 +75,9 @@ export interface CommandPaletteProps {
   fixedStyle?: React.CSSProperties | null
   /** Badge for text/preset slash rows (not `uiAction`); action rows use “ACTION” */
   slashCommandsContext?: string | null
+  /** @ palette: show only your assets vs everything you can access */
+  referencesScope?: ReferencesScope
+  onReferencesScopeChange?: (scope: ReferencesScope) => void
 }
 
 function SlashCommandRow({
@@ -137,6 +141,8 @@ export function CommandPalette({
   listRef,
   fixedStyle,
   slashCommandsContext,
+  referencesScope = "all",
+  onReferencesScopeChange,
 }: CommandPaletteProps) {
   const slashRows = React.useMemo(
     () => slashItems.map((item, paletteIndex) => ({ item, paletteIndex })),
@@ -229,8 +235,33 @@ export function CommandPalette({
         </>
       ) : (
         <>
-          <div className="border-b border-border/60 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            References
+          <div className="flex items-center justify-between gap-2 border-b border-border/60 px-2 py-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              References
+            </span>
+            {onReferencesScopeChange ? (
+              <div onMouseDown={(e) => e.preventDefault()}>
+                <ToggleGroup
+                  type="single"
+                  value={referencesScope}
+                  onValueChange={(v) => {
+                    if (v === "mine" || v === "all") onReferencesScopeChange(v)
+                  }}
+                  variant="outline"
+                  size="sm"
+                  spacing={0}
+                  className="shrink-0 scale-[0.85] origin-right"
+                  aria-label="Filter references by ownership"
+                >
+                  <ToggleGroupItem value="mine" className="px-2 text-[10px] font-semibold uppercase tracking-wide">
+                    Mine
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="all" className="px-2 text-[10px] font-semibold uppercase tracking-wide">
+                    All
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+            ) : null}
           </div>
           <div ref={listRef} className="overflow-y-auto p-1">
             {assetsLoading && atRows.length === 0 ? (

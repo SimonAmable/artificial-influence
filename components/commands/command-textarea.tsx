@@ -72,6 +72,8 @@ export function CommandTextarea({
     atRows,
     activeIndex,
     assetsLoading,
+    referencesScope,
+    setReferencesScope,
     handleChange,
     handleSelect,
     handleKeyDown,
@@ -228,6 +230,8 @@ export function CommandTextarea({
         listRef={listRef}
         fixedStyle={paletteFixedStyle}
         slashCommandsContext={slashCommandsContext}
+        referencesScope={referencesScope}
+        onReferencesScopeChange={setReferencesScope}
       />
     ) : null
 
