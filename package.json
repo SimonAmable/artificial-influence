@@ -36,6 +36,7 @@
     "@remotion/google-fonts": "4.0.452",
     "@remotion/media": "4.0.452",
     "@remotion/player": "4.0.452",
+    "@remotion/preload": "^4.0.452",
     "@remotion/transitions": "4.0.452",
     "@remotion/vercel": "4.0.452",
     "@streamdown/cjk": "^1.0.3",

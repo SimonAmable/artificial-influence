@@ -1,6 +1,7 @@
 "use client"
 
 import type { CSSProperties } from "react"
+import { useMemo } from "react"
 import { createTikTokStyleCaptions } from "@remotion/captions"
 import { Audio, Video } from "@remotion/media"
 import {
@@ -11,6 +12,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion"
+import { premountFramesForItem } from "../premount"
 import { videoTrimForRemotion } from "../project-helpers"
 import type { EditorItem, EditorProject, Track } from "../types"
 import type { TimelineCompositionProps } from "./metadata"
@@ -61,17 +63,84 @@ function ItemSequence({
   muted: boolean
   project: EditorProject
 }) {
-  const premount = project.settings.fps
+  const premount = premountFramesForItem(item, project.settings.fps)
 
   return (
     <Sequence
       from={item.from}
       durationInFrames={item.durationInFrames}
-      premountFor={premount}
+      {...(premount > 0 ? { premountFor: premount } : {})}
       layout="absolute-fill"
     >
       <ItemRenderer item={item} muted={muted} />
     </Sequence>
+  )
+}
+
+function CaptionsLayer({
+  item,
+  sizeStyle,
+  frame,
+  fps,
+}: {
+  item: Extract<EditorItem, { type: "captions" }>
+  sizeStyle: CSSProperties
+  frame: number
+  fps: number
+}) {
+  const pages = useMemo(
+    () =>
+      createTikTokStyleCaptions({
+        captions: item.captions,
+        combineTokensWithinMilliseconds: item.pageDurationMs,
+      }).pages,
+    [item.captions, item.pageDurationMs]
+  )
+
+  const relativeTimeMs = (frame / fps) * 1000
+  const page =
+    pages.find(
+      (candidate) =>
+        relativeTimeMs >= candidate.startMs &&
+        relativeTimeMs < candidate.startMs + candidate.durationMs
+    ) ?? pages[0]
+
+  return (
+    <div
+      style={{
+        ...sizeStyle,
+        color: "#fff",
+        fontFamily: item.fontFamily,
+        fontSize: item.fontSize,
+        textAlign: item.textAlign,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "flex-end",
+        textShadow: "0 2px 8px rgba(0,0,0,0.8)",
+      }}
+    >
+      <div
+        style={{
+          maxHeight: item.fontSize * 1.25 * item.maxLines,
+          overflow: "hidden",
+        }}
+      >
+        {page?.tokens.map((token, index) => {
+          const isActive =
+            relativeTimeMs >= token.fromMs && relativeTimeMs < token.toMs
+
+          return (
+            <span
+              key={`${token.text}-${index}`}
+              style={{ color: isActive ? item.highlightColor : "#fff" }}
+            >
+              {token.text}{" "}
+            </span>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -206,57 +275,8 @@ function ItemRenderer({ item, muted }: { item: EditorItem; muted: boolean }) {
           {item.text}
         </div>
       )
-    case "captions": {
-      const relativeTimeMs = (frame / fps) * 1000
-      const { pages } = createTikTokStyleCaptions({
-        captions: item.captions,
-        combineTokensWithinMilliseconds: item.pageDurationMs,
-      })
-      const page =
-        pages.find(
-          (candidate) =>
-            relativeTimeMs >= candidate.startMs &&
-            relativeTimeMs < candidate.startMs + candidate.durationMs
-        ) ?? pages[0]
-
-      return (
-        <div
-          style={{
-            ...sizeStyle,
-            color: "#fff",
-            fontFamily: item.fontFamily,
-            fontSize: item.fontSize,
-            textAlign: item.textAlign,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            textShadow: "0 2px 8px rgba(0,0,0,0.8)",
-          }}
-        >
-          <div
-            style={{
-              maxHeight: item.fontSize * 1.25 * item.maxLines,
-              overflow: "hidden",
-            }}
-          >
-            {page?.tokens.map((token, index) => {
-              const isActive =
-                relativeTimeMs >= token.fromMs && relativeTimeMs < token.toMs
-
-              return (
-                <span
-                  key={`${token.text}-${index}`}
-                  style={{ color: isActive ? item.highlightColor : "#fff" }}
-                >
-                  {token.text}{" "}
-                </span>
-              )
-            })}
-          </div>
-        </div>
-      )
-    }
+    case "captions":
+      return <CaptionsLayer item={item} sizeStyle={sizeStyle} frame={frame} fps={fps} />
     default: {
       const exhaustiveCheck: never = item
       return exhaustiveCheck

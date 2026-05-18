@@ -65,6 +65,7 @@ export function VideoEditorActionRow({
   const {
     project,
     dispatch,
+    playerRef,
     currentFrame,
     setCurrentFrame,
     isPlaying,
@@ -186,7 +187,8 @@ export function VideoEditorActionRow({
       toast.message("Select a clip to split")
       return
     }
-    dispatch({ type: "SPLIT_AT_FRAME", itemId: id, frame: currentFrame })
+    const frame = playerRef.current?.getCurrentFrame() ?? currentFrame
+    dispatch({ type: "SPLIT_AT_FRAME", itemId: id, frame })
   }
 
   return (

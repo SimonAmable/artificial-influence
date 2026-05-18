@@ -4,11 +4,51 @@ import * as React from "react"
 import { Eye, EyeOff, Volume2, VolumeX } from "lucide-react"
 import { useVideoEditor } from "@/components/video-editor/video-editor-provider"
 import { TimelineClip } from "@/components/video-editor/timeline/timeline-clip"
+import { useCurrentPlayerFrame } from "@/lib/video-editor/use-current-player-frame"
 import { cn } from "@/lib/utils"
 
 const GUTTER_PX = 120
 const RULER_H = 32
 const TRACK_ROW_H = 36
+
+function useLivePlayheadFrame(): number {
+  const { playerRef, isPlaying, currentFrame } = useVideoEditor()
+  const playerFrame = useCurrentPlayerFrame(playerRef)
+  return isPlaying ? playerFrame : currentFrame
+}
+
+function TimelinePlayheadLine({
+  px,
+  contentHeight,
+}: {
+  px: number
+  contentHeight: number
+}) {
+  const frame = useLivePlayheadFrame()
+
+  return (
+    <div
+      className="pointer-events-none absolute top-0 z-30 w-px bg-primary shadow-[0_0_6px_hsl(var(--primary))]"
+      style={{
+        left: frame * px,
+        height: contentHeight,
+      }}
+    />
+  )
+}
+
+function TimelineStatusBar({ activeTrackLabel }: { activeTrackLabel: string }) {
+  const { isPlaying, project } = useVideoEditor()
+  const frame = useLivePlayheadFrame()
+  const { durationInFrames } = project.settings
+
+  return (
+    <div className="shrink-0 border-t border-border px-2 py-1 text-[10px] text-muted-foreground">
+      Frame {frame} / {durationInFrames - 1} | {isPlaying ? "Playing" : "Paused"} | active:{" "}
+      {activeTrackLabel} | clips stay on their matching track
+    </div>
+  )
+}
 
 export function TimelinePanel({ className }: { className?: string }) {
   const {
@@ -153,13 +193,7 @@ export function TimelinePanel({ className }: { className?: string }) {
               })}
             </div>
 
-            <div
-              className="pointer-events-none absolute top-0 z-30 w-px bg-primary shadow-[0_0_6px_hsl(var(--primary))]"
-              style={{
-                left: currentFrame * px,
-                height: contentHeight,
-              }}
-            />
+            <TimelinePlayheadLine px={px} contentHeight={contentHeight} />
             <div
               className="sticky top-0 z-20 flex h-8 cursor-pointer items-end border-b border-border bg-background/95 backdrop-blur-sm"
               style={{ width: totalWidth }}
@@ -216,10 +250,9 @@ export function TimelinePanel({ className }: { className?: string }) {
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-border px-2 py-1 text-[10px] text-muted-foreground">
-        Frame {currentFrame} / {durationInFrames - 1} | {isPlaying ? "Playing" : "Paused"} | active:{" "}
-        {project.tracks.find((t) => t.id === activeTrackId)?.label ?? "-"} | clips stay on their matching track
-      </div>
+      <TimelineStatusBar
+        activeTrackLabel={project.tracks.find((t) => t.id === activeTrackId)?.label ?? "-"}
+      />
     </div>
   )
 }

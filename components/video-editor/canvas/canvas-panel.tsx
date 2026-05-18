@@ -1,10 +1,10 @@
 "use client"
 
-import type { PlayerRef } from "@remotion/player"
 import * as React from "react"
 import { CanvasOverlay } from "@/components/video-editor/canvas/canvas-overlay"
 import { EditorPlayer } from "@/components/video-editor/editor-player"
 import { useVideoEditor } from "@/components/video-editor/video-editor-provider"
+import { useMediaPreload } from "@/lib/video-editor/use-media-preload"
 import { cn } from "@/lib/utils"
 
 export function CanvasPanel({ className }: { className?: string }) {
@@ -17,22 +17,24 @@ export function CanvasPanel({ className }: { className?: string }) {
     setIsPlaying,
     loopPlayback,
     playerMuted,
+    playerRef,
   } = useVideoEditor()
-  const playerRef = React.useRef<PlayerRef>(null)
   const viewportRef = React.useRef<HTMLDivElement>(null)
   const zoom = project.canvasZoom
   const { width: compW, height: compH } = project.settings
 
-  const onFrameUpdate = React.useCallback(
+  useMediaPreload(project, currentFrame)
+
+  const onPlaybackEnded = React.useCallback(() => {
+    setIsPlaying(false)
+    setCurrentFrame(Math.max(0, project.settings.durationInFrames - 1))
+  }, [project.settings.durationInFrames, setCurrentFrame, setIsPlaying])
+
+  const onPausedAtFrame = React.useCallback(
     (frame: number) => {
-      if (isPlaying) {
-        setCurrentFrame(frame)
-        if (frame >= project.settings.durationInFrames - 1 && !loopPlayback) {
-          setIsPlaying(false)
-        }
-      }
+      setCurrentFrame(frame)
     },
-    [isPlaying, setCurrentFrame, project.settings.durationInFrames, loopPlayback, setIsPlaying]
+    [setCurrentFrame]
   )
 
   return (
@@ -82,11 +84,12 @@ export function CanvasPanel({ className }: { className?: string }) {
             <EditorPlayer
               project={project}
               currentFrame={currentFrame}
-              onFrameUpdate={onFrameUpdate}
               isPlaying={isPlaying}
               loop={loopPlayback}
               muted={playerMuted}
               playerRef={playerRef}
+              onPlaybackEnded={onPlaybackEnded}
+              onPausedAtFrame={onPausedAtFrame}
               className="h-full w-full"
             />
           </div>

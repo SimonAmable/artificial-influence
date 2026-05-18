@@ -1,5 +1,6 @@
 "use client"
 
+import type { PlayerRef } from "@remotion/player"
 import * as React from "react"
 import { MAX_HISTORY } from "@/lib/video-editor/constants"
 import { createEmptyProject } from "@/lib/video-editor/project-helpers"
@@ -81,6 +82,7 @@ export type VideoEditorContextValue = {
   project: EditorProject
   dispatch: (action: VideoEditorAction) => void
   hydrateProject: (project: EditorProject) => void
+  playerRef: React.RefObject<PlayerRef | null>
   currentFrame: number
   setCurrentFrame: React.Dispatch<React.SetStateAction<number>>
   isPlaying: boolean
@@ -99,6 +101,7 @@ const VideoEditorContext = React.createContext<VideoEditorContextValue | null>(n
 
 export function VideoEditorProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatchBase] = React.useReducer(editorHistoryReducer, initialEditorState)
+  const playerRef = React.useRef<PlayerRef>(null)
   const [currentFrame, setCurrentFrame] = React.useState(0)
   const [isPlaying, setIsPlaying] = React.useState(false)
   const [loopPlayback, setLoopPlayback] = React.useState(false)
@@ -134,6 +137,7 @@ export function VideoEditorProvider({ children }: { children: React.ReactNode })
       project: state.project,
       dispatch,
       hydrateProject,
+      playerRef,
       currentFrame,
       setCurrentFrame,
       isPlaying,

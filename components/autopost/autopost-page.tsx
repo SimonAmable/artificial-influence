@@ -8,6 +8,7 @@ import {
   Calendar as CalendarIcon,
   CalendarClock,
   ChevronDown,
+  X,
   Film,
   Globe,
   ImageIcon,
@@ -617,6 +618,76 @@ type ComposerMediaItem = {
   name?: string
 }
 
+function inferInstagramPostFormatFromFiles(files: File[]): PostFormat {
+  if (files.length >= 2) {
+    return "carousel"
+  }
+  if (files.length === 0) {
+    return "feed_image"
+  }
+  return inferFileKind(files[0]!) === "video" ? "reel" : "feed_image"
+}
+
+function inferInstagramPostFormatFromComposerItems(items: ComposerMediaItem[]): PostFormat {
+  if (items.length >= 2) {
+    return "carousel"
+  }
+  if (items.length === 0) {
+    return "feed_image"
+  }
+  return items[0]?.kind === "video" ? "reel" : "feed_image"
+}
+
+function inferTikTokPostTypeFromFiles(files: File[]): TikTokPostType {
+  if (files.length === 0) {
+    return "video"
+  }
+  if (files.some((f) => inferFileKind(f) === "video")) {
+    return "video"
+  }
+  if (files.every((f) => inferFileKind(f) === "image")) {
+    return "photo"
+  }
+  return "video"
+}
+
+function inferTikTokPostTypeFromComposerItems(items: ComposerMediaItem[]): TikTokPostType {
+  if (items.length === 0) {
+    return "video"
+  }
+  if (items.some((i) => i.kind === "video")) {
+    return "video"
+  }
+  if (items.every((i) => i.kind === "image")) {
+    return "photo"
+  }
+  return "video"
+}
+
+function inferredComposerPostTypeLabel(
+  provider: ComposerProvider,
+  postFormat: PostFormat,
+  tiktokPostType: TikTokPostType,
+): string {
+  if (provider === "tiktok") {
+    return tiktokPostType === "photo" ? "Photo post" : "Video"
+  }
+  switch (postFormat) {
+    case "feed_image":
+      return "Feed photo"
+    case "feed_video":
+      return "Feed video"
+    case "reel":
+      return "Reel"
+    case "carousel":
+      return "Carousel"
+    case "story":
+      return "Story"
+    default:
+      return postFormat
+  }
+}
+
 type RepurposeTargetSpec = {
   id: string
   provider: ComposerProvider
@@ -653,6 +724,23 @@ type RepurposeDialogState = {
 
 function hasScope(connection: SocialConnectionItem | null | undefined, scope: string) {
   return connection?.scopes?.includes(scope) === true
+}
+
+function socialConnectionAvatarSrc(connection: SocialConnectionItem | undefined): string | null {
+  if (!connection) {
+    return null
+  }
+  if (connection.avatarUrl) {
+    return connection.avatarUrl
+  }
+  const profile = connection.profile
+  if (profile && "profile_picture_url" in profile && profile.profile_picture_url) {
+    return profile.profile_picture_url
+  }
+  if (profile && "avatar_url" in profile && profile.avatar_url) {
+    return profile.avatar_url
+  }
+  return null
 }
 
 function privacyLabel(value: string) {
@@ -848,14 +936,24 @@ export function AutopostPage() {
     queueMicrotask(() => {
       if (cancelled) return
       clearLocalComposerMedia()
-      if (postFormat === "story") {
-        setCaption("")
-      }
     })
     return () => {
       cancelled = true
     }
-  }, [clearLocalComposerMedia, composerProvider, postFormat, tiktokPostType])
+  }, [clearLocalComposerMedia, composerProvider])
+
+  React.useEffect(() => {
+    if (repurposeSource) {
+      return
+    }
+    if (composerProvider === "instagram") {
+      const next = inferInstagramPostFormatFromComposerItems(composerMediaItems)
+      setPostFormat((prev) => (prev === next ? prev : next))
+    } else {
+      const next = inferTikTokPostTypeFromComposerItems(composerMediaItems)
+      setTikTokPostType((prev) => (prev === next ? prev : next))
+    }
+  }, [composerMediaItems, composerProvider, repurposeSource])
 
   React.useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -1120,38 +1218,6 @@ export function AutopostPage() {
     [postFormat, repurposeSource, tiktokPostType],
   )
 
-  const handleInstagramPostFormatChange = React.useCallback(
-    (value: string) => {
-      const nextFormat = value as PostFormat
-      if (
-        repurposeSource &&
-        !repurposeSource.allowedTargets.some(
-          (target) => target.provider === "instagram" && target.postFormat === nextFormat,
-        )
-      ) {
-        return
-      }
-      setPostFormat(nextFormat)
-    },
-    [repurposeSource],
-  )
-
-  const handleTikTokPostTypeChange = React.useCallback(
-    (value: string) => {
-      const nextType = value as TikTokPostType
-      if (
-        repurposeSource &&
-        !repurposeSource.allowedTargets.some(
-          (target) => target.provider === "tiktok" && target.tiktokPostType === nextType,
-        )
-      ) {
-        return
-      }
-      setTikTokPostType(nextType)
-    },
-    [repurposeSource],
-  )
-
   const openRepurposeDialog = React.useCallback(
     (job: AutopostJobRow) => {
       const targets = getRepurposeTargets(
@@ -1334,16 +1400,9 @@ export function AutopostPage() {
   }
 
   const handleMediaFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const isCarousel = composerProvider === "instagram" && postFormat === "carousel"
-    const isTikTokPhoto = composerProvider === "tiktok" && tiktokPostType === "photo"
-    const picked =
-      isCarousel || isTikTokPhoto
-        ? Array.from(event.target.files ?? [])
-        : event.target.files?.[0]
-          ? [event.target.files[0]]
-          : []
+    const pickedAll = Array.from(event.target.files ?? [])
 
-    if (picked.length === 0) {
+    if (pickedAll.length === 0) {
       setSelectedFiles([])
       setPreviewUrls((previous) => {
         previous.forEach((u) => URL.revokeObjectURL(u))
@@ -1352,32 +1411,71 @@ export function AutopostPage() {
       return
     }
 
-    if (isTikTokPhoto && picked.length > 35) {
-      toast.error("TikTok photo posts support up to 35 images.")
-      event.target.value = ""
-      return
-    }
-
-    for (const file of picked) {
+    for (const file of pickedAll) {
       const kind = inferFileKind(file)
       if (!kind) {
         toast.error("Use images (JPEG, PNG, WebP, GIF) or video (MP4, MOV).")
         event.target.value = ""
         return
       }
-      if (isTikTokPhoto && kind !== "image") {
-        toast.error("TikTok photo posts require image files only.")
-        event.target.value = ""
-        return
-      }
-      if (composerProvider === "tiktok" && tiktokPostType === "video" && kind !== "video") {
-        toast.error("TikTok video posts require a video file.")
-        event.target.value = ""
-        return
-      }
     }
 
     setRepurposeSource(null)
+
+    let picked: File[] = []
+
+    if (composerProvider === "instagram") {
+      const fmt = inferInstagramPostFormatFromFiles(pickedAll)
+      setPostFormat(fmt)
+      if (fmt === "carousel") {
+        if (pickedAll.length > 10) {
+          toast.error("Instagram carousels support up to 10 items.")
+          picked = pickedAll.slice(0, 10)
+        } else {
+          picked = pickedAll
+        }
+      } else {
+        picked = [pickedAll[0]!]
+        const onlyKind = inferFileKind(picked[0]!)
+        if (fmt === "feed_image" && onlyKind !== "image") {
+          toast.error("Feed photo needs an image file. Pick a video to post as a reel, or choose two or more files for a carousel.")
+          event.target.value = ""
+          return
+        }
+      }
+    } else {
+      const hasVideo = pickedAll.some((f) => inferFileKind(f) === "video")
+      const hasImage = pickedAll.some((f) => inferFileKind(f) === "image")
+      if (hasVideo && hasImage) {
+        toast.error("TikTok cannot mix images and video in one post.")
+        event.target.value = ""
+        return
+      }
+      if (hasVideo && pickedAll.length > 1) {
+        toast.error("TikTok video posts use one video file.")
+        event.target.value = ""
+        return
+      }
+      const tt = inferTikTokPostTypeFromFiles(pickedAll)
+      setTikTokPostType(tt)
+      if (tt === "video") {
+        const videoFile = pickedAll.find((f) => inferFileKind(f) === "video")
+        if (!videoFile) {
+          toast.error("TikTok video posts require a video file.")
+          event.target.value = ""
+          return
+        }
+        picked = [videoFile]
+      } else {
+        if (pickedAll.length > 35) {
+          toast.error("TikTok photo posts support up to 35 images.")
+          picked = pickedAll.slice(0, 35)
+        } else {
+          picked = pickedAll
+        }
+      }
+    }
+
     setPreviewUrls((previous) => {
       previous.forEach((u) => URL.revokeObjectURL(u))
       return picked.map((file) => URL.createObjectURL(file))
@@ -1389,6 +1487,7 @@ export function AutopostPage() {
     setCaption("")
     clearLocalComposerMedia()
     setRepurposeSource(null)
+    setPostFormat("feed_image")
     setShareReelToFeed(true)
     setReelCoverUrl("")
     setTikTokPostType("video")
@@ -2044,6 +2143,12 @@ export function AutopostPage() {
 
   const isConnected = instagramConnections.some((connection) => connection.status === "connected")
   const selectedTikTokConnection = tiktokConnections.find((connection) => connection.id === selectedTikTokConnectionId)
+  const selectedInstagramConnection = instagramConnections.find(
+    (connection) =>
+      connection.instagramConnectionId === selectedComposerConnectionId && connection.status === "connected",
+  )
+  const instagramComposerAvatarSrc = socialConnectionAvatarSrc(selectedInstagramConnection)
+  const tiktokComposerAvatarSrc = socialConnectionAvatarSrc(selectedTikTokConnection)
   const isTikTokConnected = tiktokConnections.some((connection) => connection.status === "connected")
   const tikTokRequiredScope = tiktokMode === "direct" ? "video.publish" : "video.upload"
   const repurposeTargetsForInstagram = repurposeSource?.allowedTargets.filter((target) => target.provider === "instagram") ?? []
@@ -2427,7 +2532,7 @@ export function AutopostPage() {
                         Draft Composer
                       </CardTitle>
                       <CardDescription>
-                        Choose where to post, add your media, and publish now or schedule it for later.
+                        Add media, pick the account, then publish now or schedule.
                       </CardDescription>
                     </div>
                     <Button type="button" variant="ghost" size="sm" className="rounded-full" onClick={() => setComposerOpen(false)}>
@@ -2457,511 +2562,473 @@ export function AutopostPage() {
                 </div>
               ) : null}
 
-              <div className="space-y-2">
-                <Label htmlFor="autopost-provider">Platform</Label>
-                <Select
-                  value={composerProvider}
-                  onValueChange={handleComposerProviderChange}
-                >
-                  <SelectTrigger id="autopost-provider" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-120">
-                    <SelectItem value="instagram" disabled={repurposeSource ? !repurposeAllowedProviders.has("instagram") : false}>
-                      Instagram
-                    </SelectItem>
-                    <SelectItem value="tiktok" disabled={repurposeSource ? !repurposeAllowedProviders.has("tiktok") : false}>
-                      TikTok
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold" htmlFor="autopost-media">
+                    Media
+                  </Label>
+                  <Input
+                    key={composerProvider}
+                    id="autopost-media"
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    className="cursor-pointer"
+                    onChange={handleMediaFileChange}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {repurposeSource ? "Upload new files any time to replace the repurposed media. " : ""}
+                    {composerProvider === "instagram"
+                      ? "Pick one image, one video, or 2–10 files for a carousel. The post type below updates from your selection."
+                      : "Pick one video, or 1–35 images for a photo post (not both in one upload). The post type below updates from your selection."}{" "}
+                    {composerProvider === "instagram" ? (
+                      <>
+                        PNG/WebP/GIF are converted to JPEG where needed (
+                        <span className="text-foreground/80">max 10 MB</span> upload).
+                      </>
+                    ) : null}
+                  </p>
+                </div>
 
-              {composerProvider === "tiktok" ? (
-                <div className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3">
-                  <Label htmlFor="autopost-tiktok-account">TikTok account</Label>
-                  <Select
-                    value={selectedTikTokConnectionId ?? undefined}
-                    onValueChange={setSelectedTikTokConnectionId}
-                    disabled={!isTikTokConnected}
-                  >
-                    <SelectTrigger id="autopost-tiktok-account" className="w-full">
-                      <SelectValue placeholder={isTikTokConnected ? "Select account" : "Connect TikTok first"} />
-                    </SelectTrigger>
-                    <SelectContent position="popper" className="z-120">
-                      {tiktokConnections
-                        .filter((connection) => connection.status === "connected")
-                        .map((connection) => (
-                          <SelectItem key={connection.id} value={connection.id}>
-                            {connection.displayName || connection.username || "TikTok account"}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="autopost-tiktok-mode">TikTok action</Label>
-                      <Select
-                        value={tiktokMode}
-                        onValueChange={(value) => {
-                          if (value === "direct" && !tikTokDirectPostEnabled) {
-                            toast.info("Coming soon: TikTok Direct Post", {
-                              description:
-                                "For now, use “Send to inbox draft” — content opens in TikTok as a draft so you can review and publish from the app.",
-                            })
-                            return
-                          }
-                          setTikTokMode(value as TikTokMode)
-                        }}
-                      >
-                        <SelectTrigger id="autopost-tiktok-mode" className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent position="popper" className="z-120">
-                          <SelectItem value="upload">Send to inbox draft</SelectItem>
-                          <SelectItem value="direct">Direct Post</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="autopost-tiktok-post-type">TikTok post type</Label>
-                      <Select value={tiktokPostType} onValueChange={handleTikTokPostTypeChange}>
-                        <SelectTrigger id="autopost-tiktok-post-type" className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent position="popper" className="z-120">
-                          <SelectItem
-                            value="video"
-                            disabled={
-                              repurposeSource
-                                ? !repurposeTargetsForTikTok.some((target) => target.tiktokPostType === "video")
-                                : false
+                {composerMediaItems.length > 0 &&
+                ((composerProvider === "instagram" && postFormat === "carousel") ||
+                  (composerProvider === "tiktok" && tiktokPostType === "photo")) ? (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {composerMediaItems.map((item, i) => {
+                      const isTikTokPhotoCover =
+                        composerProvider === "tiktok" && tiktokPostType === "photo" && i === tiktokPhotoCoverIndex
+                      return (
+                        <div
+                          key={`${item.url}-${i}`}
+                          className={cn(
+                            "relative aspect-square overflow-hidden rounded-md border bg-muted/30",
+                            composerProvider === "tiktok" &&
+                              tiktokPostType === "photo" &&
+                              "cursor-pointer transition hover:border-primary/60",
+                            isTikTokPhotoCover && "border-primary ring-2 ring-primary/25",
+                          )}
+                          onClick={() => {
+                            if (composerProvider === "tiktok" && tiktokPostType === "photo") {
+                              setTikTokPhotoCoverIndex(i)
                             }
-                          >
-                            Video
-                          </SelectItem>
-                          <SelectItem
-                            value="photo"
-                            disabled={
-                              repurposeSource
-                                ? !repurposeTargetsForTikTok.some((target) => target.tiktokPostType === "photo")
-                                : false
-                            }
-                          >
-                            Photo post
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Required scope</Label>
-                      <div className="flex h-10 items-center">
-                        <Badge
-                          variant={hasScope(selectedTikTokConnection, tikTokRequiredScope) ? "default" : "outline"}
+                          }}
                         >
-                          {tikTokRequiredScope}
-                        </Badge>
-                      </div>
-                    </div>
+                          {item.kind === "image" ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img alt="" className="h-full w-full object-cover" src={item.url} />
+                          ) : item.kind === "video" ? (
+                            <video className="h-full w-full object-cover" src={item.url} muted playsInline />
+                          ) : null}
+                          {composerProvider === "tiktok" && tiktokPostType === "photo" ? (
+                            <span className="absolute left-1 top-1 rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+                              {isTikTokPhotoCover ? "Cover" : `#${i + 1}`}
+                            </span>
+                          ) : null}
+                        </div>
+                      )
+                    })}
                   </div>
-                  {!hasScope(selectedTikTokConnection, tikTokRequiredScope) ? (
-                    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-950 dark:text-amber-100">
-                      Reconnect TikTok to approve {tiktokMode === "direct" ? "Direct Post" : "upload"} permissions.
-                      <Button type="button" size="sm" className="mt-2 w-full" onClick={handleConnectTikTok}>
-                        Reconnect TikTok
-                      </Button>
+                ) : null}
+
+                {composerMediaItems.length === 1 &&
+                composerMediaItems[0]?.kind === "image" &&
+                !(composerProvider === "instagram" && postFormat === "carousel") &&
+                !(composerProvider === "tiktok" && tiktokPostType === "photo") ? (
+                  <div className="overflow-hidden rounded-md border bg-muted/30">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt="Selected media preview"
+                      className="max-h-48 w-full object-contain"
+                      src={composerMediaItems[0].url}
+                    />
+                  </div>
+                ) : null}
+
+                {composerMediaItems.length === 1 && composerMediaItems[0]?.kind === "video" ? (
+                  <div className="overflow-hidden rounded-md border bg-muted/30">
+                    <video
+                      className="max-h-52 w-full object-contain"
+                      src={composerMediaItems[0].url}
+                      muted
+                      controls
+                      playsInline
+                      preload="metadata"
+                    />
+                    {composerMediaItems[0].name ? (
+                      <p className="border-t border-border/70 px-3 py-2 text-xs text-muted-foreground">
+                        Selected: <span className="text-foreground">{composerMediaItems[0].name}</span>
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div className="space-y-3 border-t border-border/50 pt-4">
+                  <Label className="text-base font-semibold">Account</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="autopost-provider" className="text-xs text-muted-foreground">
+                      Platform
+                    </Label>
+                    <Select value={composerProvider} onValueChange={handleComposerProviderChange}>
+                      <SelectTrigger id="autopost-provider" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-120">
+                        <SelectItem
+                          value="instagram"
+                          disabled={repurposeSource ? !repurposeAllowedProviders.has("instagram") : false}
+                        >
+                          Instagram
+                        </SelectItem>
+                        <SelectItem value="tiktok" disabled={repurposeSource ? !repurposeAllowedProviders.has("tiktok") : false}>
+                          TikTok
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {composerProvider === "instagram" ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="autopost-account" className="text-xs text-muted-foreground">
+                        Instagram account
+                      </Label>
+                      <Select
+                        value={selectedComposerConnectionId ?? undefined}
+                        onValueChange={(value) => {
+                          setSelectedComposerConnectionId(value)
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem(AUTOPOST_COMPOSER_ACCOUNT_KEY, value)
+                          }
+                        }}
+                        disabled={!isConnected || instagramConnections.length === 0}
+                      >
+                        <SelectTrigger id="autopost-account" className="h-auto min-h-11 w-full py-2">
+                          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                            {instagramComposerAvatarSrc ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                alt=""
+                                className="h-9 w-9 shrink-0 rounded-full object-cover"
+                                src={instagramComposerAvatarSrc}
+                              />
+                            ) : (
+                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                                <UserRound className="h-4 w-4 text-muted-foreground" />
+                              </span>
+                            )}
+                            <BrandIcon provider="instagram" className="h-5 w-5 shrink-0" />
+                            <SelectValue
+                              placeholder={isConnected ? "Select account" : "Connect Instagram first"}
+                              className="truncate"
+                            />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-120">
+                          {instagramConnections
+                            .filter((c) => c.instagramConnectionId && c.status === "connected")
+                            .map((c) => (
+                              <SelectItem key={c.id} value={c.instagramConnectionId as string}>
+                                {c.instagramUsername ? `@${c.instagramUsername}` : c.instagramUserId ?? "Account"}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="autopost-tiktok-account" className="text-xs text-muted-foreground">
+                        TikTok account
+                      </Label>
+                      <Select
+                        value={selectedTikTokConnectionId ?? undefined}
+                        onValueChange={setSelectedTikTokConnectionId}
+                        disabled={!isTikTokConnected}
+                      >
+                        <SelectTrigger id="autopost-tiktok-account" className="h-auto min-h-11 w-full py-2">
+                          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                            {tiktokComposerAvatarSrc ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                alt=""
+                                className="h-9 w-9 shrink-0 rounded-full object-cover"
+                                src={tiktokComposerAvatarSrc}
+                              />
+                            ) : (
+                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                                <UserRound className="h-4 w-4 text-muted-foreground" />
+                              </span>
+                            )}
+                            <BrandIcon provider="tiktok" className="h-5 w-5 shrink-0" />
+                            <SelectValue placeholder={isTikTokConnected ? "Select account" : "Connect TikTok first"} className="truncate" />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-120">
+                          {tiktokConnections
+                            .filter((connection) => connection.status === "connected")
+                            .map((connection) => (
+                              <SelectItem key={connection.id} value={connection.id}>
+                                {connection.displayName || connection.username || "TikTok account"}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {composerProvider === "tiktok" ? (
+                    <div className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <Label htmlFor="autopost-tiktok-mode">TikTok action</Label>
+                          <Select
+                            value={tiktokMode}
+                            onValueChange={(value) => {
+                              if (value === "direct" && !tikTokDirectPostEnabled) {
+                                toast.info("Coming soon: TikTok Direct Post", {
+                                  description:
+                                    "For now, use “Send to inbox draft” — content opens in TikTok as a draft so you can review and publish from the app.",
+                                })
+                                return
+                              }
+                              setTikTokMode(value as TikTokMode)
+                            }}
+                          >
+                            <SelectTrigger id="autopost-tiktok-mode" className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent position="popper" className="z-120">
+                              <SelectItem value="upload">Send to inbox draft</SelectItem>
+                              <SelectItem value="direct">Direct Post</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex shrink-0 flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Required scope</span>
+                          <Badge variant={hasScope(selectedTikTokConnection, tikTokRequiredScope) ? "default" : "outline"}>
+                            {tikTokRequiredScope}
+                          </Badge>
+                        </div>
+                      </div>
+                      {!hasScope(selectedTikTokConnection, tikTokRequiredScope) ? (
+                        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-950 dark:text-amber-100">
+                          Reconnect TikTok to approve {tiktokMode === "direct" ? "Direct Post" : "upload"} permissions.
+                          <Button type="button" size="sm" className="mt-2 w-full" onClick={handleConnectTikTok}>
+                            Reconnect TikTok
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
-                </div>
-              ) : null}
-
-              {composerProvider === "instagram" ? (
-              <div className="space-y-2">
-                <Label htmlFor="autopost-post-type">Post type</Label>
-                <Select
-                  value={postFormat}
-                  onValueChange={handleInstagramPostFormatChange}
-                  disabled={!isConnected || instagramConnections.length === 0}
-                >
-                  <SelectTrigger id="autopost-post-type" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-120">
-                    <SelectItem
-                      value="feed_image"
-                      disabled={
-                        repurposeSource
-                          ? !repurposeTargetsForInstagram.some((target) => target.postFormat === "feed_image")
-                          : false
-                      }
-                    >
-                      Feed photo
-                    </SelectItem>
-                    <SelectItem
-                      value="feed_video"
-                      disabled={
-                        repurposeSource
-                          ? !repurposeTargetsForInstagram.some((target) => target.postFormat === "feed_video")
-                          : false
-                      }
-                    >
-                      Feed video
-                    </SelectItem>
-                    <SelectItem
-                      value="reel"
-                      disabled={
-                        repurposeSource
-                          ? !repurposeTargetsForInstagram.some((target) => target.postFormat === "reel")
-                          : false
-                      }
-                    >
-                      Reel
-                    </SelectItem>
-                    <SelectItem
-                      value="carousel"
-                      disabled={
-                        repurposeSource
-                          ? !repurposeTargetsForInstagram.some((target) => target.postFormat === "carousel")
-                          : false
-                      }
-                    >
-                      Carousel (feed)
-                    </SelectItem>
-                    <SelectItem
-                      value="story"
-                      disabled={
-                        repurposeSource
-                          ? !repurposeTargetsForInstagram.some((target) => target.postFormat === "story")
-                          : false
-                      }
-                    >
-                      Story
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Reels are single videos. Carousel = up to 10 slides on the feed. Stories expire after 24h.
-                </p>
-              </div>
-              ) : null}
-
-              {composerProvider === "instagram" && postFormat === "reel" ? (
-                <div className="flex items-start gap-2">
-                  <Checkbox
-                    id="autopost-reel-feed"
-                    checked={shareReelToFeed}
-                    onCheckedChange={(c) => setShareReelToFeed(c === true)}
-                    className="mt-0.5"
-                  />
-                  <div className="space-y-0.5">
-                    <Label htmlFor="autopost-reel-feed" className="cursor-pointer font-normal leading-snug">
-                      Also show this reel on the main feed
-                    </Label>
+                  {composerProvider === "instagram" ? (
                     <p className="text-xs text-muted-foreground">
-                      When off, Meta may still surface the reel in Reels only (per Instagram rules).
+                      New posts and drafts are saved for the account you pick here.
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2 border-t border-border/50 pt-4">
+                  <Label htmlFor="autopost-caption" className="text-base font-semibold">
+                    {composerProvider === "tiktok" && tiktokPostType === "photo" ? "Title" : "Caption"}
+                  </Label>
+                  <Textarea
+                    id="autopost-caption"
+                    value={caption}
+                    onChange={(event) => setCaption(event.target.value)}
+                    placeholder={
+                      composerProvider === "tiktok"
+                        ? tiktokPostType === "photo"
+                          ? "Short TikTok photo title..."
+                          : "TikTok title/caption..."
+                        : "Write your caption..."
+                    }
+                    rows={5}
+                    disabled={composerProvider === "instagram" && postFormat === "story"}
+                  />
+                  {composerProvider === "instagram" && postFormat === "story" ? (
+                    <p className="text-xs text-muted-foreground">
+                      Story captions are not supported by the Instagram publishing API; compose text in-app if needed.
+                    </p>
+                  ) : null}
+                  {composerProvider === "tiktok" ? (
+                    <p className="text-xs text-muted-foreground">
+                      {tiktokPostType === "photo"
+                        ? "TikTok photo posts support a title plus an optional description. Inbox drafts can still be edited in TikTok."
+                        : "TikTok captions are sent as the video title for Direct Post. Inbox drafts can still be edited in TikTok."}
+                    </p>
+                  ) : null}
+                </div>
+
+                {composerProvider === "tiktok" && tiktokPostType === "photo" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="autopost-tiktok-description">Description (optional)</Label>
+                    <Textarea
+                      id="autopost-tiktok-description"
+                      value={tiktokDescription}
+                      onChange={(event) => setTikTokDescription(event.target.value)}
+                      placeholder="Longer TikTok photo description..."
+                      rows={4}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Sent to TikTok photo posts as `description`. Click a preview above to choose the cover image.
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="space-y-2 border-t border-border/50 pt-4">
+                  <Label className="text-base font-semibold" htmlFor="autopost-post-type-readout">
+                    Post type
+                  </Label>
+                  <div
+                    id="autopost-post-type-readout"
+                    className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5"
+                  >
+                    <Badge variant="secondary" className="shrink-0 font-medium">
+                      {inferredComposerPostTypeLabel(composerProvider, postFormat, tiktokPostType)}
+                    </Badge>
+                    <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                      {repurposeSource
+                        ? "Locked to the repurposed destination."
+                        : "Inferred from your files—one image is a feed photo, one video is a reel (Instagram) or TikTok video, multiple images become a carousel or TikTok photo post."}
                     </p>
                   </div>
                 </div>
-              ) : null}
 
-              {composerProvider === "instagram" ? (
-              <div className="space-y-2">
-                <Label htmlFor="autopost-account">Instagram account</Label>
-                <Select
-                  value={selectedComposerConnectionId ?? undefined}
-                  onValueChange={(value) => {
-                    setSelectedComposerConnectionId(value)
-                    if (typeof window !== "undefined") {
-                      localStorage.setItem(AUTOPOST_COMPOSER_ACCOUNT_KEY, value)
-                    }
-                  }}
-                  disabled={!isConnected || instagramConnections.length === 0}
-                >
-                  <SelectTrigger id="autopost-account" className="w-full">
-                    <SelectValue placeholder={isConnected ? "Select account" : "Connect Instagram first"} />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-120">
-                    {instagramConnections
-                      .filter((c) => c.instagramConnectionId && c.status === "connected")
-                      .map((c) => (
-                      <SelectItem key={c.id} value={c.instagramConnectionId as string}>
-                        {c.instagramUsername ? `@${c.instagramUsername}` : c.instagramUserId ?? "Account"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  New posts and drafts are saved for the account you pick here.
-                </p>
-              </div>
-              ) : null}
-
-              {composerProvider === "tiktok" && tiktokMode === "direct" ? (
-                <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
-                  <div className="flex items-center justify-between gap-3">
+                {composerProvider === "instagram" && postFormat === "reel" ? (
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      id="autopost-reel-feed"
+                      checked={shareReelToFeed}
+                      onCheckedChange={(c) => setShareReelToFeed(c === true)}
+                      className="mt-0.5"
+                    />
                     <div className="space-y-0.5">
-                      <Label htmlFor="autopost-tiktok-privacy">Privacy</Label>
+                      <Label htmlFor="autopost-reel-feed" className="cursor-pointer font-normal leading-snug">
+                        Also show this reel on the main feed
+                      </Label>
                       <p className="text-xs text-muted-foreground">
-                        Loaded from TikTok creator settings before Direct Post.
+                        When off, Meta may still surface the reel in Reels only (per Instagram rules).
                       </p>
                     </div>
-                    {isLoadingTikTokCreatorInfo ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
                   </div>
-                  <Select
-                    value={tiktokPrivacyLevel}
-                    onValueChange={setTikTokPrivacyLevel}
-                    disabled={isLoadingTikTokCreatorInfo}
-                  >
-                    <SelectTrigger id="autopost-tiktok-privacy" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper" className="z-120">
-                      {(tiktokCreatorInfo?.privacy_level_options?.length
-                        ? tiktokCreatorInfo.privacy_level_options
-                        : ["SELF_ONLY"]
-                      ).map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {privacyLabel(option)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="flex items-start gap-2 text-sm">
-                      <Checkbox
-                        checked={tiktokDisableComment}
-                        disabled={tiktokCreatorInfo?.comment_disabled === true}
-                        onCheckedChange={(value) => setTikTokDisableComment(value === true)}
-                      />
-                      <span>Disable comments</span>
-                    </label>
-                    {tiktokPostType === "video" ? (
-                      <label className="flex items-start gap-2 text-sm">
-                        <Checkbox
-                          checked={tiktokDisableDuet}
-                          disabled={tiktokCreatorInfo?.duet_disabled === true}
-                          onCheckedChange={(value) => setTikTokDisableDuet(value === true)}
-                        />
-                        <span>Disable duet</span>
-                      </label>
-                    ) : (
-                      <label className="flex items-start gap-2 text-sm">
-                        <Checkbox
-                          checked={tiktokAutoAddMusic}
-                          onCheckedChange={(value) => setTikTokAutoAddMusic(value === true)}
-                        />
-                        <span>Auto-add recommended music</span>
-                      </label>
-                    )}
-                    {tiktokPostType === "video" ? (
-                      <label className="flex items-start gap-2 text-sm">
-                        <Checkbox
-                          checked={tiktokDisableStitch}
-                          disabled={tiktokCreatorInfo?.stitch_disabled === true}
-                          onCheckedChange={(value) => setTikTokDisableStitch(value === true)}
-                        />
-                        <span>Disable stitch</span>
-                      </label>
-                    ) : null}
-                    <label className="flex items-start gap-2 text-sm">
-                      <Checkbox
-                        checked={tiktokIsAigc}
-                        onCheckedChange={(value) => setTikTokIsAigc(value === true)}
-                      />
-                      <span>Label as AI-generated</span>
-                    </label>
-                    <label className="flex items-start gap-2 text-sm sm:col-span-2">
-                      <Checkbox
-                        checked={tiktokBrandOrganic}
-                        onCheckedChange={(value) => setTikTokBrandOrganic(value === true)}
-                      />
-                      <span>Promotes my own business or brand</span>
-                    </label>
-                    <label className="flex items-start gap-2 text-sm sm:col-span-2">
-                      <Checkbox
-                        checked={tiktokBrandContent}
-                        onCheckedChange={(value) => setTikTokBrandContent(value === true)}
-                      />
-                      <span>Paid partnership or branded content</span>
-                    </label>
-                  </div>
-                </div>
-              ) : null}
+                ) : null}
 
-              <div className="space-y-2">
-                <Label htmlFor="autopost-media">Media</Label>
-                <Input
-                  key={`${composerProvider}-${postFormat}-${tiktokPostType}`}
-                  id="autopost-media"
-                  ref={fileInputRef}
-                  type="file"
-                  accept={
-                    composerProvider === "tiktok"
-                      ? tiktokPostType === "photo"
-                        ? "image/jpeg,image/png,image/webp,image/gif"
-                        : "video/mp4,video/quicktime,video/webm"
-                      : "image/*,video/*"
-                  }
-                  multiple={
-                    (composerProvider === "instagram" && postFormat === "carousel") ||
-                    (composerProvider === "tiktok" && tiktokPostType === "photo")
-                  }
-                  className="cursor-pointer"
-                  onChange={handleMediaFileChange}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {repurposeSource ? "Upload new files any time to replace the repurposed media. " : ""}
-                  {composerProvider === "tiktok"
-                    ? tiktokPostType === "photo"
-                      ? "Select 1-35 images. Order is preserved, and TikTok will pull each public URL from your uploads."
-                      : "Select one MP4, MOV, or WebM video. TikTok will pull it from the uploaded public URL."
-                    : postFormat === "carousel"
-                      ? "Select 2-10 images and/or videos. Order is preserved."
-                      : "One image or one video depending on post type."}{" "}
-                  {composerProvider === "instagram" ? (
-                    <>
-                      PNG/WebP/GIF are converted to JPEG where needed (
-                      <span className="text-foreground/80">max 10 MB</span> upload).
-                    </>
-                  ) : null}
-                  </p>
-              </div>
-
-              {composerProvider === "instagram" && postFormat === "reel" ? (
-                <div className="space-y-2">
-                  <Label htmlFor="autopost-reel-cover">Cover image URL (optional)</Label>
-                  <Input
-                    id="autopost-reel-cover"
-                    value={reelCoverUrl}
-                    onChange={(e) => setReelCoverUrl(e.target.value)}
-                    placeholder="https://… (JPEG, public HTTPS)"
-                    className="font-mono text-xs"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Use a public JPEG URL from your uploads (same storage as media).
-                  </p>
-                </div>
-              ) : null}
-
-              {composerMediaItems.length > 0 &&
-              ((composerProvider === "instagram" && postFormat === "carousel") ||
-                (composerProvider === "tiktok" && tiktokPostType === "photo")) ? (
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {composerMediaItems.map((item, i) => {
-                    const isTikTokPhotoCover = composerProvider === "tiktok" && tiktokPostType === "photo" && i === tiktokPhotoCoverIndex
-                    return (
-                      <div
-                        key={`${item.url}-${i}`}
-                        className={cn(
-                          "relative aspect-square overflow-hidden rounded-md border bg-muted/30",
-                          composerProvider === "tiktok" &&
-                            tiktokPostType === "photo" &&
-                            "cursor-pointer transition hover:border-primary/60",
-                          isTikTokPhotoCover && "border-primary ring-2 ring-primary/25"
-                        )}
-                        onClick={() => {
-                          if (composerProvider === "tiktok" && tiktokPostType === "photo") {
-                            setTikTokPhotoCoverIndex(i)
-                          }
-                        }}
-                      >
-                        {item.kind === "image" ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" className="h-full w-full object-cover" src={item.url} />
-                        ) : item.kind === "video" ? (
-                          <video className="h-full w-full object-cover" src={item.url} muted playsInline />
-                        ) : null}
-                        {composerProvider === "tiktok" && tiktokPostType === "photo" ? (
-                          <span className="absolute left-1 top-1 rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
-                            {isTikTokPhotoCover ? "Cover" : `#${i + 1}`}
-                          </span>
-                        ) : null}
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : null}
-
-              {composerMediaItems.length === 1 &&
-              composerMediaItems[0]?.kind === "image" &&
-              !(composerProvider === "instagram" && postFormat === "carousel") &&
-              !(composerProvider === "tiktok" && tiktokPostType === "photo") ? (
-                <div className="overflow-hidden rounded-md border bg-muted/30">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt="Selected media preview"
-                    className="max-h-48 w-full object-contain"
-                    src={composerMediaItems[0].url}
-                  />
-                </div>
-              ) : null}
-
-              {composerMediaItems.length === 1 && composerMediaItems[0]?.kind === "video" ? (
-                <div className="overflow-hidden rounded-md border bg-muted/30">
-                  <video
-                    className="max-h-52 w-full object-contain"
-                    src={composerMediaItems[0].url}
-                    muted
-                    controls
-                    playsInline
-                    preload="metadata"
-                  />
-                  {composerMediaItems[0].name ? (
-                    <p className="border-t border-border/70 px-3 py-2 text-xs text-muted-foreground">
-                      Selected: <span className="text-foreground">{composerMediaItems[0].name}</span>
+                {composerProvider === "instagram" && postFormat === "reel" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="autopost-reel-cover">Cover image URL (optional)</Label>
+                    <Input
+                      id="autopost-reel-cover"
+                      value={reelCoverUrl}
+                      onChange={(e) => setReelCoverUrl(e.target.value)}
+                      placeholder="https://… (JPEG, public HTTPS)"
+                      className="font-mono text-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Use a public JPEG URL from your uploads (same storage as media).
                     </p>
-                  ) : null}
-                </div>
-              ) : null}
+                  </div>
+                ) : null}
 
-              <div className="space-y-2">
-                <Label htmlFor="autopost-caption">
-                  {composerProvider === "tiktok" && tiktokPostType === "photo" ? "Title" : "Caption"}
-                </Label>
-                <Textarea
-                  id="autopost-caption"
-                  value={caption}
-                  onChange={(event) => setCaption(event.target.value)}
-                  placeholder={
-                    composerProvider === "tiktok"
-                      ? tiktokPostType === "photo"
-                        ? "Short TikTok photo title..."
-                        : "TikTok title/caption..."
-                      : "Write your caption..."
-                  }
-                  rows={5}
-                  disabled={composerProvider === "instagram" && postFormat === "story"}
-                />
-                {composerProvider === "instagram" && postFormat === "story" ? (
-                  <p className="text-xs text-muted-foreground">
-                    Story captions are not supported by the Instagram publishing API; compose text in-app if needed.
-                  </p>
+                {composerProvider === "tiktok" && tiktokMode === "direct" ? (
+                  <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="autopost-tiktok-privacy">Privacy</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Loaded from TikTok creator settings before Direct Post.
+                        </p>
+                      </div>
+                      {isLoadingTikTokCreatorInfo ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+                    </div>
+                    <Select
+                      value={tiktokPrivacyLevel}
+                      onValueChange={setTikTokPrivacyLevel}
+                      disabled={isLoadingTikTokCreatorInfo}
+                    >
+                      <SelectTrigger id="autopost-tiktok-privacy" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-120">
+                        {(tiktokCreatorInfo?.privacy_level_options?.length
+                          ? tiktokCreatorInfo.privacy_level_options
+                          : ["SELF_ONLY"]
+                        ).map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {privacyLabel(option)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                          checked={tiktokDisableComment}
+                          disabled={tiktokCreatorInfo?.comment_disabled === true}
+                          onCheckedChange={(value) => setTikTokDisableComment(value === true)}
+                        />
+                        <span>Disable comments</span>
+                      </label>
+                      {tiktokPostType === "video" ? (
+                        <label className="flex items-start gap-2 text-sm">
+                          <Checkbox
+                            checked={tiktokDisableDuet}
+                            disabled={tiktokCreatorInfo?.duet_disabled === true}
+                            onCheckedChange={(value) => setTikTokDisableDuet(value === true)}
+                          />
+                          <span>Disable duet</span>
+                        </label>
+                      ) : (
+                        <label className="flex items-start gap-2 text-sm">
+                          <Checkbox
+                            checked={tiktokAutoAddMusic}
+                            onCheckedChange={(value) => setTikTokAutoAddMusic(value === true)}
+                          />
+                          <span>Auto-add recommended music</span>
+                        </label>
+                      )}
+                      {tiktokPostType === "video" ? (
+                        <label className="flex items-start gap-2 text-sm">
+                          <Checkbox
+                            checked={tiktokDisableStitch}
+                            disabled={tiktokCreatorInfo?.stitch_disabled === true}
+                            onCheckedChange={(value) => setTikTokDisableStitch(value === true)}
+                          />
+                          <span>Disable stitch</span>
+                        </label>
+                      ) : null}
+                      <label className="flex items-start gap-2 text-sm">
+                        <Checkbox checked={tiktokIsAigc} onCheckedChange={(value) => setTikTokIsAigc(value === true)} />
+                        <span>Label as AI-generated</span>
+                      </label>
+                      <label className="flex items-start gap-2 text-sm sm:col-span-2">
+                        <Checkbox
+                          checked={tiktokBrandOrganic}
+                          onCheckedChange={(value) => setTikTokBrandOrganic(value === true)}
+                        />
+                        <span>Promotes my own business or brand</span>
+                      </label>
+                      <label className="flex items-start gap-2 text-sm sm:col-span-2">
+                        <Checkbox
+                          checked={tiktokBrandContent}
+                          onCheckedChange={(value) => setTikTokBrandContent(value === true)}
+                        />
+                        <span>Paid partnership or branded content</span>
+                      </label>
+                    </div>
+                  </div>
                 ) : null}
-                {composerProvider === "tiktok" ? (
-                  <p className="text-xs text-muted-foreground">
-                    {tiktokPostType === "photo"
-                      ? "TikTok photo posts support a title plus an optional description. Inbox drafts can still be edited in TikTok."
-                      : "TikTok captions are sent as the video title for Direct Post. Inbox drafts can still be edited in TikTok."}
-                  </p>
+
+                {composerProvider === "tiktok" && tiktokMode === "upload" ? (
+                  <div className="rounded-lg border border-border/60 bg-muted/25 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+                    <span className="font-medium text-foreground">TikTok inbox drafts: </span>
+                    After we send your upload, open the TikTok app on your phone, go to{" "}
+                    <span className="text-foreground">Profile</span>, then open{" "}
+                    <span className="text-foreground">Drafts</span>. On some app versions the same draft may appear from
+                    the posting tray, composer inbox, or an <span className="text-foreground">Inbox</span> entry—labels
+                    vary by region and version. Edit there (sound, stickers, cover) and publish when you are ready.
+                  </div>
                 ) : null}
+
               </div>
-
-              {composerProvider === "tiktok" && tiktokPostType === "photo" ? (
-                <div className="space-y-2">
-                  <Label htmlFor="autopost-tiktok-description">Description (optional)</Label>
-                  <Textarea
-                    id="autopost-tiktok-description"
-                    value={tiktokDescription}
-                    onChange={(event) => setTikTokDescription(event.target.value)}
-                    placeholder="Longer TikTok photo description..."
-                    rows={4}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Sent to TikTok photo posts as `description`. Click a preview above to choose the cover image.
-                  </p>
-                </div>
-              ) : null}
-
               <Tabs value={composerTab} onValueChange={(v) => setComposerTab(v as "now" | "schedule")}>
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="now" className="gap-1.5">
@@ -3019,19 +3086,20 @@ export function AutopostPage() {
                 <TabsContent value="schedule" className="mt-4 space-y-3">
                   <div className="space-y-2">
                     <Label id="autopost-schedule-label">When to post</Label>
-                    <Popover open={schedulePickerOpen} onOpenChange={setSchedulePickerOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-10 w-full justify-start font-normal"
-                          id="autopost-schedule-picker"
-                          aria-labelledby="autopost-schedule-label"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 shrink-0 opacity-70" />
-                          <span className="truncate">{format(scheduleDate, "EEE, MMM d, yyyy 'at' h:mm a")}</span>
-                        </Button>
-                      </PopoverTrigger>
+                    <div className="flex gap-2">
+                      <Popover open={schedulePickerOpen} onOpenChange={setSchedulePickerOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-10 min-w-0 flex-1 justify-start font-normal"
+                            id="autopost-schedule-picker"
+                            aria-labelledby="autopost-schedule-label"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4 shrink-0 opacity-70" />
+                            <span className="truncate">{format(scheduleDate, "EEE, MMM d, yyyy 'at' h:mm a")}</span>
+                          </Button>
+                        </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
                         <div className="flex flex-col gap-0 sm:flex-row">
                           <Calendar
@@ -3112,6 +3180,20 @@ export function AutopostPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 shrink-0"
+                        aria-label="Reset schedule to default"
+                        onClick={() => {
+                          setScheduleDate(defaultScheduleDate())
+                          setSchedulePickerOpen(false)
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       Uses your local timezone. The post is picked up within about a minute after this time.
                     </p>

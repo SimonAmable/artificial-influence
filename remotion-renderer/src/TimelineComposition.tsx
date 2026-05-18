@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react"
+import { useMemo } from "react"
 import { createTikTokStyleCaptions } from "@remotion/captions"
 import { Audio, Video } from "@remotion/media"
 import {
@@ -49,6 +50,17 @@ function TrackLayer({
   )
 }
 
+function premountFramesForItem(item: EditorItem, fps: number): number {
+  switch (item.type) {
+    case "video":
+    case "audio":
+    case "gif":
+      return Math.min(15, Math.max(1, Math.round(fps / 2)))
+    default:
+      return 0
+  }
+}
+
 function ItemSequence({
   item,
   muted,
@@ -58,11 +70,13 @@ function ItemSequence({
   muted: boolean
   project: EditorProject
 }) {
+  const premount = premountFramesForItem(item, project.settings.fps)
+
   return (
     <Sequence
       from={item.from}
       durationInFrames={item.durationInFrames}
-      premountFor={project.settings.fps}
+      {...(premount > 0 ? { premountFor: premount } : {})}
       layout="absolute-fill"
     >
       <ItemRenderer item={item} muted={muted} />

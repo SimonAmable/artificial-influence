@@ -303,7 +303,7 @@ export function FounderTestimonialSection() {
                       ? { duration: 4.2, times: [0, 0.3, 0.78, 1], delay: 0.72, ease: "linear", repeat: Infinity, repeatDelay: 0.5 }
                       : { duration: 0.38, delay: 0.72, ease: easeOut }
                   }
-                  className="absolute left-[var(--inflection-left)] top-[var(--inflection-top)] z-10 -translate-x-1/2 -translate-y-[115%] sm:-translate-x-[38%]"
+                  className="absolute left-[var(--inflection-left)] top-[var(--inflection-top)] z-20 -translate-x-1/2 translate-y-3 sm:-translate-x-[38%] sm:-translate-y-[115%]"
                   style={
                     {
                       "--inflection-left": `${(hitVideoPoint.x / svgWidth) * 100}%`,

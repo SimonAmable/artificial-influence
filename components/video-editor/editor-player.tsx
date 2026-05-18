@@ -8,25 +8,29 @@ import type { EditorProject } from "@/lib/video-editor/types"
 type EditorPlayerProps = {
   project: EditorProject
   currentFrame: number
-  onFrameUpdate?: (frame: number) => void
   isPlaying: boolean
   loop: boolean
   muted: boolean
   className?: string
   playerRef: React.RefObject<PlayerRef | null>
+  onPlaybackEnded?: () => void
+  onPausedAtFrame?: (frame: number) => void
 }
 
 export function EditorPlayer({
   project,
   currentFrame,
-  onFrameUpdate,
   isPlaying,
   loop,
   muted,
   className,
   playerRef,
+  onPlaybackEnded,
+  onPausedAtFrame,
 }: EditorPlayerProps) {
-  const { fps, width, height, durationInFrames } = project.settings
+  const { width, height, durationInFrames, fps } = project.settings
+  const inputProps = React.useMemo(() => ({ project }), [project])
+  const wasPlayingRef = React.useRef(isPlaying)
 
   React.useEffect(() => {
     const p = playerRef.current
@@ -44,14 +48,29 @@ export function EditorPlayer({
   }, [isPlaying, playerRef])
 
   React.useEffect(() => {
-    const p = playerRef.current
-    if (!p || !onFrameUpdate) return
-    const cb = (ev: { detail: { frame: number } }) => {
-      onFrameUpdate(ev.detail.frame)
+    if (wasPlayingRef.current && !isPlaying) {
+      const frame = playerRef.current?.getCurrentFrame()
+      if (frame !== undefined) {
+        onPausedAtFrame?.(frame)
+      }
     }
-    p.addEventListener("frameupdate", cb)
-    return () => p.removeEventListener("frameupdate", cb)
-  }, [onFrameUpdate, playerRef])
+    wasPlayingRef.current = isPlaying
+  }, [isPlaying, onPausedAtFrame, playerRef])
+
+  React.useEffect(() => {
+    const p = playerRef.current
+    if (!p || !isPlaying) return
+
+    const onFrame = (ev: { detail: { frame: number } }) => {
+      const frame = ev.detail.frame
+      if (!loop && frame >= durationInFrames - 1) {
+        onPlaybackEnded?.()
+      }
+    }
+
+    p.addEventListener("frameupdate", onFrame)
+    return () => p.removeEventListener("frameupdate", onFrame)
+  }, [durationInFrames, isPlaying, loop, onPlaybackEnded, playerRef])
 
   React.useEffect(() => {
     const p = playerRef.current
@@ -65,7 +84,7 @@ export function EditorPlayer({
       <Player
         ref={playerRef}
         component={EditorComposition}
-        inputProps={{ project }}
+        inputProps={inputProps}
         durationInFrames={durationInFrames}
         fps={fps}
         compositionWidth={width}
