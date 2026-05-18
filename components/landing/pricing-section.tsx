@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import { getStoredAffiliateRef } from '@/hooks/use-affiliate-ref';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -12,6 +14,18 @@ import { CreditPackCheckout } from '@/components/credits/credit-pack-checkout';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { FOUNDER_NOTE_PHOTO_SRC } from '@/lib/onboarding/founder-note';
+
+const FOUNDER_X_PROFILE_HREF = 'https://x.com/Simoncodingshit' as const;
+const FOUNDER_X_PROOF_POST_HREF =
+  'https://x.com/Simoncodingshit/status/2051864111655330245?s=20' as const;
+
+type PlanFeature = {
+  name: string;
+  info: string;
+  /** Rich popover body; falls back to a paragraph of `info` when omitted */
+  infoContent?: ReactNode;
+};
 
 type PricingPlan = {
   id: string;
@@ -22,7 +36,7 @@ type PricingPlan = {
   interval: 'month' | 'year';
   currency: 'USD' | 'CAD';
   credits: number;
-  features: { name: string; info: string }[];
+  features: PlanFeature[];
   popular?: boolean;
   priceNote?: string;
 };
@@ -52,6 +66,59 @@ const cardFade = {
   visible: { opacity: 1, y: 0 },
 };
 
+function PersonalSupportPopoverBody() {
+  return (
+    <div className="space-y-3 text-sm leading-relaxed">
+      <div className="flex gap-3">
+        <Image
+          src={FOUNDER_NOTE_PHOTO_SRC}
+          alt="Simon, founder of UniCan"
+          width={48}
+          height={48}
+          className="h-12 w-12 shrink-0 rounded-full border-2 border-border object-cover"
+        />
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="font-semibold leading-tight text-foreground">Simon</p>
+          <p className="text-xs text-muted-foreground">Founder, UniCan</p>
+        </div>
+      </div>
+      <p className="text-muted-foreground">
+        Personal support means you reach me directly—not a generic queue. Bugs, billing questions, and
+        feature ideas land in my inbox and I aim to reply within 24 hours.
+      </p>
+      <blockquote className="border-l-2 border-primary/45 pl-3 text-muted-foreground italic">
+        &ldquo;I really do use UniCan every day as my main marketing tool—if something feels off or
+        you want a feature and you&apos;re not sure it&apos;s worth asking, please just tell me. I
+        usually ship fixes and requests within 24 hours.&rdquo;
+      </blockquote>
+      <div className="flex flex-col gap-2 border-t border-border/60 pt-2">
+        <Link
+          href={FOUNDER_X_PROFILE_HREF}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-primary underline underline-offset-4 transition-opacity hover:opacity-80"
+        >
+          Follow me on X
+        </Link>
+        <Link
+          href={FOUNDER_X_PROOF_POST_HREF}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs font-medium text-primary underline underline-offset-4 transition-opacity hover:opacity-80"
+        >
+          See the proof on X
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+const personalSupportFeature: PlanFeature = {
+  name: 'Personal support',
+  info: 'Direct replies from Simon, founder—typically within 24 hours. Links to X in the details.',
+  infoContent: <PersonalSupportPopoverBody />,
+};
+
 const monthlyPlans: PricingPlan[] = [
   {
     id: 'starter-monthly',
@@ -75,17 +142,14 @@ const monthlyPlans: PricingPlan[] = [
         name: 'Early access to new models',
         info: 'Be among the first to try new AI models and features as they are released',
       },
-      {
-        name: 'Priority support',
-        info: 'Get priority email support with faster response times (within 24 hours)',
-      },
+      personalSupportFeature,
       {
         name: 'Commercial license',
         info: 'Use generated content for commercial purposes without attribution requirements',
       },
       {
-        name: '1 Instagram connection',
-        info: 'Connect one Instagram account for publishing and related workflows',
+        name: 'Unlimited Instagram & TikTok connections',
+        info: 'Connect as many Instagram and TikTok accounts as you need for publishing, autopost, and related workflows',
       },
       {
         name: 'Unlimited automations',
@@ -115,17 +179,14 @@ const monthlyPlans: PricingPlan[] = [
         name: 'Early access to new models',
         info: 'Be among the first to try new AI models and features as they are released',
       },
-      {
-        name: 'Priority support',
-        info: 'Get priority email support with faster response times (within 24 hours)',
-      },
+      personalSupportFeature,
       {
         name: 'Commercial license',
         info: 'Use generated content for commercial purposes without attribution requirements',
       },
       {
-        name: '3 Instagram connections',
-        info: 'Connect up to three Instagram accounts for publishing and related workflows',
+        name: 'Unlimited Instagram & TikTok connections',
+        info: 'Connect as many Instagram and TikTok accounts as you need for publishing, autopost, and related workflows',
       },
       {
         name: 'Unlimited automations',
@@ -156,10 +217,7 @@ const monthlyPlans: PricingPlan[] = [
         name: 'Early access to advanced features',
         info: 'Get first access to new AI models, features, and experimental capabilities',
       },
-      {
-        name: 'Dedicated support',
-        info: 'Get dedicated support with direct access to our team and priority assistance',
-      },
+      personalSupportFeature,
       {
         name: 'Commercial license',
         info: 'Full commercial license to use generated content for any purpose',
@@ -169,8 +227,8 @@ const monthlyPlans: PricingPlan[] = [
         info: 'Your generations are processed with higher priority for faster results',
       },
       {
-        name: '10 Instagram connections',
-        info: 'Connect up to ten Instagram accounts for teams, brands, or clients',
+        name: 'Unlimited Instagram & TikTok connections',
+        info: 'Connect as many Instagram and TikTok accounts as you need for publishing, autopost, and related workflows',
       },
       {
         name: 'Unlimited automations',
@@ -203,17 +261,14 @@ const yearlyPlans: PricingPlan[] = [
         name: 'Early access to new models',
         info: 'Be among the first to try new AI models and features as they are released',
       },
-      {
-        name: 'Priority support',
-        info: 'Get priority email support with faster response times (within 24 hours)',
-      },
+      personalSupportFeature,
       {
         name: 'Commercial license',
         info: 'Use generated content for commercial purposes without attribution requirements',
       },
       {
-        name: '1 Instagram connection',
-        info: 'Connect one Instagram account for publishing and related workflows',
+        name: 'Unlimited Instagram & TikTok connections',
+        info: 'Connect as many Instagram and TikTok accounts as you need for publishing, autopost, and related workflows',
       },
       {
         name: 'Unlimited automations',
@@ -243,17 +298,14 @@ const yearlyPlans: PricingPlan[] = [
         name: 'Early access to new models',
         info: 'Be among the first to try new AI models and features as they are released',
       },
-      {
-        name: 'Priority support',
-        info: 'Get priority email support with faster response times (within 24 hours)',
-      },
+      personalSupportFeature,
       {
         name: 'Commercial license',
         info: 'Use generated content for commercial purposes without attribution requirements',
       },
       {
-        name: '3 Instagram connections',
-        info: 'Connect up to three Instagram accounts for publishing and related workflows',
+        name: 'Unlimited Instagram & TikTok connections',
+        info: 'Connect as many Instagram and TikTok accounts as you need for publishing, autopost, and related workflows',
       },
       {
         name: 'Unlimited automations',
@@ -284,10 +336,7 @@ const yearlyPlans: PricingPlan[] = [
         name: 'Early access to advanced features',
         info: 'Get first access to new AI models, features, and experimental capabilities',
       },
-      {
-        name: 'Dedicated support',
-        info: 'Get dedicated support with direct access to our team and priority assistance',
-      },
+      personalSupportFeature,
       {
         name: 'Commercial license',
         info: 'Full commercial license to use generated content for any purpose',
@@ -297,8 +346,8 @@ const yearlyPlans: PricingPlan[] = [
         info: 'Your generations are processed with higher priority for faster results',
       },
       {
-        name: '10 Instagram connections',
-        info: 'Connect up to ten Instagram accounts for teams, brands, or clients',
+        name: 'Unlimited Instagram & TikTok connections',
+        info: 'Connect as many Instagram and TikTok accounts as you need for publishing, autopost, and related workflows',
       },
       {
         name: 'Unlimited automations',
@@ -331,7 +380,7 @@ function getYearlySavingsLabel(plan: PricingPlan, listMonthly?: number) {
   return savingsPercent > 0 ? `Save ${savingsPercent}%` : null;
 }
 
-const enterpriseFeatures: { name: string; info: string }[] = [
+const enterpriseFeatures: PlanFeature[] = [
   {
     name: 'Custom credit volume',
     info: 'Negotiated monthly or annual pools tailored to your team or production load',
@@ -349,8 +398,8 @@ const enterpriseFeatures: { name: string; info: string }[] = [
     info: 'Net payment terms and contracts where your finance team needs them',
   },
   {
-    name: 'Unlimited or custom Instagram connections',
-    info: 'Typically unlimited Instagram accounts; we can also set a custom limit to match procurement or policy',
+    name: 'Unlimited or custom social connections',
+    info: 'Typically unlimited Instagram and TikTok accounts; we can also set a custom limit to match procurement or policy',
   },
   {
     name: 'Unlimited automations',
@@ -416,7 +465,7 @@ function InfoPopover({
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className="max-w-xs text-sm leading-relaxed"
+        className="max-w-sm text-sm leading-relaxed"
         align="end"
         sideOffset={8}
         onMouseEnter={handleMouseEnter}
@@ -428,7 +477,7 @@ function InfoPopover({
   );
 }
 
-function PlanFeatureList({ features, className }: { features: { name: string; info: string }[]; className?: string }) {
+function PlanFeatureList({ features, className }: { features: PlanFeature[]; className?: string }) {
   return (
     <ul className={cn('space-y-3 mb-8', className)}>
       {features.map((feature, index) => (
@@ -448,7 +497,7 @@ function PlanFeatureList({ features, className }: { features: { name: string; in
             <span className="text-sm">{feature.name}</span>
           </div>
           <InfoPopover label={`More information about ${feature.name}`}>
-            <p>{feature.info}</p>
+            {feature.infoContent ?? <p>{feature.info}</p>}
           </InfoPopover>
         </li>
       ))}
@@ -519,7 +568,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
   const headerCopy: Record<PricingTab, { footer: string }> = {
     monthly: {
       footer:
-        'Create consistently with credits that stay in your balance, plus priority access and Instagram integrations on higher tiers. Cancel anytime.',
+        'Create consistently with credits that stay in your balance, plus priority access on higher tiers and unlimited Instagram and TikTok connections on every plan. Cancel anytime.',
     },
     yearly: {
       footer:

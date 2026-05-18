@@ -157,8 +157,8 @@ function SidebarThreadItem({
           : "text-foreground/85 hover:bg-muted/70 hover:text-foreground",
       )}
     >
-      <AutomationRunIndicator thread={thread} />
       <span className="min-w-0 flex-1 truncate font-medium">{thread.title}</span>
+      <AutomationRunIndicator thread={thread} />
       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
         {formatCompactUpdatedAt(thread.updated_at)}
       </span>
@@ -201,8 +201,8 @@ function CollapsedHistoryMenu({
                   href={`/chat/${thread.id}`}
                   className={cn("flex w-full items-center gap-2", isActive && "bg-muted")}
                 >
-                  <AutomationRunIndicator thread={thread} />
                   <span className="min-w-0 flex-1 truncate">{thread.title}</span>
+                  <AutomationRunIndicator thread={thread} />
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {formatCompactUpdatedAt(thread.updated_at)}
                   </span>

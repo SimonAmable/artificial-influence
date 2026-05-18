@@ -1083,6 +1083,24 @@ type ScheduleGenerationFollowUpToolPart = {
   errorText?: string
 }
 
+type DownloadSocialReferenceToolPart = {
+  type: "tool-downloadSocialReference"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    url?: string
+  }
+  output?: {
+    jobId?: string
+    message?: string
+    outputMediaKind?: "slideshow" | "video" | null
+    outputPublicUrl?: string | null
+    outputPublicUrls?: string[]
+    sourcePlatform?: "instagram" | "tiktok"
+  }
+  errorText?: string
+}
+
 type ComposerUploadAttachment = {
   file: File
   id: string
@@ -2487,6 +2505,27 @@ function UserMessageMediaParts({
       ))}
     </div>
   )
+}
+
+function humanizeToolPartType(toolType: string): string {
+  const id = toolType.startsWith("tool-") ? toolType.slice(5) : toolType
+  const spaced = id.replace(/([a-z0-9])([A-Z])/g, "$1 $2").trim()
+  if (!spaced) return "Tool"
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+function truncateMiddle(value: string, maxChars: number) {
+  if (value.length <= maxChars) return value
+  const head = Math.max(8, Math.floor(maxChars / 2) - 1)
+  const tail = maxChars - head - 1
+  return `${value.slice(0, head)}…${value.slice(-tail)}`
+}
+
+function inferSocialUrlLabel(url: string | undefined): "Instagram" | "TikTok" | "post" {
+  const lower = (url ?? "").toLowerCase()
+  if (lower.includes("instagram.com")) return "Instagram"
+  if (lower.includes("tiktok.com")) return "TikTok"
+  return "post"
 }
 
 function collectConsecutiveReasoningParts(
@@ -4796,6 +4835,143 @@ export function MessageParts({
                   <p>{output?.error || "Generation did not complete."}</p>
                 </CardContent>
               </Card>
+            )
+          }
+        }
+
+        if (part.type === "tool-downloadSocialReference") {
+          const toolPart = part as DownloadSocialReferenceToolPart
+          const url = typeof toolPart.input?.url === "string" ? toolPart.input.url.trim() : ""
+          const platformLabel = inferSocialUrlLabel(url || undefined)
+          const fetchLabel = platformLabel === "post" ? "reference" : platformLabel
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <div
+                key={`${message.id}-${index}`}
+                className="flex max-w-full items-center gap-2.5 rounded-full border border-border/30 bg-foreground/[0.03] px-3.5 py-2 text-[13px] text-muted-foreground"
+              >
+                <CircleNotch className="h-3.5 w-3.5 shrink-0 animate-spin opacity-80" aria-hidden />
+                <span className="min-w-0 leading-snug">
+                  <span className="text-foreground/90">Fetching {fetchLabel}</span>
+                  {url ? (
+                    <span className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground/90">
+                      {truncateMiddle(url, 64)}
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <div
+                key={`${message.id}-${index}`}
+                className="flex max-w-full flex-col gap-1 rounded-2xl border border-destructive/25 px-3.5 py-2 text-[13px]"
+              >
+                <span className="font-medium text-destructive">Could not save that post</span>
+                <span className="text-destructive/90">{toolPart.errorText || "Download failed."}</span>
+              </div>
+            )
+          }
+
+          if (toolPart.state === "output-available") {
+            const out = toolPart.output
+            const urls = Array.isArray(out?.outputPublicUrls)
+              ? out.outputPublicUrls.filter((href): href is string => typeof href === "string" && href.length > 0)
+              : []
+            const primary =
+              typeof out?.outputPublicUrl === "string" && out.outputPublicUrl.length > 0
+                ? out.outputPublicUrl
+                : urls[0]
+            const kind = out?.outputMediaKind
+            const summary =
+              typeof out?.message === "string" && out.message.trim().length > 0
+                ? out.message.trim()
+                : kind === "slideshow"
+                  ? `Saved ${urls.length || "a"} reference image${urls.length === 1 ? "" : "s"}.`
+                  : primary
+                    ? "Reference saved."
+                    : "Download finished."
+
+            return (
+              <div
+                key={`${message.id}-${index}`}
+                className="flex max-w-full flex-col gap-1.5 rounded-2xl border border-border/30 bg-foreground/[0.03] px-3.5 py-2.5 text-[13px]"
+              >
+                <span className="leading-snug text-foreground/90">{summary}</span>
+                {primary ? (
+                  <a
+                    href={primary}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-fit text-sm font-medium text-sky-400 underline decoration-sky-400/40 underline-offset-[3px] hover:text-sky-300"
+                  >
+                    Open media
+                  </a>
+                ) : null}
+                {kind === "slideshow" && urls.length > 1 ? (
+                  <span className="text-[11px] text-muted-foreground">{urls.length} files on your thread</span>
+                ) : null}
+              </div>
+            )
+          }
+
+          return null
+        }
+
+        if (typeof part.type === "string" && part.type.startsWith("tool-")) {
+          const generic = part as {
+            type: string
+            state?: string
+            input?: Record<string, unknown>
+            output?: Record<string, unknown>
+            errorText?: string
+          }
+          const label = humanizeToolPartType(generic.type)
+          const state = generic.state
+
+          if (state === "input-streaming" || state === "input-available") {
+            return (
+              <div
+                key={`${message.id}-${index}`}
+                className="flex max-w-full items-center gap-2.5 rounded-full border border-border/30 bg-foreground/[0.03] px-3.5 py-2 text-[13px] text-muted-foreground"
+              >
+                <CircleNotch className="h-3.5 w-3.5 shrink-0 animate-spin opacity-80" aria-hidden />
+                <span className="min-w-0 leading-snug">
+                  <span className="text-foreground/90">{label}</span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground/85">Running…</span>
+                </span>
+              </div>
+            )
+          }
+
+          if (state === "output-error") {
+            return (
+              <div
+                key={`${message.id}-${index}`}
+                className="flex max-w-full flex-col gap-1 rounded-2xl border border-destructive/25 px-3.5 py-2 text-[13px]"
+              >
+                <span className="font-medium text-destructive">{label}</span>
+                <span className="text-destructive/90">{generic.errorText || "Something went wrong."}</span>
+              </div>
+            )
+          }
+
+          if (state === "output-available") {
+            const messageText =
+              typeof generic.output?.message === "string" && generic.output.message.trim().length > 0
+                ? generic.output.message.trim()
+                : "Done."
+            return (
+              <div
+                key={`${message.id}-${index}`}
+                className="flex max-w-full flex-col gap-1 rounded-2xl border border-border/30 bg-foreground/[0.03] px-3.5 py-2 text-[13px] text-foreground/90"
+              >
+                <span className="font-medium text-foreground/95">{label}</span>
+                <span className="leading-snug text-muted-foreground">{messageText}</span>
+              </div>
             )
           }
         }

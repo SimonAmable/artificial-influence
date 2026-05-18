@@ -11,7 +11,7 @@ import { ModelsBentoSection } from "@/components/landing/models-bento-section"
 import { ProofSection } from "@/components/landing/proof-section"
 import { FAQSection } from "@/components/landing/faq-section"
 import { FounderTestimonialSection } from "@/components/landing/founder-testimonial-section"
-import { TestimonialsSection } from "@/components/landing/testimonials-section"
+// import { TestimonialsSection } from "@/components/landing/testimonials-section"
 import { PricingSection } from "@/components/landing/pricing-section"
 import { FinalCTASection } from "@/components/landing/final-cta-section"
 import { Footer } from "@/components/landing/footer"
@@ -94,7 +94,7 @@ export default async function Page() {
       <PlatformSurfacesSection />
       {/* <ProcessSection /> */}
       <ModelsBentoSection />
-      <TestimonialsSection />
+      {/* <TestimonialsSection /> */}
       <FounderTestimonialSection />
       <PricingSection embedded />
       <div id="faq">
