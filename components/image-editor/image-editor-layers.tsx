@@ -128,7 +128,7 @@ function ObjectsTriggerContent({
     <>
       <span className="flex min-w-0 flex-1 items-center gap-1">
         <Stack size={14} className="shrink-0 text-zinc-500" aria-hidden />
-        <span className="truncate text-[11px] font-medium text-zinc-200">
+        <span className="truncate text-sm font-medium leading-none text-zinc-200">
           Objects
           {objectsCount > 0 ? (
             <span className="text-zinc-500"> · {objectsCount}</span>
@@ -290,7 +290,7 @@ export function ImageEditorLayers({
     return (
       <div
         className={cn(
-          "flex h-8 w-[10.5rem] shrink-0 items-stretch sm:w-44",
+          "flex h-8 w-auto shrink-0 items-stretch sm:w-44",
           className
         )}
       >
@@ -298,7 +298,7 @@ export function ImageEditorLayers({
           <SheetTrigger asChild>
             <button
               type="button"
-              className="flex h-8 min-h-8 w-full items-center justify-between gap-1 rounded-lg border border-white/10 bg-zinc-900/90 px-2 py-0 text-left text-zinc-100 backdrop-blur-md hover:bg-white/5"
+              className="flex h-8 min-h-8 w-full max-w-full items-center justify-between gap-1 rounded-lg border border-white/10 bg-zinc-900/90 px-2 py-0 text-left text-zinc-100 backdrop-blur-md hover:bg-white/5"
               aria-label="Open objects list"
             >
               <ObjectsTriggerContent
@@ -326,7 +326,7 @@ export function ImageEditorLayers({
   return (
     <div
       className={cn(
-        "relative h-8 w-[10.5rem] shrink-0 sm:w-44",
+        "relative h-8 w-auto min-w-[9.5rem] shrink-0 sm:min-w-[10.5rem] sm:w-44",
         className
       )}
     >

@@ -33,9 +33,15 @@ function ImageEditorInner({
   const { currentImage, showLayers, canvas, activeTool } = state
   const [isFullscreen, setIsFullscreen] = React.useState(false)
   const [isGenerating, setIsGenerating] = React.useState(false)
-  const [surfaceTab, setSurfaceTab] = React.useState<EditorSurfaceTab>("inpaint")
+  const [isSaving, setIsSaving] = React.useState(false)
+  const [surfaceTab, setSurfaceTab] = React.useState<EditorSurfaceTab>(() => {
+    if (mode !== "page" || variant !== "inpaint") return "inpaint"
+    if (pathname?.includes("/image-editor")) return "image-editor"
+    if (pathname?.includes("/inpaint")) return "inpaint"
+    return "inpaint"
+  })
   const [sidebarChatOpen, setSidebarChatOpen] = React.useState(false)
-  const [generateBarOpen, setGenerateBarOpen] = React.useState(true)
+  const [generateBarOpen, setGenerateBarOpen] = React.useState(false)
   const containerRef = React.useRef<HTMLDivElement>(null)
 
   /** `/inpaint` and `/image-editor` pages use two tabs; this selects full tools vs inpaint-only */
@@ -254,13 +260,33 @@ function ImageEditorInner({
 
   // Handle save
   const handleSave = async () => {
-    if (!canvas || !onSave) return
+    if (!canvas || !onSave || isSaving) return
 
-    const url = await uploadEditedImage(canvas)
-    if (url) {
-      onSave(url)
+    setIsSaving(true)
+    try {
+      const url = await uploadEditedImage(canvas)
+      if (url) {
+        onSave(url)
+      }
+    } finally {
+      setIsSaving(false)
     }
   }
+
+  const pageSaveButton =
+    mode === "page" && onSave && hasImage ? (
+      <button
+        type="button"
+        onClick={() => void handleSave()}
+        disabled={!canvas || isSaving}
+        className={cn(
+          "flex h-8 min-h-8 shrink-0 items-center justify-center rounded-lg border border-primary/40 bg-primary px-3 text-sm font-semibold text-primary-foreground backdrop-blur-md transition-colors",
+          "hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+        )}
+      >
+        {isSaving ? "Saving…" : "Save"}
+      </button>
+    ) : null
 
   return (
     <div
@@ -322,8 +348,9 @@ function ImageEditorInner({
                     <ImageEditorColorPicker />
                   </div>
                   {showLayers && (
-                    <div className="shrink-0 md:hidden">
+                    <div className="flex shrink-0 items-center gap-2 md:hidden">
                       <ImageEditorLayers variant="sheet" />
+                      {pageSaveButton}
                     </div>
                   )}
                 </div>
@@ -334,8 +361,9 @@ function ImageEditorInner({
                 ) : null}
               </div>
               {showLayers && (
-                <div className="hidden shrink-0 justify-end md:flex">
+                <div className="hidden shrink-0 items-center justify-end gap-2 md:flex">
                   <ImageEditorLayers variant="dropdown" />
+                  {pageSaveButton}
                 </div>
               )}
             </div>
@@ -432,15 +460,17 @@ function ImageEditorInner({
       {mode === "modal" && onSave && hasImage && (
         <div className="absolute top-4 right-56 z-20">
           <button
-            onClick={handleSave}
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={!canvas || isSaving}
             className={cn(
               "px-4 py-2 rounded-lg",
               "bg-primary hover:bg-primary/90",
               "text-primary-foreground text-sm font-medium",
-              "transition-colors"
+              "transition-colors disabled:pointer-events-none disabled:opacity-50"
             )}
           >
-            Save Changes
+            {isSaving ? "Saving…" : "Save Changes"}
           </button>
         </div>
       )}

@@ -80,7 +80,7 @@ export function ImageEditorToolbar({
   isFullscreen = false,
   extendedTools = false,
   showGenerateBarToggle = false,
-  generateBarOpen = true,
+  generateBarOpen = false,
   onToggleGenerateBar,
   showMaskModeToggle = false,
 }: ImageEditorToolbarProps) {
@@ -114,6 +114,7 @@ export function ImageEditorToolbar({
 
   const generateBarToggleButton = showGenerateBarToggle ? (
     <Button
+      type="button"
       variant="ghost"
       size="icon"
       className={toolButtonClasses({ pressed: generateBarOpen })}
@@ -184,6 +185,7 @@ export function ImageEditorToolbar({
 
         {onToggleFullscreen && (
           <Button
+            type="button"
             variant="ghost"
             size="icon"
             className={toolButtonClasses({ pressed: false })}
@@ -222,6 +224,7 @@ export function ImageEditorToolbar({
 
     return (
       <Button
+        type="button"
         key={paletteId}
         variant="ghost"
         size="icon"
@@ -279,6 +282,7 @@ export function ImageEditorToolbar({
             {generateBarToggleButton}
             {onToggleFullscreen ? (
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
                 className={cn(toolButtonClasses({ pressed: false }), "snap-start")}

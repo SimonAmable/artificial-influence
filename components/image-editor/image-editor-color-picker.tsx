@@ -94,6 +94,12 @@ function parseTextAlign(v: string | undefined): EditorTextAlign {
   return "left"
 }
 
+/** Tailwind `lg` (1024px) — selection-driven open/close only on desktop; tablets/phones always use the trigger. */
+function isDesktopImageEditorViewport(): boolean {
+  if (typeof window === "undefined") return false
+  return window.matchMedia("(min-width: 1024px)").matches
+}
+
 function TextAlignPreview({ kind }: { kind: EditorTextAlign }) {
   const rows = [14, 10, 12]
   return (
@@ -191,17 +197,26 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
       }
     }
 
-    canvas.on("selection:created", syncSelection)
-    canvas.on("selection:updated", syncSelection)
-    canvas.on("selection:cleared", syncSelection)
+    /** Desktop: drive the properties popover from canvas selection (single target only). */
+    const onFabricSelectionEvent = () => {
+      syncSelection()
+      if (isDesktopImageEditorViewport()) {
+        const activeObject = canvas.getActiveObject() as EditorFabricObject | null
+        setIsPropertiesOpen(getSelectedKind(activeObject) !== null)
+      }
+    }
+
+    canvas.on("selection:created", onFabricSelectionEvent)
+    canvas.on("selection:updated", onFabricSelectionEvent)
+    canvas.on("selection:cleared", onFabricSelectionEvent)
     canvas.on("object:modified", syncSelection)
     canvas.on("text:changed", syncSelection)
     syncSelection()
 
     return () => {
-      canvas.off("selection:created", syncSelection)
-      canvas.off("selection:updated", syncSelection)
-      canvas.off("selection:cleared", syncSelection)
+      canvas.off("selection:created", onFabricSelectionEvent)
+      canvas.off("selection:updated", onFabricSelectionEvent)
+      canvas.off("selection:cleared", onFabricSelectionEvent)
       canvas.off("object:modified", syncSelection)
       canvas.off("text:changed", syncSelection)
     }
@@ -424,7 +439,7 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
         className
       )}
     >
-      <div className="relative min-h-8 min-w-0 max-w-[min(100%,11rem)] shrink sm:max-w-[13rem]">
+      <div className="relative min-h-8 min-w-0 max-w-[min(100%,12.5rem)] shrink sm:max-w-[14rem]">
         <button
           type="button"
           className="flex h-8 w-full min-w-0 items-center justify-between gap-1.5 rounded-lg border border-white/10 bg-zinc-900/90 px-2 text-zinc-100 backdrop-blur-md"
@@ -437,7 +452,7 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
               style={{ backgroundColor: triggerSwatchColor }}
               aria-hidden
             />
-            <span className="truncate text-[11px] leading-tight text-zinc-200 tabular-nums">
+            <span className="truncate text-sm font-medium leading-tight text-zinc-200 tabular-nums">
               {propertiesTriggerSummary}
             </span>
           </div>
@@ -909,7 +924,7 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
       <div className="relative h-8 shrink-0">
         <button
           type="button"
-          className="flex h-8 min-w-0 max-w-[7.5rem] items-center justify-between gap-1.5 rounded-lg border border-white/10 bg-zinc-900/90 px-2 text-zinc-100 backdrop-blur-md sm:max-w-[8.5rem]"
+          className="flex h-8 min-w-0 max-w-[8.5rem] items-center justify-between gap-1.5 rounded-lg border border-white/10 bg-zinc-900/90 px-2 text-zinc-100 backdrop-blur-md sm:max-w-[10rem]"
           onClick={() => setIsCanvasRatioOpen((prev) => !prev)}
           aria-expanded={isCanvasRatioOpen}
         >
@@ -919,7 +934,7 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
               className="shrink-0 text-zinc-400"
               aria-hidden
             />
-            <span className="truncate text-[11px] font-medium text-zinc-100">
+            <span className="truncate text-sm font-medium text-zinc-100">
               {activeAspectRatioLabel}
             </span>
           </span>
