@@ -315,6 +315,16 @@
   }
 }
 
+/* Chat composer: rest = medium depth, focus = large (beats !important shadow-md on same node) */
+[data-slot="input-group"].composer-depth {
+  box-shadow: var(--shadow-m);
+  transition: box-shadow 0.2s ease;
+}
+
+[data-slot="input-group"].composer-depth:focus-within {
+  box-shadow: var(--shadow-l) !important;
+}
+
 /* Depth System - Component-Specific Depth Application */
 /* All depth is applied via CSS selectors targeting data-slot attributes */
 /* No component files need to be modified */

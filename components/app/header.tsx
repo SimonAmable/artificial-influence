@@ -14,7 +14,7 @@ import {
 } from "@phosphor-icons/react"
 
 import { MegaNavItemBody, MenuBadge } from "@/components/app/mega-nav-item-body"
-import { MobileMegaNavSheet } from "@/components/app/mobile-mega-nav-sheet"
+import { MobileAppSidebar } from "@/components/app/mobile-app-sidebar"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { SettingsDropdown, SettingsMenuContent } from "@/components/app/settings-dropdown"
@@ -34,6 +34,7 @@ import {
   type MegaNavItem,
 } from "@/lib/constants/navigation"
 import { FeedbackDialog } from "@/components/app/feedback-dialog"
+import { ProfileSettingsModal } from "@/components/profile/profile-settings-modal"
 import { openPricingPlansModal } from "@/lib/pricing-upsell"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
 import { clearOnboardingCompletedLocal } from "@/lib/onboarding/client-storage"
@@ -101,6 +102,7 @@ export function Header() {
   const [isScrolled, setIsScrolled] = React.useState(false)
   const [credits, setCredits] = React.useState<number | null>(null)
   const [feedbackOpen, setFeedbackOpen] = React.useState(false)
+  const [profileModalOpen, setProfileModalOpen] = React.useState(false)
   const [openGroupLabel, setOpenGroupLabel] = React.useState<string | null>(null)
   const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const [assetsMenuOpen, setAssetsMenuOpen] = React.useState(false)
@@ -390,7 +392,7 @@ export function Header() {
                 </Button>
               }
             >
-              <MobileMegaNavSheet authenticated={Boolean(user)} />
+              <MobileAppSidebar authenticated={Boolean(user)} />
             </React.Suspense>
           </div>
         </div>
@@ -513,7 +515,11 @@ export function Header() {
                    </div>
                  </DropdownMenuLabel>
                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push("/profile")}>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setProfileModalOpen(true)
+                    }}
+                  >
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
@@ -566,6 +572,9 @@ export function Header() {
         </div>
       </div>
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      {user ? (
+        <ProfileSettingsModal open={profileModalOpen} onOpenChange={setProfileModalOpen} />
+      ) : null}
     </header>
   )
 }

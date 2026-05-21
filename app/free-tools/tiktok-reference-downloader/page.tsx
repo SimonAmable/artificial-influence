@@ -5,7 +5,7 @@ import { TikTokReferenceDownloaderTool } from "@/components/tools/tiktok-referen
 export const metadata: Metadata = {
   title: "TikTok & Instagram reference downloader",
   description:
-    "Paste a TikTok or Instagram post/reel URL to fetch media via Apify, copy the link, or open video in Motion Control.",
+    "Paste a TikTok or Instagram post or reel URL to download media, copy the link, or open video in Motion Control.",
 }
 
 export default function TikTokReferenceDownloaderPage() {

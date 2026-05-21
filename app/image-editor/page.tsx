@@ -9,22 +9,9 @@ function ImageEditorPageContent() {
   const searchParams = useSearchParams()
   const initialImage = searchParams.get("image") || undefined
 
-  const handleSave = async (imageUrl: string) => {
-    // In standalone mode, show success toast with download option
-    toast.success("Image saved!", {
-      description: "Your inpainted image has been uploaded.",
-      action: {
-        label: "Download",
-        onClick: () => {
-          // Download the image
-          const link = document.createElement("a")
-          link.href = imageUrl
-          link.download = `edited-image-${Date.now()}.png`
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-        },
-      },
+  const handleSave = () => {
+    toast.success("Image downloaded", {
+      description: "Your edited image has been saved to your device.",
     })
   }
 

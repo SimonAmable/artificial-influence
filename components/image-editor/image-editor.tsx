@@ -13,7 +13,8 @@ import { ImageEditorLayers } from "./image-editor-layers"
 import { ImageEditorPromptBar } from "./image-editor-prompt-bar"
 import { ImageEditorEmptyState } from "./image-editor-empty-state"
 import { ImageEditorGoogleFontsLink } from "./image-editor-google-fonts-link"
-import { uploadEditedImage } from "@/lib/image-editor/export-utils"
+import { DownloadSimple } from "@phosphor-icons/react"
+import { downloadCanvas, uploadEditedImage } from "@/lib/image-editor/export-utils"
 import { KEYBOARD_SHORTCUTS } from "@/lib/image-editor/constants"
 import type { ImageEditorProps, EditorTool } from "@/lib/image-editor/types"
 
@@ -258,9 +259,19 @@ function ImageEditorInner({
     }
   }, [])
 
-  // Handle save
+  const saveDownloadsLocally = variant === "inpaint" && mode === "page"
+  const showPageSave = mode === "page" && hasImage && (Boolean(onSave) || saveDownloadsLocally)
+
   const handleSave = async () => {
-    if (!canvas || !onSave || isSaving) return
+    if (!canvas || isSaving) return
+
+    if (saveDownloadsLocally) {
+      downloadCanvas(canvas, `inpaint-${Date.now()}`)
+      onSave?.("")
+      return
+    }
+
+    if (!onSave) return
 
     setIsSaving(true)
     try {
@@ -273,20 +284,22 @@ function ImageEditorInner({
     }
   }
 
-  const pageSaveButton =
-    mode === "page" && onSave && hasImage ? (
-      <button
-        type="button"
-        onClick={() => void handleSave()}
-        disabled={!canvas || isSaving}
-        className={cn(
-          "flex h-8 min-h-8 shrink-0 items-center justify-center rounded-lg border border-primary/40 bg-primary px-3 text-sm font-semibold text-primary-foreground backdrop-blur-md transition-colors",
-          "hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-        )}
-      >
-        {isSaving ? "Saving…" : "Save"}
-      </button>
-    ) : null
+  const pageSaveButton = showPageSave ? (
+    <button
+      type="button"
+      onClick={() => void handleSave()}
+      disabled={!canvas || isSaving}
+      title="Download image"
+      aria-label="Download image"
+      className={cn(
+        "flex h-8 min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary px-3 text-sm font-semibold text-primary-foreground backdrop-blur-md transition-colors",
+        "hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+      )}
+    >
+      <DownloadSimple size={16} weight="bold" aria-hidden />
+      {isSaving ? "Saving…" : "Save"}
+    </button>
+  ) : null
 
   return (
     <div
@@ -347,9 +360,9 @@ function ImageEditorInner({
                   <div className="min-w-0 flex-1">
                     <ImageEditorColorPicker />
                   </div>
-                  {showLayers && (
+                  {(showLayers || showPageSave) && (
                     <div className="flex shrink-0 items-center gap-2 md:hidden">
-                      <ImageEditorLayers variant="sheet" />
+                      {showLayers ? <ImageEditorLayers variant="sheet" /> : null}
                       {pageSaveButton}
                     </div>
                   )}
@@ -360,9 +373,9 @@ function ImageEditorInner({
                   </p>
                 ) : null}
               </div>
-              {showLayers && (
+              {(showLayers || showPageSave) && (
                 <div className="hidden shrink-0 items-center justify-end gap-2 md:flex">
-                  <ImageEditorLayers variant="dropdown" />
+                  {showLayers ? <ImageEditorLayers variant="dropdown" /> : null}
                   {pageSaveButton}
                 </div>
               )}

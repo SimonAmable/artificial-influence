@@ -389,6 +389,7 @@ export function createGenerateImageWithNanoBananaTool({
           promptMode: rawPrompt ? ("literal" as const) : ("expanded" as const),
           status: "pending" as const,
           usedReferenceCount: referenceUrls.length,
+          referenceImageUrls: referenceUrls,
           variantCount: effectiveVariantCount,
           ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
         }
@@ -429,6 +430,7 @@ export function createGenerateImageWithNanoBananaTool({
         promptMode: rawPrompt ? ("literal" as const) : ("expanded" as const),
         status: "completed" as const,
         usedReferenceCount: referenceUrls.length,
+        referenceImageUrls: referenceUrls,
         variantCount: result.images.length,
         ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
       }

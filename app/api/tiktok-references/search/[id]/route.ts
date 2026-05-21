@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { TIKTOK_REFERENCE_SEARCH_JOB_TABLE } from "@/lib/free-tools/social-reference-jobs"
+import { parseStoredTikTokVideoResults } from "@/lib/server/apify/tiktok-scraper"
 import { createClient } from "@/lib/supabase/server"
 
 type RouteContext = {
@@ -48,7 +49,7 @@ export async function GET(_request: Request, context: RouteContext) {
         videoSorting: job.video_sorting,
         dateFilter: job.date_filter,
         resultsRequested: job.results_requested,
-        videos: job.result_videos,
+        videos: parseStoredTikTokVideoResults(job.result_videos),
         apifyRunId: job.apify_run_id,
         errorMessage: job.error_message,
         createdAt: job.created_at,

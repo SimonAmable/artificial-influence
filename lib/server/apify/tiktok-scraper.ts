@@ -11,7 +11,7 @@ const APIFY_BASE = "https://api.apify.com/v2"
 function requireApifyToken() {
   const token = process.env.APIFY_API_TOKEN?.trim()
   if (!token) {
-    throw new Error("Apify is not configured. Set APIFY_API_TOKEN.")
+    throw new Error("TikTok search isn't available right now. Please try again later.")
   }
   return token
 }
@@ -304,8 +304,16 @@ function firstPlayableSubtitleUrl(videoMeta: Record<string, unknown>): string | 
 
   for (const rawEntry of subtitleLinks) {
     if (!isRecord(rawEntry)) continue
-    const dl = readString(rawEntry, "downloadLink") ?? readString(rawEntry, "tiktokLink")
-    if (dl && isLikelyTikTokMp4StreamUrl(dl)) return dl
+    // Apify often sets downloadLink to a .vtt subtitle file and tiktokLink to the MP4 stream.
+    // Do not coalesce with ?? or the VTT wins and we never read tiktokLink.
+    const downloadLink = readString(rawEntry, "downloadLink")
+    if (downloadLink && isLikelyTikTokMp4StreamUrl(downloadLink)) {
+      return downloadLink
+    }
+    const tiktokLink = readString(rawEntry, "tiktokLink")
+    if (tiktokLink && isLikelyTikTokMp4StreamUrl(tiktokLink)) {
+      return tiktokLink
+    }
   }
 
   return null
@@ -314,7 +322,10 @@ function firstPlayableSubtitleUrl(videoMeta: Record<string, unknown>): string | 
 function firstPlayableFromVideoMeta(videoMeta: Record<string, unknown>): string | null {
   const downloadAddr =
     readString(videoMeta, "downloadAddr") ?? readString(videoMeta, "download_url") ?? null
-  if (downloadAddr && isLikelyTikTokMp4StreamUrl(downloadAddr)) return downloadAddr
+  if (downloadAddr) {
+    if (isApifyKeyValueMp4DownloadUrl(downloadAddr)) return downloadAddr
+    if (isLikelyTikTokMp4StreamUrl(downloadAddr)) return downloadAddr
+  }
 
   const fromSubs = firstPlayableSubtitleUrl(videoMeta)
   if (fromSubs) return fromSubs
@@ -332,6 +343,7 @@ function firstPlayableFromMediaUrls(raw: Record<string, unknown>): string | null
 
   for (const entry of mediaUrls) {
     if (typeof entry === "string") {
+      if (isApifyKeyValueMp4DownloadUrl(entry)) return entry
       if (isLikelyTikTokMp4StreamUrl(entry)) return entry
       continue
     }
@@ -426,17 +438,19 @@ export function normalizeTikTokVideoRecord(raw: unknown): NormalizedTikTokVideoC
 
   let playableVideoUrl = videoMeta ? firstPlayableFromVideoMeta(videoMeta) : null
 
-  if (!playableVideoUrl && flatDd && isLikelyTikTokMp4StreamUrl(flatDd)) {
-    playableVideoUrl = flatDd
+  if (!playableVideoUrl && flatDd) {
+    if (isApifyKeyValueMp4DownloadUrl(flatDd) || isLikelyTikTokMp4StreamUrl(flatDd)) {
+      playableVideoUrl = flatDd
+    }
+  }
+
+  if (!playableVideoUrl) {
+    playableVideoUrl = firstPlayableFromMediaUrls(raw)
   }
 
   const bitrateBundles = videoMeta?.bitrateInfo ?? raw.bitrateInfo
   if (!playableVideoUrl) {
     playableVideoUrl = firstPlayableUrlFromBitrateInfoLike(bitrateBundles)
-  }
-
-  if (!playableVideoUrl) {
-    playableVideoUrl = firstPlayableFromMediaUrls(raw)
   }
   const playUrlTop = readString(raw, "playUrl")
   if (!playableVideoUrl && playUrlTop && isLikelyTikTokMp4StreamUrl(playUrlTop)) {
@@ -521,7 +535,7 @@ async function fetchDatasetItems(datasetId: string, token: string): Promise<unkn
     if (isRecord(payload) && isRecord(payload.error)) {
       msg = readString(payload.error as Record<string, unknown>, "message")
     }
-    throw new Error(msg || `Could not load Apify dataset (${response.status}).`)
+    throw new Error(msg || "Couldn't load TikTok results. Please try your search again.")
   }
 
   if (Array.isArray(payload)) {
@@ -566,13 +580,13 @@ export async function runTikTokScraperActor(input: Record<string, unknown>, wait
 
   if (!response.ok) {
     throw new Error(
-      body.error?.message || `Apify TikTok scrape failed (${response.status}).`,
+      body.error?.message || "Couldn't fetch TikTok content. Please try again.",
     )
   }
 
   const data = body.data
   if (!data) {
-    throw new Error(body.error?.message || "Apify returned an unexpected run payload.")
+    throw new Error(body.error?.message || "Couldn't fetch TikTok content. Please try again.")
   }
   const status = data?.status
   const runId = data?.id ?? null
@@ -580,14 +594,14 @@ export async function runTikTokScraperActor(input: Record<string, unknown>, wait
   if (status !== "SUCCEEDED") {
     throw new Error(
       data?.statusMessage
-        ? `Apify run did not succeed: ${status} — ${data.statusMessage}`
-        : `Apify run did not succeed (status: ${status || "unknown"}).`,
+        ? `TikTok fetch didn't complete: ${data.statusMessage}`
+        : "TikTok fetch didn't complete. Please try again.",
     )
   }
 
   const datasetId = data?.defaultDatasetId
   if (!datasetId) {
-    throw new Error("Apify run finished but no dataset id was returned.")
+    throw new Error("TikTok fetch didn't return results. Please try again.")
   }
 
   const items = await fetchDatasetItems(datasetId, token)
@@ -634,7 +648,8 @@ export function buildTikTokVideoSearchActorInput(options: {
     videoSearchSorting: options.videoSearchSorting,
     videoSearchDateFilter: options.videoSearchDateFilter,
     scrapeRelatedVideos: false,
-    shouldDownloadVideos: false,
+  /** Host MP4s on Apify KV so browsers can play via our stream proxy (TikTok CDN blocks hotlinking). */
+    shouldDownloadVideos: true,
     shouldDownloadCovers: false,
     shouldDownloadSlideshowImages: true,
     shouldDownloadAvatars: false,
@@ -652,6 +667,29 @@ export function buildTikTokVideoSearchActorInput(options: {
 
 export function normalizeTikTokDatasetItems(items: unknown[]) {
   return mapDatasetItemsToVideos(items)
+}
+
+function isStoredNormalizedVideoCard(value: Record<string, unknown>): value is NormalizedTikTokVideoCard {
+  return isRecord(value.stats)
+}
+
+/** Hydrates DB/API payloads: accepts raw Apify rows or already-normalized cards. */
+export function parseStoredTikTokVideoResults(value: unknown): NormalizedTikTokVideoCard[] {
+  if (!Array.isArray(value)) return []
+
+  const out: NormalizedTikTokVideoCard[] = []
+  for (const entry of value) {
+    if (!isRecord(entry)) continue
+    if (isStoredNormalizedVideoCard(entry)) {
+      out.push(entry)
+      continue
+    }
+    const normalized = normalizeTikTokVideoRecord(entry)
+    if (normalized) {
+      out.push(normalized)
+    }
+  }
+  return out
 }
 
 const TIKTOK_HOST_RE =

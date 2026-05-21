@@ -23,9 +23,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import type { ImageGridAgentAction } from "@/lib/chat/image-grid-agent-actions"
 import { FullscreenMediaViewer, type FullscreenMediaViewerAction } from "./fullscreen-media-viewer"
 import { copyMediaToClipboard, downloadMediaFile } from "./media-viewer-utils"
 import { toast } from "sonner"
+
+export type { ImageGridAgentAction }
 
 interface ImageData {
   id?: string
@@ -61,8 +64,13 @@ interface ImageGridProps {
   removingMetadataImageUrl?: string | null
   onDelete?: (id: string, imageUrl: string, index: number) => void | Promise<void>
   basicActionsOnly?: boolean
+  /** `direct` = /image-style navigation; `agent` = composer injection via onAgentAction */
+  actionStrategy?: "direct" | "agent"
+  onAgentAction?: (action: ImageGridAgentAction, image: ImageData, index: number) => void
   /** Initial column count for the layout slider (default 2). */
   initialColumnCount?: number
+  /** Hide column count slider (e.g. embedded chat tool cards). */
+  showColumnSlider?: boolean
 }
 
 // Normalize model names by removing prefix before slash, replacing dashes with spaces, and capitalizing
@@ -101,9 +109,14 @@ export function ImageGrid({
   removingMetadataImageUrl = null,
   onDelete,
   basicActionsOnly = false,
+  actionStrategy = "direct",
+  onAgentAction,
   initialColumnCount = 2,
+  showColumnSlider = true,
 }: ImageGridProps) {
   const router = useRouter()
+  const isAgentMode = actionStrategy === "agent"
+  const showExtendedActions = !basicActionsOnly || isAgentMode
   const [columnCount, setColumnCount] = React.useState(initialColumnCount)
   const [fullscreenImage, setFullscreenImage] = React.useState<ImageData | null>(null)
   const [copiedImageUrl, setCopiedImageUrl] = React.useState<string | null>(null)
@@ -207,6 +220,50 @@ export function ImageGrid({
     }
   }, [onDelete, pendingDeleteImage])
 
+  const runReferenceAction = React.useCallback(
+    (data: ImageData, index: number) => {
+      if (isAgentMode && onAgentAction) {
+        onAgentAction("reference", data, index)
+        return
+      }
+      onUseAsReference?.(data.url, index)
+    },
+    [isAgentMode, onAgentAction, onUseAsReference],
+  )
+
+  const runEditAction = React.useCallback(
+    (data: ImageData, index: number) => {
+      if (isAgentMode && onAgentAction) {
+        onAgentAction("edit", data, index)
+        return
+      }
+      router.push(`/inpaint?image=${encodeURIComponent(data.url)}`)
+    },
+    [isAgentMode, onAgentAction, router],
+  )
+
+  const runRecreateAction = React.useCallback(
+    (data: ImageData, index: number) => {
+      if (isAgentMode && onAgentAction) {
+        onAgentAction("recreate", data, index)
+        return
+      }
+      onRecreate?.(data)
+    },
+    [isAgentMode, onAgentAction, onRecreate],
+  )
+
+  const runAnimateAction = React.useCallback(
+    (data: ImageData, index: number) => {
+      if (isAgentMode && onAgentAction) {
+        onAgentAction("animate", data, index)
+        return
+      }
+      router.push(`/video?startFrame=${encodeURIComponent(data.url)}`)
+    },
+    [isAgentMode, onAgentAction, router],
+  )
+
   React.useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -237,21 +294,23 @@ export function ImageGrid({
       {/* Shared keyframe for generating and upscaling animations */}
       <style dangerouslySetInnerHTML={{ __html: `@keyframes fillProgress { 0% { width: 0%; } 100% { width: 100%; } }` }} />
       {/* Column Count Slider - Integrated header, matches card styling */}
-      <div className="  p-3 sm:p-4 pb-3 sm:pb-4 ">
-        <div className="flex items-center justify-end gap-3 sm:gap-4 w-full">
-          <label className="text-xs sm:text-sm font-medium whitespace-nowrap text-foreground">
-            Columns: <span className="text-primary">{columnCount}</span>
-          </label>
-          <Slider
-            value={[columnCount]}
-            onValueChange={(value) => setColumnCount(value[0])}
-            min={1}
-            max={6}
-            step={1}
-            className="w-24 sm:w-32"
-          />
+      {showColumnSlider ? (
+        <div className="p-3 pb-3 sm:p-4 sm:pb-4">
+          <div className="flex w-full items-center justify-end gap-3 sm:gap-4">
+            <label className="whitespace-nowrap text-xs font-medium text-foreground sm:text-sm">
+              Columns: <span className="text-primary">{columnCount}</span>
+            </label>
+            <Slider
+              value={[columnCount]}
+              onValueChange={(value) => setColumnCount(value[0])}
+              min={1}
+              max={6}
+              step={1}
+              className="w-24 sm:w-32"
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Image Grid - Masonry style with fixed row heights */}
       <div className="flex-1 min-h-0 overflow-auto p-0 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -427,7 +486,7 @@ export function ImageGrid({
                     className="w-48"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    {!basicActionsOnly && onCreateAsset && (
+                    {showExtendedActions && onCreateAsset && (
                       <>
                         <DropdownMenuItem
                           onClick={(event) => {
@@ -437,7 +496,7 @@ export function ImageGrid({
                           className="cursor-pointer"
                         >
                           <Plus className="mr-2 size-4" />
-                          Create Asset
+                          {isAgentMode ? "Save to Assets" : "Create Asset"}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                       </>
@@ -494,7 +553,7 @@ export function ImageGrid({
                         {removingMetadataImageUrl === item.data.url ? "Cleaning..." : "Remove Metadata"}
                       </DropdownMenuItem>
                     )}
-                    {!basicActionsOnly && item.data.id && onDelete && (
+                    {showExtendedActions && item.data.id && onDelete && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -537,7 +596,7 @@ export function ImageGrid({
                   )}
                 </div>
                 
-                {!basicActionsOnly ? (
+                {showExtendedActions ? (
                 <>
                 {/* Wide layout buttons. Narrow layouts collapse these into a single menu. */}
                 <div className="hidden shrink-0 flex-col items-end gap-1 lg:flex">
@@ -561,7 +620,7 @@ export function ImageGrid({
                     className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
                     onClick={(event) => {
                       event.stopPropagation()
-                      onUseAsReference?.(item.data.url, index)
+                      runReferenceAction(item.data, index)
                     }}
                   >
                     Reference
@@ -573,13 +632,13 @@ export function ImageGrid({
                     className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
                     onClick={(event) => {
                       event.stopPropagation()
-                      router.push(`/inpaint?image=${encodeURIComponent(item.data.url)}`)
+                      runEditAction(item.data, index)
                     }}
                   >
                     <PencilSimple className="mr-1 size-3" />
                     Edit
                   </Button>
-                  {onRecreate && (
+                  {(isAgentMode || onRecreate) && (
                     <Button
                       type="button"
                       variant="secondary"
@@ -587,13 +646,28 @@ export function ImageGrid({
                       className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
                       onClick={(event) => {
                         event.stopPropagation()
-                        onRecreate?.(item.data)
+                        runRecreateAction(item.data, index)
                       }}
                     >
                       <ArrowsClockwise className="mr-1 size-3" />
                       Recreate
                     </Button>
                   )}
+                  {onCreateAsset && isAgentMode ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onCreateAsset(item.data.url, index)
+                      }}
+                    >
+                      <Plus className="mr-1 size-3" />
+                      Save to Assets
+                    </Button>
+                  ) : null}
                   <Button
                     type="button"
                     variant="secondary"
@@ -601,8 +675,7 @@ export function ImageGrid({
                     className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
                     onClick={(event) => {
                       event.stopPropagation()
-                      const encodedUrl = encodeURIComponent(item.data.url)
-                      router.push(`/video?startFrame=${encodedUrl}`)
+                      runAnimateAction(item.data, index)
                     }}
                   >
                     <Play className="mr-1 size-3" weight="fill" />
@@ -670,7 +743,7 @@ export function ImageGrid({
                       className="w-48"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      {!basicActionsOnly && onCreateAsset && (
+                      {showExtendedActions && onCreateAsset && (
                         <>
                           <DropdownMenuItem
                             onClick={(event) => {
@@ -724,7 +797,7 @@ export function ImageGrid({
                           </>
                         )}
                       </DropdownMenuItem>
-                      {!basicActionsOnly && (
+                      {showExtendedActions && (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -743,41 +816,38 @@ export function ImageGrid({
                       <DropdownMenuItem
                         onClick={(event) => {
                           event.stopPropagation()
-                          const encodedUrl = encodeURIComponent(item.data.url)
-                          router.push(`/video?startFrame=${encodedUrl}`)
+                          runAnimateAction(item.data, index)
                         }}
                         className="cursor-pointer"
                       >
                         <Play className="mr-2 size-4" weight="fill" />
                         Animate
                       </DropdownMenuItem>
-                      {!basicActionsOnly && (
-                        <DropdownMenuItem
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            onUseAsReference?.(item.data.url, index)
-                          }}
-                          className="cursor-pointer"
-                        >
-                          <ArrowsOutSimple className="mr-2 size-4" />
-                          Use as Reference
-                        </DropdownMenuItem>
-                      )}
                       <DropdownMenuItem
                         onClick={(event) => {
                           event.stopPropagation()
-                          router.push(`/inpaint?image=${encodeURIComponent(item.data.url)}`)
+                          runReferenceAction(item.data, index)
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <ArrowsOutSimple className="mr-2 size-4" />
+                        Use as Reference
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          runEditAction(item.data, index)
                         }}
                         className="cursor-pointer"
                       >
                         <PencilSimple className="mr-2 size-4" />
                         Edit
                       </DropdownMenuItem>
-                      {!basicActionsOnly && onRecreate && (
+                      {(isAgentMode || onRecreate) && (
                         <DropdownMenuItem
                           onClick={(event) => {
                             event.stopPropagation()
-                            onRecreate?.(item.data)
+                            runRecreateAction(item.data, index)
                           }}
                           className="cursor-pointer"
                         >
@@ -785,7 +855,7 @@ export function ImageGrid({
                           Recreate
                         </DropdownMenuItem>
                       )}
-                      {!basicActionsOnly && onUpscale && (
+                      {showExtendedActions && onUpscale && (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -817,7 +887,7 @@ export function ImageGrid({
                           </DropdownMenuItem>
                         </>
                       )}
-                      {!basicActionsOnly && item.data.id && onDelete && (
+                      {showExtendedActions && item.data.id && onDelete && (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem

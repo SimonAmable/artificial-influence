@@ -11,6 +11,7 @@ import { AffiliateRefCapture } from "@/components/affiliate/affiliate-ref-captur
 import { SitewideJsonLd } from "@/components/seo/sitewide-jsonld"
 import { getSiteBaseUrl } from "@/lib/seo/site-url"
 import { PricingUpsellController } from "@/components/pricing/pricing-upsell-controller"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 const siteBase = getSiteBaseUrl()
 
@@ -51,15 +52,17 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <LayoutModeProviderWrapper>
-            <AffiliateRefCapture />
-            <Header />
-            <main>{children}</main>
-          </LayoutModeProviderWrapper>
-          <Toaster />
-          <PricingUpsellController />
-          <AIChat />
-          <TermsAcceptanceGate />
+          <TooltipProvider>
+            <LayoutModeProviderWrapper>
+              <AffiliateRefCapture />
+              <Header />
+              <main>{children}</main>
+            </LayoutModeProviderWrapper>
+            <Toaster />
+            <PricingUpsellController />
+            <AIChat />
+            <TermsAcceptanceGate />
+          </TooltipProvider>
         </ThemeProvider>
         <Analytics />
         <SitewideJsonLd />

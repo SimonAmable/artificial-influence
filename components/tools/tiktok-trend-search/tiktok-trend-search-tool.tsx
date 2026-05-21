@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import {
   ArrowsDownUp,
+  ArrowsOut,
   BookmarkSimple,
   CalendarBlank,
   ChatCircleDots,
@@ -13,6 +14,7 @@ import {
   FilmStrip,
   Fire,
   Heart,
+  Images,
   MagnifyingGlass,
   ShareFat,
 } from "@phosphor-icons/react"
@@ -33,6 +35,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  buildReferenceViewerPayloadFromTikTokCard,
+  ReferenceMediaViewer,
+  resolveTikTokCardMediaKind,
+  type ReferenceMediaViewerPayload,
+} from "@/components/tools/tiktok-reference-downloader/reference-media-viewer"
+import { toTikTokPlaybackUrl } from "@/lib/tiktok/playback-url"
+import { cn } from "@/lib/utils"
 
 const MOTION_MODEL = "kwaivgi/kling-v3-motion-control" as const
 
@@ -78,38 +88,102 @@ async function clipboard(label: string, value: string) {
 
 function ResearchCard({
   video,
+  onOpenViewer,
 }: {
   video: NormalizedTikTokVideoCard
+  onOpenViewer: (payload: ReferenceMediaViewerPayload) => void
 }) {
-  const previewSrc = video.coverUrl ?? video.playableVideoUrl ?? ""
-  const motionTarget = video.playableVideoUrl ?? ""
+  const mediaKind = resolveTikTokCardMediaKind(video)
+  const slides = (video.slideshowImageUrls ?? []).filter((url) => url.startsWith("http"))
+  const hasPlayableVideo =
+    typeof video.playableVideoUrl === "string" && video.playableVideoUrl.startsWith("http")
+  const playbackSrc = toTikTokPlaybackUrl(video.playableVideoUrl)
+  const [videoPlaybackFailed, setVideoPlaybackFailed] = React.useState(false)
+  React.useEffect(() => {
+    setVideoPlaybackFailed(false)
+  }, [video.id, video.playableVideoUrl])
+  const showInlineVideo = mediaKind === "video" && Boolean(playbackSrc) && !videoPlaybackFailed
+  const previewSrc =
+    (mediaKind === "slideshow" ? slides[0] : null) ??
+    video.coverUrl ??
+    (hasPlayableVideo ? video.playableVideoUrl : null) ??
+    ""
+  const motionTarget = hasPlayableVideo ? video.playableVideoUrl! : ""
+  const viewerPayload = buildReferenceViewerPayloadFromTikTokCard(video)
+  const canOpenViewer = Boolean(viewerPayload)
+
+  const openViewer = () => {
+    if (!viewerPayload) return
+    onOpenViewer(viewerPayload)
+  }
 
   return (
     <Card className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-950 text-white shadow-2xl">
       <CardContent className="grid gap-4 p-0 md:grid-cols-[260px,minmax(0,1fr)]">
-        <div className="relative aspect-[9/18] bg-black md:aspect-auto md:max-h-none">
-          {video.playableVideoUrl ? (
+        <div
+          className={cn(
+            "group relative aspect-[9/18] bg-black md:aspect-auto md:max-h-none",
+            canOpenViewer && "cursor-pointer",
+          )}
+          role={canOpenViewer ? "button" : undefined}
+          tabIndex={canOpenViewer ? 0 : undefined}
+          onClick={canOpenViewer ? openViewer : undefined}
+          onKeyDown={
+            canOpenViewer
+              ? (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault()
+                    openViewer()
+                  }
+                }
+              : undefined
+          }
+        >
+          {showInlineVideo ? (
             <video
-              src={video.playableVideoUrl}
+              src={playbackSrc!}
               poster={video.coverUrl ?? undefined}
-              muted
-              loop
-              autoPlay
+              controls
               playsInline
-              className="h-full w-full object-cover"
+              preload="metadata"
+              className="h-full w-full object-contain"
+              onClick={(event) => event.stopPropagation()}
+              onError={() => setVideoPlaybackFailed(true)}
             />
+          ) : slides.length > 0 ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt="Slideshow preview"
+                src={slides[0]}
+                className="h-full w-full object-contain opacity-95"
+              />
+              {slides.length > 1 ? (
+                <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[10px] font-medium text-white">
+                  <Images className="size-3" />
+                  {slides.length} slides
+                </div>
+              ) : null}
+            </>
           ) : previewSrc ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               alt="cover"
               src={previewSrc}
-              className="h-full w-full object-cover opacity-95"
+              className="h-full w-full object-contain opacity-95"
             />
           ) : (
             <div className="flex h-full items-center justify-center px-6 text-xs text-muted-foreground">
               No preview
             </div>
           )}
+          {canOpenViewer ? (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/25 group-hover:opacity-100">
+              <span className="rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white">
+                Open full screen
+              </span>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-6 p-6 text-sm">
@@ -171,6 +245,21 @@ function ResearchCard({
                 </Link>
               </Button>
             ) : null}
+            {canOpenViewer ? (
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                className="border-white/20 text-white hover:bg-white/10"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  openViewer()
+                }}
+              >
+                <ArrowsOut className="mr-2 size-3.5" />
+                Full screen
+              </Button>
+            ) : null}
             {video.webVideoUrl ? (
               <Button size="sm" variant="ghost" type="button" asChild className="text-white">
                 <a href={video.webVideoUrl} target="_blank" rel="noreferrer">
@@ -206,6 +295,7 @@ export function TikTokTrendSearchTool() {
   const [activeJob, setActiveJob] = React.useState<SearchJobPayload | null>(null)
   const [history, setHistory] = React.useState<SearchSummary[]>([])
   const [isSearching, setIsSearching] = React.useState(false)
+  const [viewerPayload, setViewerPayload] = React.useState<ReferenceMediaViewerPayload | null>(null)
   const [authState, setAuthState] = React.useState<
     "loading" | "authenticated" | "unauthenticated"
   >("loading")
@@ -249,17 +339,9 @@ export function TikTokTrendSearchTool() {
           throw new Error(payload.error || "Poll failed.")
         }
 
-        const rawVideos = payload.job.videos
-        let videosTyped: NormalizedTikTokVideoCard[] | null = null
-
-        if (Array.isArray(rawVideos)) {
-          videosTyped = rawVideos.filter(
-            (element): element is NormalizedTikTokVideoCard =>
-              typeof element === "object" &&
-              element !== null &&
-              ("webVideoUrl" in element || "playableVideoUrl" in element),
-          )
-        }
+        const videosTyped = Array.isArray(payload.job.videos)
+          ? (payload.job.videos as NormalizedTikTokVideoCard[])
+          : null
 
         const next: SearchJobPayload = {
           ...payload.job,
@@ -344,7 +426,7 @@ export function TikTokTrendSearchTool() {
       }
 
       toast.message("Scanning TikTok…", {
-        description: `Pulling ~${resultsPerPage} clips via Apify (may take ~30‑90 seconds).`,
+        description: `Fetching up to ${resultsPerPage} clips with downloadable previews. This can take 1–3 minutes.`,
       })
 
       const placeholder: SearchJobPayload = {
@@ -369,12 +451,10 @@ export function TikTokTrendSearchTool() {
     const response = await fetch(`/api/tiktok-references/search/${historicalJobId}`)
     const payload = (await response.json()) as { job?: SearchJobPayload; error?: string }
     if (!response.ok || !payload.job) {
-      toast.error(payload.error || "Could not hydrate past search.")
+      toast.error(payload.error || "Couldn't load that past search.")
       return
     }
-    const typedVideos = Array.isArray(payload.job.videos)
-      ? (payload.job.videos as NormalizedTikTokVideoCard[])
-      : []
+    const typedVideos = Array.isArray(payload.job.videos) ? payload.job.videos : []
     setActiveJob({
       ...payload.job,
       videos: typedVideos,
@@ -543,6 +623,7 @@ export function TikTokTrendSearchTool() {
               {normalizedVideos.map((video, index) => (
                 <ResearchCard
                   video={video}
+                  onOpenViewer={setViewerPayload}
                   key={video.id ?? video.webVideoUrl ?? video.coverUrl ?? `tiktok-result-${index}`}
                 />
               ))}
@@ -560,6 +641,9 @@ export function TikTokTrendSearchTool() {
               : "Sign in to unlock trend mining + motion transfer hooks."}
           </div>
         )}
+      {viewerPayload ? (
+        <ReferenceMediaViewer payload={viewerPayload} onClose={() => setViewerPayload(null)} />
+      ) : null}
       </div>
     </div>
   )

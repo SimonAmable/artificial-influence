@@ -94,6 +94,13 @@ export function getAvailableConversationImageReferences(
   return references
 }
 
+/** Client-side lookup: manifest id (ref_N) for a URL already in the transcript. */
+export function findTranscriptRefIdForUrl(messages: UIMessage[], url: string): string | undefined {
+  const normalized = url.trim()
+  if (!normalized) return undefined
+  return getAvailableConversationImageReferences(messages).find((ref) => ref.url === normalized)?.id
+}
+
 export function getAvailableConversationVideoReferences(
   messages: UIMessage[],
 ): AvailableChatVideoReference[] {

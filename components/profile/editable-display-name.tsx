@@ -11,9 +11,29 @@ import { cn } from "@/lib/utils"
 
 type EditableDisplayNameProps = {
   initialName: string
+  size?: "page" | "compact"
+  onNameUpdated?: (name: string) => void
 }
 
-export function EditableDisplayName({ initialName }: EditableDisplayNameProps) {
+const sizeStyles = {
+  page: {
+    heading: "text-3xl font-semibold tracking-tight",
+    input:
+      "h-auto min-h-12 rounded-xl border-border/80 py-2 text-3xl font-semibold tracking-tight md:text-3xl",
+  },
+  compact: {
+    heading: "text-xl font-semibold tracking-tight",
+    input:
+      "h-auto min-h-10 rounded-xl border-border/80 py-1.5 text-xl font-semibold tracking-tight",
+  },
+} as const
+
+export function EditableDisplayName({
+  initialName,
+  size = "page",
+  onNameUpdated,
+}: EditableDisplayNameProps) {
+  const styles = sizeStyles[size]
   const router = useRouter()
   const [name, setName] = useState(initialName)
   const [editing, setEditing] = useState(false)
@@ -45,6 +65,7 @@ export function EditableDisplayName({ initialName }: EditableDisplayNameProps) {
         setName(trimmed)
         setDraft(trimmed)
         setEditing(false)
+        onNameUpdated?.(trimmed)
         router.refresh()
       })()
     })
@@ -85,9 +106,7 @@ export function EditableDisplayName({ initialName }: EditableDisplayNameProps) {
             }}
             disabled={isPending}
             aria-invalid={error ? true : undefined}
-            className={cn(
-              "h-auto min-h-12 rounded-xl border-border/80 py-2 text-3xl font-semibold tracking-tight md:text-3xl"
-            )}
+            className={cn(styles.input)}
           />
           {isPending ? (
             <Loader2
@@ -107,7 +126,7 @@ export function EditableDisplayName({ initialName }: EditableDisplayNameProps) {
 
   return (
     <div className="flex items-center gap-1 sm:gap-2">
-      <h1 className="text-3xl font-semibold tracking-tight">{name}</h1>
+      <h1 className={styles.heading}>{name}</h1>
       <Button
         type="button"
         variant="ghost"

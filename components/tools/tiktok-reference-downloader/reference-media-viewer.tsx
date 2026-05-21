@@ -30,6 +30,7 @@ import {
   downloadReferenceImageSlides,
   REFERENCE_SLIDES_ZIP_THRESHOLD,
 } from "@/lib/client/download-reference-slides"
+import { toTikTokPlaybackUrl } from "@/lib/tiktok/playback-url"
 import { cn } from "@/lib/utils"
 
 export type ReferenceSourcePlatform = "tiktok" | "instagram"
@@ -63,6 +64,8 @@ export type ReferenceMediaViewerPayload = {
   createdAt: string | null
   completedAt: string | null
   motionControlHref?: string | null
+  /** e.g. "Saved reference" (default) or "Trend result". */
+  sourceLabel?: string | null
 }
 
 type ReferenceMediaViewerProps = {
@@ -175,6 +178,7 @@ export function ReferenceMediaViewer({ payload, onClose, extraActions = [] }: Re
     createdAt,
     completedAt,
     motionControlHref,
+    sourceLabel = "Saved reference",
   } = payload
 
   const [activeIndex, setActiveIndex] = React.useState(0)
@@ -423,7 +427,7 @@ export function ReferenceMediaViewer({ payload, onClose, extraActions = [] }: Re
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 space-y-2">
                 <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  {providerLabel} · Saved reference
+                  {providerLabel} · {sourceLabel ?? "Saved reference"}
                 </p>
                 <h3 className="text-sm font-semibold text-foreground">{titleFromSnapshot}</h3>
                 <div className="flex flex-wrap items-center gap-2">
@@ -562,12 +566,6 @@ export function ReferenceMediaViewer({ payload, onClose, extraActions = [] }: Re
                 </div>
               ) : null}
 
-              {normalizationProfile ? (
-                <Badge variant="secondary" className="text-[11px]">
-                  Profile: {normalizationProfile}
-                </Badge>
-              ) : null}
-
               <div className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Job</p>
                 <p className="break-all rounded-2xl border border-border/70 bg-muted/20 p-3 font-mono text-xs text-foreground">
@@ -680,11 +678,82 @@ export function buildReferenceMediaItems(
   if (mediaKind === "video") {
     const url = urls[0] ?? fallbackVideoUrl ?? ""
     if (!url) return []
-    return [{ url, kind: "video" }]
+    const playbackUrl = toTikTokPlaybackUrl(url) ?? url
+    return [{ url: playbackUrl, kind: "video" }]
   }
   return urls.map((url, index) => ({
     url,
     kind: "image" as const,
     label: String(index + 1),
   }))
+}
+
+const MOTION_CONTROL_MODEL = "kwaivgi/kling-v3-motion-control" as const
+
+function isHttpUrl(value: string | null | undefined): value is string {
+  return typeof value === "string" && value.startsWith("http")
+}
+
+export function resolveTikTokCardMediaKind(
+  video: NormalizedTikTokVideoCard,
+): ReferenceMediaViewerMediaKind {
+  const slides = (video.slideshowImageUrls ?? []).filter(isHttpUrl)
+  const hasVideo = isHttpUrl(video.playableVideoUrl)
+
+  if (slides.length > 0 && !hasVideo) {
+    return "slideshow"
+  }
+  if (slides.length > 1) {
+    return "slideshow"
+  }
+  return "video"
+}
+
+export function buildReferenceViewerPayloadFromTikTokCard(
+  video: NormalizedTikTokVideoCard,
+  options?: { sourceLabel?: string },
+): ReferenceMediaViewerPayload | null {
+  const mediaKind = resolveTikTokCardMediaKind(video)
+  const slides = (video.slideshowImageUrls ?? []).filter(isHttpUrl)
+  const urls =
+    mediaKind === "slideshow"
+      ? slides
+      : isHttpUrl(video.playableVideoUrl)
+        ? [video.playableVideoUrl]
+        : slides.length === 1
+          ? slides
+          : isHttpUrl(video.coverUrl)
+            ? [video.coverUrl]
+            : []
+
+  const items = buildReferenceMediaItems(mediaKind, urls, video.playableVideoUrl)
+  if (items.length === 0) {
+    return null
+  }
+
+  const primaryUrl = urls[0] ?? video.playableVideoUrl ?? null
+  const motionControlHref =
+    mediaKind === "video" && isHttpUrl(primaryUrl)
+      ? `/video?${new URLSearchParams({
+          model: MOTION_CONTROL_MODEL,
+          referenceVideoUrl: primaryUrl,
+        }).toString()}`
+      : null
+
+  const jobId = video.id ?? video.webVideoUrl ?? `tiktok-trend-${primaryUrl ?? "unknown"}`
+
+  return {
+    jobId,
+    platform: "tiktok",
+    sourcePostUrl: video.webVideoUrl,
+    mediaKind,
+    mediaItems: items,
+    posterUrl: video.coverUrl,
+    snapshot: video,
+    normalizationProfile: "tiktok-trend-search",
+    createdAt: video.createTimeISO,
+    completedAt: null,
+    motionControlHref,
+    sourceLabel: options?.sourceLabel ?? "Trend result",
+  }
 }

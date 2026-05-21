@@ -46,6 +46,7 @@ export async function updateProfileDisplayName(
   }
 
   revalidatePath("/profile")
+  revalidatePath("/", "layout")
   return { ok: true }
 }
 

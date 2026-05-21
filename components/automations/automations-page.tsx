@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { formatDistanceToNow } from "date-fns"
 import { FilePlus, FolderOpen, Plus as PlusPhosphor } from "@phosphor-icons/react"
 import {
   ArrowLeft,
@@ -362,8 +361,8 @@ export function AutomationsPage() {
   const [runs, setRuns] = React.useState<AutomationRunApi[]>([])
   const [loadingRuns, setLoadingRuns] = React.useState(false)
   const [editDetailsOpen, setEditDetailsOpen] = React.useState(false)
-  const [autoSaveStatus, setAutoSaveStatus] = React.useState<'saving' | 'saved'>('saved')
-  const autoSaveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
+  const [unsavedCloseConfirmOpen, setUnsavedCloseConfirmOpen] = React.useState(false)
+  const [isSaving, setIsSaving] = React.useState(false)
   /** When switching from summary → editor (mine), closing details must not clear `editDetailsOpen`. */
   const skipResetEditOnDetailsCloseRef = React.useRef(false)
 
@@ -834,91 +833,47 @@ export function AutomationsPage() {
     setEditBaselineSnapshot("")
   }, [selectedId])
 
-  const performAutoSave = React.useCallback(
-    async (currentPersistSnapshot: string) => {
-      if (isCommunityScope || !selected || newDialogOpen) return
-      if (!name.trim() || !prompt.trim()) return
-      if (uploadQueue.some((u) => u.isUploading)) return
-      const cron = presetTab === "custom" ? customCron.trim() : effectiveCron
-      if (!cron) return
-      
-      const vars = sanitizeAutomationVariables(automationVariables)
-      const promptPayload: AutomationPromptPayload = {
-        text: prompt.trim(),
-        refs: attachedRefs,
-        attachments: [
-          ...savedAttachments,
-          ...uploadQueue
-            .filter((u) => u.uploadedUrl)
-            .map((u) => ({
-              url: u.uploadedUrl!,
-              mediaType: u.file.type || "application/octet-stream",
-              filename: u.file.name,
-            })),
-        ],
-        ...(vars.length > 0 ? { variables: vars } : {}),
+  const hasUnsavedEdits =
+    !isCommunityScope &&
+    !newDialogOpen &&
+    Boolean(selected) &&
+    editBaselineSnapshot !== "" &&
+    persistSnapshot !== editBaselineSnapshot
+
+  const revertEditsToSaved = React.useCallback(() => {
+    if (!selected || isCommunityScope || newDialogOpen) return
+    hydrateFromAutomation(selected)
+    needsEditBaselineCaptureRef.current = true
+  }, [selected, isCommunityScope, newDialogOpen, hydrateFromAutomation])
+
+  const forceCloseEditDialog = React.useCallback(() => {
+    setUnsavedCloseConfirmOpen(false)
+    setEditDetailsOpen(false)
+  }, [])
+
+  const requestCloseEditDialog = React.useCallback(() => {
+    if (isCommunityScope || !hasUnsavedEdits) {
+      forceCloseEditDialog()
+      return
+    }
+    setUnsavedCloseConfirmOpen(true)
+  }, [isCommunityScope, hasUnsavedEdits, forceCloseEditDialog])
+
+  const handleEditDialogOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (open) {
+        setEditDetailsOpen(true)
+        return
       }
-      const scheduleSummary = describeCronHumanSummary(cron)
-      
-      try {
-        setAutoSaveStatus('saving')
-        const generatedDescription = await generateAutomationDescription({
-          name: name.trim(),
-          prompt: promptPayload.text,
-          scheduleSummary,
-        })
-        
-        const res = await fetch(`/api/automations/${selected.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: name.trim(),
-            description: generatedDescription,
-            promptPayload,
-            cronSchedule: cron,
-            timezone,
-            model: model || null,
-            isPublic: isPublicAutomation,
-          }),
-        })
-        
-        if (!res.ok) {
-          setAutoSaveStatus('saved')
-          return
-        }
-        
-        setAutoSaveStatus('saved')
-        setDescription(generatedDescription)
-        // Update baseline so we don't keep autosaving the same thing
-        setEditBaselineSnapshot(currentPersistSnapshot)
-      } catch {
-        setAutoSaveStatus('saved')
-      }
+      requestCloseEditDialog()
     },
-    [isCommunityScope, selected, newDialogOpen, name, prompt, uploadQueue, presetTab, customCron, effectiveCron, automationVariables, attachedRefs, savedAttachments, timezone, model, isPublicAutomation, generateAutomationDescription]
+    [requestCloseEditDialog],
   )
 
-  // Debounced autosave
-  React.useEffect(() => {
-    if (isCommunityScope || !selected || newDialogOpen) return
-    if (!name.trim() || !prompt.trim()) return
-    if (uploadQueue.some((u) => u.isUploading)) return
-    if (persistSnapshot === editBaselineSnapshot || persistSnapshot === "") return
-
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current)
-    }
-
-    autoSaveTimeoutRef.current = setTimeout(() => {
-      void performAutoSave(persistSnapshot)
-    }, 1500)
-
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current)
-      }
-    }
-  }, [persistSnapshot, editBaselineSnapshot, isCommunityScope, selected, newDialogOpen, name, prompt, uploadQueue, performAutoSave])
+  const discardEditAndClose = React.useCallback(() => {
+    revertEditsToSaved()
+    forceCloseEditDialog()
+  }, [revertEditsToSaved, forceCloseEditDialog])
 
   const previewTemplatePayload = React.useMemo((): AutomationPromptPayload | null => {
     if (!selected) return null
@@ -940,20 +895,20 @@ export function AutomationsPage() {
     setCommunityPreviewOpen(false)
   }, [selectedId, selected, hydrateFromAutomation])
 
-  const save = async () => {
-    if (isCommunityScope) return
+  const save = async (options?: { closeAfter?: boolean }): Promise<boolean> => {
+    if (isCommunityScope) return false
     if (!name.trim() || !prompt.trim()) {
       toast.error("Title and prompt are required")
-      return
+      return false
     }
     if (uploadQueue.some((u) => u.isUploading)) {
       toast.error("Wait for uploads to finish")
-      return
+      return false
     }
     const cron = presetTab === "custom" ? customCron.trim() : effectiveCron
     if (!cron) {
       toast.error("Schedule is required")
-      return
+      return false
     }
     const vars = sanitizeAutomationVariables(automationVariables)
     const promptPayload: AutomationPromptPayload = {
@@ -972,6 +927,7 @@ export function AutomationsPage() {
       ...(vars.length > 0 ? { variables: vars } : {}),
     }
     const scheduleSummary = describeCronHumanSummary(cron)
+    setIsSaving(true)
     try {
       const generatedDescription = await generateAutomationDescription({
         name: name.trim(),
@@ -1007,6 +963,7 @@ export function AutomationsPage() {
           lastHydratedId.current = null
           setSelectedId(created.id)
         }
+        return true
       } else if (selected) {
         const res = await fetch(`/api/automations/${selected.id}`, {
           method: "PATCH",
@@ -1026,11 +983,27 @@ export function AutomationsPage() {
           throw new Error(typeof j?.error === "string" ? j.error : "Save failed")
         }
         toast.success("Saved")
+        setEditBaselineSnapshot(persistSnapshot)
         lastHydratedId.current = null
         await loadAutomations()
+        if (options?.closeAfter) {
+          forceCloseEditDialog()
+        }
+        return true
       }
+      return false
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed")
+      return false
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const saveAndCloseEdit = async () => {
+    const ok = await save({ closeAfter: true })
+    if (ok) {
+      setUnsavedCloseConfirmOpen(false)
     }
   }
 
@@ -1185,11 +1158,17 @@ export function AutomationsPage() {
 
   function renderAutomationFormFields(
     idPrefix: string,
-    opts: { readOnly?: boolean; showVisibility?: boolean; showInlineActions?: boolean } = {},
+    opts: {
+      readOnly?: boolean
+      showVisibility?: boolean
+      showInlineActions?: boolean
+      showManualSaveActions?: boolean
+    } = {},
   ) {
     const readOnly = opts.readOnly ?? false
     const showVisibility = opts.showVisibility ?? false
     const showInlineActions = opts.showInlineActions ?? false
+    const showManualSaveActions = opts.showManualSaveActions ?? false
     const scheduleModeValue = presetTab === "custom" ? "custom" : presetKind
     const scheduleControlLabel = describeScheduleControlLabel({
       presetTab,
@@ -1219,7 +1198,7 @@ export function AutomationsPage() {
             onChange={(e) => setName(e.target.value)}
             placeholder="Automation title"
             disabled={readOnly}
-            className="h-auto border-0 bg-transparent px-0 text-lg font-semibold shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-0 md:text-xl"
+            className="mr-2 h-auto border-0 bg-transparent px-2 text-lg font-semibold shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-0 md:text-xl"
           />
           <p className="text-xs text-muted-foreground">
             Keep the title short. The prompt does the heavy lifting.
@@ -1338,20 +1317,6 @@ export function AutomationsPage() {
               slashCommandsContext="Automation"
               onPasteImage={(file) => void handleAttachFiles([file])}
             />
-            {!readOnly && !isCommunityScope && selected ? (
-              <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                {autoSaveStatus === 'saving' ? (
-                  <Badge variant="outline" className="gap-1.5">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Saving...
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400">
-                    ✓ Saved
-                  </Badge>
-                )}
-              </div>
-            ) : null}
           </div>
         </div>
       </div>
@@ -1661,7 +1626,7 @@ export function AutomationsPage() {
             </PopoverContent>
           </Popover>
 
-          {showVisibility || showInlineActions ? (
+          {showVisibility || showInlineActions || showManualSaveActions ? (
             <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
               {showVisibility ? (
                 <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1.5">
@@ -1682,8 +1647,46 @@ export function AutomationsPage() {
                   <Button type="button" variant="outline" size="sm" onClick={() => setNewDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="button" size="sm" onClick={() => void save()}>
-                    Create
+                  <Button type="button" size="sm" onClick={() => void save()} disabled={isSaving}>
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Creating…
+                      </>
+                    ) : (
+                      "Create"
+                    )}
+                  </Button>
+                </>
+              ) : null}
+              {showManualSaveActions ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={requestCloseEditDialog}
+                    disabled={isSaving}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void save()}
+                    disabled={!hasUnsavedEdits || isSaving || uploadQueue.some((u) => u.isUploading)}
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving…
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4" />
+                        Save
+                      </>
+                    )}
                   </Button>
                 </>
               ) : null}
@@ -2503,7 +2506,7 @@ export function AutomationsPage() {
             editDetailsOpen &&
               (!isCommunityScope || automationDetailsOpen),
           )}
-          onOpenChange={setEditDetailsOpen}
+          onOpenChange={handleEditDialogOpenChange}
         >
           <DialogContent
             className={cn(
@@ -2516,73 +2519,15 @@ export function AutomationsPage() {
               <DialogDescription>
                 {isCommunityScope
                   ? "Prompt, schedule, and attachments for this public automation."
-                  : "Update prompt, schedule, attachments, and visibility. Changes save automatically."}
+                  : "Update prompt, schedule, attachments, and visibility. Save when you are ready."}
               </DialogDescription>
             </DialogHeader>
-            <div className="min-w-0 space-y-6 px-4 py-4 sm:px-6">
-              <div className="space-y-6">
-                {renderAutomationFormFields("edit", {
-                  readOnly: isCommunityScope,
-                  showVisibility: !isCommunityScope,
-                })}
-              </div>
-
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
-                {selected.next_run_at ? (
-                  <p>
-                    <span className="text-muted-foreground">Next scheduled:</span>{" "}
-                    {new Date(selected.next_run_at).toLocaleString(undefined, {
-                      timeZone: timezone,
-                    })}
-                  </p>
-                ) : null}
-                {selected.last_run_at ? (
-                  <p className="mt-1">
-                    <span className="text-muted-foreground">Last run:</span>{" "}
-                    {formatDistanceToNow(new Date(selected.last_run_at), { addSuffix: true })}
-                  </p>
-                ) : null}
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Schedule: <code className="rounded bg-muted px-1">{selected.cron_schedule}</code>
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Timezone: <span className="font-mono text-foreground/80">{timezone}</span>
-                  {!isCommunityScope ? (
-                    <>
-                      {" · "}
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button
-                            type="button"
-                            className="text-primary underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
-                          >
-                            Change
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="w-[280px] p-3">
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-form-tz-popover" className="text-xs">
-                              Timezone
-                            </Label>
-                            <Select value={timezone} onValueChange={setTimezone}>
-                              <SelectTrigger id="edit-form-tz-popover" className="w-full font-mono text-xs">
-                                <SelectValue placeholder="Select timezone" />
-                              </SelectTrigger>
-                              <SelectContent className="max-h-[min(60dvh,320px)]">
-                                {ianaZones.map((tz) => (
-                                  <SelectItem key={tz} value={tz} className="font-mono text-xs">
-                                    {tz}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </>
-                  ) : null}
-                </p>
-              </div>
+            <div className="min-w-0 px-4 py-4 sm:px-6">
+              {renderAutomationFormFields("edit", {
+                readOnly: isCommunityScope,
+                showVisibility: !isCommunityScope,
+                showManualSaveActions: !isCommunityScope,
+              })}
             </div>
           </DialogContent>
         </Dialog>
@@ -2660,6 +2605,38 @@ export function AutomationsPage() {
           templatePayload={previewTemplatePayload}
         />
       ) : null}
+
+      <AlertDialog open={unsavedCloseConfirmOpen} onOpenChange={setUnsavedCloseConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save changes before closing?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes to this automation. Save them, discard them, or keep editing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <AlertDialogCancel disabled={isSaving}>Keep editing</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSaving}
+              onClick={discardEditAndClose}
+            >
+              Discard
+            </Button>
+            <Button type="button" disabled={isSaving} onClick={() => void saveAndCloseEdit()}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={Boolean(deleteId)} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>

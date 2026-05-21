@@ -17,7 +17,7 @@ export type SocialDownloadPlatform = "tiktok" | "instagram"
 function requireApifyToken() {
   const token = process.env.APIFY_API_TOKEN?.trim()
   if (!token) {
-    throw new Error("Apify is not configured. Set APIFY_API_TOKEN.")
+    throw new Error("Instagram download isn't available right now. Please try again later.")
   }
   return token
 }
@@ -79,7 +79,7 @@ async function fetchDatasetItems(datasetId: string, token: string): Promise<unkn
     if (isRecord(payload) && isRecord(payload.error)) {
       msg = readString(payload.error as Record<string, unknown>, "message")
     }
-    throw new Error(msg || `Could not load Apify dataset (${response.status}).`)
+    throw new Error(msg || "Couldn't load Instagram results. Please try again.")
   }
 
   if (Array.isArray(payload)) {
@@ -287,13 +287,13 @@ export async function runInstagramScraperActor(input: Record<string, unknown>, w
 
   if (!response.ok) {
     throw new Error(
-      body.error?.message || `Apify Instagram scrape failed (${response.status}).`,
+      body.error?.message || "Couldn't fetch Instagram content. Please try again.",
     )
   }
 
   const data = body.data
   if (!data) {
-    throw new Error(body.error?.message || "Apify returned an unexpected run payload.")
+    throw new Error(body.error?.message || "Couldn't fetch Instagram content. Please try again.")
   }
   const status = data.status
   const runId = data.id ?? null
@@ -301,14 +301,14 @@ export async function runInstagramScraperActor(input: Record<string, unknown>, w
   if (status !== "SUCCEEDED") {
     throw new Error(
       data.statusMessage
-        ? `Apify run did not succeed: ${status} — ${data.statusMessage}`
-        : `Apify run did not succeed (status: ${status || "unknown"}).`,
+        ? `Instagram fetch didn't complete: ${data.statusMessage}`
+        : "Instagram fetch didn't complete. Please try again.",
     )
   }
 
   const datasetId = data.defaultDatasetId
   if (!datasetId) {
-    throw new Error("Apify run finished but no dataset id was returned.")
+    throw new Error("Instagram fetch didn't return results. Please try again.")
   }
 
   const items = await fetchDatasetItems(datasetId, token)

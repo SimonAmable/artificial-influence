@@ -289,7 +289,7 @@ export function TikTokReferenceDownloaderTool() {
       return
     }
     if (authState !== "authenticated") {
-      toast.error("Sign in to scrape TikTok / Instagram references.")
+      toast.error("Sign in to download TikTok and Instagram posts.")
       return
     }
 
@@ -311,7 +311,7 @@ export function TikTokReferenceDownloaderTool() {
       }
 
       if (!response.ok || !payload.jobId) {
-        throw new Error(payload.error || "Could not queue scrape.")
+        throw new Error(payload.error || "Couldn't start the download. Please try again.")
       }
 
       toast.message("Fetching media…", {
@@ -454,8 +454,8 @@ export function TikTokReferenceDownloaderTool() {
             TikTok {"&"} Instagram downloader
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Paste a public TikTok or Instagram post/reel link. Media is saved to your workspace storage—you get a stable
-            public URL for playback and download (not ephemeral Apify or CDN links).
+            Paste a public TikTok or Instagram post or reel link. Media is saved to your library—you get a stable link
+            for playback and download that won&apos;t expire like social platform links.
           </p>
         </div>
 
@@ -569,14 +569,14 @@ export function TikTokReferenceDownloaderTool() {
                     <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-background/60 p-6 text-center">
                       <CircleNotch className="size-8 animate-spin text-muted-foreground" />
                       <p className="text-sm font-medium text-foreground">Preparing preview</p>
-                      <p className="text-xs text-muted-foreground">We are fetching and normalizing the TikTok media.</p>
+                      <p className="text-xs text-muted-foreground">We&apos;re fetching media from the post.</p>
                     </div>
                   ) : null}
 
 
                   {!primaryMediaUrl && thumbnail ? (
                     <p className="text-xs text-muted-foreground">
-                      Waiting for Storage upload to finish—or this post did not expose downloadable media. Try another clip.
+                      Waiting for your file to finish uploading—or this post did not include downloadable media. Try another clip.
                     </p>
                   ) : null}
 
@@ -607,7 +607,7 @@ export function TikTokReferenceDownloaderTool() {
                           : "Download file"}
                       </Button>
                     ) : (
-                      <Button type="button" variant="outline" disabled title="Save to Storage completes first">
+                      <Button type="button" variant="outline" disabled title="Download will be ready once upload finishes">
                         <DownloadSimple className="mr-2 size-4" />
                         Download file
                       </Button>
@@ -637,19 +637,14 @@ export function TikTokReferenceDownloaderTool() {
 
                   {jobMediaKind === "video" ? (
                     <p className="text-[11px] text-muted-foreground">
-                      Motion Control uses your Supabase public URL once the upload finishes—not ephemeral Apify or social
-                      CDN links.
+                      Motion Control uses your saved library link once the upload finishes—not temporary social links
+                      that can expire.
                     </p>
                   ) : (
                     <p className="text-[11px] text-muted-foreground">
                       Slideshow posts are saved as image sets. Download each frame or use them in image-first workflows.
                     </p>
                   )}
-                  {job.normalizationProfile ? (
-                    <Badge variant="secondary" className="text-[11px]">
-                      Profile: {job.normalizationProfile}
-                    </Badge>
-                  ) : null}
                 </div>
               ) : null}
             </CardContent>
@@ -657,14 +652,14 @@ export function TikTokReferenceDownloaderTool() {
         ) : (
           <div className="rounded-lg border border-dashed px-8 py-12 text-center text-sm text-muted-foreground">
             {authState !== "authenticated" ? (
-              "Sign in to scrape clips and hydrate your shorts library."
+              "Sign in to download clips and save them to your library."
             ) : isSubmitting ? (
               <div className="flex flex-col items-center justify-center gap-3">
                 <CircleNotch className="size-7 animate-spin text-muted-foreground" />
                 <p>Fetching your media…</p>
               </div>
             ) : (
-              "Paste a TikTok or Instagram URL above—we save files to Storage and preview them here when ready."
+              "Paste a TikTok or Instagram URL above—we save files to your library and preview them here when ready."
             )}
           </div>
         )}

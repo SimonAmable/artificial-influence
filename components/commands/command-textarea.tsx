@@ -33,6 +33,7 @@ export interface CommandTextareaProps {
   slashCommands?: CommandItem[]
   onSlashUiAction?: (action: SlashCommandUiAction) => void
   referenceInsertMode?: (item: AtPaletteRow["item"]) => "inline" | "external"
+  textareaId?: string
 }
 
 export function CommandTextarea({
@@ -50,6 +51,7 @@ export function CommandTextarea({
   slashCommands,
   onSlashUiAction,
   referenceInsertMode,
+  textareaId,
 }: CommandTextareaProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const layerRef = React.useRef<HTMLDivElement>(null)
@@ -262,6 +264,7 @@ export function CommandTextarea({
           </div>
         ) : null}
         <textarea
+          id={textareaId}
           ref={textareaRef}
           value={value}
           onChange={handleChange}

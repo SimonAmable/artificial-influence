@@ -1,0 +1,33 @@
+          <div>
+            <p className="text-4xl font-semibold">{formatCount(video.stats.views)} views</p>
+            <motionTarget.startsWith("http") ? (
+              <Button variant="outline" size="sm" type="button" asChild className="text-white hover:bg-white/10">
+                <Link href={buildMotionHref(motionTarget)} prefetch={false}>
+                  <FilmStrip className="mr-2 size-3.5" />
+                  Use in Motion Control
+                </Link>
+              </Button>
+            ) : null}
+            {canOpenViewer ? (
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                className="border-white/20 text-white hover:bg-white/10"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  openViewer()
+                }}
+              >
+                <ArrowsOut className="mr-2 size-3.5" />
+                Full screen
+              </Button>
+            ) : null}
+            {video.webVideoUrl ? (
+              <Button size="sm" variant="ghost" type="button" asChild className="text-white">
+                <a href={video.webVideoUrl} target="_blank" rel="noreferrer">
+                  Watch on TikTok
+                </a>
+              </Button>
+            ) : null}
+          </div>

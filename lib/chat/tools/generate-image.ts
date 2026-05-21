@@ -568,6 +568,7 @@ export function createGenerateImageTool({
           model: modelIdentifier,
           status: "completed" as const,
           usedReferenceCount: referenceImageUrls.length,
+          referenceImageUrls,
           variantCount: persisted.images.length,
           ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
         }
@@ -633,6 +634,7 @@ export function createGenerateImageTool({
           predictionId: requestId,
           status: "pending" as const,
           usedReferenceCount: referenceImageUrls.length,
+          referenceImageUrls,
           variantCount: effectiveVariantCount,
           ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
         }
@@ -745,6 +747,7 @@ export function createGenerateImageTool({
           predictionId: prediction.id,
           status: "pending" as const,
           usedReferenceCount: referenceImageUrls.length,
+          referenceImageUrls,
           variantCount: effectiveVariantCount,
           ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
         }
@@ -777,6 +780,7 @@ export function createGenerateImageTool({
         model: modelIdentifier,
         status: "completed" as const,
         usedReferenceCount: referenceImageUrls.length,
+        referenceImageUrls,
         variantCount: persisted.images.length,
         ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
       }

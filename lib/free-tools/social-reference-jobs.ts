@@ -143,7 +143,7 @@ async function executeTiktokDownload(jobId: string, job: { user_id: string; sour
   const normalizedList = normalizeTikTokDatasetItems(items)
   const first = normalizedList[0]
   if (!first) {
-    throw new Error("Apify returned no TikTok rows for this URL.")
+    throw new Error("We couldn't find downloadable media for that TikTok link.")
   }
 
   let outputPublicUrl: string | null = null
@@ -201,7 +201,7 @@ async function executeTiktokDownload(jobId: string, job: { user_id: string; sour
             normalizeError instanceof Error ? normalizeError.message : String(normalizeError)
           const rawMsg = rawError instanceof Error ? rawError.message : String(rawError)
           throw new Error(
-            `Could not save the TikTok clip to Storage. Transcode failed (${normalizeMsg}); raw upload failed (${rawMsg}).`,
+            `Could not save the TikTok clip to your library. Transcode failed (${normalizeMsg}); raw upload failed (${rawMsg}).`,
           )
         }
       }
@@ -220,7 +220,7 @@ async function executeTiktokDownload(jobId: string, job: { user_id: string; sour
     outputPublicUrl = outputPublicUrls[0] ?? null
     outputStoragePath = outputStoragePaths[0] ?? null
     if (!outputPublicUrl) {
-      throw new Error("Slideshow media was detected but no images were saved to Storage.")
+      throw new Error("Slideshow media was detected but no images were saved to your library.")
     }
   } else {
     throw new Error(
@@ -258,7 +258,7 @@ async function executeInstagramDownload(jobId: string, job: { user_id: string; s
   }
 
   if (!normalized) {
-    throw new Error("Apify returned no Instagram rows for this URL.")
+    throw new Error("We couldn't find downloadable media for that Instagram link.")
   }
 
   const fallbackImages =
@@ -308,7 +308,7 @@ async function executeInstagramDownload(jobId: string, job: { user_id: string; s
             normalizeError instanceof Error ? normalizeError.message : String(normalizeError)
           const rawMsg = rawError instanceof Error ? rawError.message : String(rawError)
           throw new Error(
-            `Could not save Instagram video to Storage. Transcode (${normalizeMsg}); raw (${rawMsg}).`,
+            `Could not save Instagram video to your library. Transcode (${normalizeMsg}); raw (${rawMsg}).`,
           )
         }
         outputMediaKind = "slideshow"
@@ -339,11 +339,11 @@ async function executeInstagramDownload(jobId: string, job: { user_id: string; s
     outputPublicUrl = outputPublicUrls[0] ?? null
     outputStoragePath = outputStoragePaths[0] ?? null
     if (!outputPublicUrl) {
-      throw new Error("Instagram images were detected but nothing was saved to Storage.")
+      throw new Error("Instagram images were detected but nothing was saved to your library.")
     }
   } else {
     throw new Error(
-      "Instagram did not return downloadable video or images for this post (private/restricted or empty CDN metadata).",
+      "Instagram did not return downloadable video or images for this post. It may be private, restricted, or unavailable.",
     )
   }
 
