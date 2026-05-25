@@ -1,9 +1,9 @@
 "use client"
 
-import * as React from "react"
-import { GearIcon, SunIcon, MoonIcon, MonitorIcon, Columns, Rows } from "@phosphor-icons/react"
-import { useTheme } from "next-themes"
+import { GearIcon } from "@phosphor-icons/react"
 
+import { LayoutModeToggleGroup } from "@/components/settings/layout-mode-toggle-group"
+import { ThemeToggleGroup } from "@/components/settings/theme-toggle-group"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,7 +12,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { LayoutMode } from "@/components/shared/layout/layout-toggle"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 
 interface SettingsDropdownProps {
   layoutMode?: LayoutMode
@@ -22,85 +21,6 @@ interface SettingsDropdownProps {
 
 type SettingsMenuContentProps = Omit<SettingsDropdownProps, "className"> & {
   className?: string
-}
-
-const THEME_OPTIONS = [
-  { value: "light", label: "Light theme", icon: SunIcon },
-  { value: "dark", label: "Dark theme", icon: MoonIcon },
-  { value: "system", label: "System theme", icon: MonitorIcon },
-] as const
-
-function ThemeToggleGroup({ className }: { className?: string }) {
-  const { theme, setTheme } = useTheme()
-
-  return (
-    <ToggleGroup
-      type="single"
-      value={theme ?? "system"}
-      onValueChange={(value) => {
-        if (!value) return
-        setTheme(value)
-      }}
-      variant="outline"
-      size="sm"
-      className={cn("flex w-full", className)}
-      aria-label="Theme"
-    >
-      {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
-        <ToggleGroupItem
-          key={value}
-          value={value}
-          aria-label={label}
-          title={label}
-          className="h-8 flex-1 rounded-full px-0"
-        >
-          <Icon className="size-4" weight="bold" />
-          <span className="sr-only">{label}</span>
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
-  )
-}
-
-function LayoutModeToggleGroup({
-  layoutMode,
-  onLayoutModeChange,
-}: Pick<SettingsMenuContentProps, "layoutMode" | "onLayoutModeChange">) {
-  if (!layoutMode || !onLayoutModeChange) return null
-
-  return (
-    <ToggleGroup
-      type="single"
-      value={layoutMode}
-      onValueChange={(value) => {
-        if (!value) return
-        onLayoutModeChange(value as LayoutMode)
-      }}
-      variant="outline"
-      size="sm"
-      className="flex w-full"
-      aria-label="UI layout"
-    >
-      <ToggleGroupItem
-        value="column"
-        aria-label="Column layout"
-        title="Column layout"
-        className="h-8 flex-1 gap-1.5 rounded-full px-2 text-xs"
-      >
-        <Columns className="size-4" weight="bold" />
-        <span>Column</span>
-      </ToggleGroupItem>
-      <ToggleGroupItem
-        value="row"
-        aria-label="Row layout"
-        title="Row layout"
-        className="h-8 flex-1 gap-1.5 rounded-full px-2 text-xs"
-      >
-        <Rows className="size-4" weight="bold" />
-        <span>Row</span>
-      </ToggleGroupItem>
-    </ToggleGroup>
-  )
 }
 
 export function SettingsMenuContent({

@@ -73,7 +73,7 @@ export function MockChatHero({
         <div className="pointer-events-none sticky bottom-0 z-10 w-full flex-none">
           <div className="pointer-events-auto mx-auto w-full max-w-4xl px-4 pb-4">
             <div className="rounded-[26px] p-2 transition-[box-shadow,ring-color]">
-              <InputGroup className="composer-depth items-end rounded-[22px] border-border/60 bg-background/95 p-1 backdrop-blur-sm has-[textarea]:rounded-[22px]">
+              <InputGroup className="composer-depth items-end rounded-[22px] border-black/10 dark:border-border/60 bg-background/95 p-1 backdrop-blur-sm has-[textarea]:rounded-[22px]">
                 <CommandTextarea
                   value={composerValue}
                   onChange={setComposerValue}

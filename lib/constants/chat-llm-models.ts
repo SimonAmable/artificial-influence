@@ -5,9 +5,9 @@ import type { GoogleLanguageModelOptions } from "@ai-sdk/google"
  * Canonical model ids stay server-facing while UI only shows tier labels.
  * @see https://vercel.com/ai-gateway/models/gemini-2.5-flash
  * @see https://vercel.com/ai-gateway/models/grok-4.3
- * @see https://vercel.com/ai-gateway/models/gemini-3.1-flash-lite-preview
+ * @see https://vercel.com/ai-gateway/models/gemini-3.1-flash-lite
  */
-export const DEFAULT_CHAT_GATEWAY_MODEL = "google/gemini-3.1-flash-lite-preview" as const
+export const DEFAULT_CHAT_GATEWAY_MODEL = "google/gemini-3.1-flash-lite" as const
 
 type ChatGatewayTier = "fast" | "balanced" | "max"
 
@@ -55,11 +55,12 @@ export const CHAT_GATEWAY_MODEL_OPTIONS: readonly ChatGatewayModelOption[] = [
     // unsupported provider options with "Invalid arguments passed to the model".
   },
   {
-    id: "google/gemini-3.1-flash-lite-preview",
+    id: "google/gemini-3.1-flash-lite",
     tier: "max",
     label: "Max",
     description: "Stronger reasoning for more complex planning, deeper research, and bigger asks.",
     iconPath: "/logo-max.svg",
+    legacyIds: ["google/gemini-3.1-flash-lite-preview"],
     providerOptions: {
       google: {
         thinkingConfig: {

@@ -69,6 +69,9 @@ import {
   socialProviderLabel,
   SocialPostMediaPreview,
 } from "@/components/chat/tool-ui/social-previews"
+import { ToolTraceGroup } from "@/components/chat/tool-trace-group"
+import { segmentMessagePartsForTraceCot } from "@/lib/chat/trace-tool-cot"
+
 export function MessageParts({
   message,
   allMessages,
@@ -95,9 +98,12 @@ export function MessageParts({
   onCreateAssetFromImage?: (imageUrl: string, index: number) => void
 }) {
   const transcriptMessages = allMessages ?? [message]
-  return (
-    <>
-      {message.parts.map((part, index) => {
+  const segments = segmentMessagePartsForTraceCot(message.parts)
+
+  const renderPartAtIndex = (index: number) => {
+    const part = message.parts[index]
+    if (!part) return null
+
         if (part.type === "text") {
           const inlineImageUrls = extractInlineImageUrlsFromText(part.text)
           return (
@@ -2518,6 +2524,28 @@ export function MessageParts({
         }
 
         return null
+  }
+
+  return (
+    <>
+      {segments.map((segment, segmentIndex) => {
+        if (segment.kind === "tool-trace-cot") {
+          return (
+            <ToolTraceGroup
+              key={`${message.id}-trace-cot-${segment.category}-${segmentIndex}`}
+              category={segment.category}
+              indices={segment.indices}
+              message={message}
+              renderPartAtIndex={renderPartAtIndex}
+            />
+          )
+        }
+
+        return (
+          <React.Fragment key={`${message.id}-part-${segment.index}`}>
+            {renderPartAtIndex(segment.index)}
+          </React.Fragment>
+        )
       })}
     </>
   )

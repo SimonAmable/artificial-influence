@@ -11,6 +11,7 @@ import {
 import { buildSkillsCatalogAppendix, type SkillCatalogEntry } from "@/lib/chat/skills/catalog"
 import { createCreativeChatTools } from "@/lib/chat/tools"
 import { getChatGatewayModelProviderOptions } from "@/lib/constants/chat-llm-models"
+import { adaptChatToolsForGatewayModel } from "@/lib/ai/adapt-chat-gateway-tools"
 import { createAIGatewayProvider } from "@/lib/ai/gateway"
 import type { AvailableChatImageReference } from "@/lib/chat/tools/image-reference-types"
 import type {
@@ -376,18 +377,9 @@ export function createCreativeAgent({
     preloadedModels,
   })
   const turnStartedAtMs = Date.now()
-
-  return new ToolLoopAgent({
-    model: gateway(model),
-    instructions: fullInstructions,
-    experimental_context: { turnStartedAtMs },
-    providerOptions: getChatGatewayModelProviderOptions(model),
-    prepareStep: ({ stepNumber }) => ({
-      system: `Runtime context (automatic): ISO UTC time: ${new Date().toISOString()}; agent step: ${stepNumber}; turn elapsed ms: ${Date.now() - turnStartedAtMs}`,
-    }),
-    stopWhen: stepCountIs(20),
-    temperature: 0.7,
-    tools: createCreativeChatTools({
+  const providerOptions = getChatGatewayModelProviderOptions(model)
+  const tools = adaptChatToolsForGatewayModel(
+    createCreativeChatTools({
       availableReferences,
       availableVideoReferences,
       availableAudioReferences,
@@ -399,5 +391,19 @@ export function createCreativeAgent({
       skillsCatalog,
       source,
     }),
+    model,
+  )
+
+  return new ToolLoopAgent({
+    model: gateway(model),
+    instructions: fullInstructions,
+    experimental_context: { turnStartedAtMs },
+    ...(providerOptions ? { providerOptions } : {}),
+    prepareStep: ({ stepNumber }) => ({
+      system: `Runtime context (automatic): ISO UTC time: ${new Date().toISOString()}; agent step: ${stepNumber}; turn elapsed ms: ${Date.now() - turnStartedAtMs}`,
+    }),
+    stopWhen: stepCountIs(20),
+    temperature: 0.7,
+    tools,
   })
 }

@@ -6,25 +6,21 @@ import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import {
   User,
-  SignOut,
   CaretDownIcon,
-  ChatCircleDots,
   Coin,
-  HandCoins,
 } from "@phosphor-icons/react"
 
 import { MegaNavItemBody, MenuBadge } from "@/components/app/mega-nav-item-body"
 import { MobileAppSidebar } from "@/components/app/mobile-app-sidebar"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { SettingsDropdown, SettingsMenuContent } from "@/components/app/settings-dropdown"
+import { SettingsDropdown } from "@/components/app/settings-dropdown"
 import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
 import { createClient } from "@/lib/supabase/client"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -33,11 +29,10 @@ import {
   type MegaNavGroup,
   type MegaNavItem,
 } from "@/lib/constants/navigation"
-import { FeedbackDialog } from "@/components/app/feedback-dialog"
-import { ProfileSettingsModal } from "@/components/profile/profile-settings-modal"
-import { openPricingPlansModal } from "@/lib/pricing-upsell"
-import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
-import { clearOnboardingCompletedLocal } from "@/lib/onboarding/client-storage"
+import {
+  ProfileSettingsModal,
+  type SettingsTab,
+} from "@/components/profile/profile-settings-modal"
 
 /** Matches signed-in header pills (credits, assets) for one surface style. */
 const signedInHeaderPillClassName =
@@ -101,8 +96,22 @@ export function Header() {
   const [loading, setLoading] = React.useState(true)
   const [isScrolled, setIsScrolled] = React.useState(false)
   const [credits, setCredits] = React.useState<number | null>(null)
-  const [feedbackOpen, setFeedbackOpen] = React.useState(false)
   const [profileModalOpen, setProfileModalOpen] = React.useState(false)
+  const [profileModalTab, setProfileModalTab] = React.useState<SettingsTab>("profile")
+
+  const openSettingsModal = React.useCallback((tab: SettingsTab = "profile") => {
+    setProfileModalTab(tab)
+    setProfileModalOpen(true)
+  }, [])
+
+  const showLayoutInSettings =
+    (isCustomComponentsPage ||
+      isInpaintPage ||
+      isImagePage ||
+      isCharacterSwapPage ||
+      isMotionCopyPage ||
+      isLipsyncPage) &&
+    layoutModeContext
   const [openGroupLabel, setOpenGroupLabel] = React.useState<string | null>(null)
   const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const [assetsMenuOpen, setAssetsMenuOpen] = React.useState(false)
@@ -192,17 +201,6 @@ export function Header() {
       setCredits(0)
     }
   }, [user?.id])
-
-  const handleLogout = async () => {
-    clearOnboardingCompletedLocal(user?.id)
-    if (typeof document !== "undefined") {
-      document.cookie = `${ONBOARDING_DONE_COOKIE}=; path=/; max-age=0`
-    }
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push("/")
-    router.refresh()
-  }
 
   const clearCloseTimer = React.useCallback(() => {
     if (!closeTimeoutRef.current) return
@@ -412,7 +410,7 @@ export function Header() {
                 }
                 onClick={() => {
                   void refreshCredits()
-                  openPricingPlansModal()
+                  openSettingsModal("credits")
                 }}
               >
                 <Coin
@@ -492,63 +490,19 @@ export function Header() {
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <DropdownMenu
-                onOpenChange={(open) => {
-                  if (open) {
-                    void refreshCredits()
-                  }
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="shadow-md"
+                aria-label="Open account settings"
+                onClick={() => {
+                  void refreshCredits()
+                  openSettingsModal("profile")
                 }}
               >
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="shadow-md">
-                    <User className="h-[1.2rem] w-[1.2rem]" />
-                    <span className="sr-only">User menu</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64">
-                  <DropdownMenuLabel className="font-normal">
-                   <div className="space-y-1">
-                     <div>{credits !== null ? `${credits} credits available` : "Credits unavailable"}</div>
-                     {user?.email ? (
-                       <div className="text-xs text-muted-foreground">{user.email}</div>
-                     ) : null}
-                   </div>
-                 </DropdownMenuLabel>
-                 <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setProfileModalOpen(true)
-                    }}
-                  >
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/pricing")}>
-                    <Coin className="mr-2 h-4 w-4" />
-                    <span>Pricing</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/affiliate")}>
-                    <HandCoins className="mr-2 h-4 w-4" />
-                    <span>Affiliate program</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFeedbackOpen(true)}>
-                    <ChatCircleDots className="mr-2 h-4 w-4" />
-                    <span>Send Feedback</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <div className="p-2">
-                    <SettingsMenuContent
-                      layoutMode={(isCustomComponentsPage || isInpaintPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.layoutMode : undefined}
-                      onLayoutModeChange={(isCustomComponentsPage || isInpaintPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.setLayoutMode : undefined}
-                    />
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} variant="destructive">
-                    <SignOut className="mr-2 h-4 w-4" />
-                    <span>Logout</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                <User className="h-[1.2rem] w-[1.2rem]" />
+              </Button>
             </>
           ) : (
             <>
@@ -571,9 +525,16 @@ export function Header() {
           ) : null}
         </div>
       </div>
-      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
       {user ? (
-        <ProfileSettingsModal open={profileModalOpen} onOpenChange={setProfileModalOpen} />
+        <ProfileSettingsModal
+          open={profileModalOpen}
+          onOpenChange={setProfileModalOpen}
+          initialTab={profileModalTab}
+          layoutMode={showLayoutInSettings ? layoutModeContext.layoutMode : undefined}
+          onLayoutModeChange={
+            showLayoutInSettings ? layoutModeContext.setLayoutMode : undefined
+          }
+        />
       ) : null}
     </header>
   )

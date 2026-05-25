@@ -1,11 +1,21 @@
 "use client"
 
 import * as React from "react"
-import { ChatCircleDots, User, X } from "@phosphor-icons/react"
+import {
+  ChatCircleDots,
+  Coin,
+  HandCoins,
+  User,
+  X,
+  type Icon,
+} from "@phosphor-icons/react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
+import { AffiliateSettingsPanel } from "@/components/profile/affiliate-settings-panel"
+import { CreditsSettingsPanel } from "@/components/profile/credits-settings-panel"
 import { FeedbackSettingsPanel } from "@/components/profile/feedback-settings-panel"
 import { ProfileSettingsPanel } from "@/components/profile/profile-settings-panel"
+import { LayoutMode } from "@/components/shared/layout/layout-toggle"
 import {
   Dialog,
   DialogContent,
@@ -17,7 +27,7 @@ import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
-type SettingsTab = "profile" | "feedback"
+export type SettingsTab = "profile" | "credits" | "affiliate" | "feedback"
 
 type ProfileData = {
   displayName: string
@@ -31,14 +41,27 @@ type ProfileData = {
   userId: string
 }
 
-const TAB_LABELS: Record<SettingsTab, string> = {
-  profile: "Profile",
-  feedback: "Feedback",
-}
+const SETTINGS_TABS: {
+  id: SettingsTab
+  label: string
+  icon: Icon
+}[] = [
+  { id: "profile", label: "Profile", icon: User },
+  { id: "credits", label: "Credits", icon: Coin },
+  { id: "affiliate", label: "Affiliate", icon: HandCoins },
+  { id: "feedback", label: "Feedback", icon: ChatCircleDots },
+]
+
+const TAB_LABELS = Object.fromEntries(
+  SETTINGS_TABS.map((t) => [t.id, t.label])
+) as Record<SettingsTab, string>
 
 export type ProfileSettingsModalProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialTab?: SettingsTab
+  layoutMode?: LayoutMode
+  onLayoutModeChange?: (mode: LayoutMode) => void
 }
 
 function ProfileSettingsSkeleton() {
@@ -47,14 +70,6 @@ function ProfileSettingsSkeleton() {
       <div className="space-y-2">
         <div className="h-7 w-48 rounded-md bg-muted" />
         <div className="h-4 w-56 rounded-md bg-muted/70" />
-      </div>
-      <div className="space-y-3 border-t border-border/60 pt-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="flex justify-between gap-4 py-2">
-            <div className="h-4 w-24 rounded bg-muted/70" />
-            <div className="h-4 w-20 rounded bg-muted/70" />
-          </div>
-        ))}
       </div>
     </div>
   )
@@ -120,13 +135,20 @@ async function fetchProfileData(): Promise<ProfileData | null> {
 type NavTabButtonProps = {
   tab: SettingsTab
   activeTab: SettingsTab
-  icon: React.ReactNode
+  icon: Icon
   label: string
   onSelect: (tab: SettingsTab) => void
   className?: string
 }
 
-function NavTabButton({ tab, activeTab, icon, label, onSelect, className }: NavTabButtonProps) {
+function NavTabButton({
+  tab,
+  activeTab,
+  icon: Icon,
+  label,
+  onSelect,
+  className,
+}: NavTabButtonProps) {
   const isActive = tab === activeTab
   return (
     <button
@@ -134,24 +156,64 @@ function NavTabButton({ tab, activeTab, icon, label, onSelect, className }: NavT
       onClick={() => onSelect(tab)}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "flex w-full items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium transition-colors",
+        "flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
         isActive
           ? "bg-muted/80 text-foreground"
           : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
         className
       )}
     >
-      {icon}
-      {label}
+      <Icon className="h-4 w-4 shrink-0" weight="regular" />
+      <span className="whitespace-nowrap">{label}</span>
     </button>
   )
 }
 
-export function ProfileSettingsModal({ open, onOpenChange }: ProfileSettingsModalProps) {
-  const [activeTab, setActiveTab] = React.useState<SettingsTab>("profile")
+function SettingsTabNav({
+  activeTab,
+  onSelect,
+  variant,
+}: {
+  activeTab: SettingsTab
+  onSelect: (tab: SettingsTab) => void
+  variant: "sidebar" | "scroll"
+}) {
+  return (
+    <nav
+      className={cn(
+        variant === "sidebar" && "flex flex-col gap-0.5",
+        variant === "scroll" &&
+          "flex gap-1 overflow-x-auto overscroll-x-contain px-4 pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      )}
+    >
+      {SETTINGS_TABS.map(({ id, label, icon }) => (
+        <NavTabButton
+          key={id}
+          tab={id}
+          activeTab={activeTab}
+          onSelect={onSelect}
+          icon={icon}
+          label={label}
+          className={variant === "sidebar" ? "w-full" : undefined}
+        />
+      ))}
+    </nav>
+  )
+}
+
+export function ProfileSettingsModal({
+  open,
+  onOpenChange,
+  initialTab = "profile",
+  layoutMode,
+  onLayoutModeChange,
+}: ProfileSettingsModalProps) {
+  const [activeTab, setActiveTab] = React.useState<SettingsTab>(initialTab)
   const [data, setData] = React.useState<ProfileData | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+
+  const closeModal = React.useCallback(() => onOpenChange(false), [onOpenChange])
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -177,26 +239,85 @@ export function ProfileSettingsModal({ open, onOpenChange }: ProfileSettingsModa
       setActiveTab("profile")
       return
     }
+    setActiveTab(initialTab)
     void load()
-  }, [open, load])
+  }, [open, load, initialTab])
 
   const sectionTitle = TAB_LABELS[activeTab]
+  const needsProfileData = activeTab === "profile" || activeTab === "credits"
+
+  function renderPanel() {
+    if (needsProfileData && loading) {
+      return <ProfileSettingsSkeleton />
+    }
+
+    if (needsProfileData && error) {
+      return (
+        <div className="space-y-3 text-sm">
+          <p className="text-destructive">{error}</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
+            Retry
+          </Button>
+        </div>
+      )
+    }
+
+    if (needsProfileData && !data) {
+      return null
+    }
+
+    switch (activeTab) {
+      case "profile":
+        return data ? (
+          <ProfileSettingsPanel
+            variant="modal"
+            displayName={data.displayName}
+            email={data.email}
+            memberSince={data.memberSince}
+            hasCompletedOnboarding={data.hasCompletedOnboarding}
+            userId={data.userId}
+            onDisplayNameChange={(name) =>
+              setData((prev) => (prev ? { ...prev, displayName: name } : prev))
+            }
+            onLogout={closeModal}
+            layoutMode={layoutMode}
+            onLayoutModeChange={onLayoutModeChange}
+          />
+        ) : null
+      case "credits":
+        return data ? (
+          <CreditsSettingsPanel
+            variant="modal"
+            credits={data.credits}
+            subscriptionStatus={data.subscriptionStatus}
+            renewalDate={data.renewalDate}
+            hasSubscription={data.hasSubscription}
+            onCloseModal={closeModal}
+          />
+        ) : null
+      case "affiliate":
+        return <AffiliateSettingsPanel variant="modal" onCloseModal={closeModal} />
+      case "feedback":
+        return <FeedbackSettingsPanel variant="modal" />
+      default:
+        return null
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
-          "!flex h-[min(640px,90dvh)] max-h-[90dvh] w-[calc(100%-1.5rem)] !max-w-[min(880px,calc(100vw-1.5rem))] flex-col gap-0 overflow-hidden rounded-2xl border-border/60 bg-background p-0",
-          "sm:!max-w-[min(880px,calc(100vw-2rem))] sm:w-[calc(100%-2rem)]"
+          "flex! h-[min(640px,90dvh)] max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[min(880px,calc(100vw-1.5rem))]! flex-col gap-0 overflow-hidden rounded-2xl border-border/60 bg-background p-0",
+          "sm:w-[calc(100%-2rem)] sm:max-w-[min(880px,calc(100vw-2rem))]!"
         )}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>Profile and feedback settings.</DialogDescription>
+          <DialogDescription>Account, credits, affiliate, and preferences.</DialogDescription>
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-          {/* Sidebar — large screens only (tablet uses top tabs) */}
           <aside className="hidden w-[148px] shrink-0 flex-col border-r border-border/60 bg-muted/20 px-2 py-2.5 lg:flex">
             <DialogPrimitive.Close asChild>
               <Button
@@ -209,27 +330,10 @@ export function ProfileSettingsModal({ open, onOpenChange }: ProfileSettingsModa
                 <X className="h-4 w-4" />
               </Button>
             </DialogPrimitive.Close>
-            <nav className="flex flex-col gap-0.5">
-              <NavTabButton
-                tab="profile"
-                activeTab={activeTab}
-                onSelect={setActiveTab}
-                label="Profile"
-                icon={<User className="h-4 w-4 shrink-0" weight="regular" />}
-              />
-              <NavTabButton
-                tab="feedback"
-                activeTab={activeTab}
-                onSelect={setActiveTab}
-                label="Feedback"
-                icon={<ChatCircleDots className="h-4 w-4 shrink-0" weight="regular" />}
-              />
-            </nav>
+            <SettingsTabNav activeTab={activeTab} onSelect={setActiveTab} variant="sidebar" />
           </aside>
 
-          {/* Main content */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            {/* Phone + tablet: top header and tabs */}
             <div className="shrink-0 border-b border-border/60 lg:hidden">
               <div className="flex items-center justify-between px-4 py-3">
                 <DialogPrimitive.Close asChild>
@@ -246,57 +350,14 @@ export function ProfileSettingsModal({ open, onOpenChange }: ProfileSettingsModa
                 <span className="text-sm font-semibold text-foreground">{sectionTitle}</span>
                 <span className="size-9" aria-hidden />
               </div>
-              <div className="grid grid-cols-2 gap-2 px-4 pb-4">
-                <NavTabButton
-                  tab="profile"
-                  activeTab={activeTab}
-                  onSelect={setActiveTab}
-                  label="Profile"
-                  icon={<User className="h-4 w-4 shrink-0" weight="regular" />}
-                  className="justify-center"
-                />
-                <NavTabButton
-                  tab="feedback"
-                  activeTab={activeTab}
-                  onSelect={setActiveTab}
-                  label="Feedback"
-                  icon={<ChatCircleDots className="h-4 w-4 shrink-0" weight="regular" />}
-                  className="justify-center"
-                />
-              </div>
+              <SettingsTabNav activeTab={activeTab} onSelect={setActiveTab} variant="scroll" />
             </div>
 
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-5 md:px-6 lg:px-5">
               <h2 className="mb-5 hidden text-base font-semibold text-foreground lg:block">
                 {sectionTitle}
               </h2>
-
-              {activeTab === "profile" ? (
-                <>
-                  {loading ? <ProfileSettingsSkeleton /> : null}
-
-                  {!loading && error ? (
-                    <div className="space-y-3 text-sm">
-                      <p className="text-destructive">{error}</p>
-                      <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
-                        Retry
-                      </Button>
-                    </div>
-                  ) : null}
-
-                  {!loading && !error && data ? (
-                    <ProfileSettingsPanel
-                      variant="modal"
-                      {...data}
-                      onDisplayNameChange={(name) =>
-                        setData((prev) => (prev ? { ...prev, displayName: name } : prev))
-                      }
-                    />
-                  ) : null}
-                </>
-              ) : (
-                <FeedbackSettingsPanel variant="modal" />
-              )}
+              {renderPanel()}
             </div>
           </div>
         </div>

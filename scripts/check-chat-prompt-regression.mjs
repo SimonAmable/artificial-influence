@@ -174,7 +174,7 @@ async function runLiveSmoke(promptRegistry, scenarios) {
   }
 
   const { createGateway, generateText } = await import("ai")
-  const model = process.env.UNICAN_CHAT_PROMPT_LIVE_MODEL ?? "google/gemini-3.1-flash-lite-preview"
+  const model = process.env.UNICAN_CHAT_PROMPT_LIVE_MODEL ?? "google/gemini-3.1-flash-lite"
   const gateway = createGateway({ apiKey: process.env.AI_GATEWAY_API_KEY })
 
   console.log(`Running live smoke comparison on model ${model}...`)

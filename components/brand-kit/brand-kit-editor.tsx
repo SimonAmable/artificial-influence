@@ -384,20 +384,31 @@ export const BrandKitEditor = React.forwardRef<BrandKitEditorHandle, BrandKitEdi
   React.useImperativeHandle(ref, () => ({ save: () => saveRef.current() }), [])
 
   const deleteCurrentKit = async () => {
-    if (!kitId) return
+    const deletedId = kitId
+    if (!deletedId) return
     const ok = window.confirm(`Delete "${name.trim() || "this brand kit"}"? This cannot be undone.`)
     if (!ok) return
 
     setDeleting(true)
     try {
-      const res = await fetch(`/api/brand-kits/${kitId}`, { method: "DELETE" })
+      const res = await fetch(`/api/brand-kits/${deletedId}`, { method: "DELETE" })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error((err as { error?: string }).error || "Delete failed")
       }
       invalidateCommandCache()
       toast.success("Brand kit deleted")
-      router.push("/brand")
+      const remaining = kits.filter((k) => k.id !== deletedId)
+      setKits(remaining)
+      setKitId(null)
+      setNotFound(false)
+      if (forcedKitId) {
+        router.replace("/brand")
+      } else if (remaining.length > 0) {
+        applyKit(remaining[0])
+      } else {
+        resetEmptyForm()
+      }
     } catch (e) {
       console.error(e)
       toast.error(e instanceof Error ? e.message : "Delete failed")

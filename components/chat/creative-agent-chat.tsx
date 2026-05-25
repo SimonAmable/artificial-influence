@@ -6,7 +6,7 @@ import Link from "next/link"
 import type { UIMessage } from "ai"
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai"
 import { Chat, useChat } from "@ai-sdk/react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowUp,
   Books,
@@ -16,7 +16,6 @@ import {
   FolderOpen,
   NotePencil,
   Plus,
-  Sparkle,
   X,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
@@ -152,6 +151,44 @@ const STARTER_PROMPTS: { label: string; prompt: string }[] = [
 ]
 
 const EMPTY_MESSAGES: UIMessage[] = []
+const CHAT_UI_BOOTSTRAP_STORAGE_PREFIX = "creative-chat-ui-bootstrap:"
+
+function readStoredChatBootstrapId(threadId: string): string | null {
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  try {
+    return window.sessionStorage.getItem(`${CHAT_UI_BOOTSTRAP_STORAGE_PREFIX}${threadId}`)
+  } catch {
+    return null
+  }
+}
+
+function storeChatBootstrapId(threadId: string, bootstrapId: string) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  try {
+    window.sessionStorage.setItem(`${CHAT_UI_BOOTSTRAP_STORAGE_PREFIX}${threadId}`, bootstrapId)
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function clearStoredChatBootstrapId(threadId: string) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  try {
+    window.sessionStorage.removeItem(`${CHAT_UI_BOOTSTRAP_STORAGE_PREFIX}${threadId}`)
+  } catch {
+    /* ignore */
+  }
+}
+
 const ONBOARDING_HANDOFF_PROMPT =
   "I just finished onboarding. What is this app, and what should I do first based on my goals?"
 
@@ -174,6 +211,7 @@ export function CreativeAgentChat({
   syncUrlOnThreadCreate?: boolean
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
   const [assetModalOpen, setAssetModalOpen] = React.useState(false)
@@ -189,7 +227,6 @@ export function CreativeAgentChat({
   const [socialConnections, setSocialConnections] = React.useState<SocialConnectionToolSummary[]>([])
   const [threadId, setThreadId] = React.useState<string | undefined>(initialThreadId)
   const [isCreatingThread, setIsCreatingThread] = React.useState(false)
-  const [isEnhancingComposer, setIsEnhancingComposer] = React.useState(false)
   const [isBootstrappingOnboarding, setIsBootstrappingOnboarding] = React.useState(false)
   const [createAssetDialogOpen, setCreateAssetDialogOpen] = React.useState(false)
   const [selectedImageForAsset, setSelectedImageForAsset] = React.useState<{
@@ -198,14 +235,18 @@ export function CreativeAgentChat({
   } | null>(null)
 
   /** AI SDK Chat `id`; must stay stable while a draft thread upgrades to DB id or `useChat` wipes messages mid-send (see `@ai-sdk/react` use-chat). */
-  const embedPersistBootstrapRef = React.useRef<string | null>(null)
+  const persistBootstrapRef = React.useRef<string | null>(null)
   const sidebarLikeEmbed =
     compact && enablePersistence && !syncUrlOnThreadCreate /* sheet chat only; `/chat` page sets syncUrl */
-  const resolvedUiChatBootstrapId = sidebarLikeEmbed
-    ? (embedPersistBootstrapRef.current ??=
-        typeof initialThreadId === "string" && initialThreadId.length > 0
-          ? initialThreadId
-          : `embed-draft-${typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`)
+  const pageLikePersist =
+    compact && enablePersistence && syncUrlOnThreadCreate /* full `/chat` page */
+  const useStablePersistBootstrap = sidebarLikeEmbed || pageLikePersist
+  const resolvedUiChatBootstrapId = useStablePersistBootstrap
+    ? (persistBootstrapRef.current ??=
+        (typeof initialThreadId === "string" && initialThreadId.length > 0
+          ? readStoredChatBootstrapId(initialThreadId) ?? initialThreadId
+          : null) ??
+        `page-draft-${typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`)
     : (initialThreadId ?? "creative-chat-draft")
 
   const threadIdRef = React.useRef<string | undefined>(initialThreadId)
@@ -216,6 +257,12 @@ export function CreativeAgentChat({
   const [chatGatewayModelId, setChatGatewayModelId] = React.useState<string>(DEFAULT_CHAT_GATEWAY_MODEL)
   /** One `router.refresh()` per thread ID so sidebar thread titles reflect async intent renaming. */
   const intentSidebarRefreshedForThreadIdsRef = React.useRef(new Set<string>())
+  const pathnameRef = React.useRef(pathname)
+  const syncedInitialThreadIdRef = React.useRef<string | undefined>(initialThreadId)
+
+  React.useEffect(() => {
+    pathnameRef.current = pathname
+  }, [pathname])
 
   const getLoginHref = React.useCallback(() => {
     if (typeof window === "undefined") {
@@ -241,13 +288,10 @@ export function CreativeAgentChat({
         onFinish: () => {
           const activeThreadId = threadIdRef.current
 
-          if (
-            enablePersistence &&
-            syncUrlOnThreadCreate &&
-            activeThreadId &&
-            window.location.pathname !== `/chat/${activeThreadId}`
-          ) {
-            window.history.replaceState(window.history.state, "", `/chat/${activeThreadId}`)
+          const threadHref = activeThreadId ? `/chat/${activeThreadId}` : null
+
+          if (enablePersistence && syncUrlOnThreadCreate && threadHref && pathnameRef.current !== threadHref) {
+            router.replace(threadHref)
           }
 
           if (enablePersistence && activeThreadId) {
@@ -496,6 +540,10 @@ export function CreativeAgentChat({
   const onboardingToken = searchParams.get("onboarding")
 
   React.useEffect(() => {
+    if (typeof initialThreadId !== "string" || initialThreadId.length === 0) {
+      return
+    }
+
     setThreadId(initialThreadId)
     threadIdRef.current = initialThreadId
   }, [initialThreadId])
@@ -505,8 +553,13 @@ export function CreativeAgentChat({
       return
     }
 
+    if (syncedInitialThreadIdRef.current === initialThreadId) {
+      return
+    }
+
+    syncedInitialThreadIdRef.current = initialThreadId
     setMessages(initialMessages)
-  }, [enablePersistence, initialMessages, setMessages])
+  }, [enablePersistence, initialMessages, initialThreadId, setMessages])
 
   React.useEffect(() => {
     const handleOpenSkillPicker = () => {
@@ -530,6 +583,8 @@ export function CreativeAgentChat({
     setAttachedRefs([])
     setThreadId(undefined)
     threadIdRef.current = undefined
+    persistBootstrapRef.current = null
+    syncedInitialThreadIdRef.current = undefined
     onboardingBootstrapInFlightRef.current = false
     onboardingHandoffPendingRef.current = false
     onboardingBootstrapCompletedRef.current = false
@@ -697,7 +752,7 @@ export function CreativeAgentChat({
     ) => {
       applyImageGridAgentAction({
         action,
-        context: toImageGridAgentContext(image, messages),
+        context: toImageGridAgentContext(image),
         setComposerValue,
         setAttachedRefs,
         focusComposer: focusChatComposer,
@@ -706,7 +761,7 @@ export function CreativeAgentChat({
         description: "Describe what you want and send.",
       })
     },
-    [focusChatComposer, messages],
+    [focusChatComposer],
   )
 
   const handleCreateAssetFromImage = React.useCallback((imageUrl: string, index: number) => {
@@ -748,49 +803,6 @@ export function CreativeAgentChat({
     toast.error(message)
   }, [])
 
-  const handleEnhanceComposerInstructions = React.useCallback(async () => {
-    if (!authReady) return
-    if (!userId) {
-      router.push(getLoginHref())
-      return
-    }
-
-    const trimmed = composerValue.trim()
-    if (!trimmed) {
-      toast.message("Add a message to enhance")
-      return
-    }
-
-    setIsEnhancingComposer(true)
-    try {
-      const response = await fetch("/api/enhance-agent-instructions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: trimmed }),
-      })
-      const data = (await response.json().catch(() => ({}))) as { error?: string; text?: string }
-
-      if (!response.ok) {
-        throw new Error(
-          typeof data.error === "string" ? data.error : "Could not enhance instructions",
-        )
-      }
-
-      const next = typeof data.text === "string" ? data.text : ""
-      if (!next.trim()) {
-        throw new Error("The enhancer returned empty text.")
-      }
-
-      setComposerValue(next)
-    } catch (enhanceError) {
-      toast.error(
-        enhanceError instanceof Error ? enhanceError.message : "Could not enhance instructions",
-      )
-    } finally {
-      setIsEnhancingComposer(false)
-    }
-  }, [authReady, composerValue, getLoginHref, router, userId])
-
   const ensurePersistedThread = React.useCallback(
     async (title: string): Promise<string | undefined> => {
       let nextThreadId = threadId
@@ -831,8 +843,13 @@ export function CreativeAgentChat({
         threadIdRef.current = nextThreadId
         setThreadId(nextThreadId)
         onThreadIdChange?.(nextThreadId)
+        storeChatBootstrapId(nextThreadId, resolvedUiChatBootstrapId)
 
-        if (syncUrlOnThreadCreate && window.location.pathname !== `/chat/${nextThreadId}`) {
+        if (
+          syncUrlOnThreadCreate &&
+          typeof window !== "undefined" &&
+          window.location.pathname !== `/chat/${nextThreadId}`
+        ) {
           window.history.replaceState(window.history.state, "", `/chat/${nextThreadId}`)
         }
 
@@ -841,7 +858,7 @@ export function CreativeAgentChat({
         setIsCreatingThread(false)
       }
     },
-    [enablePersistence, onThreadIdChange, syncUrlOnThreadCreate, threadId],
+    [enablePersistence, onThreadIdChange, resolvedUiChatBootstrapId, syncUrlOnThreadCreate, threadId],
   )
 
   React.useEffect(() => {
@@ -1073,6 +1090,13 @@ export function CreativeAgentChat({
 
   const clearChat = React.useCallback(() => {
     const shouldNavigateToDraft = enablePersistence && Boolean(threadId)
+
+    if (threadId) {
+      clearStoredChatBootstrapId(threadId)
+    }
+
+    persistBootstrapRef.current = null
+    syncedInitialThreadIdRef.current = undefined
 
     setMessages([])
     setComposerValue("")
@@ -1443,7 +1467,7 @@ export function CreativeAgentChat({
                 onDragOverCapture={handleComposerDragOverCapture}
                 onDropCapture={handleComposerDropCapture}
               >
-                <InputGroup className="composer-depth items-end rounded-[22px] border-border/60 bg-background/95 p-1 backdrop-blur-sm has-[textarea]:rounded-[22px]">
+                <InputGroup className="composer-depth items-end rounded-[22px] border-black/10 dark:border-border/60 bg-background/95 p-1 backdrop-blur-sm has-[textarea]:rounded-[22px]">
                   <CommandTextarea
                     textareaId="chat-composer-textarea"
                     value={composerValue}
@@ -1607,39 +1631,6 @@ export function CreativeAgentChat({
                         <TooltipContent side="top" className="max-w-56">
                           Unique skills successfully loaded in this chat (via activateSkill). Click to ask the
                           agent to load one.
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 shrink-0 gap-1 px-2 text-muted-foreground hover:text-foreground"
-                            aria-label="Enhance instructions"
-                            onClick={() => void handleEnhanceComposerInstructions()}
-                            disabled={
-                              !authReady ||
-                              !userId ||
-                              isCreatingThread ||
-                              isBootstrappingOnboarding ||
-                              hasPendingUploads ||
-                              isEnhancingComposer ||
-                              status === "submitted" ||
-                              status === "streaming" ||
-                              !composerValue.trim()
-                            }
-                          >
-                            {isEnhancingComposer ? (
-                              <CircleNotch className="h-4 w-4 shrink-0 animate-spin" />
-                            ) : (
-                              <Sparkle className="h-4 w-4 shrink-0" />
-                            )}
-                            <span className="hidden sm:inline">Enhance</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-[240px]">
-                          Rewrite your draft into clearer, more explicit instructions for the agent (concise).
                         </TooltipContent>
                       </Tooltip>
                     </div>

@@ -18,7 +18,9 @@ import {
   PencilSimple,
   Robot as RobotIcon,
   Palette,
+  ShieldCheck,
   SquaresFour,
+  Video as VideoIcon,
 } from "@phosphor-icons/react"
 
 import { MenuBadge } from "@/components/app/mega-nav-item-body"
@@ -40,11 +42,13 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
   useSidebar,
 } from "@/components/ui/sidebar"
@@ -76,9 +80,17 @@ const STANDALONE_GROUP_ICON: Record<string, typeof ImageIcon> = {
   "/character-swap": ArrowsLeftRight,
   "/editor": FilmStrip,
   "/image": ImageIcon,
-  "/video": ImageIcon,
+  "/video": VideoIcon,
+  "/assets": SquaresFour,
+  "/free-tools": ShieldCheck,
   "/chat": ChatCircleDots,
   "/automations": RobotIcon,
+}
+
+function getMegaNavGroupIcon(group: MegaNavGroup) {
+  const base = group.path?.split("?")[0]
+  if (base && STANDALONE_GROUP_ICON[base]) return STANDALONE_GROUP_ICON[base]
+  return PencilSimple
 }
 
 function MobileNavLink({
@@ -112,6 +124,41 @@ function MobileNavLink({
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
+  )
+}
+
+/** Nested row under a collapsible group (shadcn SidebarMenuSub). */
+function MobileNavSubLink({
+  item,
+  pathname,
+  search,
+  onNavigate,
+}: {
+  item: MegaNavItem
+  pathname: string
+  search: string
+  onNavigate: () => void
+}) {
+  const active = megaNavPathMatches(pathname, search, item.path)
+
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton asChild isActive={active} size="sm" title={item.description}>
+        <Link
+          href={item.path}
+          onClick={onNavigate}
+          {...(item.modelIdentifier ? { "data-model-identifier": item.modelIdentifier } : {})}
+        >
+          <MobileNavItemIcon item={item} />
+          <span className="truncate">{item.label}</span>
+          {item.badge ? (
+            <span className="ml-auto shrink-0">
+              <MenuBadge badge={item.badge} />
+            </span>
+          ) : null}
+        </Link>
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
   )
 }
 
@@ -163,6 +210,8 @@ function CollapsibleNavGroup({
   const [open, setOpen] = React.useState(defaultOpen)
   const simpleItems = group.simpleItems ?? []
   const sections = group.sections ?? []
+  const GroupIcon = getMegaNavGroupIcon(group)
+  const groupActive = isMegaGroupActiveForPath(pathname, group)
 
   React.useEffect(() => {
     setOpen(defaultOpen)
@@ -170,37 +219,46 @@ function CollapsibleNavGroup({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible">
-      <SidebarGroup>
-        <SidebarGroupLabel asChild>
-          <CollapsibleTrigger className="flex w-full items-center gap-2 [&[data-state=open]>svg.chevron]:rotate-180">
-            <span className="flex-1 truncate">{group.label}</span>
-            {group.badge ? <MenuBadge badge={group.badge} /> : null}
-            <CaretDownIcon className="chevron ml-auto size-4 shrink-0 opacity-60 transition-transform" />
-          </CollapsibleTrigger>
-        </SidebarGroupLabel>
-        <CollapsibleContent>
-          <SidebarGroupContent>
-            {simpleItems.length > 0 ? (
-              <SidebarMenu>
-                {simpleItems.map((item) => (
-                  <MobileNavLink
-                    key={item.path}
-                    item={item}
-                    pathname={pathname}
-                    search={search}
-                    onNavigate={onNavigate}
-                  />
-                ))}
-              </SidebarMenu>
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton
+            type="button"
+            isActive={groupActive}
+            className="w-full justify-start text-left"
+            tooltip={group.path ? `Open ${group.label}` : undefined}
+          >
+            <GroupIcon className="size-4 shrink-0" weight="duotone" aria-hidden />
+            <span className="truncate">{group.label}</span>
+            {group.badge ? (
+              <span className="shrink-0">
+                <MenuBadge badge={group.badge} />
+              </span>
             ) : null}
+            <CaretDownIcon
+              className="chevron ml-auto size-4 shrink-0 opacity-60 transition-transform group-data-[state=open]/collapsible:rotate-180 in-data-[state=open]:rotate-180"
+              aria-hidden
+            />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            {simpleItems.map((item) => (
+              <MobileNavSubLink
+                key={item.path}
+                item={item}
+                pathname={pathname}
+                search={search}
+                onNavigate={onNavigate}
+              />
+            ))}
             {sections.map((section) => (
-              <div key={section.title} className="mt-2 first:mt-0">
-                <p className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/60">
+              <SidebarMenuSubItem key={section.title} className="flex flex-col gap-0.5">
+                <span className="px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/55">
                   {section.title}
-                </p>
-                <SidebarMenu>
+                </span>
+                <SidebarMenuSub className="mx-0 w-full translate-x-0 gap-0.5 border-sidebar-border py-0 pl-2 pr-0">
                   {section.items.map((item) => (
-                    <MobileNavLink
+                    <MobileNavSubLink
                       key={item.path}
                       item={item}
                       pathname={pathname}
@@ -208,12 +266,12 @@ function CollapsibleNavGroup({
                       onNavigate={onNavigate}
                     />
                   ))}
-                </SidebarMenu>
-              </div>
+                </SidebarMenuSub>
+              </SidebarMenuSubItem>
             ))}
-          </SidebarGroupContent>
+          </SidebarMenuSub>
         </CollapsibleContent>
-      </SidebarGroup>
+      </SidebarMenuItem>
     </Collapsible>
   )
 }
@@ -232,25 +290,23 @@ function FlatNavGroup({
   const items = group.simpleItems ?? []
 
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel className="gap-2">
-        <span>{group.label}</span>
-        {group.badge ? <MenuBadge badge={group.badge} /> : null}
-      </SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          {items.map((item) => (
-            <MobileNavLink
-              key={item.path}
-              item={item}
-              pathname={pathname}
-              search={search}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
+    <>
+      <SidebarMenuItem className="pointer-events-none">
+        <span className="flex h-8 items-center gap-2 px-3 text-xs font-medium text-sidebar-foreground/70">
+          {group.label}
+          {group.badge ? <MenuBadge badge={group.badge} /> : null}
+        </span>
+      </SidebarMenuItem>
+      {items.map((item) => (
+        <MobileNavLink
+          key={item.path}
+          item={item}
+          pathname={pathname}
+          search={search}
+          onNavigate={onNavigate}
+        />
+      ))}
+    </>
   )
 }
 
@@ -273,11 +329,11 @@ function MobileNavSheetBody({
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
         <p className="text-sm font-semibold text-sidebar-foreground">Menu</p>
       </SidebarHeader>
-      <SidebarContent className="gap-0 overflow-y-auto px-2 py-3">
-        {!authenticated ? (
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
+      <SidebarContent className="gap-0 overflow-y-auto py-2">
+        <SidebarGroup className="p-2">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {!authenticated ? (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={pathname === "/"}>
                     <Link href="/" onClick={onNavigate}>
@@ -286,56 +342,51 @@ function MobileNavSheetBody({
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ) : null}
+              ) : null}
 
-        {mainGroups.map((group) => {
-          if (isStandaloneMegaGroup(group)) {
-            return (
-              <SidebarGroup key={group.label}>
-                <SidebarGroupContent>
-                  <SidebarMenu>
+              {mainGroups.map((group) => {
+                if (isStandaloneMegaGroup(group)) {
+                  return (
                     <StandaloneGroupLink
+                      key={group.label}
                       group={group}
                       pathname={pathname}
                       search={search}
                       onNavigate={onNavigate}
                     />
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            )
-          }
+                  )
+                }
 
-          const hasSections = Boolean((group.sections ?? []).length)
-          const collapsible =
-            MOBILE_COLLAPSIBLE_GROUP_LABELS.has(group.label) || hasSections
+                const hasSections = Boolean((group.sections ?? []).length)
+                const collapsible =
+                  MOBILE_COLLAPSIBLE_GROUP_LABELS.has(group.label) || hasSections
 
-          if (collapsible) {
-            return (
-              <CollapsibleNavGroup
-                key={group.label}
-                group={group}
-                pathname={pathname}
-                search={search}
-                onNavigate={onNavigate}
-                defaultOpen={isMegaGroupActiveForPath(pathname, group)}
-              />
-            )
-          }
+                if (collapsible) {
+                  return (
+                    <CollapsibleNavGroup
+                      key={group.label}
+                      group={group}
+                      pathname={pathname}
+                      search={search}
+                      onNavigate={onNavigate}
+                      defaultOpen={isMegaGroupActiveForPath(pathname, group)}
+                    />
+                  )
+                }
 
-          return (
-            <FlatNavGroup
-              key={group.label}
-              group={group}
-              pathname={pathname}
-              search={search}
-              onNavigate={onNavigate}
-            />
-          )
-        })}
+                return (
+                  <FlatNavGroup
+                    key={group.label}
+                    group={group}
+                    pathname={pathname}
+                    search={search}
+                    onNavigate={onNavigate}
+                  />
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       {footerGroups.length > 0 ? (
         <SidebarFooter className="border-t border-sidebar-border px-2 py-3">
@@ -408,7 +459,11 @@ function MobileNavSheet({ authenticated }: { authenticated: boolean }) {
         <SheetHeader className="sr-only">
           <SheetTitle>Menu</SheetTitle>
         </SheetHeader>
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div
+          data-sidebar="sidebar"
+          data-mobile="true"
+          className="flex min-h-0 flex-1 flex-col bg-sidebar text-sidebar-foreground"
+        >
           <MobileNavSheetBody authenticated={authenticated} onNavigate={close} />
         </div>
       </SheetContent>

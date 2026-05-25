@@ -1,8 +1,6 @@
-import type { UIMessage } from "ai"
 import type { Dispatch, SetStateAction } from "react"
 
 import type { AttachedRef } from "@/lib/commands/types"
-import { findTranscriptRefIdForUrl } from "@/lib/chat/conversation-references"
 
 export type ImageGridAgentAction = "reference" | "edit" | "recreate" | "animate"
 
@@ -12,7 +10,6 @@ export type ImageGridAgentActionContext = {
   model?: string | null
   aspectRatio?: string | null
   referenceImageUrls?: string[]
-  transcriptRefId?: string
 }
 
 function createChipId() {
@@ -46,16 +43,10 @@ function dedupeRefsByUrl(refs: AttachedRef[]): AttachedRef[] {
   })
 }
 
-function transcriptRefHint(transcriptRefId?: string): string {
-  if (!transcriptRefId) return ""
-  return `\n\nWhen you call tools, use referenceIds: ["${transcriptRefId}"] for the primary image.`
-}
-
 export function buildImageGridAgentInjection(
   action: ImageGridAgentAction,
   context: ImageGridAgentActionContext,
 ): string {
-  const refHint = transcriptRefHint(context.transcriptRefId)
   const promptLine = context.prompt?.trim()
     ? `\n\nOriginal prompt: "${context.prompt.trim()}"`
     : ""
@@ -64,13 +55,13 @@ export function buildImageGridAgentInjection(
 
   switch (action) {
     case "reference":
-      return `Use the attached image as a reference for my next generation. I want: ${refHint}`
+      return "Use the attached image as a reference for my next generation. I want: "
     case "edit":
-      return `Edit the attached image. Changes to apply: ${refHint}`
+      return "Edit the attached image. Changes to apply: "
     case "recreate":
-      return `Recreate this image with the same concept and quality.${promptLine}${modelLine}${aspectLine}${refHint}`
+      return `Recreate this image with the same concept and quality.${promptLine}${modelLine}${aspectLine}`
     case "animate":
-      return `Turn the attached image into a video using it as the start frame.\n\nMotion / duration: ${refHint}`
+      return "Turn the attached image into a video using it as the start frame.\n\nMotion / duration: "
     default: {
       const _exhaustive: never = action
       return String(_exhaustive)
@@ -102,23 +93,19 @@ export function buildAttachedRefsForAgentAction(
   return [outputRef]
 }
 
-export function toImageGridAgentContext(
-  image: {
-    url: string
-    prompt?: string | null
-    model?: string | null
-    aspectRatio?: string | null
-    referenceImageUrls?: string[]
-  },
-  messages: UIMessage[],
-): ImageGridAgentActionContext {
+export function toImageGridAgentContext(image: {
+  url: string
+  prompt?: string | null
+  model?: string | null
+  aspectRatio?: string | null
+  referenceImageUrls?: string[]
+}): ImageGridAgentActionContext {
   return {
     imageUrl: image.url,
     prompt: image.prompt ?? null,
     model: image.model ?? null,
     aspectRatio: image.aspectRatio ?? null,
     referenceImageUrls: image.referenceImageUrls ?? [],
-    transcriptRefId: findTranscriptRefIdForUrl(messages, image.url),
   }
 }
 

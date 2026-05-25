@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 
+import { CreditsSettingsPanel } from "@/components/profile/credits-settings-panel"
 import { ProfileSettingsPanel } from "@/components/profile/profile-settings-panel"
 import { createClient } from "@/lib/supabase/server"
 import { getUserSubscription } from "@/lib/subscription-server"
@@ -42,19 +43,25 @@ export default async function ProfilePage() {
 
   return (
     <main className="min-h-screen bg-background px-4 py-20 sm:px-6">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-10">
         <section className="p-1">
           <ProfileSettingsPanel
             variant="page"
             displayName={displayName}
             email={email}
+            memberSince={memberSince}
+            hasCompletedOnboarding={hasCompletedOnboarding}
+            userId={user.id}
+          />
+        </section>
+        <section className="p-1">
+          <p className="mb-4 text-sm text-muted-foreground">Credits & subscription</p>
+          <CreditsSettingsPanel
+            variant="page"
             credits={credits}
             subscriptionStatus={subscriptionStatus}
             renewalDate={renewalDate}
-            memberSince={memberSince}
             hasSubscription={hasSubscription}
-            hasCompletedOnboarding={hasCompletedOnboarding}
-            userId={user.id}
           />
         </section>
       </div>

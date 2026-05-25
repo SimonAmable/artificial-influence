@@ -13,7 +13,7 @@ import { createAIGatewayProvider, hasAIGatewayCredentials } from "@/lib/ai/gatew
 const PROMPT_ENHANCEMENT_MODEL = 'xai/grok-4.1-fast-non-reasoning' as const;
 
 /** Vision-capable model for JSON / Nano Banana prompt enhancement when reference images are provided. */
-const PROMPT_ENHANCEMENT_VISION_MODEL = 'google/gemini-3.1-flash-lite-preview' as const;
+const PROMPT_ENHANCEMENT_VISION_MODEL = 'google/gemini-3.1-flash-lite' as const;
 
 /** Cap reference images sent to the enhancer (latency + token limits). */
 const MAX_JSON_ENHANCEMENT_REFERENCE_IMAGES = 8;

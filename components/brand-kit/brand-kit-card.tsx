@@ -33,9 +33,12 @@ export function BrandKitCard({ kit, className, onDeleted }: BrandKitCardProps) {
     event.preventDefault()
     event.stopPropagation()
     if (deleting) return
-    const ok = window.confirm(`Delete "${kit.name}"? This cannot be undone.`)
-    if (!ok) return
     setDeleting(true)
+    const ok = window.confirm(`Delete "${kit.name}"? This cannot be undone.`)
+    if (!ok) {
+      setDeleting(false)
+      return
+    }
     try {
       const res = await fetch(`/api/brand-kits/${kit.id}`, { method: "DELETE" })
       if (!res.ok) {
@@ -53,45 +56,58 @@ export function BrandKitCard({ kit, className, onDeleted }: BrandKitCardProps) {
   }
 
   return (
-    <Link href={`/brand/${kit.id}`} className={cn("group block", className)}>
-      <Card className="relative h-full overflow-hidden border-border bg-background text-foreground transition hover:border-primary/40 hover:shadow-lg hover:ring-1 hover:ring-primary/25">
-        <div className="absolute right-2 top-2 z-10">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                disabled={deleting}
-                className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
-                aria-label="More actions"
-              >
-                <DotsThree className="h-4 w-4" weight="bold" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onSelect={(e) => void handleDelete(e)}
-              >
-                <Trash className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+    <Card
+      className={cn(
+        "group relative h-full overflow-hidden border-border bg-background text-foreground transition hover:border-primary/40 hover:shadow-lg hover:ring-1 hover:ring-primary/25",
+        className,
+      )}
+    >
+      <div
+        className="absolute right-2 top-2 z-10"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={deleting}
+              className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+              aria-label="More actions"
+            >
+              <DotsThree className="h-4 w-4" weight="bold" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={(e) => void handleDelete(e)}
+            >
+              <Trash className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
+      <Link
+        href={deleting ? "/brand" : `/brand/${kit.id}`}
+        className="block"
+        tabIndex={deleting ? -1 : undefined}
+        aria-disabled={deleting}
+        onClick={(e) => {
+          if (deleting) e.preventDefault()
+        }}
+      >
         <BrandKitSummaryCard kit={kit} framed={false} className="px-5 pb-3 pt-4 pr-14" />
 
         <div className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
           {kit.isDefault ? "Default kit" : "Brand kit"}
           {updatedLabel ? ` · ${updatedLabel}` : ""}
         </div>
-      </Card>
-    </Link>
+      </Link>
+    </Card>
   )
 }
