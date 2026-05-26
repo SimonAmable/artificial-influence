@@ -147,14 +147,17 @@ export function getTraceToolStepMeta(part: UIMessage["parts"][number]): TraceToo
       }
     case "tool-saveGenerationAsAsset": {
       const asset = tool.output?.asset as { title?: string } | undefined
+      const output = tool.output as { updated?: boolean; alreadySaved?: boolean } | undefined
       return {
-        label: "Save as asset",
+        label: output?.updated ? "Update asset" : "Save as asset",
         description:
           typeof asset?.title === "string"
             ? asset.title
-            : tool.output?.alreadySaved
-              ? "Already saved"
-              : undefined,
+            : output?.updated
+              ? "Updated"
+              : output?.alreadySaved
+                ? "Already saved"
+                : undefined,
         status,
       }
     }

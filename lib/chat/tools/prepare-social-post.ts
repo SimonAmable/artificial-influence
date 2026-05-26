@@ -159,6 +159,80 @@ const tiktokInputSchema = z.object({
   brandContentToggle: z.boolean().optional(),
 })
 
+/**
+ * Flat object schema for tool registration. xAI Grok rejects `oneOf` / `anyOf` tool
+ * schemas (from discriminated unions); provider-specific rules are enforced in execute.
+ */
+const prepareSocialPostInputSchema = z.object({
+  provider: z.enum(["instagram", "tiktok"]).describe("Target social network."),
+  action: z.enum(["draft", "publish", "schedule"]),
+  connectionId: z.string().min(1).describe("The exact connected social connection id to use."),
+  caption: z.string().max(2200).optional().describe("Optional caption or title."),
+  scheduledAt: z
+    .string()
+    .optional()
+    .describe("Required when action is schedule. Must be a future ISO 8601 date-time string."),
+  mediaType: z
+    .enum(["image", "feed_video", "reel", "carousel", "story"])
+    .optional()
+    .describe("Instagram only: media type."),
+  mediaUrl: z.string().url().optional().describe("Single public media URL."),
+  carouselItems: z
+    .array(
+      z.object({
+        url: z.string().url(),
+        kind: z.enum(["image", "video"]),
+      }),
+    )
+    .min(2)
+    .max(10)
+    .optional()
+    .describe("Instagram carousel items."),
+  storyAssetKind: z
+    .enum(["image", "video"])
+    .optional()
+    .describe("Instagram story only: whether the story asset is image or video."),
+  shareToFeed: z.boolean().optional().describe("Instagram reels: share to main feed."),
+  coverUrl: z.string().url().optional().describe("Instagram reels: optional cover image URL."),
+  trialParams: z
+    .object({
+      graduationStrategy: z.enum(["MANUAL", "SS_PERFORMANCE"]),
+    })
+    .optional()
+    .describe("Instagram reels: optional trial parameters."),
+  mode: z
+    .enum(["upload", "direct"])
+    .optional()
+    .describe("TikTok only: upload to inbox or direct post."),
+  postType: z.enum(["video", "photo"]).optional().describe("TikTok post type. Defaults to video."),
+  photoItems: z
+    .array(z.string().url())
+    .min(1)
+    .max(35)
+    .optional()
+    .describe("TikTok photo posts: ordered image URLs."),
+  photoCoverIndex: z.number().int().min(0).optional().describe("TikTok photo posts: cover index."),
+  description: z.string().optional().describe("TikTok photo posts: optional description."),
+  privacyLevel: z.string().optional().describe("TikTok direct post: privacy level."),
+  disableComment: z.boolean().optional(),
+  disableDuet: z.boolean().optional(),
+  disableStitch: z.boolean().optional(),
+  isAigc: z.boolean().optional(),
+  autoAddMusic: z.boolean().optional(),
+  brandOrganicToggle: z.boolean().optional(),
+  brandContentToggle: z.boolean().optional(),
+})
+
+function parsePrepareSocialPostToolInput(
+  input: z.infer<typeof prepareSocialPostInputSchema>,
+): PrepareSocialPostInput {
+  if (input.provider === "instagram") {
+    return instagramInputSchema.parse(input)
+  }
+
+  return tiktokInputSchema.parse(input)
+}
+
 function fallbackInstagramSocialAccount(connection: InstagramConnectionSummary): SocialConnectionToolSummary {
   return {
     accountType: connection.accountType,
@@ -499,12 +573,12 @@ export function createPrepareSocialPostTool({
   return tool({
     description:
       "Create an Instagram or TikTok post as a draft, publish it immediately, or schedule it for later. This tool requires explicit user approval in the tool UI before writing or publishing any post in normal chat.",
-    inputSchema: z.discriminatedUnion("provider", [instagramInputSchema, tiktokInputSchema]),
+    inputSchema: prepareSocialPostInputSchema,
     strict: true,
     needsApproval: requireApproval,
     execute: async (input) =>
       prepareSocialPost({
-        input,
+        input: parsePrepareSocialPostToolInput(input),
         supabase,
         userId,
       }),

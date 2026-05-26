@@ -586,11 +586,15 @@ export type SaveGenerationAsAssetToolPart = {
   toolCallId: string
   state: "input-streaming" | "input-available" | "output-available" | "output-error"
   input?: {
+    assetId?: string
     category?: "character" | "scene" | "shorts" | "element"
     confirmed?: boolean
     description?: string
     generationId?: string
+    mediaId?: string
+    tags?: string[]
     title?: string
+    uploadId?: string
     visibility?: "private" | "public"
   }
   output?: {
@@ -601,6 +605,7 @@ export type SaveGenerationAsAssetToolPart = {
       description?: string | null
       id: string
       sourceGenerationId?: string | null
+      sourceUploadId?: string | null
       tags: string[]
       thumbnailUrl?: string | null
       title: string
@@ -608,6 +613,7 @@ export type SaveGenerationAsAssetToolPart = {
       visibility: "private" | "public"
     }
     message?: string
+    updated?: boolean
   }
   errorText?: string
 }

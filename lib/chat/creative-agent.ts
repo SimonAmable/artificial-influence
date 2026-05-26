@@ -11,7 +11,10 @@ import {
 import { buildSkillsCatalogAppendix, type SkillCatalogEntry } from "@/lib/chat/skills/catalog"
 import { createCreativeChatTools } from "@/lib/chat/tools"
 import { getChatGatewayModelProviderOptions } from "@/lib/constants/chat-llm-models"
-import { adaptChatToolsForGatewayModel } from "@/lib/ai/adapt-chat-gateway-tools"
+import {
+  adaptChatToolsForGatewayModel,
+  isXaiChatGatewayModel,
+} from "@/lib/ai/adapt-chat-gateway-tools"
 import { createAIGatewayProvider } from "@/lib/ai/gateway"
 import type { AvailableChatImageReference } from "@/lib/chat/tools/image-reference-types"
 import type {
@@ -120,8 +123,9 @@ Agent rules:
 - Use the asset-search tool when the user wants to reuse a saved asset, find an existing character/product/reference, or when you need asset ids before generation.
 - Use **searchWeb** when the user asks to find links, sources, examples, references, current pages, or content ideas from the web. Use **readWebPage** when they give one URL to inspect/summarize/extract. Use **searchWebImages** for visual inspiration/reference discovery from the web, use **searchStockReferences** for live external meme/GIF/sticker and future stock-provider searches, and clearly treat external results as license-unverified unless the source says otherwise. Use **capturePageScreenshot** only when they explicitly ask to screenshot, capture, preview, or visually save a web page; default to viewport capture, not full-page capture, unless the user explicitly says full page. Screenshots saved to the thread can be reused as image references via **listThreadMedia**.
 - Use **listThreadMedia** to enumerate uploads and completed generations in this thread (**\`upl_<uuid>\`** / **\`gen_<uuid>\`**). Use **listRecentGenerations** for user-wide history; each row has **id** (save-as-asset, credits) and **mediaId** (**gen_<uuid>**) for **referenceIds** / **referenceVideoIds** / **referenceAudioIds**. Either form resolves for references.
-- Before using the save-generation-as-asset tool, make sure the user has clearly confirmed they want that generation saved. If they have not confirmed yet, ask one short confirmation question first.
-- When you save a generation as an asset, choose a sensible category and a rich agent-context description yourself unless the user explicitly asks for something else. Shorts assets: describe movement, pacing, camera. Character assets: generalized styling and vibe—not hyper-specific facial detail (face can be separate assets).
+- Before using the save-generation-as-asset tool, make sure the user has clearly confirmed they want that media saved or an existing asset updated. If they have not confirmed yet, ask one short confirmation question first.
+- Use **saveGenerationAsAsset** to save completed generations (**generationId** / **gen_<uuid>**) or user uploads (**uploadId** / **upl_<uuid>** from **listThreadMedia**). Use **assetId** (from **searchAssets**) to update title, description, category, tags, or visibility on an existing library asset.
+- When you save media as an asset, choose a sensible category and a rich agent-context description yourself unless the user explicitly asks for something else. Shorts assets: describe movement, pacing, camera. Character assets: generalized styling and vibe—not hyper-specific facial detail (face can be separate assets).
 - Use **listSocialConnections** when the user wants to post to Instagram or TikTok and the exact connected account is not already clear. If multiple accounts exist, do not guess.
 - Use **prepareSocialPost** only when the user clearly wants to save a social post draft, publish a social post now, or schedule one for later.
 - **prepareSocialPost** requires explicit approval in the tool UI before anything is saved in normal chat. If the approval is denied, do not retry the same tool call unless the user changes the request. (Server-scheduled **scheduleGenerationFollowUp** runs may execute drafts without that interactive approval.)
@@ -216,7 +220,7 @@ ${onboardingContext}
 - Use listAutomations before controlling an existing automation unless the exact automation id was returned by a tool in this turn.
 - Use manageAutomation for create, update, pause, resume, run-now, and delete automation requests.
 - Use listSocialConnections before prepareSocialPost when the target account is not explicit.
-- Use saveGenerationAsAsset only after explicit user confirmation.
+- Use saveGenerationAsAsset only after explicit user confirmation. Supports generations, thread uploads, and editing existing assets by assetId.
 - Use searchWeb to find source links, readWebPage to inspect one URL, searchWebImages for license-unverified visual inspiration, searchStockReferences for live external meme/GIF/sticker and future stock-provider search, and capturePageScreenshot only when the user explicitly asks for a screenshot or page capture. Default screenshots to viewport capture unless the user asks for full page.
 - Use composeTimelineVideo when the user wants a cut-together deliverable from existing thread media rather than newly generated motion. Sequence visual **segments** in order, use **durationSeconds** to control image/GIF pacing, **trimStartSeconds** / **trimEndSeconds** to isolate the useful moment of a video clip, and optional **audioSegments** with **startAtSeconds** / **durationSeconds** when the user wants music, narration, or a soundtrack bed.
 - Prefer one generation tool plus only the support tools actually needed for the turn.
@@ -399,11 +403,15 @@ export function createCreativeAgent({
     instructions: fullInstructions,
     experimental_context: { turnStartedAtMs },
     ...(providerOptions ? { providerOptions } : {}),
-    prepareStep: ({ stepNumber }) => ({
-      system: `Runtime context (automatic): ISO UTC time: ${new Date().toISOString()}; agent step: ${stepNumber}; turn elapsed ms: ${Date.now() - turnStartedAtMs}`,
-    }),
+    ...(!isXaiChatGatewayModel(model)
+      ? {
+          prepareStep: ({ stepNumber }: { stepNumber: number }) => ({
+            system: `Runtime context (automatic): ISO UTC time: ${new Date().toISOString()}; agent step: ${stepNumber}; turn elapsed ms: ${Date.now() - turnStartedAtMs}`,
+          }),
+        }
+      : {}),
     stopWhen: stepCountIs(20),
-    temperature: 0.7,
+    ...(isXaiChatGatewayModel(model) ? {} : { temperature: 0.7 }),
     tools,
   })
 }

@@ -730,10 +730,17 @@ function ImagePageContent() {
       }
       const outputUrl = data.imageUrl
       if (outputUrl) {
-        setHistoryImages((prev) => [
-          { url: outputUrl, model: 'Creative Upscale', prompt: null },
-          ...prev,
-        ])
+        setHistoryImages((prev) =>
+          prependUniqueHistoryItems(prev, [
+            {
+              id: typeof data.generationId === 'string' ? data.generationId : undefined,
+              url: outputUrl,
+              model: 'P-Image Upscale',
+              prompt: null,
+              tool: 'upscale',
+            },
+          ])
+        )
       }
       toast.success('Upscale complete', {
         action: outputUrl

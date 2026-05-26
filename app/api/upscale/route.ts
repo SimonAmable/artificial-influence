@@ -4,7 +4,41 @@ import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 
 // Pin to a version hash to avoid 404s (Replicate v1 can 404 for owner/name on some community models)
-const UPSCALE_MODEL_ID = 'zsxkib/seedvr2:ca98249be9cb623f02a80a7851a2b1a33d5104c251a8f5a1588f251f79bf7c78';
+// https://replicate.com/prunaai/p-image-upscale
+const UPSCALE_MODEL_ID =
+  'prunaai/p-image-upscale:ea74e255330ec5a0a6aa394e7e1451a8cea94fe1edb8266cc4848eab047a74c4';
+const UPSCALE_MODEL_IDENTIFIER_FALLBACK = 'prunaai/p-image-upscale';
+const UPSCALE_CREDITS_COST = 1;
+
+const DEFAULT_UPSCALE_INPUT: Record<string, unknown> = {
+  upscale_mode: 'target',
+  target: 4,
+  enhance_realism: true,
+  output_format: 'png',
+  disable_safety_checker: true,
+};
+
+async function findActiveUpscaleModel(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { data: pinned, error: pinnedError } = await supabase
+    .from('models')
+    .select('id, name, model_cost')
+    .eq('identifier', UPSCALE_MODEL_ID)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (!pinnedError && pinned) return pinned;
+
+  const { data: fallback, error: fallbackError } = await supabase
+    .from('models')
+    .select('id, name, model_cost')
+    .eq('identifier', UPSCALE_MODEL_IDENTIFIER_FALLBACK)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (!fallbackError && fallback) return fallback;
+
+  return null;
+}
 
 function extractOutputUrl(output: unknown): string | null {
   if (typeof output === 'string' && (output.startsWith('http://') || output.startsWith('https://'))) {
@@ -121,36 +155,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: modelData, error: modelError } = await supabase
-      .from('models')
-      .select('id, name, model_cost')
-      .eq('identifier', UPSCALE_MODEL_ID)
-      .eq('is_active', true)
-      .single();
+    const modelData = await findActiveUpscaleModel(supabase);
 
-    if (modelError || !modelData) {
-      console.error('[upscale] Model not found:', modelError?.message);
-      return NextResponse.json(
-        { error: 'Upscale model not found or inactive.' },
-        { status: 400 }
+    if (!modelData) {
+      console.warn(
+        '[upscale] Model row not found for',
+        UPSCALE_MODEL_ID,
+        'or',
+        UPSCALE_MODEL_IDENTIFIER_FALLBACK,
+        '— continuing with pinned Replicate model. Apply migration 20260526120000_switch_upscale_to_p_image_upscale.sql.',
       );
     }
 
-    const requiredCredits = Math.max(1, Number(modelData.model_cost) || 2);
-    const hasCredits = await checkUserHasCredits(user.id, requiredCredits);
+    const hasCredits = await checkUserHasCredits(user.id, UPSCALE_CREDITS_COST);
     if (!hasCredits) {
       return NextResponse.json(
         {
           error: 'Insufficient credits.',
-          message: `Upscale requires ${requiredCredits} credits.`,
+          message: `Upscale requires ${UPSCALE_CREDITS_COST} credit.`,
         },
         { status: 402 }
       );
     }
 
     const replicateInput: Record<string, unknown> = {
-      media: mediaUrl,
+      ...DEFAULT_UPSCALE_INPUT,
+      image: mediaUrl,
       ...parameters,
+      disable_safety_checker: true,
     };
 
     console.log('[upscale] Replicate input keys:', Object.keys(replicateInput));
@@ -172,15 +204,75 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await deductUserCredits(user.id, requiredCredits);
-    console.log('[upscale] ✓ Credits deducted:', requiredCredits);
+    // Persist to storage (Replicate URLs expire) and save to generations for history.
+    let savedUrl = outputUrl;
+    let savedStoragePath: string | null = null;
+    let generationId: string | null = null;
+
+    try {
+      const imageRes = await fetch(outputUrl);
+      if (imageRes.ok) {
+        const buffer = Buffer.from(await imageRes.arrayBuffer());
+        const timestamp = Date.now();
+        const storagePath = `${user.id}/upscale-outputs/${timestamp}.png`;
+        const { error: saveError } = await supabase.storage
+          .from('public-bucket')
+          .upload(storagePath, buffer, {
+            contentType: 'image/png',
+            upsert: false,
+          });
+
+        if (!saveError) {
+          savedStoragePath = storagePath;
+          const { data: savedData } = supabase.storage
+            .from('public-bucket')
+            .getPublicUrl(storagePath);
+          savedUrl = savedData.publicUrl;
+        }
+      }
+    } catch (saveErr) {
+      console.warn('[upscale] Save to storage failed, returning Replicate URL:', saveErr);
+    }
+
+    if (savedStoragePath) {
+      try {
+        const { data: generationRow, error: genError } = await supabase
+          .from('generations')
+          .insert({
+            user_id: user.id,
+            prompt: null,
+            supabase_storage_path: savedStoragePath,
+            reference_images_supabase_storage_path: null,
+            model: UPSCALE_MODEL_IDENTIFIER_FALLBACK,
+            type: 'image',
+            is_public: true,
+            tool: 'upscale',
+            status: 'completed',
+            error_message: null,
+          })
+          .select('id')
+          .single();
+
+        if (genError) {
+          console.warn('[upscale] Failed to save to generations table:', genError);
+        } else if (generationRow?.id) {
+          generationId = generationRow.id;
+        }
+      } catch (genErr) {
+        console.warn('[upscale] Exception saving to generations table:', genErr);
+      }
+    }
+
+    await deductUserCredits(user.id, UPSCALE_CREDITS_COST);
+    console.log('[upscale] ✓ Credits deducted:', UPSCALE_CREDITS_COST);
 
     const totalTime = Date.now() - requestStartTime;
     console.log('[upscale] ✓ Request completed in', totalTime, 'ms');
 
     return NextResponse.json({
-      imageUrl: outputUrl,
-      creditsUsed: requiredCredits,
+      imageUrl: savedUrl,
+      generationId,
+      creditsUsed: UPSCALE_CREDITS_COST,
     });
   } catch (err) {
     console.error('[upscale] Error:', err);

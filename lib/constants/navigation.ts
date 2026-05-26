@@ -184,6 +184,12 @@ export const megaNavGroups: MegaNavGroup[] = [
             iconPhosphor: "paint-brush",
           },
           {
+            path: "/upscale",
+            label: "Upscale",
+            description: "Enhance resolution (1 credit)",
+            iconPhosphor: "magnifying-glass",
+          },
+          {
             path: "/free-tools/metadata-remover",
             label: "Metadata Remover",
             description: "Remove metadata from AI images locally",

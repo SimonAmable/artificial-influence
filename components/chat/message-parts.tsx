@@ -1965,16 +1965,33 @@ export function MessageParts({
           const toolPart = part as SaveGenerationAsAssetToolPart
 
           if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            const isUpdate = Boolean(toolPart.input?.assetId)
+            const saveTarget =
+              toolPart.input?.title ||
+              (isUpdate
+                ? `Asset ${toolPart.input?.assetId || ""}`
+                : toolPart.input?.mediaId ||
+                  toolPart.input?.uploadId ||
+                  toolPart.input?.generationId ||
+                  "")
             return (
               <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
                 <CardContent className="flex items-center gap-3 p-4">
                   <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium">Saving generation as asset</p>
+                    <p className="text-sm font-medium">
+                      {isUpdate ? "Updating asset" : "Saving as asset"}
+                    </p>
                     <p className="truncate text-xs text-muted-foreground">
                       {toolPart.input?.title
-                        ? `Creating ${toolPart.input.title}`
-                        : `Saving generation ${toolPart.input?.generationId || ""}`}
+                        ? isUpdate
+                          ? `Updating ${toolPart.input.title}`
+                          : `Creating ${toolPart.input.title}`
+                        : saveTarget
+                          ? isUpdate
+                            ? `Updating ${saveTarget}`
+                            : `Saving ${saveTarget}`
+                          : "Saving media to library"}
                     </p>
                   </div>
                 </CardContent>
@@ -1998,7 +2015,13 @@ export function MessageParts({
             <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
               <CardContent className="space-y-4 p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge>{toolPart.output?.alreadySaved ? "Existing Asset" : "Asset Saved"}</Badge>
+                  <Badge>
+                    {toolPart.output?.updated
+                      ? "Asset Updated"
+                      : toolPart.output?.alreadySaved
+                        ? "Existing Asset"
+                        : "Asset Saved"}
+                  </Badge>
                   {asset ? <Badge variant="outline">{asset.assetType}</Badge> : null}
                   {asset ? <Badge variant="outline">{asset.category}</Badge> : null}
                   {asset ? <Badge variant="outline">{asset.visibility}</Badge> : null}
