@@ -9,7 +9,7 @@ export function SidebarSkillButton({ className }: { className?: string }) {
     <button
       type="button"
       className={cn(
-        "flex h-9 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-medium text-foreground/90 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "flex h-9 w-full items-center gap-3 rounded-full px-3 text-left text-sm font-medium text-foreground/90 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className,
       )}
       onClick={() => {

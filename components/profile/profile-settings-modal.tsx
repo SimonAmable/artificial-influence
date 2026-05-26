@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import {
+  Bell,
   ChatCircleDots,
   Coin,
   HandCoins,
@@ -14,7 +15,9 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 import { AffiliateSettingsPanel } from "@/components/profile/affiliate-settings-panel"
 import { CreditsSettingsPanel } from "@/components/profile/credits-settings-panel"
 import { FeedbackSettingsPanel } from "@/components/profile/feedback-settings-panel"
+import { NotificationsSettingsPanel } from "@/components/profile/notifications-settings-panel"
 import { ProfileSettingsPanel } from "@/components/profile/profile-settings-panel"
+import { useNotificationsRead } from "@/lib/notifications/use-notifications-read"
 import { LayoutMode } from "@/components/shared/layout/layout-toggle"
 import {
   Dialog,
@@ -27,7 +30,12 @@ import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
-export type SettingsTab = "profile" | "credits" | "affiliate" | "feedback"
+export type SettingsTab =
+  | "profile"
+  | "notifications"
+  | "credits"
+  | "affiliate"
+  | "feedback"
 
 type ProfileData = {
   displayName: string
@@ -47,6 +55,7 @@ const SETTINGS_TABS: {
   icon: Icon
 }[] = [
   { id: "profile", label: "Profile", icon: User },
+  { id: "notifications", label: "Notifications", icon: Bell },
   { id: "credits", label: "Credits", icon: Coin },
   { id: "affiliate", label: "Affiliate", icon: HandCoins },
   { id: "feedback", label: "Feedback", icon: ChatCircleDots },
@@ -139,6 +148,7 @@ type NavTabButtonProps = {
   label: string
   onSelect: (tab: SettingsTab) => void
   className?: string
+  showUnreadDot?: boolean
 }
 
 function NavTabButton({
@@ -148,6 +158,7 @@ function NavTabButton({
   label,
   onSelect,
   className,
+  showUnreadDot = false,
 }: NavTabButtonProps) {
   const isActive = tab === activeTab
   return (
@@ -156,7 +167,7 @@ function NavTabButton({
       onClick={() => onSelect(tab)}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
+        "relative flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
         isActive
           ? "bg-muted/80 text-foreground"
           : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
@@ -165,6 +176,12 @@ function NavTabButton({
     >
       <Icon className="h-4 w-4 shrink-0" weight="regular" />
       <span className="whitespace-nowrap">{label}</span>
+      {showUnreadDot ? (
+        <span
+          className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-primary"
+          aria-hidden
+        />
+      ) : null}
     </button>
   )
 }
@@ -173,10 +190,12 @@ function SettingsTabNav({
   activeTab,
   onSelect,
   variant,
+  notificationsUnread,
 }: {
   activeTab: SettingsTab
   onSelect: (tab: SettingsTab) => void
   variant: "sidebar" | "scroll"
+  notificationsUnread: boolean
 }) {
   return (
     <nav
@@ -195,6 +214,7 @@ function SettingsTabNav({
           icon={icon}
           label={label}
           className={variant === "sidebar" ? "w-full" : undefined}
+          showUnreadDot={id === "notifications" && notificationsUnread}
         />
       ))}
     </nav>
@@ -212,6 +232,8 @@ export function ProfileSettingsModal({
   const [data, setData] = React.useState<ProfileData | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const { hasUnread: notificationsUnread, markSeen: markNotificationsSeen } =
+    useNotificationsRead()
 
   const closeModal = React.useCallback(() => onOpenChange(false), [onOpenChange])
 
@@ -242,6 +264,12 @@ export function ProfileSettingsModal({
     setActiveTab(initialTab)
     void load()
   }, [open, load, initialTab])
+
+  React.useEffect(() => {
+    if (open && activeTab === "notifications") {
+      markNotificationsSeen()
+    }
+  }, [open, activeTab, markNotificationsSeen])
 
   const sectionTitle = TAB_LABELS[activeTab]
   const needsProfileData = activeTab === "profile" || activeTab === "credits"
@@ -295,6 +323,8 @@ export function ProfileSettingsModal({
             onCloseModal={closeModal}
           />
         ) : null
+      case "notifications":
+        return <NotificationsSettingsPanel variant="modal" onViewed={markNotificationsSeen} />
       case "affiliate":
         return <AffiliateSettingsPanel variant="modal" onCloseModal={closeModal} />
       case "feedback":
@@ -314,7 +344,9 @@ export function ProfileSettingsModal({
       >
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>Account, credits, affiliate, and preferences.</DialogDescription>
+          <DialogDescription>
+            Account, notifications, credits, affiliate, and preferences.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
@@ -330,7 +362,12 @@ export function ProfileSettingsModal({
                 <X className="h-4 w-4" />
               </Button>
             </DialogPrimitive.Close>
-            <SettingsTabNav activeTab={activeTab} onSelect={setActiveTab} variant="sidebar" />
+            <SettingsTabNav
+              activeTab={activeTab}
+              onSelect={setActiveTab}
+              variant="sidebar"
+              notificationsUnread={notificationsUnread}
+            />
           </aside>
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -347,10 +384,15 @@ export function ProfileSettingsModal({
                     <X className="h-4 w-4" />
                   </Button>
                 </DialogPrimitive.Close>
-                <span className="text-sm font-semibold text-foreground">{sectionTitle}</span>
+                <span className="text-base font-semibold text-foreground">{sectionTitle}</span>
                 <span className="size-9" aria-hidden />
               </div>
-              <SettingsTabNav activeTab={activeTab} onSelect={setActiveTab} variant="scroll" />
+              <SettingsTabNav
+                activeTab={activeTab}
+                onSelect={setActiveTab}
+                variant="scroll"
+                notificationsUnread={notificationsUnread}
+              />
             </div>
 
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-5 md:px-6 lg:px-5">

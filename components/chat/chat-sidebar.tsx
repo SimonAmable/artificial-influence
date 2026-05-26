@@ -84,7 +84,7 @@ function SidebarActionLink({
   return (
     <Link
       href={href}
-      className="flex h-9 items-center gap-3 rounded-md px-3 text-sm font-medium text-foreground/90 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex h-9 items-center gap-3 rounded-full px-3 text-sm font-medium text-foreground/90 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {icon}
       <span className="truncate">{children}</span>
@@ -151,7 +151,7 @@ function SidebarThreadItem({
     <Link
       href={`/chat/${thread.id}`}
       className={cn(
-        "flex min-h-8 items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors",
+        "flex min-h-8 items-center gap-2 rounded-full px-3 py-1.5 text-sm transition-colors",
         isActive
           ? "bg-muted text-foreground"
           : "text-foreground/85 hover:bg-muted/70 hover:text-foreground",
@@ -182,7 +182,7 @@ function CollapsedHistoryMenu({
             variant="ghost"
             size="icon-sm"
             aria-label="Chat history"
-            className="rounded-md"
+            className="rounded-full"
           >
             <ClockCounterClockwise className="size-4" aria-hidden />
           </Button>
@@ -242,7 +242,7 @@ export function ChatSidebar({
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="rounded-md"
+              className="rounded-full"
               aria-label="Expand sidebar"
               onClick={() => setCollapsed(false)}
             >
@@ -255,14 +255,14 @@ export function ChatSidebar({
             <NewChatButton
               variant="ghost"
               size="icon-sm"
-              className="rounded-md"
+              className="rounded-full"
               aria-label="New chat"
             >
               <NotePencil className="size-4" aria-hidden />
             </NewChatButton>
           </IconTooltip>
           <IconTooltip label="Automations">
-            <Button asChild variant="ghost" size="icon-sm" className="rounded-md">
+            <Button asChild variant="ghost" size="icon-sm" className="rounded-full">
               <Link href="/automations" aria-label="Automations">
                 <Robot className="size-4" aria-hidden />
               </Link>
@@ -273,7 +273,7 @@ export function ChatSidebar({
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="rounded-md"
+              className="rounded-full"
               aria-label="Skills"
               onClick={openSkillPicker}
             >
@@ -287,7 +287,7 @@ export function ChatSidebar({
             <div className="flex items-center gap-1">
               <NewChatButton
                 variant="ghost"
-                className="h-9 min-w-0 flex-1 justify-start gap-3 rounded-md px-3 text-foreground/90 hover:bg-muted hover:text-foreground"
+                className="h-9 min-w-0 flex-1 justify-start gap-3 rounded-full px-3 text-foreground/90 hover:bg-muted hover:text-foreground"
               >
                 <NotePencil className="size-4 shrink-0" aria-hidden />
                 <span className="truncate">New chat</span>
@@ -297,7 +297,7 @@ export function ChatSidebar({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="rounded-md"
+                  className="rounded-full"
                   aria-label="Collapse sidebar"
                   onClick={() => setCollapsed(true)}
                 >
@@ -337,7 +337,7 @@ export function ChatSidebar({
                 {hiddenThreadCount > 0 ? (
                   <button
                     type="button"
-                    className="mt-1 rounded-md px-3 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="mt-1 rounded-full px-3 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     onClick={() => setShowAllThreads(true)}
                   >
                     Show more

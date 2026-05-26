@@ -1271,19 +1271,17 @@ export function CreativeAgentChat({
                 : "mx-auto w-full max-w-4xl px-4 py-6"
             }
           >
-            {!authReady ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CircleNotch className="h-4 w-4 animate-spin" />
-                Loading chat...
-              </div>
-            ) : null}
-
             {showEmptyState ? (
               <div className="flex w-full max-w-2xl flex-col items-center gap-2">
                 <ConversationEmptyState
                   className="pb-0"
                   icon={(
-                    <span className="flex size-12 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/30">
+                    <span
+                      className={cn(
+                        "flex size-12 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/30",
+                        !authReady && "animate-pulse",
+                      )}
+                    >
                       <Image
                         src="/logo.svg"
                         alt="Website AI"

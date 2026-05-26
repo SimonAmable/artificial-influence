@@ -33,6 +33,7 @@ import {
   ProfileSettingsModal,
   type SettingsTab,
 } from "@/components/profile/profile-settings-modal"
+import { useNotificationsRead } from "@/lib/notifications/use-notifications-read"
 
 /** Matches signed-in header pills (credits, assets) for one surface style. */
 const signedInHeaderPillClassName =
@@ -98,6 +99,7 @@ export function Header() {
   const [credits, setCredits] = React.useState<number | null>(null)
   const [profileModalOpen, setProfileModalOpen] = React.useState(false)
   const [profileModalTab, setProfileModalTab] = React.useState<SettingsTab>("profile")
+  const { hasUnread: notificationsUnread } = useNotificationsRead()
 
   const openSettingsModal = React.useCallback((tab: SettingsTab = "profile") => {
     setProfileModalTab(tab)
@@ -494,14 +496,24 @@ export function Header() {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="shadow-md"
-                aria-label="Open account settings"
+                className="relative shadow-md"
+                aria-label={
+                  notificationsUnread
+                    ? "Open account settings (unread notifications)"
+                    : "Open account settings"
+                }
                 onClick={() => {
                   void refreshCredits()
                   openSettingsModal("profile")
                 }}
               >
                 <User className="h-[1.2rem] w-[1.2rem]" />
+                {notificationsUnread ? (
+                  <span
+                    className="absolute top-1 right-1 size-2 rounded-full bg-primary ring-2 ring-background"
+                    aria-hidden
+                  />
+                ) : null}
               </Button>
             </>
           ) : (
