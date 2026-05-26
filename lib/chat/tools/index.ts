@@ -4,6 +4,7 @@ import type { AutomationPromptAttachment } from "@/lib/automations/prompt-payloa
 import { createGenerateAudioTool } from "@/lib/chat/tools/generate-audio"
 import type { AvailableChatImageReference } from "@/lib/chat/tools/image-reference-types"
 import { createGenerateImageTool } from "@/lib/chat/tools/generate-image"
+import { createUpscaleImageTool } from "@/lib/chat/tools/upscale-image"
 import type {
   AvailableChatAudioReference,
   AvailableChatVideoReference,
@@ -131,6 +132,12 @@ export function createCreativeChatTools({
       userId,
     }),
     generateImage: createGenerateImageTool({
+      availableReferences,
+      supabase,
+      threadId,
+      userId,
+    }),
+    upscaleImage: createUpscaleImageTool({
       availableReferences,
       supabase,
       threadId,

@@ -103,6 +103,9 @@ async function runStaticChecks() {
   assert.match(promptRegistry.CHATBOT_SYSTEM_PROMPT_V2, /<hard_rules>/)
   assert.match(promptRegistry.CHATBOT_SYSTEM_PROMPT_V2, /<execution_policy>/)
   assert.match(promptRegistry.CHATBOT_SYSTEM_PROMPT_V2, /<prompt_fidelity>/)
+  assert.match(promptRegistry.CHATBOT_SYSTEM_PROMPT_V2, /<prompt_capabilities>/)
+  assert.match(promptRegistry.CHATBOT_SYSTEM_PROMPT_V2, /Text in images/i)
+  assert.match(promptRegistry.CHATBOT_SYSTEM_PROMPT_V2, /JSON as generation input/i)
   assert.match(promptRegistry.CHATBOT_SYSTEM_PROMPT_V2, /<tool_routing>/)
   assert.match(promptRegistry.CHATBOT_SYSTEM_PROMPT_V2, /<response_style>/)
   assert.doesNotMatch(promptRegistry.CHATBOT_SYSTEM_PROMPT_V2, /must always receive json/i)
@@ -112,6 +115,9 @@ async function runStaticChecks() {
   assert.match(creativeAgentSource, /getChatPromptVersion/)
   assert.match(creativeAgentSource, /buildCreativeAgentAppendixV1/)
   assert.match(creativeAgentSource, /buildCreativeAgentAppendixV2/)
+  assert.match(creativeAgentSource, /<prompt_capabilities>/)
+  assert.match(creativeAgentSource, /Text in images/i)
+  assert.match(creativeAgentSource, /JSON in tool \\`prompt\\`/i)
   assert.match(creativeAgentSource, /resolvedPromptVersion === "v1"/)
   assert.match(
     creativeAgentSource,

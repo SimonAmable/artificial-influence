@@ -17,6 +17,7 @@ import {
   normalizeMediaToolName,
   type FullscreenMediaKind,
 } from "./media-viewer-utils"
+import { ImageCompareSlider } from "./image-compare-slider"
 
 export type MediaViewerMetadata = {
   id?: string
@@ -73,6 +74,14 @@ export function FullscreenMediaViewer({
   const [activeReferenceIndex, setActiveReferenceIndex] = React.useState<number | null>(null)
 
   const hasReferences = referenceImages.length > 0
+  const isUpscaleResult =
+    metadata.tool === "upscale" || metadata.tool === "chat-upscale-image"
+  const upscaleBeforeUrl = isUpscaleResult ? referenceImages[0]?.imageUrl : undefined
+  const showUpscaleCompare =
+    kind === "image" &&
+    activeReferenceIndex === null &&
+    Boolean(upscaleBeforeUrl) &&
+    upscaleBeforeUrl !== url
   const currentUrl =
     activeReferenceIndex === null
       ? url
@@ -132,6 +141,20 @@ export function FullscreenMediaViewer({
               className="max-h-[85vh] max-w-full rounded-lg object-contain lg:max-h-[90vh] lg:max-w-[70vw]"
               onClick={(event) => event.stopPropagation()}
             />
+          ) : showUpscaleCompare && upscaleBeforeUrl ? (
+            <div
+              className="h-[min(85vh,90dvh)] w-full max-w-[min(100vw,70vw)] rounded-lg"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <ImageCompareSlider
+                beforeSrc={upscaleBeforeUrl}
+                afterSrc={url}
+                objectFit="contain"
+                className="h-full w-full rounded-lg"
+                beforeLabel="Original"
+                afterLabel="Upscaled"
+              />
+            </div>
           ) : (
             <img
               src={currentUrl}
@@ -149,7 +172,7 @@ export function FullscreenMediaViewer({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0 rounded-full"
+              className="h-8 w-8 shrink-0 rounded-full shadow-m"
               onClick={onClose}
               aria-label="Close"
             >
@@ -162,24 +185,34 @@ export function FullscreenMediaViewer({
               <div className="mb-4">
                 <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                   <ImageSquare className="size-3.5" />
-                  Reference images
+                  {isUpscaleResult ? "Original image" : "Reference images"}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <ReferenceThumb
-                    active={activeReferenceIndex === null}
-                    imageUrl={url}
-                    label="Main"
-                    onClick={() => setActiveReferenceIndex(null)}
-                  />
+                  {!isUpscaleResult && (
+                    <ReferenceThumb
+                      active={activeReferenceIndex === null}
+                      imageUrl={url}
+                      label="Main"
+                      onClick={() => setActiveReferenceIndex(null)}
+                    />
+                  )}
                   {referenceImages.map((refImage, index) => (
                     <ReferenceThumb
                       key={`${refImage.imageUrl}-${index}`}
                       active={activeReferenceIndex === index}
                       imageUrl={refImage.imageUrl}
-                      label={`${index + 1}`}
+                      label={isUpscaleResult ? "Original" : `${index + 1}`}
                       onClick={() => setActiveReferenceIndex(index)}
                     />
                   ))}
+                  {isUpscaleResult && (
+                    <ReferenceThumb
+                      active={activeReferenceIndex === null}
+                      imageUrl={url}
+                      label="Upscaled"
+                      onClick={() => setActiveReferenceIndex(null)}
+                    />
+                  )}
                 </div>
               </div>
             )}

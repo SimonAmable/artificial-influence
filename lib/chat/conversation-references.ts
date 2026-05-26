@@ -28,6 +28,17 @@ type UniversalGenerateImageToolPart = {
   }
 }
 
+type UpscaleImageToolPart = {
+  type: "tool-upscaleImage"
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  output?: {
+    images?: Array<{
+      mimeType?: string
+      url: string
+    }>
+  }
+}
+
 type GenerateAudioToolPart = {
   type: "tool-generateAudio"
   state: "input-streaming" | "input-available" | "output-available" | "output-error"
@@ -65,11 +76,18 @@ export function getAvailableConversationImageReferences(
     }
 
     for (const part of message.parts) {
-      if (part.type !== "tool-generateImageWithNanoBanana" && part.type !== "tool-generateImage") {
+      if (
+        part.type !== "tool-generateImageWithNanoBanana" &&
+        part.type !== "tool-generateImage" &&
+        part.type !== "tool-upscaleImage"
+      ) {
         continue
       }
 
-      const toolPart = part as unknown as GenerateImageToolPart | UniversalGenerateImageToolPart
+      const toolPart = part as unknown as
+        | GenerateImageToolPart
+        | UniversalGenerateImageToolPart
+        | UpscaleImageToolPart
 
       if (toolPart.state !== "output-available") {
         continue
@@ -82,7 +100,9 @@ export function getAvailableConversationImageReferences(
           label:
             part.type === "tool-generateImageWithNanoBanana"
               ? "generated Nano Banana image"
-              : "generated image",
+              : part.type === "tool-upscaleImage"
+                ? "upscaled image"
+                : "generated image",
           mediaType: image.mimeType,
           source: "generated",
           url: image.url,

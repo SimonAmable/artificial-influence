@@ -729,6 +729,10 @@ function ImagePageContent() {
         return
       }
       const outputUrl = data.imageUrl
+      const sourceImageUrl =
+        typeof data.sourceImageUrl === "string" && data.sourceImageUrl.length > 0
+          ? data.sourceImageUrl
+          : imageUrl
       if (outputUrl) {
         setHistoryImages((prev) =>
           prependUniqueHistoryItems(prev, [
@@ -738,6 +742,7 @@ function ImagePageContent() {
               model: 'P-Image Upscale',
               prompt: null,
               tool: 'upscale',
+              reference_image_urls: [sourceImageUrl],
             },
           ])
         )

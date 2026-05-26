@@ -30,6 +30,39 @@ export type GenerateImageToolPart = {
   errorText?: string
 }
 
+export type UpscaleImageToolPart = {
+  type: "tool-upscaleImage"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    assetIds?: string[]
+    enhanceDetails?: boolean
+    enhanceRealism?: boolean
+    mediaIds?: string[]
+    modelIdentifier?: string
+    outputFormat?: "jpg" | "png" | "webp"
+    referenceIds?: string[]
+    scaleFactor?: number
+    targetMegapixels?: number
+    upscaleMode?: "target" | "factor"
+  }
+  output?: {
+    creditsUsed?: number
+    generationId?: string | null
+    images?: Array<{
+      mimeType?: string
+      storagePath?: string | null
+      url: string
+    }>
+    message?: string
+    model?: string
+    status?: "completed" | "failed"
+    usedReferenceCount?: number
+    referenceImageUrls?: string[]
+  }
+  errorText?: string
+}
+
 export type UniversalGenerateImageToolPart = {
   type: "tool-generateImage"
   toolCallId: string

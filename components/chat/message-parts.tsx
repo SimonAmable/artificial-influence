@@ -46,6 +46,7 @@ import type {
   SearchWebToolPart,
   SocialConnectionToolSummary,
   UniversalGenerateImageToolPart,
+  UpscaleImageToolPart,
 } from "@/lib/chat/agent-tool-part-types"
 import {
   formatAutomationActionLabel,
@@ -54,6 +55,7 @@ import {
 } from "@/components/chat/tool-ui/automation-helpers"
 import { AudioGenerationResultCard } from "@/components/chat/tool-ui/audio-generation-result-card"
 import { ImageGenerationResultCard } from "@/components/chat/tool-ui/image-generation-result-card"
+import { UpscaleImageResultCard } from "@/components/chat/tool-ui/upscale-image-result-card"
 import { MessageFilePart } from "@/components/chat/tool-ui/user-message-parts"
 import { VideoGenerationResultCard } from "@/components/chat/tool-ui/video-generation-result-card"
 import {
@@ -188,6 +190,19 @@ export function MessageParts({
               part={toolPart}
               title="Image Generation Tool"
               allMessages={transcriptMessages}
+              onImageGridAgentAction={onImageGridAgentAction}
+              onCreateAssetFromImage={onCreateAssetFromImage}
+            />
+          )
+        }
+
+        if (part.type === "tool-upscaleImage") {
+          const toolPart = part as UpscaleImageToolPart
+          return (
+            <UpscaleImageResultCard
+              key={`${message.id}-${index}`}
+              messageId={`${message.id}-${index}`}
+              part={toolPart}
               onImageGridAgentAction={onImageGridAgentAction}
               onCreateAssetFromImage={onCreateAssetFromImage}
             />
