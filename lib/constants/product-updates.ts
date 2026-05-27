@@ -24,7 +24,7 @@ export const PRODUCT_UPDATES: ProductUpdate[] = [
     id: "templates-gallery-2026-05-27",
     title: "Templates",
     description:
-      "Browse reusable templates to launch ideas faster, or open one to jump straight into a guided run.",
+      "Instantly copy winning trends with reusable templates, then jump straight into a guided run.",
     publishedAt: "2026-05-27T12:00:00.000Z",
     imageSrc: TEMPLATE_IMAGE,
     fallbackImageSrc: NOTIFICATION_IMAGE,

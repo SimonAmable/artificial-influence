@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { CircleNotch, FilePlus, FolderOpen, Plus, Sparkle, Trash, Image as ImageIcon } from "@phosphor-icons/react"
+import { CircleNotch, FilePlus, FolderOpen, Plus, Trash, Image as ImageIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 import type {
   Template,
@@ -29,7 +29,6 @@ import {
 } from "@/lib/templates/input-utils"
 import type { TemplateEditorDraft } from "@/lib/templates/editor-draft"
 import {
-  createTemplateEditorDraftFromTemplate,
   normalizeTemplateEditorDraft,
 } from "@/lib/templates/editor-draft"
 import { consumePendingTemplateEditorDraft } from "@/lib/templates/editor-draft-handoff"
@@ -141,12 +140,10 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
     initial?.thumbnail_kind ?? "image",
   )
   const [isSaving, setIsSaving] = React.useState(false)
+  const [isDeleting, setIsDeleting] = React.useState(false)
   const [isUploadingThumb, setIsUploadingThumb] = React.useState(false)
   const [isUploadingPromptAttachment, setIsUploadingPromptAttachment] = React.useState(false)
   const [promptAssetModalOpen, setPromptAssetModalOpen] = React.useState(false)
-  const [aiInstruction, setAiInstruction] = React.useState("")
-  const [isApplyingAi, setIsApplyingAi] = React.useState(false)
-  const [lastAiSummary, setLastAiSummary] = React.useState<string | null>(null)
   const promptAttachmentInputRef = React.useRef<HTMLInputElement | null>(null)
 
   const resolvedInputs = React.useMemo(
@@ -196,43 +193,6 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
     setThumbnailKind(normalized.thumbnail_kind)
   }, [])
 
-  const buildCurrentDraft = React.useCallback((): TemplateEditorDraft => {
-    const source = initial
-      ? createTemplateEditorDraftFromTemplate(initial)
-      : normalizeTemplateEditorDraft(null)
-
-    return {
-      ...source,
-      title: name,
-      description,
-      tips,
-      category,
-      output_kind: outputKind,
-      prompt,
-      prompt_attachments: promptAttachments.map((attachment) => ({
-        url: attachment.url,
-        title: attachment.title ?? null,
-      })),
-      inputs: draftInputs.map((input) => ({ ...input })),
-      visibility,
-      thumbnail_url: thumbnailUrl,
-      thumbnail_kind: thumbnailKind,
-    }
-  }, [
-    category,
-    description,
-    draftInputs,
-    initial,
-    name,
-    outputKind,
-    prompt,
-    promptAttachments,
-    thumbnailKind,
-    thumbnailUrl,
-    tips,
-    visibility,
-  ])
-
   React.useEffect(() => {
     if (initial || hasHydratedPendingDraftRef.current) return
     hasHydratedPendingDraftRef.current = true
@@ -241,7 +201,6 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
     if (!pendingDraft) return
 
     applyDraft(pendingDraft)
-    setLastAiSummary("AI prepared a first draft. You can keep editing before saving.")
   }, [applyDraft, initial])
 
   const insertPlaceholder = (input: TemplateInput) => {
@@ -338,22 +297,16 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
     }
   }
 
-  const handleAiAssist = async () => {
-    if (!aiInstruction.trim()) {
-      toast.error("Tell AI what you want to change")
-      return
-    }
+  const handleDelete = async () => {
+    if (!initial?.id || isDeleting) return
 
-    setIsApplyingAi(true)
+    const ok = window.confirm(`Delete "${initial.title}"? This cannot be undone.`)
+    if (!ok) return
+
+    setIsDeleting(true)
     try {
-      const response = await fetch("/api/templates/ai/draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: isEdit ? "edit" : "create",
-          instruction: aiInstruction.trim(),
-          currentDraft: buildCurrentDraft(),
-        }),
+      const response = await fetch(`/api/templates/${initial.id}`, {
+        method: "DELETE",
       })
 
       const data = await response.json().catch(() => ({}))
@@ -361,22 +314,16 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
         const err =
           typeof data.error === "string"
             ? data.error
-            : JSON.stringify(data.error ?? "Failed to update template draft")
+            : JSON.stringify(data.error ?? "Failed to delete template")
         throw new Error(err)
       }
 
-      applyDraft(data.draft as TemplateEditorDraft)
-      setLastAiSummary(
-        typeof data.summary === "string" && data.summary.trim()
-          ? data.summary.trim()
-          : "AI updated the draft.",
-      )
-      setAiInstruction("")
-      toast.success(isEdit ? "Template draft updated with AI" : "Template draft created with AI")
+      toast.success("Template deleted")
+      router.push("/templates")
+      router.refresh()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update template draft")
-    } finally {
-      setIsApplyingAi(false)
+      toast.error(error instanceof Error ? error.message : "Could not delete template")
+      setIsDeleting(false)
     }
   }
 
@@ -806,7 +753,48 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
           )}
         </section>
 
-        <Button className="w-full rounded-full h-12" disabled={isSaving} onClick={() => void handleSave()}>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          {isEdit ? (
+            <Button
+              type="button"
+              variant="destructive"
+              className="h-12 rounded-full sm:w-auto"
+              disabled={isSaving || isDeleting}
+              onClick={() => void handleDelete()}
+            >
+              {isDeleting ? (
+                <>
+                  <CircleNotch className="mr-2 size-4 animate-spin" weight="bold" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash className="mr-2 size-4" />
+                  Delete template
+                </>
+              )}
+            </Button>
+          ) : null}
+
+          <Button
+            className="h-12 w-full rounded-full"
+            disabled={isSaving || isDeleting}
+            onClick={() => void handleSave()}
+          >
+            {isSaving ? (
+              <>
+                <CircleNotch className="mr-2 size-4 animate-spin" weight="bold" />
+                Saving...
+              </>
+            ) : isEdit ? (
+              "Save template"
+            ) : (
+              "Create template"
+            )}
+          </Button>
+        </div>
+
+        <Button className="hidden w-full rounded-full h-12" disabled={isSaving} onClick={() => void handleSave()}>
           {isSaving ? (
             <>
               <CircleNotch className="mr-2 size-4 animate-spin" weight="bold" />
