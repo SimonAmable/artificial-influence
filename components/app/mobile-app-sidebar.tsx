@@ -65,7 +65,6 @@ import {
   megaNavPathMatches,
   MOBILE_COLLAPSIBLE_GROUP_LABELS,
 } from "@/lib/navigation/mobile-sidebar"
-import { cn } from "@/lib/utils"
 
 const STANDALONE_GROUP_ICON: Record<string, typeof ImageIcon> = {
   "/audio": MicrophoneIcon,
@@ -91,6 +90,14 @@ function getMegaNavGroupIcon(group: MegaNavGroup) {
   const base = group.path?.split("?")[0]
   if (base && STANDALONE_GROUP_ICON[base]) return STANDALONE_GROUP_ICON[base]
   return PencilSimple
+}
+
+function MegaNavGroupIcon({ group, className }: { group: MegaNavGroup; className?: string }) {
+  return React.createElement(getMegaNavGroupIcon(group), {
+    className,
+    weight: "duotone",
+    "aria-hidden": true,
+  })
 }
 
 function MobileNavLink({
@@ -210,7 +217,6 @@ function CollapsibleNavGroup({
   const [open, setOpen] = React.useState(defaultOpen)
   const simpleItems = group.simpleItems ?? []
   const sections = group.sections ?? []
-  const GroupIcon = getMegaNavGroupIcon(group)
   const groupActive = isMegaGroupActiveForPath(pathname, group)
 
   React.useEffect(() => {
@@ -227,7 +233,7 @@ function CollapsibleNavGroup({
             className="w-full justify-start text-left"
             tooltip={group.path ? `Open ${group.label}` : undefined}
           >
-            <GroupIcon className="size-4 shrink-0" weight="duotone" aria-hidden />
+            <MegaNavGroupIcon group={group} className="size-4 shrink-0" />
             <span className="truncate">{group.label}</span>
             {group.badge ? (
               <span className="shrink-0">
