@@ -2,7 +2,10 @@
 
 import type { UIMessage } from "ai"
 import { MessageResponse } from "@/components/ai-elements/message"
-import { isTemplateHiddenContextText } from "@/lib/templates/prompt-filler"
+import {
+  isTemplateHiddenContextText,
+  isTemplateHiddenMediaFilename,
+} from "@/lib/templates/prompt-filler"
 import { cn } from "@/lib/utils"
 
 type FileMessagePart = Extract<UIMessage["parts"][number], { type: "file" }>
@@ -77,6 +80,7 @@ export function UserMessageMediaParts({ message }: { message: UIMessage }) {
   const mediaParts = message.parts.filter(
     (part): part is FileMessagePart =>
       part.type === "file"
+      && !isTemplateHiddenMediaFilename(part.filename)
       && (part.mediaType?.startsWith("image/")
         || part.mediaType?.startsWith("video/")
         || part.mediaType?.startsWith("audio/")),

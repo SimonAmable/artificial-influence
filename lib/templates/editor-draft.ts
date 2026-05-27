@@ -54,6 +54,12 @@ export const templateEditorDraftSchema = z.object({
   category: z.enum(["photo", "video", "slideshow"]),
   output_kind: z.enum(["image", "video", "audio"]),
   prompt: z.string().max(8000),
+  prompt_attachments: z.array(
+    z.object({
+      url: z.string().url(),
+      title: z.string().max(240).nullable(),
+    }),
+  ).max(12),
   inputs: z.array(templateDraftInputSchema).max(20),
   visibility: z.enum(["private", "public"]),
   thumbnail_url: z.string().url().nullable(),
@@ -70,6 +76,7 @@ export function createEmptyTemplateEditorDraft(): TemplateEditorDraft {
     category: "photo",
     output_kind: "image",
     prompt: "",
+    prompt_attachments: [],
     inputs: [],
     visibility: "private",
     thumbnail_url: null,
@@ -87,6 +94,10 @@ export function createTemplateEditorDraftFromTemplate(template: Template): Templ
       ? "image"
       : template.output_kind,
     prompt: template.prompt,
+    prompt_attachments: template.prompt_attachments.map((attachment) => ({
+      url: attachment.url,
+      title: attachment.title ?? null,
+    })),
     inputs: template.inputs.map((input) => ({ ...input })) as DraftTemplateInput[],
     visibility: template.visibility,
     thumbnail_url: template.thumbnail_url,
@@ -108,6 +119,12 @@ export function normalizeTemplateEditorDraft(
     category: draft?.category ?? base.category,
     output_kind: draft?.output_kind ?? base.output_kind,
     prompt: draft?.prompt ?? base.prompt,
+    prompt_attachments: Array.isArray(draft?.prompt_attachments)
+      ? draft.prompt_attachments.map((attachment) => ({
+          url: attachment.url,
+          title: attachment.title ?? null,
+        }))
+      : base.prompt_attachments,
     visibility: draft?.visibility ?? base.visibility,
     thumbnail_url: draft?.thumbnail_url ?? base.thumbnail_url,
     thumbnail_kind: draft?.thumbnail_kind ?? base.thumbnail_kind,

@@ -96,6 +96,7 @@ function buildTemplateAuthoringPrompt(input: {
     "Every input must have a short snake_case id. The prompt may reference only those ids with {{field_id}} placeholders.",
     "Image, video, and audio inputs are attached automatically at run time, so do not force placeholders for them unless the user explicitly asked for that.",
     "Use placeholders mainly for text, boolean, and aspect_ratio fields when the AI needs those values in the instructions.",
+    "Preserve prompt_attachments unless the user explicitly asked to add, remove, or replace the template's built-in reference images.",
     "Keep the user-facing title concise. Keep tips short and practical.",
     "Do not invent thumbnails. Keep thumbnail_url and thumbnail_kind unchanged unless the user explicitly asked to change them.",
     "Avoid making templates public unless the user explicitly asked for that.",

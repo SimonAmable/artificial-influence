@@ -2,13 +2,14 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { CircleNotch, Plus, Sparkle, Trash, Image as ImageIcon } from "@phosphor-icons/react"
+import { CircleNotch, FilePlus, FolderOpen, Plus, Sparkle, Trash, Image as ImageIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 import type {
   Template,
   TemplateCategory,
   TemplateInput,
   TemplateInputKind,
+  TemplatePromptAttachment,
   TemplateVisibility,
 } from "@/lib/templates/types"
 import {
@@ -33,8 +34,17 @@ import {
 } from "@/lib/templates/editor-draft"
 import { consumePendingTemplateEditorDraft } from "@/lib/templates/editor-draft-handoff"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { ComposerAttachmentPreviews } from "@/components/chat/composer/attachments"
+import type { ComposerAssetAttachment, ComposerAttachment } from "@/components/chat/composer/types"
+import { AssetSelectionModal, type AssetSelectionPick } from "@/components/shared/modals/asset-selection-modal"
 import { TemplateRunForm } from "@/components/templates/template-run-form"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -60,6 +70,36 @@ const ADD_INPUT_KINDS: TemplateInputKind[] = [
   "boolean",
   "aspect_ratio",
 ]
+
+function createClientId() {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function promptAttachmentToComposerAttachment(
+  attachment: TemplatePromptAttachment,
+): ComposerAssetAttachment {
+  const id = createClientId()
+  return {
+    assetType: "image",
+    id,
+    ref: {
+      id,
+      label: attachment.title?.trim() || "Reference image",
+      category: "asset",
+      assetType: "image",
+      assetUrl: attachment.url,
+      previewUrl: attachment.url,
+      serialized: `Reference (image) "${attachment.title?.trim() || "Reference image"}": ${attachment.url}`,
+      chipId: id,
+      mentionToken: "",
+    },
+    source: "asset",
+    title: attachment.title?.trim() || "Reference image",
+    url: attachment.url,
+  }
+}
 
 interface TemplateEditorProps {
   initial?: Template
@@ -88,6 +128,9 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
       ? initial.inputs.map((input) => ({ ...input } as DraftTemplateInput))
       : [],
   )
+  const [promptAttachments, setPromptAttachments] = React.useState<TemplatePromptAttachment[]>(
+    initial?.prompt_attachments?.map((attachment) => ({ ...attachment })) ?? [],
+  )
   const [visibility, setVisibility] = React.useState<TemplateVisibility>(
     initial?.visibility ?? "private",
   )
@@ -99,9 +142,12 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
   )
   const [isSaving, setIsSaving] = React.useState(false)
   const [isUploadingThumb, setIsUploadingThumb] = React.useState(false)
+  const [isUploadingPromptAttachment, setIsUploadingPromptAttachment] = React.useState(false)
+  const [promptAssetModalOpen, setPromptAssetModalOpen] = React.useState(false)
   const [aiInstruction, setAiInstruction] = React.useState("")
   const [isApplyingAi, setIsApplyingAi] = React.useState(false)
   const [lastAiSummary, setLastAiSummary] = React.useState<string | null>(null)
+  const promptAttachmentInputRef = React.useRef<HTMLInputElement | null>(null)
 
   const resolvedInputs = React.useMemo(
     () => assignInputIds(draftInputs),
@@ -123,6 +169,7 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
     thumbnail_kind: thumbnailKind,
     category,
     prompt,
+    prompt_attachments: promptAttachments.map((attachment) => ({ ...attachment })),
     output_kind: outputKind,
     inputs: resolvedInputs,
     credits_cost: creditsCost,
@@ -140,6 +187,7 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
     setDescription(normalized.description)
     setTips(normalized.tips)
     setPrompt(normalized.prompt)
+    setPromptAttachments(normalized.prompt_attachments.map((attachment) => ({ ...attachment })))
     setCategory(normalized.category)
     setOutputKind(normalized.output_kind)
     setDraftInputs(normalized.inputs)
@@ -161,6 +209,10 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
       category,
       output_kind: outputKind,
       prompt,
+      prompt_attachments: promptAttachments.map((attachment) => ({
+        url: attachment.url,
+        title: attachment.title ?? null,
+      })),
       inputs: draftInputs.map((input) => ({ ...input })),
       visibility,
       thumbnail_url: thumbnailUrl,
@@ -174,6 +226,7 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
     name,
     outputKind,
     prompt,
+    promptAttachments,
     thumbnailKind,
     thumbnailUrl,
     tips,
@@ -250,6 +303,7 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
         thumbnail_kind: thumbnailKind,
         category,
         prompt: prompt.trim(),
+        prompt_attachments: promptAttachments,
         output_kind: outputKind,
         inputs,
         credits_cost: creditsCost,
@@ -325,6 +379,70 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
       setIsApplyingAi(false)
     }
   }
+
+  const composerPromptAttachments = React.useMemo<ComposerAttachment[]>(
+    () => promptAttachments.map(promptAttachmentToComposerAttachment),
+    [promptAttachments],
+  )
+
+  const handlePromptAttachmentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (promptAttachmentInputRef.current) {
+      promptAttachmentInputRef.current.value = ""
+    }
+    if (files.length === 0) return
+
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"))
+    if (imageFiles.length !== files.length) {
+      toast.error("Only image files can be attached to the template prompt")
+    }
+    if (imageFiles.length === 0) return
+
+    setIsUploadingPromptAttachment(true)
+    try {
+      const uploadedAttachments: TemplatePromptAttachment[] = []
+      for (const file of imageFiles) {
+        const uploaded = await uploadFileToSupabase(file, "template-prompt-images")
+        if (!uploaded) {
+          throw new Error(`Failed to upload ${file.name}`)
+        }
+        uploadedAttachments.push({
+          url: uploaded.url,
+          title: file.name,
+        })
+      }
+
+      setPromptAttachments((current) => [...current, ...uploadedAttachments])
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not upload prompt attachment")
+    } finally {
+      setIsUploadingPromptAttachment(false)
+    }
+  }
+
+  const handlePromptAssetSelect = React.useCallback((pick: AssetSelectionPick) => {
+    if (pick.assetType !== "image") {
+      toast.error("Only image assets can be attached to the template prompt")
+      return
+    }
+
+    setPromptAttachments((current) => [
+      ...current,
+      {
+        url: pick.url,
+        title: pick.title?.trim() || "Reference image",
+      },
+    ])
+    setPromptAssetModalOpen(false)
+  }, [])
+
+  const handleRemovePromptAttachment = React.useCallback((attachment: ComposerAttachment) => {
+    if (attachment.source !== "asset") return
+
+    setPromptAttachments((current) =>
+      current.filter((item) => !(item.url === attachment.url && (item.title ?? "") === attachment.title)),
+    )
+  }, [])
 
   return (
     <div className="grid min-h-screen pt-[60px] lg:grid-cols-2">
@@ -480,14 +598,73 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
             </p>
           </div>
 
-          <Textarea
-            ref={promptRef}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            rows={6}
-            placeholder="Put the person from the photo into the coconut water dance. Use vertical format."
-            className="max-h-96 overflow-y-auto text-sm"
-          />
+          <div className="space-y-3">
+            <div className="relative">
+              <Textarea
+                ref={promptRef}
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={6}
+                placeholder="Put the person from the photo into the coconut water dance. Use vertical format."
+                className="max-h-96 overflow-y-auto pb-14 text-sm"
+              />
+              <input
+                ref={promptAttachmentInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="sr-only"
+                onChange={(e) => void handlePromptAttachmentFileChange(e)}
+              />
+              <div className="absolute bottom-3 left-3">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 rounded-full"
+                      aria-label="Attach reference image to template prompt"
+                      disabled={isUploadingPromptAttachment}
+                    >
+                      {isUploadingPromptAttachment ? (
+                        <CircleNotch className="size-4 animate-spin" weight="bold" />
+                      ) : (
+                        <Plus className="size-4" />
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" side="top" sideOffset={6}>
+                    <DropdownMenuItem
+                      onClick={() => promptAttachmentInputRef.current?.click()}
+                      disabled={isUploadingPromptAttachment}
+                    >
+                      <FilePlus className="mr-2 size-4" />
+                      Upload image
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setPromptAssetModalOpen(true)}
+                      disabled={isUploadingPromptAttachment}
+                    >
+                      <FolderOpen className="mr-2 size-4" />
+                      Select asset
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            {composerPromptAttachments.length > 0 ? (
+              <ComposerAttachmentPreviews
+                attachments={composerPromptAttachments}
+                onRemove={handleRemovePromptAttachment}
+              />
+            ) : null}
+
+            <p className="text-xs text-muted-foreground">
+              Attached reference images are saved with this template and sent on every run.
+            </p>
+          </div>
 
           {resolvedInputs.some((i) => i.kind !== "image" && i.kind !== "video" && i.kind !== "audio") ? (
             <div className="flex flex-wrap gap-2">
@@ -676,61 +853,14 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
           <TemplateRunForm template={previewTemplate} disabled />
         </div>
 
-        <div className="mx-auto max-w-lg rounded-2xl border bg-background p-5 shadow-sm">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Sparkle className="size-4 text-amber-500" weight="fill" />
-              <h3 className="text-sm font-medium">
-                {isEdit ? "Ask AI to edit this template" : "Ask AI to build or refine this template"}
-              </h3>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Describe the workflow you want, or ask for a specific change like adding
-              fields, tightening the instructions, or changing the output format.
-            </p>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            <Textarea
-              value={aiInstruction}
-              onChange={(e) => setAiInstruction(e.target.value)}
-              rows={4}
-              disabled={isApplyingAi}
-              placeholder={
-                isEdit
-                  ? "Make this template better for faceless TikTok product videos and add a text field for the product name."
-                  : "Create a template for turning one selfie into a cinematic perfume ad."
-              }
-            />
-
-            {lastAiSummary ? (
-              <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
-                {lastAiSummary}
-              </p>
-            ) : null}
-
-            <Button
-              type="button"
-              className="w-full"
-              variant="secondary"
-              disabled={isApplyingAi}
-              onClick={() => void handleAiAssist()}
-            >
-              {isApplyingAi ? (
-                <>
-                  <CircleNotch className="mr-2 size-4 animate-spin" weight="bold" />
-                  Applying AI changes...
-                </>
-              ) : (
-                <>
-                  <Sparkle className="mr-2 size-4" weight="fill" />
-                  {isEdit ? "Edit With AI" : "Generate With AI"}
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
+        {/* AI-powered template editing is temporarily hidden. */}
       </div>
+
+      <AssetSelectionModal
+        open={promptAssetModalOpen}
+        onOpenChange={setPromptAssetModalOpen}
+        onSelect={handlePromptAssetSelect}
+      />
     </div>
   )
 }

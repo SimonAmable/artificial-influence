@@ -9,6 +9,11 @@ export type TemplateInputKind = "image" | "video" | "audio" | "text" | "boolean"
 
 export type AspectRatioPreset = "auto" | "9:16" | "1:1" | "16:9"
 
+export interface TemplatePromptAttachment {
+  url: string
+  title?: string | null
+}
+
 export interface TemplateContextFieldSummary {
   id: string
   kind: TemplateInputKind
@@ -84,6 +89,7 @@ export interface Template {
   thumbnail_kind: ThumbnailKind
   category: TemplateCategory
   prompt: string
+  prompt_attachments: TemplatePromptAttachment[]
   output_kind: OutputKind
   inputs: TemplateInput[]
   credits_cost: number
@@ -118,6 +124,7 @@ export interface CreateTemplateInput {
   thumbnail_kind?: ThumbnailKind
   category: TemplateCategory
   prompt: string
+  prompt_attachments?: TemplatePromptAttachment[]
   output_kind: OutputKind
   inputs: TemplateInput[]
   credits_cost?: number
@@ -133,6 +140,7 @@ export interface UpdateTemplateInput {
   thumbnail_kind?: ThumbnailKind
   category?: TemplateCategory
   prompt?: string
+  prompt_attachments?: TemplatePromptAttachment[]
   output_kind?: OutputKind
   inputs?: TemplateInput[]
   credits_cost?: number

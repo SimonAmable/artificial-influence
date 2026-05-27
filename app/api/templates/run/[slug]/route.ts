@@ -18,6 +18,32 @@ interface RouteParams {
   params: Promise<{ slug: string }>
 }
 
+function parsePromptImageUrlsByInputId(
+  value: unknown,
+): Record<string, string[]> {
+  if (!value || typeof value !== "object") {
+    return {}
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>)
+  const next: Record<string, string[]> = {}
+
+  for (const [inputId, urls] of entries) {
+    if (!Array.isArray(urls)) continue
+
+    const validUrls = urls
+      .filter((url): url is string => typeof url === "string")
+      .map((url) => url.trim())
+      .filter((url) => url.startsWith("http://") || url.startsWith("https://"))
+
+    if (validUrls.length > 0) {
+      next[inputId] = [...new Set(validUrls)]
+    }
+  }
+
+  return next
+}
+
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { slug } = await params
@@ -57,9 +83,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: validated.error }, { status: 400 })
     }
 
-    const filled = fillTemplatePrompt(template, validated.values)
-    const templateContext = buildTemplateHiddenContext(template, validated.values, filled)
-    const openingMessage = buildTemplateOpeningMessage(filled, template.title, templateContext)
+    const promptImageUrlsByInputId = parsePromptImageUrlsByInputId(body.promptImageUrlsByInputId)
+    const hiddenPromptImageUrls = [
+      ...template.prompt_attachments.map((attachment) => attachment.url),
+      ...Object.values(promptImageUrlsByInputId).flat(),
+    ]
+    const filled = fillTemplatePrompt(template, validated.values, {
+      additionalImageUrls: hiddenPromptImageUrls,
+    })
+    const templateContext = buildTemplateHiddenContext(template, validated.values, filled, {
+      promptImageCountsByInputId: Object.fromEntries(
+        Object.entries(promptImageUrlsByInputId).map(([inputId, urls]) => [inputId, urls.length]),
+      ),
+    })
+    const openingMessage = buildTemplateOpeningMessage(filled, template.title, templateContext, {
+      hiddenImageUrls: hiddenPromptImageUrls,
+    })
 
     const thread = await createChatThread(user.id, template.title)
 

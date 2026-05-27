@@ -1,11 +1,21 @@
 "use client"
 
 import * as React from "react"
-import { Image as ImageIcon, UploadSimple } from "@phosphor-icons/react"
+import { FilePlus, FolderOpen, Image as ImageIcon, Plus, UploadSimple } from "@phosphor-icons/react"
+import {
+  ComposerAttachmentPreviews,
+} from "@/components/chat/composer/attachments"
+import type { ComposerAttachment } from "@/components/chat/composer/types"
 import type { TemplateInput } from "@/lib/templates/types"
 import { ASPECT_RATIO_PRESETS } from "@/lib/templates/input-utils"
 import { getDefaultInputValue } from "@/lib/templates/validation"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -20,6 +30,10 @@ interface TemplateInputFieldProps {
   onChange: (value: TemplateFieldValue) => void
   disabled?: boolean
   previewUrl?: string | null
+  promptAttachments?: ComposerAttachment[]
+  onOpenPromptAssetPicker?: () => void
+  onPromptAttachmentFilesSelected?: (files: File[]) => void
+  onRemovePromptAttachment?: (attachment: ComposerAttachment) => void
 }
 
 export function TemplateInputField({
@@ -28,8 +42,17 @@ export function TemplateInputField({
   onChange,
   disabled = false,
   previewUrl,
+  promptAttachments = [],
+  onOpenPromptAssetPicker,
+  onPromptAttachmentFilesSelected,
+  onRemovePromptAttachment,
 }: TemplateInputFieldProps) {
   const id = `template-input-${input.id}`
+  const promptAttachmentInputRef = React.useRef<HTMLInputElement | null>(null)
+  const canAttachPromptImages =
+    input.kind === "text" &&
+    input.multiline &&
+    (typeof onPromptAttachmentFilesSelected === "function" || typeof onOpenPromptAssetPicker === "function")
 
   const label = (
     <Label htmlFor={id} className="text-sm font-medium">
@@ -44,14 +67,79 @@ export function TemplateInputField({
         <div className="space-y-2">
           {label}
           {input.multiline ? (
-            <Textarea
-              id={id}
-              disabled={disabled}
-              rows={4}
-              value={typeof value === "string" ? value : ""}
-              placeholder={input.placeholder}
-              onChange={(e) => onChange(e.target.value)}
-            />
+            <div className="space-y-3">
+              <div className="relative">
+                <Textarea
+                  id={id}
+                  disabled={disabled}
+                  rows={4}
+                  value={typeof value === "string" ? value : ""}
+                  placeholder={input.placeholder}
+                  className={cn(canAttachPromptImages && "pb-14")}
+                  onChange={(e) => onChange(e.target.value)}
+                />
+
+                {canAttachPromptImages ? (
+                  <>
+                    <input
+                      ref={promptAttachmentInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="sr-only"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files ?? [])
+                        if (files.length > 0) {
+                          onPromptAttachmentFilesSelected?.(files)
+                        }
+                        if (promptAttachmentInputRef.current) {
+                          promptAttachmentInputRef.current.value = ""
+                        }
+                      }}
+                    />
+                    <div className="absolute bottom-3 left-3">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Attach reference image"
+                            disabled={disabled}
+                            className="size-8 rounded-full"
+                          >
+                            <Plus className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" side="top" sideOffset={6}>
+                          <DropdownMenuItem
+                            onClick={() => promptAttachmentInputRef.current?.click()}
+                            disabled={disabled || !onPromptAttachmentFilesSelected}
+                          >
+                            <FilePlus className="mr-2 size-4" />
+                            Upload image
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onOpenPromptAssetPicker?.()}
+                            disabled={disabled || !onOpenPromptAssetPicker}
+                          >
+                            <FolderOpen className="mr-2 size-4" />
+                            Select asset
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              {promptAttachments.length > 0 && onRemovePromptAttachment ? (
+                <ComposerAttachmentPreviews
+                  attachments={promptAttachments}
+                  onRemove={onRemovePromptAttachment}
+                />
+              ) : null}
+            </div>
           ) : (
             <Input
               id={id}

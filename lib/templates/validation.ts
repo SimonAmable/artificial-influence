@@ -50,6 +50,11 @@ export const outputKindSchema = z.enum(["image", "video", "audio", "slideshow", 
 
 export const templateVisibilitySchema = z.enum(["private", "public"])
 
+const templatePromptAttachmentSchema = z.object({
+  url: z.string().url(),
+  title: z.string().max(240).nullable().optional(),
+})
+
 export const createTemplateBodySchema = z.object({
   slug: z
     .string()
@@ -63,6 +68,7 @@ export const createTemplateBodySchema = z.object({
   thumbnail_kind: z.enum(["image", "video"]).optional(),
   category: templateCategorySchema,
   prompt: z.string().min(1).max(8000),
+  prompt_attachments: z.array(templatePromptAttachmentSchema).max(12).optional(),
   output_kind: outputKindSchema,
   inputs: z.array(templateInputSchema).max(20),
   credits_cost: z.number().int().min(0).max(10000).optional(),

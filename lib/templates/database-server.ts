@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import type {
   CreateTemplateInput,
   Template,
+  TemplatePromptAttachment,
   TemplateHiddenContext,
   TemplateRun,
   TemplateRunStatus,
@@ -12,8 +13,19 @@ import { guessCreditsCost } from "@/lib/templates/types"
 import type { TemplateInputValues } from "@/lib/templates/prompt-filler"
 
 function mapTemplateRow(row: Record<string, unknown>): Template {
+  const promptAttachments = Array.isArray(row.prompt_attachments)
+    ? row.prompt_attachments
+        .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+        .map((item) => ({
+          url: typeof item.url === "string" ? item.url : "",
+          title: typeof item.title === "string" ? item.title : null,
+        }))
+        .filter((item) => item.url.length > 0)
+    : []
+
   return {
     ...(row as Omit<Template, "inputs">),
+    prompt_attachments: promptAttachments as TemplatePromptAttachment[],
     inputs: normalizeTemplateInputs(row.inputs),
   }
 }
@@ -37,6 +49,7 @@ export async function createTemplate(
       thumbnail_kind: input.thumbnail_kind ?? "image",
       category: input.category,
       prompt: input.prompt,
+      prompt_attachments: input.prompt_attachments ?? [],
       output_kind: input.output_kind,
       inputs: input.inputs,
       credits_cost: creditsCost,
@@ -79,6 +92,7 @@ export async function updateTemplate(
   if (input.thumbnail_kind !== undefined) updates.thumbnail_kind = input.thumbnail_kind
   if (input.category !== undefined) updates.category = input.category
   if (input.prompt !== undefined) updates.prompt = input.prompt
+  if (input.prompt_attachments !== undefined) updates.prompt_attachments = input.prompt_attachments
   if (input.output_kind !== undefined) updates.output_kind = input.output_kind
   if (input.inputs !== undefined) updates.inputs = input.inputs
   if (input.credits_cost !== undefined) updates.credits_cost = input.credits_cost

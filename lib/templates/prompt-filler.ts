@@ -15,8 +15,21 @@ export interface FilledTemplatePrompt {
   audioUrls: string[]
 }
 
+interface FillTemplatePromptOptions {
+  additionalImageUrls?: string[]
+}
+
+interface BuildTemplateHiddenContextOptions {
+  promptImageCountsByInputId?: Record<string, number>
+}
+
+interface BuildTemplateOpeningMessageOptions {
+  hiddenImageUrls?: string[]
+}
+
 const TEMPLATE_HIDDEN_CONTEXT_PREFIX = "<template_context hidden=\"true\">"
 const TEMPLATE_HIDDEN_CONTEXT_SUFFIX = "</template_context>"
+const TEMPLATE_HIDDEN_MEDIA_FILENAME_PREFIX = "__template_hidden__"
 
 function stringifyScalar(value: unknown): string {
   if (value === null || value === undefined) return ""
@@ -38,6 +51,7 @@ function resolveScalarValue(input: TemplateInput, values: TemplateInputValues): 
 export function fillTemplatePrompt(
   template: Pick<Template, "prompt" | "inputs">,
   values: TemplateInputValues,
+  options?: FillTemplatePromptOptions,
 ): FilledTemplatePrompt {
   const imageUrls: string[] = []
   const videoUrls: string[] = []
@@ -53,6 +67,13 @@ export function fillTemplatePrompt(
     if (input.kind === "audio") audioUrls.push(url.trim())
   }
 
+  for (const url of options?.additionalImageUrls ?? []) {
+    const trimmed = url.trim()
+    if (trimmed.length > 0) {
+      imageUrls.push(trimmed)
+    }
+  }
+
   let text = template.prompt
   for (const input of template.inputs) {
     if (isMediaInputKind(input.kind)) {
@@ -63,13 +84,19 @@ export function fillTemplatePrompt(
     text = text.replaceAll(`{{${input.id}}}`, replacement)
   }
 
-  return { text: text.trim(), imageUrls, videoUrls, audioUrls }
+  return {
+    text: text.trim(),
+    imageUrls: [...new Set(imageUrls)],
+    videoUrls: [...new Set(videoUrls)],
+    audioUrls: [...new Set(audioUrls)],
+  }
 }
 
 export function buildTemplateHiddenContext(
   template: Pick<Template, "title" | "slug" | "prompt" | "output_kind" | "inputs">,
   values: TemplateInputValues,
   filled: FilledTemplatePrompt,
+  options?: BuildTemplateHiddenContextOptions,
 ): TemplateHiddenContext {
   const fieldSummaries = template.inputs.map((input) => {
     if (isMediaInputKind(input.kind)) {
@@ -85,12 +112,17 @@ export function buildTemplateHiddenContext(
     }
 
     const resolvedValue = resolveScalarValue(input, values)
+    const promptImageCount = options?.promptImageCountsByInputId?.[input.id] ?? 0
+    const promptImageNote =
+      promptImageCount > 0
+        ? ` (+${promptImageCount} reference image${promptImageCount === 1 ? "" : "s"} attached)`
+        : ""
 
     return {
       id: input.id,
       kind: input.kind,
       label: input.label,
-      value: resolvedValue || "(empty)",
+      value: `${resolvedValue || "(empty)"}${promptImageNote}`,
     }
   })
 
@@ -157,6 +189,10 @@ export function isTemplateHiddenContextText(text: string): boolean {
     && trimmed.endsWith(TEMPLATE_HIDDEN_CONTEXT_SUFFIX)
 }
 
+export function isTemplateHiddenMediaFilename(filename: string | undefined): boolean {
+  return typeof filename === "string" && filename.startsWith(TEMPLATE_HIDDEN_MEDIA_FILENAME_PREFIX)
+}
+
 function mediaTypeForUrl(url: string, kind: "image" | "video" | "audio"): string {
   const lower = url.toLowerCase()
   if (kind === "image") {
@@ -177,16 +213,21 @@ export function buildTemplateOpeningMessage(
   filled: FilledTemplatePrompt,
   templateTitle: string,
   templateContext: TemplateHiddenContext,
+  options?: BuildTemplateOpeningMessageOptions,
 ): UIMessage {
   const parts: UIMessage["parts"] = []
+  const hiddenImageUrls = new Set(options?.hiddenImageUrls ?? [])
   parts.push({ type: "text", text: `Help me with the "${templateTitle}" template.` })
 
   for (const url of filled.imageUrls) {
+    const isHidden = hiddenImageUrls.has(url)
     parts.push({
       type: "file",
       url,
       mediaType: mediaTypeForUrl(url, "image"),
-      filename: "reference-image",
+      filename: isHidden
+        ? `${TEMPLATE_HIDDEN_MEDIA_FILENAME_PREFIX}reference-image`
+        : "reference-image",
     })
   }
 
