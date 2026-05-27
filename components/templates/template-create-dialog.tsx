@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { Sparkle } from "@phosphor-icons/react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import { FeedbackDialog } from "@/components/app/feedback-dialog"
@@ -21,8 +22,6 @@ export function TemplateCreateDialog({ currentUserId }: TemplateCreateDialogProp
   const isSignedIn = Boolean(currentUserId)
 
   const requestTemplateNextPath = `${pathname}?${TEMPLATE_REQUEST_PARAM}=1`
-  const createTemplateNextPath = "/templates/new"
-
   const syncRequestTemplateQuery = React.useCallback(
     (open: boolean) => {
       const nextParams = new URLSearchParams(searchParams.toString())
@@ -59,16 +58,7 @@ export function TemplateCreateDialog({ currentUserId }: TemplateCreateDialogProp
   return (
     <>
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {isSignedIn ? (
-          <Button className="rounded-full px-5" onClick={() => handleRequestDialogOpenChange(true)}>
-            Request template
-          </Button>
-        ) : (
-          <Button asChild className="rounded-full px-5">
-            <Link href={`/login?next=${encodeURIComponent(requestTemplateNextPath)}`}>Request template</Link>
-          </Button>
-        )}
-
+        {/*
         <Button asChild variant="outline" className="rounded-full px-5">
           <Link
             href={
@@ -77,9 +67,25 @@ export function TemplateCreateDialog({ currentUserId }: TemplateCreateDialogProp
                 : `/login?next=${encodeURIComponent(createTemplateNextPath)}`
             }
           >
+            <FilePlus className="h-4 w-4" weight="duotone" />
             Create manually
           </Link>
         </Button>
+        */}
+
+        {isSignedIn ? (
+          <Button className="rounded-full px-5" onClick={() => handleRequestDialogOpenChange(true)}>
+            <Sparkle className="h-4 w-4" weight="duotone" />
+            Request template
+          </Button>
+        ) : (
+          <Button asChild className="rounded-full px-5">
+            <Link href={`/login?next=${encodeURIComponent(requestTemplateNextPath)}`}>
+              <Sparkle className="h-4 w-4" weight="duotone" />
+              Request template
+            </Link>
+          </Button>
+        )}
       </div>
 
       {isSignedIn ? (
