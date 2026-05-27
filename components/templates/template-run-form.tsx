@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { CircleNotch } from "@phosphor-icons/react"
+import { CircleNotch, Sparkle } from "@phosphor-icons/react"
 import { toast } from "sonner"
 import type {
   ComposerAssetAttachment,
@@ -13,17 +13,16 @@ import {
   AssetSelectionModal,
   type AssetSelectionPick,
 } from "@/components/shared/modals/asset-selection-modal"
-import type { Template } from "@/lib/templates/types"
-import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
-import type { AttachedRef } from "@/lib/commands/types"
-import { setPendingTemplateHandoff } from "@/lib/templates/handoff"
-import { getDefaultInputValue, isMediaInputKind } from "@/lib/templates/validation"
 import {
   TemplateInputField,
   type TemplateFieldValue,
 } from "@/components/templates/template-input-field"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import type { AttachedRef } from "@/lib/commands/types"
+import { setPendingTemplateHandoff } from "@/lib/templates/handoff"
+import type { Template } from "@/lib/templates/types"
+import { getDefaultInputValue, isMediaInputKind } from "@/lib/templates/validation"
 import { cn } from "@/lib/utils"
 
 interface TemplateRunFormProps {
@@ -252,12 +251,6 @@ export function TemplateRunForm({
 
   return (
     <div className={cn("space-y-6", className)}>
-      <div className="flex items-center justify-between gap-3">
-        <Badge variant="secondary" className="text-xs font-normal">
-          Cost: {template.credits_cost} credits
-        </Badge>
-      </div>
-
       <div className="space-y-5">
         {template.inputs.map((input) => {
           const supportsPromptAttachments = input.kind === "text" && input.multiline
@@ -290,24 +283,30 @@ export function TemplateRunForm({
       </div>
 
       {template.output_kind === "video" ? (
-        <p className="text-xs text-muted-foreground text-center">
-          Generation typically takes 2–5 minutes for video templates.
+        <p className="text-center text-xs text-muted-foreground">
+          Generation typically takes 2-5 minutes for video templates.
         </p>
       ) : null}
 
       {!disabled ? (
         <Button
-          className="w-full rounded-full h-12 text-base"
+          className="h-12 w-full rounded-full text-base"
           disabled={isSubmitting}
           onClick={() => void handleSubmit()}
         >
           {isSubmitting ? (
             <>
               <CircleNotch className="mr-2 size-4 animate-spin" weight="bold" />
-              Starting…
+              Starting...
             </>
           ) : (
-            "Generate →"
+            <>
+              <span>Generate</span>
+              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-background/16 px-2.5 py-1 text-xs font-medium text-primary-foreground/90 ring-1 ring-white/15">
+                <Sparkle className="size-3.5" weight="fill" />
+                {template.credits_cost}
+              </span>
+            </>
           )}
         </Button>
       ) : null}

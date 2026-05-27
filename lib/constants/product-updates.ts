@@ -14,11 +14,24 @@ export type ProductUpdate = {
   tag?: ProductUpdateTag
 }
 
-export const DEFAULT_PRODUCT_UPDATE_FALLBACK_IMAGE = "/blog_fallback_image.png" as const
+export const DEFAULT_PRODUCT_UPDATE_FALLBACK_IMAGE = "/notificaitons/notifications.png" as const
 
 const NOTIFICATION_IMAGE = DEFAULT_PRODUCT_UPDATE_FALLBACK_IMAGE
+const TEMPLATE_IMAGE = "/notificaitons/templates.png" as const
 
 export const PRODUCT_UPDATES: ProductUpdate[] = [
+  {
+    id: "templates-gallery-2026-05-27",
+    title: "Templates",
+    description:
+      "Browse reusable templates to launch ideas faster, or open one to jump straight into a guided run.",
+    publishedAt: "2026-05-27T12:00:00.000Z",
+    imageSrc: TEMPLATE_IMAGE,
+    fallbackImageSrc: NOTIFICATION_IMAGE,
+    ctaLabel: "Browse templates",
+    ctaHref: "/templates",
+    tag: "feature",
+  },
   {
     id: "notifications-tab-2026-05-25",
     title: "Notifications",

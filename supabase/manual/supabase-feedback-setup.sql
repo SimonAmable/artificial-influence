@@ -2,8 +2,9 @@
 CREATE TABLE IF NOT EXISTS public.feedback (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  feedback_type TEXT NOT NULL CHECK (feedback_type IN ('general', 'bug', 'feature', 'improvement')),
+  feedback_type TEXT NOT NULL CHECK (feedback_type IN ('general', 'bug', 'feature', 'improvement', 'template_request')),
   message TEXT NOT NULL,
+  tiktok_links TEXT,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'in_progress', 'resolved', 'closed')),
   admin_notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
@@ -69,6 +70,7 @@ GRANT SELECT, INSERT ON public.feedback TO authenticated;
 GRANT SELECT, INSERT ON public.feedback TO anon;
 
 COMMENT ON TABLE public.feedback IS 'Stores user feedback, bug reports, and feature requests';
-COMMENT ON COLUMN public.feedback.feedback_type IS 'Type of feedback: general, bug, feature, or improvement';
+COMMENT ON COLUMN public.feedback.feedback_type IS 'Type of feedback: general, bug, feature, improvement, or template_request';
+COMMENT ON COLUMN public.feedback.tiktok_links IS 'TikTok trend links supplied for template request feedback';
 COMMENT ON COLUMN public.feedback.status IS 'Current status: pending, reviewed, in_progress, resolved, or closed';
 COMMENT ON COLUMN public.feedback.admin_notes IS 'Internal notes from administrators';

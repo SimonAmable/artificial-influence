@@ -40,6 +40,7 @@ import { toast } from "sonner"
 import { GenerationLoadingSlots } from "@/components/shared/display/generation-loading-slots"
 
 interface VideoInputBoxProps {
+  className?: string
   videoModels: Model[]
   forceRowLayout?: boolean
   promptValue: string
@@ -81,6 +82,7 @@ interface VideoInputBoxProps {
 }
 
 export function VideoInputBox({
+  className,
   videoModels,
   forceRowLayout = false,
   promptValue,
@@ -871,6 +873,7 @@ export function VideoInputBox({
     <Card
       className={cn(
         "w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative overflow-visible",
+        className,
         forceRowLayout && "backdrop-blur-xl bg-background/95 shadow-2xl border-2"
       )}
       onDropCapture={handlePromptDrop}

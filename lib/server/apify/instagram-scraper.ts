@@ -75,11 +75,7 @@ async function fetchDatasetItems(datasetId: string, token: string): Promise<unkn
   const payload = await parseJson(response)
 
   if (!response.ok) {
-    let msg: string | null = null
-    if (isRecord(payload) && isRecord(payload.error)) {
-      msg = readString(payload.error as Record<string, unknown>, "message")
-    }
-    throw new Error(msg || "Couldn't load Instagram results. Please try again.")
+    throw new Error("Couldn't load Instagram results. Please try again.")
   }
 
   if (Array.isArray(payload)) {
@@ -286,24 +282,18 @@ export async function runInstagramScraperActor(input: Record<string, unknown>, w
   const body = (await parseJson(response)) as ApifyRunResponse
 
   if (!response.ok) {
-    throw new Error(
-      body.error?.message || "Couldn't fetch Instagram content. Please try again.",
-    )
+    throw new Error("Couldn't fetch Instagram content. Please try again.")
   }
 
   const data = body.data
   if (!data) {
-    throw new Error(body.error?.message || "Couldn't fetch Instagram content. Please try again.")
+    throw new Error("Couldn't fetch Instagram content. Please try again.")
   }
   const status = data.status
   const runId = data.id ?? null
 
   if (status !== "SUCCEEDED") {
-    throw new Error(
-      data.statusMessage
-        ? `Instagram fetch didn't complete: ${data.statusMessage}`
-        : "Instagram fetch didn't complete. Please try again.",
-    )
+    throw new Error("Instagram fetch didn't complete. Please try again.")
   }
 
   const datasetId = data.defaultDatasetId

@@ -531,11 +531,7 @@ async function fetchDatasetItems(datasetId: string, token: string): Promise<unkn
   const payload = await parseJson(response)
 
   if (!response.ok) {
-    let msg: string | null = null
-    if (isRecord(payload) && isRecord(payload.error)) {
-      msg = readString(payload.error as Record<string, unknown>, "message")
-    }
-    throw new Error(msg || "Couldn't load TikTok results. Please try your search again.")
+    throw new Error("Couldn't load TikTok results. Please try your search again.")
   }
 
   if (Array.isArray(payload)) {
@@ -579,24 +575,18 @@ export async function runTikTokScraperActor(input: Record<string, unknown>, wait
   const body = (await parseJson(response)) as ApifyRunResponse
 
   if (!response.ok) {
-    throw new Error(
-      body.error?.message || "Couldn't fetch TikTok content. Please try again.",
-    )
+    throw new Error("Couldn't fetch TikTok content. Please try again.")
   }
 
   const data = body.data
   if (!data) {
-    throw new Error(body.error?.message || "Couldn't fetch TikTok content. Please try again.")
+    throw new Error("Couldn't fetch TikTok content. Please try again.")
   }
   const status = data?.status
   const runId = data?.id ?? null
 
   if (status !== "SUCCEEDED") {
-    throw new Error(
-      data?.statusMessage
-        ? `TikTok fetch didn't complete: ${data.statusMessage}`
-        : "TikTok fetch didn't complete. Please try again.",
-    )
+    throw new Error("TikTok fetch didn't complete. Please try again.")
   }
 
   const datasetId = data?.defaultDatasetId

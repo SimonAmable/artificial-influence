@@ -6,6 +6,7 @@ import {
   ChatCircleDots,
   DownloadSimple,
   FilmStrip,
+  Folder,
   FlowArrow,
   Image as ImageIcon,
   MagnifyingGlass,
@@ -25,6 +26,7 @@ import {
 } from "@/lib/constants/navigation"
 
 const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
+  folder: Folder,
   image: ImageIcon,
   video: VideoIcon,
   "paint-brush": PaintBrushIcon,

@@ -637,7 +637,7 @@ export function TikTokTrendSearchTool() {
         ) : (
           <div className="rounded-lg border border-dashed px-6 py-14 text-center text-sm text-muted-foreground">
             {authState === "authenticated"
-              ? "Run a search above; Apify-backed cards land here when the dataset finishes hydrating."
+              ? "Run a search above and your TikTok results will land here once they're ready."
               : "Sign in to unlock trend mining + motion transfer hooks."}
           </div>
         )}

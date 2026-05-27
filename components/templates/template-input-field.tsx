@@ -61,6 +61,22 @@ export function TemplateInputField({
     </Label>
   )
 
+  const getAspectDisplay = (option: { value: string; label: string }) =>
+    option.value === "auto" ? "Auto" : option.value
+
+  const getAspectPreviewClass = (value: string) => {
+    switch (value) {
+      case "9:16":
+        return "h-4 w-2.5"
+      case "1:1":
+        return "h-3.5 w-3.5"
+      case "16:9":
+        return "h-2.5 w-4"
+      default:
+        return "h-3.5 w-3.5"
+    }
+  }
+
   switch (input.kind) {
     case "text":
       return (
@@ -247,12 +263,31 @@ export function TemplateInputField({
               <Button
                 key={option.value}
                 type="button"
-                variant={current === option.value ? "default" : "outline"}
+                variant="outline"
                 disabled={disabled}
-                className="h-auto py-2.5 text-xs sm:text-sm"
+                className={cn(
+                  "h-auto justify-center rounded-xl border px-3 py-2 text-xs sm:text-sm",
+                  current === option.value
+                    ? "border-primary bg-primary/8 text-foreground hover:bg-primary/10"
+                    : "border-border/70 bg-background hover:bg-muted/40",
+                )}
                 onClick={() => onChange(option.value)}
               >
-                {option.label}
+                <div className="flex items-center justify-center gap-2 text-left">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                    <div
+                      className={cn(
+                        "rounded-[4px] border-2 border-current",
+                        option.value === "auto" && "border-dashed",
+                        getAspectPreviewClass(option.value),
+                        current === option.value ? "text-foreground" : "text-foreground/90",
+                      )}
+                    />
+                  </div>
+                  <span className="text-sm font-medium tracking-tight">
+                    {getAspectDisplay(option)}
+                  </span>
+                </div>
               </Button>
             ))}
           </div>

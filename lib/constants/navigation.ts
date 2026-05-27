@@ -19,6 +19,7 @@ export type MegaNavBadge = "new" | "popular" | "beta"
 
 /** Phosphor icons for feature rows, clearer than generic brand SVGs for create/edit flows */
 export type MegaNavPhosphorIcon =
+  | "folder"
   | "image"
   | "video"
   | "paint-brush"
@@ -364,7 +365,7 @@ export const megaNavGroups: MegaNavGroup[] = [
     label: "Assets",
     path: "/assets",
     simpleItems: [
-      { path: "/assets", label: "Assets", description: "Store and sort your generated assets", iconSrc: "/window.svg", badge: "new" },
+      { path: "/assets", label: "Assets", description: "Store and sort your generated assets", iconPhosphor: "folder", badge: "new" },
       { path: "/history", label: "History", description: "Past generations and edits", iconSrc: "/file.svg" },
       { path: "/resources", label: "Resources", description: "Search live stock and meme references", iconPhosphor: "image", badge: "new" },
       { path: "/brand", label: "Brand", description: "Manage brand settings", iconSrc: "/logo.svg", badge: "new" },

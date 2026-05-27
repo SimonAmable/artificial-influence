@@ -12,10 +12,12 @@ import {
   HandTap,
   NotePencil,
   Robot,
+  SquaresFour,
 } from "@phosphor-icons/react"
 
 import { NewChatButton } from "@/components/chat/new-chat-button"
 import { SidebarSkillButton } from "@/components/chat/sidebar-skill-button"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -73,10 +75,12 @@ function IconTooltip({
 }
 
 function SidebarActionLink({
+  badge,
   children,
   href,
   icon,
 }: {
+  badge?: React.ReactNode
   children: React.ReactNode
   href: string
   icon: React.ReactNode
@@ -87,7 +91,8 @@ function SidebarActionLink({
       className="flex h-9 items-center gap-3 rounded-full px-3 text-sm font-medium text-foreground/90 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {icon}
-      <span className="truncate">{children}</span>
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      {badge}
     </Link>
   )
 }
@@ -268,6 +273,13 @@ export function ChatSidebar({
               </Link>
             </Button>
           </IconTooltip>
+          <IconTooltip label="Templates (new)">
+            <Button asChild variant="ghost" size="icon-sm" className="rounded-full">
+              <Link href="/templates" aria-label="Templates">
+                <SquaresFour className="size-4" aria-hidden />
+              </Link>
+            </Button>
+          </IconTooltip>
           <IconTooltip label="Skills">
             <Button
               type="button"
@@ -310,6 +322,20 @@ export function ChatSidebar({
               icon={<Robot className="size-4 shrink-0" aria-hidden />}
             >
               Automations
+            </SidebarActionLink>
+            <SidebarActionLink
+              href="/templates"
+              icon={<SquaresFour className="size-4 shrink-0" aria-hidden />}
+              badge={
+                <Badge
+                  variant="secondary"
+                  className="h-5 rounded-full px-1.5 text-[10px] font-semibold uppercase tracking-[0.08em]"
+                >
+                  New
+                </Badge>
+              }
+            >
+              Templates
             </SidebarActionLink>
             <SidebarSkillButton />
           </div>

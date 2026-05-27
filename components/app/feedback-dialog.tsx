@@ -7,25 +7,36 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { FeedbackSettingsPanel } from "@/components/profile/feedback-settings-panel"
+import { FeedbackSettingsPanel, type FeedbackType } from "@/components/profile/feedback-settings-panel"
 
 interface FeedbackDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  title?: string
+  description?: string
+  initialFeedbackType?: FeedbackType
 }
 
-export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
+export function FeedbackDialog({
+  open,
+  onOpenChange,
+  title = "Send Feedback",
+  description = "Share feedback, report bugs, or request features.",
+  initialFeedbackType = "general",
+}: FeedbackDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
-          <DialogTitle>Send Feedback</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription className="sr-only">
-            Share feedback, report bugs, or request features.
+            {description}
           </DialogDescription>
         </DialogHeader>
         <FeedbackSettingsPanel
+          open={open}
           variant="dialog"
+          initialFeedbackType={initialFeedbackType}
           onSubmitted={() => onOpenChange(false)}
           onCancel={() => onOpenChange(false)}
         />

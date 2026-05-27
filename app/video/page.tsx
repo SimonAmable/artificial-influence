@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
 import { VideoInputBox } from "@/components/tools/video/video-input-box"
 import { VideoShowcaseCard } from "@/components/tools/video/video-showcase-card"
@@ -32,6 +32,7 @@ import type { VideoGridItem, VideoHistoryItem } from "@/components/shared/displa
 import { toast } from "sonner"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { pickRetainedAspectRatio } from "@/lib/utils/aspect-ratios"
+import { consumeVideoGenerationIntent } from "@/lib/video/video-generation-intent"
 
 interface PendingVideoRequest {
   clientRequestId: string
@@ -107,6 +108,7 @@ const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
 
 function VideoPageContent() {
   const layoutModeContext = useLayoutMode()
+  const router = useRouter()
   const searchParams = useSearchParams()
   
   if (!layoutModeContext) {
@@ -178,9 +180,13 @@ function VideoPageContent() {
   const [selectedVideoForAsset, setSelectedVideoForAsset] = React.useState<{ url: string; index: number } | null>(
     null,
   )
+  const [shouldAutoGenerate, setShouldAutoGenerate] = React.useState(false)
   const historyAbortRef = React.useRef<AbortController | null>(null)
   const historyRequestIdRef = React.useRef(0)
   const prevVideoModelIdForParamsRef = React.useRef<string | null>(null)
+  const autoGenerateHandoffConsumedRef = React.useRef(false)
+  const pendingAutoGenerateModelRef = React.useRef<string | null>(null)
+  const pendingIntentParametersRef = React.useRef<Record<string, unknown> | null>(null)
   const isGenerating = pendingRequests.length > 0
 
   // Handle pre-loaded start frame from URL parameter (only load once)
@@ -231,6 +237,7 @@ function VideoPageContent() {
       paramList.forEach((param: ParameterDefinition) => {
         next[param.name] = param.default
       })
+      const pendingIntentParameters = pendingIntentParametersRef.current
 
       const aspectParam = paramList.find(
         (p): p is StringParameterDefinition =>
@@ -241,6 +248,10 @@ function VideoPageContent() {
       )
 
       if (!aspectParam?.enum?.length || prevModelId === null) {
+        if (pendingIntentParameters) {
+          Object.assign(next, pendingIntentParameters)
+          pendingIntentParametersRef.current = null
+        }
         return next
       }
 
@@ -255,9 +266,54 @@ function VideoPageContent() {
         next[aspectParam.name] = kept
       }
 
+      if (pendingIntentParameters) {
+        Object.assign(next, pendingIntentParameters)
+        pendingIntentParametersRef.current = null
+      }
+
       return next
     })
   }, [selectedModel])
+
+  React.useEffect(() => {
+    if (autoGenerateHandoffConsumedRef.current) return
+    if (searchParams.get("generate") !== "1") return
+    if (videoModels.length === 0) return
+
+    autoGenerateHandoffConsumedRef.current = true
+
+    const intent = consumeVideoGenerationIntent()
+    const nextParams = new URLSearchParams(searchParams.toString())
+    nextParams.delete("generate")
+    const nextQuery = nextParams.toString()
+    router.replace(nextQuery ? `/video?${nextQuery}` : "/video", { scroll: false })
+
+    if (!intent) return
+
+    const resolvedModel = videoModels.find((model) => model.identifier === intent.model)
+    if (resolvedModel) {
+      setSelectedModel({
+        ...resolvedModel,
+        parameters: { parameters: buildVideoModelParameters(resolvedModel) },
+      })
+      pendingAutoGenerateModelRef.current = resolvedModel.identifier
+    } else {
+      pendingAutoGenerateModelRef.current = null
+    }
+
+    setPrompt(intent.prompt)
+    setNegativePrompt(intent.negativePrompt)
+    setAttachedCommandRefs(intent.attachedRefs)
+    pendingIntentParametersRef.current = intent.parameters
+    setMultiShotMode(intent.multiShotMode)
+    setMultiShotShots(intent.multiShotShots)
+    setInputImage(intent.inputImageUrl ? { url: intent.inputImageUrl } : null)
+    setLastFrameImage(intent.lastFrameImageUrl ? { url: intent.lastFrameImageUrl } : null)
+    setInputVideo(intent.inputVideoUrl ? { url: intent.inputVideoUrl } : null)
+    setInputAudio(intent.inputAudioUrl ? { url: intent.inputAudioUrl } : null)
+    setReferenceImages(intent.referenceImageUrls.map((url) => ({ url })))
+    setShouldAutoGenerate(true)
+  }, [router, searchParams, videoModels])
 
   // Kling Omni / Seedance: when reference video is added, cap extra reference images
   React.useEffect(() => {
@@ -1017,6 +1073,20 @@ function VideoPageContent() {
       }
     })()
   }
+
+  const handleGenerateRef = React.useRef(handleGenerate)
+  handleGenerateRef.current = handleGenerate
+
+  React.useEffect(() => {
+    if (!shouldAutoGenerate || !selectedModel) return
+    if (pendingAutoGenerateModelRef.current && selectedModel.identifier !== pendingAutoGenerateModelRef.current) {
+      return
+    }
+
+    pendingAutoGenerateModelRef.current = null
+    setShouldAutoGenerate(false)
+    void handleGenerateRef.current()
+  }, [selectedModel, shouldAutoGenerate])
 
   const handleUseVideoAsReference = React.useCallback((videoUrl: string) => {
     setInputVideo({ url: videoUrl })

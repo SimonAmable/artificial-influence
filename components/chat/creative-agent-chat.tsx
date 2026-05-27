@@ -91,12 +91,12 @@ import { CHAT_AGENT_COMMANDS } from "@/lib/commands/presets-chat"
 import { extendMentionRangeEnd } from "@/lib/commands/mention-token"
 import {
   refsToChatMetadata,
-  type ChatReferenceMetadataItem,
 } from "@/lib/chat/reference-metadata"
 import type {
   InstagramConnectionToolSummary,
   SocialConnectionToolSummary,
 } from "@/lib/chat/agent-tool-part-types"
+import { consumeDashboardAgentHandoff } from "@/lib/chat/dashboard-agent-handoff"
 import { consumePendingTemplateHandoff } from "@/lib/templates/handoff"
 
 /** Serializable thread row for mobile history (matches ChatThreadListItem). */
@@ -254,6 +254,7 @@ export function CreativeAgentChat({
   const onboardingBootstrapInFlightRef = React.useRef(false)
   const onboardingHandoffPendingRef = React.useRef(false)
   const onboardingBootstrapCompletedRef = React.useRef(false)
+  const dashboardHandoffConsumedRef = React.useRef(false)
   const templateHandoffCompletedRef = React.useRef(false)
   const chatGatewayModelRef = React.useRef<string>(DEFAULT_CHAT_GATEWAY_MODEL)
   const [chatGatewayModelId, setChatGatewayModelId] = React.useState<string>(DEFAULT_CHAT_GATEWAY_MODEL)
@@ -892,6 +893,61 @@ export function CreativeAgentChat({
     },
     [enablePersistence, onThreadIdChange, resolvedUiChatBootstrapId, syncUrlOnThreadCreate, threadId],
   )
+
+  React.useEffect(() => {
+    if (!authReady) return
+    if (newChatToken) return
+    if (dashboardHandoffConsumedRef.current) return
+    if (messages.length > 0) return
+    if (status === "submitted" || status === "streaming") return
+    if (hasPendingUploads || isCreatingThread || isBootstrappingOnboarding) return
+
+    const handoff = consumeDashboardAgentHandoff()
+    dashboardHandoffConsumedRef.current = true
+    if (!handoff) return
+
+    chatGatewayModelRef.current = handoff.model
+    setChatGatewayModelId(handoff.model)
+
+    if (!userId) {
+      setComposerValue(handoff.prompt)
+      setAttachedRefs(handoff.attachedRefs)
+      return
+    }
+
+    const bootstrap = async () => {
+      try {
+        const title = handoff.prompt.trim() || handoff.attachedRefs[0]?.label || "New Chat"
+        const nextThreadId = await ensurePersistedThread(title)
+        if (nextThreadId) {
+          threadIdRef.current = nextThreadId
+        }
+
+        await sendMessage({
+          metadata: refsToChatMetadata(handoff.attachedRefs),
+          role: "user",
+          parts: [{ type: "text", text: handoff.prompt.trim() }],
+        })
+      } catch (error) {
+        setComposerValue(handoff.prompt)
+        setAttachedRefs(handoff.attachedRefs)
+        toast.error(error instanceof Error ? error.message : "Could not start chat.")
+      }
+    }
+
+    void bootstrap()
+  }, [
+    authReady,
+    ensurePersistedThread,
+    hasPendingUploads,
+    isBootstrappingOnboarding,
+    isCreatingThread,
+    messages.length,
+    newChatToken,
+    sendMessage,
+    status,
+    userId,
+  ])
 
   React.useEffect(() => {
     if (onboardingToken !== "1") {

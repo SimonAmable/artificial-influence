@@ -1,6 +1,9 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
+import { ArrowLeft } from "lucide-react"
 import { TemplateRunForm } from "@/components/templates/template-run-form"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/server"
 import { getTemplateBySlugForUser } from "@/lib/templates/database-server"
 
@@ -27,9 +30,21 @@ export default async function TemplateRunPage({ params }: TemplateRunPageProps) 
   return (
     <main className="min-h-screen bg-background">
       <div className="mx-auto w-full max-w-lg px-4 pb-8 pt-[60px] sm:pb-12">
-        <div className="mb-8 space-y-4 text-center">
+        <div className="relative mb-8 space-y-4 text-center">
+          <Button
+            asChild
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute left-0 top-0 rounded-full"
+          >
+            <Link href="/templates" aria-label="Back to templates">
+              <ArrowLeft className="size-5" />
+            </Link>
+          </Button>
+
           {template.thumbnail_url ? (
-            <div className="mx-auto size-16 overflow-hidden rounded-2xl bg-muted">
+            <div className="mx-auto size-16 overflow-hidden rounded-2xl bg-muted sm:size-32">
               {template.thumbnail_kind === "video" ? (
                 <video
                   src={template.thumbnail_url}
@@ -48,7 +63,7 @@ export default async function TemplateRunPage({ params }: TemplateRunPageProps) 
               )}
             </div>
           ) : (
-            <div className="mx-auto size-16 rounded-2xl bg-muted" />
+            <div className="mx-auto size-16 rounded-2xl bg-muted sm:size-32" />
           )}
 
           <div>
@@ -59,7 +74,8 @@ export default async function TemplateRunPage({ params }: TemplateRunPageProps) 
           </div>
 
           {template.tips ? (
-            <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-left text-sm text-foreground">
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-left text-sm text-emerald-800 dark:text-emerald-200">
+              <span className="mr-1 font-semibold uppercase tracking-wide">Tip:</span>
               {template.tips}
             </div>
           ) : null}
@@ -68,9 +84,14 @@ export default async function TemplateRunPage({ params }: TemplateRunPageProps) 
 
         <TemplateRunForm template={template} />
 
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          Nudity/suggestive content is not supported and will be blocked.
-        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <p className="text-center text-xs text-muted-foreground">
+            Nudity/suggestive content is not supported and will be blocked.
+          </p>
+          <Badge variant="secondary" className="text-xs font-normal">
+            Cost: {template.credits_cost} credits
+          </Badge>
+        </div>
 
         <div className="mt-8 text-center">
           <Link
