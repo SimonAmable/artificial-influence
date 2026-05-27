@@ -154,6 +154,13 @@ export const megaNavGroups: MegaNavGroup[] = [
         badge: "beta",
         iconPhosphor: "robot",
       },
+      {
+        path: "/templates",
+        label: "Templates",
+        description: "Browse reusable creation workflows and manage your own templates",
+        badge: "new",
+        iconPhosphor: "flow-arrow",
+      },
     ],
   },
   {

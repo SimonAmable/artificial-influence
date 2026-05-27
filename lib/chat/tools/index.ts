@@ -25,6 +25,7 @@ import { createSearchVoicesTool } from "@/lib/chat/tools/search-voices"
 import { createActivateSkillTool, createSaveSkillTool } from "@/lib/chat/tools/skills"
 import { createExtractVideoFramesTool } from "@/lib/chat/tools/extract-video-frames"
 import { createComposeTimelineVideoTool } from "@/lib/chat/tools/compose-timeline-video"
+import { createAnalyzeMediaTool } from "@/lib/chat/tools/analyze-media"
 import { createDownloadSocialReferenceTool } from "@/lib/chat/tools/download-social-reference"
 import { createAwaitGenerationTool } from "@/lib/chat/tools/await-generation"
 import { createEstimateModelLatencyTool } from "@/lib/chat/tools/estimate-model-latency"
@@ -32,6 +33,7 @@ import { createListThreadMediaTool } from "@/lib/chat/tools/list-thread-media"
 import { createScheduleGenerationFollowUpTool } from "@/lib/chat/tools/schedule-generation-follow-up"
 import { createListAutomationsTool } from "@/lib/chat/tools/list-automations"
 import { createManageAutomationTool } from "@/lib/chat/tools/manage-automation"
+import { createManageTemplateTool } from "@/lib/chat/tools/manage-template"
 import {
   createCapturePageScreenshotTool,
   createReadWebPageTool,
@@ -183,6 +185,12 @@ export function createCreativeChatTools({
       threadId,
       userId,
     }),
+    analyzeMedia: createAnalyzeMediaTool({
+      availableReferences,
+      supabase,
+      threadId,
+      userId,
+    }),
     downloadSocialReference: createDownloadSocialReferenceTool({ supabase, userId }),
     searchAssets: createSearchAssetsTool({
       supabase,
@@ -202,6 +210,9 @@ export function createCreativeChatTools({
     estimateModelLatency: createEstimateModelLatencyTool({ supabase, userId }),
     saveSkill: createSaveSkillTool({
       supabase,
+      userId,
+    }),
+    manageTemplate: createManageTemplateTool({
       userId,
     }),
     ...(activateSkillTool ? { activateSkill: activateSkillTool } : {}),

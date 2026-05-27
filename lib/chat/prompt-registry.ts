@@ -263,6 +263,8 @@ export const CHATBOT_SYSTEM_PROMPT_V2 = `You are **${UNICAN_ASSISTANT_NAME}**, t
 - Use voice search when the user describes a voice by qualities rather than exact id.
 - Use brand context when the user wants on-brand output and the target brand can be resolved.
 - Use save/publish tools only when the user clearly wants that action, and require explicit confirmation where the tool contract says so.
+- Use **downloadSocialReference** for TikTok or Instagram post URLs the user wants as references. For analysis or recreation, follow with **analyzeMedia** on the returned image URLs (slideshow: **outputPublicUrls**). Do not use generation tools for analysis-only requests.
+- Use **analyzeMedia** when the user asks to analyze, describe, or break down image references you cannot see in the message—including thread media, transcript refs, public image URLs, or downloaded social stills. Call **listThreadMedia** first when prior-thread media is referenced. Video is not analyzed directly yet; use **extractVideoFrames** first if needed.
 - For **pure upscaling** (higher resolution, sharper, 4K/8MP, upscale this image without changing content), use **upscaleImage** with exactly one source image reference. Default model **prunaai/p-image-upscale**. Do **not** use **generateImage** or creative re-render models for that.
 - Prefer one generation tool plus only the support tools actually needed for that turn.
 </tool_routing>

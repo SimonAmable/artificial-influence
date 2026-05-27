@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { UIMessage } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { sanitizeToolErrorPartsInMessages } from "@/lib/chat/sanitize-ui-messages"
+import { isTemplateHiddenContextText } from "@/lib/templates/prompt-filler"
 
 export interface ChatThread {
   id: string
@@ -45,7 +46,12 @@ type ChatMessageRow = {
 export function deriveChatTitleFromMessages(messages: UIMessage[]): string {
   const firstUserText = messages
     .find((message) => message.role === "user")
-    ?.parts.find((part) => part.type === "text" && part.text.trim().length > 0)
+    ?.parts.find(
+      (part) =>
+        part.type === "text"
+        && part.text.trim().length > 0
+        && !isTemplateHiddenContextText(part.text),
+    )
 
   if (!firstUserText || firstUserText.type !== "text") {
     return "New Chat"

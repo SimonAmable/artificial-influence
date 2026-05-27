@@ -195,47 +195,48 @@ const monthlyPlans: PricingPlan[] = [
     ],
     popular: true,
   },
-  {
-    id: 'max-monthly',
-    name: 'Max',
-    description: 'For power users and teams',
-    price: 200.0,
-    priceId: 'price_1TQIsxGYRyfMJZ0CzYtrgkNP',
-    interval: 'month' as const,
-    currency: 'USD' as const,
-    credits: 6000,
-    features: [
-      {
-        name: 'Access to all AI models',
-        info: ALL_MODELS_INFO,
-      },
-      {
-        name: 'Maximum concurrent generations',
-        info: 'Generate multiple videos and images simultaneously for maximum productivity',
-      },
-      {
-        name: 'Early access to advanced features',
-        info: 'Get first access to new AI models, features, and experimental capabilities',
-      },
-      personalSupportFeature,
-      {
-        name: 'Commercial license',
-        info: 'Full commercial license to use generated content for any purpose',
-      },
-      {
-        name: 'Priority processing',
-        info: 'Your generations are processed with higher priority for faster results',
-      },
-      {
-        name: 'Unlimited Instagram & TikTok connections',
-        info: 'Connect as many Instagram and TikTok accounts as you need for publishing, autopost, and related workflows',
-      },
-      {
-        name: 'Unlimited automations',
-        info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
-      },
-    ],
-  },
+  // Max monthly plan hidden for conversion test — re-enable to restore
+  // {
+  //   id: 'max-monthly',
+  //   name: 'Max',
+  //   description: 'For power users and teams',
+  //   price: 200.0,
+  //   priceId: 'price_1TQIsxGYRyfMJZ0CzYtrgkNP',
+  //   interval: 'month' as const,
+  //   currency: 'USD' as const,
+  //   credits: 6000,
+  //   features: [
+  //     {
+  //       name: 'Access to all AI models',
+  //       info: ALL_MODELS_INFO,
+  //     },
+  //     {
+  //       name: 'Maximum concurrent generations',
+  //       info: 'Generate multiple videos and images simultaneously for maximum productivity',
+  //     },
+  //     {
+  //       name: 'Early access to advanced features',
+  //       info: 'Get first access to new AI models, features, and experimental capabilities',
+  //     },
+  //     personalSupportFeature,
+  //     {
+  //       name: 'Commercial license',
+  //       info: 'Full commercial license to use generated content for any purpose',
+  //     },
+  //     {
+  //       name: 'Priority processing',
+  //       info: 'Your generations are processed with higher priority for faster results',
+  //     },
+  //     {
+  //       name: 'Unlimited Instagram & TikTok connections',
+  //       info: 'Connect as many Instagram and TikTok accounts as you need for publishing, autopost, and related workflows',
+  //     },
+  //     {
+  //       name: 'Unlimited automations',
+  //       info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
+  //     },
+  //   ],
+  // },
 ];
 
 const yearlyPlans: PricingPlan[] = [
@@ -314,47 +315,48 @@ const yearlyPlans: PricingPlan[] = [
     ],
     popular: true,
   },
-  {
-    id: 'max-yearly',
-    name: 'Max',
-    description: 'For power users and teams',
-    price: 792.0,
-    priceId: 'price_1TQKZwGYRyfMJZ0CcVI6e5wM',
-    interval: 'year' as const,
-    currency: 'USD' as const,
-    credits: 6000,
-    features: [
-      {
-        name: 'Access to all AI models',
-        info: ALL_MODELS_INFO,
-      },
-      {
-        name: 'Maximum concurrent generations',
-        info: 'Generate multiple videos and images simultaneously for maximum productivity',
-      },
-      {
-        name: 'Early access to advanced features',
-        info: 'Get first access to new AI models, features, and experimental capabilities',
-      },
-      personalSupportFeature,
-      {
-        name: 'Commercial license',
-        info: 'Full commercial license to use generated content for any purpose',
-      },
-      {
-        name: 'Priority processing',
-        info: 'Your generations are processed with higher priority for faster results',
-      },
-      {
-        name: 'Unlimited Instagram & TikTok connections',
-        info: 'Connect as many Instagram and TikTok accounts as you need for publishing, autopost, and related workflows',
-      },
-      {
-        name: 'Unlimited automations',
-        info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
-      },
-    ],
-  },
+  // Max yearly plan hidden for conversion test — re-enable to restore
+  // {
+  //   id: 'max-yearly',
+  //   name: 'Max',
+  //   description: 'For power users and teams',
+  //   price: 792.0,
+  //   priceId: 'price_1TQKZwGYRyfMJZ0CcVI6e5wM',
+  //   interval: 'year' as const,
+  //   currency: 'USD' as const,
+  //   credits: 6000,
+  //   features: [
+  //     {
+  //       name: 'Access to all AI models',
+  //       info: ALL_MODELS_INFO,
+  //     },
+  //     {
+  //       name: 'Maximum concurrent generations',
+  //       info: 'Generate multiple videos and images simultaneously for maximum productivity',
+  //     },
+  //     {
+  //       name: 'Early access to advanced features',
+  //       info: 'Get first access to new AI models, features, and experimental capabilities',
+  //     },
+  //     personalSupportFeature,
+  //     {
+  //       name: 'Commercial license',
+  //       info: 'Full commercial license to use generated content for any purpose',
+  //     },
+  //     {
+  //       name: 'Priority processing',
+  //       info: 'Your generations are processed with higher priority for faster results',
+  //     },
+  //     {
+  //       name: 'Unlimited Instagram & TikTok connections',
+  //       info: 'Connect as many Instagram and TikTok accounts as you need for publishing, autopost, and related workflows',
+  //     },
+  //     {
+  //       name: 'Unlimited automations',
+  //       info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
+  //     },
+  //   ],
+  // },
 ];
 
 const ENTERPRISE_CONTACT_EMAIL =
@@ -742,7 +744,8 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                     >
                       Plus
                     </Button>
-                    <Button
+                    {/* Max jump-to button hidden for conversion test — re-enable to restore */}
+                    {/* <Button
                       type="button"
                       variant="outline"
                       size="sm"
@@ -750,7 +753,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                       onClick={() => scrollCardIntoView(maxCardRef.current)}
                     >
                       Max
-                    </Button>
+                    </Button> */}
                   </div>
                 </div>
               </div>
@@ -762,7 +765,8 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                   '-mx-4 flex-row gap-3 overflow-x-auto overscroll-x-contain pb-4 px-[calc((100vw-85vw)/2)] pt-5',
                   'snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
                   'sm:mx-auto sm:grid sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:overscroll-auto sm:pb-0 sm:px-0 sm:pt-0',
-                  'lg:grid-cols-3',
+                  // 'lg:grid-cols-3', // hidden while Max plan is disabled — restore alongside Max plan
+                  'sm:max-w-3xl',
                   'sm:snap-none lg:gap-8',
                 ].join(' ')}
                 variants={cardList}

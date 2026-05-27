@@ -2,6 +2,7 @@
 
 import type { UIMessage } from "ai"
 import { MessageResponse } from "@/components/ai-elements/message"
+import { isTemplateHiddenContextText } from "@/lib/templates/prompt-filler"
 import { cn } from "@/lib/utils"
 
 type FileMessagePart = Extract<UIMessage["parts"][number], { type: "file" }>
@@ -54,7 +55,10 @@ export function MessageFilePart({
 }
 
 export function UserMessageTextParts({ message }: { message: UIMessage }) {
-  const textParts = message.parts.filter((part) => part.type === "text")
+  const textParts = message.parts.filter(
+    (part): part is Extract<UIMessage["parts"][number], { type: "text" }> =>
+      part.type === "text" && !isTemplateHiddenContextText(part.text),
+  )
 
   if (textParts.length === 0) return null
 

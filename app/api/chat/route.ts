@@ -39,6 +39,7 @@ import {
   hasAIGatewayCredentials,
 } from "@/lib/ai/gateway"
 import { scheduleThreadIntentTitleJob } from "@/lib/chat/thread-intent-title-scheduler"
+import { finalizeTemplateRunFromChat } from "@/lib/templates/finalize-run"
 
 /** Allows long chained tool turns (e.g. awaitGeneration + follow-up tools) on Vercel Pro (max 300s). */
 export const maxDuration = 300
@@ -246,7 +247,7 @@ export async function POST(req: Request) {
           (profile as { onboarding_json_data?: unknown } | null)?.onboarding_json_data,
         )
       }
-      }
+    }
 
     const creativeAgent = createCreativeAgent({
       availableReferences: getAvailableConversationImageReferences(validatedMessages),
@@ -306,6 +307,7 @@ export async function POST(req: Request) {
             onboardingHandoff: onboardingHandoff === true,
             openingUserMessage: openingUserUiMessageForIntentTitle,
           })
+          await finalizeTemplateRunFromChat(threadId, responseMessages as UIMessage[])
         } catch (persistError) {
           console.error("[chat] Failed to persist thread:", persistError)
         }

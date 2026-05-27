@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useModels } from "@/hooks/use-models"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import { consumeImageGenerationIntent } from "@/lib/image/image-generation-intent"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import {
   type GenerateImageAcceptedPayload,
@@ -37,6 +38,12 @@ import {
 } from "@/lib/commands/ref-image-pipeline"
 import { stripImageMetadataAndDownload } from "@/lib/images/strip-metadata"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
+import {
+  getParameterDefault,
+  parseModelParameters,
+  type Model,
+  type ModelInputValues,
+} from "@/lib/types/models"
 
 interface ImageHistoryItem {
   id?: string
@@ -62,6 +69,21 @@ interface PendingImageRequest {
   numImages: number
   generationId?: string | null
   predictionId?: string | null
+}
+
+const QUALITY_IMAGE_PARAMETER_NAMES = new Set(["quality", "output_quality"])
+
+function getQualityModelParameters(model: Model | null): ModelInputValues {
+  if (!model) return {}
+
+  return parseModelParameters(model.parameters).reduce<ModelInputValues>((acc, param) => {
+    if (!QUALITY_IMAGE_PARAMETER_NAMES.has(param.name)) {
+      return acc
+    }
+
+    acc[param.name] = getParameterDefault(param)
+    return acc
+  }, {})
 }
 
 function createClientRequestId() {
@@ -153,6 +175,7 @@ const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
 function ImagePageContent() {
   const layoutModeContext = useLayoutMode()
   const searchParams = useSearchParams()
+  const router = useRouter()
   
   if (!layoutModeContext) {
     throw new Error("ImagePage must be used within LayoutModeProvider")
@@ -204,8 +227,13 @@ function ImagePageContent() {
   const [selectedModel, setSelectedModel] = React.useState<string>("")
   const [selectedAspectRatio, setSelectedAspectRatio] = React.useState<string>("match_input_image")
   const [selectedNumImages, setSelectedNumImages] = React.useState<number>(1)
+  const [selectedModelParameters, setSelectedModelParameters] = React.useState<ModelInputValues>({})
   const prevModelForAspectRef = React.useRef<string | null>(null)
   const isCharacterSwapModel = selectedModel === CHARACTER_SWAP_UI_MODEL_IDENTIFIER
+  const selectedModelObject = React.useMemo(
+    () => effectiveImageModels.find((model) => model.identifier === selectedModel) ?? null,
+    [effectiveImageModels, selectedModel]
+  )
   
   // Create asset dialog state
   const [createAssetDialogOpen, setCreateAssetDialogOpen] = React.useState(false)
@@ -214,6 +242,9 @@ function ImagePageContent() {
   // Upscale: which image is currently upscaling (by URL)
   const [upscalingImageUrl, setUpscalingImageUrl] = React.useState<string | null>(null)
   const [removingMetadataImageUrl, setRemovingMetadataImageUrl] = React.useState<string | null>(null)
+  const [shouldAutoGenerate, setShouldAutoGenerate] = React.useState(false)
+  const autoGenerateHandoffConsumedRef = React.useRef(false)
+  const pendingAutoGenerateModelRef = React.useRef<string | null>(null)
 
   // Set default model when models load.
   React.useEffect(() => {
@@ -252,6 +283,34 @@ function ImagePageContent() {
     lastLoadedModelParam.current = rawModelParam
   }, [searchParams, effectiveImageModels])
 
+  // Dashboard hero (or other routes) can hand off intent via sessionStorage + ?generate=1.
+  React.useEffect(() => {
+    if (autoGenerateHandoffConsumedRef.current) return
+    if (searchParams.get("generate") !== "1") return
+    if (effectiveImageModels.length === 0) return
+
+    autoGenerateHandoffConsumedRef.current = true
+
+    const intent = consumeImageGenerationIntent()
+    const nextParams = new URLSearchParams(searchParams.toString())
+    nextParams.delete("generate")
+    const nextQuery = nextParams.toString()
+    router.replace(nextQuery ? `/image?${nextQuery}` : "/image", { scroll: false })
+
+    if (!intent) return
+
+    setPrompt(intent.prompt)
+    setAttachedCommandRefs(intent.attachedRefs)
+    setReferenceImages(intent.referenceImageUrls.map((url) => ({ url })))
+    setReferenceImage(null)
+    setEnhancePrompt(intent.enhancePrompt)
+    setSelectedModel(intent.model)
+    setSelectedAspectRatio(intent.aspectRatio)
+    setSelectedNumImages(intent.numImages)
+    pendingAutoGenerateModelRef.current = intent.model
+    setShouldAutoGenerate(true)
+  }, [effectiveImageModels.length, router, searchParams])
+
   // When the model (or catalog) changes: keep aspect ratio if the new model supports it; else default.
   // First time we bind to a model, always apply that model's default (don't "retain" initial state).
   React.useEffect(() => {
@@ -275,6 +334,10 @@ function ImagePageContent() {
     const maxImages = model.max_images ?? 1
     setSelectedNumImages((prev) => (maxImages >= 1 ? Math.min(prev, maxImages) : 1))
   }, [selectedModel, effectiveImageModels])
+
+  React.useEffect(() => {
+    setSelectedModelParameters(getQualityModelParameters(selectedModelObject))
+  }, [selectedModelObject])
 
   type FetchHistoryOptions = { silent?: boolean; replace?: boolean }
 
@@ -438,8 +501,6 @@ function ImagePageContent() {
     const capturedRefUrls = isCharacterSwapModel
       ? manualRefUrls
       : [...new Set([...manualRefUrls, ...chipImageUrls])]
-    const selectedModelObject =
-      effectiveImageModels.find((model) => model.identifier === selectedModel) ?? null
     const capturedAspectRatio = isCharacterSwapModel
       ? "match_input_image"
       : resolveAspectRatioForRequest({
@@ -458,6 +519,7 @@ function ImagePageContent() {
       referenceImageUrls: capturedRefUrls,
       numImages: isCharacterSwapModel ? 1 : Math.max(1, selectedNumImages),
     }
+    const capturedModelParameters = { ...selectedModelParameters }
 
     setPendingRequests((prev) => [optimisticPendingRequest, ...prev])
 
@@ -486,6 +548,11 @@ function ImagePageContent() {
       } else if (capturedAspectRatio) {
         formData.append('aspectRatio', capturedAspectRatio)
         formData.append('aspect_ratio', capturedAspectRatio)
+      }
+
+      for (const [key, value] of Object.entries(capturedModelParameters)) {
+        if (value == null || value === "") continue
+        formData.append(key, String(value))
       }
       
       // Add reference image files if present (supports both single and multiple)
@@ -590,6 +657,18 @@ function ImagePageContent() {
     }
   }
 
+  React.useEffect(() => {
+    if (!shouldAutoGenerate) return
+    if (!selectedModel) return
+    if (pendingAutoGenerateModelRef.current && selectedModel !== pendingAutoGenerateModelRef.current) {
+      return
+    }
+
+    pendingAutoGenerateModelRef.current = null
+    setShouldAutoGenerate(false)
+    void handleGenerate()
+  }, [shouldAutoGenerate, selectedModel])
+
   const handleUseAsReference = React.useCallback(async (imageUrl: string) => {
     try {
       const response = await fetch(imageUrl)
@@ -647,6 +726,8 @@ function ImagePageContent() {
           selectedNumImages={selectedNumImages}
           onNumImagesChange={setSelectedNumImages}
           showNumImagesSelector={true}
+          modelParameters={selectedModelParameters}
+          onModelParametersChange={setSelectedModelParameters}
           allowedAssetTypes={["image"]}
         />
       )
@@ -685,6 +766,7 @@ function ImagePageContent() {
     referenceImages,
     selectedAspectRatio,
     selectedModel,
+    selectedModelParameters,
     selectedNumImages,
   ])
 

@@ -526,6 +526,79 @@ export type ManageAutomationToolPart = {
   errorText?: string
 }
 
+export type ManageTemplateToolInput =
+  | {
+      action: "search"
+      category?: "all" | "photo" | "video" | "slideshow"
+      limit?: number
+      query?: string
+      scope?: "mine" | "public" | "all"
+    }
+  | {
+      action: "get"
+      slug?: string
+      templateId?: string
+    }
+  | {
+      action: "create"
+      template: {
+        category: "photo" | "video" | "slideshow"
+        credits_cost?: number
+        description?: string
+        inputs: Array<Record<string, unknown>>
+        output_kind: "image" | "video" | "audio" | "slideshow" | "mixed"
+        prompt: string
+        slug?: string
+        thumbnail_kind?: "image" | "video"
+        thumbnail_url?: string | null
+        tips?: string | null
+        title: string
+        visibility?: "private" | "public"
+      }
+    }
+  | {
+      action: "update"
+      changes: Record<string, unknown>
+      templateId: string
+    }
+
+export type ManageTemplateToolSummary = {
+  category: string
+  creatorId?: string
+  description?: string | null
+  editUrl: string
+  id: string
+  isOwner?: boolean
+  outputKind: string
+  prompt?: string
+  runUrl: string
+  slug: string
+  thumbnailKind?: "image" | "video"
+  thumbnailUrl?: string | null
+  tips?: string | null
+  title: string
+  updatedAt: string
+  visibility: string
+  inputs?: Array<Record<string, unknown>>
+  creditsCost?: number
+}
+
+export type ManageTemplateToolPart = {
+  type: "tool-manageTemplate"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: ManageTemplateToolInput
+  output?: {
+    action?: ManageTemplateToolInput["action"]
+    message?: string
+    status?: "ok" | "error"
+    template?: ManageTemplateToolSummary
+    templates?: ManageTemplateToolSummary[]
+    total?: number
+  }
+  errorText?: string
+}
+
 export type ListThreadMediaToolPart = {
   type: "tool-listThreadMedia"
   toolCallId: string
@@ -996,6 +1069,47 @@ export type DownloadSocialReferenceToolPart = {
   errorText?: string
 }
 
+export type AnalyzeMediaToolPart = {
+  type: "tool-analyzeMedia"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    focus?: "general" | "prompt_pack" | "recreation" | "style"
+    mediaIds?: string[]
+    referenceIds?: string[]
+  }
+  output?: {
+    analysis?: {
+      colorPalette?: string[]
+      composition?: string
+      lighting?: string
+      mood?: string
+      promptPack?: {
+        editDescription?: Record<string, string>
+        imageDescription?: Record<string, string>
+        masterPrompt?: string
+      }
+      recreationGuidance?: {
+        changeable?: string[]
+        preserve?: string[]
+        suggestedWorkflow?: string
+      }
+      styleNotes?: string
+      subjects?: string[]
+      summary?: string
+      visibleText?: string[]
+    }
+    analyzedUrls?: string[]
+    focus?: "general" | "prompt_pack" | "recreation" | "style"
+    imageCount?: number
+    mediaKind?: "image" | "slideshow"
+    message?: string
+    summary?: string
+    warnings?: string[]
+  }
+  errorText?: string
+}
+
 export type ComposerUploadAttachment = {
   file: File
   id: string
@@ -1014,4 +1128,3 @@ export type ComposerAssetAttachment = {
 }
 
 export type ComposerAttachment = ComposerUploadAttachment | ComposerAssetAttachment
-

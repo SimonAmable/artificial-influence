@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type {
   ActivateSkillToolPart,
+  AnalyzeMediaToolPart,
   AwaitGenerationToolPart,
   CapturePageScreenshotToolPart,
   ComposeTimelineVideoToolPart,
@@ -32,6 +33,7 @@ import type {
   ListSocialConnectionsToolPart,
   ListThreadMediaToolPart,
   ManageAutomationToolPart,
+  ManageTemplateToolPart,
   ModelsToolPart,
   PrepareInstagramPostToolPart,
   PrepareSocialPostToolPart,
@@ -52,6 +54,8 @@ import {
   formatAutomationActionLabel,
   formatAutomationDate,
   getAutomationPromptPreview,
+  formatTemplateActionLabel,
+  getTemplatePromptPreview,
 } from "@/components/chat/tool-ui/automation-helpers"
 import { AudioGenerationResultCard } from "@/components/chat/tool-ui/audio-generation-result-card"
 import { ImageGenerationResultCard } from "@/components/chat/tool-ui/image-generation-result-card"
@@ -1870,6 +1874,129 @@ export function MessageParts({
           )
         }
 
+        if (part.type === "tool-manageTemplate") {
+          const toolPart = part as ManageTemplateToolPart
+          const action = toolPart.output?.action ?? toolPart.input?.action
+          const template = toolPart.output?.template
+          const templates = toolPart.output?.templates ?? []
+          const promptPreview = getTemplatePromptPreview(template?.prompt)
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{formatTemplateActionLabel(action)} template</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {action === "search"
+                        ? "Looking through available templates"
+                        : "Preparing template details"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Template action failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Templates</Badge>
+                  {action ? <Badge variant="outline">{formatTemplateActionLabel(action)}</Badge> : null}
+                  {typeof toolPart.output?.total === "number" ? (
+                    <Badge variant="outline">
+                      {toolPart.output.total} result{toolPart.output.total === 1 ? "" : "s"}
+                    </Badge>
+                  ) : null}
+                </div>
+                {toolPart.output?.message ? (
+                  <p className="text-sm text-muted-foreground">{toolPart.output.message}</p>
+                ) : null}
+                {template ? (
+                  <div className="rounded-xl border border-border/60 bg-background/80 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium">{template.title}</p>
+                      <Badge variant="outline">{template.visibility}</Badge>
+                      <Badge variant="outline">{template.outputKind}</Badge>
+                      <Badge variant="outline">{template.id.slice(0, 8)}</Badge>
+                    </div>
+                    {template.description ? (
+                      <p className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">
+                        {template.description}
+                      </p>
+                    ) : null}
+                    {promptPreview ? (
+                      <p className="mt-3 whitespace-pre-wrap text-sm text-foreground">{promptPreview}</p>
+                    ) : null}
+                    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                      <span>{template.category}</span>
+                      <span>{template.slug}</span>
+                      <span>{new Date(template.updatedAt).toLocaleString()}</span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={template.runUrl}>Open Template</Link>
+                      </Button>
+                      {template.isOwner ? (
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={template.editUrl}>Edit Template</Link>
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : templates.length > 0 ? (
+                  <div className="space-y-2">
+                    {templates.map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-xl border border-border/60 bg-background/80 p-3"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium">{item.title}</p>
+                          <Badge variant="outline">{item.visibility}</Badge>
+                          <Badge variant="outline">{item.outputKind}</Badge>
+                          <Badge variant="outline">{item.id.slice(0, 8)}</Badge>
+                        </div>
+                        {item.description ? (
+                          <p className="mt-2 text-xs text-muted-foreground">{item.description}</p>
+                        ) : null}
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                          <span>{item.category}</span>
+                          <span>{item.slug}</span>
+                          <span>{new Date(item.updatedAt).toLocaleString()}</span>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button asChild size="sm" variant="outline">
+                            <Link href={item.runUrl}>Open</Link>
+                          </Button>
+                          {item.isOwner ? (
+                            <Button asChild size="sm" variant="outline">
+                              <Link href={item.editUrl}>Edit</Link>
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          )
+        }
+
         if (part.type === "tool-listThreadMedia") {
           const toolPart = part as ListThreadMediaToolPart
 
@@ -2424,6 +2551,96 @@ export function MessageParts({
           }
         }
 
+        if (part.type === "tool-analyzeMedia") {
+          const toolPart = part as AnalyzeMediaToolPart
+          const focus = toolPart.input?.focus ?? toolPart.output?.focus ?? "general"
+
+          if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/20">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Analyzing media</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {focus === "general" ? "Reading visual references" : `Focus: ${focus}`}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          if (toolPart.state === "output-error") {
+            return (
+              <Card key={`${message.id}-${index}`} className="border-destructive/30 bg-destructive/5">
+                <CardContent className="space-y-2 p-4 text-sm text-destructive">
+                  <p className="font-medium">Media analysis failed</p>
+                  <p>{toolPart.errorText || "Unknown tool error."}</p>
+                </CardContent>
+              </Card>
+            )
+          }
+
+          const output = toolPart.output
+          const analysis = output?.analysis
+          const summary =
+            typeof output?.summary === "string" && output.summary.trim().length > 0
+              ? output.summary.trim()
+              : typeof analysis?.summary === "string"
+                ? analysis.summary.trim()
+                : output?.message
+
+          return (
+            <Card key={`${message.id}-${index}`} className="border-border/60 bg-muted/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>Media analysis</Badge>
+                  {typeof output?.imageCount === "number" ? (
+                    <Badge variant="outline">
+                      {output.imageCount} image{output.imageCount === 1 ? "" : "s"}
+                    </Badge>
+                  ) : null}
+                  {focus !== "general" ? <Badge variant="outline">{focus}</Badge> : null}
+                </div>
+                {summary ? <p className="text-sm text-foreground">{summary}</p> : null}
+                {Array.isArray(analysis?.subjects) && analysis.subjects.length > 0 ? (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Subjects
+                    </p>
+                    <p className="text-sm text-muted-foreground">{analysis.subjects.join(", ")}</p>
+                  </div>
+                ) : null}
+                {analysis?.composition ? (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Composition
+                    </p>
+                    <p className="text-sm text-muted-foreground">{analysis.composition}</p>
+                  </div>
+                ) : null}
+                {Array.isArray(analysis?.colorPalette) && analysis.colorPalette.length > 0 ? (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Palette
+                    </p>
+                    <p className="text-sm text-muted-foreground">{analysis.colorPalette.join(", ")}</p>
+                  </div>
+                ) : null}
+                {Array.isArray(analysis?.visibleText) && analysis.visibleText.length > 0 ? (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Visible text
+                    </p>
+                    <p className="text-sm text-muted-foreground">{analysis.visibleText.join(" · ")}</p>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          )
+        }
+
         if (part.type === "tool-downloadSocialReference") {
           const toolPart = part as DownloadSocialReferenceToolPart
           const url = typeof toolPart.input?.url === "string" ? toolPart.input.url.trim() : ""
@@ -2588,4 +2805,3 @@ export function MessageParts({
     </>
   )
 }
-

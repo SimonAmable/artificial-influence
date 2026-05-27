@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Stack } from "@phosphor-icons/react"
 // import { FeatureShowcaseCarousel } from "@/components/dashboard/feature-showcase-carousel"
+import { DashboardHeroSection } from "@/components/dashboard/dashboard-hero-section"
 import { FeatureButtonGrid } from "@/components/dashboard/feature-button-grid"
 import { CanvasesSection } from "@/components/dashboard/canvases-section"
 import { Footer } from "@/components/landing/footer"
@@ -15,12 +16,9 @@ import type { Workflow } from "@/lib/workflows/database-server"
 export function DashboardPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <div className="flex-1 px-4 pt-4">
-        {/* Hero Section with Carousel, hidden until showcase assets are updated */}
-        {/* <section className="mx-auto w-full pt-[60px]">
-        <FeatureShowcaseCarousel />
-      </section> */}
+      <DashboardHeroSection />
 
+      <div className="flex-1 px-4">
         {/* Tools Section */}
         <section className="mx-auto w-full py-10">
           <FeatureButtonGrid />

@@ -14,6 +14,7 @@ import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Slider } from "@/components/ui/slider"
 import { ImagePromptFields } from "./image-prompt-fields"
 import { ImageEnhanceSwitch } from "./image-enhance-switch"
 import {
@@ -26,7 +27,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Model } from "@/lib/types/models"
+import {
+  getParameterDefault,
+  parseModelParameters,
+  type Model,
+  type ModelInputValues,
+} from "@/lib/types/models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { AspectRatioSelector } from "@/components/shared/selectors/aspect-ratio-selector"
 import { getActiveModelMetadata, type ModelMetadata } from "@/lib/constants/model-metadata"
@@ -92,6 +98,25 @@ interface InfluencerInputBoxProps {
   allowedAssetTypes?: AssetType[]
   /** Optional: parent tracks pending generation slots for layout/UX */
   activeGenerationSlotCount?: number
+  modelParameters?: ModelInputValues
+  onModelParametersChange?: (params: ModelInputValues) => void
+}
+
+const QUALITY_IMAGE_PARAMETER_NAMES = new Set(["quality", "output_quality"])
+
+function formatQualityOptionLabel(paramName: string, option: string): string {
+  if (paramName !== "quality") return option
+
+  switch (option) {
+    case "low":
+      return "1k"
+    case "medium":
+      return "2k"
+    case "high":
+      return "4k"
+    default:
+      return option
+  }
 }
 
 export function InfluencerInputBox({
@@ -134,6 +159,8 @@ export function InfluencerInputBox({
   onAttachedRefsChange,
   allowedAssetTypes,
   activeGenerationSlotCount: _activeGenerationSlotCount,
+  modelParameters,
+  onModelParametersChange,
 }: InfluencerInputBoxProps) {
   const [localPrompt, setLocalPrompt] = React.useState(promptValue)
   const [attachedRefs, setAttachedRefs] = React.useState<AttachedRef[]>([])
@@ -471,6 +498,13 @@ export function InfluencerInputBox({
     if (!selectedModel) return null
     return models.find(m => m.identifier === selectedModel) || null
   }, [selectedModel, models])
+  const selectedQualityParameters = React.useMemo(() => {
+    if (!selectedModelObject) return []
+
+    return parseModelParameters(selectedModelObject.parameters).filter((param) =>
+      QUALITY_IMAGE_PARAMETER_NAMES.has(param.name)
+    )
+  }, [selectedModelObject])
 
   // Determine if button is ready (prompt must not be empty)
   const isReady = React.useMemo(() => {
@@ -786,6 +820,80 @@ export function InfluencerInputBox({
               </SelectContent>
             </Select>
           )}
+
+          {onModelParametersChange && selectedQualityParameters.map((param) => {
+            const value = modelParameters?.[param.name] ?? getParameterDefault(param)
+
+            if (param.ui_type === "select" && "enum" in param && Array.isArray(param.enum)) {
+              const displayValue = formatQualityOptionLabel(param.name, String(value))
+
+              return (
+                <Select
+                  key={param.name}
+                  value={String(value)}
+                  onValueChange={(nextValue) =>
+                    onModelParametersChange({
+                      ...(modelParameters ?? {}),
+                      [param.name]: nextValue,
+                    })
+                  }
+                  disabled={!allowOptionsDuringGeneration && isGenerating}
+                >
+                  <SelectTrigger id={param.name} className="h-7 text-xs w-fit min-w-[4.25rem] px-2">
+                    <SelectValue placeholder={param.label}>
+                      {displayValue}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent position="popper" side="top" sideOffset={4}>
+                    {param.enum.map((option) => (
+                      <SelectItem key={String(option)} value={String(option)} className="text-xs">
+                        {formatQualityOptionLabel(param.name, String(option))}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )
+            }
+
+            if (param.ui_type === "slider" && param.type === "number") {
+              const sliderValue =
+                typeof value === "number"
+                  ? value
+                  : typeof param.default === "number"
+                    ? param.default
+                    : typeof param.min === "number"
+                      ? param.min
+                      : 0
+
+              return (
+                <div
+                  key={param.name}
+                  className="flex h-7 items-center gap-2 rounded-[28px] border border-border bg-muted/30 px-2.5"
+                >
+                  <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">
+                    {param.label}
+                  </span>
+                  <Slider
+                    min={param.min}
+                    max={param.max}
+                    step={param.step || 1}
+                    value={[sliderValue]}
+                    onValueChange={([nextValue]) =>
+                      onModelParametersChange({
+                        ...(modelParameters ?? {}),
+                        [param.name]: nextValue,
+                      })
+                    }
+                    className="w-20"
+                    disabled={!allowOptionsDuringGeneration && isGenerating}
+                  />
+                  <span className="text-[11px] font-semibold tabular-nums">{sliderValue}</span>
+                </div>
+              )
+            }
+
+            return null
+          })}
 
           {/* Aspect Ratio 1:1 Checkbox (if enabled) */}
           {showAspectRatio1to1Checkbox && (

@@ -145,6 +145,11 @@ export async function POST(request: NextRequest) {
     const resolution = formData.get('resolution') as string | null;
     const output_format = formData.get('output_format') as string | null;
     const quality = (formData.get('quality') as string | null)?.toLowerCase() ?? null;
+    const outputQualityRaw = formData.get('output_quality') as string | null;
+    const output_quality =
+      outputQualityRaw != null && outputQualityRaw !== ''
+        ? Number(outputQualityRaw)
+        : null;
     const moderation = (formData.get('moderation') as string | null)?.toLowerCase() ?? null;
     const background = (formData.get('background') as string | null)?.toLowerCase() ?? null;
     const widthForm = formData.get('width');
@@ -233,6 +238,7 @@ export async function POST(request: NextRequest) {
       aspect_ratio,
       resolution,
       output_format,
+      output_quality,
     });
 
     // Validate required prompt
@@ -570,7 +576,11 @@ export async function POST(request: NextRequest) {
           width: dims.width,
           height: dims.height,
           ...(resolution && { resolution }),
+          ...(quality && { quality }),
+          ...(output_quality != null && Number.isFinite(output_quality) && { output_quality }),
           ...(output_format && { output_format }),
+          ...(moderation && { moderation }),
+          ...(background && { background }),
           ...(referenceImageUrls.length > 0 && { image_input: referenceImageUrls }),
         };
       } else {
@@ -578,7 +588,11 @@ export async function POST(request: NextRequest) {
         generateOptions.providerOptions.replicate = {
           ...(aspect_ratio && { aspect_ratio }),
           ...(resolution && { resolution }),
+          ...(quality && { quality }),
+          ...(output_quality != null && Number.isFinite(output_quality) && { output_quality }),
           ...(output_format && { output_format }),
+          ...(moderation && { moderation }),
+          ...(background && { background }),
           ...(referenceImageUrls.length > 0 && { image_input: referenceImageUrls }),
           // Flux 2 Dev: disable safety checker to avoid NSFW content detection blocking valid images
           ...(modelIdentifier === 'black-forest-labs/flux-2-dev' && { disable_safety_checker: true }),

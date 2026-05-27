@@ -1,4 +1,7 @@
-﻿import type { ManageAutomationToolInput } from "@/lib/chat/agent-tool-part-types"
+import type {
+  ManageAutomationToolInput,
+  ManageTemplateToolInput,
+} from "@/lib/chat/agent-tool-part-types"
 
 export function formatAutomationActionLabel(action?: ManageAutomationToolInput["action"]) {
   switch (action) {
@@ -27,6 +30,27 @@ export function formatAutomationDate(value?: string | null) {
 }
 
 export function getAutomationPromptPreview(text?: string | null, maxLength = 220) {
+  const trimmed = text?.trim()
+  if (!trimmed) return null
+  return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength).trimEnd()}...` : trimmed
+}
+
+export function formatTemplateActionLabel(action?: ManageTemplateToolInput["action"]) {
+  switch (action) {
+    case "search":
+      return "Search"
+    case "get":
+      return "Inspect"
+    case "create":
+      return "Create"
+    case "update":
+      return "Update"
+    default:
+      return "Template"
+  }
+}
+
+export function getTemplatePromptPreview(text?: string | null, maxLength = 220) {
   const trimmed = text?.trim()
   if (!trimmed) return null
   return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength).trimEnd()}...` : trimmed

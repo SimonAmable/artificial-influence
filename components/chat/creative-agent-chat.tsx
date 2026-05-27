@@ -97,6 +97,7 @@ import type {
   InstagramConnectionToolSummary,
   SocialConnectionToolSummary,
 } from "@/lib/chat/agent-tool-part-types"
+import { consumePendingTemplateHandoff } from "@/lib/templates/handoff"
 
 /** Serializable thread row for mobile history (matches ChatThreadListItem). */
 type MobileChatThreadListItem = {
@@ -253,6 +254,7 @@ export function CreativeAgentChat({
   const onboardingBootstrapInFlightRef = React.useRef(false)
   const onboardingHandoffPendingRef = React.useRef(false)
   const onboardingBootstrapCompletedRef = React.useRef(false)
+  const templateHandoffCompletedRef = React.useRef(false)
   const chatGatewayModelRef = React.useRef<string>(DEFAULT_CHAT_GATEWAY_MODEL)
   const [chatGatewayModelId, setChatGatewayModelId] = React.useState<string>(DEFAULT_CHAT_GATEWAY_MODEL)
   /** One `router.refresh()` per thread ID so sidebar thread titles reflect async intent renaming. */
@@ -558,6 +560,7 @@ export function CreativeAgentChat({
     }
 
     syncedInitialThreadIdRef.current = initialThreadId
+    templateHandoffCompletedRef.current = false
     setMessages(initialMessages)
   }, [enablePersistence, initialMessages, initialThreadId, setMessages])
 
@@ -588,6 +591,7 @@ export function CreativeAgentChat({
     onboardingBootstrapInFlightRef.current = false
     onboardingHandoffPendingRef.current = false
     onboardingBootstrapCompletedRef.current = false
+    templateHandoffCompletedRef.current = false
     onThreadIdChange?.(undefined)
 
     if (fileInputRef.current) {
@@ -601,6 +605,34 @@ export function CreativeAgentChat({
     onboardingBootstrapInFlightRef.current = false
     onboardingBootstrapCompletedRef.current = false
   }, [onboardingToken])
+
+  React.useEffect(() => {
+    if (!enablePersistence || !initialThreadId || !userId) return
+    if (templateHandoffCompletedRef.current) return
+    if (messages.length > 0) return
+    if (status === "submitted" || status === "streaming") return
+    if (isBootstrappingOnboarding || isCreatingThread) return
+
+    const handoff = consumePendingTemplateHandoff(initialThreadId)
+    if (!handoff) return
+
+    templateHandoffCompletedRef.current = true
+    threadIdRef.current = initialThreadId
+
+    void sendMessage({
+      role: handoff.openingMessage.role,
+      parts: handoff.openingMessage.parts,
+    })
+  }, [
+    enablePersistence,
+    initialThreadId,
+    isBootstrappingOnboarding,
+    isCreatingThread,
+    messages.length,
+    sendMessage,
+    status,
+    userId,
+  ])
 
   const handleAttachFiles = React.useCallback(async (files: File[]) => {
     if (files.length === 0) return

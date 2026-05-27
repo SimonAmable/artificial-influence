@@ -15,6 +15,8 @@ export const TRACE_COT_TOOLS = {
     "tool-searchWebImages",
     "tool-searchStockReferences",
     "tool-capturePageScreenshot",
+    "tool-analyzeMedia",
+    "tool-downloadSocialReference",
   ],
   catalog: ["tool-listModels", "tool-searchModels", "tool-searchVoices"],
   social: ["tool-listSocialConnections", "tool-listInstagramConnections"],
@@ -198,6 +200,29 @@ export function getTraceToolStepMeta(part: UIMessage["parts"][number]): TraceToo
           hostnameFromUrl(
             tool.output?.screenshot && (tool.output.screenshot as { sourceUrl?: string }).sourceUrl,
           ) ?? hostnameFromUrl(tool.input?.url),
+        status,
+      }
+    case "tool-analyzeMedia": {
+      const imageCount =
+        typeof tool.output?.imageCount === "number" ? tool.output.imageCount : undefined
+      const focus = typeof tool.input?.focus === "string" ? tool.input.focus : undefined
+      return {
+        label: "Analyze media",
+        description:
+          imageCount !== undefined
+            ? `${formatCount(imageCount, "image")}${focus ? ` · ${focus}` : ""}`
+            : truncateQuery(tool.output?.summary ?? tool.input?.focus),
+        status,
+      }
+    }
+    case "tool-downloadSocialReference":
+      return {
+        label: "Download social reference",
+        description:
+          hostnameFromUrl(tool.input?.url) ??
+          (typeof tool.output?.outputMediaKind === "string"
+            ? tool.output.outputMediaKind
+            : undefined),
         status,
       }
     case "tool-listModels":

@@ -8,6 +8,7 @@ import {
   createAIGatewayProvider,
   hasAIGatewayCredentials,
 } from "@/lib/ai/gateway"
+import { isTemplateHiddenContextText } from "@/lib/templates/prompt-filler"
 
 /** Fast model via AI Gateway — override with THREAD_TITLE_GATEWAY_MODEL when needed. */
 const DEFAULT_THREAD_TITLE_GATEWAY_MODEL = "google/gemini-2.5-flash" as const
@@ -34,6 +35,9 @@ export function plaintextFromFirstUserMessageForIntentTitle(message: UIMessage |
 
   for (const part of message.parts) {
     if (part.type === "text" && typeof part.text === "string") {
+      if (isTemplateHiddenContextText(part.text)) {
+        continue
+      }
       const t = part.text.replace(/\s+/g, " ").trim()
       if (t.length > 0) {
         chunks.push(t)

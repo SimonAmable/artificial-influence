@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { isTemplateHiddenContextText } from "@/lib/templates/prompt-filler"
 import { cn } from "@/lib/utils"
 import type { UIMessage } from "ai"
 import { ArrowDownIcon, DownloadIcon } from "lucide-react"
@@ -97,7 +98,10 @@ export const ConversationScrollButton = ({
 
 const getMessageText = (message: UIMessage): string =>
   message.parts
-    .filter((part) => part.type === "text")
+    .filter(
+      (part): part is Extract<UIMessage["parts"][number], { type: "text" }> =>
+        part.type === "text" && !isTemplateHiddenContextText(part.text),
+    )
     .map((part) => part.text)
     .join("")
 
