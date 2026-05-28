@@ -29,6 +29,7 @@ export type FeedbackSettingsPanelProps = {
   onCancel?: () => void
   open?: boolean
   initialFeedbackType?: FeedbackType
+  hideFeedbackType?: boolean
 }
 
 const DEFAULT_FEEDBACK_TYPE: FeedbackType = "general"
@@ -62,10 +63,10 @@ const FEEDBACK_COPY: Record<
     messagePlaceholder: "Tell us what should be improved and how you would change it...",
   },
   template_request: {
-    description: "Request a new template based on a trend, format, or reference you want us to turn into a reusable flow. We will research and recreate the trend into a easy to use tool for you in under 24 hours fo FREE!",
-    messageLabel: "Template request details",
+    description: "Share a trend, format, or reference you want turned into a template.",
+    messageLabel: "What should we make?",
     messagePlaceholder:
-      "Ask for a trend you want turned into a template, or share an AI trend/link you want us to copy. Include the hook, format, visual style, or any notes that would help.",
+      "Describe the hook, format, or visual style you want.",
   },
 }
 
@@ -75,6 +76,7 @@ export function FeedbackSettingsPanel({
   onCancel,
   open,
   initialFeedbackType = DEFAULT_FEEDBACK_TYPE,
+  hideFeedbackType = false,
 }: FeedbackSettingsPanelProps) {
   const [feedbackType, setFeedbackType] = React.useState<FeedbackType>(initialFeedbackType)
   const [message, setMessage] = React.useState("")
@@ -139,27 +141,29 @@ export function FeedbackSettingsPanel({
       </p>
 
       <div className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor={typeId}>Feedback type</Label>
-          <Select value={feedbackType} onValueChange={(value) => setFeedbackType(value as FeedbackType)}>
-            <SelectTrigger id={typeId} className="w-full">
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="general">General Feedback</SelectItem>
-              <SelectItem value="bug">Bug Report</SelectItem>
-              <SelectItem value="feature">Feature Request</SelectItem>
-              <SelectItem value="improvement">Improvement Suggestion</SelectItem>
-              <SelectItem value="template_request">Template Request</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {hideFeedbackType ? null : (
+          <div className="grid gap-2">
+            <Label htmlFor={typeId}>Feedback type</Label>
+            <Select value={feedbackType} onValueChange={(value) => setFeedbackType(value as FeedbackType)}>
+              <SelectTrigger id={typeId} className="w-full">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="general">General Feedback</SelectItem>
+                <SelectItem value="bug">Bug Report</SelectItem>
+                <SelectItem value="feature">Feature Request</SelectItem>
+                <SelectItem value="improvement">Improvement Suggestion</SelectItem>
+                <SelectItem value="template_request">Template Request</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         {isTemplateRequest ? (
           <div className="grid gap-2">
-            <Label htmlFor={tiktokLinksId}>TikTok trend links</Label>
+            <Label htmlFor={tiktokLinksId}>Example links</Label>
             <Textarea
               id={tiktokLinksId}
-              placeholder="Paste one or more TikTok links to the trends you want us to study or turn into a template."
+              placeholder="Paste TikTok links or references."
               value={tiktokLinks}
               onChange={(e) => setTiktokLinks(e.target.value)}
               className="min-h-[96px] w-full resize-none"
@@ -191,7 +195,7 @@ export function FeedbackSettingsPanel({
           </Button>
         ) : null}
         <Button type="submit" disabled={isSubmitting} className={isModal ? "rounded-full" : undefined}>
-          {isSubmitting ? "Submitting..." : "Submit feedback"}
+          {isSubmitting ? "Submitting..." : isTemplateRequest ? "Send request" : "Submit feedback"}
         </Button>
       </div>
     </form>

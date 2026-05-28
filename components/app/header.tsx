@@ -8,6 +8,7 @@ import {
   User,
   CaretDownIcon,
   Coin,
+  FolderSimple,
 } from "@phosphor-icons/react"
 
 import { MegaNavItemBody, MenuBadge } from "@/components/app/mega-nav-item-body"
@@ -21,7 +22,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -116,15 +116,7 @@ export function Header() {
     layoutModeContext
   const [openGroupLabel, setOpenGroupLabel] = React.useState<string | null>(null)
   const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [assetsMenuOpen, setAssetsMenuOpen] = React.useState(false)
-  const assetsCloseTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const supportsHoverDropdowns = useFinePointerHoverDevice()
-
-  const assetsMegaGroup = React.useMemo(
-    () => megaNavGroups.find((group) => group.label === "Assets"),
-    []
-  )
-  const assetsMenuItems = assetsMegaGroup?.simpleItems ?? []
 
   // Scroll detection
   React.useEffect(() => {
@@ -222,28 +214,6 @@ export function Header() {
     return () => {
       if (closeTimeoutRef.current) {
         clearTimeout(closeTimeoutRef.current)
-      }
-    }
-  }, [])
-
-  const clearAssetsCloseTimer = React.useCallback(() => {
-    if (!assetsCloseTimeoutRef.current) return
-    clearTimeout(assetsCloseTimeoutRef.current)
-    assetsCloseTimeoutRef.current = null
-  }, [])
-
-  const scheduleAssetsClose = React.useCallback(() => {
-    clearAssetsCloseTimer()
-    assetsCloseTimeoutRef.current = setTimeout(() => {
-      setAssetsMenuOpen(false)
-      assetsCloseTimeoutRef.current = null
-    }, 180)
-  }, [clearAssetsCloseTimer])
-
-  React.useEffect(() => {
-    return () => {
-      if (assetsCloseTimeoutRef.current) {
-        clearTimeout(assetsCloseTimeoutRef.current)
       }
     }
   }, [])
@@ -428,70 +398,18 @@ export function Header() {
                   />
                 )}
               </button>
-              <DropdownMenu
-                open={assetsMenuOpen}
-                onOpenChange={(open) => {
-                  if (!open) {
-                    clearAssetsCloseTimer()
-                    setAssetsMenuOpen(false)
-                  } else {
-                    setAssetsMenuOpen(true)
-                  }
-                }}
+              <Button
+                variant="secondary"
+                asChild
+                className={cn(
+                  "size-9 rounded-full border border-border/70 bg-secondary/40 p-0 text-foreground shadow-sm transition-colors hover:bg-secondary/70 hover:text-foreground",
+                  pathname === "/history" && "bg-secondary/70"
+                )}
               >
-                <DropdownMenuTrigger asChild>
-                  {supportsHoverDropdowns ? (
-                    <Button
-                      variant="secondary"
-                      asChild
-                      className={signedInHeaderPillClassName}
-                      onPointerEnter={() => {
-                        clearAssetsCloseTimer()
-                        setAssetsMenuOpen(true)
-                      }}
-                      onPointerLeave={scheduleAssetsClose}
-                    >
-                      <Link href="/assets">Assets</Link>
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className={signedInHeaderPillClassName}
-                      aria-expanded={assetsMenuOpen}
-                    >
-                      Assets
-                    </Button>
-                  )}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-80 p-3"
-                  onPointerEnter={() => {
-                    if (!supportsHoverDropdowns) return
-                    clearAssetsCloseTimer()
-                    setAssetsMenuOpen(true)
-                  }}
-                  onPointerLeave={() => {
-                    if (!supportsHoverDropdowns) return
-                    scheduleAssetsClose()
-                  }}
-                >
-                  <div className="space-y-1">
-                    {assetsMenuItems.map((item) => (
-                      <HeaderMenuItem
-                        key={item.path}
-                        item={item}
-                        onSelect={(path) => {
-                          clearAssetsCloseTimer()
-                          setAssetsMenuOpen(false)
-                          router.push(path)
-                        }}
-                      />
-                    ))}
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                <Link href="/history" aria-label="Open history" className="inline-flex items-center justify-center">
+                  <FolderSimple className="h-4 w-4 shrink-0 text-muted-foreground" weight="duotone" />
+                </Link>
+              </Button>
               <Button
                 type="button"
                 variant="outline"

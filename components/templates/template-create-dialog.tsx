@@ -95,6 +95,7 @@ export function TemplateCreateDialog({ currentUserId }: TemplateCreateDialogProp
           title="Request a Template"
           description="Share the trend or reference you want turned into a reusable template."
           initialFeedbackType="template_request"
+          hideFeedbackType
         />
       ) : null}
     </>

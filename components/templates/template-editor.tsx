@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { CircleNotch, FilePlus, FolderOpen, Plus, Trash, Image as ImageIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 import type {
+  OutputKind,
   Template,
   TemplateCategory,
   TemplateInput,
@@ -15,9 +16,9 @@ import type {
 import {
   TEMPLATE_CATEGORIES,
   CATEGORY_LABELS,
-  OUTPUT_KIND_LABELS,
   buildTemplateSlug,
-  guessCreditsCost,
+  guessCreditsCostForCategory,
+  outputKindForCategory,
 } from "@/lib/templates/types"
 import {
   assignInputIds,
@@ -57,9 +58,6 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
-
-const CREATOR_OUTPUT_KINDS = ["image", "video", "audio"] as const
-type TemplateEditorOutputKind = (typeof CREATOR_OUTPUT_KINDS)[number]
 
 const ADD_INPUT_KINDS: TemplateInputKind[] = [
   "image",
@@ -115,13 +113,6 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
   const [tips, setTips] = React.useState(initial?.tips ?? "")
   const [prompt, setPrompt] = React.useState(initial?.prompt ?? "")
   const [category, setCategory] = React.useState<TemplateCategory>(initial?.category ?? "photo")
-  const [outputKind, setOutputKind] = React.useState<TemplateEditorOutputKind>(
-    initial?.output_kind === "image" ||
-      initial?.output_kind === "video" ||
-      initial?.output_kind === "audio"
-      ? initial.output_kind
-      : "image",
-  )
   const [draftInputs, setDraftInputs] = React.useState<DraftTemplateInput[]>(() =>
     initial?.inputs
       ? initial.inputs.map((input) => ({ ...input } as DraftTemplateInput))
@@ -144,6 +135,7 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
   const [isUploadingThumb, setIsUploadingThumb] = React.useState(false)
   const [isUploadingPromptAttachment, setIsUploadingPromptAttachment] = React.useState(false)
   const [promptAssetModalOpen, setPromptAssetModalOpen] = React.useState(false)
+  const thumbnailInputRef = React.useRef<HTMLInputElement | null>(null)
   const promptAttachmentInputRef = React.useRef<HTMLInputElement | null>(null)
 
   const resolvedInputs = React.useMemo(
@@ -151,9 +143,11 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
     [draftInputs],
   )
 
+  const outputKind = React.useMemo<OutputKind>(() => outputKindForCategory(category), [category])
+
   const creditsCost = initial?.credits_cost_locked
-    ? (initial.credits_cost ?? guessCreditsCost(outputKind))
-    : guessCreditsCost(outputKind)
+    ? (initial.credits_cost ?? guessCreditsCostForCategory(category))
+    : guessCreditsCostForCategory(category)
 
   const previewTemplate: Template = {
     id: initial?.id ?? "preview",
@@ -186,7 +180,6 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
     setPrompt(normalized.prompt)
     setPromptAttachments(normalized.prompt_attachments.map((attachment) => ({ ...attachment })))
     setCategory(normalized.category)
-    setOutputKind(normalized.output_kind)
     setDraftInputs(normalized.inputs)
     setVisibility(normalized.visibility)
     setThumbnailUrl(normalized.thumbnail_url)
@@ -232,6 +225,12 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
       setIsUploadingThumb(false)
     }
   }
+
+  const handleThumbnailFileChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (file) void handleThumbnailUpload(file)
+  }, [])
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -436,10 +435,8 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>
-              Cover media {visibility === "public" ? "(required for public templates)" : "(optional)"}
-            </Label>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <Label>Gallery cover (image or video)</Label>
+            <div className="hidden flex-col gap-3 sm:flex-row sm:items-start">
               <div
                 className={cn(
                   "relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted/30",
@@ -476,40 +473,77 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
                 </p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => thumbnailInputRef.current?.click()}
+              disabled={isUploadingThumb}
+              className={cn(
+                "group relative flex min-h-28 w-full items-center overflow-hidden rounded-2xl border bg-muted/20 text-left transition-colors hover:border-foreground/30",
+                !thumbnailUrl && "border-dashed",
+                isUploadingThumb && "cursor-wait opacity-80",
+              )}
+            >
+              <input
+                ref={thumbnailInputRef}
+                type="file"
+                accept="image/*,video/*"
+                className="sr-only"
+                onChange={handleThumbnailFileChange}
+              />
+              {thumbnailUrl ? (
+                <>
+                  {thumbnailKind === "video" ? (
+                    <video src={thumbnailUrl} className="absolute inset-0 h-full w-full object-contain" muted />
+                  ) : (
+                    <img src={thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-contain" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/25 to-black/40" />
+                  <div className="relative flex w-full items-end justify-between gap-3 p-4 text-white">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">{thumbnailKind === "video" ? "Video cover" : "Image cover"}</p>
+                      <p className="text-xs text-white/80">Click to replace</p>
+                    </div>
+                    <Badge variant="secondary" className="bg-black/50 text-white backdrop-blur-sm">
+                      Change
+                    </Badge>
+                  </div>
+                </>
+              ) : (
+                <div className="flex w-full items-center gap-4 p-4">
+                  <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-dashed border-border/70 bg-background/80">
+                    {isUploadingThumb ? (
+                      <CircleNotch className="size-6 animate-spin text-muted-foreground" weight="bold" />
+                    ) : (
+                      <ImageIcon className="size-7 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      {isUploadingThumb ? "Uploading cover..." : "Click to upload a gallery cover"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Keep it simple and easy to recognize.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </button>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Select value={category} onValueChange={(v) => setCategory(v as TemplateCategory)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TEMPLATE_CATEGORIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {CATEGORY_LABELS[c]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Creates</Label>
-              <Select value={outputKind} onValueChange={(v) => setOutputKind(v as TemplateEditorOutputKind)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CREATOR_OUTPUT_KINDS.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {OUTPUT_KIND_LABELS[k]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>Category</Label>
+            <Select value={category} onValueChange={(v) => setCategory(v as TemplateCategory)}>
+              <SelectTrigger className="max-w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TEMPLATE_CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {CATEGORY_LABELS[c]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center justify-between rounded-xl border px-4 py-3">
@@ -531,7 +565,7 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Estimated cost: ~{creditsCost} credits (updates automatically after the first run).
+              Estimated cost for {CATEGORY_LABELS[category].toLowerCase()}: ~{creditsCost} credits.
             </p>
           )}
         </section>
@@ -753,12 +787,12 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
           )}
         </section>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-3">
           {isEdit ? (
             <Button
               type="button"
               variant="destructive"
-              className="h-12 rounded-full sm:w-auto"
+              className="hidden h-12 rounded-full sm:w-auto"
               disabled={isSaving || isDeleting}
               onClick={() => void handleDelete()}
             >
@@ -792,6 +826,27 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
               "Create template"
             )}
           </Button>
+          {isEdit ? (
+            <Button
+              type="button"
+              variant="destructive"
+              className="h-12 w-full rounded-full"
+              disabled={isSaving || isDeleting}
+              onClick={() => void handleDelete()}
+            >
+              {isDeleting ? (
+                <>
+                  <CircleNotch className="mr-2 size-4 animate-spin" weight="bold" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash className="mr-2 size-4" />
+                  Delete template
+                </>
+              )}
+            </Button>
+          ) : null}
         </div>
 
         <Button className="hidden w-full rounded-full h-12" disabled={isSaving} onClick={() => void handleSave()}>

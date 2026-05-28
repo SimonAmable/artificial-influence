@@ -180,6 +180,20 @@ export function guessCreditsCost(outputKind: OutputKind): number {
   return OUTPUT_KIND_CREDIT_HEURISTICS[outputKind] ?? 10
 }
 
+export const CATEGORY_OUTPUT_KIND: Record<TemplateCategory, OutputKind> = {
+  photo: "image",
+  video: "video",
+  slideshow: "slideshow",
+}
+
+export function outputKindForCategory(category: TemplateCategory): OutputKind {
+  return CATEGORY_OUTPUT_KIND[category]
+}
+
+export function guessCreditsCostForCategory(category: TemplateCategory): number {
+  return guessCreditsCost(outputKindForCategory(category))
+}
+
 export function buildTemplateSlug(title: string): string {
   return (
     title
