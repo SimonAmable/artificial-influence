@@ -69,7 +69,6 @@ import {
 const STANDALONE_GROUP_ICON: Record<string, typeof ImageIcon> = {
   "/audio": MicrophoneIcon,
   "/canvases": FlowArrow,
-  "/apps": SquaresFour,
   "/autopost": PaperPlaneTilt,
   "/pricing": CurrencyDollar,
   "/brand": Palette,

@@ -48,7 +48,7 @@ export function TemplatesGallery({ templates, currentUserId }: TemplatesGalleryP
     () => filtered.filter((template) => template.creator_id !== currentUserId),
     [currentUserId, filtered],
   )
-  const popular = publicTemplates.slice(0, 8)
+  const popular = filtered.slice(0, 8)
   const [recentThreshold] = React.useState(
     () => Date.now() - 7 * 24 * 60 * 60 * 1000,
   )
@@ -157,11 +157,11 @@ export function TemplatesGallery({ templates, currentUserId }: TemplatesGalleryP
             </section>
           ) : null}
 
-          {publicTemplates.length > 0 ? (
+          {filtered.length > 0 ? (
             <section className="mt-10">
               <h2 className="mb-4 text-lg font-bold">All templates</h2>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5">
-                {publicTemplates.map((template) => (
+                {filtered.map((template) => (
                   <TemplateCard
                     key={template.id}
                     template={template}

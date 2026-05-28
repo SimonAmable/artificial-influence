@@ -28,6 +28,7 @@ export type MegaNavPhosphorIcon =
   | "microphone"
   | "chat-circle-dots"
   | "robot"
+  | "paper-plane-tilt"
   | "shield-check"
   | "magnifying-glass"
   | "download-simple"
@@ -83,6 +84,8 @@ export interface DashboardToolNavItem {
 const baseNavigationItems: NavigationItem[] = [
   { path: "/", label: "Home" },
   { path: "/chat", label: "Agent" },
+  { path: "/templates", label: "Templates" },
+  { path: "/autopost", label: "Autopost" },
   { path: "/image", label: "Image" },
   { path: "/video", label: "Video" },
   { path: "/audio", label: "Audio" },
@@ -92,9 +95,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/inpaint", label: "Image Editing" },
   { path: "/character-swap", label: "Character Swap" },
   { path: "/canvases", label: "Canvas" },
-  { path: "/apps", label: "Apps" },
   { path: "/editor", label: "Editor" },
-  { path: "/autopost", label: "Autopost" },
   { path: "/history", label: "History" },
   { path: "/assets", label: "Assets" },
   { path: "/resources", label: "Resources" },
@@ -161,6 +162,13 @@ export const megaNavGroups: MegaNavGroup[] = [
         description: "Browse reusable creation workflows and manage your own templates",
         badge: "new",
         iconPhosphor: "flow-arrow",
+      },
+      {
+        path: "/autopost",
+        label: "Autopost",
+        description: "Schedule and publish your generated content",
+        badge: "new",
+        iconPhosphor: "paper-plane-tilt",
       },
     ],
   },
@@ -426,8 +434,6 @@ export const megaNavGroups: MegaNavGroup[] = [
       },
     ],
   },
-  { label: "Apps", path: "/apps" },
-  { label: "Autopost", path: "/autopost", badge: "new" },
   { label: "Pricing", path: "/pricing" },
 ]
 
@@ -529,6 +535,18 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     hint: "Set up automated creation and posting workflows.",
   },
   {
+    label: "Templates",
+    href: "/templates",
+    icon: "flow-arrow",
+    hint: "Browse reusable workflows and launch your own template runs.",
+  },
+  {
+    label: "Autopost",
+    href: "/autopost",
+    icon: "palette",
+    hint: "Schedule and publish your generated content.",
+  },
+  {
     label: "Image Studio",
     href: "/image",
     icon: "image",
@@ -583,22 +601,10 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     hint: "Node-based pipelines and canvas projects.",
   },
   {
-    label: "Apps",
-    href: "/apps",
-    icon: "squares-four",
-    hint: "Explore ready-made AI apps and tools.",
-  },
-  {
     label: "Video Editor",
     href: "/editor",
     icon: "video",
     hint: "Edit and assemble AI videos on a timeline.",
-  },
-  {
-    label: "Autopost",
-    href: "/autopost",
-    icon: "palette",
-    hint: "Schedule and publish your generated content.",
   },
   {
     label: "History",

@@ -207,9 +207,12 @@ ${onboardingContext}
 </execution_rules>
 
 <prompt_capabilities>
-- **Text in images:** Do not refuse or claim unsupported. For posters, ads, thumbnails, logos, captions, or packaging, ask for **exact wording** when missing; put quoted copy plus typography and placement in the tool \`prompt\` (or \`text_in_image\` inside JSON briefs).
-- **JSON in tool \`prompt\`:** **generateImage** and Nano Banana accept stringified JSON creative briefs — use them freely when appropriate. User-supplied JSON → pass whole string + \`rawPrompt: true\`. Vague generate-now asks → you may compose JSON into \`prompt\` (Expand) unless Literal triggers apply. Do not insist on prose-only or strip JSON unless they asked for a shorter plain prompt.
+- **Text in images:** Do not refuse or claim unsupported. GPT Image 2 and Nano Banana 2 are strong default choices for readable text in generated images. For posters, ads, thumbnails, logos, captions, or packaging, ask for **exact wording** when missing; put quoted copy plus typography and placement in the tool \`prompt\` (or \`text_in_image\` inside JSON briefs).
+- **JSON in tool \`prompt\`:** **generateImage** and Nano Banana accept stringified JSON creative briefs -- use them freely when appropriate. User-supplied JSON -> pass whole string + \`rawPrompt: true\`. Vague generate-now asks -> you may compose JSON into \`prompt\` (Expand) unless Literal triggers apply. Do not insist on prose-only or strip JSON unless they asked for a shorter plain prompt.
 - **Video:** Pass detailed or structured scene briefs verbatim in **generateVideo** \`prompt\` when the user supplied them; motion-copy-with-references-only jobs may omit prompt unless they provided text.
+- **Multi-shot video:** Seedance 2.0 and Kling 3.0 can handle multi-scene generation in one run. Treat Seedance 2.0 as the primary high-quality multi-shot recommendation; use Seedance 2.0 Fast when speed is prioritized.
+- **Seedance reference tags:** When using Seedance references, label assets in prompt text as \`[Image1]\`, \`[Video1]\`, \`[Audio1]\` based on attachment order (then increment index). For spoken lines, keep dialogue in double quotes.
+- **Video audio:** Allow sound prompting (music, SFX, ambience, dialogue) on video models. If user says audio quality is the top priority, prefer attaching reference audio when available, while still allowing native audio generation when references are not provided.
 </prompt_capabilities>
 
 <user_facing_voice>
@@ -235,6 +238,8 @@ ${onboardingContext}
 - Use searchWeb to find source links, readWebPage to inspect one URL, searchWebImages for license-unverified visual inspiration, searchStockReferences for live external meme/GIF/sticker and future stock-provider search, and capturePageScreenshot only when the user explicitly asks for a screenshot or page capture. Default screenshots to viewport capture unless the user asks for full page.
 - Use **downloadSocialReference** when the user shares a TikTok or Instagram post URL as a reference. For analysis or recreation of that media, call **analyzeMedia** on the returned storage URLs (slideshow: pass **outputPublicUrls**). Do not use **generateImage** for analysis-only requests.
 - Use **analyzeMedia** when the user asks to analyze, describe, or break down image references—including thread uploads (**listThreadMedia** first when ids are unclear), transcript refs, public image URLs, or downloaded social slideshow stills. Video posts are not analyzed directly yet; use **extractVideoFrames** first if needed.
+- For "copy this TikTok dance/video with my own influencer" requests, do **not** jump straight to Kling motion control from a loose portrait/headshot unless the user already has a strong start frame of the influencer in the target scene and pose. Preferred order: **extractVideoFrames** on the source clip to get the opening or cleanest anchor frame, create a face-swap or character-swap still so the influencer is already in that frame, optionally do one cleanup still pass if identity is weak, then use **generateVideo** with Kling to drive motion from the source clip using that swapped still as the image reference.
+- For high-quality multi-shot requests, default to **bytedance/seedance-2.0** unless the user explicitly asks for a different video model or prioritizes speed over quality.
 - Use composeTimelineVideo when the user wants a cut-together deliverable from existing thread media rather than newly generated motion. Sequence visual **segments** in order, use **durationSeconds** to control image/GIF pacing, **trimStartSeconds** / **trimEndSeconds** to isolate the useful moment of a video clip, and optional **audioSegments** with **startAtSeconds** / **durationSeconds** when the user wants music, narration, or a soundtrack bed.
 - Prefer one generation tool plus only the support tools actually needed for the turn.
 </tool_routing>
@@ -428,3 +433,4 @@ export function createCreativeAgent({
     tools,
   })
 }
+
