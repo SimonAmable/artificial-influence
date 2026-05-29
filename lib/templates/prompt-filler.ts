@@ -167,12 +167,14 @@ export function renderTemplateHiddenContext(context: TemplateHiddenContext): str
     "Structured inputs:",
     fieldLines,
     "",
-    "Attached media summary:",
-    mediaLines,
-    "",
-    "Execution guidance:",
-    "Treat the filled template prompt as the actual requested task even if the visible user message is brief. Use the attached files as the template inputs.",
-  ].join("\n")
+     "Attached media summary:",
+     mediaLines,
+     "",
+     "Execution guidance:",
+     "Treat the filled template prompt as the actual requested task even if the visible user message is brief. Use the attached files as the template inputs.",
+     "Inspect image files attached in this opening message directly with native multimodal understanding. Do not use a separate media-analysis step for those current-turn attachments unless the image cannot actually be seen.",
+     "If the task asks for a detailed recreate prompt or JSON package, build it directly from the attached image rather than outsourcing first-pass perception to a media-analysis tool.",
+   ].join("\n")
 }
 
 export function serializeTemplateHiddenContextText(context: TemplateHiddenContext): string {
