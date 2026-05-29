@@ -30,7 +30,7 @@ export function createAnalyzeMediaTool({
 
   return tool({
     description:
-      "Analyze one or more image references with vision and return structured observations (summary, subjects, composition, lighting, palette, mood, visible text, optional recreation guidance or prompt pack). Use when the user asks to analyze, describe, break down, or understand image references—including public https image URLs, transcript refs (ref_N), thread uploads/generations (upl_/gen_), or URLs returned by downloadSocialReference for slideshow posts. Do NOT use generateImage for analysis-only requests. Supports up to 8 images per call. Video analysis is not supported yet; for video references use extractVideoFrames first, then analyze the stills.",
+      "Second-pass structured vision analysis for one or more image references. Prefer native multimodal understanding first for images attached in the current user message. Use this tool when the image is referenced indirectly or is not natively visible in the current turn (public https image URLs, transcript refs, thread uploads/generations, downloadSocialReference outputs), or when the user explicitly wants a structured analysis artifact such as summary fields, recreation guidance, or a prompt pack. Do NOT use generateImage for analysis-only requests. Supports up to 8 images per call. Video analysis is not supported yet; for video references use extractVideoFrames first, then analyze the stills.",
     inputSchema: z.object({
       referenceIds: z
         .array(z.string().min(1))
