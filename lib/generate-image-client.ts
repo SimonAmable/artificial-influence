@@ -13,6 +13,34 @@ function makeInsufficientCreditsError(message: string): Error {
   return err;
 }
 
+type GenerateImageApiErrorDetails = {
+  status: number;
+  code?: string;
+  details?: string;
+};
+
+function makeApiError(
+  payload: { error?: unknown; message?: unknown; details?: unknown } | null | undefined,
+  fallbackMessage: string,
+  status: number
+): Error {
+  const message =
+    typeof payload?.message === 'string' && payload.message.trim().length > 0
+      ? payload.message
+      : typeof payload?.error === 'string' && payload.error.trim().length > 0
+        ? payload.error
+        : fallbackMessage;
+  const err = new Error(message) as Error & GenerateImageApiErrorDetails;
+  err.status = status;
+  if (typeof payload?.error === 'string' && payload.error.trim().length > 0) {
+    err.code = payload.error;
+  }
+  if (typeof payload?.details === 'string' && payload.details.trim().length > 0) {
+    err.details = payload.details;
+  }
+  return err;
+}
+
 /** Detect 402-style credit messages when only a string is available (e.g. canvas node error). */
 export function isInsufficientCreditsMessage(message: string): boolean {
   const t = message.trim();
@@ -27,6 +55,29 @@ export function isInsufficientCreditsMessage(message: string): boolean {
 /** Prefer over `instanceof`, safe across chunk splits; 402 errors use `name === 'InsufficientCreditsError'`. */
 export function isInsufficientCreditsError(err: unknown): boolean {
   return err instanceof Error && err.name === 'InsufficientCreditsError';
+}
+
+/** Content moderation errors can arrive as API metadata or only as provider text after polling. */
+export function isContentModerationError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+
+  const apiError = err as Error & GenerateImageApiErrorDetails;
+  const haystack = [err.name, err.message, apiError.code, apiError.details]
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .join(' ')
+    .toLowerCase();
+
+  return (
+    apiError.code === 'Content moderation' ||
+    haystack.includes('content moderation') ||
+    haystack.includes('content policy') ||
+    haystack.includes('flagged this request') ||
+    haystack.includes('flagged this image') ||
+    haystack.includes('violates our policy') ||
+    haystack.includes('violates our content policy') ||
+    haystack.includes('safety system') ||
+    haystack.includes('safety filter')
+  );
 }
 
 export type GenerateImageResult =
@@ -85,7 +136,7 @@ export async function generateImageAndWait(
 
   if (!response.ok) {
     const d = await response.json();
-    throw new Error(d.message || d.error || 'Failed to generate image');
+    throw makeApiError(d, 'Failed to generate image', response.status);
   }
 
   const data = await response.json();

@@ -14,7 +14,6 @@ import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Slider } from "@/components/ui/slider"
 import { ImagePromptFields } from "./image-prompt-fields"
 import { ImageEnhanceSwitch } from "./image-enhance-switch"
 import {
@@ -103,6 +102,12 @@ interface InfluencerInputBoxProps {
 }
 
 const QUALITY_IMAGE_PARAMETER_NAMES = new Set(["quality", "output_quality"])
+
+function shouldShowImageQualitySelector(modelIdentifier: string | null | undefined) {
+  if (!modelIdentifier) return false
+  const normalized = modelIdentifier.toLowerCase()
+  return normalized.includes("nano-banana") || normalized.includes("gpt-image")
+}
 
 function formatQualityOptionLabel(paramName: string, option: string): string {
   if (paramName !== "quality") return option
@@ -501,9 +506,17 @@ export function InfluencerInputBox({
   const selectedQualityParameters = React.useMemo(() => {
     if (!selectedModelObject) return []
 
-    return parseModelParameters(selectedModelObject.parameters).filter((param) =>
-      QUALITY_IMAGE_PARAMETER_NAMES.has(param.name)
-    )
+    return parseModelParameters(selectedModelObject.parameters).filter((param) => {
+      if (!QUALITY_IMAGE_PARAMETER_NAMES.has(param.name)) {
+        return false
+      }
+
+      if (param.name === "output_quality") {
+        return false
+      }
+
+      return param.name === "quality" && shouldShowImageQualitySelector(selectedModelObject.identifier)
+    })
   }, [selectedModelObject])
 
   // Determine if button is ready (prompt must not be empty)
@@ -852,43 +865,6 @@ export function InfluencerInputBox({
                     ))}
                   </SelectContent>
                 </Select>
-              )
-            }
-
-            if (param.ui_type === "slider" && param.type === "number") {
-              const sliderValue =
-                typeof value === "number"
-                  ? value
-                  : typeof param.default === "number"
-                    ? param.default
-                    : typeof param.min === "number"
-                      ? param.min
-                      : 0
-
-              return (
-                <div
-                  key={param.name}
-                  className="flex h-7 items-center gap-2 rounded-[28px] border border-border bg-muted/30 px-2.5"
-                >
-                  <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">
-                    {param.label}
-                  </span>
-                  <Slider
-                    min={param.min}
-                    max={param.max}
-                    step={param.step || 1}
-                    value={[sliderValue]}
-                    onValueChange={([nextValue]) =>
-                      onModelParametersChange({
-                        ...(modelParameters ?? {}),
-                        [param.name]: nextValue,
-                      })
-                    }
-                    className="w-20"
-                    disabled={!allowOptionsDuringGeneration && isGenerating}
-                  />
-                  <span className="text-[11px] font-semibold tabular-nums">{sliderValue}</span>
-                </div>
               )
             }
 

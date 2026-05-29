@@ -19,6 +19,7 @@ import { consumeImageGenerationIntent } from "@/lib/image/image-generation-inten
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import {
   type GenerateImageAcceptedPayload,
+  isContentModerationError,
   isInsufficientCreditsError,
   isInsufficientCreditsMessage,
 } from "@/lib/generate-image-client"
@@ -73,6 +74,12 @@ interface PendingImageRequest {
 
 const QUALITY_IMAGE_PARAMETER_NAMES = new Set(["quality", "output_quality"])
 
+function shouldShowImageQualitySelector(modelIdentifier: string | null | undefined) {
+  if (!modelIdentifier) return false
+  const normalized = modelIdentifier.toLowerCase()
+  return normalized.includes("nano-banana") || normalized.includes("gpt-image")
+}
+
 function getQualityModelParameters(model: Model | null): ModelInputValues {
   if (!model) return {}
 
@@ -81,7 +88,15 @@ function getQualityModelParameters(model: Model | null): ModelInputValues {
       return acc
     }
 
-    acc[param.name] = getParameterDefault(param)
+    if (param.name === "output_quality") {
+      acc[param.name] = 100
+      return acc
+    }
+
+    if (param.name === "quality" && shouldShowImageQualitySelector(model.identifier)) {
+      acc[param.name] = getParameterDefault(param)
+    }
+
     return acc
   }, {})
 }
@@ -138,6 +153,26 @@ function mergeRemoteHistoryWithLocal(
   }
 
   return out
+}
+
+function normalizeModerationFailureMessage(message: string) {
+  const trimmed = message.trim()
+  if (!trimmed) {
+    return "The AI model flagged this request. Try adjusting your prompt or reference images."
+  }
+
+  if (/try\s+/i.test(trimmed)) {
+    return trimmed
+  }
+
+  return `${trimmed} Try adjusting your prompt or reference images.`
+}
+
+function showImageModerationToast(message: string) {
+  toast.error("Generation blocked by moderation", {
+    id: "image-moderation-error",
+    description: `${normalizeModerationFailureMessage(message)} You were not charged, and if any credits were temporarily held they'll be refunded automatically.`,
+  })
 }
 
 const CHARACTER_SWAP_UI_MODEL_IDENTIFIER = "custom/character-swap"
@@ -636,6 +671,7 @@ function ImagePageContent() {
       const message = err instanceof Error ? err.message : 'Failed to generate image'
       const isCredits =
         isInsufficientCreditsError(err) || isInsufficientCreditsMessage(message)
+      const isModeration = isContentModerationError(err)
       if (!isCredits) {
         console.error('Error generating image:', err)
       }
@@ -650,6 +686,10 @@ function ImagePageContent() {
         toast.error('Too many active generations', {
           description: `${message} Wait for one to finish, then try again.`,
         })
+      } else if (isModeration) {
+        const normalizedMessage = normalizeModerationFailureMessage(message)
+        showImageModerationToast(message)
+        setError(normalizedMessage)
       } else {
         setError(message)
       }

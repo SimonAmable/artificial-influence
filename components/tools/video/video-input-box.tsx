@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, FilePlus, X, Sparkle, Check, Waveform } from "@phosphor-icons/react"
+import { Plus, FilePlus, X, Sparkle, Check, Waveform, CircleNotch } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import type { Model } from "@/lib/types/models"
 import { PhotoUpload, ImageUpload } from "@/components/shared/upload/photo-upload"
@@ -37,8 +37,6 @@ import {
   isSupportedVideoReferenceAudioFile,
 } from "@/lib/utils/video-reference-audio"
 import { toast } from "sonner"
-import { GenerationLoadingSlots } from "@/components/shared/display/generation-loading-slots"
-
 interface VideoInputBoxProps {
   className?: string
   videoModels: Model[]
@@ -680,15 +678,16 @@ export function VideoInputBox({
           <div className="flex flex-col items-center gap-0.5">
             <span className="text-sm font-semibold">
               {isGenerating && displayGenerationSlotCount > 0 ? (
-                <span className="inline-flex flex-wrap items-center justify-center gap-2">
-                  <GenerationLoadingSlots
-                    count={displayGenerationSlotCount}
-                    tone="video"
-                    maxVisible={6}
-                  />
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <CircleNotch className="size-3.5 shrink-0 animate-spin" aria-hidden />
                   <span className="whitespace-nowrap">
                     {allowConcurrent ? "Generate" : "Generating..."}
                   </span>
+                  {displayGenerationSlotCount > 1 ? (
+                    <span className="rounded-full bg-black/20 px-1.5 py-px text-[9px] font-medium leading-4 text-primary-foreground/90">
+                      {displayGenerationSlotCount} active
+                    </span>
+                  ) : null}
                 </span>
               ) : (
                 "Generate"
