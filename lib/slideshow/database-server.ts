@@ -2,9 +2,13 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
+import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import {
   createSlideshowProjectSchema,
+  slideshowCollectionImageSourceKindSchema,
   slideshowCollectionSchema,
+  slideshowImportCandidateSchema,
+  slideshowImportModeSchema,
   slideshowProjectHooksSchema,
   slideshowProjectSchema,
   slideshowProjectSlidesSchema,
@@ -12,11 +16,14 @@ import {
   slideshowProjectStatusSchema,
   type SlideshowCollection,
   type SlideshowHookOption,
+  type SlideshowImportCandidate,
+  type SlideshowImportMode,
   type SlideshowProject,
   type SlideshowProjectStatus,
   type SlideshowProvider,
   type SlideshowSlide,
 } from "@/lib/slideshow/types"
+import { resolveStoredObjectUrl } from "@/lib/uploads/server"
 
 type CollectionRow = {
   id: string
@@ -27,23 +34,57 @@ type CollectionRow = {
   updated_at: string
 }
 
-type CollectionItemRow = {
+type CollectionImageRow = {
   id: string
+  user_id: string
   collection_id: string
-  asset_id: string
+  title: string
+  image_url: string
+  thumbnail_url: string | null
+  supabase_storage_path: string | null
+  source_kind: string
+  source_asset_id: string | null
+  source_url: string | null
+  source_query: string | null
+  tags: string[] | null
+  width: number | null
+  height: number | null
   sort_order: number
+  metadata: unknown
   created_at: string
+  updated_at: string
 }
 
 type AssetRow = {
   id: string
   user_id: string
   title: string
+  description: string | null
   asset_type: string
   asset_url: string
   thumbnail_url: string | null
+  supabase_storage_path: string | null
   tags: string[] | null
   created_at: string
+}
+
+type UploadRow = {
+  id: string
+  bucket: string
+  storage_path: string
+  mime_type: string
+  original_filename: string | null
+}
+
+type ImportJobRow = {
+  id: string
+  user_id: string
+  target_collection_id: string
+  mode: string
+  query_or_url: string
+  candidates: unknown
+  created_at: string
+  expires_at: string
 }
 
 type ProjectRow = {
@@ -62,11 +103,49 @@ type ProjectRow = {
   updated_at: string
 }
 
-function mapCollection(
-  row: CollectionRow,
-  itemRows: CollectionItemRow[],
-  assetsById: Map<string, AssetRow>,
-): SlideshowCollection {
+type CollectionImageInsert = {
+  title: string
+  image_url: string
+  thumbnail_url?: string | null
+  supabase_storage_path?: string | null
+  source_kind: "upload" | "asset" | "pinterest"
+  source_asset_id?: string | null
+  source_url?: string | null
+  source_query?: string | null
+  tags?: string[]
+  width?: number | null
+  height?: number | null
+  metadata?: Record<string, unknown>
+}
+
+function normalizeTags(tags: string[]) {
+  return Array.from(
+    new Set(
+      tags
+        .map((tag) => tag.trim().toLowerCase())
+        .filter((tag) => tag.length > 0),
+    ),
+  ).slice(0, 20)
+}
+
+function inferCollectionTags(collection: Pick<CollectionRow, "name" | "description">) {
+  return normalizeTags(
+    `${collection.name} ${collection.description ?? ""}`
+      .split(/[^a-zA-Z0-9]+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 3),
+  ).slice(0, 8)
+}
+
+function formatImageTitle(fileName: string | null | undefined) {
+  const value = (fileName ?? "").trim()
+  if (!value) return "Slideshow image"
+  const stripped = value.replace(/\.[^/.]+$/, "")
+  const normalized = stripped.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim()
+  return normalized || "Slideshow image"
+}
+
+function mapCollection(row: CollectionRow, itemRows: CollectionImageRow[]): SlideshowCollection {
   return slideshowCollectionSchema.parse({
     id: row.id,
     userId: row.user_id,
@@ -74,22 +153,25 @@ function mapCollection(
     description: row.description,
     items: itemRows
       .sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at))
-      .flatMap((item) => {
-        const asset = assetsById.get(item.asset_id)
-        if (!asset) return []
-        return [
-          {
-            id: item.id,
-            assetId: item.asset_id,
-            title: asset.title,
-            url: asset.asset_url,
-            thumbnailUrl: asset.thumbnail_url,
-            tags: Array.isArray(asset.tags) ? asset.tags : [],
-            sortOrder: item.sort_order,
-            createdAt: asset.created_at,
-          },
-        ]
-      }),
+      .map((item) => ({
+        id: item.id,
+        sourceKind: slideshowCollectionImageSourceKindSchema.parse(item.source_kind),
+        sourceAssetId: item.source_asset_id,
+        sourceUrl: item.source_url,
+        sourceQuery: item.source_query,
+        title: item.title,
+        url: item.image_url,
+        thumbnailUrl: item.thumbnail_url,
+        tags: Array.isArray(item.tags) ? item.tags : [],
+        width: item.width,
+        height: item.height,
+        sortOrder: item.sort_order,
+        metadata:
+          typeof item.metadata === "object" && item.metadata !== null && !Array.isArray(item.metadata)
+            ? (item.metadata as Record<string, unknown>)
+            : {},
+        createdAt: item.created_at,
+      })),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   })
@@ -173,7 +255,7 @@ async function ensureOwnedImageAssets(
 
   const { data, error } = await supabase
     .from("assets")
-    .select("id, user_id, title, asset_type, asset_url, thumbnail_url, tags, created_at")
+    .select("id, user_id, title, description, asset_type, asset_url, thumbnail_url, supabase_storage_path, tags, created_at")
     .eq("user_id", userId)
     .eq("asset_type", "image")
     .in("id", assetIds)
@@ -187,7 +269,8 @@ async function ensureOwnedImageAssets(
     throw new Error("One or more image assets could not be used in a slideshow collection.")
   }
 
-  return rows
+  const byId = new Map(rows.map((row) => [row.id, row]))
+  return assetIds.map((assetId) => byId.get(assetId)!).filter(Boolean)
 }
 
 async function loadCollectionRows(
@@ -215,34 +298,18 @@ async function loadCollectionRows(
 
   const collectionIdList = collectionRows.map((collection) => collection.id)
   const { data: itemData, error: itemError } = await supabase
-    .from("slideshow_collection_items")
-    .select("id, collection_id, asset_id, sort_order, created_at")
+    .from("slideshow_collection_images")
+    .select("id, user_id, collection_id, title, image_url, thumbnail_url, supabase_storage_path, source_kind, source_asset_id, source_url, source_query, tags, width, height, sort_order, metadata, created_at, updated_at")
     .in("collection_id", collectionIdList)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true })
 
   if (itemError) {
-    throw new Error(`Failed to load slideshow collection items: ${itemError.message}`)
+    throw new Error(`Failed to load slideshow collection images: ${itemError.message}`)
   }
 
-  const itemRows = (itemData ?? []) as CollectionItemRow[]
-  const assetIds = Array.from(new Set(itemRows.map((item) => item.asset_id)))
-
-  const { data: assetData, error: assetError } = assetIds.length
-    ? await supabase
-        .from("assets")
-        .select("id, user_id, title, asset_type, asset_url, thumbnail_url, tags, created_at")
-        .eq("user_id", userId)
-        .eq("asset_type", "image")
-        .in("id", assetIds)
-    : { data: [], error: null }
-
-  if (assetError) {
-    throw new Error(`Failed to load slideshow collection assets: ${assetError.message}`)
-  }
-
-  const assetsById = new Map(((assetData ?? []) as AssetRow[]).map((asset) => [asset.id, asset]))
-  const itemsByCollection = new Map<string, CollectionItemRow[]>()
+  const itemRows = (itemData ?? []) as CollectionImageRow[]
+  const itemsByCollection = new Map<string, CollectionImageRow[]>()
 
   for (const item of itemRows) {
     const current = itemsByCollection.get(item.collection_id)
@@ -253,7 +320,111 @@ async function loadCollectionRows(
     }
   }
 
-  return collectionRows.map((row) => mapCollection(row, itemsByCollection.get(row.id) ?? [], assetsById))
+  return collectionRows.map((row) => mapCollection(row, itemsByCollection.get(row.id) ?? []))
+}
+
+async function getOwnedCollectionRow(
+  supabase: SupabaseClient,
+  userId: string,
+  collectionId: string,
+) {
+  const { data, error } = await supabase
+    .from("slideshow_collections")
+    .select("id, user_id, name, description, created_at, updated_at")
+    .eq("id", collectionId)
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to load slideshow collection: ${error.message}`)
+  }
+
+  return (data as CollectionRow | null) ?? null
+}
+
+async function getCollectionImageRows(
+  supabase: SupabaseClient,
+  collectionId: string,
+) {
+  const { data, error } = await supabase
+    .from("slideshow_collection_images")
+    .select("id, user_id, collection_id, title, image_url, thumbnail_url, supabase_storage_path, source_kind, source_asset_id, source_url, source_query, tags, width, height, sort_order, metadata, created_at, updated_at")
+    .eq("collection_id", collectionId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true })
+
+  if (error) {
+    throw new Error(`Failed to load slideshow collection images: ${error.message}`)
+  }
+
+  return (data ?? []) as CollectionImageRow[]
+}
+
+async function insertCollectionImages(
+  supabase: SupabaseClient,
+  userId: string,
+  collection: CollectionRow,
+  items: CollectionImageInsert[],
+) {
+  if (items.length === 0) {
+    return getSlideshowCollectionById(supabase, userId, collection.id)
+  }
+
+  const existingRows = await getCollectionImageRows(supabase, collection.id)
+  const existingStoragePaths = new Set(
+    existingRows
+      .map((row) => row.supabase_storage_path)
+      .filter((value): value is string => typeof value === "string" && value.length > 0),
+  )
+  const existingAssetIds = new Set(
+    existingRows
+      .map((row) => row.source_asset_id)
+      .filter((value): value is string => typeof value === "string" && value.length > 0),
+  )
+
+  const baseSortOrder =
+    existingRows.reduce((max, row) => Math.max(max, row.sort_order), -1) + 1
+
+  const rowsToInsert = items.flatMap((item, index) => {
+    if (item.supabase_storage_path && existingStoragePaths.has(item.supabase_storage_path)) {
+      return []
+    }
+    if (item.source_asset_id && existingAssetIds.has(item.source_asset_id)) {
+      return []
+    }
+
+    if (item.supabase_storage_path) existingStoragePaths.add(item.supabase_storage_path)
+    if (item.source_asset_id) existingAssetIds.add(item.source_asset_id)
+
+    return [
+      {
+        user_id: userId,
+        collection_id: collection.id,
+        title: item.title.trim() || "Slideshow image",
+        image_url: item.image_url,
+        thumbnail_url: item.thumbnail_url ?? null,
+        supabase_storage_path: item.supabase_storage_path ?? null,
+        source_kind: item.source_kind,
+        source_asset_id: item.source_asset_id ?? null,
+        source_url: item.source_url ?? null,
+        source_query: item.source_query ?? null,
+        tags: normalizeTags(item.tags ?? inferCollectionTags(collection)),
+        width: item.width ?? null,
+        height: item.height ?? null,
+        sort_order: baseSortOrder + index,
+        metadata: item.metadata ?? {},
+      },
+    ]
+  })
+
+  if (rowsToInsert.length > 0) {
+    const { error } = await supabase.from("slideshow_collection_images").insert(rowsToInsert)
+    if (error) {
+      throw new Error(`Failed to save slideshow collection images: ${error.message}`)
+    }
+  }
+
+  return getSlideshowCollectionById(supabase, userId, collection.id)
 }
 
 export async function listSlideshowCollections(
@@ -278,12 +449,8 @@ export async function createSlideshowCollection(
   input: {
     name: string
     description?: string | null
-    assetIds?: string[]
   },
 ) {
-  const normalizedAssetIds = Array.from(new Set(input.assetIds ?? []))
-  await ensureOwnedImageAssets(supabase, userId, normalizedAssetIds)
-
   const { data, error } = await supabase
     .from("slideshow_collections")
     .insert({
@@ -296,20 +463,6 @@ export async function createSlideshowCollection(
 
   if (error || !data?.id) {
     throw new Error(error?.message || "Failed to create slideshow collection.")
-  }
-
-  if (normalizedAssetIds.length > 0) {
-    const { error: itemError } = await supabase.from("slideshow_collection_items").insert(
-      normalizedAssetIds.map((assetId, index) => ({
-        collection_id: data.id,
-        asset_id: assetId,
-        sort_order: index,
-      })),
-    )
-
-    if (itemError) {
-      throw new Error(`Failed to save slideshow collection items: ${itemError.message}`)
-    }
   }
 
   const created = await getSlideshowCollectionById(supabase, userId, String(data.id))
@@ -326,10 +479,10 @@ export async function updateSlideshowCollection(
   input: {
     name?: string
     description?: string | null
-    assetIds?: string[]
+    itemIds?: string[]
   },
 ) {
-  const existing = await getSlideshowCollectionById(supabase, userId, collectionId)
+  const existing = await getOwnedCollectionRow(supabase, userId, collectionId)
   if (!existing) {
     throw new Error("Slideshow collection not found.")
   }
@@ -350,35 +503,180 @@ export async function updateSlideshowCollection(
     }
   }
 
-  if (input.assetIds !== undefined) {
-    const normalizedAssetIds = Array.from(new Set(input.assetIds))
-    await ensureOwnedImageAssets(supabase, userId, normalizedAssetIds)
+  if (input.itemIds !== undefined) {
+    const existingItems = await getCollectionImageRows(supabase, collectionId)
+    const existingIds = new Set(existingItems.map((item) => item.id))
+    const normalizedItemIds = Array.from(new Set(input.itemIds))
 
-    const { error: deleteError } = await supabase
-      .from("slideshow_collection_items")
-      .delete()
-      .eq("collection_id", collectionId)
-
-    if (deleteError) {
-      throw new Error(`Failed to refresh slideshow collection items: ${deleteError.message}`)
+    if (!normalizedItemIds.every((itemId) => existingIds.has(itemId))) {
+      throw new Error("One or more collection images could not be updated.")
     }
 
-    if (normalizedAssetIds.length > 0) {
-      const { error: insertError } = await supabase.from("slideshow_collection_items").insert(
-        normalizedAssetIds.map((assetId, index) => ({
-          collection_id: collectionId,
-          asset_id: assetId,
-          sort_order: index,
-        })),
-      )
+    const removedIds = existingItems
+      .map((item) => item.id)
+      .filter((itemId) => !normalizedItemIds.includes(itemId))
 
-      if (insertError) {
-        throw new Error(`Failed to save slideshow collection items: ${insertError.message}`)
+    if (removedIds.length > 0) {
+      const { error: deleteError } = await supabase
+        .from("slideshow_collection_images")
+        .delete()
+        .eq("collection_id", collectionId)
+        .in("id", removedIds)
+
+      if (deleteError) {
+        throw new Error(`Failed to remove slideshow collection images: ${deleteError.message}`)
+      }
+    }
+
+    for (let index = 0; index < normalizedItemIds.length; index += 1) {
+      const itemId = normalizedItemIds[index]
+      const { error: updateError } = await supabase
+        .from("slideshow_collection_images")
+        .update({ sort_order: index })
+        .eq("collection_id", collectionId)
+        .eq("id", itemId)
+
+      if (updateError) {
+        throw new Error(`Failed to reorder slideshow collection images: ${updateError.message}`)
       }
     }
   }
 
   const updated = await getSlideshowCollectionById(supabase, userId, collectionId)
+  if (!updated) {
+    throw new Error("Updated slideshow collection could not be loaded.")
+  }
+  return updated
+}
+
+export async function appendUploadedImagesToCollection(
+  supabase: SupabaseClient,
+  userId: string,
+  collectionId: string,
+  uploads: Array<{ uploadId: string; title?: string }>,
+) {
+  const collection = await getOwnedCollectionRow(supabase, userId, collectionId)
+  if (!collection) {
+    throw new Error("Slideshow collection not found.")
+  }
+
+  const uploadIds = Array.from(new Set(uploads.map((upload) => upload.uploadId)))
+  const { data, error } = await supabase
+    .from("uploads")
+    .select("id, bucket, storage_path, mime_type, original_filename")
+    .eq("user_id", userId)
+    .in("id", uploadIds)
+
+  if (error) {
+    throw new Error(`Failed to verify uploaded images: ${error.message}`)
+  }
+
+  const uploadRows = (data ?? []) as UploadRow[]
+  if (uploadRows.length !== uploadIds.length) {
+    throw new Error("One or more uploads could not be used in the collection.")
+  }
+
+  const byId = new Map(uploadRows.map((row) => [row.id, row]))
+  const storageClient = createServiceRoleClient() ?? supabase
+  const rows: CollectionImageInsert[] = []
+
+  for (const upload of uploads) {
+    const row = byId.get(upload.uploadId)
+    if (!row || !row.mime_type.startsWith("image/")) {
+      throw new Error("Only image uploads can be added to slideshow collections.")
+    }
+
+    rows.push({
+      title: upload.title?.trim() || formatImageTitle(row.original_filename),
+      image_url: await resolveStoredObjectUrl(storageClient, row.bucket, row.storage_path),
+      thumbnail_url: null,
+      supabase_storage_path: row.storage_path,
+      source_kind: "upload",
+      tags: inferCollectionTags(collection),
+      metadata: {
+        uploadId: row.id,
+      },
+    })
+  }
+
+  const updated = await insertCollectionImages(supabase, userId, collection, rows)
+  if (!updated) {
+    throw new Error("Updated slideshow collection could not be loaded.")
+  }
+  return updated
+}
+
+export async function appendAssetCopiesToCollection(
+  supabase: SupabaseClient,
+  userId: string,
+  collectionId: string,
+  assetIds: string[],
+) {
+  const collection = await getOwnedCollectionRow(supabase, userId, collectionId)
+  if (!collection) {
+    throw new Error("Slideshow collection not found.")
+  }
+
+  const assets = await ensureOwnedImageAssets(supabase, userId, Array.from(new Set(assetIds)))
+  const rows: CollectionImageInsert[] = assets.map((asset) => ({
+    title: asset.title,
+    image_url: asset.asset_url,
+    thumbnail_url: asset.thumbnail_url,
+    supabase_storage_path: asset.supabase_storage_path,
+    source_kind: "asset",
+    source_asset_id: asset.id,
+    source_url: asset.asset_url,
+    tags: Array.isArray(asset.tags) ? asset.tags : [],
+    metadata: {
+      assetDescription: asset.description,
+      copiedAt: new Date().toISOString(),
+    },
+  }))
+
+  const updated = await insertCollectionImages(supabase, userId, collection, rows)
+  if (!updated) {
+    throw new Error("Updated slideshow collection could not be loaded.")
+  }
+  return updated
+}
+
+export async function appendPinterestImagesToCollection(
+  supabase: SupabaseClient,
+  userId: string,
+  collectionId: string,
+  images: Array<{
+    title: string
+    imageUrl: string
+    thumbnailUrl?: string | null
+    supabaseStoragePath?: string | null
+    sourceUrl: string
+    sourceQuery: string
+    width?: number | null
+    height?: number | null
+    tags?: string[]
+    metadata?: Record<string, unknown>
+  }>,
+) {
+  const collection = await getOwnedCollectionRow(supabase, userId, collectionId)
+  if (!collection) {
+    throw new Error("Slideshow collection not found.")
+  }
+
+  const rows: CollectionImageInsert[] = images.map((image) => ({
+    title: image.title,
+    image_url: image.imageUrl,
+    thumbnail_url: image.thumbnailUrl ?? null,
+    supabase_storage_path: image.supabaseStoragePath ?? null,
+    source_kind: "pinterest",
+    source_url: image.sourceUrl,
+    source_query: image.sourceQuery,
+    width: image.width ?? null,
+    height: image.height ?? null,
+    tags: normalizeTags(image.tags ?? [collection.name, image.sourceQuery]),
+    metadata: image.metadata ?? {},
+  }))
+
+  const updated = await insertCollectionImages(supabase, userId, collection, rows)
   if (!updated) {
     throw new Error("Updated slideshow collection could not be loaded.")
   }
@@ -398,6 +696,96 @@ export async function deleteSlideshowCollection(
 
   if (error) {
     throw new Error(`Failed to delete slideshow collection: ${error.message}`)
+  }
+}
+
+export async function createSlideshowCollectionImportJob(
+  supabase: SupabaseClient,
+  userId: string,
+  input: {
+    collectionId: string
+    mode: SlideshowImportMode
+    queryOrUrl: string
+    candidates: SlideshowImportCandidate[]
+  },
+) {
+  const collection = await getOwnedCollectionRow(supabase, userId, input.collectionId)
+  if (!collection) {
+    throw new Error("Slideshow collection not found.")
+  }
+
+  const { data, error } = await supabase
+    .from("slideshow_collection_import_jobs")
+    .insert({
+      user_id: userId,
+      target_collection_id: input.collectionId,
+      mode: input.mode,
+      query_or_url: input.queryOrUrl,
+      candidates: input.candidates,
+    })
+    .select("id, user_id, target_collection_id, mode, query_or_url, candidates, created_at, expires_at")
+    .single()
+
+  if (error || !data) {
+    throw new Error(error?.message || "Failed to create slideshow import preview.")
+  }
+
+  return {
+    id: String(data.id),
+    userId: String(data.user_id),
+    targetCollectionId: String(data.target_collection_id),
+    mode: slideshowImportModeSchema.parse(data.mode),
+    queryOrUrl: String(data.query_or_url),
+    candidates: z.array(slideshowImportCandidateSchema).parse(data.candidates),
+    createdAt: String(data.created_at),
+    expiresAt: String(data.expires_at),
+  }
+}
+
+export async function getSlideshowCollectionImportJobById(
+  supabase: SupabaseClient,
+  userId: string,
+  jobId: string,
+) {
+  const { data, error } = await supabase
+    .from("slideshow_collection_import_jobs")
+    .select("id, user_id, target_collection_id, mode, query_or_url, candidates, created_at, expires_at")
+    .eq("id", jobId)
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to load slideshow import preview: ${error.message}`)
+  }
+
+  if (!data) return null
+
+  const row = data as ImportJobRow
+  return {
+    id: row.id,
+    userId: row.user_id,
+    targetCollectionId: row.target_collection_id,
+    mode: slideshowImportModeSchema.parse(row.mode),
+    queryOrUrl: row.query_or_url,
+    candidates: z.array(slideshowImportCandidateSchema).parse(row.candidates),
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+  }
+}
+
+export async function deleteSlideshowCollectionImportJob(
+  supabase: SupabaseClient,
+  userId: string,
+  jobId: string,
+) {
+  const { error } = await supabase
+    .from("slideshow_collection_import_jobs")
+    .delete()
+    .eq("id", jobId)
+    .eq("user_id", userId)
+
+  if (error) {
+    throw new Error(`Failed to delete slideshow import preview: ${error.message}`)
   }
 }
 
@@ -547,6 +935,7 @@ export function applySlideUpdate(
     index: number
     overlayText?: string
     collectionId?: string
+    collectionImageId?: string
     assetId?: string
     assetUrl?: string
     selectionMode?: "random" | "first" | "manual"
@@ -562,7 +951,11 @@ export function applySlideUpdate(
 
   if (update.overlayText !== undefined) current.overlayText = update.overlayText
   if (update.collectionId !== undefined) current.collectionId = update.collectionId
-  if (update.assetId !== undefined) current.assetId = update.assetId
+  if (update.collectionImageId !== undefined) {
+    current.collectionImageId = update.collectionImageId
+  } else if (update.assetId !== undefined) {
+    current.collectionImageId = update.assetId
+  }
   if (update.assetUrl !== undefined) current.assetUrl = update.assetUrl
   if (update.selectionMode !== undefined) current.selectionMode = update.selectionMode
   if (update.narrativeRole !== undefined) current.narrativeRole = update.narrativeRole

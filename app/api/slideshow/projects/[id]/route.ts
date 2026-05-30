@@ -77,6 +77,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       const nextUpdate = { ...parsed.data.slideUpdate }
       if (
         nextUpdate.collectionId !== undefined ||
+        nextUpdate.collectionImageId !== undefined ||
         nextUpdate.assetId !== undefined ||
         nextUpdate.assetUrl !== undefined
       ) {
@@ -86,8 +87,12 @@ export async function PATCH(request: Request, context: RouteContext) {
           return NextResponse.json({ error: "Collection not found." }, { status: 404 })
         }
 
-        const assetId = nextUpdate.assetId ?? currentSlide.assetId
-        const item = collection.items.find((candidate) => candidate.assetId === assetId)
+        const collectionImageId =
+          nextUpdate.collectionImageId ?? nextUpdate.assetId ?? currentSlide.collectionImageId
+        const item = collection.items.find(
+          (candidate) =>
+            candidate.id === collectionImageId || candidate.sourceAssetId === collectionImageId,
+        )
         if (!item) {
           return NextResponse.json(
             { error: "The chosen image is not part of that collection." },
@@ -96,7 +101,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         }
 
         nextUpdate.collectionId = collection.id
-        nextUpdate.assetId = item.assetId
+        nextUpdate.collectionImageId = item.id
         nextUpdate.assetUrl = item.url
         nextUpdate.selectionMode = nextUpdate.selectionMode ?? "manual"
       }

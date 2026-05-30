@@ -18,24 +18,46 @@ export const slideshowSlideSchema = z.object({
   index: z.number().int().min(0),
   overlayText: z.string().trim().min(1).max(220),
   collectionId: z.string().uuid(),
-  assetId: z.string().uuid(),
+  collectionImageId: z.string().uuid().optional(),
+  assetId: z.string().uuid().optional(),
   assetUrl: z.string().url(),
   selectionMode: slideshowSelectionModeSchema,
   narrativeRole: z.string().trim().min(1).max(120).nullable().optional(),
   notes: z.string().trim().max(500).nullable().optional(),
 })
+  .superRefine((value, ctx) => {
+    if (!value.collectionImageId && !value.assetId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["collectionImageId"],
+        message: "collectionImageId is required",
+      })
+    }
+  })
+  .transform(({ assetId, collectionImageId, ...rest }) => ({
+    ...rest,
+    collectionImageId: collectionImageId ?? assetId!,
+  }))
 
 export const slideshowProjectHooksSchema = z.array(slideshowHookOptionSchema).max(20)
 export const slideshowProjectSlidesSchema = z.array(slideshowSlideSchema).max(12)
 
+export const slideshowCollectionImageSourceKindSchema = z.enum(["upload", "asset", "pinterest"])
+
 export const slideshowCollectionItemSchema = z.object({
   id: z.string().uuid(),
-  assetId: z.string().uuid(),
+  sourceKind: slideshowCollectionImageSourceKindSchema,
+  sourceAssetId: z.string().uuid().nullable(),
+  sourceUrl: z.string().url().nullable(),
+  sourceQuery: z.string().trim().max(500).nullable(),
   title: z.string(),
   url: z.string().url(),
   thumbnailUrl: z.string().url().nullable(),
   tags: z.array(z.string()),
+  width: z.number().int().positive().nullable(),
+  height: z.number().int().positive().nullable(),
   sortOrder: z.number().int().min(0),
+  metadata: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.string(),
 })
 
@@ -68,13 +90,51 @@ export const slideshowProjectSchema = z.object({
 export const createSlideshowCollectionSchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().max(500).nullable().optional(),
-  assetIds: z.array(z.string().uuid()).max(200).optional(),
 })
 
 export const updateSlideshowCollectionSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   description: z.string().trim().max(500).nullable().optional(),
-  assetIds: z.array(z.string().uuid()).max(200).optional(),
+  itemIds: z.array(z.string().uuid()).max(200).optional(),
+})
+
+export const slideshowCollectionUploadPayloadSchema = z.object({
+  uploadId: z.string().uuid(),
+  title: z.string().trim().min(1).max(160).optional(),
+})
+
+export const appendUploadedCollectionImagesSchema = z.object({
+  uploads: z.array(slideshowCollectionUploadPayloadSchema).min(1).max(50),
+})
+
+export const appendAssetCollectionImagesSchema = z.object({
+  assetIds: z.array(z.string().uuid()).min(1).max(50),
+})
+
+export const slideshowImportModeSchema = z.enum(["board_url", "search"])
+
+export const slideshowImportCandidateSchema = z.object({
+  id: z.string().trim().min(1).max(120),
+  previewUrl: z.string().url(),
+  sourceUrl: z.string().url(),
+  title: z.string().trim().max(300).nullable(),
+  description: z.string().trim().max(1000).nullable(),
+  width: z.number().int().positive().nullable(),
+  height: z.number().int().positive().nullable(),
+  tags: z.array(z.string()).max(20).default([]),
+})
+
+export const previewSlideshowCollectionImportSchema = z.object({
+  collectionId: z.string().uuid(),
+  mode: slideshowImportModeSchema,
+  query: z.string().trim().min(1).max(500),
+  limit: z.number().int().min(1).max(50).default(50),
+})
+
+export const commitSlideshowCollectionImportSchema = z.object({
+  collectionId: z.string().uuid(),
+  jobId: z.string().uuid(),
+  candidateIds: z.array(z.string().trim().min(1).max(120)).min(1).max(50),
 })
 
 export const createSlideshowProjectSchema = z.object({
@@ -97,6 +157,7 @@ export const updateSlideshowProjectSchema = z.object({
       index: z.number().int().min(0),
       overlayText: z.string().trim().min(1).max(220).optional(),
       collectionId: z.string().uuid().optional(),
+      collectionImageId: z.string().uuid().optional(),
       assetId: z.string().uuid().optional(),
       assetUrl: z.string().url().optional(),
       selectionMode: slideshowSelectionModeSchema.optional(),
@@ -111,7 +172,9 @@ export type SlideshowProjectStatus = z.infer<typeof slideshowProjectStatusSchema
 export type SlideshowSelectionMode = z.infer<typeof slideshowSelectionModeSchema>
 export type SlideshowHookOption = z.infer<typeof slideshowHookOptionSchema>
 export type SlideshowSlide = z.infer<typeof slideshowSlideSchema>
+export type SlideshowCollectionImageSourceKind = z.infer<typeof slideshowCollectionImageSourceKindSchema>
 export type SlideshowCollectionItem = z.infer<typeof slideshowCollectionItemSchema>
 export type SlideshowCollection = z.infer<typeof slideshowCollectionSchema>
 export type SlideshowProject = z.infer<typeof slideshowProjectSchema>
-
+export type SlideshowImportMode = z.infer<typeof slideshowImportModeSchema>
+export type SlideshowImportCandidate = z.infer<typeof slideshowImportCandidateSchema>

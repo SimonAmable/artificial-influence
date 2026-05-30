@@ -220,12 +220,12 @@ export async function generateSlideshowSlides(input: {
 
   const usableCollectionsById = new Map(usableCollections.map((collection) => [collection.id, collection]))
   const fallbackCollection = usableCollections[0]
-  const usedAssetIdsByCollection = new Map<string, Set<string>>()
+  const usedImageIdsByCollection = new Map<string, Set<string>>()
 
   return object.slides.map((slide, index) => {
     const collection = usableCollectionsById.get(slide.preferredCollectionId) ?? fallbackCollection
-    const usedIds = usedAssetIdsByCollection.get(collection.id) ?? new Set<string>()
-    usedAssetIdsByCollection.set(collection.id, usedIds)
+    const usedIds = usedImageIdsByCollection.get(collection.id) ?? new Set<string>()
+    usedImageIdsByCollection.set(collection.id, usedIds)
 
     const rotationIndex = stableIndex(
       `${input.projectId}:${input.hook}:${collection.id}:${index}`,
@@ -236,16 +236,16 @@ export async function generateSlideshowSlides(input: {
       ...collection.items.slice(0, rotationIndex),
     ]
 
-    const unusedPick = rotatedItems.find((item) => !usedIds.has(item.assetId))
+    const unusedPick = rotatedItems.find((item) => !usedIds.has(item.id))
     const chosenItem = unusedPick ?? collection.items[0]
     const selectionMode = unusedPick ? "random" : "first"
-    usedIds.add(chosenItem.assetId)
+    usedIds.add(chosenItem.id)
 
     return {
       index,
       overlayText: slide.overlayText.trim(),
       collectionId: collection.id,
-      assetId: chosenItem.assetId,
+      collectionImageId: chosenItem.id,
       assetUrl: chosenItem.url,
       selectionMode,
       narrativeRole: slide.narrativeRole.trim(),

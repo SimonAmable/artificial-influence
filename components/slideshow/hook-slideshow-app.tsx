@@ -29,6 +29,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import type { AssetRecord } from "@/lib/assets/types"
 import type { BrandKit } from "@/lib/brand-kit/types"
@@ -36,6 +43,7 @@ import { uploadBlobToSupabase, uploadFileToSupabase } from "@/lib/canvas/upload-
 import type {
   SlideshowCollection,
   SlideshowHookOption,
+  SlideshowImportCandidate,
   SlideshowProject,
   SlideshowSlide,
 } from "@/lib/slideshow/types"
@@ -156,16 +164,18 @@ function formatAssetTitle(fileName: string) {
   return normalized || "Slideshow image"
 }
 
-function inferCollectionTags(collection: SlideshowCollection) {
-  return Array.from(
-    new Set(
-      `${collection.name} ${collection.description ?? ""}`
-        .toLowerCase()
-        .split(/[^a-z0-9]+/)
-        .map((token) => token.trim())
-        .filter((token) => token.length >= 3),
-    ),
-  ).slice(0, 8)
+function replaceCollection(
+  collections: SlideshowCollection[],
+  nextCollection: SlideshowCollection,
+) {
+  return collections.map((collection) =>
+    collection.id === nextCollection.id ? nextCollection : collection,
+  )
+}
+
+function slideUsesCollectionItem(slide: SlideshowSlide | null, item: SlideshowCollection["items"][number]) {
+  if (!slide) return false
+  return slide.collectionImageId === item.id || slide.collectionImageId === item.sourceAssetId
 }
 
 function CollectionManagerDialog({
@@ -179,7 +189,10 @@ function CollectionManagerDialog({
   onCreateCollection,
   onUpdateCollection,
   onDeleteCollection,
+  onAddAssetCopiesToCollection,
   onUploadAssetsToCollection,
+  onPreviewPinterestImport,
+  onCommitPinterestImport,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -191,10 +204,22 @@ function CollectionManagerDialog({
   onCreateCollection: (payload: { name: string; description?: string | null }) => Promise<void>
   onUpdateCollection: (
     collectionId: string,
-    payload: { name?: string; description?: string | null; assetIds?: string[] },
+    payload: { name?: string; description?: string | null; itemIds?: string[] },
   ) => Promise<void>
   onDeleteCollection: (collectionId: string) => Promise<void>
+  onAddAssetCopiesToCollection: (collectionId: string, assetIds: string[]) => Promise<void>
   onUploadAssetsToCollection: (collectionId: string, files: File[]) => Promise<void>
+  onPreviewPinterestImport: (payload: {
+    collectionId: string
+    mode: "board_url" | "search"
+    query: string
+    limit: number
+  }) => Promise<{ jobId: string; candidates: SlideshowImportCandidate[] }>
+  onCommitPinterestImport: (payload: {
+    collectionId: string
+    jobId: string
+    candidateIds: string[]
+  }) => Promise<{ importedCount: number }>
 }) {
   const [activeCollectionId, setActiveCollectionId] = React.useState<string | null>(collections[0]?.id ?? null)
   const [newCollectionName, setNewCollectionName] = React.useState("")
@@ -202,6 +227,7 @@ function CollectionManagerDialog({
   const [draftName, setDraftName] = React.useState("")
   const [draftDescription, setDraftDescription] = React.useState("")
   const [busyCollectionId, setBusyCollectionId] = React.useState<string | null>(null)
+  const [importOpen, setImportOpen] = React.useState(false)
   const uploadInputRef = React.useRef<HTMLInputElement | null>(null)
 
   const activeCollection =
@@ -252,13 +278,11 @@ function CollectionManagerDialog({
 
   async function addAssetToCollection(assetId: string) {
     if (!activeCollection) return
-    const alreadyIncluded = activeCollection.items.some((item) => item.assetId === assetId)
+    const alreadyIncluded = activeCollection.items.some((item) => item.sourceAssetId === assetId)
     if (alreadyIncluded) return
     setBusyCollectionId(activeCollection.id)
     try {
-      await onUpdateCollection(activeCollection.id, {
-        assetIds: [...activeCollection.items.map((item) => item.assetId), assetId],
-      })
+      await onAddAssetCopiesToCollection(activeCollection.id, [assetId])
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update collection.")
     } finally {
@@ -266,14 +290,12 @@ function CollectionManagerDialog({
     }
   }
 
-  async function removeAssetFromCollection(assetId: string) {
+  async function removeAssetFromCollection(itemId: string) {
     if (!activeCollection) return
     setBusyCollectionId(activeCollection.id)
     try {
       await onUpdateCollection(activeCollection.id, {
-        assetIds: activeCollection.items
-          .filter((item) => item.assetId !== assetId)
-          .map((item) => item.assetId),
+        itemIds: activeCollection.items.filter((item) => item.id !== itemId).map((item) => item.id),
       })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update collection.")
@@ -288,7 +310,7 @@ function CollectionManagerDialog({
     setBusyCollectionId(activeCollection.id)
     try {
       await onUpdateCollection(activeCollection.id, {
-        assetIds: reordered.map((item) => item.assetId),
+        itemIds: reordered.map((item) => item.id),
       })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to reorder collection.")
@@ -345,21 +367,21 @@ function CollectionManagerDialog({
   }
 
   const unusedAssets = availableAssets.filter(
-    (asset) => asset.assetType === "image" && !activeCollection?.items.some((item) => item.assetId === asset.id),
+    (asset) => asset.assetType === "image" && !activeCollection?.items.some((item) => item.sourceAssetId === asset.id),
   )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[92vh] !w-[calc(100vw-2rem)] !max-w-none sm:!max-w-none xl:!w-[min(1760px,calc(100vw-2rem))] overflow-hidden border-border/60 bg-background p-0 text-foreground">
-        <DialogHeader className="border-b border-border/60 px-6 py-5 text-left">
+      <DialogContent className="h-[94vh] !w-[calc(100vw-1rem)] !max-w-none overflow-hidden border-border/60 bg-background p-0 text-foreground sm:!w-[calc(100vw-2rem)] sm:!max-w-none xl:!w-[min(1760px,calc(100vw-2rem))]">
+        <DialogHeader className="border-b border-border/60 px-4 py-4 text-left sm:px-6 sm:py-5">
           <DialogTitle className="text-xl font-semibold">Manage Image Collections</DialogTitle>
           <DialogDescription className={subtleTextClass}>
             Group saved image assets by aesthetic so AI can pick stronger slideshow backgrounds.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid h-[calc(92vh-88px)] grid-cols-[320px_1fr] xl:grid-cols-[360px_1fr]">
-          <div className="border-r border-border/60 bg-muted/20 p-4">
+        <div className="grid h-[calc(94vh-80px)] min-h-0 grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[360px_1fr]">
+          <div className="min-h-0 border-b border-border/60 bg-muted/20 p-4 lg:border-b-0 lg:border-r">
             <div className="space-y-3 rounded-2xl border border-border/60 bg-card p-3">
               <Label className={subtleLabelClass}>New collection</Label>
               <Input
@@ -380,7 +402,7 @@ function CollectionManagerDialog({
               </Button>
             </div>
 
-            <ScrollArea className="mt-4 h-[calc(100%-220px)]">
+            <ScrollArea className="mt-4 h-[240px] lg:h-[calc(100%-220px)]">
               <div className="space-y-2 pr-3">
                 {collections.map((collection) => {
                   const active = collection.id === activeCollectionId
@@ -413,8 +435,8 @@ function CollectionManagerDialog({
           <div className="flex min-h-0 flex-col">
             {activeCollection ? (
               <>
-                <div className="border-b border-border/60 px-6 py-4">
-                  <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
+                <div className="border-b border-border/60 px-4 py-4 sm:px-6">
+                  <div className="grid gap-3 xl:grid-cols-[1fr_1fr_auto_auto]">
                     <Input
                       value={draftName}
                       onChange={(event) => setDraftName(event.target.value)}
@@ -449,8 +471,8 @@ function CollectionManagerDialog({
                   </div>
                 </div>
 
-                <div className="grid min-h-0 flex-1 gap-0 md:grid-cols-[1.1fr_1fr]">
-                  <div className="min-h-0 border-r border-border/60 px-6 py-5">
+                <div className="grid min-h-0 flex-1 gap-0 xl:grid-cols-[1.1fr_1fr]">
+                  <div className="min-h-0 border-b border-border/60 px-4 py-5 sm:px-6 xl:border-b-0 xl:border-r">
                     <div className="mb-3 flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium">Collection images</p>
@@ -458,12 +480,12 @@ function CollectionManagerDialog({
                       </div>
                     </div>
                     <ScrollArea className="h-[calc(100%-44px)]">
-                      {activeCollection.items.length === 0 ? (
-                        <div className={cn(emptyStateClass, "p-8 text-center text-sm")}>
-                          Add some image assets from the library on the right.
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-4 pr-4 xl:grid-cols-3">
+                        {activeCollection.items.length === 0 ? (
+                          <div className={cn(emptyStateClass, "p-8 text-center text-sm")}>
+                           Add uploaded images, copy from your asset library, or import from Pinterest.
+                          </div>
+                        ) : (
+                        <div className="grid grid-cols-2 gap-4 pr-4 sm:grid-cols-3 2xl:grid-cols-4">
                           {activeCollection.items.map((item, index) => (
                             <div key={item.id} className={cn(subPanelClass, "p-3")}>
                               <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-muted">
@@ -499,7 +521,7 @@ function CollectionManagerDialog({
                                   size="icon"
                                   variant="outline"
                                   disabled={busyCollectionId === activeCollection.id}
-                                  onClick={() => void removeAssetFromCollection(item.assetId)}
+                                  onClick={() => void removeAssetFromCollection(item.id)}
                                   className={cn("h-8 w-8", outlineButtonClass)}
                                 >
                                   <X className="h-4 w-4" />
@@ -512,13 +534,15 @@ function CollectionManagerDialog({
                     </ScrollArea>
                   </div>
 
-                  <div className="min-h-0 px-6 py-5">
-                    <div className="mb-3 flex items-center justify-between">
+                  <div className="min-h-0 px-4 py-5 sm:px-6">
+                    <div className="mb-3 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                       <div>
                         <p className="text-sm font-medium">Available image assets</p>
-                        <p className={cn("text-xs", subtleTextClass)}>Upload new images here or pull from your private asset library.</p>
+                        <p className={cn("text-xs", subtleTextClass)}>
+                          Upload files, click any asset below to copy it into this collection, or import from Pinterest.
+                        </p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <input
                           ref={uploadInputRef}
                           type="file"
@@ -535,6 +559,15 @@ function CollectionManagerDialog({
                           className={outlineButtonClass}
                         >
                           {uploadingAssets ? "Uploading..." : "Upload Images"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={!activeCollection}
+                          onClick={() => setImportOpen(true)}
+                          className={outlineButtonClass}
+                        >
+                          + Add
                         </Button>
                         <Button
                           type="button"
@@ -560,7 +593,7 @@ function CollectionManagerDialog({
                           .
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 gap-4 pr-4 xl:grid-cols-3">
+                        <div className="grid grid-cols-2 gap-4 pr-4 sm:grid-cols-3 2xl:grid-cols-4">
                           {unusedAssets.map((asset) => (
                             <button
                               key={asset.id}
@@ -593,6 +626,299 @@ function CollectionManagerDialog({
             )}
           </div>
         </div>
+        <CollectionImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          collections={collections}
+          initialCollectionId={activeCollection?.id ?? null}
+          onPreview={onPreviewPinterestImport}
+          onCommit={onCommitPinterestImport}
+        />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function CollectionImportDialog({
+  open,
+  onOpenChange,
+  collections,
+  initialCollectionId,
+  onPreview,
+  onCommit,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  collections: SlideshowCollection[]
+  initialCollectionId: string | null
+  onPreview: (payload: {
+    collectionId: string
+    mode: "board_url" | "search"
+    query: string
+    limit: number
+  }) => Promise<{ jobId: string; candidates: SlideshowImportCandidate[] }>
+  onCommit: (payload: {
+    collectionId: string
+    jobId: string
+    candidateIds: string[]
+  }) => Promise<{ importedCount: number }>
+}) {
+  const [mode, setMode] = React.useState<"board_url" | "search">("board_url")
+  const [query, setQuery] = React.useState("")
+  const [targetCollectionId, setTargetCollectionId] = React.useState<string | null>(initialCollectionId)
+  const [jobId, setJobId] = React.useState<string | null>(null)
+  const [candidates, setCandidates] = React.useState<SlideshowImportCandidate[]>([])
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([])
+  const [step, setStep] = React.useState<"input" | "loading" | "review" | "committing">("input")
+
+  React.useEffect(() => {
+    if (!open) {
+      setMode("board_url")
+      setQuery("")
+      setJobId(null)
+      setCandidates([])
+      setSelectedIds([])
+      setStep("input")
+      return
+    }
+    setTargetCollectionId(initialCollectionId)
+  }, [initialCollectionId, open])
+
+  async function handlePreview() {
+    if (!targetCollectionId) {
+      toast.error("Pick a collection first.")
+      return
+    }
+    if (!query.trim()) {
+      toast.error(mode === "board_url" ? "Paste a Pinterest board URL first." : "Enter a Pinterest search first.")
+      return
+    }
+
+    setStep("loading")
+    try {
+      const result = await onPreview({
+        collectionId: targetCollectionId,
+        mode,
+        query: query.trim(),
+        limit: 50,
+      })
+      setJobId(result.jobId)
+      setCandidates(result.candidates)
+      setSelectedIds(result.candidates.map((candidate) => candidate.id))
+      setStep("review")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load Pinterest images.")
+      setStep("input")
+    }
+  }
+
+  async function handleCommit() {
+    if (!targetCollectionId || !jobId) return
+    if (selectedIds.length === 0) {
+      toast.error("Choose at least one image to import.")
+      return
+    }
+
+    setStep("committing")
+    try {
+      await onCommit({
+        collectionId: targetCollectionId,
+        jobId,
+        candidateIds: selectedIds,
+      })
+      onOpenChange(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to import Pinterest images.")
+      setStep("review")
+    }
+  }
+
+  function toggleCandidate(candidateId: string) {
+    setSelectedIds((current) =>
+      current.includes(candidateId)
+        ? current.filter((id) => id !== candidateId)
+        : [...current, candidateId],
+    )
+  }
+
+  const primaryActionLabel =
+    step === "loading"
+      ? "Finding images..."
+      : step === "committing"
+        ? "Adding images..."
+        : step === "review"
+          ? `Add ${selectedIds.length} image${selectedIds.length === 1 ? "" : "s"}`
+          : mode === "board_url"
+            ? "Import Board"
+            : "Search Pinterest"
+
+  const primaryActionDisabled =
+    step === "loading" ||
+    step === "committing" ||
+    !targetCollectionId ||
+    (step === "review" ? selectedIds.length === 0 : !query.trim())
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="h-[88vh] !w-[calc(100vw-1rem)] !max-w-none overflow-hidden border-border/60 bg-background p-0 text-foreground sm:!w-[calc(100vw-2.5rem)] sm:!max-w-none xl:!w-[min(1560px,calc(100vw-3rem))]">
+        <DialogHeader className="border-b border-border/60 px-4 py-4 text-left sm:px-6 sm:py-5">
+          <DialogTitle className="text-xl font-semibold">Import Pinterest Images</DialogTitle>
+          <DialogDescription className={subtleTextClass}>
+            Search Pinterest or paste a board URL, review the results, then add the images you want.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex h-[calc(88vh-88px)] min-h-0 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden px-4 py-5 sm:px-6">
+            <div className="flex h-full min-h-0 flex-col space-y-4">
+              <div className="grid gap-3 md:grid-cols-[220px_1fr]">
+            <Label className={subtleLabelClass}>Add To Collection</Label>
+                <Select
+                  value={targetCollectionId ?? ""}
+                  onValueChange={(value) => setTargetCollectionId(value || null)}
+                >
+                  <SelectTrigger className="h-10 w-full rounded-md border-border/60 bg-background">
+                    <SelectValue placeholder="Select a collection" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {collections.map((collection) => (
+                      <SelectItem key={collection.id} value={collection.id}>
+                        {collection.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {step === "input" || step === "loading" ? (
+                <div className="space-y-4 rounded-2xl border border-border/60 bg-card/70 p-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setMode("board_url")}
+                      className={cn(mode === "board_url" ? selectedCardClass : outlineButtonClass)}
+                    >
+                      Board URL
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setMode("search")}
+                      className={cn(mode === "search" ? selectedCardClass : outlineButtonClass)}
+                    >
+                      Search
+                    </Button>
+                  </div>
+
+                  <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={
+                      mode === "board_url"
+                        ? "https://www.pinterest.com/username/board-name/"
+                        : "indie sleaze night out"
+                    }
+                    className="border-border/60 bg-background"
+                  />
+                </div>
+              ) : null}
+
+              {step === "review" || step === "committing" ? (
+                <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-sm font-medium">
+                        Selected {selectedIds.length} of {candidates.length} images
+                      </p>
+                      <p className={cn("text-xs", subtleTextClass)}>
+                        Review the Pinterest results and keep only the images you want in this collection.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSelectedIds(candidates.map((candidate) => candidate.id))}
+                        className={outlineButtonClass}
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSelectedIds([])}
+                        className={outlineButtonClass}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+
+                  <ScrollArea className="min-h-0 flex-1 rounded-2xl border border-border/60 bg-card/50">
+                    <div className="grid grid-cols-2 gap-4 p-4 pr-5 md:grid-cols-3 xl:grid-cols-5">
+                      {candidates.map((candidate) => {
+                        const selected = selectedIds.includes(candidate.id)
+                        return (
+                          <button
+                            key={candidate.id}
+                            type="button"
+                            onClick={() => toggleCandidate(candidate.id)}
+                            className={cn(
+                              "rounded-2xl border p-3 text-left transition",
+                              selected ? selectedCardClass : idleCardClass,
+                            )}
+                          >
+                            <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-muted">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={candidate.previewUrl}
+                                alt={candidate.title ?? "Pinterest candidate"}
+                                className="h-full w-full object-cover"
+                              />
+                              {selected ? (
+                                <CheckCircle className="absolute right-2 top-2 h-5 w-5 text-primary" weight="fill" />
+                              ) : null}
+                            </div>
+                            <p className="mt-2 line-clamp-2 text-xs font-medium">
+                              {candidate.title || "Pinterest image"}
+                            </p>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </ScrollArea>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div className="border-t border-border/60 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-6">
+            <div className="flex flex-wrap justify-end gap-2 pr-[max(0.25rem,env(safe-area-inset-right))] sm:pr-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className={cn("max-sm:flex-1", outlineButtonClass)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={primaryActionDisabled}
+                onClick={() => {
+                  if (step === "review" || step === "committing") {
+                    void handleCommit()
+                    return
+                  }
+                  void handlePreview()
+                }}
+                className={cn("max-sm:flex-1", primaryButtonClass)}
+              >
+                {primaryActionLabel}
+              </Button>
+            </div>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )
@@ -609,12 +935,12 @@ function BackgroundPickerDialog({
   onOpenChange: (open: boolean) => void
   slide: SlideshowSlide | null
   collections: SlideshowCollection[]
-  onSelect: (collection: SlideshowCollection, assetId: string) => Promise<void>
+  onSelect: (collection: SlideshowCollection, collectionImageId: string) => Promise<void>
 }) {
   const usableCollections = collections.filter((collection) => collection.items.length > 0)
   const [activeCollectionId, setActiveCollectionId] = React.useState<string | null>(slide?.collectionId ?? usableCollections[0]?.id ?? null)
   const [search, setSearch] = React.useState("")
-  const [busyAssetId, setBusyAssetId] = React.useState<string | null>(null)
+  const [busyImageId, setBusyImageId] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     if (!open) return
@@ -636,16 +962,16 @@ function BackgroundPickerDialog({
       })
     : []
 
-  async function handleSelect(assetId: string) {
+  async function handleSelect(collectionImageId: string) {
     if (!activeCollection) return
-    setBusyAssetId(assetId)
+    setBusyImageId(collectionImageId)
     try {
-      await onSelect(activeCollection, assetId)
+      await onSelect(activeCollection, collectionImageId)
       onOpenChange(false)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update slide background.")
     } finally {
-      setBusyAssetId(null)
+      setBusyImageId(null)
     }
   }
 
@@ -713,13 +1039,13 @@ function BackgroundPickerDialog({
               ) : (
                 <div className="grid grid-cols-2 gap-4 pr-4 md:grid-cols-3 xl:grid-cols-5">
                   {filteredItems.map((item) => {
-                    const selected = slide?.assetId === item.assetId
+                    const selected = slideUsesCollectionItem(slide, item)
                     return (
                       <button
                         key={item.id}
                         type="button"
-                        disabled={busyAssetId === item.assetId}
-                        onClick={() => void handleSelect(item.assetId)}
+                        disabled={busyImageId === item.id}
+                        onClick={() => void handleSelect(item.id)}
                         className={cn(
                           "rounded-2xl border p-3 text-left transition",
                           selected ? selectedCardClass : "border-border/60 bg-background/70 hover:border-primary/40 hover:bg-muted/40",
@@ -1034,7 +1360,7 @@ export function HookSlideshowApp() {
             index,
             overlayText: patch.overlayText,
             collectionId: patch.collectionId,
-            assetId: patch.assetId,
+            collectionImageId: patch.collectionImageId,
             assetUrl: patch.assetUrl,
             selectionMode: patch.selectionMode,
             narrativeRole: patch.narrativeRole,
@@ -1071,7 +1397,7 @@ export function HookSlideshowApp() {
 
   async function handleUpdateCollection(
     collectionId: string,
-    payload: { name?: string; description?: string | null; assetIds?: string[] },
+    payload: { name?: string; description?: string | null; itemIds?: string[] },
   ) {
     const response = await fetch(`/api/slideshow/collections/${collectionId}`, {
       method: "PATCH",
@@ -1082,9 +1408,7 @@ export function HookSlideshowApp() {
     if (!response.ok || !data.collection) {
       throw new Error(data.error || "Failed to update collection.")
     }
-    setCollections((current) =>
-      current.map((collection) => (collection.id === collectionId ? data.collection! : collection)),
-    )
+    setCollections((current) => replaceCollection(current, data.collection!))
   }
 
   async function handleDeleteCollection(collectionId: string) {
@@ -1107,48 +1431,116 @@ export function HookSlideshowApp() {
 
     setAssetsUploading(true)
     try {
-      const newAssetIds: string[] = []
+      const uploads: Array<{ uploadId: string; title: string }> = []
 
       for (const file of files) {
         const uploaded = await uploadFileToSupabase(file, "slideshow-collections")
         if (!uploaded) {
           throw new Error(`Failed to upload ${file.name}.`)
         }
-
-        const response = await fetch("/api/assets", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: formatAssetTitle(file.name),
-            assetType: "image",
-            category: "scene",
-            visibility: "private",
-            url: uploaded.url,
-            uploadId: uploaded.uploadId,
-            tags: inferCollectionTags(collection),
-          }),
+        uploads.push({
+          uploadId: uploaded.uploadId,
+          title: formatAssetTitle(file.name),
         })
-
-        const data = (await response.json()) as { asset?: AssetRecord; error?: string }
-        if (!response.ok || !data.asset) {
-          throw new Error(data.error || `Failed to create an asset record for ${file.name}.`)
-        }
-
-        newAssetIds.push(data.asset.id)
       }
 
-      await handleUpdateCollection(collectionId, {
-        assetIds: [...collection.items.map((item) => item.assetId), ...newAssetIds],
+      const response = await fetch(`/api/slideshow/collections/${collectionId}/images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploads }),
       })
-      await refreshAvailableAssets()
-      toast.success(`${newAssetIds.length} image${newAssetIds.length === 1 ? "" : "s"} added to ${collection.name}.`)
+      const data = (await response.json()) as { collection?: SlideshowCollection; error?: string }
+      if (!response.ok || !data.collection) {
+        throw new Error(data.error || "Failed to save uploaded collection images.")
+      }
+
+      setCollections((current) => replaceCollection(current, data.collection!))
+      toast.success(`${uploads.length} image${uploads.length === 1 ? "" : "s"} added to ${collection.name}.`)
     } finally {
       setAssetsUploading(false)
     }
   }
 
-  async function handleBackgroundSelect(collection: SlideshowCollection, assetId: string) {
-    const item = collection.items.find((candidate) => candidate.assetId === assetId)
+  async function handleAddAssetCopiesToCollection(collectionId: string, assetIds: string[]) {
+    const collection = collections.find((candidate) => candidate.id === collectionId)
+    if (!collection) {
+      throw new Error("Collection not found.")
+    }
+
+    const response = await fetch(`/api/slideshow/collections/${collectionId}/images`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assetIds }),
+    })
+    const data = (await response.json()) as { collection?: SlideshowCollection; error?: string }
+    if (!response.ok || !data.collection) {
+      throw new Error(data.error || "Failed to copy asset into collection.")
+    }
+
+    setCollections((current) => replaceCollection(current, data.collection!))
+    toast.success(`${assetIds.length} asset${assetIds.length === 1 ? "" : "s"} copied to ${collection.name}.`)
+  }
+
+  async function handlePreviewPinterestImport(payload: {
+    collectionId: string
+    mode: "board_url" | "search"
+    query: string
+    limit: number
+  }) {
+    const response = await fetch("/api/slideshow/collections/import/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const data = (await response.json()) as {
+      jobId?: string
+      candidates?: SlideshowImportCandidate[]
+      error?: string
+    }
+    if (!response.ok || !data.jobId || !data.candidates) {
+      throw new Error(data.error || "Failed to preview Pinterest images.")
+    }
+    return {
+      jobId: data.jobId,
+      candidates: data.candidates,
+    }
+  }
+
+  async function handleCommitPinterestImport(payload: {
+    collectionId: string
+    jobId: string
+    candidateIds: string[]
+  }) {
+    const collection = collections.find((candidate) => candidate.id === payload.collectionId)
+    if (!collection) {
+      throw new Error("Collection not found.")
+    }
+
+    const response = await fetch("/api/slideshow/collections/import/commit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const data = (await response.json()) as {
+      collection?: SlideshowCollection
+      importedCount?: number
+      failedCount?: number
+      error?: string
+    }
+    if (!response.ok || !data.collection || typeof data.importedCount !== "number") {
+      throw new Error(data.error || "Failed to import Pinterest images.")
+    }
+
+    setCollections((current) => replaceCollection(current, data.collection!))
+    toast.success(`${data.importedCount} Pinterest image${data.importedCount === 1 ? "" : "s"} added to ${collection.name}.`)
+    if (typeof data.failedCount === "number" && data.failedCount > 0) {
+      toast.error(`${data.failedCount} selected Pinterest image${data.failedCount === 1 ? "" : "s"} could not be imported.`)
+    }
+    return { importedCount: data.importedCount }
+  }
+
+  async function handleBackgroundSelect(collection: SlideshowCollection, collectionImageId: string) {
+    const item = collection.items.find((candidate) => candidate.id === collectionImageId)
     if (!item || activeSlideIndex === null) return
 
     setSlides((current) =>
@@ -1157,7 +1549,7 @@ export function HookSlideshowApp() {
           ? {
               ...slide,
               collectionId: collection.id,
-              assetId: item.assetId,
+              collectionImageId: item.id,
               assetUrl: item.url,
               selectionMode: "manual",
             }
@@ -1167,7 +1559,7 @@ export function HookSlideshowApp() {
 
     await updateSlide(activeSlideIndex, {
       collectionId: collection.id,
-      assetId: item.assetId,
+      collectionImageId: item.id,
       assetUrl: item.url,
       selectionMode: "manual",
     })
@@ -1696,7 +2088,10 @@ export function HookSlideshowApp() {
         onCreateCollection={handleCreateCollection}
         onUpdateCollection={handleUpdateCollection}
         onDeleteCollection={handleDeleteCollection}
+        onAddAssetCopiesToCollection={handleAddAssetCopiesToCollection}
         onUploadAssetsToCollection={handleUploadAssetsToCollection}
+        onPreviewPinterestImport={handlePreviewPinterestImport}
+        onCommitPinterestImport={handleCommitPinterestImport}
       />
 
       <BackgroundPickerDialog
