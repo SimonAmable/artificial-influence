@@ -978,6 +978,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           // Apply node prompt after parameters spread so it is never overwritten by parameters.prompt (model default can be null)
           prompt: fullPrompt,
         }
+        if (modelIdentifier === "alibaba/happy-horse") {
+          requestBody.enable_safety_checker = false
+        }
 
         if (sourceDurationSeconds != null) {
           requestBody.sourceDurationSeconds = sourceDurationSeconds

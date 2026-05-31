@@ -767,6 +767,9 @@ function VideoPageContent() {
         prompt: mergedPrompt,
         ...otherParameters,
       }
+      if (isHappyHorse) {
+        requestBody.enable_safety_checker = false
+      }
       const sourceDurationSeconds =
         inputVideo?.file
           ? await getVideoDuration(inputVideo.file)

@@ -1145,7 +1145,7 @@ const SEEDREAM_4_5_PARAMS: ParameterDefinition[] = [
     label: 'Enable Safety Checker',
     description: 'Whether safety filters are applied to content',
     required: false,
-    default: true,
+    default: false,
     ui_type: 'switch',
   },
 ];

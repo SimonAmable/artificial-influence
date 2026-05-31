@@ -189,6 +189,12 @@ const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
   "wan-2.7-pro": "fal-ai/wan/v2.7/pro",
   "wan-2.7-pro-image": "fal-ai/wan/v2.7/pro",
 }
+const FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF = new Set([
+  "fal-ai/qwen-image-2",
+  "fal-ai/wan/v2.7",
+  "fal-ai/wan/v2.7/pro",
+  "openai/gpt-image-2",
+])
 const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
   full_character:
     "Character swap task using two reference images. First image is the reference character. " +
@@ -588,6 +594,12 @@ function ImagePageContent() {
       for (const [key, value] of Object.entries(capturedModelParameters)) {
         if (value == null || value === "") continue
         formData.append(key, String(value))
+      }
+      if (
+        capturedModel &&
+        FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF.has(capturedModel)
+      ) {
+        formData.set("enable_safety_checker", "false")
       }
       
       // Add reference image files if present (supports both single and multiple)

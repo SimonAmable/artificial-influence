@@ -211,7 +211,7 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
       num_images: Math.min(4, Math.max(1, options.numImages)),
       output_format: normalizeOutputFormat(options.outputFormat),
       enable_prompt_expansion: options.enablePromptExpansion ?? true,
-      enable_safety_checker: options.enableSafetyChecker ?? false,
+      enable_safety_checker: false,
     }
 
     if (options.seed != null && !Number.isNaN(Number(options.seed))) {

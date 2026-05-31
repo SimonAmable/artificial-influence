@@ -404,7 +404,7 @@ export async function POST(request: NextRequest) {
     if (modelProvider === 'fal' && isSupportedFalImageModel(modelIdentifier)) {
       const negativePromptField = formData.get('negative_prompt') as string | null;
       const enablePromptExpansion = formData.get('enable_prompt_expansion') !== 'false';
-      const enableSafetyChecker = formData.get('enable_safety_checker') === 'true';
+      const enableSafetyChecker = false;
       const rawFormat = (output_format || 'png').toLowerCase();
       const outputFormatResolved: 'png' | 'jpeg' | 'webp' =
         rawFormat === 'jpeg' || rawFormat === 'jpg'
