@@ -22,6 +22,29 @@ function parseOffset(rawOffset: string | null) {
   return Math.floor(parsed);
 }
 
+function normalizeSearch(rawSearch: string | null) {
+  return (rawSearch ?? '').trim().replace(/\s+/g, ' ').slice(0, 120);
+}
+
+function escapeIlikePattern(value: string) {
+  return value
+    .replace(/[\\%_]/g, (match) => `\\${match}`)
+    .replace(/[,()]/g, ' ');
+}
+
+function applySearchFilter<T extends { or: (filters: string) => T }>(query: T, rawSearch: string) {
+  const search = normalizeSearch(rawSearch);
+  if (!search) return query;
+
+  const pattern = `%${escapeIlikePattern(search)}%`;
+  return query.or([
+    `prompt.ilike.${pattern}`,
+    `model.ilike.${pattern}`,
+    `tool.ilike.${pattern}`,
+    `type.ilike.${pattern}`,
+  ].join(','));
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -40,6 +63,7 @@ export async function GET(request: NextRequest) {
     const tool = searchParams.get('tool');
     const limit = parseLimit(searchParams.get('limit'));
     const offset = parseOffset(searchParams.get('offset'));
+    const search = normalizeSearch(searchParams.get('search'));
     const includePending = searchParams.get('includePending') === 'true';
     const excludeFailed = searchParams.get('excludeFailed') !== 'false';
 
@@ -57,6 +81,8 @@ export async function GET(request: NextRequest) {
     if (tool) {
       query = query.eq('tool', tool);
     }
+
+    query = applySearchFilter(query, search);
 
     if (!includePending) {
       query = query.neq('status', 'pending');
@@ -90,6 +116,8 @@ export async function GET(request: NextRequest) {
     if (tool) {
       countQuery = countQuery.eq('tool', tool);
     }
+
+    countQuery = applySearchFilter(countQuery, search);
 
     if (!includePending) {
       countQuery = countQuery.neq('status', 'pending');

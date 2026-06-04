@@ -469,7 +469,7 @@ export const BrandKitEditor = React.forwardRef<BrandKitEditorHandle, BrandKitEdi
       <div className={cn(PAGE_BG, "flex min-h-[40vh] flex-col items-center justify-center gap-4 text-center", className)}>
         <p className="text-muted-foreground">This brand kit could not be found.</p>
         <Button type="button" variant="outline" asChild className="rounded-full border-border">
-          <Link href="/brand">Back to brand kits</Link>
+          <Link href="/assets?tab=brands">Back to brand kits</Link>
         </Button>
       </div>
     )

@@ -10,10 +10,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowUp,
   Books,
+  Check,
   CircleNotch,
   ClockCounterClockwise,
   FilePlus,
   FolderOpen,
+  HandPalm,
+  Lightning,
   NotePencil,
   Plus,
   X,
@@ -87,17 +90,27 @@ import { extractAssetFromNode } from "@/lib/canvas/drag-utils"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { CommandTextarea } from "@/components/commands/command-textarea"
 import type { AttachedRef } from "@/lib/commands/types"
-import { CHAT_AGENT_COMMANDS } from "@/lib/commands/presets-chat"
 import { extendMentionRangeEnd } from "@/lib/commands/mention-token"
 import {
   refsToChatMetadata,
 } from "@/lib/chat/reference-metadata"
 import type {
+  GenerateAudioToolPart,
+  GenerateImageToolPart,
+  GenerateVideoToolPart,
   InstagramConnectionToolSummary,
   SocialConnectionToolSummary,
+  UniversalGenerateImageToolPart,
 } from "@/lib/chat/agent-tool-part-types"
 import { consumeDashboardAgentHandoff } from "@/lib/chat/dashboard-agent-handoff"
 import { consumePendingTemplateHandoff } from "@/lib/templates/handoff"
+import { buildActivateSkillPrompt, buildSkillSlashCommands, normalizeLeadingSkillSlashPrompt } from "@/lib/chat/skills/slash-skill-prompt"
+import type { SkillPickerEntry } from "@/lib/chat/skills/catalog"
+import {
+  DEFAULT_GENERATION_APPROVAL_MODE,
+  normalizeGenerationApprovalMode,
+  type GenerationApprovalMode,
+} from "@/lib/chat/generation-approval"
 
 /** Serializable thread row for mobile history (matches ChatThreadListItem). */
 type MobileChatThreadListItem = {
@@ -106,6 +119,126 @@ type MobileChatThreadListItem = {
   updated_at: string
   source?: "user" | "automation"
   automation_trigger?: "manual" | "scheduled" | null
+}
+
+type PendingToolApprovalPart = {
+  approval?: {
+    approved?: boolean
+    id?: unknown
+    reason?: string
+  }
+  state?: unknown
+  toolCallId?: unknown
+  type?: unknown
+}
+
+type GenerationApprovalActionPart =
+  | GenerateAudioToolPart
+  | GenerateImageToolPart
+  | GenerateVideoToolPart
+  | UniversalGenerateImageToolPart
+
+const GENERATION_APPROVAL_TOOL_TYPES = new Set([
+  "tool-generateAudio",
+  "tool-generateImage",
+  "tool-generateImageWithNanoBanana",
+  "tool-generateVideo",
+])
+
+function getPendingGenerationApprovalIds(messages: UIMessage[]) {
+  const approvalIds: string[] = []
+
+  for (const message of messages) {
+    for (const part of message.parts ?? []) {
+      const toolPart = part as PendingToolApprovalPart
+      if (
+        typeof toolPart.type === "string" &&
+        GENERATION_APPROVAL_TOOL_TYPES.has(toolPart.type) &&
+        toolPart.state === "approval-requested" &&
+        typeof toolPart.approval?.id === "string" &&
+        typeof toolPart.toolCallId === "string"
+      ) {
+        approvalIds.push(toolPart.approval.id)
+      }
+    }
+  }
+
+  return approvalIds
+}
+
+function cancelPendingGenerationApprovals(messages: UIMessage[]) {
+  let canceledCount = 0
+  const reason = "User sent a revised message before approving generation."
+
+  const nextMessages = messages.map((message) => {
+    let changed = false
+    const nextParts = (message.parts ?? []).map((part) => {
+      const toolPart = part as PendingToolApprovalPart
+      if (
+        typeof toolPart.type === "string" &&
+        GENERATION_APPROVAL_TOOL_TYPES.has(toolPart.type) &&
+        toolPart.state === "approval-requested" &&
+        typeof toolPart.approval?.id === "string" &&
+        typeof toolPart.toolCallId === "string"
+      ) {
+        changed = true
+        canceledCount += 1
+        return {
+          ...part,
+          state: "output-denied",
+          approval: {
+            ...toolPart.approval,
+            approved: false,
+            id: toolPart.approval.id,
+            reason,
+          },
+        } as typeof part
+      }
+
+      return part
+    }) as UIMessage["parts"]
+
+    return changed ? { ...message, parts: nextParts } : message
+  })
+
+  return { canceledCount, messages: nextMessages }
+}
+
+function markGenerationApprovalResponded(
+  messages: UIMessage[],
+  toolCallId: string,
+  approved: boolean,
+) {
+  const nextMessages = messages.map((message) => {
+    let changed = false
+    const nextParts = (message.parts ?? []).map((part) => {
+      const toolPart = part as PendingToolApprovalPart
+      if (
+        typeof toolPart.type === "string" &&
+        GENERATION_APPROVAL_TOOL_TYPES.has(toolPart.type) &&
+        toolPart.state === "approval-requested" &&
+        toolPart.toolCallId === toolCallId
+      ) {
+        changed = true
+        return {
+          ...part,
+          approval: toolPart.approval
+            ? {
+                ...toolPart.approval,
+                approved,
+              }
+            : undefined,
+          state: "approval-responded",
+        } as typeof part
+      }
+
+      return part
+    }) as UIMessage["parts"]
+
+    return changed ? { ...message, parts: nextParts } : message
+  })
+
+  return nextMessages
 }
 
 function formatThreadUpdatedAt(value: string) {
@@ -153,6 +286,31 @@ const STARTER_PROMPTS: { label: string; prompt: string }[] = [
 
 const EMPTY_MESSAGES: UIMessage[] = []
 const CHAT_UI_BOOTSTRAP_STORAGE_PREFIX = "creative-chat-ui-bootstrap:"
+const GENERATION_APPROVAL_STORAGE_KEY = "creative-chat-generation-approval-mode"
+
+function readStoredGenerationApprovalMode(): GenerationApprovalMode {
+  if (typeof window === "undefined") {
+    return DEFAULT_GENERATION_APPROVAL_MODE
+  }
+
+  try {
+    return normalizeGenerationApprovalMode(window.localStorage.getItem(GENERATION_APPROVAL_STORAGE_KEY))
+  } catch {
+    return DEFAULT_GENERATION_APPROVAL_MODE
+  }
+}
+
+function storeGenerationApprovalMode(mode: GenerationApprovalMode) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  try {
+    window.localStorage.setItem(GENERATION_APPROVAL_STORAGE_KEY, mode)
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 function readStoredChatBootstrapId(threadId: string): string | null {
   if (typeof window === "undefined") {
@@ -225,6 +383,7 @@ export function CreativeAgentChat({
   const [composerValue, setComposerValue] = React.useState("")
   const [attachedFiles, setAttachedFiles] = React.useState<ComposerUploadAttachment[]>([])
   const [attachedRefs, setAttachedRefs] = React.useState<AttachedRef[]>([])
+  const [availableSkills, setAvailableSkills] = React.useState<SkillPickerEntry[]>([])
   const [socialConnections, setSocialConnections] = React.useState<SocialConnectionToolSummary[]>([])
   const [threadId, setThreadId] = React.useState<string | undefined>(initialThreadId)
   const [isCreatingThread, setIsCreatingThread] = React.useState(false)
@@ -257,7 +416,11 @@ export function CreativeAgentChat({
   const dashboardHandoffConsumedRef = React.useRef(false)
   const templateHandoffCompletedRef = React.useRef(false)
   const chatGatewayModelRef = React.useRef<string>(DEFAULT_CHAT_GATEWAY_MODEL)
+  const generationApprovalModeRef = React.useRef<GenerationApprovalMode>(DEFAULT_GENERATION_APPROVAL_MODE)
+  const forceFullMessagesNextSendRef = React.useRef(false)
   const [chatGatewayModelId, setChatGatewayModelId] = React.useState<string>(DEFAULT_CHAT_GATEWAY_MODEL)
+  const [generationApprovalMode, setGenerationApprovalMode] =
+    React.useState<GenerationApprovalMode>(DEFAULT_GENERATION_APPROVAL_MODE)
   /** One `router.refresh()` per thread ID so sidebar thread titles reflect async intent renaming. */
   const intentSidebarRefreshedForThreadIdsRef = React.useRef(new Set<string>())
   const pathnameRef = React.useRef(pathname)
@@ -266,6 +429,18 @@ export function CreativeAgentChat({
   React.useEffect(() => {
     pathnameRef.current = pathname
   }, [pathname])
+
+  React.useEffect(() => {
+    const storedMode = readStoredGenerationApprovalMode()
+    generationApprovalModeRef.current = storedMode
+    setGenerationApprovalMode(storedMode)
+  }, [])
+
+  const updateGenerationApprovalMode = React.useCallback((mode: GenerationApprovalMode) => {
+    generationApprovalModeRef.current = mode
+    setGenerationApprovalMode(mode)
+    storeGenerationApprovalMode(mode)
+  }, [])
 
   const getLoginHref = React.useCallback(() => {
     if (typeof window === "undefined") {
@@ -314,14 +489,20 @@ export function CreativeAgentChat({
           api: "/api/chat",
           prepareSendMessagesRequest: ({ messages }) => {
             const model = chatGatewayModelRef.current
+            const generationApprovalMode = generationApprovalModeRef.current
+            const forceFullMessages = forceFullMessagesNextSendRef.current
+            if (forceFullMessages) {
+              forceFullMessagesNextSendRef.current = false
+            }
             const onboardingHandoff = onboardingHandoffPendingRef.current
             if (onboardingHandoff) {
               onboardingHandoffPendingRef.current = false
             }
-            if (enablePersistence && threadIdRef.current && messages.length > 0) {
+            if (enablePersistence && threadIdRef.current && messages.length > 0 && !forceFullMessages) {
               return {
                 body: {
                   message: messages[messages.length - 1],
+                  generationApprovalMode,
                   mode: "chat",
                   model,
                   ...(onboardingHandoff ? { onboardingHandoff: true } : {}),
@@ -333,6 +514,7 @@ export function CreativeAgentChat({
             return {
               body: {
                 messages,
+                generationApprovalMode,
                 mode: "chat",
                 model,
                 ...(onboardingHandoff ? { onboardingHandoff: true } : {}),
@@ -356,9 +538,61 @@ export function CreativeAgentChat({
     experimental_throttle: 50,
   })
 
+  const queuedComposerSendRef = React.useRef<{
+    message: Parameters<typeof sendMessage>[0]
+    restoreAttachedFiles: ComposerUploadAttachment[]
+    restoreAttachedRefs: AttachedRef[]
+    restoreComposerValue: string
+  } | null>(null)
+
   const loadedSkillsCount = React.useMemo(
     () => countUniqueSkillsLoadedInMessages(messages),
     [messages],
+  )
+  const pendingGenerationApprovalIds = React.useMemo(
+    () => getPendingGenerationApprovalIds(messages),
+    [messages],
+  )
+
+  React.useEffect(() => {
+    if (!queuedComposerSendRef.current) {
+      return
+    }
+
+    if (status === "submitted" || status === "streaming") {
+      return
+    }
+
+    if (status === "error") {
+      const queued = queuedComposerSendRef.current
+      queuedComposerSendRef.current = null
+      setComposerValue(queued.restoreComposerValue)
+      setAttachedFiles(queued.restoreAttachedFiles)
+      setAttachedRefs(queued.restoreAttachedRefs)
+      toast.error(error?.message || "Could not send message. Please try again.")
+      return
+    }
+
+    if (pendingGenerationApprovalIds.length > 0) {
+      return
+    }
+
+    const queued = queuedComposerSendRef.current
+    queuedComposerSendRef.current = null
+    forceFullMessagesNextSendRef.current = true
+
+    void sendMessage(queued.message).catch((sendError) => {
+      forceFullMessagesNextSendRef.current = false
+      setComposerValue(queued.restoreComposerValue)
+      setAttachedFiles(queued.restoreAttachedFiles)
+      setAttachedRefs(queued.restoreAttachedRefs)
+      toast.error(sendError instanceof Error ? sendError.message : "Could not send message.")
+    })
+  }, [error, pendingGenerationApprovalIds.length, sendMessage, status])
+
+  const chatSlashCommands = React.useMemo(
+    () => buildSkillSlashCommands(availableSkills),
+    [availableSkills],
   )
 
   const refreshPinnedSkills = React.useCallback(async () => {
@@ -378,6 +612,25 @@ export function CreativeAgentChat({
     }
 
     setPinnedSkills(Array.isArray(data.pinnedSkills) ? data.pinnedSkills : [])
+  }, [userId])
+
+  const refreshAvailableSkills = React.useCallback(async () => {
+    if (!userId) {
+      setAvailableSkills([])
+      return
+    }
+
+    const response = await fetch("/api/skills", { credentials: "same-origin" })
+    const data = (await response.json().catch(() => ({}))) as {
+      error?: string
+      skills?: SkillPickerEntry[]
+    }
+
+    if (!response.ok) {
+      throw new Error(typeof data.error === "string" ? data.error : "Could not load skills.")
+    }
+
+    setAvailableSkills(Array.isArray(data.skills) ? data.skills : [])
   }, [userId])
 
   React.useEffect(() => {
@@ -417,6 +670,7 @@ export function CreativeAgentChat({
 
     if (!userId) {
       setPinnedSkills([])
+      setAvailableSkills([])
       return
     }
 
@@ -424,7 +678,11 @@ export function CreativeAgentChat({
       console.error("[chat] Failed to load pinned skills:", error)
       setPinnedSkills([])
     })
-  }, [authReady, refreshPinnedSkills, userId])
+    void refreshAvailableSkills().catch((error: unknown) => {
+      console.error("[chat] Failed to load skills for slash commands:", error)
+      setAvailableSkills([])
+    })
+  }, [authReady, refreshAvailableSkills, refreshPinnedSkills, userId])
 
   React.useEffect(() => {
     if (!authReady || !userId) {
@@ -802,6 +1060,71 @@ export function CreativeAgentChat({
     setCreateAssetDialogOpen(true)
   }, [])
 
+  const handleGenerationToolApprovalResponse = React.useCallback(
+    async (part: GenerationApprovalActionPart, approved: boolean) => {
+      if (!part.toolCallId) {
+        toast.error("Could not find the generation request.")
+        return
+      }
+
+      const previousMessages = messages
+      const toastId = approved
+        ? toast.loading("Starting generation...", {
+            description: "Running the approved request now.",
+          })
+        : toast.message("Generation canceled.", {
+            description: "No credits were spent.",
+          })
+
+      setMessages(markGenerationApprovalResponded(previousMessages, part.toolCallId, approved))
+
+      try {
+        const response = await fetch("/api/chat/generation-approval", {
+          body: JSON.stringify({
+            approved,
+            messages: previousMessages,
+            threadId: threadIdRef.current,
+            toolCallId: part.toolCallId,
+          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        })
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string
+          messages?: UIMessage[]
+        }
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Could not update generation approval.")
+        }
+
+        if (Array.isArray(payload.messages)) {
+          setMessages(payload.messages)
+        }
+
+        if (approved) {
+          toast.success("Generation started.", {
+            description: "The result card will update here.",
+            id: toastId,
+          })
+        }
+      } catch (approvalError) {
+        setMessages(previousMessages)
+        toast.error(
+          approvalError instanceof Error
+            ? approvalError.message
+            : "Could not update generation approval.",
+          {
+            id: toastId,
+          },
+        )
+      }
+    },
+    [messages, setMessages],
+  )
+
   const transcribeAudioBlob = React.useCallback(async (audioBlob: Blob) => {
     const formData = new FormData()
     formData.append("audio", audioBlob, "audio.webm")
@@ -1039,9 +1362,14 @@ export function CreativeAgentChat({
     if (isCreatingThread) return
     if (isBootstrappingOnboarding) return
 
+    const normalizedComposerValue = normalizeLeadingSkillSlashPrompt(
+      composerValue,
+      availableSkills.map((skill) => skill.slug),
+    )
+
     const parts: UIMessage["parts"] = []
-    if (composerValue.trim()) {
-      parts.push({ type: "text", text: composerValue.trim() })
+    if (normalizedComposerValue) {
+      parts.push({ type: "text", text: normalizedComposerValue })
     }
     parts.push(...(await filesToMessageParts(composerAttachments)))
 
@@ -1070,19 +1398,45 @@ export function CreativeAgentChat({
       fileInputRef.current.value = ""
     }
 
+    const userMessage = {
+      metadata: refsToChatMetadata(attachedRefs),
+      role: "user" as const,
+      parts,
+    }
+
     try {
-      await sendMessage({
-        metadata: refsToChatMetadata(attachedRefs),
-        role: "user",
-        parts,
-      })
+      if (pendingGenerationApprovalIds.length > 0) {
+        const canceled = cancelPendingGenerationApprovals(messages)
+        queuedComposerSendRef.current = {
+          message: userMessage,
+          restoreAttachedFiles: draftAttachedFiles,
+          restoreAttachedRefs: draftAttachedRefs,
+          restoreComposerValue: draftComposerValue,
+        }
+        setMessages(canceled.messages)
+
+        toast.message(
+          canceled.canceledCount === 1
+            ? "Canceled pending generation."
+            : `Canceled ${canceled.canceledCount} pending generations.`,
+          {
+            description: "Sending your new message now.",
+          },
+        )
+        return
+      }
+
+      await sendMessage(userMessage)
     } catch (sendError) {
+      queuedComposerSendRef.current = null
+      forceFullMessagesNextSendRef.current = false
       setComposerValue(draftComposerValue)
       setAttachedFiles(draftAttachedFiles)
       setAttachedRefs(draftAttachedRefs)
       toast.error(sendError instanceof Error ? sendError.message : "Could not send message.")
     }
   }, [
+    availableSkills,
     attachedFiles,
     attachedRefs,
     authReady,
@@ -1093,8 +1447,11 @@ export function CreativeAgentChat({
     isBootstrappingOnboarding,
     isCreatingThread,
     getLoginHref,
+    messages,
+    pendingGenerationApprovalIds,
     router,
     sendMessage,
+    setMessages,
     userId,
   ])
 
@@ -1116,7 +1473,7 @@ export function CreativeAgentChat({
         return
       }
 
-      const text = `Please use the activateSkill tool with slug \`${slug}\` so you load that skill's instructions before continuing.`
+      const text = buildActivateSkillPrompt([slug])
 
       try {
         const nextThreadId = await ensurePersistedThread(`Skill: ${slug}`)
@@ -1445,6 +1802,9 @@ export function CreativeAgentChat({
                               approved,
                             })
                           }}
+                          onGenerationToolApprovalResponse={(part, approved) => {
+                            void handleGenerationToolApprovalResponse(part, approved)
+                          }}
                           onImageGridAgentAction={handleImageGridAgentAction}
                           onCreateAssetFromImage={handleCreateAssetFromImage}
                         />
@@ -1562,9 +1922,9 @@ export function CreativeAgentChat({
                     onRefsChange={setAttachedRefs}
                     rows={3}
                     className="min-h-[72px] max-h-[180px] flex-1 px-3 py-2"
-                    placeholder="Describe what you want. / for shortcuts, @ for brands & assets."
-                    slashCommands={CHAT_AGENT_COMMANDS}
-                    slashCommandsContext="Agent"
+                    placeholder="Describe what you want. Type /skill-name to load a skill, @ for brands & assets."
+                    slashCommands={chatSlashCommands}
+                    slashCommandsContext="Skills"
                     onPasteImage={(file) => void handleAttachFiles([file])}
                     onPromptKeyDown={(event) => {
                       if (event.key === "Enter" && !event.shiftKey) {
@@ -1721,6 +2081,60 @@ export function CreativeAgentChat({
                       </Tooltip>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 max-w-[14rem] shrink min-w-0 gap-1.5 rounded-full px-2 text-xs font-medium text-muted-foreground hover:text-foreground sm:px-3"
+                            aria-label={
+                              generationApprovalMode === "ask"
+                                ? "Ask before generation"
+                                : "Auto-run generation without asking"
+                            }
+                            disabled={
+                              !authReady ||
+                              isCreatingThread ||
+                              isBootstrappingOnboarding ||
+                              status === "submitted" ||
+                              status === "streaming"
+                            }
+                          >
+                            {generationApprovalMode === "ask" ? (
+                              <HandPalm className="size-4 shrink-0" weight="duotone" />
+                            ) : (
+                              <Lightning className="size-4 shrink-0" weight="duotone" />
+                            )}
+                            <span className="hidden truncate md:inline">
+                              {generationApprovalMode === "ask"
+                                ? "Ask before generation"
+                                : "Auto-run generation"}
+                            </span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" side="top" sideOffset={4} className="w-64">
+                          <DropdownMenuLabel className="font-normal text-muted-foreground">
+                            Generation approval
+                          </DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onClick={() => updateGenerationApprovalMode("auto")}
+                            className="gap-3"
+                          >
+                            <Lightning className="size-4 text-muted-foreground" weight="duotone" />
+                            <span className="min-w-0 flex-1">Auto-run without asking</span>
+                            {generationApprovalMode === "auto" ? <Check className="size-4" /> : null}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => updateGenerationApprovalMode("ask")}
+                            className="gap-3"
+                          >
+                            <HandPalm className="size-4 text-muted-foreground" weight="duotone" />
+                            <span className="min-w-0 flex-1">Confirm before running</span>
+                            {generationApprovalMode === "ask" ? <Check className="size-4" /> : null}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <SpeechInput
                         forceServerTranscription
                         variant="ghost"
@@ -1744,7 +2158,9 @@ export function CreativeAgentChat({
                         aria-label={
                           status === "submitted" || status === "streaming"
                             ? "Stop response"
-                            : "Send message"
+                            : pendingGenerationApprovalIds.length > 0
+                              ? "Cancel pending generation and send message"
+                              : "Send message"
                         }
                         onClick={() => {
                           if (status === "submitted" || status === "streaming") {

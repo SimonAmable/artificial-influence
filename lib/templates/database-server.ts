@@ -198,6 +198,7 @@ export async function listPublicTemplates(category?: string): Promise<Template[]
 export async function listTemplatesForGallery(
   userId?: string | null,
   category?: string,
+  search?: string,
 ): Promise<Template[]> {
   const supabase = await createClient()
 
@@ -214,6 +215,16 @@ export async function listTemplatesForGallery(
 
   if (category && category !== "all") {
     query = query.eq("category", category)
+  }
+
+  const trimmedSearch = search?.trim()
+  if (trimmedSearch) {
+    const safeSearch = trimmedSearch.replace(/[%_,()'":;]/g, " ").replace(/\s+/g, " ").trim()
+    if (safeSearch) {
+      query = query.or(
+        `title.ilike.%${safeSearch}%,description.ilike.%${safeSearch}%,slug.ilike.%${safeSearch}%`,
+      )
+    }
   }
 
   const { data, error } = await query
@@ -261,10 +272,10 @@ export async function searchTemplatesForUser(
       ? await listUserTemplates(userId)
       : scope === "public"
         ? await listPublicTemplates(category)
-        : await listTemplatesForGallery(userId, category)
+        : await listTemplatesForGallery(userId, category, options?.query)
 
   const query = options?.query?.trim().toLowerCase()
-  const filtered = query
+  const filtered = query && scope !== "all"
     ? templates.filter((template) =>
         [template.title, template.description, template.slug].some((value) =>
           value.toLowerCase().includes(query),

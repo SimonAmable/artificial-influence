@@ -5,7 +5,7 @@ import type { AttachedRef, CommandItem, ReferenceItem, SlashCommandUiAction } fr
 import { PRESET_COMMANDS } from "./presets"
 import { getCachedAssets, getCachedBrandKits } from "./cache"
 import { assetToReferenceItem, brandKitToReferenceItem } from "./reference-items"
-import { makeMentionToken, mentionReserveTail } from "./mention-token"
+import { makeMentionToken } from "./mention-token"
 import { valueToParts } from "./mention-segments"
 import type { AssetRecord, AssetType } from "@/lib/assets/types"
 import type { BrandKit } from "@/lib/brand-kit/types"
@@ -252,7 +252,7 @@ export function useCommandInput(options: {
       const existing = refs.find((r) => r.id === item.id)
       const taken = new Set(refs.map((r) => r.mentionToken))
       const mentionToken = existing?.mentionToken ?? makeMentionToken(item, taken)
-      const insert = mentionToken + mentionReserveTail()
+      const insert = mentionToken
       const next = value.slice(0, t.start) + insert + value.slice(end)
       const nextRefs = existing
         ? refs

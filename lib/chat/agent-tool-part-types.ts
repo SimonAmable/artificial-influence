@@ -2,10 +2,25 @@
 
 import type { AttachedRef } from "@/lib/commands/types"
 
+type ToolApprovalState = {
+  approved?: boolean
+  id: string
+  reason?: string
+}
+
+type ApprovableToolState =
+  | "input-streaming"
+  | "input-available"
+  | "approval-requested"
+  | "approval-responded"
+  | "output-available"
+  | "output-error"
+  | "output-denied"
+
 export type GenerateImageToolPart = {
   type: "tool-generateImageWithNanoBanana"
   toolCallId: string
-  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  state: ApprovableToolState
   input?: {
     aspectRatio?: string
     modelIdentifier?: string
@@ -27,6 +42,7 @@ export type GenerateImageToolPart = {
     referenceImageUrls?: string[]
     variantCount?: number
   }
+  approval?: ToolApprovalState
   errorText?: string
 }
 
@@ -66,7 +82,7 @@ export type UpscaleImageToolPart = {
 export type UniversalGenerateImageToolPart = {
   type: "tool-generateImage"
   toolCallId: string
-  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  state: ApprovableToolState
   input?: {
     aspectRatio?: string
     assetIds?: string[]
@@ -92,13 +108,14 @@ export type UniversalGenerateImageToolPart = {
     referenceImageUrls?: string[]
     variantCount?: number
   }
+  approval?: ToolApprovalState
   errorText?: string
 }
 
 export type GenerateVideoToolPart = {
   type: "tool-generateVideo"
   toolCallId: string
-  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  state: ApprovableToolState
   input?: {
     aspectRatio?: string
     assetIds?: string[]
@@ -132,13 +149,14 @@ export type GenerateVideoToolPart = {
       url: string
     }
   }
+  approval?: ToolApprovalState
   errorText?: string
 }
 
 export type GenerateAudioToolPart = {
   type: "tool-generateAudio"
   toolCallId: string
-  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  state: ApprovableToolState
   input?: {
     languageCode?: string
     modelIdentifier?: string
@@ -161,6 +179,7 @@ export type GenerateAudioToolPart = {
     voiceDisplayName?: string | null
     voiceId?: string
   }
+  approval?: ToolApprovalState
   errorText?: string
 }
 

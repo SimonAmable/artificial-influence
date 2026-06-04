@@ -42,6 +42,7 @@ const JSON_SUPPORTED_MODELS = new Set([
 
 interface CreateGenerateImageToolOptions {
   availableReferences: AvailableChatImageReference[]
+  requireApproval?: boolean
   supabase: SupabaseClient
   threadId?: string
   userId: string
@@ -327,6 +328,7 @@ async function maybeEnhancePrompt({
 
 export function createGenerateImageTool({
   availableReferences,
+  requireApproval = false,
   supabase,
   threadId,
   userId,
@@ -395,6 +397,7 @@ export function createGenerateImageTool({
           "Literal pass-through: the `prompt` string is sent to the image API with no server-side enhancement or rewriting. Use for stringified JSON visual recipes, copy-pasted prompt packs, or whenever the user asked for full JSON / verbatim / no condensation. When true, overrides enhancePrompt.",
         ),
     }),
+    needsApproval: requireApproval,
     strict: true,
     execute: async ({
       aspectRatio,

@@ -48,6 +48,7 @@ interface CreateGenerateVideoToolOptions {
   availableReferences: AvailableChatImageReference[]
   availableVideoReferences: AvailableChatVideoReference[]
   availableAudioReferences: AvailableChatAudioReference[]
+  requireApproval?: boolean
   supabase: SupabaseClient
   threadId?: string
   userId: string
@@ -229,6 +230,7 @@ export function createGenerateVideoTool({
   availableReferences,
   availableVideoReferences,
   availableAudioReferences,
+  requireApproval = false,
   supabase,
   threadId,
   userId,
@@ -308,6 +310,7 @@ export function createGenerateVideoTool({
           "Kling motion-control only. 'video' (default) matches the reference video's orientation and allows reference videos up to 30s. 'image' keeps the still-image orientation but caps the reference video at 10s. Only pass 'image' if the user explicitly wants the character locked to the still image.",
         ),
     }),
+    needsApproval: requireApproval,
     strict: true,
     execute: async ({
       prompt = "",

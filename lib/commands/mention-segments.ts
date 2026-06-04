@@ -12,9 +12,7 @@ export type MentionPart =
       end: number
     }
 
-/**
- * Split prompt value into plain text runs and @mention segments (token + trailing layout NBSP).
- */
+/** Split prompt value into plain text runs and @mention segments. */
 export function valueToParts(value: string, refs: AttachedRef[]): MentionPart[] {
   const withToken = refs.filter((r) => r.mentionToken.length > 0)
   if (withToken.length === 0 || !value) {

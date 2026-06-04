@@ -154,6 +154,8 @@ export function buildSkillsCatalogAppendix(entries: SkillCatalogEntry[]) {
 
 You have specialized **Agent Skills** (portable instruction packs). Each entry below is only a summary. When the user's task matches a skill's description, call **activateSkill** with that skill's \`slug\` **before** improvising from general knowledge, so you load the full instructions for that turn.
 
+If the user starts their message with one or more slash skill tokens like \`/storyboard-pro\` or \`/brand-audit\`, treat each matching slash token as an explicit request to call **activateSkill** for that slug before handling the rest of the message.
+
 Available skills:
 ${lines.join("\n")}
 

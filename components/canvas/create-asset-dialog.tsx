@@ -49,6 +49,7 @@ interface CreateAssetDialogProps {
     tags?: string[]
     description?: string | null
     sourceNodeType?: string
+    sourceGenerationId?: string
   }
   onSaved?: () => void
   /** When the dialog opens, call the same AI autofill used by the manual button (e.g. onboarding upload). */
@@ -160,6 +161,7 @@ export function CreateAssetDialog({
           uploadId: initial.uploadId,
           supabaseStoragePath: initial.supabaseStoragePath,
           sourceNodeType: initial.sourceNodeType,
+          sourceGenerationId: initial.sourceGenerationId,
         })
         toast.success("Asset updated")
         invalidateCommandCache()
@@ -175,6 +177,7 @@ export function CreateAssetDialog({
           uploadId: initial.uploadId,
           supabaseStoragePath: initial.supabaseStoragePath,
           sourceNodeType: initial.sourceNodeType,
+          sourceGenerationId: initial.sourceGenerationId,
         })
         toast.success("Asset saved")
         invalidateCommandCache()

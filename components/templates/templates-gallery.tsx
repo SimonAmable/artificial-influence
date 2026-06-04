@@ -22,33 +22,60 @@ interface TemplatesGalleryProps {
 
 export function TemplatesGallery({ templates, currentUserId }: TemplatesGalleryProps) {
   const [search, setSearch] = React.useState("")
+  const [debouncedSearch, setDebouncedSearch] = React.useState("")
   const [category, setCategory] = React.useState<TemplateCategory | "all">("all")
+  const [galleryTemplates, setGalleryTemplates] = React.useState<Template[]>(templates)
+  const [loading, setLoading] = React.useState(false)
 
-  const filtered = React.useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return templates.filter((template) => {
-      if (category !== "all" && template.category !== category) return false
-      if (!q) return true
-      return (
-        template.title.toLowerCase().includes(q) ||
-        template.description.toLowerCase().includes(q) ||
-        template.slug.toLowerCase().includes(q)
-      )
-    })
-  }, [templates, search, category])
+  React.useEffect(() => {
+    setGalleryTemplates(templates)
+  }, [templates])
+
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 200)
+    return () => window.clearTimeout(timer)
+  }, [search])
+
+  React.useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadTemplates() {
+      setLoading(true)
+      try {
+        const params = new URLSearchParams()
+        if (category !== "all") params.set("category", category)
+        if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim())
+
+        const response = await fetch(`/api/templates?${params.toString()}`, {
+          signal: controller.signal,
+        })
+        if (!response.ok) throw new Error("Failed to search templates")
+
+        const payload = (await response.json()) as { templates?: Template[] }
+        setGalleryTemplates(payload.templates ?? [])
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error("[templates-gallery] search failed:", error)
+          setGalleryTemplates([])
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
+    }
+
+    void loadTemplates()
+
+    return () => controller.abort()
+  }, [category, debouncedSearch])
 
   const ownedTemplates = React.useMemo(
     () =>
       currentUserId
-        ? filtered.filter((template) => template.creator_id === currentUserId)
+        ? galleryTemplates.filter((template) => template.creator_id === currentUserId)
         : [],
-    [currentUserId, filtered],
+    [currentUserId, galleryTemplates],
   )
-  const publicTemplates = React.useMemo(
-    () => filtered.filter((template) => template.creator_id !== currentUserId),
-    [currentUserId, filtered],
-  )
-  const popular = filtered.slice(0, 8)
+  const popular = galleryTemplates.slice(0, 8)
   const [recentThreshold] = React.useState(
     () => Date.now() - 7 * 24 * 60 * 60 * 1000,
   )
@@ -107,14 +134,14 @@ export function TemplatesGallery({ templates, currentUserId }: TemplatesGalleryP
           </div>
 
           <p className="text-sm text-muted-foreground">
-            {filtered.length} template{filtered.length === 1 ? "" : "s"}
+            {loading ? "Searching..." : `${galleryTemplates.length} template${galleryTemplates.length === 1 ? "" : "s"}`}
           </p>
         </div>
       </section>
 
-      {filtered.length === 0 ? (
+      {galleryTemplates.length === 0 ? (
         <p className="mt-10 text-center text-muted-foreground">
-          No templates match your search.
+          {loading ? "Loading templates..." : "No templates match your search."}
         </p>
       ) : (
         <>
@@ -157,11 +184,11 @@ export function TemplatesGallery({ templates, currentUserId }: TemplatesGalleryP
             </section>
           ) : null}
 
-          {filtered.length > 0 ? (
+          {galleryTemplates.length > 0 ? (
             <section className="mt-10">
               <h2 className="mb-4 text-lg font-bold">All templates</h2>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5">
-                {filtered.map((template) => (
+                {galleryTemplates.map((template) => (
                   <TemplateCard
                     key={template.id}
                     template={template}

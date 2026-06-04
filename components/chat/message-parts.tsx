@@ -85,6 +85,7 @@ export function MessageParts({
   socialConnectionsById = new Map(),
   onEditSkillRequest,
   onToolApprovalResponse,
+  onGenerationToolApprovalResponse,
   onImageGridAgentAction,
   onCreateAssetFromImage,
 }: {
@@ -94,6 +95,14 @@ export function MessageParts({
   socialConnectionsById?: Map<string, SocialConnectionToolSummary>
   onEditSkillRequest?: (slug: string) => void
   onToolApprovalResponse: (approvalId: string, approved: boolean) => void
+  onGenerationToolApprovalResponse?: (
+    part:
+      | GenerateAudioToolPart
+      | GenerateImageToolPart
+      | GenerateVideoToolPart
+      | UniversalGenerateImageToolPart,
+    approved: boolean,
+  ) => void
   onImageGridAgentAction?: (action: ImageGridAgentAction, image: {
     url: string
     prompt?: string | null
@@ -177,6 +186,11 @@ export function MessageParts({
               part={toolPart}
               title="Nano Banana Tool"
               allMessages={transcriptMessages}
+              onToolApprovalResponse={(approvalId, approved) =>
+                onGenerationToolApprovalResponse
+                  ? onGenerationToolApprovalResponse(toolPart, approved)
+                  : onToolApprovalResponse(approvalId, approved)
+              }
               onImageGridAgentAction={onImageGridAgentAction}
               onCreateAssetFromImage={onCreateAssetFromImage}
             />
@@ -194,6 +208,11 @@ export function MessageParts({
               part={toolPart}
               title="Image Generation Tool"
               allMessages={transcriptMessages}
+              onToolApprovalResponse={(approvalId, approved) =>
+                onGenerationToolApprovalResponse
+                  ? onGenerationToolApprovalResponse(toolPart, approved)
+                  : onToolApprovalResponse(approvalId, approved)
+              }
               onImageGridAgentAction={onImageGridAgentAction}
               onCreateAssetFromImage={onCreateAssetFromImage}
             />
@@ -215,12 +234,34 @@ export function MessageParts({
 
         if (part.type === "tool-generateVideo") {
           const toolPart = part as GenerateVideoToolPart
-          return <VideoGenerationResultCard key={`${message.id}-${index}`} messageId={`${message.id}-${index}`} part={toolPart} />
+          return (
+            <VideoGenerationResultCard
+              key={`${message.id}-${index}`}
+              messageId={`${message.id}-${index}`}
+              part={toolPart}
+              onToolApprovalResponse={(approvalId, approved) =>
+                onGenerationToolApprovalResponse
+                  ? onGenerationToolApprovalResponse(toolPart, approved)
+                  : onToolApprovalResponse(approvalId, approved)
+              }
+            />
+          )
         }
 
         if (part.type === "tool-generateAudio") {
           const toolPart = part as GenerateAudioToolPart
-          return <AudioGenerationResultCard key={`${message.id}-${index}`} messageId={`${message.id}-${index}`} part={toolPart} />
+          return (
+            <AudioGenerationResultCard
+              key={`${message.id}-${index}`}
+              messageId={`${message.id}-${index}`}
+              part={toolPart}
+              onToolApprovalResponse={(approvalId, approved) =>
+                onGenerationToolApprovalResponse
+                  ? onGenerationToolApprovalResponse(toolPart, approved)
+                  : onToolApprovalResponse(approvalId, approved)
+              }
+            />
+          )
         }
 
         if (part.type === "tool-extractVideoFrames") {

@@ -9,19 +9,20 @@ import { valueToParts, type MentionPart } from "@/lib/commands/mention-segments"
 /** Re-export for callers that already imported from here */
 export { valueToParts, type MentionPart } from "@/lib/commands/mention-segments"
 
-/** Button size (px), keep in sync with MentionRemoveOverlay button */
-export const MENTION_REMOVE_BTN_PX = 14
-
 export type MentionControlLayout = {
   key: string
   start: number
   end: number
   refItem: AttachedRef
-  /** Pill bounds in the layer (for hover hit-testing + remove button placement). */
+  /** Mention bounds in the layer for hover hit-testing. */
   pillLeft: number
   pillTop: number
   pillWidth: number
   pillHeight: number
+  triggerLeft: number
+  triggerTop: number
+  triggerWidth: number
+  triggerHeight: number
 }
 
 function MentionTokenSpan({
@@ -33,7 +34,7 @@ function MentionTokenSpan({
   hoveredKey,
 }: {
   refItem: AttachedRef
-  /** Exact substring from the textarea (token + layout NBSP), must match textarea width for caret alignment */
+  /** Exact substring from the textarea; the mirror must preserve this text footprint. */
   segment: string
   mentionKey: string
   start: number
@@ -42,6 +43,9 @@ function MentionTokenSpan({
   hoveredKey: string | null
 }) {
   const isBrand = refItem.category === "brand"
+  const mentionColorClass = isBrand
+    ? "bg-violet-500/20 text-violet-300"
+    : "bg-muted/70 text-foreground"
   const token = refItem.mentionToken
   const tail = segment.slice(token.length)
   const slug = token.startsWith("@") ? token.slice(1) : token
@@ -55,17 +59,28 @@ function MentionTokenSpan({
       title={refItem.label}
       className={cn(
         "rounded-sm [line-height:inherit] [box-decoration-break:clone]",
-        isBrand ? "bg-violet-500/20 text-violet-300" : "bg-muted/70 text-foreground"
+        mentionColorClass
       )}
     >
-      {/** Visible @ by default; hidden on hover while the remove control draws in the same slot. */}
       <span
-        className={cn("select-none", showRemoveInPlace && "text-transparent")}
+        data-mention-trigger-slot="true"
+        className="relative inline-block select-none align-baseline"
         aria-hidden
       >
-        @
+        <span className="text-transparent">@</span>
+        {refItem.previewUrl && !showRemoveInPlace ? (
+          <span
+            className="absolute inset-x-0 top-1/2 inline-block -translate-y-1/2 overflow-hidden rounded-full bg-cover bg-center"
+            style={{
+              height: "1em",
+              backgroundImage: `url("${refItem.previewUrl.replace(/"/g, '\\"')}")`,
+            }}
+          />
+        ) : (
+          <span className={cn("absolute inset-0", showRemoveInPlace && "text-transparent")}>@</span>
+        )}
       </span>
-      <span className="whitespace-pre">{slug}</span>
+      <span className={cn("rounded-sm whitespace-pre [box-decoration-break:clone]", mentionColorClass)}>{slug}</span>
       <span className="whitespace-pre text-transparent select-none" aria-hidden>
         {tail}
       </span>
@@ -81,7 +96,7 @@ export interface MentionMirrorProps {
   className?: string
   layerRef: React.RefObject<HTMLElement | null>
   onControlLayouts: (layouts: MentionControlLayout[]) => void
-  /** Which mention chip is hovered (shows X in place of @). */
+  /** Which mention is hovered (shows X in place of @). */
   hoveredKey?: string | null
 }
 
@@ -125,6 +140,8 @@ export function MentionMirror({
       const part = mentionByKey.get(key)
       if (!part) return
       const sr = el.getBoundingClientRect()
+      const trigger = el.querySelector<HTMLElement>("[data-mention-trigger-slot=true]")
+      const tr = trigger?.getBoundingClientRect() ?? sr
       next.push({
         key: part.key,
         start: part.start,
@@ -134,12 +151,16 @@ export function MentionMirror({
         pillTop: sr.top - lr.top,
         pillWidth: sr.width,
         pillHeight: sr.height,
+        triggerLeft: tr.left - lr.left,
+        triggerTop: tr.top - lr.top,
+        triggerWidth: tr.width,
+        triggerHeight: tr.height,
       })
     })
     const sig = next
       .map(
         (c) =>
-          `${c.key}:${Math.round(c.pillLeft)}:${Math.round(c.pillTop)}:${Math.round(c.pillWidth)}:${Math.round(c.pillHeight)}`
+          `${c.key}:${Math.round(c.pillLeft)}:${Math.round(c.pillTop)}:${Math.round(c.pillWidth)}:${Math.round(c.pillHeight)}:${Math.round(c.triggerLeft)}:${Math.round(c.triggerTop)}:${Math.round(c.triggerWidth)}:${Math.round(c.triggerHeight)}`
       )
       .join("|")
     if (sig !== prevLayoutsRef.current) {
@@ -198,7 +219,6 @@ export interface MentionRemoveOverlayProps {
 }
 
 export function MentionRemoveOverlay({ layouts, onRemove, hoveredKey }: MentionRemoveOverlayProps) {
-  const btn = MENTION_REMOVE_BTN_PX
   return (
     <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
       {layouts.map((c) => {
@@ -210,10 +230,10 @@ export function MentionRemoveOverlay({ layouts, onRemove, hoveredKey }: MentionR
             type="button"
             tabIndex={-1}
             style={{
-              left: c.pillLeft + 1,
-              top: c.pillTop + (c.pillHeight - btn) / 2,
-              width: btn,
-              height: btn,
+              left: c.triggerLeft,
+              top: c.triggerTop,
+              width: c.triggerWidth,
+              height: c.triggerHeight,
             }}
             className={cn(
               "absolute inline-flex shrink-0 items-center justify-center rounded-sm",
@@ -235,7 +255,7 @@ export function MentionRemoveOverlay({ layouts, onRemove, hoveredKey }: MentionR
               onRemove(c.start, c.end)
             }}
           >
-            <X className="size-2.5" weight="bold" aria-hidden />
+            <X className="size-[0.85em]" weight="bold" aria-hidden />
           </button>
         )
       })}

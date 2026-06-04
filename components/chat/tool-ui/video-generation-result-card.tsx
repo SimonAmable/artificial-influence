@@ -3,6 +3,7 @@
 import * as React from "react"
 import { CircleNotch } from "@phosphor-icons/react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type { GenerateVideoToolPart } from "@/lib/chat/agent-tool-part-types"
@@ -149,9 +150,11 @@ function VideoToolPromptPill({ input }: { input?: GenerateVideoToolPart["input"]
 export function VideoGenerationResultCard({
   messageId,
   part,
+  onToolApprovalResponse,
 }: {
   messageId: string
   part: GenerateVideoToolPart
+  onToolApprovalResponse?: (approvalId: string, approved: boolean) => void
 }) {
   const pollEnabled =
     part.state === "output-available" &&
@@ -191,6 +194,74 @@ export function VideoGenerationResultCard({
             ) : null}
             <VideoToolPromptPill input={part.input} />
           </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (part.state === "approval-requested") {
+    return (
+      <Card key={messageId} className="border-border/60 bg-muted/10">
+        <CardContent className="space-y-4 p-4">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Generate this video?</p>
+            <p className="text-xs text-muted-foreground">
+              Confirm before spending credits and starting the video job.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {!part.input?.modelIdentifier ? <Badge variant="outline">Model auto</Badge> : null}
+            {part.input?.modelIdentifier ? (
+              <Badge variant="outline" className="max-w-[12rem] truncate font-mono text-[10px]">
+                {part.input.modelIdentifier}
+              </Badge>
+            ) : null}
+            {part.input?.aspectRatio ? <Badge variant="outline">{part.input.aspectRatio}</Badge> : null}
+            {part.input?.duration ? <Badge variant="outline">{part.input.duration}s</Badge> : null}
+            <VideoToolPromptPill input={part.input} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => part.approval?.id && onToolApprovalResponse?.(part.approval.id, true)}
+            >
+              Generate
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => part.approval?.id && onToolApprovalResponse?.(part.approval.id, false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (part.state === "approval-responded") {
+    return (
+      <Card key={messageId} className="border-border/60 bg-muted/20">
+        <CardContent className="flex items-center gap-3 p-4">
+          <CircleNotch className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Processing approval</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {part.approval?.approved ? "Starting video generation" : "Canceling video generation"}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (part.state === "output-denied") {
+    return (
+      <Card key={messageId} className="border-border/60 bg-muted/10">
+        <CardContent className="space-y-2 p-4 text-sm">
+          <p className="font-medium">Video generation canceled</p>
+          <p className="text-muted-foreground">No video job was started.</p>
         </CardContent>
       </Card>
     )

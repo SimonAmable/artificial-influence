@@ -41,6 +41,7 @@ import {
   createSearchWebTool,
 } from "@/lib/chat/tools/web-research"
 import type { AttachedRef } from "@/lib/commands/types"
+import type { GenerationApprovalMode } from "@/lib/chat/generation-approval"
 
 interface CreateCreativeChatToolsOptions {
   availableReferences: AvailableChatImageReference[]
@@ -52,6 +53,7 @@ interface CreateCreativeChatToolsOptions {
   threadId?: string
   userId: string
   skillsCatalog?: SkillCatalogEntry[]
+  generationApprovalMode?: GenerationApprovalMode
   /** `resume`: webhook follow-up turn — Instagram draft etc. runs without interactive tool approval. */
   source?: "chat" | "automation" | "resume"
 }
@@ -66,8 +68,10 @@ export function createCreativeChatTools({
   threadId,
   userId,
   skillsCatalog = [],
+  generationApprovalMode = "auto",
   source = "chat",
 }: CreateCreativeChatToolsOptions) {
+  const requireGenerationApproval = source === "chat" && generationApprovalMode === "ask"
   const skillSlugs = skillsCatalog.map((entry) => entry.slug).filter(Boolean) as string[]
   const activateSkillTool =
     skillSlugs.length > 0
@@ -129,12 +133,14 @@ export function createCreativeChatTools({
       requireApproval: source === "chat",
     }),
     generateAudio: createGenerateAudioTool({
+      requireApproval: requireGenerationApproval,
       supabase,
       threadId,
       userId,
     }),
     generateImage: createGenerateImageTool({
       availableReferences,
+      requireApproval: requireGenerationApproval,
       supabase,
       threadId,
       userId,
@@ -149,6 +155,7 @@ export function createCreativeChatTools({
       availableReferences,
       availableVideoReferences,
       availableAudioReferences,
+      requireApproval: requireGenerationApproval,
       supabase,
       threadId,
       userId,

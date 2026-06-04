@@ -84,7 +84,7 @@ export function ProfileSettingsPanel({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Button asChild variant="outline" className={isModal ? "rounded-full" : undefined}>
-          <Link href="/history">View history</Link>
+          <Link href="/assets?tab=history">View history</Link>
         </Button>
         {hasCompletedOnboarding ? (
           <RestartOnboardingButton userId={userId} />

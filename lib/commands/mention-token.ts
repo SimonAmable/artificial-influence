@@ -28,18 +28,17 @@ export function makeMentionToken(
   return candidate
 }
 
-/** Non-breaking spaces inserted after each @mention so the textarea width matches the pill + remove control. */
+/** Legacy layout character once used after @mentions. New mentions no longer insert it. */
 export const MENTION_NBSP = "\u00A0"
-/** How many NBSP we append after each @token so the mirror width matches the textarea (minimal tail now that remove control sits over the leading @). */
-export const MENTION_TAIL_NBSP_COUNT = 2
+export const MENTION_TAIL_NBSP_COUNT = 0
 /** Max consecutive NBSP consumed after a token when parsing (allows manual edits). */
 export const MENTION_NBSP_MAX_RUN = 16
 
 export function mentionReserveTail(): string {
-  return MENTION_NBSP.repeat(MENTION_TAIL_NBSP_COUNT)
+  return ""
 }
 
-/** End index after token + optional layout NBSP run (same chars we insert after the @token). */
+/** End index after token + optional legacy layout NBSP run. */
 export function extendMentionRangeEnd(value: string, tokenStart: number, tokenLen: number): number {
   let end = tokenStart + tokenLen
   let n = 0

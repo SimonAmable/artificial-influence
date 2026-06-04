@@ -4,6 +4,7 @@ import type { UIMessage } from "ai"
 import { CircleNotch } from "@phosphor-icons/react"
 import { ImageGrid, type ImageGridAgentAction } from "@/components/shared/display/image-grid"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import type {
   GenerateImageToolPart,
@@ -18,6 +19,7 @@ export function ImageGenerationResultCard({
   modelFallback,
   part,
   title,
+  onToolApprovalResponse,
   onImageGridAgentAction,
   onCreateAssetFromImage,
 }: {
@@ -27,6 +29,7 @@ export function ImageGenerationResultCard({
   part: GenerateImageToolPart | UniversalGenerateImageToolPart
   title: string
   allMessages: UIMessage[]
+  onToolApprovalResponse?: (approvalId: string, approved: boolean) => void
   onImageGridAgentAction?: (
     action: ImageGridAgentAction,
     image: {
@@ -81,6 +84,80 @@ export function ImageGenerationResultCard({
               variantCount={part.input?.variantCount ?? 1}
             />
           </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (part.state === "approval-requested") {
+    return (
+      <Card key={messageId} className="border-border/60 bg-muted/10">
+        <CardContent className="space-y-4 p-4">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Generate this image?</p>
+            <p className="text-xs text-muted-foreground">
+              Confirm before spending credits and starting the image job.
+            </p>
+          </div>
+          {part.input?.prompt ? (
+            <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-border/60 bg-background/80 p-3 text-sm leading-6">
+              {part.input.prompt}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">{part.input?.modelIdentifier || modelFallback}</Badge>
+            <Badge variant="outline">{part.input?.aspectRatio || "1:1"}</Badge>
+            <Badge variant="outline">
+              {part.input?.variantCount || 1} variation
+              {(part.input?.variantCount || 1) > 1 ? "s" : ""}
+            </Badge>
+            <CreditCostBadge
+              modelIdentifier={part.input?.modelIdentifier ?? modelFallback}
+              variantCount={part.input?.variantCount ?? 1}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => part.approval?.id && onToolApprovalResponse?.(part.approval.id, true)}
+            >
+              Generate
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => part.approval?.id && onToolApprovalResponse?.(part.approval.id, false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (part.state === "approval-responded") {
+    return (
+      <Card key={messageId} className="border-border/60 bg-muted/20">
+        <CardContent className="flex items-center gap-3 p-4">
+          <CircleNotch className="h-4 w-4 animate-spin text-muted-foreground" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Processing approval</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {part.approval?.approved ? "Starting image generation" : "Canceling image generation"}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (part.state === "output-denied") {
+    return (
+      <Card key={messageId} className="border-border/60 bg-muted/10">
+        <CardContent className="space-y-2 p-4 text-sm">
+          <p className="font-medium">Image generation canceled</p>
+          <p className="text-muted-foreground">No image job was started.</p>
         </CardContent>
       </Card>
     )

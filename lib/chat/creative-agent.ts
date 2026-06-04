@@ -27,6 +27,7 @@ import {
 } from "@/lib/chat/tools/search-models"
 import type { PinnedSkillInstructionEntry } from "@/lib/chat/skills/pins"
 import type { AttachedRef } from "@/lib/commands/types"
+import type { GenerationApprovalMode } from "@/lib/chat/generation-approval"
 
 function buildReferenceManifest(
   imageRefs: AvailableChatImageReference[],
@@ -277,6 +278,7 @@ interface CreateCreativeAgentOptions {
   threadId?: string
   userId: string
   source?: "chat" | "automation" | "resume"
+  generationApprovalMode?: GenerationApprovalMode
   promptVersion?: PromptVersion
   /** Pre-fetched active model list to inject into the system prompt so the agent
    * always has the full catalog in context without needing a listModels tool call. */
@@ -388,6 +390,7 @@ export function createCreativeAgent({
   threadId,
   userId,
   source = "chat",
+  generationApprovalMode = "auto",
   promptVersion,
   preloadedModels,
 }: CreateCreativeAgentOptions) {
@@ -418,6 +421,7 @@ export function createCreativeAgent({
       userId,
       skillsCatalog,
       source,
+      generationApprovalMode,
     }),
     model,
   )

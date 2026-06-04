@@ -20,6 +20,7 @@ import { createCreativeAgent } from "@/lib/chat/creative-agent"
 import { loadActiveModels } from "@/lib/chat/tools/search-models"
 import { loadSkillsCatalog } from "@/lib/chat/skills/catalog"
 import { loadPinnedSkillInstructionsForUser } from "@/lib/chat/skills/pins"
+import { normalizeLeadingSkillSlashPrompt } from "@/lib/chat/skills/slash-skill-prompt"
 import { bindPendingGenerationsToChatMessages } from "@/lib/chat/media-persistence"
 import { sanitizeToolErrorPartsInMessages } from "@/lib/chat/sanitize-ui-messages"
 import { createCreativeChatTools } from "@/lib/chat/tools"
@@ -40,9 +41,52 @@ import {
 } from "@/lib/ai/gateway"
 import { scheduleThreadIntentTitleJob } from "@/lib/chat/thread-intent-title-scheduler"
 import { finalizeTemplateRunFromChat } from "@/lib/templates/finalize-run"
+import { normalizeGenerationApprovalMode } from "@/lib/chat/generation-approval"
 
 /** Allows long chained tool turns (e.g. awaitGeneration + follow-up tools) on Vercel Pro (max 300s). */
 export const maxDuration = 300
+
+function normalizeLeadingSkillSlashInLatestUserMessage(
+  messages: UIMessage[],
+  availableSkillSlugs: string[],
+): UIMessage[] {
+  if (messages.length === 0 || availableSkillSlugs.length === 0) {
+    return messages
+  }
+
+  const lastUserIndex = [...messages].map((message) => message.role).lastIndexOf("user")
+  if (lastUserIndex < 0) {
+    return messages
+  }
+
+  const targetMessage = messages[lastUserIndex]
+  if (!targetMessage.parts || targetMessage.parts.length === 0) {
+    return messages
+  }
+
+  let changed = false
+  const nextParts = targetMessage.parts.map((part, index) => {
+    if (index !== 0 || part.type !== "text" || typeof part.text !== "string") {
+      return part
+    }
+
+    const normalizedText = normalizeLeadingSkillSlashPrompt(part.text, availableSkillSlugs)
+    if (normalizedText === part.text) {
+      return part
+    }
+
+    changed = true
+    return { ...part, text: normalizedText }
+  })
+
+  if (!changed) {
+    return messages
+  }
+
+  return messages.map((message, index) =>
+    index === lastUserIndex ? { ...message, parts: nextParts } : message,
+  )
+}
 
 export async function POST(req: Request) {
   try {
@@ -74,6 +118,7 @@ export async function POST(req: Request) {
       messages,
       mode = "chat",
       model: modelFromBody,
+      generationApprovalMode: generationApprovalModeFromBody,
       threadId,
       onboardingHandoff,
     }: {
@@ -81,6 +126,7 @@ export async function POST(req: Request) {
       messages?: UIMessage[]
       mode?: "chat" | "prompt-recreate"
       model?: string
+      generationApprovalMode?: unknown
       threadId?: string
       onboardingHandoff?: boolean
     } = body
@@ -88,6 +134,7 @@ export async function POST(req: Request) {
     const model = resolveChatGatewayModel(
       typeof modelFromBody === "string" ? modelFromBody : undefined,
     )
+    const generationApprovalMode = normalizeGenerationApprovalMode(generationApprovalModeFromBody)
 
     let persistedChatThread: ChatThread | null = null
 
@@ -130,6 +177,10 @@ export async function POST(req: Request) {
       loadSkillsCatalog(supabase, user.id),
       loadPinnedSkillInstructionsForUser(supabase, user.id),
     ])
+    requestMessages = normalizeLeadingSkillSlashInLatestUserMessage(
+      requestMessages,
+      skillsCatalog.map((entry) => entry.slug),
+    )
     const automationDefaults = getAutomationDefaultsFromMessages(requestMessages)
 
     const validationTools = createCreativeChatTools({
@@ -138,6 +189,7 @@ export async function POST(req: Request) {
       availableAudioReferences: [],
       defaultAutomationRefs: automationDefaults.refs,
       defaultAutomationAttachments: automationDefaults.attachments,
+      generationApprovalMode,
       supabase,
       threadId,
       userId: user.id,
@@ -256,6 +308,7 @@ export async function POST(req: Request) {
       defaultAutomationRefs: automationDefaults.refs,
       defaultAutomationAttachments: automationDefaults.attachments,
       model,
+      generationApprovalMode,
       selectedReferenceContext,
       onboardingContext,
       pinnedSkillInstructions,

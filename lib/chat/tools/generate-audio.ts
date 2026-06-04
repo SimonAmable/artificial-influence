@@ -13,6 +13,7 @@ import {
 } from "@/lib/server/audio-tts"
 
 interface CreateGenerateAudioToolOptions {
+  requireApproval?: boolean
   supabase: SupabaseClient
   threadId?: string
   userId: string
@@ -29,6 +30,7 @@ function getSafeFileStem(text: string) {
 }
 
 export function createGenerateAudioTool({
+  requireApproval = false,
   supabase,
   threadId,
   userId,
@@ -70,6 +72,7 @@ export function createGenerateAudioTool({
         .optional()
         .describe("Optional BCP-47 language code, mainly for Gemini TTS."),
     }),
+    needsApproval: requireApproval,
     strict: true,
     execute: async ({
       languageCode,

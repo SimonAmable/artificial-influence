@@ -16,6 +16,7 @@ import { MobileAppSidebar } from "@/components/app/mobile-app-sidebar"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { SettingsDropdown } from "@/components/app/settings-dropdown"
+import { GlobalSearchCommand } from "@/components/app/global-search-command"
 import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -367,6 +368,7 @@ export function Header() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <GlobalSearchCommand />
           {loading ? null : user ? (
             <>
               <button
@@ -403,10 +405,10 @@ export function Header() {
                 asChild
                 className={cn(
                   "size-9 rounded-full border border-border/70 bg-secondary/40 p-0 text-foreground shadow-sm transition-colors hover:bg-secondary/70 hover:text-foreground",
-                  pathname === "/history" && "bg-secondary/70"
+                  (pathname === "/history" || pathname === "/assets") && "bg-secondary/70"
                 )}
               >
-                <Link href="/history" aria-label="Open history" className="inline-flex items-center justify-center">
+                <Link href="/assets?tab=history" aria-label="Open library history" className="inline-flex items-center justify-center">
                   <FolderSimple className="h-4 w-4 shrink-0 text-muted-foreground" weight="duotone" />
                 </Link>
               </Button>

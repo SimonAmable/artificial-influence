@@ -29,6 +29,7 @@ interface TemplateInputFieldProps {
   value: TemplateFieldValue
   onChange: (value: TemplateFieldValue) => void
   disabled?: boolean
+  compactDesktop?: boolean
   previewUrl?: string | null
   promptAttachments?: ComposerAttachment[]
   onOpenPromptAssetPicker?: () => void
@@ -41,6 +42,7 @@ export function TemplateInputField({
   value,
   onChange,
   disabled = false,
+  compactDesktop = false,
   previewUrl,
   promptAttachments = [],
   onOpenPromptAssetPicker,
@@ -183,6 +185,7 @@ export function TemplateInputField({
           <div
             className={cn(
               "relative flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20 p-4",
+              compactDesktop && "lg:min-h-[116px] lg:p-3",
               disabled && "opacity-60 pointer-events-none",
             )}
           >
@@ -191,7 +194,10 @@ export function TemplateInputField({
                 <img
                   src={previewUrl}
                   alt=""
-                  className="max-h-48 w-full rounded-lg object-contain"
+                  className={cn(
+                    "max-h-48 w-full rounded-lg object-contain",
+                    compactDesktop && "lg:max-h-32",
+                  )}
                 />
               ) : (
                 <p className="text-sm text-muted-foreground truncate max-w-full">

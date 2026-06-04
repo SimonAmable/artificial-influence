@@ -93,7 +93,7 @@ export function BrandKitCard({ kit, className, onDeleted }: BrandKitCardProps) {
       </div>
 
       <Link
-        href={deleting ? "/brand" : `/brand/${kit.id}`}
+        href={deleting ? "/assets?tab=brands" : `/brand/${kit.id}`}
         className="block"
         tabIndex={deleting ? -1 : undefined}
         aria-disabled={deleting}

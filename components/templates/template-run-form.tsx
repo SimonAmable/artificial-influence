@@ -29,6 +29,7 @@ interface TemplateRunFormProps {
   template: Template
   disabled?: boolean
   className?: string
+  compactDesktop?: boolean
 }
 
 function createClientId() {
@@ -77,6 +78,7 @@ export function TemplateRunForm({
   template,
   disabled = false,
   className,
+  compactDesktop = false,
 }: TemplateRunFormProps) {
   const router = useRouter()
   const [values, setValues] = React.useState<Record<string, TemplateFieldValue>>(() =>
@@ -250,8 +252,8 @@ export function TemplateRunForm({
   }, [])
 
   return (
-    <div className={cn("space-y-6", className)}>
-      <div className="space-y-5">
+    <div className={cn("space-y-6", compactDesktop && "lg:space-y-4", className)}>
+      <div className={cn("space-y-5", compactDesktop && "lg:space-y-4")}>
         {template.inputs.map((input) => {
           const supportsPromptAttachments = input.kind === "text" && input.multiline
 
@@ -262,6 +264,7 @@ export function TemplateRunForm({
               value={values[input.id] ?? null}
               previewUrl={previewUrls[input.id] ?? null}
               disabled={disabled || isSubmitting}
+              compactDesktop={compactDesktop}
               onChange={(next) => setFieldValue(input.id, next)}
               promptAttachments={promptAttachmentsByInputId[input.id] ?? []}
               onPromptAttachmentFilesSelected={

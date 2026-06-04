@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
 
     const scope = request.nextUrl.searchParams.get("scope")
     const category = request.nextUrl.searchParams.get("category") ?? undefined
+    const search = request.nextUrl.searchParams.get("search") ?? undefined
 
     if (scope === "mine") {
       if (!user) {
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ templates })
     }
 
-    const templates = await listTemplatesForGallery(user?.id ?? null, category)
+    const templates = await listTemplatesForGallery(user?.id ?? null, category, search)
     return NextResponse.json({ templates })
   } catch (error) {
     console.error("[templates] GET error:", error)
