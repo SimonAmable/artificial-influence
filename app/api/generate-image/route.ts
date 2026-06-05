@@ -6,7 +6,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enhancePrompt, enhancePromptForJSONModels } from '@/lib/prompt-enhancement';
 import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
-import { modelUsesDimensions, aspectRatioToDimensions } from '@/lib/utils/model-parameters';
+import {
+  aspectRatioToDimensions,
+  buildReplicateReferenceImageInput,
+  modelUsesDimensions,
+} from '@/lib/utils/model-parameters';
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from '@/lib/constants/models';
 import { runReplicatePollingImageGeneration } from '@/lib/server/replicate-image-generation';
 import {
@@ -476,6 +480,11 @@ export async function POST(request: NextRequest) {
     // Prepare generateImage options
     console.log('[generate-image] Preparing generation options...');
     const isNanoBananaFamily = ['google/nano-banana', 'google/nano-banana-pro', 'google/nano-banana-2'].includes(modelIdentifier);
+    const replicateReferenceImageInput = buildReplicateReferenceImageInput(modelIdentifier, referenceImageUrls);
+    const replicateReferenceImageStoragePaths =
+      replicateReferenceImageInput.usedReferenceImageUrls.length === referenceImageUrls.length
+        ? referenceImageStoragePaths
+        : referenceImageStoragePaths.slice(0, replicateReferenceImageInput.usedReferenceImageUrls.length);
 
     // For image-editor-style edits with references, default nano-banana family to input image ratio
     if (isNanoBananaFamily && referenceImageUrls.length > 0 && !aspect_ratio && !aspectRatio) {
@@ -581,7 +590,7 @@ export async function POST(request: NextRequest) {
           ...(output_format && { output_format }),
           ...(moderation && { moderation }),
           ...(background && { background }),
-          ...(referenceImageUrls.length > 0 && { image_input: referenceImageUrls }),
+          ...replicateReferenceImageInput.input,
         };
       } else {
         // Model expects aspect_ratio (e.g. nano-banana)
@@ -593,7 +602,7 @@ export async function POST(request: NextRequest) {
           ...(output_format && { output_format }),
           ...(moderation && { moderation }),
           ...(background && { background }),
-          ...(referenceImageUrls.length > 0 && { image_input: referenceImageUrls }),
+          ...replicateReferenceImageInput.input,
           // Flux 2 Dev: disable safety checker to avoid NSFW content detection blocking valid images
           ...(modelIdentifier === 'black-forest-labs/flux-2-dev' && { disable_safety_checker: true }),
         };
@@ -751,7 +760,7 @@ export async function POST(request: NextRequest) {
               user_id: user.id,
               prompt: finalPrompt,
               supabase_storage_path: null,
-              reference_images_supabase_storage_path: referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+              reference_images_supabase_storage_path: replicateReferenceImageStoragePaths.length > 0 ? replicateReferenceImageStoragePaths : null,
               aspect_ratio: replicateResolvedAspectRatio,
               model: modelIdentifier,
               type: 'image',
@@ -961,7 +970,12 @@ export async function POST(request: NextRequest) {
 
       // Save each generation to database
       await Promise.all(
-        imageStoragePaths.map((storagePath) => saveGenerationToDatabase(storagePath, referenceImageStoragePaths))
+        imageStoragePaths.map((storagePath) =>
+          saveGenerationToDatabase(
+            storagePath,
+            provider === 'xai' ? referenceImageStoragePaths : replicateReferenceImageStoragePaths,
+          )
+        )
       );
 
       const totalUploadTime = Date.now() - uploadStartTime;
@@ -985,7 +999,10 @@ export async function POST(request: NextRequest) {
       const { url: imageUrl, storagePath: imageStoragePath } = await uploadImageToStorage(result.image.base64);
 
       // Save generation to database
-      await saveGenerationToDatabase(imageStoragePath, referenceImageStoragePaths);
+      await saveGenerationToDatabase(
+        imageStoragePath,
+        provider === 'xai' ? referenceImageStoragePaths : replicateReferenceImageStoragePaths,
+      );
 
       const totalUploadTime = Date.now() - uploadStartTime;
       const totalTime = Date.now() - requestStartTime;

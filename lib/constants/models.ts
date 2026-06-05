@@ -25,6 +25,7 @@ export const MODEL_IDENTIFIERS = {
   PRUNAAI_Z_IMAGE_TURBO: 'prunaai/z-image-turbo',
   PRUNAAI_FLUX_KONTEXT_FAST: 'prunaai/flux-kontext-fast',
   XAI_GROK_IMAGINE: 'xai/grok-imagine-image',
+  XAI_GROK_IMAGINE_IMAGE_QUALITY: 'xai/grok-imagine-image-quality',
   FAL_WAN_27_IMAGE: 'fal-ai/wan/v2.7',
   FAL_WAN_27_PRO_IMAGE: 'fal-ai/wan/v2.7/pro',
   
@@ -810,6 +811,29 @@ const GROK_IMAGINE_PARAMS: ParameterDefinition[] = [
     required: false,
     default: null,
     ui_type: 'text',
+  },
+];
+
+const GROK_IMAGINE_IMAGE_QUALITY_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'aspect_ratio',
+    type: 'string',
+    label: 'Aspect Ratio',
+    description: 'Aspect ratio of the generated image. Ignored when editing an input image.',
+    required: false,
+    default: '1:1',
+    enum: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '2:1', '1:2', '19.5:9', '9:19.5', '20:9', '9:20'],
+    ui_type: 'select',
+  },
+  {
+    name: 'resolution',
+    type: 'string',
+    label: 'Resolution',
+    description: 'Output resolution tier',
+    required: false,
+    default: '2k',
+    enum: ['1k', '2k'],
+    ui_type: 'select',
   },
 ];
 
@@ -1658,6 +1682,24 @@ export const GROK_IMAGINE_MODEL: Model = {
   updated_at: new Date().toISOString(),
 };
 
+export const GROK_IMAGINE_IMAGE_QUALITY_MODEL: Model = {
+  id: 'model-grok-imagine-image-quality',
+  identifier: MODEL_IDENTIFIERS.XAI_GROK_IMAGINE_IMAGE_QUALITY,
+  name: 'Grok Imagine Quality',
+  description:
+    'xAI higher-quality image model on Replicate with sharper details, stronger text rendering, image editing, and 2k output.',
+  type: 'image',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 7,
+  parameters: {
+    parameters: GROK_IMAGINE_IMAGE_QUALITY_PARAMS,
+  },
+  supports_reference_image: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 /**
  * Nano Banana Pro - State of the art image generation and editing
  */
@@ -1821,6 +1863,7 @@ export const IMAGE_MODELS = [
   SEEDREAM_5_LITE_MODEL,
   Z_IMAGE_TURBO_MODEL,
   FLUX_KONTEXT_FAST_MODEL,
+  GROK_IMAGINE_IMAGE_QUALITY_MODEL,
   GROK_IMAGINE_MODEL,
 ] as const;
 
@@ -1860,6 +1903,7 @@ const IMAGE_MODELS_FIXED = [
   SEEDREAM_5_LITE_MODEL,
   Z_IMAGE_TURBO_MODEL,
   FLUX_KONTEXT_FAST_MODEL,
+  GROK_IMAGINE_IMAGE_QUALITY_MODEL,
   GROK_IMAGINE_MODEL,
 ] as const;
 

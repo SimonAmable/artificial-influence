@@ -29,7 +29,7 @@ export default async function TemplateRunPage({ params }: TemplateRunPageProps) 
 
   return (
     <main className="min-h-screen bg-background">
-      <div className="mx-auto w-full max-w-lg px-4 pb-8 pt-[60px] sm:pb-12 lg:max-w-6xl lg:px-8 lg:pt-10">
+      <div className="mx-auto w-full max-w-lg px-4 pb-8 pt-[60px] sm:pb-12 lg:max-w-6xl lg:px-8">
         <div className="grid gap-8 lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start">
           <div className="order-2 lg:order-1">
             <TemplateRunForm template={template} compactDesktop />

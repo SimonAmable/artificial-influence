@@ -246,6 +246,30 @@ export const GROK_IMAGINE_META: ModelMetadata = {
   ],
 };
 
+export const GROK_IMAGINE_IMAGE_QUALITY_META: ModelMetadata = {
+  id: 'grok-imagine-image-quality-meta',
+  identifier: 'xai/grok-imagine-image-quality',
+  name: 'Grok Imagine Quality',
+  description:
+    'xAI higher-quality image model on Replicate with sharper details, stronger text rendering, image editing, and 2k output',
+  type: 'image',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 7.0,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '2:1', '1:2', '19.5:9', '9:19.5', '20:9', '9:20'],
+  customParameters: [
+    {
+      name: 'resolution',
+      label: 'Resolution',
+      options: ['1k', '2k'],
+      default: '2k',
+      description: 'Output resolution tier',
+    },
+  ],
+};
+
 export const GPT_IMAGE_1_5_META: ModelMetadata = {
   id: '86759014-7189-4753-92d6-f6e0fd6a7177',
   identifier: 'openai/gpt-image-1.5',
@@ -730,6 +754,7 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
   NANO_BANANA_2_META,
   SEEDREAM_4_5_META,
   SEEDREAM_5_LITE_META,
+  GROK_IMAGINE_IMAGE_QUALITY_META,
   GROK_IMAGINE_META,
   GPT_IMAGE_1_5_META,
   GPT_IMAGE_2_META,
@@ -795,6 +820,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     GPT_IMAGE_2_META,
     Z_IMAGE_TURBO_META,
     FLUX_KONTEXT_FAST_META,
+    GROK_IMAGINE_IMAGE_QUALITY_META,
     KLING_V2_6_MOTION_META,
     KLING_V3_MOTION_META,
     FABRIC_1_0_META,

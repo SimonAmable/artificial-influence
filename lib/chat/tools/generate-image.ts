@@ -21,7 +21,11 @@ import {
   isReplicateGptImage2Model,
 } from "@/lib/server/replicate-gpt-image"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
-import { aspectRatioToDimensions, modelUsesDimensions } from "@/lib/utils/model-parameters"
+import {
+  aspectRatioToDimensions,
+  buildReplicateReferenceImageInput,
+  modelUsesDimensions,
+} from "@/lib/utils/model-parameters"
 import { validateExternalReferenceUrl } from "@/lib/server/external-reference-url"
 import type {
   AvailableChatImageReference,
@@ -360,6 +364,12 @@ export function createGenerateImageTool({
         .max(32)
         .optional()
         .describe("Preferred aspect ratio. It must match the selected model's supported aspect ratios from listModels. For `openai/gpt-image-2`, rely on the model's returned ratio list instead of guessing."),
+      resolution: z
+        .string()
+        .min(1)
+        .max(32)
+        .optional()
+        .describe("Optional output resolution when the selected model exposes a resolution option in listModels, for example `1k` or `2k` for xai/grok-imagine-image-quality."),
       variantCount: z
         .number()
         .int()
@@ -408,6 +418,7 @@ export function createGenerateImageTool({
       mediaIds = [],
       rawPrompt = false,
       referenceIds = [],
+      resolution,
       variantCount = 1,
     }) => {
       const { references: resolvedFromIds, warnings: referenceWarnings } =
@@ -454,6 +465,11 @@ export function createGenerateImageTool({
       const referenceImageStoragePaths = allReferences
         .map((reference) => reference.storagePath)
         .filter((value): value is string => Boolean(value))
+      const replicateReferenceImageInput = buildReplicateReferenceImageInput(modelIdentifier, referenceImageUrls)
+      const replicateReferenceImageStoragePaths =
+        replicateReferenceImageInput.usedReferenceImageUrls.length === referenceImageUrls.length
+          ? referenceImageStoragePaths
+          : referenceImageStoragePaths.slice(0, replicateReferenceImageInput.usedReferenceImageUrls.length)
       const finalPrompt = rawPrompt
         ? prompt
         : await maybeEnhancePrompt({
@@ -648,7 +664,12 @@ export function createGenerateImageTool({
       }
 
       let resolvedAspectRatio =
-        aspectRatio ?? (referenceImageUrls.length > 0 ? "match_input_image" : "1:1")
+        aspectRatio ??
+        (referenceImageUrls.length > 0 && modelIdentifier === "xai/grok-imagine-image-quality"
+          ? null
+          : referenceImageUrls.length > 0
+            ? "match_input_image"
+            : "1:1")
       let replicateInput: Record<string, unknown>
 
       if (isReplicateGptImage2Model(modelIdentifier)) {
@@ -671,15 +692,17 @@ export function createGenerateImageTool({
         }
 
         if (usesDimensions) {
-          const dims = aspectRatioToDimensions(resolvedAspectRatio)
+          const dims = aspectRatioToDimensions(resolvedAspectRatio ?? "1:1")
           replicateInput.width = dims.width
           replicateInput.height = dims.height
-        } else {
+        } else if (resolvedAspectRatio) {
           replicateInput.aspect_ratio = resolvedAspectRatio
         }
 
-        if (referenceImageUrls.length > 0) {
-          replicateInput.image_input = referenceImageUrls
+        Object.assign(replicateInput, replicateReferenceImageInput.input)
+
+        if (resolution) {
+          replicateInput.resolution = resolution
         }
 
         if (modelIdentifier === "google/nano-banana-2") {
@@ -723,7 +746,7 @@ export function createGenerateImageTool({
             prompt: finalPrompt,
             supabase_storage_path: null,
             reference_images_supabase_storage_path:
-              referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+              replicateReferenceImageStoragePaths.length > 0 ? replicateReferenceImageStoragePaths : null,
             aspect_ratio: resolvedAspectRatio,
             model: modelIdentifier,
             type: "image",
@@ -749,8 +772,8 @@ export function createGenerateImageTool({
             "Only call awaitGeneration when a later tool in this same turn needs the finished image (for example image -> video or image -> draft). Otherwise reply to the user and stop.",
           predictionId: prediction.id,
           status: "pending" as const,
-          usedReferenceCount: referenceImageUrls.length,
-          referenceImageUrls,
+          usedReferenceCount: replicateReferenceImageInput.usedReferenceImageUrls.length,
+          referenceImageUrls: replicateReferenceImageInput.usedReferenceImageUrls,
           variantCount: effectiveVariantCount,
           ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
         }
@@ -760,7 +783,7 @@ export function createGenerateImageTool({
         aspectRatio: resolvedAspectRatio,
         modelIdentifier,
         prompt: finalPrompt,
-        referenceImageStoragePaths,
+        referenceImageStoragePaths: replicateReferenceImageStoragePaths,
         replicateInput,
         requiredCredits,
         supabase,
@@ -782,8 +805,8 @@ export function createGenerateImageTool({
               : `Generated ${persisted.images.length} images with ${modelIdentifier}.`,
         model: modelIdentifier,
         status: "completed" as const,
-        usedReferenceCount: referenceImageUrls.length,
-        referenceImageUrls,
+        usedReferenceCount: replicateReferenceImageInput.usedReferenceImageUrls.length,
+        referenceImageUrls: replicateReferenceImageInput.usedReferenceImageUrls,
         variantCount: persisted.images.length,
         ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
       }

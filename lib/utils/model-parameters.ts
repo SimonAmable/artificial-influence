@@ -5,6 +5,34 @@
 
 import { parseModelParameters } from '@/lib/types/models';
 
+const REPLICATE_SINGLE_REFERENCE_IMAGE_MODELS = new Set([
+  'xai/grok-imagine-image-quality',
+]);
+
+export function buildReplicateReferenceImageInput(
+  modelIdentifier: string,
+  referenceImageUrls: string[],
+): {
+  input: Record<string, string | string[]>;
+  usedReferenceImageUrls: string[];
+} {
+  if (referenceImageUrls.length === 0) {
+    return { input: {}, usedReferenceImageUrls: [] };
+  }
+
+  if (REPLICATE_SINGLE_REFERENCE_IMAGE_MODELS.has(modelIdentifier)) {
+    return {
+      input: { image: referenceImageUrls[0]! },
+      usedReferenceImageUrls: [referenceImageUrls[0]!],
+    };
+  }
+
+  return {
+    input: { image_input: referenceImageUrls },
+    usedReferenceImageUrls: referenceImageUrls,
+  };
+}
+
 /** Aspect ratio string to width, height. Base size 1024 for longest side. */
 const ASPECT_RATIO_TO_DIMENSIONS: Record<string, [number, number]> = {
   '1:1': [1024, 1024],
