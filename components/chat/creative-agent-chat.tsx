@@ -111,6 +111,7 @@ import {
   normalizeGenerationApprovalMode,
   type GenerationApprovalMode,
 } from "@/lib/chat/generation-approval"
+import { readStoredEditorProjectId } from "@/lib/video-editor/editor-project-context"
 
 /** Serializable thread row for mobile history (matches ChatThreadListItem). */
 type MobileChatThreadListItem = {
@@ -490,6 +491,7 @@ export function CreativeAgentChat({
           prepareSendMessagesRequest: ({ messages }) => {
             const model = chatGatewayModelRef.current
             const generationApprovalMode = generationApprovalModeRef.current
+            const editorProjectId = readStoredEditorProjectId()
             const forceFullMessages = forceFullMessagesNextSendRef.current
             if (forceFullMessages) {
               forceFullMessagesNextSendRef.current = false
@@ -505,6 +507,7 @@ export function CreativeAgentChat({
                   generationApprovalMode,
                   mode: "chat",
                   model,
+                  ...(editorProjectId ? { editorProjectId } : {}),
                   ...(onboardingHandoff ? { onboardingHandoff: true } : {}),
                   threadId: threadIdRef.current,
                 },
@@ -517,6 +520,7 @@ export function CreativeAgentChat({
                 generationApprovalMode,
                 mode: "chat",
                 model,
+                ...(editorProjectId ? { editorProjectId } : {}),
                 ...(onboardingHandoff ? { onboardingHandoff: true } : {}),
                 threadId: threadIdRef.current,
               },

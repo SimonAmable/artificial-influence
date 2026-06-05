@@ -59,13 +59,15 @@ export function computeEndFrame(item: EditorItem): number {
 
 export function computeProjectEndFrame(project: EditorProject): number {
   let max = 0
+  let hasItems = false
   for (const track of project.tracks) {
     for (const item of track.items) {
+      hasItems = true
       const end = computeEndFrame(item)
       if (end > max) max = end
     }
   }
-  return Math.max(max, DEFAULT_DURATION_FRAMES)
+  return hasItems ? max : DEFAULT_DURATION_FRAMES
 }
 
 /** Keeps project duration derived from its clips, with an empty-project fallback. */

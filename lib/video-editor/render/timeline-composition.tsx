@@ -14,6 +14,12 @@ import {
 } from "remotion"
 import { premountFramesForItem } from "../premount"
 import { videoTrimForRemotion } from "../project-helpers"
+import {
+  getTextBackgroundMode,
+  textBackgroundStyle,
+  textDecorationStyle,
+  textJustifyContent,
+} from "../text-rendering"
 import type { EditorItem, EditorProject, Track } from "../types"
 import type { TimelineCompositionProps } from "./metadata"
 
@@ -244,37 +250,40 @@ function ItemRenderer({ item, muted }: { item: EditorItem; muted: boolean }) {
       )
     }
     case "text":
-      return (
+      {
+        const backgroundMode = getTextBackgroundMode(item)
+        const justifyContent = textJustifyContent(item.textAlign)
+        const decorationStyle = textDecorationStyle(item)
+        const backgroundStyle = textBackgroundStyle(item)
+
+        return (
         <div
           style={{
             ...sizeStyle,
-            color: item.color,
-            fontFamily: item.fontFamily,
-            fontSize: item.fontSize,
-            fontWeight: item.fontWeight,
-            fontStyle: item.fontStyle,
-            textAlign: item.textAlign,
-            direction: item.textDirection,
-            lineHeight: item.lineHeight,
-            letterSpacing: item.letterSpacingPx,
+            ...decorationStyle,
             display: "flex",
             alignItems: "center",
-            justifyContent:
-              item.textAlign === "left"
-                ? "flex-start"
-                : item.textAlign === "right"
-                  ? "flex-end"
-                  : "center",
-            backgroundColor: item.backgroundColor ?? "transparent",
-            paddingLeft: item.backgroundPaddingX,
-            paddingRight: item.backgroundPaddingX,
-            borderRadius: item.backgroundRadius,
+            justifyContent,
+            ...(backgroundMode === "box" && backgroundStyle ? backgroundStyle : null),
             whiteSpace: "pre-wrap",
           }}
         >
-          {item.text}
+          {backgroundMode === "line" && backgroundStyle ? (
+            <span
+              style={{
+                ...backgroundStyle,
+                boxDecorationBreak: "clone",
+                WebkitBoxDecorationBreak: "clone",
+              }}
+            >
+              {item.text}
+            </span>
+          ) : (
+            item.text
+          )}
         </div>
-      )
+        )
+      }
     case "captions":
       return <CaptionsLayer item={item} sizeStyle={sizeStyle} frame={frame} fps={fps} />
     default: {

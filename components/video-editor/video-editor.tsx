@@ -13,8 +13,11 @@ import {
   getEditorRenderDisplayState,
   type EditorRenderJobApiResponse,
 } from "@/lib/video-editor/render-jobs"
+import { writeStoredEditorProjectId } from "@/lib/video-editor/editor-project-context"
 import { editorProjectSchema } from "@/lib/video-editor/types"
 import type { EditorProject } from "@/lib/video-editor/types"
+
+const EDITOR_PROJECT_UPDATED_EVENT = "editor-project-updated"
 
 function VideoEditorShell({ initialProjectId }: { initialProjectId?: string | null }) {
   const {
@@ -127,6 +130,35 @@ function VideoEditorShell({ initialProjectId }: { initialProjectId?: string | nu
     []
   )
 
+  const refreshProject = React.useCallback(
+    async (projectId: string): Promise<EditorProject | null> => {
+      try {
+        const res = await fetch(`/api/editor/projects/${projectId}`, {
+          cache: "no-store",
+        })
+        if (!res.ok) {
+          return null
+        }
+
+        const row = (await res.json()) as { id?: string; state_json?: unknown }
+        const merged = {
+          ...(typeof row.state_json === "object" && row.state_json !== null ? row.state_json : {}),
+          id: row.id ?? null,
+        }
+        const parsed = editorProjectSchema.safeParse(merged)
+        if (!parsed.success) {
+          return null
+        }
+
+        hydrateProject(parsed.data)
+        return parsed.data
+      } catch {
+        return null
+      }
+    },
+    [hydrateProject]
+  )
+
   const queueRender = React.useCallback(async () => {
     setIsQueueingRender(true)
 
@@ -170,29 +202,42 @@ function VideoEditorShell({ initialProjectId }: { initialProjectId?: string | nu
   }, [project, saveProject])
 
   React.useEffect(() => {
-    if (!initialProjectId) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetch(`/api/editor/projects/${initialProjectId}`)
-        if (!res.ok) return
-        const row = (await res.json()) as { id?: string; state_json?: unknown }
-        const merged = {
-          ...(typeof row.state_json === "object" && row.state_json !== null ? row.state_json : {}),
-          id: row.id ?? null,
-        }
-        const parsed = editorProjectSchema.safeParse(merged)
-        if (parsed.success && !cancelled) {
-          hydrateProject(parsed.data)
-        }
-      } catch {
-        /* ignore */
-      }
-    })()
-    return () => {
-      cancelled = true
+    if (!initialProjectId) {
+      return
     }
-  }, [initialProjectId, hydrateProject])
+
+    void refreshProject(initialProjectId)
+  }, [initialProjectId, refreshProject])
+
+  React.useEffect(() => {
+    writeStoredEditorProjectId(project.id ?? initialProjectId ?? null)
+  }, [initialProjectId, project.id])
+
+  React.useEffect(() => {
+    const onEditorProjectUpdated = (event: Event) => {
+      const detail =
+        event instanceof CustomEvent && typeof event.detail === "object" && event.detail !== null
+          ? (event.detail as { projectId?: unknown })
+          : null
+      const nextProjectId =
+        typeof detail?.projectId === "string" && detail.projectId.length > 0
+          ? detail.projectId
+          : project.id ?? initialProjectId ?? null
+
+      if (!nextProjectId) {
+        return
+      }
+
+      if (project.id && nextProjectId !== project.id) {
+        return
+      }
+
+      void refreshProject(nextProjectId)
+    }
+
+    window.addEventListener(EDITOR_PROJECT_UPDATED_EVENT, onEditorProjectUpdated)
+    return () => window.removeEventListener(EDITOR_PROJECT_UPDATED_EVENT, onEditorProjectUpdated)
+  }, [initialProjectId, project.id, refreshProject])
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

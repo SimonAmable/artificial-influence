@@ -211,12 +211,14 @@ function createDefaultTracks(): Track[] {
 
 function computeDerivedDurationFromTracks(tracks: Track[]): number {
   let maxEnd = 0
+  let hasItems = false
   for (const track of tracks) {
     for (const item of track.items) {
+      hasItems = true
       maxEnd = Math.max(maxEnd, item.from + item.durationInFrames)
     }
   }
-  return Math.max(DEFAULT_DURATION_FALLBACK_FRAMES, maxEnd)
+  return hasItems ? maxEnd : DEFAULT_DURATION_FALLBACK_FRAMES
 }
 
 function resolveActiveTrackId(

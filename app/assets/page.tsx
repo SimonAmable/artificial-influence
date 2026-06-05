@@ -152,6 +152,10 @@ const tabLabels: Record<LibraryTab, string> = {
   collections: "Collections",
 }
 
+function normalizeLibraryTab(value: string | null): LibraryTab {
+  return LIBRARY_TABS.includes(value as LibraryTab) ? (value as LibraryTab) : "assets"
+}
+
 const emptyHistoryMessages: Record<GenerationType, string> = {
   all: "No generations found.",
   image: "No image generations found.",
@@ -293,7 +297,12 @@ function LibraryPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const requestedTab = searchParams.get("tab")
-  const activeTab = LIBRARY_TABS.includes(requestedTab as LibraryTab) ? (requestedTab as LibraryTab) : "assets"
+  const [activeTab, setActiveTab] = React.useState<LibraryTab>(() => normalizeLibraryTab(requestedTab))
+
+  React.useEffect(() => {
+    const nextTab = normalizeLibraryTab(requestedTab)
+    setActiveTab((current) => (current === nextTab ? current : nextTab))
+  }, [requestedTab])
 
   const [search, setSearch] = React.useState("")
   const debouncedSearch = useDebouncedValue(search.trim(), 250)
@@ -351,8 +360,9 @@ function LibraryPageContent() {
     }
   }, [])
 
-  const setActiveTab = React.useCallback(
+  const handleActiveTabChange = React.useCallback(
     (nextTab: LibraryTab) => {
+      setActiveTab(nextTab)
       const params = new URLSearchParams(searchParams.toString())
       params.set("tab", nextTab)
       router.replace(`/assets?${params.toString()}`, { scroll: false })
@@ -998,7 +1008,7 @@ function LibraryPageContent() {
 
         <div className="sticky top-[58px] z-30 -mx-4 mb-4 bg-background/90 px-4 py-2 backdrop-blur supports-backdrop-filter:bg-background/70">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as LibraryTab)}>
+            <Tabs value={activeTab} onValueChange={(value) => handleActiveTabChange(value as LibraryTab)}>
               <TabsList className="h-auto max-w-full flex-wrap justify-start overflow-visible rounded-full p-0.5">
                 {LIBRARY_TABS.map((tab) => (
                   <TabsTrigger key={tab} value={tab} className="shrink-0 gap-2 rounded-full px-4 py-1.5">
@@ -1025,7 +1035,7 @@ function LibraryPageContent() {
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as LibraryTab)}>
+        <Tabs value={activeTab} onValueChange={(value) => handleActiveTabChange(value as LibraryTab)}>
           <TabsContent value="history" className="mt-0">
             <HistoryPanel
               activeType={historyType}

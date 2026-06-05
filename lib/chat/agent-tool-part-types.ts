@@ -1,6 +1,7 @@
 ﻿/** AI SDK tool UI part shapes for the creative agent chat. */
 
 import type { AttachedRef } from "@/lib/commands/types"
+import type { TextItem } from "@/lib/video-editor/types"
 
 type ToolApprovalState = {
   approved?: boolean
@@ -180,6 +181,42 @@ export type GenerateAudioToolPart = {
     voiceId?: string
   }
   approval?: ToolApprovalState
+  errorText?: string
+}
+
+export type TextOverlayToolPart = {
+  type: "tool-textOverlay"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: {
+    durationInFrames?: number
+    mode?: "create" | "replace" | "update"
+    placement?: "top" | "center" | "bottom"
+    presetId?: string
+    sourceMediaId?: string
+    targetItemId?: string
+    text?: string
+  }
+  output?: {
+    itemId?: string | null
+    message?: string
+    placement?: "top" | "center" | "bottom"
+    presetLabel?: string | null
+    previewItem?: TextItem | null
+    projectId?: string | null
+    projectName?: string | null
+    renderJobId?: string | null
+    renderedMediaId?: string | null
+    sourceLabel?: string | null
+    sourceMediaId?: string | null
+    status?: "completed" | "applied" | "preview"
+    syncError?: string | null
+    video?: {
+      mimeType?: string
+      storagePath?: string | null
+      url: string
+    }
+  }
   errorText?: string
 }
 

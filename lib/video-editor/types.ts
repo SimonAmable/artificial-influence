@@ -1,6 +1,9 @@
 import type { Caption } from "@remotion/captions"
 import { z } from "zod"
 
+export type TextBackgroundMode = "none" | "box" | "line"
+export type TextTransformMode = "none" | "uppercase"
+
 /** Normalized crop 0–1 from each edge */
 export type CropRect = {
   top: number
@@ -72,6 +75,7 @@ export type GifItem = BaseItemFields & {
 export type TextItem = BaseItemFields & {
   type: "text"
   text: string
+  stylePresetId: string | null
   fontFamily: string
   fontWeight: string
   fontStyle: "normal" | "italic"
@@ -82,8 +86,14 @@ export type TextItem = BaseItemFields & {
   letterSpacingPx: number
   color: string
   backgroundColor: string | null
+  backgroundMode: TextBackgroundMode
   backgroundPaddingX: number
+  backgroundPaddingY: number
   backgroundRadius: number
+  textStrokeColor: string
+  textStrokeWidth: number
+  textShadow: string
+  textTransform: TextTransformMode
 }
 
 export type SolidItem = BaseItemFields & {
@@ -216,12 +226,14 @@ export function createDefaultTracks(): Track[] {
 
 function computeDerivedDurationFromTracks(tracks: Track[]): number {
   let maxEnd = 0
+  let hasItems = false
   for (const track of tracks) {
     for (const item of track.items) {
+      hasItems = true
       maxEnd = Math.max(maxEnd, item.from + item.durationInFrames)
     }
   }
-  return Math.max(DEFAULT_DURATION_FALLBACK_FRAMES, maxEnd)
+  return hasItems ? maxEnd : DEFAULT_DURATION_FALLBACK_FRAMES
 }
 
 function resolveActiveTrackId(
@@ -355,6 +367,7 @@ export const editorItemSchema: z.ZodType<EditorItem> = z.discriminatedUnion("typ
     ...baseFields,
     type: z.literal("text"),
     text: z.string(),
+    stylePresetId: z.string().nullable().default(null),
     fontFamily: z.string(),
     fontWeight: z.string(),
     fontStyle: z.enum(["normal", "italic"]),
@@ -365,8 +378,14 @@ export const editorItemSchema: z.ZodType<EditorItem> = z.discriminatedUnion("typ
     letterSpacingPx: z.number().min(-10).max(50),
     color: z.string(),
     backgroundColor: z.string().nullable(),
+    backgroundMode: z.enum(["none", "box", "line"]).default("box"),
     backgroundPaddingX: z.number().nonnegative(),
+    backgroundPaddingY: z.number().nonnegative().default(0),
     backgroundRadius: z.number().nonnegative(),
+    textStrokeColor: z.string().default("#000000"),
+    textStrokeWidth: z.number().min(0).max(32).default(0),
+    textShadow: z.string().default("none"),
+    textTransform: z.enum(["none", "uppercase"]).default("none"),
   }),
   z.object({ ...baseFields, type: z.literal("solid"), fill: z.string() }),
   z.object({

@@ -47,6 +47,7 @@ import type {
   SearchWebImagesToolPart,
   SearchWebToolPart,
   SocialConnectionToolSummary,
+  TextOverlayToolPart,
   UniversalGenerateImageToolPart,
   UpscaleImageToolPart,
 } from "@/lib/chat/agent-tool-part-types"
@@ -59,6 +60,7 @@ import {
 } from "@/components/chat/tool-ui/automation-helpers"
 import { AudioGenerationResultCard } from "@/components/chat/tool-ui/audio-generation-result-card"
 import { ImageGenerationResultCard } from "@/components/chat/tool-ui/image-generation-result-card"
+import { TextOverlayResultCard } from "@/components/chat/tool-ui/text-overlay-result-card"
 import { UpscaleImageResultCard } from "@/components/chat/tool-ui/upscale-image-result-card"
 import { MessageFilePart } from "@/components/chat/tool-ui/user-message-parts"
 import { VideoGenerationResultCard } from "@/components/chat/tool-ui/video-generation-result-card"
@@ -260,6 +262,17 @@ export function MessageParts({
                   ? onGenerationToolApprovalResponse(toolPart, approved)
                   : onToolApprovalResponse(approvalId, approved)
               }
+            />
+          )
+        }
+
+        if (part.type === "tool-textOverlay") {
+          const toolPart = part as TextOverlayToolPart
+          return (
+            <TextOverlayResultCard
+              key={`${message.id}-${index}`}
+              messageId={`${message.id}-${index}`}
+              part={toolPart}
             />
           )
         }

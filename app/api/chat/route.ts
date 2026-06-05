@@ -119,6 +119,7 @@ export async function POST(req: Request) {
       mode = "chat",
       model: modelFromBody,
       generationApprovalMode: generationApprovalModeFromBody,
+      editorProjectId: editorProjectIdFromBody,
       threadId,
       onboardingHandoff,
     }: {
@@ -127,6 +128,7 @@ export async function POST(req: Request) {
       mode?: "chat" | "prompt-recreate"
       model?: string
       generationApprovalMode?: unknown
+      editorProjectId?: unknown
       threadId?: string
       onboardingHandoff?: boolean
     } = body
@@ -135,6 +137,10 @@ export async function POST(req: Request) {
       typeof modelFromBody === "string" ? modelFromBody : undefined,
     )
     const generationApprovalMode = normalizeGenerationApprovalMode(generationApprovalModeFromBody)
+    const editorProjectId =
+      typeof editorProjectIdFromBody === "string" && editorProjectIdFromBody.length > 0
+        ? editorProjectIdFromBody
+        : undefined
 
     let persistedChatThread: ChatThread | null = null
 
@@ -316,6 +322,7 @@ export async function POST(req: Request) {
       supabase,
       threadId,
       userId: user.id,
+      editorProjectId,
       preloadedModels,
     })
     type CreativeAgentUIMessage = InferAgentUIMessage<typeof creativeAgent>

@@ -19,32 +19,38 @@ const base = (project: EditorProject) => ({
 })
 
 export function createTextItem(project: EditorProject, text = "Text"): EditorItem {
-  const fps = project.settings.fps
   const { width: cw, height: ch } = project.settings
   /** Tight-ish bounds for one line; canvas selection matches layer rect (Remotion centers text inside). */
-  const tw = Math.min(720, Math.round(cw * 0.55))
-  const th = 120
+  const tw = Math.min(860, Math.round(cw * 0.84))
+  const th = 180
   return {
     ...base(project),
     type: "text",
-    durationInFrames: defaultDurationForType("text", fps),
+    durationInFrames: project.settings.durationInFrames,
     text,
-    fontFamily: "Inter",
-    fontWeight: "400",
+    stylePresetId: "tiktok-original",
+    fontFamily: '"TikTok Sans", "Montserrat", "Inter", system-ui, sans-serif',
+    fontWeight: "800",
     fontStyle: "normal" as const,
     fontSize: 72,
     textAlign: "center" as const,
     textDirection: "ltr" as const,
-    lineHeight: 1.2,
+    lineHeight: 1,
     letterSpacingPx: 0,
     color: "#ffffff",
     backgroundColor: null,
-    backgroundPaddingX: 8,
-    backgroundRadius: 4,
+    backgroundMode: "none" as const,
+    backgroundPaddingX: 0,
+    backgroundPaddingY: 0,
+    backgroundRadius: 0,
+    textStrokeColor: "#000000",
+    textStrokeWidth: 6,
+    textShadow: "0 2px 0 rgba(0,0,0,0.95), 0 5px 14px rgba(0,0,0,0.45)",
+    textTransform: "none" as const,
     width: tw,
     height: th,
     x: (cw - tw) / 2,
-    y: (ch - th) / 2,
+    y: (ch - th) * 0.62,
   }
 }
 
