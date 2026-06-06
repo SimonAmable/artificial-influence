@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs"
+import { tmpdir } from "node:os"
 import path from "node:path"
 import { bundle } from "@remotion/bundler"
 import {
@@ -146,7 +147,7 @@ function mapRenderProgress(progress: RenderMediaOnVercelProgress): number {
 }
 
 async function createBundleDir(renderJobId: string): Promise<string> {
-  const tempRoot = path.join(process.cwd(), ".tmp")
+  const tempRoot = path.join(tmpdir(), "unican-remotion")
   await fs.mkdir(tempRoot, { recursive: true })
   const prefix = path.join(tempRoot, `editor-render-${renderJobId}-`)
   return fs.mkdtemp(prefix)

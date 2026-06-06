@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
       "./remotion-renderer/package-lock.json",
       "./remotion-renderer/tsconfig.json",
       "./remotion-renderer/src/**/*",
+      "./node_modules/@rspack/binding*/**/*",
     ],
   },
   async redirects() {

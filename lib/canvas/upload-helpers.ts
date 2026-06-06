@@ -52,6 +52,39 @@ function isRegisterUploadResponse(value: unknown): value is RegisterUploadRespon
   return "status" in value
 }
 
+async function requestUploadRegistration(payload: RegisterUploadRequest) {
+  let lastResult: {
+    response: Response
+    json: RegisterUploadResponse | { error?: string } | null
+  } | null = null
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await fetch('/api/uploads/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const body = await response.text()
+    const json = (() => {
+      try {
+        return JSON.parse(body) as RegisterUploadResponse | { error?: string }
+      } catch {
+        return null
+      }
+    })()
+
+    lastResult = { response, json }
+    const shouldRetry = attempt === 0 && (response.status >= 500 || (response.ok && !json))
+    if (!shouldRetry) {
+      return lastResult
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+
+  return lastResult!
+}
+
 /**
  * Upload a file to Supabase Storage and return the public URL
  * @param file - File to upload
@@ -104,26 +137,25 @@ export async function uploadFileToSupabase(
       sizeBytes: file.size,
     }
 
-    const registerResponse = await fetch('/api/uploads/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(registerPayload),
-    })
-
-    const registerJson = (await registerResponse.json().catch(() => ({}))) as
-      | RegisterUploadResponse
-      | { error?: string }
+    const { response: registerResponse, json: registerJson } =
+      await requestUploadRegistration(registerPayload)
 
     if (!registerResponse.ok) {
-      throw new Error(
-        typeof registerJson === 'object' && registerJson && 'error' in registerJson && registerJson.error
+      const serverError =
+        registerJson &&
+        typeof registerJson === 'object' &&
+        'error' in registerJson &&
+        typeof registerJson.error === 'string'
           ? registerJson.error
-          : `Failed to prepare ${file.name}`,
+          : null
+      throw new Error(
+        serverError ||
+          `Could not prepare ${file.name} for upload (HTTP ${registerResponse.status}). Please try again.`,
       )
     }
 
     if (!isRegisterUploadResponse(registerJson)) {
-      throw new Error(`Failed to prepare ${file.name}`)
+      throw new Error(`The upload server returned an invalid response for ${file.name}. Please try again.`)
     }
 
     if (registerJson.status === 'existing') {
