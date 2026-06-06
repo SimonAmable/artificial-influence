@@ -636,7 +636,7 @@ async function startBackendRender(params: {
     throw new Error("Backend rendering is not configured.")
   }
 
-  const response = await fetch(`${getInternalAppUrl()}/api/editor/render`, {
+  const response = await fetch(`${getInternalAppUrl()}/api/editor/render/text-overlay`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${secret}`,
