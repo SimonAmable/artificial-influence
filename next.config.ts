@@ -6,15 +6,20 @@ const ffmpegTracingIncludes = [
 ]
 
 const remotionRuntimeTracingIncludes = [
-  "./node_modules/remotion/**/*",
-  "./node_modules/@remotion/captions/**/*",
-  "./node_modules/@remotion/media/**/*",
-  "./node_modules/@remotion/media-parser/**/*",
-  "./node_modules/mediabunny/**/*",
-  "./node_modules/react/**/*",
-  "./node_modules/react-dom/**/*",
-  "./node_modules/scheduler/**/*",
-  "./node_modules/zod/**/*",
+  // @remotion/bundler resolves these browser entry files dynamically at render time.
+  "./node_modules/remotion/package.json",
+  "./node_modules/remotion/dist/esm/**/*",
+  "./node_modules/@remotion/studio/package.json",
+  "./node_modules/@remotion/studio/dist/esm/renderEntry.mjs",
+  "./node_modules/@remotion/studio/dist/esm/chunk-6jf1natv.js",
+  "./node_modules/@remotion/media-parser/package.json",
+  "./node_modules/@remotion/media-parser/dist/esm/worker.mjs",
+  "./node_modules/@remotion/captions/package.json",
+  "./node_modules/@remotion/captions/dist/**/*.js",
+  "./node_modules/@remotion/media/package.json",
+  "./node_modules/@remotion/media/dist/esm/index.mjs",
+  "./node_modules/@remotion/media/node_modules/mediabunny/package.json",
+  "./node_modules/@remotion/media/node_modules/mediabunny/dist/modules/**/*.js",
 ]
 
 const nextConfig: NextConfig = {
