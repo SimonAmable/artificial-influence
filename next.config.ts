@@ -5,6 +5,18 @@ const ffmpegTracingIncludes = [
   "./node_modules/ffprobe-static/bin/linux/x64/ffprobe",
 ]
 
+const remotionRuntimeTracingIncludes = [
+  "./node_modules/remotion/**/*",
+  "./node_modules/@remotion/captions/**/*",
+  "./node_modules/@remotion/media/**/*",
+  "./node_modules/@remotion/media-parser/**/*",
+  "./node_modules/mediabunny/**/*",
+  "./node_modules/react/**/*",
+  "./node_modules/react-dom/**/*",
+  "./node_modules/scheduler/**/*",
+  "./node_modules/zod/**/*",
+]
+
 const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
@@ -29,6 +41,7 @@ const nextConfig: NextConfig = {
       "./remotion-renderer/tsconfig.json",
       "./remotion-renderer/src/**/*",
       "./node_modules/@rspack/binding*/**/*",
+      ...remotionRuntimeTracingIncludes,
     ],
   },
   async redirects() {
