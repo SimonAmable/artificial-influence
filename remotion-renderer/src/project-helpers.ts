@@ -8,14 +8,16 @@ export function computeEndFrame(item: EditorItem): number {
 
 export function computeProjectEndFrame(project: EditorProject): number {
   let maxEnd = 0
+  let hasItems = false
 
   for (const track of project.tracks) {
     for (const item of track.items) {
+      hasItems = true
       maxEnd = Math.max(maxEnd, computeEndFrame(item))
     }
   }
 
-  return Math.max(maxEnd, DEFAULT_DURATION_FRAMES)
+  return hasItems ? maxEnd : DEFAULT_DURATION_FRAMES
 }
 
 export function videoTrimForRemotion(item: VideoItem): {
