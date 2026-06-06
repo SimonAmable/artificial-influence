@@ -58,7 +58,8 @@ export function MessageFilePart({
 }
 
 export function UserMessageTextParts({ message }: { message: UIMessage }) {
-  const textParts = message.parts.filter(
+  const parts = message.parts ?? []
+  const textParts = parts.filter(
     (part): part is Extract<UIMessage["parts"][number], { type: "text" }> =>
       part.type === "text" && !isTemplateHiddenContextText(part.text),
   )
@@ -77,7 +78,8 @@ export function UserMessageTextParts({ message }: { message: UIMessage }) {
 }
 
 export function UserMessageMediaParts({ message }: { message: UIMessage }) {
-  const mediaParts = message.parts.filter(
+  const parts = message.parts ?? []
+  const mediaParts = parts.filter(
     (part): part is FileMessagePart =>
       part.type === "file"
       && !isTemplateHiddenMediaFilename(part.filename)

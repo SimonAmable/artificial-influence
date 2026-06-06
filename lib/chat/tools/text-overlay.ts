@@ -28,8 +28,8 @@ const TEXT_OVERLAY_PRESET_IDS = TEXT_STYLE_PRESETS.map((preset) => preset.id) as
 ]
 
 const DEFAULT_TEXT_OVERLAY_PRESET_ID =
-  TEXT_OVERLAY_PRESET_IDS.includes("snapchat-classic")
-    ? "snapchat-classic"
+  TEXT_OVERLAY_PRESET_IDS.includes("tiktok-original")
+    ? "tiktok-original"
     : TEXT_OVERLAY_PRESET_IDS[0]
 
 const textOverlayPresetSchema = z.enum(TEXT_OVERLAY_PRESET_IDS)
@@ -72,6 +72,14 @@ function sleep(ms: number) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
+}
+
+function estimateWrappedLineCount(text: string, fontSize: number, width: number) {
+  const plainLines = Math.max(1, text.split(/\r?\n/).length)
+  const averageCharWidth = Math.max(1, fontSize * 0.56)
+  const charsPerLine = Math.max(12, Math.floor(width / averageCharWidth))
+  const estimatedLines = Math.max(plainLines, Math.ceil(text.length / charsPerLine))
+  return estimatedLines
 }
 
 function inferVideoMimeType(storagePath: string) {
@@ -141,11 +149,20 @@ function normalizeTextItem(
 ) {
   const preset = findTextStylePreset(presetId) ?? findTextStylePreset(DEFAULT_TEXT_OVERLAY_PRESET_ID)
   const nextPreset = preset ?? TEXT_STYLE_PRESETS[0]!
-  const lineCount = Math.max(1, text.split(/\r?\n/).length)
   const fontSize = Number(nextPreset.patch.fontSize ?? item.fontSize)
   const lineHeight = Number(nextPreset.patch.lineHeight ?? item.lineHeight)
   const backgroundPaddingY = Number(nextPreset.patch.backgroundPaddingY ?? item.backgroundPaddingY ?? 0)
-  const minHeight = Math.ceil(fontSize * lineHeight * Math.max(1.25, lineCount * 1.05) + backgroundPaddingY * 2)
+  const strokeWidth = Number(nextPreset.patch.textStrokeWidth ?? item.textStrokeWidth ?? 0)
+  const wrappedLineCount = estimateWrappedLineCount(
+    text,
+    fontSize,
+    Math.max(1, item.width - Number(nextPreset.patch.backgroundPaddingX ?? item.backgroundPaddingX) * 2)
+  )
+  const minHeight = Math.ceil(
+    fontSize * lineHeight * Math.max(1.35, wrappedLineCount * 1.1) +
+      backgroundPaddingY * 2 +
+      Math.max(8, Math.ceil(strokeWidth * 0.75))
+  )
 
   const nextItem: TextItem = {
     ...item,

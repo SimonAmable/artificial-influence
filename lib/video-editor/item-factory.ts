@@ -161,20 +161,21 @@ export function createAudioItem(
 }
 
 export function createCaptionsItem(project: EditorProject): EditorItem {
-  const fps = project.settings.fps
+  const fontSize = 48
+  const maxLines = 3
   return {
     ...base(project),
     type: "captions",
-    durationInFrames: defaultDurationForType("captions", fps),
+    durationInFrames: project.settings.durationInFrames,
     captions: [],
     pageDurationMs: 2000,
-    maxLines: 2,
+    maxLines,
     highlightColor: "#f472b6",
     fontFamily: "Inter",
-    fontSize: 48,
+    fontSize,
     textAlign: "center" as const,
     width: project.settings.width * 0.9,
-    height: 200,
+    height: Math.ceil(fontSize * 1.25 * maxLines + 32),
     x: project.settings.width * 0.05,
     y: project.settings.height * 0.75,
   }

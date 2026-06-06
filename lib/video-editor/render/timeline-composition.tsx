@@ -128,7 +128,7 @@ function CaptionsLayer({
     >
       <div
         style={{
-          maxHeight: item.fontSize * 1.25 * item.maxLines,
+          maxHeight: Math.max(0, item.height - 16),
           overflow: "hidden",
         }}
       >

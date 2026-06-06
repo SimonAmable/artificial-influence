@@ -1586,7 +1586,8 @@ export function CreativeAgentChat({
     for (let i = lastUserIndex + 1; i < messages.length; i++) {
       const m = messages[i]
       if (m?.role !== "assistant") continue
-      const hasAnswerText = m.parts.some(
+      const assistantParts = m.parts ?? []
+      const hasAnswerText = assistantParts.some(
         (part) => part.type === "text" && typeof part.text === "string" && part.text.trim().length > 0,
       )
       if (hasAnswerText) return false
@@ -1761,10 +1762,11 @@ export function CreativeAgentChat({
             {messages.map((message) => {
               const isUserMessage = message.role === "user"
               const isLastMessage = message.id === messages.at(-1)?.id
+              const messageParts = message.parts ?? []
               const showEmptyAssistantThinking =
                 !isUserMessage &&
                 isLastMessage &&
-                message.parts.length === 0 &&
+                messageParts.length === 0 &&
                 (status === "submitted" || status === "streaming")
 
               return (
@@ -1775,7 +1777,7 @@ export function CreativeAgentChat({
                 >
                   {isUserMessage ? (
                     <div className="flex w-full max-w-[85%] flex-col items-end gap-2">
-                      {message.parts.some((part) => part.type === "text") ? (
+                      {messageParts.some((part) => part.type === "text") ? (
                         <MessageContent className="max-w-full rounded-[24px] px-4 py-3 shadow-sm">
                           <UserMessageTextParts message={message} />
                         </MessageContent>

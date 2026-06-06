@@ -114,11 +114,12 @@ export function MessageParts({
   }) => void
   onCreateAssetFromImage?: (imageUrl: string, index: number) => void
 }) {
+  const parts = message.parts ?? []
   const transcriptMessages = allMessages ?? [message]
-  const segments = segmentMessagePartsForTraceCot(message.parts)
+  const segments = segmentMessagePartsForTraceCot(parts)
 
   const renderPartAtIndex = (index: number) => {
-    const part = message.parts[index]
+    const part = parts[index]
     if (!part) return null
 
         if (part.type === "text") {
@@ -142,11 +143,11 @@ export function MessageParts({
         }
 
         if (part.type === "reasoning") {
-          if (index > 0 && message.parts[index - 1]?.type === "reasoning") {
+          if (index > 0 && parts[index - 1]?.type === "reasoning") {
             return null
           }
 
-          const reasoningParts = collectConsecutiveReasoningParts(message.parts, index)
+          const reasoningParts = collectConsecutiveReasoningParts(parts, index)
           const reasoningText = reasoningParts
             .map((reasoningPart) => reasoningPart.text)
             .filter((text) => text.trim().length > 0)

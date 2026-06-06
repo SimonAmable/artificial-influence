@@ -75,7 +75,11 @@ export function isTraceCotToolActive(part: UIMessage["parts"][number]): boolean 
   return state === "input-streaming" || state === "input-available"
 }
 
-export function traceCotGroupIsActive(parts: UIMessage["parts"], indices: number[]): boolean {
+export function traceCotGroupIsActive(
+  parts: UIMessage["parts"] | undefined,
+  indices: number[],
+): boolean {
+  if (!Array.isArray(parts)) return false
   return indices.some((index) => isTraceCotToolActive(parts[index]))
 }
 
@@ -295,7 +299,13 @@ export function getTraceToolStepMeta(part: UIMessage["parts"][number]): TraceToo
   }
 }
 
-export function segmentMessagePartsForTraceCot(parts: UIMessage["parts"]): MessagePartSegment[] {
+export function segmentMessagePartsForTraceCot(
+  parts: UIMessage["parts"] | undefined,
+): MessagePartSegment[] {
+  if (!Array.isArray(parts) || parts.length === 0) {
+    return []
+  }
+
   const segments: MessagePartSegment[] = []
   let bufferIndices: number[] = []
   let bufferCategory: TraceCotCategory | null = null
