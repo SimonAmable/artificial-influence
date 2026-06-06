@@ -210,7 +210,7 @@ function styleLine(item: TextItem, index: number) {
     ? Math.max(item.backgroundPaddingX, item.backgroundPaddingY, 2)
     : Math.max(0, item.textStrokeWidth)
 
-  return [
+  return `Style: ${[
     `Overlay${index}`,
     resolveFontFamily(item.fontFamily),
     Math.max(1, Math.round(item.fontSize)),
@@ -234,7 +234,7 @@ function styleLine(item: TextItem, index: number) {
     0,
     0,
     1,
-  ].join(",")
+  ].join(",")}`
 }
 
 function dialogueLine(item: TextItem, index: number, fps: number) {

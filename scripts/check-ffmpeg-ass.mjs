@@ -79,6 +79,10 @@ const project = {
 
 const result = buildFfmpegAssProject(project)
 assert.match(result.ass, /\[Events\]/)
+assert.match(
+  result.ass,
+  /Style: Overlay0,Noto Sans,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,6,3,5,0,0,0,1/
+)
 assert.match(result.ass, /\\pos\(540,900\)/)
 assert.match(result.ass, /\\N/)
 assert.match(result.ass, /\\\{EDITABLE\\\}/)
