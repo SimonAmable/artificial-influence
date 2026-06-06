@@ -6,11 +6,6 @@ import { formatUploadMediaId } from "@/lib/chat/media-id"
 import { resolveMediaRef } from "@/lib/chat/resolve-media-ref"
 import { createTextItem, createVideoItem } from "@/lib/video-editor/item-factory"
 import { createEmptyProject, findItemInProject, syncCompositionToItems } from "@/lib/video-editor/project-helpers"
-import {
-  assertCanStartRemotionRender,
-  startRemotionRenderInBackground,
-} from "@/lib/video-editor/remotion-vercel-render"
-import { EDITOR_RENDER_RUNNER } from "@/lib/video-editor/render-jobs"
 import { findTextStylePreset, TEXT_STYLE_PRESETS } from "@/lib/video-editor/text-style-presets"
 import { getVideoDimensions, getVideoDurationSeconds } from "@/lib/video-editor/media-parser"
 import {
@@ -38,6 +33,8 @@ const textOverlayModeSchema = z.enum(["create", "update", "replace"])
 
 const SOURCE_WAIT_POLL_MS = 3000
 const SOURCE_WAIT_MAX_MS = 90_000
+const RENDER_WAIT_POLL_MS = 3000
+const RENDER_WAIT_MAX_MS = 250_000
 
 type TextOverlayPlacement = "top" | "center" | "bottom"
 type TextOverlayMode = "create" | "update" | "replace"
@@ -620,77 +617,91 @@ async function saveProject(params: {
   }
 }
 
-async function renderProject(params: {
-  project: EditorProject
+function getInternalAppUrl() {
+  const rawUrl =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ??
+    process.env.VERCEL_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    "http://localhost:3000"
+
+  return `${/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`}`.replace(/\/+$/, "")
+}
+
+async function startBackendRender(params: {
   projectId: string
+  userId: string
+}) {
+  const secret = process.env.CRON_SECRET
+  if (!secret) {
+    throw new Error("Backend rendering is not configured.")
+  }
+
+  const response = await fetch(`${getInternalAppUrl()}/api/editor/render`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${secret}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(params),
+    cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
+  })
+  const result = (await response.json().catch(() => ({}))) as {
+    error?: string
+    jobId?: string
+  }
+
+  if (!response.ok || !result.jobId) {
+    throw new Error(result.error || "Could not start the backend render.")
+  }
+
+  return result.jobId
+}
+
+async function waitForBackendRender(params: {
+  renderJobId: string
   supabase: SupabaseClient
   userId: string
 }) {
-  const { project, projectId, supabase, userId } = params
+  const { renderJobId, supabase, userId } = params
+  const deadline = Date.now() + RENDER_WAIT_MAX_MS
 
-  assertCanStartRemotionRender()
+  while (Date.now() < deadline) {
+    const { data, error } = await supabase
+      .from("editor_render_jobs")
+      .select("id, status, output_url, output_storage_path, error_message")
+      .eq("id", renderJobId)
+      .eq("user_id", userId)
+      .single()
 
-  const { data: renderJob, error: insertError } = await supabase
-    .from("editor_render_jobs")
-    .insert({
-      user_id: userId,
-      project_id: projectId,
-      status: "queued",
-      progress: 0,
-      project_snapshot: project,
-      request_payload: {
-        runner: EDITOR_RENDER_RUNNER,
-        codec: "h264",
-        container: "mp4",
-        queued_from: "editor-app",
-        engine: "@remotion/vercel",
-        bundleStrategy: "local-bundle",
-      },
-    })
-    .select("id")
-    .single()
+    if (error || !data) {
+      throw new Error(error?.message || "The backend render job could not be loaded.")
+    }
 
-  if (insertError || !renderJob?.id) {
-    throw new Error(insertError?.message ?? "Failed to create the render job.")
+    const row = data as {
+      error_message: string | null
+      id: string
+      output_storage_path: string | null
+      output_url: string | null
+      status: "completed" | "failed" | "queued" | "rendering"
+    }
+
+    if (row.status === "completed" && row.output_url && row.output_storage_path) {
+      return {
+        renderJobId: row.id,
+        storagePath: row.output_storage_path,
+        url: row.output_url,
+      }
+    }
+
+    if (row.status === "failed") {
+      throw new Error(row.error_message || "The backend render failed.")
+    }
+
+    await sleep(RENDER_WAIT_POLL_MS)
   }
 
-  try {
-    await startRemotionRenderInBackground({
-      renderJobId: renderJob.id,
-      project,
-    })
-  } catch {
-    // The row is updated with failure details by the renderer.
-  }
-
-  const { data: completedRow, error: completedError } = await supabase
-    .from("editor_render_jobs")
-    .select("id, status, output_url, output_storage_path, error_message")
-    .eq("id", renderJob.id)
-    .eq("user_id", userId)
-    .single()
-
-  if (completedError || !completedRow) {
-    throw new Error(completedError?.message ?? "The render job could not be loaded after rendering.")
-  }
-
-  const row = completedRow as {
-    error_message: string | null
-    id: string
-    output_storage_path: string | null
-    output_url: string | null
-    status: "completed" | "failed" | "queued" | "rendering"
-  }
-
-  if (row.status !== "completed" || !row.output_url || !row.output_storage_path) {
-    throw new Error(row.error_message || "The Remotion render did not complete successfully.")
-  }
-
-  return {
-    renderJobId: row.id,
-    storagePath: row.output_storage_path,
-    url: row.output_url,
-  }
+  throw new Error("The backend render is taking too long. The saved project can still be opened in the editor.")
 }
 
 async function registerRenderedUpload(params: {
@@ -745,7 +756,7 @@ export function createTextOverlayTool({
 }: CreateTextOverlayToolOptions) {
   return tool({
     description:
-      "Apply a styled Remotion text overlay to a source video, render the finished MP4, and return that final video in chat. This is for hooks, titles, callouts, and lower-thirds using the existing text presets. The tool can create or reuse an editor project automatically, wait for the latest thread video if needed, and does not require approval.",
+      "Apply styled text or captions to a source video, trigger the isolated backend renderer, and return the finished MP4 in chat. This is for hooks, titles, callouts, labels, and lower-thirds using the existing text presets. The tool also saves an editable video-editor project and does not require approval.",
     inputSchema: z.object({
       text: z
         .string()
@@ -820,13 +831,15 @@ export function createTextOverlayTool({
         userId,
       })
 
-      const renderResult = await renderProject({
-        project: savedProject.project,
+      const renderJobId = await startBackendRender({
         projectId: savedProject.projectId,
+        userId,
+      })
+      const renderResult = await waitForBackendRender({
+        renderJobId,
         supabase,
         userId,
       })
-
       const renderedMediaId = await registerRenderedUpload({
         durationSeconds: sourceVideo.durationSeconds,
         label: `Text overlay render (${preset.label})`,
@@ -838,13 +851,12 @@ export function createTextOverlayTool({
 
       return {
         status: "completed" as const,
-        message: "Rendered the final video with the text overlay applied.",
+        message: "Rendered the final MP4 with the text overlay applied.",
         projectId: savedProject.projectId,
         projectName: savedProject.projectName,
         itemId: textItem.id,
         placement,
         presetLabel: preset.label,
-        previewItem: textItem,
         renderJobId: renderResult.renderJobId,
         renderedMediaId,
         sourceLabel: sourceVideo.label,

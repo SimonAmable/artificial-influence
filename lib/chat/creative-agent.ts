@@ -179,6 +179,7 @@ function buildCreativeAgentAppendixV2(
 - Available tool families: image generation/editing, **image upscaling** (**upscaleImage**), video generation, audio TTS, web research/search/screenshot capture, model lookup, voice lookup, assets/history, brand context, social post prep, and optional skills.
 - Available tool families also include template management for reusable gallery workflows via **manageTemplate**.
  - Available tool families include stock-reference search for live external sources like GIPHY.
+ - Available tool families include **textOverlay** for styled, editable text overlays and captions. Use it for hooks, titles, callouts, labels, and lower-thirds. It renders the final MP4 through the isolated backend and also saves an editor project.
 - Tool descriptions and input schemas are the canonical contract for field names and tool-specific rules.
 - The default image generation model is **GPT Image 2** (\`openai/gpt-image-2\`). If asked about the default image model, answer that directly; do not say there is no single default and do not answer Google Nano Banana.
 - Active models are pre-loaded in \`<active_models_snapshot>\` below. Use ONLY those identifiers when calling generation tools — never use model ids from training memory alone.${modelsBlock}
@@ -248,6 +249,7 @@ ${onboardingContext}
 - For "copy this TikTok dance/video with my own influencer" requests, do **not** jump straight to Kling motion control from a loose portrait/headshot unless the user already has a strong start frame of the influencer in the target scene and pose. Preferred order: **extractVideoFrames** on the source clip to get the opening or cleanest anchor frame, create a face-swap or character-swap still so the influencer is already in that frame, optionally do one cleanup still pass if identity is weak, then use **generateVideo** with Kling to drive motion from the source clip using that swapped still as the image reference.
 - For high-quality multi-shot requests, default to **bytedance/seedance-2.0** unless the user explicitly asks for a different video model or prioritizes speed over quality.
  - Use composeTimelineVideo when the user wants a cut-together deliverable from existing thread media rather than newly generated motion. Sequence visual **segments** in order, use **durationSeconds** to control image/GIF pacing, **trimStartSeconds** / **trimEndSeconds** to isolate the useful moment of a video clip, and optional **audioSegments** with **startAtSeconds** / **durationSeconds** when the user wants music, narration, or a soundtrack bed.
+ - Use **textOverlay** when the user wants styled on-video text or captions. It returns the fully rendered MP4 in chat and saves an editable project that the user can open in the editor.
  - Prefer one generation tool plus only the support tools actually needed for the turn.
 </tool_routing>
 
@@ -269,6 +271,7 @@ interface CreateCreativeAgentOptions {
   availableAudioReferences: AvailableChatAudioReference[]
   defaultAutomationRefs?: AttachedRef[]
   defaultAutomationAttachments?: AutomationPromptAttachment[]
+  editorProjectId?: string
   model: string
   selectedReferenceContext?: string
   onboardingContext?: string
@@ -381,6 +384,7 @@ export function createCreativeAgent({
   availableAudioReferences,
   defaultAutomationRefs = [],
   defaultAutomationAttachments = [],
+  editorProjectId,
   model,
   selectedReferenceContext,
   onboardingContext,
@@ -416,6 +420,7 @@ export function createCreativeAgent({
       availableAudioReferences,
       defaultAutomationRefs,
       defaultAutomationAttachments,
+      editorProjectId,
       supabase,
       threadId,
       userId,

@@ -34,6 +34,7 @@ import { createScheduleGenerationFollowUpTool } from "@/lib/chat/tools/schedule-
 import { createListAutomationsTool } from "@/lib/chat/tools/list-automations"
 import { createManageAutomationTool } from "@/lib/chat/tools/manage-automation"
 import { createManageTemplateTool } from "@/lib/chat/tools/manage-template"
+import { createTextOverlayTool } from "@/lib/chat/tools/text-overlay"
 import {
   createCapturePageScreenshotTool,
   createReadWebPageTool,
@@ -49,6 +50,7 @@ interface CreateCreativeChatToolsOptions {
   availableAudioReferences: AvailableChatAudioReference[]
   defaultAutomationRefs?: AttachedRef[]
   defaultAutomationAttachments?: AutomationPromptAttachment[]
+  editorProjectId?: string
   supabase: SupabaseClient
   threadId?: string
   userId: string
@@ -64,6 +66,7 @@ export function createCreativeChatTools({
   availableAudioReferences,
   defaultAutomationRefs = [],
   defaultAutomationAttachments = [],
+  editorProjectId,
   supabase,
   threadId,
   userId,
@@ -217,6 +220,12 @@ export function createCreativeChatTools({
     estimateModelLatency: createEstimateModelLatencyTool({ supabase, userId }),
     saveSkill: createSaveSkillTool({
       supabase,
+      userId,
+    }),
+    textOverlay: createTextOverlayTool({
+      editorProjectId,
+      supabase,
+      threadId,
       userId,
     }),
     manageTemplate: createManageTemplateTool({

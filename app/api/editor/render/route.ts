@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { waitUntil } from "@vercel/functions"
 import { createClient } from "@/lib/supabase/server"
+import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import {
   EDITOR_RENDER_RUNNER,
 } from "@/lib/video-editor/render-jobs"
@@ -15,29 +16,47 @@ export const maxDuration = 800
 
 type QueueRenderRequest = {
   projectId?: string
+  userId?: string
+}
+
+function verifyInternalAuth(req: Request) {
+  const secret = process.env.CRON_SECRET
+  return Boolean(secret) && req.headers.get("authorization") === `Bearer ${secret}`
 }
 
 export async function POST(req: Request) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
   const body = (await req.json().catch(() => ({}))) as QueueRenderRequest
   if (!body.projectId) {
     return NextResponse.json({ error: "Missing projectId" }, { status: 400 })
+  }
+
+  const isInternalRequest = verifyInternalAuth(req)
+  const internalClient = isInternalRequest ? createServiceRoleClient() : null
+  const supabase = internalClient ?? await createClient()
+  let userId = isInternalRequest ? body.userId : undefined
+
+  if (isInternalRequest && (!internalClient || !userId)) {
+    return NextResponse.json({ error: "Server configuration error" }, { status: 500 })
+  }
+
+  if (!isInternalRequest) {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    userId = user.id
   }
 
   const { data: projectRow, error: projectError } = await supabase
     .from("editor_projects")
     .select("id, name, state_json")
     .eq("id", body.projectId)
-    .eq("user_id", user.id)
+    .eq("user_id", userId!)
     .single()
 
   if (projectError || !projectRow) {
@@ -83,7 +102,7 @@ export async function POST(req: Request) {
   const { data: renderJob, error: insertError } = await supabase
     .from("editor_render_jobs")
     .insert({
-      user_id: user.id,
+      user_id: userId!,
       project_id: projectRow.id,
       status: "queued",
       progress: 0,
@@ -92,7 +111,7 @@ export async function POST(req: Request) {
         runner: EDITOR_RENDER_RUNNER,
         codec: "h264",
         container: "mp4",
-        queued_from: "editor-app",
+        queued_from: isInternalRequest ? "chat-agent" : "editor-app",
         engine: "@remotion/vercel",
         bundleStrategy: "local-bundle",
       },
