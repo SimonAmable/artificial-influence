@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { ArrowsClockwise, Shuffle } from "@phosphor-icons/react"
-import { CharacterAssetPicker } from "@/components/slideshows/template-builder/character-asset-picker"
+import { GenerationPromptField } from "@/components/slideshows/template-builder/generation-prompt-field"
 import { CollectionImagePicker } from "@/components/slideshows/collection-image-picker"
 import { SlideTypePicker } from "@/components/slideshows/template-builder/slide-type-picker"
 import {
@@ -190,16 +190,37 @@ export function SlideImageControls({
         </div>
       ) : null}
 
-      {kind === "ai" ? (
+      {(kind === "ai" || kind === "character") ? (
         <div className="space-y-4 rounded-xl border p-4">
-          <div className="space-y-2">
-            <Label>Generation prompt</Label>
-            <Textarea
-              rows={4}
-              value={slide.visual.prompt}
-              onChange={(event) => update(queueSlideRegeneration(patchVisual(slide, { prompt: event.target.value })))}
-            />
-          </div>
+          <GenerationPromptField
+            prompt={slide.visual.prompt}
+            onPromptChange={(value) => update(queueSlideRegeneration(patchVisual(slide, { prompt: value })))}
+            placeholder={
+              kind === "character"
+                ? "Same character as reference. Describe the new scene and message."
+                : "Describe the visual you want to generate for this slide."
+            }
+            references={slide.visual.referenceImages ?? []}
+            onReferencesChange={(referenceImages) => update(queueSlideRegeneration(patchVisual(slide, { referenceImages })))}
+            characterReference={
+              kind === "character" && slide.characterReferenceAssetId && slide.characterReferenceUrl
+                ? {
+                    assetId: slide.characterReferenceAssetId,
+                    previewUrl: slide.characterReferenceUrl,
+                    title: "Character",
+                  }
+                : null
+            }
+            onCharacterReferenceChange={
+              kind === "character"
+                ? (selection) => update(queueSlideRegeneration({
+                    ...slide,
+                    characterReferenceAssetId: selection?.assetId ?? null,
+                    characterReferenceUrl: selection?.previewUrl ?? null,
+                  }))
+                : undefined
+            }
+          />
           <Button
             type="button"
             variant="outline"
@@ -224,104 +245,6 @@ export function SlideImageControls({
             allowedAssetTypes={["image"]}
             defaultTab="assets"
           />
-        </div>
-      ) : null}
-
-      {kind === "character" ? (
-        <div className="space-y-4 rounded-xl border p-4">
-          <CharacterAssetPicker
-            label="Character reference"
-            value={slide.characterReferenceAssetId && slide.characterReferenceUrl
-              ? {
-                  assetId: slide.characterReferenceAssetId,
-                  previewUrl: slide.characterReferenceUrl,
-                  title: "Character",
-                }
-              : null}
-            onChange={(selection) => update({
-              ...queueSlideRegeneration(slide),
-              characterReferenceAssetId: selection?.assetId ?? null,
-              characterReferenceUrl: selection?.previewUrl ?? null,
-            })}
-          />
-
-          <div className="space-y-2">
-            <Label>Character mode</Label>
-            <Select
-              value={slide.characterMode ?? "generate"}
-              onValueChange={(value) => {
-                const mode = value as "generate" | "edit_pack"
-                update(queueSlideRegeneration(switchSlideKind({
-                  ...slide,
-                  characterMode: mode,
-                }, "character")))
-              }}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="generate">Generate new scene</SelectItem>
-                <SelectItem value="edit_pack">Edit from image pack</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {slide.characterMode === "edit_pack" ? (
-            <>
-              <div className="space-y-2">
-                <Label>Image pack</Label>
-                <Select
-                  value={slide.visual.collectionId ?? "none"}
-                  onValueChange={(value) => handleCollectionChange(value === "none" ? null : value)}
-                >
-                  <SelectTrigger><SelectValue placeholder="Choose pack" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Select pack</SelectItem>
-                    {collections.map((collection) => (
-                      <SelectItem key={collection.id} value={collection.id}>
-                        {collection.name} ({collection.items.length})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <CollectionImagePicker
-                collection={selectedCollection}
-                selectedImageId={slide.sourceCollectionImageId}
-                onSelect={(item) => update(pinCollectionImage(slide, { id: item.id, url: item.url }))}
-              />
-
-              <div className="space-y-2">
-                <Label>AI edit prompt</Label>
-                <Textarea
-                  rows={3}
-                  value={slide.visual.aiEditPrompt ?? ""}
-                  onChange={(event) => update(queueSlideRegeneration(patchVisual(slide, {
-                    aiEditPrompt: event.target.value,
-                  })))}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="space-y-2">
-              <Label>Generation prompt</Label>
-              <Textarea
-                rows={4}
-                value={slide.visual.prompt}
-                onChange={(event) => update(queueSlideRegeneration(patchVisual(slide, { prompt: event.target.value })))}
-              />
-            </div>
-          )}
-
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full gap-2"
-            onClick={() => update(queueSlideRegeneration(slide))}
-          >
-            <ArrowsClockwise className="h-4 w-4" />
-            Regenerate visual
-          </Button>
         </div>
       ) : null}
 

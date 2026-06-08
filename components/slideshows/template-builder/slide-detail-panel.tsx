@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { CharacterAssetPicker } from "@/components/slideshows/template-builder/character-asset-picker"
+import { GenerationPromptField } from "@/components/slideshows/template-builder/generation-prompt-field"
 import { SlideTypePicker } from "@/components/slideshows/template-builder/slide-type-picker"
 import {
   AssetSelectionModal,
@@ -50,6 +50,7 @@ export function SlideDetailPanel({
   const currentSlide = slide
   const kind = inferSlideKind(currentSlide)
   const usesOverlay = currentSlide.textTreatment === "overlay"
+  const usesGenerationPrompt = kind === "ai" || kind === "character"
 
   function patchSlide(update: Partial<SlideshowSlideBlueprint>) {
     onSlideChange({ ...currentSlide, ...update })
@@ -152,83 +153,35 @@ export function SlideDetailPanel({
         </div>
       </div>
 
-      {kind === "character" ? (
-        <div className="space-y-4 rounded-xl border bg-muted/20 p-4">
-          <CharacterAssetPicker
-            label="Character reference"
-            value={currentSlide.characterReferenceAssetId && currentSlide.characterReferenceUrl
+      {usesGenerationPrompt ? (
+        <GenerationPromptField
+          prompt={currentSlide.visual.prompt}
+          onPromptChange={(value) => patchVisual({ prompt: value })}
+          placeholder={
+            kind === "character"
+              ? "Same character as reference. Describe the new scene and message."
+              : "Describe the visual you want to generate for this slide."
+          }
+          references={currentSlide.visual.referenceImages ?? []}
+          onReferencesChange={(referenceImages) => patchVisual({ referenceImages })}
+          characterReference={
+            kind === "character" && currentSlide.characterReferenceAssetId && currentSlide.characterReferenceUrl
               ? {
                   assetId: currentSlide.characterReferenceAssetId,
                   previewUrl: currentSlide.characterReferenceUrl,
                   title: "Character",
                 }
-              : null}
-            onChange={(selection) => patchSlide({
-              characterReferenceAssetId: selection?.assetId ?? null,
-              characterReferenceUrl: selection?.previewUrl ?? null,
-            })}
-          />
-          <div className="space-y-2">
-            <Label>Character visual mode</Label>
-            <Select
-              value={currentSlide.characterMode ?? "generate"}
-              onValueChange={(value) => {
-                const mode = value as "generate" | "edit_pack"
-                onSlideChange(applySlideKind({
-                  ...currentSlide,
-                  characterMode: mode,
-                }, "character"))
-              }}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="generate">Generate new scene</SelectItem>
-                <SelectItem value="edit_pack">Edit from image pack</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {currentSlide.characterMode === "edit_pack" ? (
-            <div className="space-y-2">
-              <Label>Image pack</Label>
-              <Select
-                value={currentSlide.visual.collectionId ?? "none"}
-                onValueChange={(value) => patchVisual({
-                  collectionId: value === "none" ? null : value,
-                  source: "collection",
-                })}
-              >
-                <SelectTrigger><SelectValue placeholder="Choose collection" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Select collection</SelectItem>
-                  {collections.map((collection) => (
-                    <SelectItem key={collection.id} value={collection.id}>
-                      {collection.name} ({collection.items.length})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="space-y-2">
-                <Label>AI edit prompt</Label>
-                <Textarea
-                  rows={3}
-                  value={currentSlide.visual.aiEditPrompt ?? ""}
-                  onChange={(event) => patchVisual({ aiEditPrompt: event.target.value })}
-                  placeholder="Keep the same person. Change the scene to match the slide message."
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Label>Generation prompt</Label>
-              <Textarea
-                rows={4}
-                value={currentSlide.visual.prompt}
-                onChange={(event) => patchVisual({ prompt: event.target.value })}
-                placeholder="Same character as reference. Describe the new scene and message."
-              />
-            </div>
-          )}
-        </div>
+              : null
+          }
+          onCharacterReferenceChange={
+            kind === "character"
+              ? (selection) => patchSlide({
+                  characterReferenceAssetId: selection?.assetId ?? null,
+                  characterReferenceUrl: selection?.previewUrl ?? null,
+                })
+              : undefined
+          }
+        />
       ) : null}
 
       {usesOverlay ? (
@@ -241,17 +194,6 @@ export function SlideDetailPanel({
               content: { ...currentSlide.content, prompt: event.target.value },
             })}
             placeholder="Describe what the overlay caption should say on this slide."
-          />
-        </div>
-      ) : null}
-
-      {kind === "ai" ? (
-        <div className="space-y-2">
-          <Label>Generation prompt</Label>
-          <Textarea
-            rows={4}
-            value={currentSlide.visual.prompt}
-            onChange={(event) => patchVisual({ prompt: event.target.value })}
           />
         </div>
       ) : null}

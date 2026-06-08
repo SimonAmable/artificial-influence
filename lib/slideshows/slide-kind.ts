@@ -34,6 +34,7 @@ export function defaultVisualForKind(kind: SlideshowSlideKind): SlideshowVisualR
         locked: false,
         manualAssetId: null,
         manualImageUrl: null,
+        referenceImages: [],
       }
     case "pack":
       return {
@@ -47,6 +48,7 @@ export function defaultVisualForKind(kind: SlideshowSlideKind): SlideshowVisualR
         locked: false,
         manualAssetId: null,
         manualImageUrl: null,
+        referenceImages: [],
       }
     case "custom":
       return {
@@ -60,6 +62,7 @@ export function defaultVisualForKind(kind: SlideshowSlideKind): SlideshowVisualR
         locked: false,
         manualAssetId: null,
         manualImageUrl: null,
+        referenceImages: [],
       }
     case "character":
       return {
@@ -73,6 +76,7 @@ export function defaultVisualForKind(kind: SlideshowSlideKind): SlideshowVisualR
         locked: false,
         manualAssetId: null,
         manualImageUrl: null,
+        referenceImages: [],
       }
   }
 }
@@ -97,31 +101,12 @@ export function applySlideKind(
   slide: SlideshowSlideBlueprint,
   kind: SlideshowSlideKind,
 ): SlideshowSlideBlueprint {
-  const characterMode = kind === "character" ? slide.characterMode ?? "generate" : undefined
   const visual = defaultVisualForKind(kind)
-
-  if (kind === "character" && characterMode === "edit_pack") {
-    return {
-      ...slide,
-      slideKind: kind,
-      characterMode,
-      characterReferenceAssetId: slide.characterReferenceAssetId ?? null,
-      characterReferenceUrl: slide.characterReferenceUrl ?? null,
-      visual: {
-        ...visual,
-        source: "collection",
-        collectionId: slide.visual.collectionId,
-        aiEditPrompt: slide.visual.aiEditPrompt
-          ?? "Keep the same person. Adjust the scene to match the slide.",
-        prompt: "",
-      },
-    }
-  }
 
   return {
     ...slide,
     slideKind: kind,
-    characterMode,
+    characterMode: kind === "character" ? "generate" : undefined,
     characterReferenceAssetId: kind === "character" ? slide.characterReferenceAssetId ?? null : null,
     characterReferenceUrl: kind === "character" ? slide.characterReferenceUrl ?? null : null,
     visual: {
@@ -131,6 +116,9 @@ export function applySlideKind(
       aiEditPrompt: kind === "pack" ? slide.visual.aiEditPrompt : null,
       manualAssetId: kind === "custom" ? slide.visual.manualAssetId : null,
       manualImageUrl: kind === "custom" ? slide.visual.manualImageUrl : null,
+      referenceImages: kind === "ai" || kind === "character"
+        ? slide.visual.referenceImages ?? []
+        : [],
     },
   }
 }
@@ -165,18 +153,16 @@ export function createDefaultSlide(
 
 export function normalizeSlide(slide: SlideshowSlideBlueprint): SlideshowSlideBlueprint {
   const kind = inferSlideKind(slide)
+  const normalized = applySlideKind(slide, kind)
   return {
-    ...slide,
-    slideKind: kind,
+    ...normalized,
     textTreatment: slide.textTreatment ?? "off",
-    characterMode: kind === "character" ? slide.characterMode ?? "generate" : undefined,
+    characterMode: kind === "character" ? "generate" : undefined,
     characterReferenceAssetId: slide.characterReferenceAssetId ?? null,
     characterReferenceUrl: slide.characterReferenceUrl ?? null,
     visual: {
-      ...defaultVisualForKind(kind),
-      ...slide.visual,
-      manualAssetId: slide.visual.manualAssetId ?? null,
-      manualImageUrl: slide.visual.manualImageUrl ?? null,
+      ...normalized.visual,
+      referenceImages: slide.visual.referenceImages ?? [],
     },
   }
 }

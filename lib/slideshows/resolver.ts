@@ -8,6 +8,7 @@ import {
   getSlideshowProject,
   updateSlideshowProject,
 } from "@/lib/slideshows/database-server"
+import { collectSlideReferenceUrls } from "@/lib/slideshows/reference-images"
 import type { ResolvedSlideshowSlide, SlideshowProject } from "@/lib/slideshows/types"
 import { tryCompleteFalPendingImage } from "@/lib/server/fal-image-completion"
 import { resolveStoredObjectUrl } from "@/lib/uploads/server"
@@ -72,7 +73,7 @@ async function runImageGeneration(input: {
   userId: string
   prompt: string
   modelIdentifier: string | null
-  referenceUrl?: string | null
+  referenceUrls?: string[]
   aspectRatio: "9:16" | "4:5" | "1:1"
 }) {
   const imageTool = createGenerateImageTool({
@@ -84,13 +85,15 @@ async function runImageGeneration(input: {
   const execute = imageTool.execute
   if (!execute) throw new Error("Image generation is unavailable.")
 
+  const referenceUrls = input.referenceUrls?.filter(Boolean) ?? []
+
   const output = await execute(
     {
       prompt: input.prompt,
       modelIdentifier: input.modelIdentifier ?? "openai/gpt-image-2",
       aspectRatio: input.aspectRatio,
       variantCount: 1,
-      referenceIds: input.referenceUrl ? [input.referenceUrl] : [],
+      referenceIds: referenceUrls,
       enhancePrompt: false,
       rawPrompt: false,
       mediaIds: [],
@@ -185,12 +188,18 @@ export async function resolveSlideshowProject(
           : null
 
       if (generationPrompt) {
+        const referenceUrls = slide.visual.source === "generate"
+          ? collectSlideReferenceUrls(slide)
+          : baseImageUrl
+            ? [baseImageUrl]
+            : []
+
         const result = await runImageGeneration({
           supabase,
           userId,
           prompt: generationPrompt,
           modelIdentifier: slide.visual.modelIdentifier,
-          referenceUrl: slide.visual.source === "generate" ? null : baseImageUrl,
+          referenceUrls,
           aspectRatio: project.aspectRatio,
         })
         const completedUrl = result.images?.find((image) => image.url)?.url ?? null

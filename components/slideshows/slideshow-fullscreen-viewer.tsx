@@ -11,12 +11,14 @@ import {
   Trash,
   X,
 } from "@phosphor-icons/react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog"
 import { SlidePreviewFrame } from "@/components/slideshows/slide-preview-frame"
+import { downloadReferenceImageSlides } from "@/lib/client/download-reference-slides"
 import type { SlideshowAspectRatio, SlideshowProject } from "@/lib/slideshows/types"
 import { cn } from "@/lib/utils"
 
@@ -24,6 +26,36 @@ type ViewerSlide = {
   id: string
   imageUrl: string | null
   slide?: SlideshowProject["slides"][number]
+}
+
+function inferImageExtension(url: string): string {
+  const lower = url.toLowerCase()
+  if (lower.includes(".png")) return "png"
+  if (lower.includes(".webp")) return "webp"
+  if (lower.includes(".jpeg") || lower.includes(".jpg")) return "jpg"
+  return "png"
+}
+
+async function downloadImageUrl(url: string, fileName: string) {
+  const response = await fetch(url, { mode: "cors", cache: "no-store" })
+  if (!response.ok) {
+    throw new Error(`Download failed (${response.status})`)
+  }
+
+  const blob = await response.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  try {
+    const anchor = document.createElement("a")
+    anchor.href = objectUrl
+    anchor.download = fileName
+    anchor.rel = "noopener"
+    anchor.style.display = "none"
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
 }
 
 function buildViewerSlides(project: SlideshowProject): ViewerSlide[] {
@@ -56,6 +88,7 @@ export function SlideshowFullscreenViewer({
   onDelete?: () => void
 }) {
   const [index, setIndex] = React.useState(initialIndex)
+  const [downloading, setDownloading] = React.useState<"slide" | "all" | null>(null)
   const slides = React.useMemo(
     () => (project ? buildViewerSlides(project) : []),
     [project],
@@ -71,23 +104,35 @@ export function SlideshowFullscreenViewer({
 
   const resolvedProject = project
 
-  function downloadCurrent() {
+  async function downloadCurrent() {
     const url = current?.imageUrl
-    if (!url) return
-    const anchor = document.createElement("a")
-    anchor.href = url
-    anchor.download = `${resolvedProject.name}-slide-${index + 1}.png`
-    anchor.click()
+    if (!url || downloading) return
+
+    setDownloading("slide")
+    try {
+      const extension = inferImageExtension(url)
+      await downloadImageUrl(url, `${resolvedProject.name}-slide-${index + 1}.${extension}`)
+    } catch {
+      toast.error("Could not download slide.")
+    } finally {
+      setDownloading(null)
+    }
   }
 
-  function downloadAll() {
-    slides.forEach((slide, slideIndex) => {
-      if (!slide.imageUrl) return
-      const anchor = document.createElement("a")
-      anchor.href = slide.imageUrl
-      anchor.download = `${resolvedProject.name}-slide-${slideIndex + 1}.png`
-      anchor.click()
-    })
+  async function downloadAll() {
+    const urls = slides
+      .map((slide) => slide.imageUrl)
+      .filter((url): url is string => Boolean(url))
+    if (urls.length === 0 || downloading) return
+
+    setDownloading("all")
+    try {
+      await downloadReferenceImageSlides(urls, resolvedProject.name)
+    } catch {
+      toast.error("Could not download images.")
+    } finally {
+      setDownloading(null)
+    }
   }
 
   return (
@@ -164,21 +209,21 @@ export function SlideshowFullscreenViewer({
               type="button"
               variant="ghost"
               className="justify-start gap-3"
-              disabled={!current?.imageUrl}
-              onClick={downloadCurrent}
+              disabled={!current?.imageUrl || downloading !== null}
+              onClick={() => void downloadCurrent()}
             >
               <DownloadSimple className="h-4 w-4" />
-              Download slide
+              {downloading === "slide" ? "Downloading…" : "Download slide"}
             </Button>
             <Button
               type="button"
               variant="ghost"
               className="justify-start gap-3"
-              disabled={!hasRendered && !slides.some((slide) => slide.imageUrl)}
-              onClick={downloadAll}
+              disabled={(!hasRendered && !slides.some((slide) => slide.imageUrl)) || downloading !== null}
+              onClick={() => void downloadAll()}
             >
               <DownloadSimple className="h-4 w-4" />
-              Download all images
+              {downloading === "all" ? "Downloading…" : "Download all images"}
             </Button>
             {onEdit ? (
               <Button type="button" variant="ghost" className="justify-start gap-3" onClick={onEdit}>

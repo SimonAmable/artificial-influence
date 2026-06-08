@@ -60,6 +60,12 @@ export const slideshowTemplateSettingsSchema = z.object({
   defaultCharacterPreviewUrl: z.string().url().nullable().default(null),
 })
 
+export const slideshowReferenceImageSchema = z.object({
+  assetId: z.string().uuid().nullable().default(null),
+  url: z.string().url(),
+  title: z.string().trim().max(160).optional(),
+})
+
 export const slideshowVisualRecipeSchema = z.object({
   source: slideshowVisualSourceSchema,
   collectionId: z.string().uuid().nullable().default(null),
@@ -71,6 +77,7 @@ export const slideshowVisualRecipeSchema = z.object({
   locked: z.boolean().default(false),
   manualAssetId: z.string().uuid().nullable().default(null),
   manualImageUrl: z.string().url().nullable().default(null),
+  referenceImages: z.array(slideshowReferenceImageSchema).max(8).default([]),
 })
 
 export const slideshowSlideBlueprintSchema = z.object({
@@ -155,6 +162,7 @@ export type SlideshowTextTreatment = z.infer<typeof slideshowTextTreatmentSchema
 export type SlideshowCharacterMode = z.infer<typeof slideshowCharacterModeSchema>
 export type SlideshowTemplateSettings = z.infer<typeof slideshowTemplateSettingsSchema>
 export type SlideshowOverlay = z.infer<typeof slideshowOverlaySchema>
+export type SlideshowReferenceImage = z.infer<typeof slideshowReferenceImageSchema>
 export type SlideshowVisualRecipe = z.infer<typeof slideshowVisualRecipeSchema>
 export type SlideshowSlideBlueprint = z.infer<typeof slideshowSlideBlueprintSchema>
 export type SlideshowSlideBlueprintStored = z.infer<typeof slideshowSlideBlueprintStoredSchema>
