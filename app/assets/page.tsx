@@ -996,7 +996,7 @@ function LibraryPageContent() {
                   Refresh collections
                 </Button>
                 <Button asChild className="gap-2">
-                  <Link href="/apps/hook-slideshow">
+                  <Link href="/slideshows">
                     <Plus className="h-4 w-4" />
                     Manage in slideshow
                   </Link>
@@ -1732,7 +1732,7 @@ function CollectionsPanel({
           description="Create image collections from the slideshow app, then they’ll appear here."
           action={
             <Button asChild>
-              <Link href="/apps/hook-slideshow">Open slideshow app</Link>
+              <Link href="/slideshows">Open slideshow app</Link>
             </Button>
           }
         />
@@ -1791,7 +1791,7 @@ function CollectionCard({
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">Updated {formatDate(collection.updatedAt)}</span>
           <Button asChild variant="outline" size="sm">
-            <Link href="/apps/hook-slideshow">Manage</Link>
+            <Link href="/slideshows">Manage</Link>
           </Button>
         </div>
       </div>

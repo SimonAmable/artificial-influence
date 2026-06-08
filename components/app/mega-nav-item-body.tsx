@@ -15,6 +15,7 @@ import {
   PaintBrush as PaintBrushIcon,
   Robot as RobotIcon,
   ShieldCheck,
+  SquaresFour,
   Video as VideoIcon,
 } from "@phosphor-icons/react"
 
@@ -40,6 +41,7 @@ const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
   "shield-check": ShieldCheck,
   "magnifying-glass": MagnifyingGlass,
   "download-simple": DownloadSimple,
+  "squares-four": SquaresFour,
 }
 
 function getBadgeClasses(badge: MegaNavBadge) {

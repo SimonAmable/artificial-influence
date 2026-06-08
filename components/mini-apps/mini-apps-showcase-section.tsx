@@ -19,13 +19,13 @@ export function MiniAppsShowcaseSection({ miniApps }: MiniAppsShowcaseSectionPro
         </div>
 
         <div className="mt-12 grid gap-6 md:grid-cols-2">
-          <Link href="/apps/hook-slideshow" className="group block">
+          <Link href="/slideshows" className="group block">
             <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card shadow-sm">
               <div className="relative aspect-square w-full bg-[radial-gradient(circle_at_top_left,_hsl(var(--primary)/0.22),_transparent_35%),linear-gradient(135deg,_hsl(var(--card)),_hsl(var(--muted)/0.8)_70%)]">
                 <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(hsl(var(--border)/0.4)_1px,transparent_1px),linear-gradient(90deg,hsl(var(--border)/0.4)_1px,transparent_1px)] [background-position:center] [background-size:36px_36px]" />
                 <div className="absolute inset-x-8 top-10 rounded-[2rem] border border-border/60 bg-background/80 p-5 shadow-xl backdrop-blur">
                   <p className="text-xs uppercase tracking-[0.28em] text-primary">AI-first slideshow</p>
-                  <h2 className="mt-4 text-3xl font-semibold text-foreground sm:text-4xl">Hook Slideshow</h2>
+                  <h2 className="mt-4 text-3xl font-semibold text-foreground sm:text-4xl">Slideshows</h2>
                   <p className="mt-3 max-w-md text-sm text-muted-foreground sm:text-base">
                     Pick an account and brand, generate hooks, auto-build slides from collections, and finish with an editable Autopost draft.
                   </p>
@@ -90,7 +90,7 @@ export function MiniAppsShowcaseSection({ miniApps }: MiniAppsShowcaseSectionPro
 
         {miniApps.length === 0 ? (
           <p className="mt-8 text-center text-sm text-muted-foreground">
-            No published mini apps yet. Hook Slideshow is available above as a dedicated app route.
+            No published mini apps yet. Slideshows is available above as a dedicated creation area.
           </p>
         ) : null}
       </div>

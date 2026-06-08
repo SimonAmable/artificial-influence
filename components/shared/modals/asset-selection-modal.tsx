@@ -181,6 +181,12 @@ interface AssetSelectionModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSelect: (pick: AssetSelectionPick) => void
+  /** Pre-filter the assets tab to a category (e.g. character picker). */
+  presetCategory?: AssetCategory
+  /** Hide assets that do not match these types. */
+  allowedAssetTypes?: AssetType[]
+  /** Which tab opens first when the modal opens. */
+  defaultTab?: ModalTab
 }
 
 // Helper function to format date (relative)
@@ -201,8 +207,15 @@ function formatDate(dateString: string): string {
   })
 }
 
-export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelectionModalProps) {
-  const [activeTab, setActiveTab] = React.useState<ModalTab>("assets")
+export function AssetSelectionModal({
+  open,
+  onOpenChange,
+  onSelect,
+  presetCategory,
+  allowedAssetTypes,
+  defaultTab = "assets",
+}: AssetSelectionModalProps) {
+  const [activeTab, setActiveTab] = React.useState<ModalTab>(defaultTab)
   const [historyState, setHistoryState] = React.useState<PaginatedTabState<Generation>>(
     createEmptyTabState<Generation>(),
   )
@@ -245,6 +258,17 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
   React.useEffect(() => {
     uploadsStateRef.current = uploadsState
   }, [uploadsState])
+
+  React.useEffect(() => {
+    if (!open) return
+    setActiveTab(defaultTab)
+    setCategory(presetCategory ?? "all")
+  }, [defaultTab, open, presetCategory])
+
+  const visibleAssets = React.useMemo(() => {
+    if (!allowedAssetTypes?.length) return assetsState.items
+    return assetsState.items.filter((asset) => allowedAssetTypes.includes(asset.assetType))
+  }, [allowedAssetTypes, assetsState.items])
 
   const fetchHistory = React.useCallback(async (append: boolean) => {
     const currentState = historyStateRef.current
@@ -797,7 +821,7 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
                   Try Again
                 </Button>
               </div>
-            ) : assetsState.items.length === 0 ? (
+            ) : visibleAssets.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                 <FolderOpen className="h-12 w-12 mb-3 opacity-50" />
                 <p className="text-sm">No saved assets</p>
@@ -806,11 +830,11 @@ export function AssetSelectionModal({ open, onOpenChange, onSelect }: AssetSelec
             ) : (
               <div className="space-y-6">
                 <div className="text-sm text-muted-foreground">
-                  Showing {assetsState.items.length} of {assetsState.pagination.total}
+                  Showing {visibleAssets.length} of {assetsState.pagination.total}
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {assetsState.items.map((asset) => (
+                  {visibleAssets.map((asset) => (
                     <div
                       key={asset.id}
                       className="overflow-hidden rounded-md"

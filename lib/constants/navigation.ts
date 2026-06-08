@@ -32,6 +32,7 @@ export type MegaNavPhosphorIcon =
   | "shield-check"
   | "magnifying-glass"
   | "download-simple"
+  | "squares-four"
 
 export interface MegaNavItem {
   path: string
@@ -85,6 +86,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/", label: "Home" },
   { path: "/chat", label: "Agent" },
   { path: "/templates", label: "Templates" },
+  { path: "/slideshows", label: "Slideshows" },
   { path: "/autopost", label: "Autopost" },
   { path: "/image", label: "Image" },
   { path: "/video", label: "Video" },
@@ -162,6 +164,13 @@ export const megaNavGroups: MegaNavGroup[] = [
         description: "Browse reusable creation workflows and manage your own templates",
         badge: "new",
         iconPhosphor: "flow-arrow",
+      },
+      {
+        path: "/slideshows",
+        label: "Slideshows",
+        description: "Create repeatable collection and AI-powered image slideshows",
+        badge: "new",
+        iconPhosphor: "squares-four",
       },
       {
         path: "/autopost",
@@ -539,6 +548,12 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     href: "/templates",
     icon: "flow-arrow",
     hint: "Browse reusable workflows and launch your own template runs.",
+  },
+  {
+    label: "Slideshows",
+    href: "/slideshows",
+    icon: "squares-four",
+    hint: "Create repeatable collection and AI-powered image slideshows.",
   },
   {
     label: "Autopost",

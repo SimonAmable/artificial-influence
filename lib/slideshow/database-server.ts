@@ -108,7 +108,7 @@ type CollectionImageInsert = {
   image_url: string
   thumbnail_url?: string | null
   supabase_storage_path?: string | null
-  source_kind: "upload" | "asset" | "pinterest"
+  source_kind: "upload" | "asset" | "pinterest" | "generated"
   source_asset_id?: string | null
   source_url?: string | null
   source_query?: string | null
@@ -832,7 +832,7 @@ export async function createSlideshowProject(
 ) {
   const connection = await loadOwnedSocialConnection(supabase, userId, input.socialConnectionId)
   const brandKitId = await ensureOwnedBrandKit(supabase, userId, input.brandKitId)
-  const name = input.name?.trim() || "Hook Slideshow"
+  const name = input.name?.trim() || "Legacy slideshow"
 
   const { data, error } = await supabase
     .from("slideshow_projects")

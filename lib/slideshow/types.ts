@@ -42,7 +42,7 @@ export const slideshowSlideSchema = z.object({
 export const slideshowProjectHooksSchema = z.array(slideshowHookOptionSchema).max(20)
 export const slideshowProjectSlidesSchema = z.array(slideshowSlideSchema).max(12)
 
-export const slideshowCollectionImageSourceKindSchema = z.enum(["upload", "asset", "pinterest"])
+export const slideshowCollectionImageSourceKindSchema = z.enum(["upload", "asset", "pinterest", "generated"])
 
 export const slideshowCollectionItemSchema = z.object({
   id: z.string().uuid(),
