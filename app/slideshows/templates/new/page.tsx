@@ -43,7 +43,7 @@ export default function NewSlideshowTemplatePage() {
       collections={collections}
       onSaved={(template) => router.push(`/slideshows/templates/${template.id}/edit`)}
       onSaveAndRun={(template) => {
-        router.push(`/slideshows?tab=projects&create=1&templateId=${template.id}`)
+        router.push(`/slideshows?tab=slideshows&create=1&templateId=${template.id}`)
       }}
     />
   )

@@ -13,6 +13,7 @@ import type {
   SlideshowBlueprint,
   SlideshowTextMode,
 } from "@/lib/slideshows/types"
+import { cn } from "@/lib/utils"
 
 const TEXT_MODE_LABELS: Record<SlideshowTextMode, string> = {
   off: "Off",
@@ -46,12 +47,15 @@ export function TemplateToolbar({
     })
   }
 
+  const fieldControlClass =
+    "h-10 border-0 bg-background/50 shadow-none ring-1 ring-inset ring-border/40 transition-colors hover:bg-background/70 focus-visible:ring-ring/30"
+
   return (
-    <div className="flex flex-wrap items-end gap-4 rounded-xl border bg-card p-4">
+    <div className="flex flex-wrap items-end gap-5 rounded-2xl bg-muted/15 p-5 ring-1 ring-inset ring-border/40">
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">Aspect ratio</Label>
+        <Label className="text-xs font-medium text-muted-foreground">Aspect ratio</Label>
         <Select value={aspectRatio} onValueChange={(v) => onAspectRatioChange(v as SlideshowAspectRatio)}>
-          <SelectTrigger className="w-[120px]">
+          <SelectTrigger className={cn("w-[120px]", fieldControlClass)}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -63,12 +67,12 @@ export function TemplateToolbar({
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">Default for new slides</Label>
+        <Label className="text-xs font-medium text-muted-foreground">Default for new slides</Label>
         <Select
           value={settings.textMode}
           onValueChange={(v) => updateSettings({ textMode: v as SlideshowTextMode })}
         >
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className={cn("w-[140px]", fieldControlClass)}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -82,12 +86,12 @@ export function TemplateToolbar({
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">Language</Label>
+        <Label className="text-xs font-medium text-muted-foreground">Language</Label>
         <Select
           value={settings.language}
           onValueChange={(v) => updateSettings({ language: v })}
         >
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className={cn("w-[140px]", fieldControlClass)}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

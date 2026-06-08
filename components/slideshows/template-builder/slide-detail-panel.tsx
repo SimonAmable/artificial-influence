@@ -41,7 +41,7 @@ export function SlideDetailPanel({
 
   if (!slide) {
     return (
-      <div className="rounded-xl border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
+      <div className="rounded-2xl bg-muted/10 p-8 text-center text-sm text-muted-foreground ring-1 ring-inset ring-dashed ring-border/50">
         Select a slide to configure its type, visuals, and copy behavior.
       </div>
     )
@@ -49,6 +49,7 @@ export function SlideDetailPanel({
 
   const currentSlide = slide
   const kind = inferSlideKind(currentSlide)
+  const usesOverlay = currentSlide.textTreatment === "overlay"
 
   function patchSlide(update: Partial<SlideshowSlideBlueprint>) {
     onSlideChange({ ...currentSlide, ...update })
@@ -74,10 +75,12 @@ export function SlideDetailPanel({
   }
 
   return (
-    <div className="space-y-5 rounded-xl border bg-card p-5">
+    <div className="space-y-5 rounded-2xl bg-muted/15 p-5 ring-1 ring-inset ring-border/40">
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Selected slide</p>
-        <h3 className="mt-1 text-lg font-semibold">Slide {slideIndex + 1}</h3>
+        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">
+          Selected slide
+        </p>
+        <h3 className="mt-1 text-lg font-semibold tracking-tight">Slide {slideIndex + 1}</h3>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -95,25 +98,30 @@ export function SlideDetailPanel({
             })}
           />
         </div>
-        <div className="space-y-2">
-          <Label>Variation</Label>
-          <Select
-            value={currentSlide.content.variation}
-            onValueChange={(value) => patchSlide({
-              content: {
-                ...currentSlide.content,
-                variation: value as SlideshowSlideBlueprint["content"]["variation"],
-              },
-            })}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="fresh_each_run">Fresh each run</SelectItem>
-              <SelectItem value="fixed">Fixed</SelectItem>
-              <SelectItem value="prefer_unused">Prefer unused</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {usesOverlay ? (
+          <div className="space-y-2">
+            <Label>Copy variation</Label>
+            <Select
+              value={currentSlide.content.variation}
+              onValueChange={(value) => patchSlide({
+                content: {
+                  ...currentSlide.content,
+                  variation: value as SlideshowSlideBlueprint["content"]["variation"],
+                },
+              })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fresh_each_run">Fresh each run</SelectItem>
+                <SelectItem value="fixed">Fixed</SelectItem>
+                <SelectItem value="prefer_unused">Prefer unused</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Controls whether overlay caption text is rewritten on each run.
+            </p>
+          </div>
+        ) : null}
         <div className="space-y-2">
           <Label>Text overlays</Label>
           <Select
@@ -223,6 +231,20 @@ export function SlideDetailPanel({
         </div>
       ) : null}
 
+      {usesOverlay ? (
+        <div className="space-y-2">
+          <Label>Content prompt</Label>
+          <Textarea
+            rows={3}
+            value={currentSlide.content.prompt}
+            onChange={(event) => patchSlide({
+              content: { ...currentSlide.content, prompt: event.target.value },
+            })}
+            placeholder="Describe what the overlay caption should say on this slide."
+          />
+        </div>
+      ) : null}
+
       {kind === "ai" ? (
         <div className="space-y-2">
           <Label>Generation prompt</Label>
@@ -231,16 +253,6 @@ export function SlideDetailPanel({
             value={currentSlide.visual.prompt}
             onChange={(event) => patchVisual({ prompt: event.target.value })}
           />
-          <div className="space-y-2">
-            <Label>Content prompt</Label>
-            <Textarea
-              rows={3}
-              value={currentSlide.content.prompt}
-              onChange={(event) => patchSlide({
-                content: { ...currentSlide.content, prompt: event.target.value },
-              })}
-            />
-          </div>
         </div>
       ) : null}
 

@@ -22,6 +22,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import type { SlideshowCollection } from "@/lib/slideshow/types"
+import { CollectionEditorDialog } from "@/components/collections/collection-editor-dialog"
+import { CreateCollectionDialog } from "@/components/collections/create-collection-dialog"
 import { ProjectEditor } from "@/components/slideshows/project-editor"
 import { projectPreviewImage } from "@/components/slideshows/slide-preview-frame"
 import { SlideshowFullscreenViewer } from "@/components/slideshows/slideshow-fullscreen-viewer"
@@ -33,7 +35,7 @@ import type {
   SlideshowTemplate,
 } from "@/lib/slideshows/types"
 
-type Tab = "projects" | "templates" | "collections"
+type Tab = "slideshows" | "templates" | "collections"
 
 function statusVariant(status: SlideshowProject["status"]) {
   return status === "rendered" || status === "ready" ? "default" : status === "failed" ? "destructive" : "secondary"
@@ -176,7 +178,7 @@ function CreateSlideshowDialog({
 export function SlideshowsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [tab, setTab] = React.useState<Tab>("projects")
+  const [tab, setTab] = React.useState<Tab>("slideshows")
   const [projects, setProjects] = React.useState<SlideshowProject[]>([])
   const [templates, setTemplates] = React.useState<SlideshowTemplate[]>([])
   const [collections, setCollections] = React.useState<SlideshowCollection[]>([])
@@ -184,7 +186,8 @@ export function SlideshowsPage() {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [initialTemplateId, setInitialTemplateId] = React.useState<string | null>(null)
   const [selectedProject, setSelectedProject] = React.useState<SlideshowProject | null>(null)
-  const [collectionName, setCollectionName] = React.useState("")
+  const [collectionDialogOpen, setCollectionDialogOpen] = React.useState(false)
+  const [selectedCollection, setSelectedCollection] = React.useState<SlideshowCollection | null>(null)
   const [previewTemplate, setPreviewTemplate] = React.useState<SlideshowTemplate | null>(null)
   const [lockedCreateTemplateId, setLockedCreateTemplateId] = React.useState<string | null>(null)
   const [fullscreenProject, setFullscreenProject] = React.useState<SlideshowProject | null>(null)
@@ -217,8 +220,8 @@ export function SlideshowsPage() {
 
   React.useEffect(() => {
     const requestedTab = searchParams.get("tab")
-    if (requestedTab === "projects" || requestedTab === "templates" || requestedTab === "collections") {
-      setTab(requestedTab)
+    if (requestedTab === "slideshows" || requestedTab === "projects" || requestedTab === "templates" || requestedTab === "collections") {
+      setTab(requestedTab === "projects" ? "slideshows" : requestedTab)
     }
   }, [searchParams])
 
@@ -251,20 +254,9 @@ export function SlideshowsPage() {
     }
   }
 
-  async function createCollection() {
-    if (!collectionName.trim()) return
-    try {
-      const { collection } = await readJson<{ collection: SlideshowCollection }>(await fetch("/api/slideshows/collections", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: collectionName }),
-      }))
-      setCollections((current) => [collection, ...current])
-      setCollectionName("")
-      toast.success("Collection created.")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to create collection.")
-    }
+  function upsertCollection(collection: SlideshowCollection) {
+    setCollections((current) => [collection, ...current.filter((candidate) => candidate.id !== collection.id)])
+    setSelectedCollection(collection)
   }
 
   if (selectedProject) {
@@ -293,20 +285,40 @@ export function SlideshowsPage() {
               Mix curated collections, AI-generated graphics, AI edits, and editable overlays in reusable slideshow templates.
             </p>
           </div>
-          <Button size="lg" onClick={() => { setInitialTemplateId(null); setCreateOpen(true) }}>
-            <Plus className="mr-2 h-4 w-4" />Create slideshow
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {tab === "collections" ? (
+              <Button size="lg" onClick={() => setCollectionDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                New collection
+              </Button>
+            ) : (
+              <>
+                {tab === "templates" ? (
+                  <Button size="lg" variant="outline" asChild>
+                    <Link href="/slideshows/templates/new">
+                      <Plus className="mr-2 h-4 w-4" />
+                      New template
+                    </Link>
+                  </Button>
+                ) : null}
+                <Button size="lg" onClick={() => { setInitialTemplateId(null); setCreateOpen(true) }}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create slideshow
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
           <TabsList>
-            <TabsTrigger value="projects">Projects</TabsTrigger>
+            <TabsTrigger value="slideshows">Slideshows</TabsTrigger>
             <TabsTrigger value="templates">Templates</TabsTrigger>
             <TabsTrigger value="collections">Collections</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="projects" className="mt-6">
-            {loading ? <p className="text-sm text-muted-foreground">Loading projects...</p> : projects.length === 0 ? (
+          <TabsContent value="slideshows" className="mt-6">
+            {loading ? <p className="text-sm text-muted-foreground">Loading slideshows...</p> : projects.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center py-16 text-center">
                   <Sparkle className="mb-4 h-8 w-8 text-muted-foreground" />
@@ -368,14 +380,6 @@ export function SlideshowsPage() {
           </TabsContent>
 
           <TabsContent value="templates" className="mt-6">
-            <div className="mb-5 flex justify-end">
-              <Button asChild>
-                <Link href="/slideshows/templates/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  New template
-                </Link>
-              </Button>
-            </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {templates.map((template) => (
                 <Card key={template.id} className="overflow-hidden">
@@ -426,28 +430,84 @@ export function SlideshowsPage() {
           </TabsContent>
 
           <TabsContent value="collections" className="mt-6">
-            <div className="mb-5 flex max-w-xl gap-2">
-              <Input value={collectionName} onChange={(event) => setCollectionName(event.target.value)} placeholder="New collection name" />
-              <Button onClick={() => void createCollection()}>Create</Button>
+            <div className="mb-5 flex justify-end">
+              <Button onClick={() => setCollectionDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                New collection
+              </Button>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {collections.map((collection) => (
-                <Card key={collection.id}>
-                  <CardHeader>
-                    <CardTitle className="text-base">{collection.name}</CardTitle>
-                    <CardDescription>{collection.items.length} images · {collection.description || "Reusable visual collection"}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex gap-2 overflow-hidden">
-                    {collection.items.slice(0, 6).map((item) => (
-                      <img key={item.id} src={item.thumbnailUrl || item.url} alt="" className="aspect-square w-14 rounded-md object-cover" />
-                    ))}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            {loading ? (
+              <p className="text-sm text-muted-foreground">Loading collections...</p>
+            ) : collections.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center py-16 text-center">
+                  <h2 className="font-medium">Create your first image pack</h2>
+                  <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                    Group reusable images into collections, then plug them into slideshow templates and slideshows.
+                  </p>
+                  <Button className="mt-5" onClick={() => setCollectionDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    New collection
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {collections.map((collection) => (
+                  <Card
+                    key={collection.id}
+                    className="cursor-pointer transition hover:border-foreground/25"
+                    onClick={() => setSelectedCollection(collection)}
+                  >
+                    <CardHeader>
+                      <CardTitle className="text-base">{collection.name}</CardTitle>
+                      <CardDescription>
+                        {collection.items.length} images · {collection.description || "Reusable visual collection"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex gap-2 overflow-hidden">
+                      {collection.items.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No images yet — click to add</p>
+                      ) : (
+                        collection.items.slice(0, 6).map((item) => (
+                          <img
+                            key={item.id}
+                            src={item.thumbnailUrl || item.url}
+                            alt=""
+                            className="aspect-square w-14 rounded-md object-cover"
+                          />
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
+
+      <CreateCollectionDialog
+        open={collectionDialogOpen}
+        onOpenChange={setCollectionDialogOpen}
+        onCreated={(collection) => {
+          upsertCollection(collection)
+          setSelectedCollection(collection)
+        }}
+      />
+
+      <CollectionEditorDialog
+        collection={selectedCollection}
+        open={Boolean(selectedCollection)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedCollection(null)
+        }}
+        onChange={upsertCollection}
+        onDeleted={(collectionId) => {
+          setCollections((current) => current.filter((collection) => collection.id !== collectionId))
+          setSelectedCollection(null)
+        }}
+      />
 
       <CreateSlideshowDialog
         open={createOpen}

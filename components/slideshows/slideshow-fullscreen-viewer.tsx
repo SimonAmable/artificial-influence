@@ -200,7 +200,7 @@ export function SlideshowFullscreenViewer({
                 onClick={onDelete}
               >
                 <Trash className="h-4 w-4" />
-                Delete project
+                Delete slideshow
               </Button>
             ) : null}
           </div>

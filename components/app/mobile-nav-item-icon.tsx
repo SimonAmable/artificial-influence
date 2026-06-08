@@ -1,9 +1,9 @@
 "use client"
 
 import Image from "next/image"
-import { ClockCounterClockwise } from "@phosphor-icons/react"
 import {
   ChatCircleDots,
+  ClockCounterClockwise,
   DownloadSimple,
   FilmStrip,
   Folder,
@@ -38,20 +38,11 @@ const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
   "magnifying-glass": MagnifyingGlass,
   "download-simple": DownloadSimple,
   "squares-four": SquaresFour,
+  "clock-counter-clockwise": ClockCounterClockwise,
 }
 
 export function MobileNavItemIcon({ item, className }: { item: MegaNavItem; className?: string }) {
   const PhosphorIcon = item.iconPhosphor ? MEGA_NAV_PHOSPHOR[item.iconPhosphor] : null
-
-  if (item.path === "/history") {
-    return (
-      <ClockCounterClockwise
-        className={cn("size-4 shrink-0", className)}
-        weight="duotone"
-        aria-hidden
-      />
-    )
-  }
 
   if (PhosphorIcon) {
     return <PhosphorIcon className={cn("size-4 shrink-0", className)} weight="duotone" aria-hidden />

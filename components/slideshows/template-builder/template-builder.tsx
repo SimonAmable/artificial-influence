@@ -33,8 +33,14 @@ import type {
   SlideshowBlueprint,
   SlideshowTemplate,
 } from "@/lib/slideshows/types"
+import { cn } from "@/lib/utils"
 
 type BrandKitOption = { id: string; name: string; isDefault?: boolean }
+
+const fieldLabelClass = "text-xs font-medium text-muted-foreground"
+const fieldControlClass =
+  "h-10 border-0 bg-background/50 shadow-none ring-1 ring-inset ring-border/40 transition-colors hover:bg-background/70 focus-visible:ring-ring/30"
+const panelClass = "rounded-2xl bg-muted/15 ring-1 ring-inset ring-border/40"
 
 async function readJson<T>(response: Response): Promise<T> {
   const body = await response.json()
@@ -173,82 +179,115 @@ export function TemplateBuilder({
 
   return (
     <div className="mx-auto max-w-[1500px] px-5 pb-16 pt-20">
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button variant="outline" size="icon" asChild>
-            <Link href={backHref}><ArrowLeft className="h-4 w-4" /></Link>
-          </Button>
-          <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Template builder</p>
-            <Input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="mt-2 h-11 max-w-md border-none px-0 text-2xl font-semibold shadow-none focus-visible:ring-0"
-              placeholder="Template name"
-            />
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={busy !== null} onClick={() => void handleSave()}>
-            {busy === "save" ? <CircleNotch className="mr-2 h-4 w-4 animate-spin" /> : <FloppyDisk className="mr-2 h-4 w-4" />}
-            Save
-          </Button>
-          {onSaveAndRun ? (
-            <Button disabled={busy !== null} onClick={() => void handleSaveAndRun()}>
-              {busy === "run" ? <CircleNotch className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Save & run
+      <div className="sticky top-0 z-30 -mx-5 mb-8 border-b border-border/30 bg-background/75 px-5 py-4 backdrop-blur-xl supports-backdrop-filter:bg-background/60">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              asChild
+            >
+              <Link href={backHref}><ArrowLeft className="h-4 w-4" weight="bold" /></Link>
             </Button>
-          ) : null}
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">
+                Template builder
+              </p>
+              <Input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                className="mt-0.5 h-auto max-w-lg border-0 bg-transparent px-0 text-xl font-semibold tracking-tight shadow-none placeholder:text-muted-foreground/40 focus-visible:ring-0 sm:text-2xl"
+                placeholder="Untitled template"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground"
+              disabled={busy !== null}
+              onClick={() => void handleSave()}
+            >
+              {busy === "save"
+                ? <CircleNotch className="mr-1.5 h-4 w-4 animate-spin" />
+                : <FloppyDisk className="mr-1.5 h-4 w-4" />}
+              Save
+            </Button>
+            {onSaveAndRun ? (
+              <Button
+                size="sm"
+                className="rounded-full px-4"
+                disabled={busy !== null}
+                onClick={() => void handleSaveAndRun()}
+              >
+                {busy === "run" ? <CircleNotch className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+                Save & run
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <div className="mb-6 grid gap-4 rounded-xl border bg-card p-4 lg:grid-cols-[1fr_auto]">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Context</Label>
-            <Select
-              value={blueprint.settings.brandKitId ?? "none"}
-              onValueChange={(value) => updateSettings({
-                brandKitId: value === "none" ? null : value,
-              })}
-            >
-              <SelectTrigger><SelectValue placeholder="Brand kit" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No brand context</SelectItem>
-                {brandKits.map((kit) => (
-                  <SelectItem key={kit.id} value={kit.id}>
-                    {kit.name}{kit.isDefault ? " (default)" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Description</Label>
-            <Input
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder="Short description for the template gallery"
-            />
-          </div>
+      <div className={cn("mb-6 grid gap-5 p-5 sm:grid-cols-2 lg:grid-cols-3", panelClass)}>
+        <div className="space-y-2">
+          <Label className={fieldLabelClass}>Context</Label>
+          <Select
+            value={blueprint.settings.brandKitId ?? "none"}
+            onValueChange={(value) => updateSettings({
+              brandKitId: value === "none" ? null : value,
+            })}
+          >
+            <SelectTrigger className={fieldControlClass}>
+              <SelectValue placeholder="Brand kit" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No brand context</SelectItem>
+              {brandKits.map((kit) => (
+                <SelectItem key={kit.id} value={kit.id}>
+                  {kit.name}{kit.isDefault ? " (default)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
-          <Label>Mode</Label>
+          <Label className={fieldLabelClass}>Description</Label>
+          <Input
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Short description for the template gallery"
+            className={fieldControlClass}
+          />
+        </div>
+        <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+          <Label className={fieldLabelClass}>Mode</Label>
           <ToggleGroup
             type="single"
-            variant="outline"
             value={blueprint.settings.mode}
             onValueChange={(value) => {
               if (value) updateSettings({ mode: value as "product" | "custom" })
             }}
+            className="grid h-10 w-full grid-cols-2 rounded-full bg-background/50 p-1 ring-1 ring-inset ring-border/40"
           >
-            <ToggleGroupItem value="product">Product</ToggleGroupItem>
-            <ToggleGroupItem value="custom">Custom</ToggleGroupItem>
+            <ToggleGroupItem
+              value="product"
+              className="h-8 rounded-full border-0 px-3 text-sm shadow-none data-[state=off]:bg-transparent data-[state=off]:text-muted-foreground data-[state=on]:bg-foreground data-[state=on]:text-background"
+            >
+              Product
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="custom"
+              className="h-8 rounded-full border-0 px-3 text-sm shadow-none data-[state=off]:bg-transparent data-[state=off]:text-muted-foreground data-[state=on]:bg-foreground data-[state=on]:text-background"
+            >
+              Custom
+            </ToggleGroupItem>
           </ToggleGroup>
         </div>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-5">
         <CharacterAssetPicker
           label="Default character (optional)"
           value={blueprint.settings.defaultCharacterAssetId && blueprint.settings.defaultCharacterPreviewUrl

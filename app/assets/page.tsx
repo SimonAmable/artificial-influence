@@ -28,6 +28,7 @@ import { toast } from "sonner"
 import { BrandKitCard } from "@/components/brand-kit/brand-kit-card"
 import { BrandKitNewFlowDialog } from "@/components/brand-kit/brand-kit-new-flow-dialog"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { CreateCollectionDialog } from "@/components/collections/create-collection-dialog"
 import {
   FullscreenMediaViewer,
   type FullscreenMediaViewerAction,
@@ -322,6 +323,7 @@ function LibraryPageContent() {
   const [brandsLoading, setBrandsLoading] = React.useState(false)
   const [brandsError, setBrandsError] = React.useState<string | null>(null)
   const [brandFlowOpen, setBrandFlowOpen] = React.useState(false)
+  const [collectionDialogOpen, setCollectionDialogOpen] = React.useState(false)
   const [collections, setCollections] = React.useState<SlideshowCollection[]>([])
   const [collectionsLoading, setCollectionsLoading] = React.useState(false)
   const [collectionsError, setCollectionsError] = React.useState<string | null>(null)
@@ -995,11 +997,9 @@ function LibraryPageContent() {
                   <ClockCounterClockwise className="h-4 w-4" />
                   Refresh collections
                 </Button>
-                <Button asChild className="gap-2">
-                  <Link href="/slideshows">
-                    <Plus className="h-4 w-4" />
-                    Manage in slideshow
-                  </Link>
+                <Button className="gap-2" onClick={() => setCollectionDialogOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  New collection
                 </Button>
               </>
             ) : null}
@@ -1096,6 +1096,7 @@ function LibraryPageContent() {
               loading={collectionsLoading}
               error={collectionsError}
               onRefresh={() => void refreshCollections()}
+              onCreate={() => setCollectionDialogOpen(true)}
               onCopyReference={copyReference}
             />
           </TabsContent>
@@ -1152,6 +1153,12 @@ function LibraryPageContent() {
       )}
 
       <BrandKitNewFlowDialog open={brandFlowOpen} onOpenChange={setBrandFlowOpen} />
+
+      <CreateCollectionDialog
+        open={collectionDialogOpen}
+        onOpenChange={setCollectionDialogOpen}
+        onCreated={(collection) => setCollections((prev) => [collection, ...prev])}
+      />
     </div>
   )
 }
@@ -1711,12 +1718,14 @@ function CollectionsPanel({
   loading,
   error,
   onRefresh,
+  onCreate,
   onCopyReference,
 }: {
   collections: SlideshowCollection[]
   loading: boolean
   error: string | null
   onRefresh: () => void
+  onCreate: () => void
   onCopyReference: (url: string, label?: string) => void
 }) {
   return (
@@ -1729,12 +1738,8 @@ function CollectionsPanel({
         <EmptyState
           icon={<FolderSimple className="h-7 w-7" />}
           title="No collections yet"
-          description="Create image collections from the slideshow app, then they’ll appear here."
-          action={
-            <Button asChild>
-              <Link href="/slideshows">Open slideshow app</Link>
-            </Button>
-          }
+          description="Create a collection to group images for slideshows and templates."
+          action={<Button onClick={onCreate}>Create collection</Button>}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

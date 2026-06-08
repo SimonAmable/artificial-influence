@@ -34,7 +34,7 @@ export function SlideCard({
           selected ? "ring-2 ring-primary border-primary/40" : "hover:border-foreground/20",
         )}
       >
-        <div className="relative aspect-[9/16] bg-muted/60">
+        <div className="relative aspect-[9/16]">
           {previewUrl ? (
             <img src={previewUrl} alt="" className="h-full w-full object-cover" />
           ) : (
@@ -51,7 +51,7 @@ export function SlideCard({
             {index + 1}
           </Badge>
         </div>
-        <div className="space-y-1 border-t px-3 py-2">
+        <div className="space-y-1 px-3 py-2">
           <div className="flex items-center gap-1.5">
             <span className={cn("inline-flex rounded p-0.5", getSlideKindBadgeClass(kind))}>
               <SlideTypeIcon kind={kind} className="h-3.5 w-3.5" />

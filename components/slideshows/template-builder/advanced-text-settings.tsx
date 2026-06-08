@@ -35,13 +35,13 @@ export function AdvancedTextSettings({
   }
 
   return (
-    <div className="rounded-xl border bg-card">
+    <div className="rounded-2xl bg-muted/15 ring-1 ring-inset ring-border/40">
       <button
         type="button"
-        className="flex w-full items-center justify-between px-4 py-3 text-left"
+        className="flex w-full items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-muted/20"
         onClick={() => setOpen((current) => !current)}
       >
-        <span className="text-sm font-medium">Advanced text settings</span>
+        <span className="text-sm font-medium text-foreground/90">Advanced text settings</span>
         <CaretDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
       </button>
       {open ? (

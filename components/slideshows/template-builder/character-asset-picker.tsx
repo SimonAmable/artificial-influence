@@ -40,9 +40,9 @@ export function CharacterAssetPicker({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <p className="text-sm font-medium">{label}</p>
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
       {value ? (
-        <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3">
+        <div className="flex items-center gap-3 rounded-2xl bg-muted/15 p-3 ring-1 ring-inset ring-border/40">
           <img
             src={value.previewUrl}
             alt={value.title || "Character reference"}

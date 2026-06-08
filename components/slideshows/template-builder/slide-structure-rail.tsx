@@ -58,11 +58,13 @@ export function SlideStructureRail({
   }
 
   return (
-    <div className="space-y-4 rounded-xl border bg-card p-4">
+    <div className="space-y-4 rounded-2xl bg-muted/15 p-5 ring-1 ring-inset ring-border/40">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Slide structure</p>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">
+            Slide structure
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground/80">
             Build the repeatable sequence for this template.
           </p>
         </div>

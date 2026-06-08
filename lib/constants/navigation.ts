@@ -33,6 +33,7 @@ export type MegaNavPhosphorIcon =
   | "magnifying-glass"
   | "download-simple"
   | "squares-four"
+  | "clock-counter-clockwise"
 
 export interface MegaNavItem {
   path: string
@@ -383,7 +384,7 @@ export const megaNavGroups: MegaNavGroup[] = [
     path: "/assets",
     simpleItems: [
       { path: "/assets", label: "Assets", description: "Store and sort your generated assets", iconPhosphor: "folder", badge: "new" },
-      { path: "/assets?tab=history", label: "History", description: "Past generations and edits", iconSrc: "/file.svg" },
+      { path: "/assets?tab=history", label: "History", description: "Past generations and edits", iconPhosphor: "clock-counter-clockwise" },
       { path: "/resources", label: "Resources", description: "Search live stock and meme references", iconPhosphor: "image", badge: "new" },
       { path: "/assets?tab=brands", label: "Brand", description: "Manage brand settings", iconSrc: "/logo.svg", badge: "new" },
     ],
