@@ -1,5 +1,13 @@
 import type { Canvas as FabricCanvas, Textbox } from "fabric"
 import {
+  applyTextStylePresetToTextbox,
+  type EditorTextboxWithPreset,
+} from "@/lib/image-editor/apply-text-style-preset"
+import {
+  isImageEditorSnapchatPreset,
+  normalizeImageEditorTextStylePresetId,
+} from "@/lib/image-editor/text-style-presets"
+import {
   applyTextStrokeAppearance,
   ensureEditorTextboxHaloPatch,
   getEffectiveTextStrokeColor,
@@ -15,7 +23,17 @@ export function serializeCanvas(canvas: FabricCanvas): string {
     toJSON: (propertiesToInclude?: string[]) => unknown
   }
   return JSON.stringify(
-    canvasWithCustomSerializer.toJSON(["id", "name", "layerId", "editorTextStrokeWidth"])
+    canvasWithCustomSerializer.toJSON([
+      "id",
+      "name",
+      "layerId",
+      "editorTextStrokeWidth",
+      "editorTextStylePresetId",
+      "editorTextBarMode",
+      "editorTextBarPaddingX",
+      "editorTextBarPaddingY",
+      "editorTextBarFullWidth",
+    ])
   )
 }
 
@@ -34,6 +52,13 @@ export async function deserializeCanvas(
         canvas.forEachObject((obj) => {
           if (obj.type !== "textbox" && obj.type !== "i-text") return
           const t = obj as Textbox
+          const presetId = normalizeImageEditorTextStylePresetId(
+            (t as EditorTextboxWithPreset).editorTextStylePresetId
+          )
+          if (isImageEditorSnapchatPreset(presetId) || presetId === "original") {
+            applyTextStylePresetToTextbox(t, presetId, canvas.width ?? 800)
+            return
+          }
           const logical = getLogicalTextStrokeWidth(t as EditorTextboxWithHalo)
           if (logical <= 0) return
           const color = getEffectiveTextStrokeColor(

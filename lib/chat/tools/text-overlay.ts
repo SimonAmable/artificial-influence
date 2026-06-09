@@ -6,6 +6,12 @@ import { formatUploadMediaId } from "@/lib/chat/media-id"
 import { resolveMediaRef } from "@/lib/chat/resolve-media-ref"
 import { createTextItem, createVideoItem } from "@/lib/video-editor/item-factory"
 import { createEmptyProject, findItemInProject, syncCompositionToItems } from "@/lib/video-editor/project-helpers"
+import {
+  estimateSnapchatWrappedLineCount,
+  isSnapchatClassicPreset,
+  snapchatBarHeightForLineCount,
+  snapchatFontSizeForWidth,
+} from "@/lib/video-editor/snapchat-overlay-style"
 import { findTextStylePreset, TEXT_STYLE_PRESETS } from "@/lib/video-editor/text-style-presets"
 import { getVideoDimensions, getVideoDurationSeconds } from "@/lib/video-editor/media-parser"
 import {
@@ -166,24 +172,30 @@ function normalizeTextItem(
 ) {
   const preset = findTextStylePreset(presetId) ?? findTextStylePreset(DEFAULT_TEXT_OVERLAY_PRESET_ID)
   const nextPreset = preset ?? TEXT_STYLE_PRESETS[0]!
-  const fontSize = Number(nextPreset.patch.fontSize ?? item.fontSize)
+  const fontSize = isSnapchatClassicPreset(nextPreset.id)
+    ? snapchatFontSizeForWidth(project.settings.width)
+    : Number(nextPreset.patch.fontSize ?? item.fontSize)
   const lineHeight = Number(nextPreset.patch.lineHeight ?? item.lineHeight)
   const backgroundPaddingY = Number(nextPreset.patch.backgroundPaddingY ?? item.backgroundPaddingY ?? 0)
   const strokeWidth = Number(nextPreset.patch.textStrokeWidth ?? item.textStrokeWidth ?? 0)
   const wrapWidth =
-    nextPreset.id === "snapchat-classic" && mode === "create"
+    isSnapchatClassicPreset(nextPreset.id) && mode === "create"
       ? project.settings.width
       : item.width
-  const wrappedLineCount = estimateWrappedLineCount(
-    text,
-    fontSize,
-    Math.max(1, wrapWidth - Number(nextPreset.patch.backgroundPaddingX ?? item.backgroundPaddingX) * 2)
+  const contentWidth = Math.max(
+    1,
+    wrapWidth - Number(nextPreset.patch.backgroundPaddingX ?? item.backgroundPaddingX) * 2
   )
-  const minHeight = Math.ceil(
-    fontSize * lineHeight * Math.max(1.35, wrappedLineCount * 1.1) +
-      backgroundPaddingY * 2 +
-      Math.max(8, Math.ceil(strokeWidth * 0.75))
-  )
+  const wrappedLineCount = isSnapchatClassicPreset(nextPreset.id)
+    ? estimateSnapchatWrappedLineCount(text, fontSize, contentWidth)
+    : estimateWrappedLineCount(text, fontSize, contentWidth)
+  const minHeight = isSnapchatClassicPreset(nextPreset.id)
+    ? snapchatBarHeightForLineCount(fontSize, lineHeight, backgroundPaddingY, wrappedLineCount)
+    : Math.ceil(
+        fontSize * lineHeight * Math.max(1.35, wrappedLineCount * 1.1) +
+          backgroundPaddingY * 2 +
+          Math.max(8, Math.ceil(strokeWidth * 0.75))
+      )
 
   const nextItem: TextItem = {
     ...item,
@@ -215,7 +227,7 @@ function normalizeTextItem(
   if (mode === "create") {
     const nextHeight = Math.max(item.height, minHeight)
     const bounds =
-      nextPreset.id === "snapchat-classic"
+      isSnapchatClassicPreset(nextPreset.id)
         ? computeSnapchatOverlayBounds(project, nextHeight, placement ?? "bottom")
         : computeOverlayBounds(
             project,

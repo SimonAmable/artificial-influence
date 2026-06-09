@@ -39,6 +39,7 @@ import { getActiveModelMetadata, type ModelMetadata } from "@/lib/constants/mode
 import type { Model } from "@/lib/types/models"
 import type { Canvas as FabricCanvas } from "fabric"
 import { toast } from "sonner"
+import { getCanvasExportMultiplier } from "@/lib/image-editor/export-resolution"
 import type { ImageEditorVariant } from "@/lib/image-editor/types"
 import {
   isInsufficientCreditsError,
@@ -218,14 +219,21 @@ export function ImageEditorPromptBar({
       maskOverlay.dirty = true
     }
     canvas.requestRenderAll()
-    const compositeDataUrl = canvas.toDataURL({ format: "png", multiplier: 1 })
+    const exportMultiplier = getCanvasExportMultiplier(canvas)
+    const compositeDataUrl = canvas.toDataURL({
+      format: "png",
+      multiplier: exportMultiplier,
+    })
 
     nonBaseOverlays.forEach((overlay) => {
       overlay.set?.("visible", false)
       overlay.dirty = true
     })
     canvas.requestRenderAll()
-    const baseDataUrl = canvas.toDataURL({ format: "png", multiplier: 1 })
+    const baseDataUrl = canvas.toDataURL({
+      format: "png",
+      multiplier: exportMultiplier,
+    })
 
     nonBaseOverlays.forEach((overlay) => {
       overlay.set?.("visible", true)
@@ -240,7 +248,10 @@ export function ImageEditorPromptBar({
     let maskDataUrl: string | null = null
     const maskWorkCanvas = canvas.__maskWorkCanvas
     if (hadMask && maskWorkCanvas) {
-      maskDataUrl = maskWorkCanvas.toDataURL({ format: "png", multiplier: 1 })
+      maskDataUrl = maskWorkCanvas.toDataURL({
+        format: "png",
+        multiplier: exportMultiplier,
+      })
     }
 
     return { baseDataUrl, compositeDataUrl, maskDataUrl, hadMask }

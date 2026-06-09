@@ -1,5 +1,9 @@
 import type { Canvas as FabricCanvas } from "fabric"
 import { uploadBlobToSupabase } from "@/lib/canvas/upload-helpers"
+import {
+  getCanvasExportMultiplier,
+  withHiddenExportArtifacts,
+} from "@/lib/image-editor/export-resolution"
 
 /**
  * Export canvas to data URL
@@ -9,11 +13,13 @@ export function canvasToDataUrl(
   format: "png" | "jpeg" = "png",
   quality: number = 1
 ): string {
-  return canvas.toDataURL({
-    format,
-    quality,
-    multiplier: 1,
-  })
+  return withHiddenExportArtifacts(canvas, () =>
+    canvas.toDataURL({
+      format,
+      quality,
+      multiplier: getCanvasExportMultiplier(canvas),
+    })
+  )
 }
 
 /**

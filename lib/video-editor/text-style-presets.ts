@@ -1,3 +1,7 @@
+import {
+  SNAPCHAT_CLASSIC_TEXT_PATCH,
+  SNAPCHAT_STYLE_PRESET_ID,
+} from "./snapchat-overlay-style"
 import type { TextItem } from "./types"
 
 export type TextStylePreset = {
@@ -211,31 +215,12 @@ export const TEXT_STYLE_PRESETS: readonly TextStylePreset[] = [
     },
   },
   {
-    id: "snapchat-classic",
+    id: SNAPCHAT_STYLE_PRESET_ID,
     label: "Snapchat Bar",
-    description: "Classic Snapchat caption: white text on a media-width translucent black rounded bar.",
+    description:
+      "Classic Snapchat caption: Public Sans regular, white text on a full-width translucent bar.",
     previewText: "what are you looking at",
-    patch: {
-      stylePresetId: "snapchat-classic",
-      fontFamily:
-        '"Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
-      fontWeight: "700",
-      fontStyle: "normal",
-      fontSize: 46,
-      textAlign: "center",
-      lineHeight: 1.15,
-      letterSpacingPx: 0,
-      color: "#ffffff",
-      backgroundColor: "rgba(0,0,0,0.75)",
-      backgroundMode: "box",
-      backgroundPaddingX: 18,
-      backgroundPaddingY: 10,
-      backgroundRadius: 8,
-      textStrokeColor: "#000000",
-      textStrokeWidth: 0,
-      textShadow: "0 1px 1px rgba(0,0,0,0.35)",
-      textTransform: "none",
-    },
+    patch: SNAPCHAT_CLASSIC_TEXT_PATCH,
   },
 ]
 

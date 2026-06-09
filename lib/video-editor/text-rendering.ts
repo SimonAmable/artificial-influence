@@ -1,3 +1,7 @@
+/**
+ * Remotion Snapchat reference renderer — do not change box/text layout here.
+ * Sync Fabric + FFmpeg paths to snapchat-overlay-style.constants.mjs instead.
+ */
 import type { CSSProperties } from "react"
 import type { TextItem } from "./types"
 

@@ -10,6 +10,13 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion"
+import {
+  getTextBackgroundMode,
+  textBackgroundStyle,
+  textDecorationStyle,
+  textJustifyContent,
+} from "../../lib/video-editor/text-rendering"
+import "../../lib/video-editor/overlay-fonts"
 import { videoTrimForRemotion } from "./project-helpers"
 import type { EditorItem, EditorProject, Track } from "./project-types"
 
@@ -176,38 +183,40 @@ function ItemRenderer({ item, muted }: { item: EditorItem; muted: boolean }) {
           />
         </AbsoluteFill>
       )
-    case "text":
+    case "text": {
+      const backgroundMode = getTextBackgroundMode(item)
+      const justifyContent = textJustifyContent(item.textAlign)
+      const decorationStyle = textDecorationStyle(item)
+      const backgroundStyle = textBackgroundStyle(item)
+
       return (
         <div
           style={{
             ...baseStyle,
-            color: item.color,
-            fontFamily: item.fontFamily,
-            fontSize: item.fontSize,
-            fontWeight: item.fontWeight,
-            fontStyle: item.fontStyle,
-            textAlign: item.textAlign,
-            direction: item.textDirection,
-            lineHeight: item.lineHeight,
-            letterSpacing: item.letterSpacingPx,
+            ...decorationStyle,
             display: "flex",
             alignItems: "center",
-            justifyContent:
-              item.textAlign === "left"
-                ? "flex-start"
-                : item.textAlign === "right"
-                  ? "flex-end"
-                  : "center",
-            backgroundColor: item.backgroundColor ?? "transparent",
-            paddingLeft: item.backgroundPaddingX,
-            paddingRight: item.backgroundPaddingX,
-            borderRadius: item.backgroundRadius,
+            justifyContent,
+            ...(backgroundMode === "box" && backgroundStyle ? backgroundStyle : null),
             whiteSpace: "pre-wrap",
           }}
         >
-          {item.text}
+          {backgroundMode === "line" && backgroundStyle ? (
+            <span
+              style={{
+                ...backgroundStyle,
+                boxDecorationBreak: "clone",
+                WebkitBoxDecorationBreak: "clone",
+              }}
+            >
+              {item.text}
+            </span>
+          ) : (
+            item.text
+          )}
         </div>
       )
+    }
     case "captions": {
       const relativeTimeMs = (frame / fps) * 1000
       const { pages } = createTikTokStyleCaptions({

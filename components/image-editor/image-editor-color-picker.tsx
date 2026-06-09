@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { CaretDown, CaretUp, CornersOut } from "@phosphor-icons/react"
+import { Ghost } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
 import { BrandFontPicker } from "@/components/brand-kit/brand-font-picker"
@@ -14,13 +15,22 @@ import {
 } from "@/lib/image-editor/editor-font-options"
 import { loadFont } from "@/lib/google-fonts"
 import type { FabricObject, Textbox } from "fabric"
-import type { EditorTextAlign } from "@/lib/image-editor/types"
+import {
+  applyTextStylePresetToTextbox,
+  type EditorTextboxWithPreset,
+} from "@/lib/image-editor/apply-text-style-preset"
+import type { EditorTextAlign, ImageEditorTextStylePresetId } from "@/lib/image-editor/types"
 import {
   applyTextStrokeAppearance,
   getEffectiveTextStrokeColor,
   getLogicalTextStrokeWidth,
   type EditorTextboxWithHalo,
 } from "@/lib/image-editor/text-stroke-appearance"
+import {
+  IMAGE_EDITOR_TEXT_STYLE_PRESETS,
+  isImageEditorSnapchatPreset,
+  normalizeImageEditorTextStylePresetId,
+} from "@/lib/image-editor/text-style-presets"
 
 interface ImageEditorColorPickerProps {
   className?: string
@@ -42,6 +52,7 @@ type EditorFabricObject = FabricObject & {
   isEditing?: boolean
   backgroundColor?: string
   editorTextStrokeWidth?: number
+  editorTextStylePresetId?: ImageEditorTextStylePresetId
   opacity?: number
   getObjects?: () => FabricObject[]
   set: (key: string | Record<string, unknown>, value?: unknown) => void
@@ -134,6 +145,8 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
   const [activeTextFontFamily, setActiveTextFontFamily] =
     React.useState<string | null>(null)
   const [textDraft, setTextDraft] = React.useState("")
+  const [activeTextStylePresetId, setActiveTextStylePresetId] =
+    React.useState<ImageEditorTextStylePresetId | null>(null)
   const [textControlSnap, setTextControlSnap] = React.useState<{
     fontSize: number
     textStrokeWidth: number
@@ -178,12 +191,20 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
           textAlign: parseTextAlign(activeObject.textAlign),
           fill: String(activeObject.fill ?? TEXT_DEFAULTS.fill),
         })
+        setActiveTextStylePresetId(
+          (activeObject as EditorTextboxWithPreset).editorTextStylePresetId
+            ? normalizeImageEditorTextStylePresetId(
+                (activeObject as EditorTextboxWithPreset).editorTextStylePresetId
+              )
+            : null
+        )
         setCustomColor(
           fillToHex6ForColorInput(String(activeObject.fill ?? TEXT_DEFAULTS.fill))
         )
       } else {
         setTextDraft("")
         setTextControlSnap(null)
+        setActiveTextStylePresetId(null)
         if (activeTool === "text") {
           setCustomColor(fillToHex6ForColorInput(brushSettings.color))
         }
@@ -290,6 +311,36 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
       canvas.requestRenderAll()
     },
     [canvas]
+  )
+
+  const applyTextStylePreset = React.useCallback(
+    (presetId: ImageEditorTextStylePresetId) => {
+      const canvasWidth = Math.max(1, canvas?.width ?? 1080)
+      dispatch({ type: "SET_TEXT_STYLE_PRESET", presetId, canvasWidth })
+      setActiveTextStylePresetId(presetId)
+
+      if (isImageEditorSnapchatPreset(presetId)) {
+        void loadFont("Public Sans", "200").catch(() => undefined)
+      }
+
+      applyToActiveText((object) => {
+        const settings = applyTextStylePresetToTextbox(
+          object as Textbox,
+          presetId,
+          canvasWidth
+        )
+        setTextControlSnap({
+          fontSize: settings.fontSize,
+          textStrokeWidth: settings.textStrokeWidth,
+          textAlign: settings.textAlign,
+          fill: settings.textFill,
+        })
+        setCustomColor(fillToHex6ForColorInput(settings.textFill))
+      })
+
+      saveToHistory()
+    },
+    [applyToActiveText, canvas, dispatch, saveToHistory]
   )
 
   const applyToActiveImage = React.useCallback(
@@ -415,6 +466,10 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
     textControlSnap?.textStrokeWidth ?? textSettings.textStrokeWidth
   const displayTextAlign = textControlSnap?.textAlign ?? textSettings.textAlign
   const isTextTarget = selectedKind === "text"
+  const displayTextStylePresetId =
+    isTextTarget && activeTextStylePresetId
+      ? activeTextStylePresetId
+      : textSettings.stylePresetId
 
   const displayImageOpacity = imageOpacitySnap ?? 1
 
@@ -684,6 +739,51 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
 
             {showTextSection && (
               <div>
+                <label className="text-xs text-zinc-500 uppercase tracking-wider mb-2 block">
+                  Quick style
+                </label>
+                <div className="mb-4 grid grid-cols-2 gap-2">
+                  {IMAGE_EDITOR_TEXT_STYLE_PRESETS.map((preset) => {
+                    const selected = displayTextStylePresetId === preset.id
+                    const isSnapchat = isImageEditorSnapchatPreset(preset.id)
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        title={preset.description}
+                        aria-pressed={selected}
+                        className={cn(
+                          "flex h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-2 text-[10px] transition-colors",
+                          selected
+                            ? "border-primary bg-primary/15 text-primary"
+                            : isSnapchat
+                              ? "border-[#fffc00]/70 bg-[#fffc00] text-black hover:bg-[#fffc00]/90"
+                              : "border-white/10 bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                        )}
+                        onClick={() => applyTextStylePreset(preset.id)}
+                      >
+                        {isSnapchat ? (
+                          <Ghost className="h-3.5 w-3.5" aria-hidden />
+                        ) : (
+                          <span
+                            className="text-[13px] font-black leading-none"
+                            style={{
+                              WebkitTextStroke: "1px #000000",
+                              color: "#ffffff",
+                            }}
+                            aria-hidden
+                          >
+                            T
+                          </span>
+                        )}
+                        <span className="w-full truncate text-center leading-none">
+                          {preset.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
                 <label className="text-xs text-zinc-500 uppercase tracking-wider mb-2 block">
                   Text
                 </label>

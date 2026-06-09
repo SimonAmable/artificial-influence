@@ -19,6 +19,7 @@ export function getThemeWorkspaceBackgroundColor(): string {
   return resolved
 }
 import { resolveImageUrlForFabric } from "./canvas-image-url"
+import { canvasToDataUrl } from "./export-utils"
 import type { EditorTool } from "./types"
 
 type BaseAwareObject = {
@@ -325,18 +326,9 @@ export async function exportCanvasToBlob(
   format: "png" | "jpeg" = "png",
   quality: number = 1
 ): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const dataUrl = canvas.toDataURL({
-      format,
-      quality,
-      multiplier: 1,
-    })
-
-    fetch(dataUrl)
-      .then((res) => res.blob())
-      .then(resolve)
-      .catch(reject)
-  })
+  const dataUrl = canvasToDataUrl(canvas, format, quality)
+  const response = await fetch(dataUrl)
+  return response.blob()
 }
 
 /**

@@ -1,6 +1,9 @@
 import { Sandbox } from "@vercel/sandbox"
 
 const FFMPEG_VERSION = "5.3.0"
+const PUBLIC_SANS_EXTRALIGHT_URL =
+  "https://github.com/uswds/public-sans/raw/refs/heads/main/fonts/otf/PublicSans-ExtraLight.otf"
+const PUBLIC_SANS_FONT_DIR = "/usr/share/fonts/public-sans"
 
 async function run(sandbox, command, args, label) {
   const result = await sandbox.runCommand(command, args)
@@ -36,6 +39,30 @@ try {
     ],
     "Installing fonts"
   )
+  await run(sandbox, "sudo", ["mkdir", "-p", PUBLIC_SANS_FONT_DIR], "Creating Public Sans font dir")
+  await run(
+    sandbox,
+    "curl",
+    ["-fsSL", "-o", "/tmp/PublicSans-ExtraLight.otf", PUBLIC_SANS_EXTRALIGHT_URL],
+    "Downloading Public Sans ExtraLight"
+  )
+  await run(
+    sandbox,
+    "sudo",
+    ["cp", "/tmp/PublicSans-ExtraLight.otf", `${PUBLIC_SANS_FONT_DIR}/PublicSans-ExtraLight.otf`],
+    "Installing Public Sans ExtraLight"
+  )
+  await run(sandbox, "sudo", ["fc-cache", "-f"], "Refreshing font cache")
+  const fontMatch = await run(
+    sandbox,
+    "fc-match",
+    ["-f", "%{family}\n", "Public Sans"],
+    "Verifying Public Sans"
+  )
+  const matchedFamily = (await fontMatch.stdout()).trim()
+  if (!matchedFamily.toLowerCase().includes("public sans")) {
+    throw new Error(`Public Sans is not registered in fontconfig (fc-match returned "${matchedFamily}")`)
+  }
   await run(
     sandbox,
     "npm",

@@ -89,3 +89,40 @@ export function projectPreviewImage(
   const first = [...project.slides].sort((a, b) => a.index - b.index)[0]
   return first?.finalImageUrl || first?.sourceImageUrl || null
 }
+
+export function ProjectPreviewFrame({
+  project,
+  className,
+  previewWidth = 320,
+}: {
+  project: {
+    slides: ResolvedSlideshowSlide[]
+    renderedSlideUrls: string[]
+    aspectRatio: SlideshowAspectRatio
+  }
+  className?: string
+  previewWidth?: number
+}) {
+  const firstSlide = [...project.slides].sort((a, b) => a.index - b.index)[0]
+  if (!firstSlide) return null
+
+  const hasRendered = project.renderedSlideUrls.length > 0
+  const previewUrl = hasRendered
+    ? project.renderedSlideUrls[0] ?? firstSlide.finalImageUrl ?? firstSlide.sourceImageUrl
+    : firstSlide.finalImageUrl ?? firstSlide.sourceImageUrl
+
+  return (
+    <SlidePreviewFrame
+      slide={{
+        ...firstSlide,
+        finalImageUrl: previewUrl,
+        sourceImageUrl: previewUrl ?? firstSlide.sourceImageUrl,
+      }}
+      aspectRatio={project.aspectRatio}
+      className={className}
+      burnedPreview={hasRendered}
+      showPreBurnText={!hasRendered}
+      previewWidth={previewWidth}
+    />
+  )
+}

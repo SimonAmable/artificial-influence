@@ -22,7 +22,10 @@ export interface BrushSettings {
 /** Horizontal alignment for image editor text (Fabric `textAlign`). */
 export type EditorTextAlign = "left" | "center" | "right"
 
+export type ImageEditorTextStylePresetId = "original" | "snapchat-classic"
+
 export interface TextSettings {
+  stylePresetId: ImageEditorTextStylePresetId | null
   fontSize: number
   fontFamily: string
   textAlign: EditorTextAlign
@@ -89,6 +92,11 @@ export type ImageEditorAction =
   | { type: "SET_TEXT_ALIGN"; textAlign: EditorTextAlign }
   | { type: "SET_TEXT_STROKE_WIDTH"; width: number }
   | { type: "SET_TEXT_STROKE_COLOR"; color: string }
+  | {
+      type: "SET_TEXT_STYLE_PRESET"
+      presetId: ImageEditorTextStylePresetId
+      canvasWidth: number
+    }
   | { type: "SET_SHAPE_STROKE_WIDTH"; width: number }
   | { type: "SET_RECTANGLE_FILLED"; filled: boolean }
   | { type: "LOAD_IMAGE"; url: string }

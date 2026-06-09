@@ -26,6 +26,7 @@ export const DEFAULT_BRUSH_SETTINGS: BrushSettings = {
 }
 
 export const DEFAULT_TEXT_SETTINGS: TextSettings = {
+  stylePresetId: "original",
   fontSize: 24,
   fontFamily: '"Inter", sans-serif',
   textAlign: "center",

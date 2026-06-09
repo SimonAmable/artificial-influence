@@ -4,7 +4,6 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
-  ArrowsOutSimple,
   CircleNotch,
   Copy,
   PencilSimple,
@@ -25,7 +24,7 @@ import type { SlideshowCollection } from "@/lib/slideshow/types"
 import { CollectionEditorDialog } from "@/components/collections/collection-editor-dialog"
 import { CreateCollectionDialog } from "@/components/collections/create-collection-dialog"
 import { ProjectEditor } from "@/components/slideshows/project-editor"
-import { projectPreviewImage } from "@/components/slideshows/slide-preview-frame"
+import { ProjectPreviewFrame } from "@/components/slideshows/slide-preview-frame"
 import { SlideshowFullscreenViewer } from "@/components/slideshows/slideshow-fullscreen-viewer"
 import { TemplatePreviewModal } from "@/components/slideshows/template-preview-modal"
 import { TemplateSlideThumb } from "@/components/slideshows/template-slide-thumb"
@@ -333,48 +332,39 @@ export function SlideshowsPage() {
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {projects.map((project) => {
-                  const cover = projectPreviewImage(project)
+                  const hasPreview = project.slides.length > 0
                   return (
                     <Card key={project.id} className="overflow-hidden transition hover:border-foreground/25">
-                      <div className="relative">
-                        <button
-                          type="button"
-                          className="block w-full text-left"
-                          onClick={() => setSelectedProject(project)}
-                        >
-                          <div className="aspect-[9/16] w-full bg-muted">
-                            {cover ? (
-                              <img src={cover} alt="" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        className="block w-full text-left"
+                        onClick={() => setFullscreenProject(project)}
+                      >
+                        <div className="relative">
+                          <div className="w-full bg-muted">
+                            {hasPreview ? (
+                              <ProjectPreviewFrame
+                                project={project}
+                                className="w-full rounded-none shadow-none"
+                                previewWidth={360}
+                              />
                             ) : (
-                              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                              <div className="flex aspect-[9/16] items-center justify-center text-sm text-muted-foreground">
                                 No preview yet
                               </div>
                             )}
                           </div>
-                        </button>
-                        <Badge className="absolute left-3 top-3" variant="secondary">
-                          {project.slides.length} slides
-                        </Badge>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="icon"
-                          className="absolute right-3 top-3 h-8 w-8 rounded-full bg-background/90 shadow-sm"
-                          onClick={() => setFullscreenProject(project)}
-                        >
-                          <ArrowsOutSimple className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <button
-                        type="button"
-                        className="w-full px-5 py-4 text-left"
-                        onClick={() => setSelectedProject(project)}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <CardTitle className="line-clamp-1 text-base">{project.name}</CardTitle>
-                          <Badge variant={statusVariant(project.status)}>{project.status}</Badge>
+                          <Badge className="absolute left-3 top-3" variant="secondary">
+                            {project.slides.length} slides
+                          </Badge>
                         </div>
-                        <CardDescription className="mt-2 line-clamp-2">{project.brief}</CardDescription>
+                        <div className="w-full px-5 py-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <CardTitle className="line-clamp-1 text-base">{project.name}</CardTitle>
+                            <Badge variant={statusVariant(project.status)}>{project.status}</Badge>
+                          </div>
+                          <CardDescription className="mt-2 line-clamp-2">{project.brief}</CardDescription>
+                        </div>
                       </button>
                     </Card>
                   )

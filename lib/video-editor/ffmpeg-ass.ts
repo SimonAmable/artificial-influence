@@ -1,3 +1,9 @@
+import {
+  isSnapchatClassicPreset,
+  SNAPCHAT_ASS_FONT_NAME,
+  SNAPCHAT_REFERENCE_LINE_HEIGHT,
+} from "./snapchat-overlay-style.constants.mjs"
+import { snapchatBarHeightForLineCount } from "./snapchat-overlay-style"
 import type { EditorItem, EditorProject, TextItem, VideoItem } from "./types"
 
 export type FfmpegTextOverlayProject = {
@@ -80,8 +86,8 @@ export function validateFfmpegTextOverlayProject(
 }
 
 function resolveFontFamily(fontFamily: string, stylePresetId?: string | null) {
-  if (stylePresetId === "snapchat-classic") {
-    return FONT_FALLBACKS.sans
+  if (isSnapchatClassicPreset(stylePresetId)) {
+    return SNAPCHAT_ASS_FONT_NAME
   }
 
   const lower = fontFamily.toLowerCase()
@@ -115,7 +121,7 @@ function resolveFontFamily(fontFamily: string, stylePresetId?: string | null) {
 
 function usesSnapchatVectorBar(item: TextItem) {
   return (
-    item.stylePresetId === "snapchat-classic" &&
+    isSnapchatClassicPreset(item.stylePresetId) &&
     item.backgroundMode === "box" &&
     Boolean(item.backgroundColor)
   )
@@ -201,33 +207,33 @@ function formatAssTextWithEmoji(value: string) {
   return result
 }
 
-function wrapText(item: TextItem) {
+function wrappedAssLines(item: TextItem) {
   const text = item.textTransform === "uppercase" ? item.text.toUpperCase() : item.text
   const usableWidth = Math.max(1, item.width - item.backgroundPaddingX * 2)
   const averageCharacterWidth = Math.max(1, item.fontSize * 0.56 + item.letterSpacingPx)
   const maxCharacters = Math.max(8, Math.floor(usableWidth / averageCharacterWidth))
 
-  return text
-    .split(/\r?\n/)
-    .flatMap((paragraph) => {
-      const words = paragraph.trim().split(/\s+/).filter(Boolean)
-      if (words.length === 0) return [""]
-      const lines: string[] = []
-      let line = ""
-      for (const word of words) {
-        const candidate = line ? `${line} ${word}` : word
-        if (candidate.length <= maxCharacters || !line) {
-          line = candidate
-        } else {
-          lines.push(line)
-          line = word
-        }
+  return text.split(/\r?\n/).flatMap((paragraph) => {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean)
+    if (words.length === 0) return [""]
+    const lines: string[] = []
+    let line = ""
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word
+      if (candidate.length <= maxCharacters || !line) {
+        line = candidate
+      } else {
+        lines.push(line)
+        line = word
       }
-      if (line) lines.push(line)
-      return lines
-    })
-    .map(formatAssTextWithEmoji)
-    .join("\\N")
+    }
+    if (line) lines.push(line)
+    return lines
+  })
+}
+
+function wrapText(item: TextItem) {
+  return wrappedAssLines(item).map(formatAssTextWithEmoji).join("\\N")
 }
 
 function assFillTags(color: string | null | undefined, opacity = 1) {
@@ -273,7 +279,10 @@ function positionFor(item: TextItem) {
       : item.textAlign === "right"
         ? item.x + item.width
         : item.x + item.width / 2
-  return { x: Math.round(x), y: Math.round(item.y + item.height / 2) }
+  const barHeight = usesSnapchatVectorBar(item)
+    ? snapchatMetricsForItem(item).height
+    : item.height
+  return { x: Math.round(x), y: Math.round(item.y + barHeight / 2) }
 }
 
 function shadowDepth(item: TextItem) {
@@ -319,7 +328,8 @@ function styleLine(item: TextItem, index: number) {
 function snapchatBarDialogue(item: TextItem, index: number, fps: number) {
   const start = frameToAssTime(item.from, fps)
   const end = frameToAssTime(item.from + item.durationInFrames, fps)
-  const drawing = roundedRectDrawing(item.width, item.height, item.backgroundRadius)
+  const barHeight = snapchatMetricsForItem(item).height
+  const drawing = roundedRectDrawing(item.width, barHeight, item.backgroundRadius)
   const tags = [
     "\\p1",
     "\\an7",
@@ -340,9 +350,24 @@ function snapchatBarDialogue(item: TextItem, index: number, fps: number) {
   return `Dialogue: 0,${start},${end},Overlay${index},,0,0,0,,{${tags.join("")}}${drawing}{\\p0}`
 }
 
+function snapchatMetricsForItem(item: TextItem) {
+  const lineCount = Math.max(1, wrappedAssLines(item).length)
+  const height = snapchatBarHeightForLineCount(
+    item.fontSize,
+    item.lineHeight || SNAPCHAT_REFERENCE_LINE_HEIGHT,
+    item.backgroundPaddingY,
+    lineCount
+  )
+  return { lineCount, height }
+}
+
 function dialogueLine(item: TextItem, index: number, fps: number) {
+  const snapchat = usesSnapchatVectorBar(item)
   const { x, y } = positionFor(item)
   const tags = [`\\pos(${x},${y})`]
+  if (snapchat) {
+    tags.push("\\b0")
+  }
   if (!isNearly(item.rotation, 0)) tags.push(`\\frz${item.rotation.toFixed(2)}`)
   if (item.fadeInFrames > 0 || item.fadeOutFrames > 0) {
     tags.push(

@@ -12,6 +12,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion"
+import "../overlay-fonts"
 import { premountFramesForItem } from "../premount"
 import { videoTrimForRemotion } from "../project-helpers"
 import {

@@ -29,6 +29,8 @@ import {
 import { resolveImageUrlForFabric } from "@/lib/image-editor/canvas-image-url"
 import { serializeCanvas } from "@/lib/image-editor/history-manager"
 import { CANVAS_SETTINGS, SHAPE_DEFAULTS } from "@/lib/image-editor/constants"
+import { applyTextStylePresetToTextbox, syncSnapchatBarTextboxLayout } from "@/lib/image-editor/apply-text-style-preset"
+import { isImageEditorSnapchatPreset } from "@/lib/image-editor/text-style-presets"
 import {
   applyTextStrokeAppearance,
 } from "@/lib/image-editor/text-stroke-appearance"
@@ -450,7 +452,14 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
     dispatch({ type: "SET_CANVAS", canvas })
 
     // Handle object modifications
-    const handleModified = () => {
+    const handleModified = (e: { target?: FabricObject }) => {
+      const target = e.target
+      if (target?.type === "textbox") {
+        syncSnapchatBarTextboxLayout(
+          target as Textbox,
+          Math.max(1, canvas.width ?? 800)
+        )
+      }
       ensureMaskOnTop(canvas)
       saveToHistory()
     }
@@ -474,9 +483,19 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
       ensureMaskOnTop(canvas)
     }
 
+    const handleTextChanged = (e: { target?: FabricObject }) => {
+      const target = e.target
+      if (!target || target.type !== "textbox") return
+      syncSnapchatBarTextboxLayout(
+        target as Textbox,
+        Math.max(1, canvas.width ?? 800)
+      )
+    }
+
     canvas.on("object:modified", handleModified)
     canvas.on("path:created", handlePathCreated)
     canvas.on("object:added", handleObjectAdded)
+    canvas.on("text:changed", handleTextChanged)
 
     const handleObjectMoving = (e: { target?: FabricObject }) => {
       const target = e.target
@@ -559,6 +578,7 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
       canvas.off("object:modified", handleModified)
       canvas.off("path:created", handlePathCreated)
       canvas.off("object:added", handleObjectAdded)
+      canvas.off("text:changed", handleTextChanged)
       canvas.off("object:moving", handleObjectMoving)
       canvas.off("after:render", handleAfterRender)
       canvas.off("mouse:up", handleSnapGuidesEnd)
@@ -651,6 +671,8 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
           canvas.add(line)
           draftArrowLineRef.current = line
         } else if (activeTool === "text") {
+          const canvasWidth = Math.max(1, canvas.width ?? 800)
+          const presetId = textSettings.stylePresetId ?? "original"
           const textBox = new Textbox("Type here", {
             left: pointer.x,
             top: pointer.y,
@@ -665,11 +687,15 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
             evented: false,
             editable: true,
           })
-          applyTextStrokeAppearance(
-            textBox,
-            textSettings.textStrokeWidth,
-            textSettings.textStrokeColor
-          )
+          if (isImageEditorSnapchatPreset(presetId) || presetId === "original") {
+            applyTextStylePresetToTextbox(textBox, presetId, canvasWidth)
+          } else {
+            applyTextStrokeAppearance(
+              textBox,
+              textSettings.textStrokeWidth,
+              textSettings.textStrokeColor
+            )
+          }
           assignMeta(textBox as MetaFabricObject, "text", "Text")
           canvas.add(textBox)
           draftTextRef.current = textBox
@@ -703,14 +729,16 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
         draftArrowLineRef.current.setCoords()
         canvas.requestRenderAll()
       } else if (activeTool === "text" && draftTextRef.current) {
-        const width = Math.max(40, Math.abs(pointer.x - start.x))
-        draftTextRef.current.set({
-          left: start.x,
-          top: start.y,
-          width,
-        })
-        draftTextRef.current.setCoords()
-        canvas.requestRenderAll()
+        if (!isImageEditorSnapchatPreset(textSettings.stylePresetId)) {
+          const width = Math.max(40, Math.abs(pointer.x - start.x))
+          draftTextRef.current.set({
+            left: start.x,
+            top: start.y,
+            width,
+          })
+          draftTextRef.current.setCoords()
+          canvas.requestRenderAll()
+        }
       }
     }
 
@@ -757,9 +785,15 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
       } else if (activeTool === "text") {
         const text = draftTextRef.current
         if (text) {
-          const currentWidth = text.width ?? 0
-          if (currentWidth < 60) {
-            text.set({ width: 220 })
+          const canvasWidth = Math.max(1, canvas.width ?? 800)
+          const presetId = textSettings.stylePresetId ?? "original"
+          if (isImageEditorSnapchatPreset(presetId) || presetId === "original") {
+            applyTextStylePresetToTextbox(text, presetId, canvasWidth)
+          } else {
+            const currentWidth = text.width ?? 0
+            if (currentWidth < 60) {
+              text.set({ width: 220 })
+            }
           }
 
           text.set({
@@ -806,6 +840,7 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
     shapeSettings.strokeWidth,
     textSettings.fontFamily,
     textSettings.fontSize,
+    textSettings.stylePresetId,
     textSettings.textAlign,
     textSettings.textStrokeColor,
     textSettings.textStrokeWidth,

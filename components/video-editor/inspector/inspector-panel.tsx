@@ -24,6 +24,11 @@ import {
   textDecorationStyle,
 } from "@/lib/video-editor/text-rendering"
 import {
+  estimateSnapchatWrappedLineCount,
+  snapchatBarHeightForLineCount,
+  snapchatFontSizeForWidth,
+} from "@/lib/video-editor/snapchat-overlay-style"
+import {
   TEXT_STYLE_PRESETS,
   TIKTOK_TEXT_COLORS,
   findTextStylePreset,
@@ -377,8 +382,12 @@ function TextSection({
   }
 
   const applyPreset = (preset: (typeof TEXT_STYLE_PRESETS)[number]) => {
-    const fontSize = Number(preset.patch.fontSize ?? item.fontSize)
+    const fontSize =
+      preset.id === "snapchat-classic"
+        ? snapchatFontSizeForWidth(project.settings.width)
+        : Number(preset.patch.fontSize ?? item.fontSize)
     const lineHeight = Number(preset.patch.lineHeight ?? item.lineHeight)
+    const padX = Number(preset.patch.backgroundPaddingX ?? item.backgroundPaddingX ?? 0)
     const padY = Number(preset.patch.backgroundPaddingY ?? item.backgroundPaddingY ?? 0)
     const minHeight = Math.ceil(fontSize * lineHeight * 2.35 + padY * 2)
     const snap = preset.id === "snapchat-classic"
@@ -386,8 +395,15 @@ function TextSection({
     const nextWidth = snap
       ? visualFrame?.width ?? project.settings.width
       : Math.max(item.width, Math.min(project.settings.width * 0.84, 860))
+    const snapLineCount = snap
+      ? estimateSnapchatWrappedLineCount(
+          item.text,
+          fontSize,
+          Math.max(1, nextWidth - padX * 2)
+        )
+      : 1
     const nextHeight = snap
-      ? Math.ceil(fontSize * lineHeight + padY * 2)
+      ? snapchatBarHeightForLineCount(fontSize, lineHeight, padY, snapLineCount)
       : Math.max(item.height, minHeight)
     const nextY = snap ? item.y + (item.height - nextHeight) / 2 : item.y
 

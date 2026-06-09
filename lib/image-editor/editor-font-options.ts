@@ -17,6 +17,11 @@ type GoogleBackedFont = ImageEditorFontOption & {
 
 const EDITOR_GOOGLE_FONTS: readonly GoogleBackedFont[] = [
   {
+    label: "Public Sans",
+    fontFamilyCss: '"Public Sans", sans-serif',
+    googleFamilyWeights: "Public+Sans:wght@200",
+  },
+  {
     label: "Inter",
     fontFamilyCss: '"Inter", sans-serif',
     googleFamilyWeights: "Inter:wght@400;600;700",

@@ -116,19 +116,18 @@ const snapchatText = {
   x: 0,
   y: 1400,
   width: 1080,
-  height: 72,
+  height: 94,
   text: "Wait, this cost how much? 🤯",
   stylePresetId: "snapchat-classic",
-  fontFamily:
-    '"Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
-  fontWeight: "700",
-  fontSize: 46,
-  lineHeight: 1.15,
-  backgroundColor: "rgba(0,0,0,0.75)",
+  fontFamily: '"Public Sans", Helvetica, Arial, sans-serif',
+  fontWeight: "200",
+  fontSize: 50,
+  lineHeight: 1.2,
+  backgroundColor: "rgba(0,0,0,0.5)",
   backgroundMode: "box",
-  backgroundPaddingX: 18,
-  backgroundPaddingY: 10,
-  backgroundRadius: 8,
+  backgroundPaddingX: 16,
+  backgroundPaddingY: 17,
+  backgroundRadius: 0,
   textStrokeWidth: 0,
   textTransform: "none",
 }
@@ -140,7 +139,7 @@ const snapchatProject = {
   ],
 }
 const snapchatResult = buildFfmpegAssProject(snapchatProject)
-assert.match(snapchatResult.ass, /Style: Overlay0,Noto Sans,46,/)
+assert.match(snapchatResult.ass, /Style: Overlay0,Public Sans,50,/)
 assert.doesNotMatch(snapchatResult.ass, /Style: Overlay0,Noto Serif,/)
 assert.match(snapchatResult.ass, /\\fnNoto Color Emoji/)
 assert.match(snapchatResult.ass, /\\p1/)

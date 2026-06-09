@@ -10,6 +10,7 @@ import type {
   ImageEditorVariant,
 } from "@/lib/image-editor/types"
 import { INITIAL_EDITOR_STATE } from "@/lib/image-editor/constants"
+import { textPresetSettingsForCanvas } from "@/lib/image-editor/text-style-presets"
 import { serializeCanvas, deserializeCanvas } from "@/lib/image-editor/history-manager"
 import {
   getThemeWorkspaceBackgroundColor,
@@ -76,6 +77,23 @@ function imageEditorReducer(
         ...state,
         textSettings: { ...state.textSettings, textStrokeColor: action.color },
       }
+
+    case "SET_TEXT_STYLE_PRESET": {
+      const preset = textPresetSettingsForCanvas(action.presetId, action.canvasWidth)
+      return {
+        ...state,
+        brushSettings: { ...state.brushSettings, color: preset.textFill },
+        textSettings: {
+          ...state.textSettings,
+          stylePresetId: preset.stylePresetId,
+          fontFamily: preset.fontFamily,
+          fontSize: preset.fontSize,
+          textAlign: preset.textAlign,
+          textStrokeWidth: preset.textStrokeWidth,
+          textStrokeColor: preset.textStrokeColor,
+        },
+      }
+    }
 
     case "SET_SHAPE_STROKE_WIDTH":
       return {
