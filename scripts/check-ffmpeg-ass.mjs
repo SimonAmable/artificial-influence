@@ -110,4 +110,40 @@ assert.throws(
   /do not support visible image/
 )
 
+const snapchatText = {
+  ...text,
+  id: "snapchat-text",
+  x: 0,
+  y: 1400,
+  width: 1080,
+  height: 72,
+  text: "Wait, this cost how much? 🤯",
+  stylePresetId: "snapchat-classic",
+  fontFamily:
+    '"Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
+  fontWeight: "700",
+  fontSize: 46,
+  lineHeight: 1.15,
+  backgroundColor: "rgba(0,0,0,0.75)",
+  backgroundMode: "box",
+  backgroundPaddingX: 18,
+  backgroundPaddingY: 10,
+  backgroundRadius: 8,
+  textStrokeWidth: 0,
+  textTransform: "none",
+}
+const snapchatProject = {
+  ...project,
+  tracks: [
+    project.tracks[0],
+    { ...project.tracks[1], items: [snapchatText] },
+  ],
+}
+const snapchatResult = buildFfmpegAssProject(snapchatProject)
+assert.match(snapchatResult.ass, /Style: Overlay0,Noto Sans,46,/)
+assert.doesNotMatch(snapchatResult.ass, /Style: Overlay0,Noto Serif,/)
+assert.match(snapchatResult.ass, /\\fnNoto Color Emoji/)
+assert.match(snapchatResult.ass, /\\p1/)
+assert.match(snapchatResult.ass, /Dialogue: 1,/)
+
 console.log("FFmpeg ASS checks passed.")

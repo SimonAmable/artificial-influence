@@ -7,11 +7,15 @@ export type FfmpegTextOverlayProject = {
 }
 
 const FONT_FALLBACKS = {
+  emoji: "Noto Color Emoji",
   handwriting: "Noto Serif",
   mono: "Noto Sans Mono",
   sans: "Noto Sans",
   serif: "Noto Serif",
 } as const
+
+const EMOJI_SEQUENCE =
+  /\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?)*/gu
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
@@ -75,12 +79,27 @@ export function validateFfmpegTextOverlayProject(
   return { sourceVideo: videos[0], textItems }
 }
 
-function resolveFontFamily(fontFamily: string) {
+function resolveFontFamily(fontFamily: string, stylePresetId?: string | null) {
+  if (stylePresetId === "snapchat-classic") {
+    return FONT_FALLBACKS.sans
+  }
+
   const lower = fontFamily.toLowerCase()
   if (lower.includes("source code") || lower.includes("mono") || lower.includes("consolas")) {
     return FONT_FALLBACKS.mono
   }
-  if (lower.includes("georgia") || lower.includes("times") || lower.includes("serif")) {
+  if (
+    lower.includes("sans-serif") ||
+    lower.includes("helvetica") ||
+    lower.includes("inter") ||
+    lower.includes("montserrat") ||
+    lower.includes("arial") ||
+    lower.includes("tiktok") ||
+    lower.includes("system-ui")
+  ) {
+    return FONT_FALLBACKS.sans
+  }
+  if (lower.includes("georgia") || lower.includes("times") || /\bserif\b/.test(lower)) {
     return FONT_FALLBACKS.serif
   }
   if (
@@ -92,6 +111,14 @@ function resolveFontFamily(fontFamily: string) {
     return FONT_FALLBACKS.handwriting
   }
   return FONT_FALLBACKS.sans
+}
+
+function usesSnapchatVectorBar(item: TextItem) {
+  return (
+    item.stylePresetId === "snapchat-classic" &&
+    item.backgroundMode === "box" &&
+    Boolean(item.backgroundColor)
+  )
 }
 
 function parseCssColor(value: string | null | undefined) {
@@ -150,6 +177,30 @@ function frameToAssTime(frame: number, fps: number) {
     .padStart(2, "0")}.${centiseconds.toString().padStart(2, "0")}`
 }
 
+function escapeAssText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\{/g, "\\{").replace(/\}/g, "\\}")
+}
+
+function formatAssTextWithEmoji(value: string) {
+  let result = ""
+  let lastIndex = 0
+
+  for (const match of value.matchAll(EMOJI_SEQUENCE)) {
+    const index = match.index ?? 0
+    if (index > lastIndex) {
+      result += escapeAssText(value.slice(lastIndex, index))
+    }
+    result += `{\\fn${FONT_FALLBACKS.emoji}}${escapeAssText(match[0])}{\\r}`
+    lastIndex = index + match[0].length
+  }
+
+  if (lastIndex < value.length) {
+    result += escapeAssText(value.slice(lastIndex))
+  }
+
+  return result
+}
+
 function wrapText(item: TextItem) {
   const text = item.textTransform === "uppercase" ? item.text.toUpperCase() : item.text
   const usableWidth = Math.max(1, item.width - item.backgroundPaddingX * 2)
@@ -175,12 +226,38 @@ function wrapText(item: TextItem) {
       if (line) lines.push(line)
       return lines
     })
-    .map(escapeAssText)
+    .map(formatAssTextWithEmoji)
     .join("\\N")
 }
 
-function escapeAssText(value: string) {
-  return value.replace(/\\/g, "\\\\").replace(/\{/g, "\\{").replace(/\}/g, "\\}")
+function assFillTags(color: string | null | undefined, opacity = 1) {
+  const parsed = parseCssColor(color)
+  const assAlpha = 255 - Math.round(255 * clamp(parsed.alpha * opacity, 0, 1))
+  const rgb =
+    `&H${parsed.blue.toString(16).padStart(2, "0")}` +
+    `${parsed.green.toString(16).padStart(2, "0")}` +
+    `${parsed.red.toString(16).padStart(2, "0")}&`
+  return `\\1c${rgb.toUpperCase()}\\1a&H${assAlpha.toString(16).padStart(2, "0")}&`
+}
+
+function roundedRectDrawing(width: number, height: number, radius: number) {
+  const w = Math.max(1, Math.round(width))
+  const h = Math.max(1, Math.round(height))
+  const r = Math.min(Math.max(0, Math.round(radius)), Math.floor(Math.min(w, h) / 2))
+  if (r === 0) {
+    return `m 0 0 l ${w} 0 ${w} ${h} 0 ${h}`
+  }
+  return [
+    `m ${r} 0`,
+    `l ${w - r} 0`,
+    `b ${w} 0 ${w} 0 ${w} ${r}`,
+    `l ${w} ${h - r}`,
+    `b ${w} ${h} ${w} ${h} ${w - r} ${h}`,
+    `l ${r} ${h}`,
+    `b 0 ${h} 0 ${h} 0 ${h - r}`,
+    `l 0 ${r}`,
+    `b 0 0 0 0 ${r} 0`,
+  ].join(" ")
 }
 
 function alignmentFor(item: TextItem) {
@@ -204,7 +281,9 @@ function shadowDepth(item: TextItem) {
 }
 
 function styleLine(item: TextItem, index: number) {
-  const hasBackground = item.backgroundMode !== "none" && Boolean(item.backgroundColor)
+  const vectorBar = usesSnapchatVectorBar(item)
+  const hasBackground =
+    !vectorBar && item.backgroundMode !== "none" && Boolean(item.backgroundColor)
   const borderStyle = hasBackground ? 3 : 1
   const outline = hasBackground
     ? Math.max(item.backgroundPaddingX, item.backgroundPaddingY, 2)
@@ -212,7 +291,7 @@ function styleLine(item: TextItem, index: number) {
 
   return `Style: ${[
     `Overlay${index}`,
-    resolveFontFamily(item.fontFamily),
+    resolveFontFamily(item.fontFamily, item.stylePresetId),
     Math.max(1, Math.round(item.fontSize)),
     assColor(item.color, item.opacity),
     assColor(item.color, item.opacity),
@@ -237,6 +316,30 @@ function styleLine(item: TextItem, index: number) {
   ].join(",")}`
 }
 
+function snapchatBarDialogue(item: TextItem, index: number, fps: number) {
+  const start = frameToAssTime(item.from, fps)
+  const end = frameToAssTime(item.from + item.durationInFrames, fps)
+  const drawing = roundedRectDrawing(item.width, item.height, item.backgroundRadius)
+  const tags = [
+    "\\p1",
+    "\\an7",
+    "\\bord0",
+    "\\shad0",
+    assFillTags(item.backgroundColor, item.opacity),
+    `\\pos(${Math.round(item.x)},${Math.round(item.y)})`,
+  ]
+  if (!isNearly(item.rotation, 0)) tags.push(`\\frz${item.rotation.toFixed(2)}`)
+  if (item.fadeInFrames > 0 || item.fadeOutFrames > 0) {
+    tags.push(
+      `\\fad(${Math.round((item.fadeInFrames / fps) * 1000)},${Math.round(
+        (item.fadeOutFrames / fps) * 1000
+      )})`
+    )
+  }
+
+  return `Dialogue: 0,${start},${end},Overlay${index},,0,0,0,,{${tags.join("")}}${drawing}{\\p0}`
+}
+
 function dialogueLine(item: TextItem, index: number, fps: number) {
   const { x, y } = positionFor(item)
   const tags = [`\\pos(${x},${y})`]
@@ -252,13 +355,20 @@ function dialogueLine(item: TextItem, index: number, fps: number) {
   const start = frameToAssTime(item.from, fps)
   const end = frameToAssTime(item.from + item.durationInFrames, fps)
   const text = wrapText(item)
-  return `Dialogue: 0,${start},${end},Overlay${index},,0,0,0,,{${tags.join("")}}${text}`
+  const layer = usesSnapchatVectorBar(item) ? 1 : 0
+  return `Dialogue: ${layer},${start},${end},Overlay${index},,0,0,0,,{${tags.join("")}}${text}`
 }
 
 export function buildFfmpegAssProject(project: EditorProject): FfmpegTextOverlayProject {
   const { sourceVideo, textItems } = validateFfmpegTextOverlayProject(project)
   const styles = textItems.map(styleLine)
-  const events = textItems.map((item, index) => dialogueLine(item, index, project.settings.fps))
+  const events = textItems.flatMap((item, index) => {
+    const lines = [dialogueLine(item, index, project.settings.fps)]
+    if (usesSnapchatVectorBar(item)) {
+      lines.unshift(snapchatBarDialogue(item, index, project.settings.fps))
+    }
+    return lines
+  })
 
   return {
     ass: [

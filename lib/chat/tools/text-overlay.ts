@@ -102,6 +102,26 @@ function buildGenerationLabel(model: string | null) {
   return `Generated video (${model ?? "video"})`
 }
 
+function computeSnapchatOverlayBounds(
+  project: EditorProject,
+  itemHeight: number,
+  placement: TextOverlayPlacement,
+) {
+  const safeMargin = Math.max(24, Math.round(project.settings.height * 0.04))
+  const fraction = placement === "top" ? 0.25 : placement === "bottom" ? 0.75 : 0.5
+  const y = clamp(
+    Math.round(project.settings.height * fraction - itemHeight / 2),
+    safeMargin,
+    Math.max(safeMargin, project.settings.height - itemHeight - safeMargin),
+  )
+
+  return {
+    width: project.settings.width,
+    x: 0,
+    y,
+  }
+}
+
 function computeOverlayBounds(
   project: EditorProject,
   item: TextItem,
@@ -150,10 +170,14 @@ function normalizeTextItem(
   const lineHeight = Number(nextPreset.patch.lineHeight ?? item.lineHeight)
   const backgroundPaddingY = Number(nextPreset.patch.backgroundPaddingY ?? item.backgroundPaddingY ?? 0)
   const strokeWidth = Number(nextPreset.patch.textStrokeWidth ?? item.textStrokeWidth ?? 0)
+  const wrapWidth =
+    nextPreset.id === "snapchat-classic" && mode === "create"
+      ? project.settings.width
+      : item.width
   const wrappedLineCount = estimateWrappedLineCount(
     text,
     fontSize,
-    Math.max(1, item.width - Number(nextPreset.patch.backgroundPaddingX ?? item.backgroundPaddingX) * 2)
+    Math.max(1, wrapWidth - Number(nextPreset.patch.backgroundPaddingX ?? item.backgroundPaddingX) * 2)
   )
   const minHeight = Math.ceil(
     fontSize * lineHeight * Math.max(1.35, wrappedLineCount * 1.1) +
@@ -189,13 +213,17 @@ function normalizeTextItem(
   }
 
   if (mode === "create") {
-    const bounds = computeOverlayBounds(
-      project,
-      { ...nextItem, height: Math.max(item.height, minHeight) },
-      placement ?? "bottom",
-    )
+    const nextHeight = Math.max(item.height, minHeight)
+    const bounds =
+      nextPreset.id === "snapchat-classic"
+        ? computeSnapchatOverlayBounds(project, nextHeight, placement ?? "bottom")
+        : computeOverlayBounds(
+            project,
+            { ...nextItem, height: nextHeight },
+            placement ?? "bottom",
+          )
     nextItem.width = bounds.width
-    nextItem.height = Math.max(item.height, minHeight)
+    nextItem.height = nextHeight
     nextItem.x = bounds.x
     nextItem.y = bounds.y
   } else if (placement) {

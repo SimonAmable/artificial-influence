@@ -1,5 +1,5 @@
 import type { UIMessage } from "ai"
-import { sumCreditsFromChatMessages } from "@/lib/templates/calibrate"
+import { analyzeChatHistoryForTemplate } from "@/lib/chat/analyze-chat-history"
 import {
   calibrateTemplateCreditsIfNeeded,
   completeTemplateRun,
@@ -16,7 +16,7 @@ export async function finalizeTemplateRunFromChat(
   const run = await getTemplateRunByThreadId(threadId)
   if (!run || !run.template) return
 
-  const creditsActual = sumCreditsFromChatMessages(messages)
+  const { creditsTotal: creditsActual } = analyzeChatHistoryForTemplate(messages)
   const status = creditsActual > 0 || messages.some((m) => m.role === "assistant") ? "complete" : "failed"
 
   await completeTemplateRun(threadId, status, creditsActual > 0 ? creditsActual : null)

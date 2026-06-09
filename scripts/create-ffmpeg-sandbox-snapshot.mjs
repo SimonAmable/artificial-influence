@@ -32,6 +32,7 @@ try {
       "google-noto-sans-fonts",
       "google-noto-serif-fonts",
       "google-noto-sans-mono-fonts",
+      "google-noto-emoji-fonts",
     ],
     "Installing fonts"
   )

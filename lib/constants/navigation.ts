@@ -176,7 +176,7 @@ export const megaNavGroups: MegaNavGroup[] = [
       {
         path: "/autopost",
         label: "Autopost",
-        description: "Schedule and publish your generated content",
+        description: "Schedule and publish posts to Instagram and TikTok",
         badge: "new",
         iconPhosphor: "paper-plane-tilt",
       },
@@ -560,7 +560,7 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     label: "Autopost",
     href: "/autopost",
     icon: "palette",
-    hint: "Schedule and publish your generated content.",
+    hint: "Schedule and publish posts to Instagram and TikTok.",
   },
   {
     label: "Image Studio",

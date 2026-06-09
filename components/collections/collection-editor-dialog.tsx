@@ -27,8 +27,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { uploadFilesToSupabase } from "@/lib/canvas/upload-helpers"
 import type { SlideshowCollection, SlideshowImportCandidate } from "@/lib/slideshow/types"
+import { cn } from "@/lib/utils"
 
 async function readJson<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({}))
@@ -66,7 +67,9 @@ export function CollectionEditorDialog({
   const [importJobId, setImportJobId] = React.useState<string | null>(null)
   const [importCandidates, setImportCandidates] = React.useState<SlideshowImportCandidate[]>([])
   const [selectedCandidateIds, setSelectedCandidateIds] = React.useState<string[]>([])
+  const [isDragging, setIsDragging] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const dragCounterRef = React.useRef(0)
 
   React.useEffect(() => {
     if (!open || !collection) return
@@ -78,6 +81,8 @@ export function CollectionEditorDialog({
     setImportCandidates([])
     setSelectedCandidateIds([])
     setBusy(false)
+    setIsDragging(false)
+    dragCounterRef.current = 0
   }, [collection, open])
 
   if (!collection) return null
@@ -170,31 +175,81 @@ export function CollectionEditorDialog({
     }
   }
 
-  async function handleUpload(file: File) {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file.")
+  function collectImageFiles(fileList: FileList | File[]): File[] {
+    return Array.from(fileList).filter((file) => file.type.startsWith("image/"))
+  }
+
+  async function handleUploadFiles(files: File[]) {
+    const imageFiles = collectImageFiles(files)
+    if (imageFiles.length === 0) {
+      toast.error("Please choose image files.")
       return
+    }
+    if (imageFiles.length < files.length) {
+      const skipped = files.length - imageFiles.length
+      toast.info(`Skipped ${skipped} non-image file${skipped === 1 ? "" : "s"}.`)
     }
 
     setBusy(true)
     try {
-      const uploaded = await uploadFileToSupabase(file)
-      const { collection: updated } = await readJson<{ collection: SlideshowCollection }>(
-        await fetch(`/api/slideshow/collections/${collection.id}/images`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            uploads: [{ uploadId: uploaded.uploadId, title: uploaded.fileName }],
-          }),
-        }),
-      )
+      const uploaded = await uploadFilesToSupabase(imageFiles)
+      if (uploaded.length === 0) return
+
+      const { collection: updated } = await postCollectionImages({
+        uploads: uploaded.map((result) => ({
+          uploadId: result.uploadId,
+          title: result.fileName,
+        })),
+      })
       onChange(updated)
-      toast.success("Image uploaded to collection.")
+      toast.success(
+        uploaded.length === 1
+          ? "Image uploaded to collection."
+          : `${uploaded.length} images uploaded to collection.`,
+      )
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to upload image.")
+      toast.error(error instanceof Error ? error.message : "Failed to upload images.")
     } finally {
       setBusy(false)
     }
+  }
+
+  function handleDragEnter(event: React.DragEvent) {
+    event.preventDefault()
+    event.stopPropagation()
+    dragCounterRef.current += 1
+    if (event.dataTransfer.types.includes("Files")) {
+      setIsDragging(true)
+    }
+  }
+
+  function handleDragLeave(event: React.DragEvent) {
+    event.preventDefault()
+    event.stopPropagation()
+    dragCounterRef.current -= 1
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0
+      setIsDragging(false)
+    }
+  }
+
+  function handleDragOver(event: React.DragEvent) {
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  function handleDrop(event: React.DragEvent) {
+    event.preventDefault()
+    event.stopPropagation()
+    dragCounterRef.current = 0
+    setIsDragging(false)
+
+    const imageFiles = collectImageFiles(event.dataTransfer.files)
+    if (imageFiles.length === 0) {
+      toast.error("Please drop image files.")
+      return
+    }
+    void handleUploadFiles(imageFiles)
   }
 
   async function previewPinterestImport() {
@@ -332,7 +387,7 @@ export function CollectionEditorDialog({
               </Button>
               <Button type="button" variant="outline" className="gap-2" disabled={busy} onClick={() => fileInputRef.current?.click()}>
                 <UploadSimple className="h-4 w-4" />
-                Upload image
+                Upload images
               </Button>
               <Button type="button" variant="outline" disabled={busy} onClick={() => void saveDetails()}>
                 Save details
@@ -402,7 +457,16 @@ export function CollectionEditorDialog({
               ) : null}
             </div>
 
-            <div className="space-y-2">
+            <div
+              className={cn(
+                "relative space-y-2 rounded-xl p-1 transition-colors",
+                isDragging && "bg-primary/5 ring-2 ring-inset ring-primary/40",
+              )}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            >
               <div className="flex items-center justify-between gap-2">
                 <Label>Images ({collection.items.length})</Label>
                 <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void refreshCollection()}>
@@ -410,25 +474,41 @@ export function CollectionEditorDialog({
                 </Button>
               </div>
               {collection.items.length === 0 ? (
-                <p className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-                  This collection is empty. Upload images, pick from your library, or import from Pinterest.
+                <p
+                  className={cn(
+                    "rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground",
+                    isDragging && "border-primary text-foreground",
+                  )}
+                >
+                  {isDragging
+                    ? "Drop images to add to collection"
+                    : "This collection is empty. Upload images, drag and drop here, pick from your library, or import from Pinterest."}
                 </p>
               ) : (
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-                  {collection.items.map((item) => (
-                    <div key={item.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
-                      <img src={item.thumbnailUrl || item.url} alt={item.title} className="h-full w-full object-cover" />
-                      <button
-                        type="button"
-                        className="absolute right-1 top-1 rounded-md bg-background/90 p-1 opacity-0 transition-opacity group-hover:opacity-100"
-                        onClick={() => void removeImage(item.id)}
-                        disabled={busy}
-                        title="Remove image"
-                      >
-                        <Trash className="h-3.5 w-3.5" />
-                      </button>
+                <div className="relative">
+                  {isDragging ? (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-primary/10">
+                      <p className="rounded-lg bg-background/90 px-3 py-2 text-sm font-medium shadow-sm">
+                        Drop images to add
+                      </p>
                     </div>
-                  ))}
+                  ) : null}
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                    {collection.items.map((item) => (
+                      <div key={item.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
+                        <img src={item.thumbnailUrl || item.url} alt={item.title} className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          className="absolute right-1 top-1 rounded-md bg-background/90 p-1 opacity-0 transition-opacity group-hover:opacity-100"
+                          onClick={() => void removeImage(item.id)}
+                          disabled={busy}
+                          title="Remove image"
+                        >
+                          <Trash className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -450,11 +530,12 @@ export function CollectionEditorDialog({
         ref={fileInputRef}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
         onChange={(event) => {
-          const file = event.target.files?.[0]
+          const imageFiles = collectImageFiles(event.target.files ?? [])
           event.target.value = ""
-          if (file) void handleUpload(file)
+          if (imageFiles.length > 0) void handleUploadFiles(imageFiles)
         }}
       />
 

@@ -8,7 +8,7 @@ import {
   getSlideshowProject,
   updateSlideshowProject,
 } from "@/lib/slideshows/database-server"
-import { collectSlideReferenceUrls } from "@/lib/slideshows/reference-images"
+import { collectAiEditReferenceUrls, collectSlideReferenceUrls } from "@/lib/slideshows/reference-images"
 import type { ResolvedSlideshowSlide, SlideshowProject } from "@/lib/slideshows/types"
 import { tryCompleteFalPendingImage } from "@/lib/server/fal-image-completion"
 import { resolveStoredObjectUrl } from "@/lib/uploads/server"
@@ -190,9 +190,11 @@ export async function resolveSlideshowProject(
       if (generationPrompt) {
         const referenceUrls = slide.visual.source === "generate"
           ? collectSlideReferenceUrls(slide)
-          : baseImageUrl
-            ? [baseImageUrl]
-            : []
+          : slide.visual.aiEditPrompt
+            ? collectAiEditReferenceUrls(slide, baseImageUrl)
+            : baseImageUrl
+              ? [baseImageUrl]
+              : []
 
         const result = await runImageGeneration({
           supabase,

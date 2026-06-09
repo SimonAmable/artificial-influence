@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { inferSlideKind } from "@/lib/slideshows/slide-kind"
 import type { SlideshowCollection } from "@/lib/slideshow/types"
 import type { ResolvedSlideshowSlide } from "@/lib/slideshows/types"
@@ -149,19 +148,20 @@ export function SlideImageControls({
             onSelect={(item) => update(pinCollectionImage(slide, { id: item.id, url: item.url }))}
           />
 
-          <div className="space-y-2">
-            <Label>Optional AI edit prompt</Label>
-            <Textarea
-              rows={3}
-              value={slide.visual.aiEditPrompt ?? ""}
-              onChange={(event) => update({
-                ...queueSlideRegeneration(patchVisual(slide, {
-                  aiEditPrompt: event.target.value.trim() ? event.target.value : null,
-                })),
-              })}
-              placeholder="Leave empty to use the pack image as-is."
-            />
-          </div>
+          <GenerationPromptField
+            label="Edit prompt"
+            prompt={slide.visual.aiEditPrompt ?? ""}
+            onPromptChange={(value) => update({
+              ...queueSlideRegeneration(patchVisual(slide, {
+                aiEditPrompt: value.trim() ? value : null,
+              })),
+            })}
+            placeholder="Leave empty to use the pack image as-is."
+            references={slide.visual.referenceImages ?? []}
+            onReferencesChange={(referenceImages) => update(
+              queueSlideRegeneration(patchVisual(slide, { referenceImages })),
+            )}
+          />
 
           <div className="flex flex-wrap gap-2">
             <Button

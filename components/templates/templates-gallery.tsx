@@ -170,14 +170,14 @@ export function TemplatesGallery({ templates, currentUserId }: TemplatesGalleryP
           {popular.length > 0 ? (
             <section className="mt-10">
               <h2 className="mb-4 text-lg font-bold">Popular right now</h2>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5">
+              <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {popular.map((template) => (
                   <TemplateCard
                     key={template.id}
                     template={template}
                     isNew={isRecent(template.created_at)}
                     isOwner={template.creator_id === currentUserId}
-                    layout="grid"
+                    layout="scroll"
                   />
                 ))}
               </div>

@@ -131,14 +131,16 @@ function CreateSlideshowDialog({
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2 sm:col-span-2">
+            <div className="min-w-0 space-y-2 sm:col-span-2">
               <Label>Start from template</Label>
               <Select
                 value={templateId}
                 onValueChange={setTemplateId}
                 disabled={templateLocked}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full min-w-0">
+                  <SelectValue className="truncate" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Let AI create a reusable template</SelectItem>
                   {templates.map((template) => (
@@ -147,10 +149,12 @@ function CreateSlideshowDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label>Aspect ratio</Label>
               <Select value={aspectRatio} onValueChange={(value) => setAspectRatio(value as SlideshowAspectRatio)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full min-w-0">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="9:16">9:16</SelectItem>
                   <SelectItem value="4:5">4:5</SelectItem>

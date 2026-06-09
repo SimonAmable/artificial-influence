@@ -116,7 +116,7 @@ export function applySlideKind(
       aiEditPrompt: kind === "pack" ? slide.visual.aiEditPrompt : null,
       manualAssetId: kind === "custom" ? slide.visual.manualAssetId : null,
       manualImageUrl: kind === "custom" ? slide.visual.manualImageUrl : null,
-      referenceImages: kind === "ai" || kind === "character"
+      referenceImages: kind === "ai" || kind === "character" || kind === "pack"
         ? slide.visual.referenceImages ?? []
         : [],
     },

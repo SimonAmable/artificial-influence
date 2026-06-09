@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { formatCreationGoalGuidance } from "@/lib/onboarding/creation-goal-guidance"
 import {
   onboardingAiExperienceSchema,
   onboardingCreationGoalSchema,
@@ -83,7 +84,8 @@ export function buildOnboardingHiddenContext(raw: unknown): string {
     `AI experience: ${AI_EXPERIENCE_LABELS[data.aiExperience]}`,
     `Top priority: ${data.priorities.map((priority) => PRIORITY_LABELS[priority]).join(", ")}`,
     `Referral source: ${REFERRAL_SOURCE_LABELS[data.referralSource]}`,
-    "Guide them toward the best first actions in UniCan, but do not repeat this profile back unless it helps answer the user directly.",
+    formatCreationGoalGuidance(data.creationGoals),
+    "Guide them toward the recommended first actions above. Lead with the best match for their top goal; keep it short and actionable. Do not repeat this profile back unless it helps answer the user directly.",
   ]
 
   return lines.filter((line): line is string => Boolean(line)).join("\n")
