@@ -1,7 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { FilePlus, FolderOpen, Image as ImageIcon, Plus, UploadSimple } from "@phosphor-icons/react"
+import {
+  FilePlus,
+  FolderOpen,
+  Image as ImageIcon,
+  Plus,
+  UploadSimple,
+  X,
+} from "@phosphor-icons/react"
 import {
   ComposerAttachmentPreviews,
 } from "@/components/chat/composer/attachments"
@@ -31,10 +38,223 @@ interface TemplateInputFieldProps {
   disabled?: boolean
   compactDesktop?: boolean
   previewUrl?: string | null
+  mediaLabel?: string | null
   promptAttachments?: ComposerAttachment[]
   onOpenPromptAssetPicker?: () => void
+  onOpenMediaAssetPicker?: () => void
   onPromptAttachmentFilesSelected?: (files: File[]) => void
   onRemovePromptAttachment?: (attachment: ComposerAttachment) => void
+}
+
+function useFileDragDrop(onFiles: (files: File[]) => void, enabled = true) {
+  const [isDragging, setIsDragging] = React.useState(false)
+  const dragCounter = React.useRef(0)
+
+  const handleDrop = React.useCallback(
+    (event: React.DragEvent) => {
+      if (!enabled) return
+      event.preventDefault()
+      event.stopPropagation()
+      dragCounter.current = 0
+      setIsDragging(false)
+      const files = Array.from(event.dataTransfer.files ?? [])
+      if (files.length > 0) {
+        onFiles(files)
+      }
+    },
+    [enabled, onFiles],
+  )
+
+  const handleDragOver = React.useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+  }, [])
+
+  const handleDragEnter = React.useCallback(
+    (event: React.DragEvent) => {
+      if (!enabled) return
+      event.preventDefault()
+      event.stopPropagation()
+      dragCounter.current += 1
+      if (event.dataTransfer.types.includes("Files")) {
+        setIsDragging(true)
+      }
+    },
+    [enabled],
+  )
+
+  const handleDragLeave = React.useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    dragCounter.current -= 1
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0
+      setIsDragging(false)
+    }
+  }, [])
+
+  return {
+    isDragging,
+    dragHandlers: {
+      onDrop: handleDrop,
+      onDragOver: handleDragOver,
+      onDragEnter: handleDragEnter,
+      onDragLeave: handleDragLeave,
+    },
+  }
+}
+
+function fileMatchesMediaKind(file: File, kind: "image" | "video" | "audio") {
+  if (kind === "image") return file.type.startsWith("image/")
+  if (kind === "video") return file.type.startsWith("video/")
+  return file.type.startsWith("audio/")
+}
+
+function TemplateMediaInputField({
+  input,
+  value,
+  onChange,
+  disabled = false,
+  compactDesktop = false,
+  previewUrl,
+  mediaLabel,
+  label,
+  onOpenMediaAssetPicker,
+}: {
+  input: Extract<TemplateInput, { kind: "image" | "video" | "audio" }>
+  value: TemplateFieldValue
+  onChange: (value: TemplateFieldValue) => void
+  disabled?: boolean
+  compactDesktop?: boolean
+  previewUrl?: string | null
+  mediaLabel?: string | null
+  label: React.ReactNode
+  onOpenMediaAssetPicker?: () => void
+}) {
+  const mediaFileInputRef = React.useRef<HTMLInputElement | null>(null)
+  const accept =
+    input.kind === "image" ? "image/*" : input.kind === "video" ? "video/*" : "audio/*"
+  const hasMediaValue =
+    value instanceof File || (typeof value === "string" && value.startsWith("http"))
+  const displayName =
+    value instanceof File
+      ? value.name
+      : mediaLabel?.trim() || (hasMediaValue ? "Asset selected" : "")
+
+  const handleMediaFiles = React.useCallback(
+    (files: File[]) => {
+      const file = files.find((candidate) => fileMatchesMediaKind(candidate, input.kind))
+      if (file) {
+        onChange(file)
+      }
+    },
+    [input.kind, onChange],
+  )
+
+  const mediaDragDrop = useFileDragDrop(handleMediaFiles, !disabled)
+
+  return (
+    <div className="space-y-2">
+      {label}
+      {input.helpText ? <p className="text-xs text-muted-foreground">{input.helpText}</p> : null}
+      <div
+        className={cn(
+          "relative flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20 p-4 transition-colors",
+          compactDesktop && "lg:min-h-[116px] lg:p-3",
+          disabled && "opacity-60 pointer-events-none",
+          mediaDragDrop.isDragging && "border-primary bg-primary/10",
+        )}
+        {...mediaDragDrop.dragHandlers}
+      >
+        <input
+          ref={mediaFileInputRef}
+          type="file"
+          accept={accept}
+          className="sr-only"
+          disabled={disabled}
+          onChange={(e) => {
+            const file = e.target.files?.[0] ?? null
+            onChange(file)
+            if (mediaFileInputRef.current) {
+              mediaFileInputRef.current.value = ""
+            }
+          }}
+        />
+
+        {hasMediaValue ? (
+          <div className="relative flex w-full flex-col items-center gap-2">
+            {input.kind === "image" && previewUrl ? (
+              <img
+                src={previewUrl}
+                alt=""
+                className={cn(
+                  "max-h-48 w-full rounded-lg object-contain",
+                  compactDesktop && "lg:max-h-32",
+                )}
+              />
+            ) : input.kind === "video" && previewUrl ? (
+              <video
+                src={previewUrl}
+                muted
+                playsInline
+                className={cn(
+                  "max-h-48 w-full rounded-lg object-contain",
+                  compactDesktop && "lg:max-h-32",
+                )}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground truncate max-w-full px-2 text-center">
+                {displayName}
+              </p>
+            )}
+            {!disabled ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 size-8"
+                aria-label="Remove file"
+                onClick={() => onChange(null)}
+              >
+                <X className="size-4" />
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3">
+            {input.kind === "image" ? (
+              <ImageIcon className="size-8 text-muted-foreground" />
+            ) : (
+              <UploadSimple className="size-8 text-muted-foreground" />
+            )}
+            <p className="text-xs text-muted-foreground text-center">Drag and drop a file here</p>
+            <div className="flex flex-row items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={disabled}
+                onClick={() => mediaFileInputRef.current?.click()}
+              >
+                <UploadSimple className="mr-2 size-4" />
+                {mediaDragDrop.isDragging ? "Drop file here" : "Upload"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={disabled || !onOpenMediaAssetPicker}
+                onClick={() => onOpenMediaAssetPicker?.()}
+              >
+                <FolderOpen className="mr-2 size-4" />
+                Select asset
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export function TemplateInputField({
@@ -44,8 +264,10 @@ export function TemplateInputField({
   disabled = false,
   compactDesktop = false,
   previewUrl,
+  mediaLabel,
   promptAttachments = [],
   onOpenPromptAssetPicker,
+  onOpenMediaAssetPicker,
   onPromptAttachmentFilesSelected,
   onRemovePromptAttachment,
 }: TemplateInputFieldProps) {
@@ -56,10 +278,24 @@ export function TemplateInputField({
     input.multiline &&
     (typeof onPromptAttachmentFilesSelected === "function" || typeof onOpenPromptAssetPicker === "function")
 
+  const handlePromptDropFiles = React.useCallback(
+    (files: File[]) => {
+      if (!onPromptAttachmentFilesSelected) return
+      onPromptAttachmentFilesSelected(files)
+    },
+    [onPromptAttachmentFilesSelected],
+  )
+
+  const promptDragDrop = useFileDragDrop(handlePromptDropFiles, !disabled && canAttachPromptImages)
+
   const label = (
     <Label htmlFor={id} className="text-sm font-medium">
       {input.label}
-      {input.required ? <span className="text-destructive ml-0.5">*</span> : null}
+      {input.required ? (
+        <span className="text-destructive ml-0.5">*</span>
+      ) : (
+        <span className="ml-1 font-normal text-muted-foreground">(optional)</span>
+      )}
     </Label>
   )
 
@@ -86,7 +322,13 @@ export function TemplateInputField({
           {label}
           {input.multiline ? (
             <div className="space-y-3">
-              <div className="relative">
+              <div
+                className={cn(
+                  "relative rounded-xl",
+                  canAttachPromptImages && promptDragDrop.isDragging && "ring-2 ring-inset ring-primary/40",
+                )}
+                {...(canAttachPromptImages ? promptDragDrop.dragHandlers : {})}
+              >
                 <Textarea
                   id={id}
                   disabled={disabled}
@@ -172,65 +414,20 @@ export function TemplateInputField({
 
     case "image":
     case "video":
-    case "audio": {
-      const accept =
-        input.kind === "image" ? "image/*" : input.kind === "video" ? "video/*" : "audio/*"
-
+    case "audio":
       return (
-        <div className="space-y-2">
-          {label}
-          {input.helpText ? (
-            <p className="text-xs text-muted-foreground">{input.helpText}</p>
-          ) : null}
-          <div
-            className={cn(
-              "relative flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20 p-4",
-              compactDesktop && "lg:min-h-[116px] lg:p-3",
-              disabled && "opacity-60 pointer-events-none",
-            )}
-          >
-            {previewUrl ? (
-              input.kind === "image" ? (
-                <img
-                  src={previewUrl}
-                  alt=""
-                  className={cn(
-                    "max-h-48 w-full rounded-lg object-contain",
-                    compactDesktop && "lg:max-h-32",
-                  )}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground truncate max-w-full">
-                  {value instanceof File ? value.name : "File attached"}
-                </p>
-              )
-            ) : (
-              <>
-                {input.kind === "image" ? (
-                  <ImageIcon className="mb-2 size-8 text-muted-foreground" />
-                ) : (
-                  <UploadSimple className="mb-2 size-8 text-muted-foreground" />
-                )}
-                <p className="text-sm text-muted-foreground">Click to upload</p>
-              </>
-            )}
-            {!disabled ? (
-              <label className="absolute inset-0 cursor-pointer">
-                <input
-                  type="file"
-                  accept={accept}
-                  className="sr-only"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] ?? null
-                    onChange(file)
-                  }}
-                />
-              </label>
-            ) : null}
-          </div>
-        </div>
+        <TemplateMediaInputField
+          input={input}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          compactDesktop={compactDesktop}
+          previewUrl={previewUrl}
+          mediaLabel={mediaLabel}
+          label={label}
+          onOpenMediaAssetPicker={onOpenMediaAssetPicker}
+        />
       )
-    }
 
     case "boolean": {
       const checked =

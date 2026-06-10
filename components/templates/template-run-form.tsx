@@ -18,12 +18,37 @@ import {
   type TemplateFieldValue,
 } from "@/components/templates/template-input-field"
 import { Button } from "@/components/ui/button"
+import type { AssetCategory, AssetType } from "@/lib/assets/types"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import type { AttachedRef } from "@/lib/commands/types"
 import { setPendingTemplateHandoff } from "@/lib/templates/handoff"
 import type { Template } from "@/lib/templates/types"
 import { getDefaultInputValue, isMediaInputKind } from "@/lib/templates/validation"
 import { cn } from "@/lib/utils"
+
+type AssetModalTarget =
+  | { mode: "prompt"; inputId: string }
+  | { mode: "media"; inputId: string; inputKind: "image" | "video" | "audio" }
+
+function getAssetModalConfigForTarget(target: AssetModalTarget): {
+  presetCategory?: AssetCategory
+  allowedAssetTypes?: AssetType[]
+} {
+  if (target.mode === "prompt") {
+    return { presetCategory: "character", allowedAssetTypes: ["image"] }
+  }
+
+  switch (target.inputKind) {
+    case "image":
+      return { presetCategory: "character", allowedAssetTypes: ["image"] }
+    case "video":
+      return { presetCategory: "shorts", allowedAssetTypes: ["video"] }
+    case "audio":
+      return { allowedAssetTypes: ["audio"] }
+    default:
+      return {}
+  }
+}
 
 interface TemplateRunFormProps {
   template: Template
@@ -85,10 +110,11 @@ export function TemplateRunForm({
     buildInitialValues(template),
   )
   const [previewUrls, setPreviewUrls] = React.useState<Record<string, string | null>>({})
+  const [mediaLabelsByInputId, setMediaLabelsByInputId] = React.useState<Record<string, string>>({})
   const [promptAttachmentsByInputId, setPromptAttachmentsByInputId] = React.useState<
     Record<string, ComposerAttachment[]>
   >({})
-  const [assetModalTargetInputId, setAssetModalTargetInputId] = React.useState<string | null>(null)
+  const [assetModalTarget, setAssetModalTarget] = React.useState<AssetModalTarget | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   React.useEffect(() => {
@@ -102,15 +128,41 @@ export function TemplateRunForm({
   const setFieldValue = (id: string, next: TemplateFieldValue) => {
     setValues((current) => ({ ...current, [id]: next }))
 
-    if (next instanceof File && next.type.startsWith("image/")) {
+    if (next instanceof File) {
+      setMediaLabelsByInputId((current) => {
+        const updated = { ...current }
+        delete updated[id]
+        return updated
+      })
+
+      if (
+        next.type.startsWith("image/") ||
+        next.type.startsWith("video/") ||
+        next.type.startsWith("audio/")
+      ) {
+        setPreviewUrls((current) => {
+          const previous = current[id]
+          if (previous?.startsWith("blob:")) URL.revokeObjectURL(previous)
+          return { ...current, [id]: URL.createObjectURL(next) }
+        })
+        return
+      }
+    }
+
+    if (typeof next === "string" && next.startsWith("http")) {
       setPreviewUrls((current) => {
         const previous = current[id]
         if (previous?.startsWith("blob:")) URL.revokeObjectURL(previous)
-        return { ...current, [id]: URL.createObjectURL(next) }
+        return { ...current, [id]: next }
       })
       return
     }
 
+    setMediaLabelsByInputId((current) => {
+      const updated = { ...current }
+      delete updated[id]
+      return updated
+    })
     setPreviewUrls((current) => {
       const previous = current[id]
       if (previous?.startsWith("blob:")) URL.revokeObjectURL(previous)
@@ -217,23 +269,42 @@ export function TemplateRunForm({
     }))
   }, [])
 
-  const handlePromptAssetSelect = React.useCallback((pick: AssetSelectionPick) => {
-    if (!assetModalTargetInputId) return
+  const handleAssetSelect = React.useCallback(
+    (pick: AssetSelectionPick) => {
+      if (!assetModalTarget) return
 
-    if (pick.assetType !== "image") {
-      toast.error("Only image assets can be attached to template prompts")
-      return
-    }
+      if (assetModalTarget.mode === "prompt") {
+        if (pick.assetType !== "image") {
+          toast.error("Only image assets can be attached to template prompts")
+          return
+        }
 
-    setPromptAttachmentsByInputId((current) => ({
-      ...current,
-      [assetModalTargetInputId]: [
-        ...(current[assetModalTargetInputId] ?? []),
-        assetPickToPromptAttachment(pick),
-      ],
-    }))
-    setAssetModalTargetInputId(null)
-  }, [assetModalTargetInputId])
+        setPromptAttachmentsByInputId((current) => ({
+          ...current,
+          [assetModalTarget.inputId]: [
+            ...(current[assetModalTarget.inputId] ?? []),
+            assetPickToPromptAttachment(pick),
+          ],
+        }))
+        setAssetModalTarget(null)
+        return
+      }
+
+      const expectedType = assetModalTarget.inputKind
+      if (pick.assetType !== expectedType) {
+        toast.error(`Selected asset must be a ${expectedType}`)
+        return
+      }
+
+      setFieldValue(assetModalTarget.inputId, pick.url)
+      setMediaLabelsByInputId((current) => ({
+        ...current,
+        [assetModalTarget.inputId]: pick.title?.trim() || `${expectedType} asset`,
+      }))
+      setAssetModalTarget(null)
+    },
+    [assetModalTarget],
+  )
 
   const handleRemovePromptAttachment = React.useCallback((inputId: string, attachmentId: string) => {
     setPromptAttachmentsByInputId((current) => {
@@ -256,6 +327,8 @@ export function TemplateRunForm({
       <div className={cn("space-y-5", compactDesktop && "lg:space-y-4")}>
         {template.inputs.map((input) => {
           const supportsPromptAttachments = input.kind === "text" && input.multiline
+          const isMediaInput =
+            input.kind === "image" || input.kind === "video" || input.kind === "audio"
 
           return (
             <TemplateInputField
@@ -263,6 +336,7 @@ export function TemplateRunForm({
               input={input}
               value={values[input.id] ?? null}
               previewUrl={previewUrls[input.id] ?? null}
+              mediaLabel={mediaLabelsByInputId[input.id] ?? null}
               disabled={disabled || isSubmitting}
               compactDesktop={compactDesktop}
               onChange={(next) => setFieldValue(input.id, next)}
@@ -275,7 +349,17 @@ export function TemplateRunForm({
               onOpenPromptAssetPicker={
                 disabled || isSubmitting || !supportsPromptAttachments
                   ? undefined
-                  : () => setAssetModalTargetInputId(input.id)
+                  : () => setAssetModalTarget({ mode: "prompt", inputId: input.id })
+              }
+              onOpenMediaAssetPicker={
+                disabled || isSubmitting || !isMediaInput
+                  ? undefined
+                  : () =>
+                      setAssetModalTarget({
+                        mode: "media",
+                        inputId: input.id,
+                        inputKind: input.kind,
+                      })
               }
               onRemovePromptAttachment={(attachment) =>
                 handleRemovePromptAttachment(input.id, attachment.id)
@@ -315,13 +399,14 @@ export function TemplateRunForm({
       ) : null}
 
       <AssetSelectionModal
-        open={assetModalTargetInputId !== null}
+        open={assetModalTarget !== null}
         onOpenChange={(open) => {
           if (!open) {
-            setAssetModalTargetInputId(null)
+            setAssetModalTarget(null)
           }
         }}
-        onSelect={handlePromptAssetSelect}
+        onSelect={handleAssetSelect}
+        {...(assetModalTarget ? getAssetModalConfigForTarget(assetModalTarget) : {})}
       />
     </div>
   )
