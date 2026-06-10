@@ -9,6 +9,25 @@ const REPLICATE_SINGLE_REFERENCE_IMAGE_MODELS = new Set([
   'xai/grok-imagine-image-quality',
 ]);
 
+export function parseReplicateInputDefaults(parameters: unknown): Record<string, unknown> {
+  let parsed: unknown = parameters;
+  if (typeof parameters === 'string') {
+    try {
+      parsed = JSON.parse(parameters);
+    } catch {
+      return {};
+    }
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    return {};
+  }
+  const defaults = (parsed as Record<string, unknown>).replicate_input_defaults;
+  if (!defaults || typeof defaults !== 'object' || Array.isArray(defaults)) {
+    return {};
+  }
+  return defaults as Record<string, unknown>;
+}
+
 export function buildReplicateReferenceImageInput(
   modelIdentifier: string,
   referenceImageUrls: string[],

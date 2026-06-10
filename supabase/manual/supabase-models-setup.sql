@@ -577,7 +577,7 @@ VALUES (
         "label": "Moderation",
         "description": "Controls content moderation level",
         "required": false,
-        "default": "auto",
+        "default": "low",
         "enum": ["low", "auto"],
         "ui_type": "select"
       },

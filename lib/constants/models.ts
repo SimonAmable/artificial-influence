@@ -26,6 +26,7 @@ export const MODEL_IDENTIFIERS = {
   PRUNAAI_FLUX_KONTEXT_FAST: 'prunaai/flux-kontext-fast',
   XAI_GROK_IMAGINE: 'xai/grok-imagine-image',
   XAI_GROK_IMAGINE_IMAGE_QUALITY: 'xai/grok-imagine-image-quality',
+  QWEN_IMAGE_EDIT_PLUS_LORA: 'qwen/qwen-image-edit-plus-lora',
   FAL_WAN_27_IMAGE: 'fal-ai/wan/v2.7',
   FAL_WAN_27_PRO_IMAGE: 'fal-ai/wan/v2.7/pro',
   
@@ -41,6 +42,8 @@ export const MODEL_IDENTIFIERS = {
   BYTEDANCE_SEEDANCE_2_0: 'bytedance/seedance-2.0',
   ALIBABA_HAPPY_HORSE: 'alibaba/happy-horse',
   PRUNAAI_P_VIDEO: 'prunaai/p-video',
+  XAI_GROK_IMAGINE_VIDEO: 'xai/grok-imagine-video',
+  XAI_GROK_IMAGINE_VIDEO_1_5: 'xai/grok-imagine-video-1.5',
 
   // Audio Models
   GOOGLE_GEMINI_3_1_FLASH_TTS: 'google/gemini-3.1-flash-tts',
@@ -567,6 +570,15 @@ const SEEDANCE_2_0_VIDEO_PARAMS: ParameterDefinition[] = [
 
 const HAPPY_HORSE_VIDEO_PARAMS: ParameterDefinition[] = [
   {
+    name: 'enable_safety_checker',
+    type: 'boolean',
+    label: 'Safety checker',
+    description: 'Enable content moderation for input and output',
+    required: false,
+    default: false,
+    ui_type: 'switch',
+  },
+  {
     name: 'image',
     type: 'string',
     label: 'Start Frame',
@@ -618,6 +630,15 @@ const HAPPY_HORSE_VIDEO_PARAMS: ParameterDefinition[] = [
 ];
 
 const P_VIDEO_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'disable_safety_filter',
+    type: 'boolean',
+    label: 'Disable safety filter',
+    description: 'Disable prompt and input-image safety filtering',
+    required: false,
+    default: true,
+    ui_type: 'switch',
+  },
   {
     name: 'image',
     type: 'string',
@@ -1000,7 +1021,7 @@ const GPT_IMAGE_1_5_PARAMS: ParameterDefinition[] = [
     label: 'Moderation',
     description: 'Controls content moderation level',
     required: false,
-    default: 'auto',
+    default: 'low',
     enum: ['low', 'auto'],
     ui_type: 'select',
   },
@@ -1326,6 +1347,15 @@ const Z_IMAGE_TURBO_PARAMS: ParameterDefinition[] = [
 ];
 
 const FAL_WAN_IMAGE_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'enable_safety_checker',
+    type: 'boolean',
+    label: 'Safety checker',
+    description: 'Enable content moderation for input and output',
+    required: false,
+    default: false,
+    ui_type: 'switch',
+  },
   {
     name: 'negative_prompt',
     type: 'string',

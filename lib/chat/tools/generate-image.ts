@@ -20,13 +20,19 @@ import {
   buildReplicateGptImage2Input,
   isReplicateGptImage2Model,
 } from "@/lib/server/replicate-gpt-image"
+import {
+  buildReplicateQwenImageEditPlusInput,
+  isQwenImageEditPlusLoraModel,
+} from "@/lib/server/replicate-qwen-image-edit-plus"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import {
   aspectRatioToDimensions,
   buildReplicateReferenceImageInput,
   modelUsesDimensions,
+  parseReplicateInputDefaults,
 } from "@/lib/utils/model-parameters"
 import { validateExternalReferenceUrl } from "@/lib/server/external-reference-url"
+import { applyMinimalReplicateImageModeration } from "@/lib/server/minimal-moderation"
 import type {
   AvailableChatImageReference,
   ChatImageReference,
@@ -465,11 +471,20 @@ export function createGenerateImageTool({
       const referenceImageStoragePaths = allReferences
         .map((reference) => reference.storagePath)
         .filter((value): value is string => Boolean(value))
+      if (isQwenImageEditPlusLoraModel(modelIdentifier) && referenceImageUrls.length === 0) {
+        throw new Error(
+          "Qwen Image Edit Plus requires at least one reference image. Attach a source image or pass referenceIds/mediaIds.",
+        )
+      }
+
       const replicateReferenceImageInput = buildReplicateReferenceImageInput(modelIdentifier, referenceImageUrls)
       const replicateReferenceImageStoragePaths =
-        replicateReferenceImageInput.usedReferenceImageUrls.length === referenceImageUrls.length
-          ? referenceImageStoragePaths
-          : referenceImageStoragePaths.slice(0, replicateReferenceImageInput.usedReferenceImageUrls.length)
+        isQwenImageEditPlusLoraModel(modelIdentifier)
+          ? referenceImageStoragePaths.slice(0, 1)
+          : replicateReferenceImageInput.usedReferenceImageUrls.length === referenceImageUrls.length
+            ? referenceImageStoragePaths
+            : referenceImageStoragePaths.slice(0, replicateReferenceImageInput.usedReferenceImageUrls.length)
+      const replicateInputDefaults = parseReplicateInputDefaults(modelData.parameters)
       const finalPrompt = rawPrompt
         ? prompt
         : await maybeEnhancePrompt({
@@ -672,7 +687,16 @@ export function createGenerateImageTool({
             : "1:1")
       let replicateInput: Record<string, unknown>
 
-      if (isReplicateGptImage2Model(modelIdentifier)) {
+      if (isQwenImageEditPlusLoraModel(modelIdentifier)) {
+        const qwenEditRequest = buildReplicateQwenImageEditPlusInput({
+          aspectRatio: resolvedAspectRatio,
+          defaults: replicateInputDefaults,
+          prompt: finalPrompt,
+          referenceImageUrls,
+        })
+        resolvedAspectRatio = qwenEditRequest.resolvedAspectRatio
+        replicateInput = qwenEditRequest.input
+      } else if (isReplicateGptImage2Model(modelIdentifier)) {
         const replicateGptImage2ReferenceImages = await Promise.all(
           allReferences.map((reference, index) => storedAssetToFile(reference, index, supabase)),
         )
@@ -709,7 +733,12 @@ export function createGenerateImageTool({
           replicateInput.google_search = true
           replicateInput.image_search = true
         }
+
+        if (Object.keys(replicateInputDefaults).length > 0) {
+          Object.assign(replicateInput, replicateInputDefaults)
+        }
       }
+      applyMinimalReplicateImageModeration(modelIdentifier, replicateInput)
 
       const webhookBase = process.env.REPLICATE_WEBHOOK_BASE_URL?.replace(/\/$/, "")
       if (webhookBase) {

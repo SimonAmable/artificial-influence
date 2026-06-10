@@ -91,6 +91,8 @@ function mergeRemoteHistoryWithLocal(
 
 const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
   "grok-imagine-video": "xai/grok-imagine-video",
+  "grok-imagine-video-1.5": "xai/grok-imagine-video-1.5",
+  "grok-imagine-video-15": "xai/grok-imagine-video-1.5",
   "p-video": "prunaai/p-video",
   "pvideo": "prunaai/p-video",
   "pruna-p-video": "prunaai/p-video",

@@ -3,8 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { inferStoragePathFromUrl } from '@/lib/uploads/storage-ref';
 import {
   DEFAULT_UPSCALE_CREDITS_COST,
+  normalizeUpscaleModelIdentifier,
   runImageUpscale,
-  type UpscaleParameters,
+  type UpscaleRunParameters,
 } from '@/lib/server/upscale-image';
 
 export async function POST(request: NextRequest) {
@@ -25,7 +26,8 @@ export async function POST(request: NextRequest) {
     console.log('[upscale] ✓ User authenticated:', { userId: user.id });
 
     let mediaUrl: string;
-    let parameters: UpscaleParameters = {};
+    let parameters: UpscaleRunParameters = {};
+    let modelIdentifier: string | undefined;
     let referenceImageStoragePaths: string[] | null = null;
 
     const contentType = request.headers.get('content-type') ?? '';
@@ -33,13 +35,17 @@ export async function POST(request: NextRequest) {
     if (contentType.includes('application/json')) {
       const body = await request.json();
       mediaUrl = (body.media ?? body.imageUrl) ?? '';
+      if (typeof body.modelIdentifier === 'string' && body.modelIdentifier.trim()) {
+        modelIdentifier = normalizeUpscaleModelIdentifier(body.modelIdentifier);
+      }
       if (body.parameters && typeof body.parameters === 'object' && !Array.isArray(body.parameters)) {
-        parameters = body.parameters as UpscaleParameters;
+        parameters = body.parameters as UpscaleRunParameters;
       }
     } else if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData();
       const imageFile = formData.get('image') as File | null;
       const paramsRaw = formData.get('parameters');
+      const modelRaw = formData.get('modelIdentifier');
 
       if (!imageFile || !(imageFile instanceof File)) {
         return NextResponse.json(
@@ -48,9 +54,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      if (typeof modelRaw === 'string' && modelRaw.trim()) {
+        modelIdentifier = normalizeUpscaleModelIdentifier(modelRaw);
+      }
+
       if (paramsRaw && typeof paramsRaw === 'string') {
         try {
-          const parsed = JSON.parse(paramsRaw) as UpscaleParameters;
+          const parsed = JSON.parse(paramsRaw) as UpscaleRunParameters;
           if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
             parameters = parsed;
           }
@@ -131,6 +141,7 @@ export async function POST(request: NextRequest) {
       supabase,
       userId: user.id,
       imageUrl: mediaUrl,
+      modelIdentifier,
       parameters,
       tool: 'upscale',
       referenceImageStoragePaths,

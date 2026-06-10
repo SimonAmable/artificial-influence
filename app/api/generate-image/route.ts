@@ -10,7 +10,12 @@ import {
   aspectRatioToDimensions,
   buildReplicateReferenceImageInput,
   modelUsesDimensions,
+  parseReplicateInputDefaults,
 } from '@/lib/utils/model-parameters';
+import {
+  buildReplicateQwenImageEditPlusInput,
+  isQwenImageEditPlusLoraModel,
+} from '@/lib/server/replicate-qwen-image-edit-plus';
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from '@/lib/constants/models';
 import { runReplicatePollingImageGeneration } from '@/lib/server/replicate-image-generation';
 import {
@@ -22,6 +27,7 @@ import {
   buildReplicateGptImage2Input,
   isReplicateGptImage2Model,
 } from '@/lib/server/replicate-gpt-image';
+import { applyMinimalReplicateImageModeration } from '@/lib/server/minimal-moderation';
 
 const STALE_PENDING_MINUTES = 30;
 const FREE_CONCURRENCY_LIMIT = 1;
@@ -161,6 +167,12 @@ export async function POST(request: NextRequest) {
     const width = widthForm ? parseInt(widthForm as string) : null;
     const height = heightForm ? parseInt(heightForm as string) : null;
     const tool = formData.get('tool') as string | null;
+    const goFastValue = formData.get('go_fast');
+    const go_fast =
+      goFastValue === 'true' ? true : goFastValue === 'false' ? false : null;
+    const loraScaleRaw = formData.get('lora_scale') as string | null;
+    const lora_scale =
+      loraScaleRaw != null && loraScaleRaw !== '' ? Number(loraScaleRaw) : null;
 
     // Fetch model details from database
     console.log('[generate-image] Fetching model details for:', modelIdentifier);
@@ -365,6 +377,16 @@ export async function POST(request: NextRequest) {
       console.log('[generate-image] No reference images provided');
     }
 
+    if (isQwenImageEditPlusLoraModel(modelIdentifier) && referenceImageUrls.length === 0) {
+      return NextResponse.json(
+        {
+          error: 'Reference image required',
+          message: 'Qwen Image Edit Plus requires at least one reference image to edit.',
+        },
+        { status: 400 },
+      );
+    }
+
     // Enhance prompt if requested
     let finalPrompt = prompt;
     if (shouldEnhance === true) {
@@ -480,9 +502,11 @@ export async function POST(request: NextRequest) {
     // Prepare generateImage options
     console.log('[generate-image] Preparing generation options...');
     const isNanoBananaFamily = ['google/nano-banana', 'google/nano-banana-pro', 'google/nano-banana-2'].includes(modelIdentifier);
+    const replicateInputDefaults = parseReplicateInputDefaults(modelData.parameters);
     const replicateReferenceImageInput = buildReplicateReferenceImageInput(modelIdentifier, referenceImageUrls);
-    const replicateReferenceImageStoragePaths =
-      replicateReferenceImageInput.usedReferenceImageUrls.length === referenceImageUrls.length
+    const replicateReferenceImageStoragePaths = isQwenImageEditPlusLoraModel(modelIdentifier)
+      ? referenceImageStoragePaths.slice(0, 1)
+      : replicateReferenceImageInput.usedReferenceImageUrls.length === referenceImageUrls.length
         ? referenceImageStoragePaths
         : referenceImageStoragePaths.slice(0, replicateReferenceImageInput.usedReferenceImageUrls.length);
 
@@ -490,6 +514,11 @@ export async function POST(request: NextRequest) {
     if (isNanoBananaFamily && referenceImageUrls.length > 0 && !aspect_ratio && !aspectRatio) {
       aspect_ratio = 'match_input_image';
       console.log('[generate-image] Applied default aspect_ratio=match_input_image for nano-banana family edit flow');
+    }
+
+    if (isQwenImageEditPlusLoraModel(modelIdentifier) && referenceImageUrls.length > 0 && !aspect_ratio && !aspectRatio) {
+      aspect_ratio = 'match_input_image';
+      console.log('[generate-image] Applied default aspect_ratio=match_input_image for Qwen Image Edit Plus');
     }
     
     // Initialize model based on provider
@@ -573,6 +602,20 @@ export async function POST(request: NextRequest) {
         const replicateProviderOptions = { ...gptImage2Request.input };
         delete replicateProviderOptions.prompt;
         generateOptions.providerOptions.replicate = replicateProviderOptions as never;
+      } else if (isQwenImageEditPlusLoraModel(modelIdentifier)) {
+        const qwenEditRequest = buildReplicateQwenImageEditPlusInput({
+          aspectRatio: aspect_ratio || aspectRatio,
+          defaults: replicateInputDefaults,
+          goFast: go_fast,
+          loraScale: lora_scale,
+          outputFormat: output_format,
+          outputQuality: output_quality,
+          prompt: finalPrompt,
+          referenceImageUrls,
+        });
+        const replicateProviderOptions = { ...qwenEditRequest.input };
+        delete replicateProviderOptions.prompt;
+        generateOptions.providerOptions.replicate = replicateProviderOptions as never;
       } else if (modelUsesDimensions(modelData.parameters)) {
         // Model expects width/height (e.g. prunaai/z-image-turbo)
         const aspectValue = aspect_ratio || aspectRatio;
@@ -607,6 +650,10 @@ export async function POST(request: NextRequest) {
           ...(modelIdentifier === 'black-forest-labs/flux-2-dev' && { disable_safety_checker: true }),
         };
       }
+      applyMinimalReplicateImageModeration(
+        modelIdentifier,
+        generateOptions.providerOptions.replicate as Record<string, unknown>,
+      );
     }
 
     console.log('[generate-image] Generation options:', {
@@ -702,7 +749,6 @@ export async function POST(request: NextRequest) {
         });
 
         const replicateProviderOptions = (generateOptions.providerOptions?.replicate ?? {}) as Record<string, unknown>;
-        const replicateInputDefaults = (modelData.parameters as Record<string, unknown> | null)?.replicate_input_defaults as Record<string, unknown> | undefined;
         let replicateResolvedAspectRatio: string | null = aspectRatio || aspect_ratio || null;
         const replicateInput: Record<string, unknown> = isReplicateGptImage2Model(modelIdentifier)
           ? (() => {
@@ -719,6 +765,21 @@ export async function POST(request: NextRequest) {
               replicateResolvedAspectRatio = gptImage2Request.resolvedAspectRatio;
               return gptImage2Request.input;
             })()
+          : isQwenImageEditPlusLoraModel(modelIdentifier)
+            ? (() => {
+                const qwenEditRequest = buildReplicateQwenImageEditPlusInput({
+                  aspectRatio: aspect_ratio || aspectRatio,
+                  defaults: replicateInputDefaults,
+                  goFast: go_fast,
+                  loraScale: lora_scale,
+                  outputFormat: output_format,
+                  outputQuality: output_quality,
+                  prompt: finalPrompt,
+                  referenceImageUrls,
+                });
+                replicateResolvedAspectRatio = qwenEditRequest.resolvedAspectRatio;
+                return qwenEditRequest.input;
+              })()
           : {
               prompt: finalPrompt,
               ...(generateOptions.n && { num_outputs: generateOptions.n }),
@@ -733,6 +794,7 @@ export async function POST(request: NextRequest) {
           replicateInput.google_search = true;
           replicateInput.image_search = true;
         }
+        applyMinimalReplicateImageModeration(modelIdentifier, replicateInput);
 
         // Fallback mapping if only generic aspectRatio was set.
         if (!('aspect_ratio' in replicateInput) && generateOptions.aspectRatio) {

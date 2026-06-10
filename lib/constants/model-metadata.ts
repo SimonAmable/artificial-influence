@@ -246,6 +246,37 @@ export const GROK_IMAGINE_META: ModelMetadata = {
   ],
 };
 
+export const QWEN_IMAGE_EDIT_PLUS_META: ModelMetadata = {
+  id: 'qwen-image-edit-plus-meta',
+  identifier: 'qwen/qwen-image-edit-plus-lora',
+  name: 'Qwen Image Edit Plus',
+  description:
+    'Qwen image editing on Replicate with a preconfigured MCNL LoRA. Attach a reference image and describe the edit.',
+  type: 'image',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 4.0,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['match_input_image', '1:1', '16:9', '9:16', '4:3', '3:4'],
+  customParameters: [
+    {
+      name: 'go_fast',
+      label: 'Go Fast',
+      options: ['true', 'false'],
+      default: 'true',
+      description: 'Faster generation with slightly lower quality',
+    },
+    {
+      name: 'output_format',
+      label: 'Output Format',
+      options: ['webp', 'png', 'jpeg'],
+      default: 'webp',
+      description: 'Image file format',
+    },
+  ],
+};
+
 export const GROK_IMAGINE_IMAGE_QUALITY_META: ModelMetadata = {
   id: 'grok-imagine-image-quality-meta',
   identifier: 'xai/grok-imagine-image-quality',
@@ -755,6 +786,7 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
   SEEDREAM_4_5_META,
   SEEDREAM_5_LITE_META,
   GROK_IMAGINE_IMAGE_QUALITY_META,
+  QWEN_IMAGE_EDIT_PLUS_META,
   GROK_IMAGINE_META,
   GPT_IMAGE_1_5_META,
   GPT_IMAGE_2_META,
@@ -821,6 +853,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     Z_IMAGE_TURBO_META,
     FLUX_KONTEXT_FAST_META,
     GROK_IMAGINE_IMAGE_QUALITY_META,
+    QWEN_IMAGE_EDIT_PLUS_META,
     KLING_V2_6_MOTION_META,
     KLING_V3_MOTION_META,
     FABRIC_1_0_META,

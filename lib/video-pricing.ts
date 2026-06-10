@@ -49,6 +49,7 @@ function getDefaultDurationSeconds(modelIdentifier: string): number {
     case "bytedance/seedance-2.0":
     case "wan-video/wan-2.7":
     case "xai/grok-imagine-video":
+    case "xai/grok-imagine-video-1.5":
     case "alibaba/happy-horse":
     case "veed/fabric-1.0":
     default:
@@ -87,6 +88,8 @@ function resolveCreditsPerSecond(input: VideoPricingQuoteInput): number | null {
       return resolution === "480p" ? 4 : 6
     case "xai/grok-imagine-video":
       return resolution === "480p" ? 2 : 3
+    case "xai/grok-imagine-video-1.5":
+      return resolution === "480p" ? 3 : 5
     case "minimax/hailuo-2.3-fast":
       return resolution === "1080p" ? 2.2 : 1.2
     case "prunaai/p-video":
@@ -129,6 +132,11 @@ function resolvePredictedDurationSeconds(input: VideoPricingQuoteInput): number 
       if (input.hasInputVideo && sourceDuration != null && sourceDuration > 0) {
         return roundDuration(sourceDuration, 1, 15)
       }
+      if (explicitDuration != null && explicitDuration > 0) {
+        return roundDuration(explicitDuration, 1, 15)
+      }
+      return 5
+    case "xai/grok-imagine-video-1.5":
       if (explicitDuration != null && explicitDuration > 0) {
         return roundDuration(explicitDuration, 1, 15)
       }

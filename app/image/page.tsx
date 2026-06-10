@@ -188,6 +188,8 @@ const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
   "wan-pro": "fal-ai/wan/v2.7/pro",
   "wan-2.7-pro": "fal-ai/wan/v2.7/pro",
   "wan-2.7-pro-image": "fal-ai/wan/v2.7/pro",
+  "qwen-edit": "qwen/qwen-image-edit-plus-lora",
+  "qwen-image-edit-plus": "qwen/qwen-image-edit-plus-lora",
 }
 const FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF = new Set([
   "fal-ai/qwen-image-2",

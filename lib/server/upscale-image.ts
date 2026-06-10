@@ -1,12 +1,36 @@
 import Replicate from "replicate"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
+import {
+  isSeedVr2ModelIdentifier,
+  normalizeUpscaleModelIdentifier,
+  SEEDVR2_MODEL_IDENTIFIER,
+  UPSCALE_MODEL_IDENTIFIER,
+  type SeedVr2Parameters,
+  type UpscaleMode,
+  type UpscaleParameters,
+  type UpscaleRunParameters,
+} from "@/lib/upscale/constants"
+
+export {
+  isSeedVr2ModelIdentifier,
+  normalizeUpscaleModelIdentifier,
+  SEEDVR2_MODEL_IDENTIFIER,
+  UPSCALE_MODEL_IDENTIFIER,
+  type SeedVr2ModelVariant,
+  type SeedVr2Parameters,
+  type UpscaleMode,
+  type UpscaleParameters,
+  type UpscaleRunParameters,
+} from "@/lib/upscale/constants"
 
 /** Pinned Replicate version — https://replicate.com/prunaai/p-image-upscale */
 export const UPSCALE_REPLICATE_MODEL_ID =
   "prunaai/p-image-upscale:ea74e255330ec5a0a6aa394e7e1451a8cea94fe1edb8266cc4848eab047a74c4"
 
-export const UPSCALE_MODEL_IDENTIFIER = "prunaai/p-image-upscale"
+/** Pinned Replicate version — https://replicate.com/zsxkib/seedvr2 */
+export const SEEDVR2_REPLICATE_MODEL_ID =
+  "zsxkib/seedvr2:ca98249be9cb623f02a80a7851a2b1a33d5104c251a8f5a1588f251f79bf7c78"
 
 export const DEFAULT_UPSCALE_CREDITS_COST = 1
 
@@ -18,15 +42,16 @@ export const DEFAULT_UPSCALE_REPLICATE_INPUT: Record<string, unknown> = {
   disable_safety_checker: true,
 }
 
-export type UpscaleMode = "target" | "factor"
+export const DEFAULT_SEEDVR2_REPLICATE_INPUT: Record<string, unknown> = {
+  model_variant: "3b",
+  sample_steps: 1,
+  cfg_scale: 1,
+  apply_color_fix: false,
+  output_format: "png",
+}
 
-export type UpscaleParameters = {
-  upscale_mode?: UpscaleMode
-  target?: number
-  factor?: number
-  enhance_realism?: boolean
-  enhance_details?: boolean
-  output_format?: "jpg" | "png" | "webp"
+export function getUpscaleReplicateModelId(identifier: string): string {
+  return isSeedVr2ModelIdentifier(identifier) ? SEEDVR2_REPLICATE_MODEL_ID : UPSCALE_REPLICATE_MODEL_ID
 }
 
 export function extractUpscaleOutputUrl(output: unknown): string | null {
@@ -45,7 +70,26 @@ export function extractUpscaleOutputUrl(output: unknown): string | null {
   return null
 }
 
-export async function findActiveUpscaleModelRow(supabase: SupabaseClient) {
+export async function findActiveUpscaleModelRow(
+  supabase: SupabaseClient,
+  preferredIdentifier?: string,
+) {
+  const normalizedPreferred = preferredIdentifier
+    ? normalizeUpscaleModelIdentifier(preferredIdentifier)
+    : null
+
+  if (normalizedPreferred) {
+    const { data: preferred, error: preferredError } = await supabase
+      .from("models")
+      .select("id, name, model_cost, identifier")
+      .eq("identifier", normalizedPreferred)
+      .eq("type", "upscale")
+      .eq("is_active", true)
+      .maybeSingle()
+
+    if (!preferredError && preferred) return preferred
+  }
+
   const { data: pinned, error: pinnedError } = await supabase
     .from("models")
     .select("id, name, model_cost, identifier")
@@ -85,11 +129,27 @@ function buildReplicateUpscaleInput(
   }
 }
 
+function buildReplicateSeedVr2Input(
+  imageUrl: string,
+  parameters: SeedVr2Parameters,
+): Record<string, unknown> {
+  return {
+    ...DEFAULT_SEEDVR2_REPLICATE_INPUT,
+    media: imageUrl,
+    ...(parameters.model_variant ? { model_variant: parameters.model_variant } : {}),
+    ...(parameters.sample_steps != null ? { sample_steps: parameters.sample_steps } : {}),
+    ...(parameters.cfg_scale != null ? { cfg_scale: parameters.cfg_scale } : {}),
+    ...(parameters.apply_color_fix != null ? { apply_color_fix: parameters.apply_color_fix } : {}),
+    ...(parameters.output_format ? { output_format: parameters.output_format } : {}),
+  }
+}
+
 export type RunImageUpscaleOptions = {
   supabase: SupabaseClient
   userId: string
   imageUrl: string
-  parameters?: UpscaleParameters
+  modelIdentifier?: string
+  parameters?: UpscaleRunParameters
   threadId?: string
   tool?: string
   referenceImageStoragePaths?: string[] | null
@@ -107,6 +167,7 @@ export async function runImageUpscale({
   supabase,
   userId,
   imageUrl,
+  modelIdentifier: requestedModelIdentifier,
   parameters = {},
   threadId,
   tool = "upscale",
@@ -121,15 +182,16 @@ export async function runImageUpscale({
     throw new Error("Upscale requires a source image URL.")
   }
 
-  const modelRow = await findActiveUpscaleModelRow(supabase)
+  const normalizedModelIdentifier = normalizeUpscaleModelIdentifier(requestedModelIdentifier)
+  const modelRow = await findActiveUpscaleModelRow(supabase, normalizedModelIdentifier)
   const creditsCost = Math.max(
     1,
     Number(modelRow?.model_cost ?? DEFAULT_UPSCALE_CREDITS_COST) || DEFAULT_UPSCALE_CREDITS_COST,
   )
   const modelIdentifier =
     typeof modelRow?.identifier === "string" && modelRow.identifier.length > 0
-      ? modelRow.identifier
-      : UPSCALE_MODEL_IDENTIFIER
+      ? normalizeUpscaleModelIdentifier(modelRow.identifier)
+      : normalizedModelIdentifier
 
   const hasCredits = await checkUserHasCredits(userId, creditsCost, supabase)
   if (!hasCredits) {
@@ -137,9 +199,12 @@ export async function runImageUpscale({
   }
 
   const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
-  const replicateInput = buildReplicateUpscaleInput(trimmedUrl, parameters)
+  const replicateModelId = getUpscaleReplicateModelId(modelIdentifier)
+  const replicateInput = isSeedVr2ModelIdentifier(modelIdentifier)
+    ? buildReplicateSeedVr2Input(trimmedUrl, parameters)
+    : buildReplicateUpscaleInput(trimmedUrl, parameters)
 
-  const output = await replicate.run(UPSCALE_REPLICATE_MODEL_ID as `${string}/${string}`, {
+  const output = await replicate.run(replicateModelId as `${string}/${string}`, {
     input: replicateInput,
   })
 

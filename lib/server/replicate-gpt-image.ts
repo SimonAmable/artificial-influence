@@ -49,10 +49,7 @@ function normalizeQuality(value: string | null | undefined): GptImage2Quality {
 }
 
 function normalizeModeration(value: string | null | undefined): GptImage2Moderation {
-  if (value === "auto") {
-    return "auto"
-  }
-
+  void value
   return "low"
 }
 

@@ -9,6 +9,7 @@ import {
   submitFalVideoQueue,
 } from '@/lib/server/fal-video';
 import { resolveWan27Replicate } from '@/lib/server/wan-2.7-replicate';
+import { applyMinimalReplicateVideoModeration } from '@/lib/server/minimal-moderation';
 import {
   isMotionCopyModelIdentifier,
   normalizeMotionCopyModelIdentifier,
@@ -119,6 +120,20 @@ export async function POST(request: NextRequest) {
         { error: 'Image and video are required for motion copy' },
         { status: 400 }
       );
+    }
+
+    if (normalizedModel === 'xai/grok-imagine-video-1.5') {
+      const startImage =
+        (typeof image === 'string' && image.length > 0 ? image : null) ??
+        (typeof first_frame_image === 'string' && first_frame_image.length > 0
+          ? first_frame_image
+          : null);
+      if (!startImage) {
+        return NextResponse.json(
+          { error: 'Input image is required for Grok Imagine Video 1.5' },
+          { status: 400 }
+        );
+      }
     }
     if (!allowsPromptlessRequest && (!prompt || typeof prompt !== 'string')) {
       return NextResponse.json(
@@ -340,6 +355,17 @@ export async function POST(request: NextRequest) {
         if (otherParams.resolution) replicateInput.resolution = otherParams.resolution;
         break;
 
+      case 'xai/grok-imagine-video-1.5': {
+        const startImage = image || first_frame_image;
+        if (startImage) replicateInput.image = startImage;
+        if (otherParams.duration != null && otherParams.duration !== undefined) {
+          replicateInput.duration = Number(otherParams.duration);
+        }
+        if (otherParams.aspect_ratio) replicateInput.aspect_ratio = otherParams.aspect_ratio;
+        if (otherParams.resolution) replicateInput.resolution = otherParams.resolution;
+        break;
+      }
+
       case 'kwaivgi/kling-v3-video': {
         const startImage = otherParams.start_image ?? first_frame_image;
         const endImage = otherParams.end_image ?? last_frame;
@@ -514,6 +540,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
     }
+    applyMinimalReplicateVideoModeration(normalizedModel, replicateInput);
 
     console.log('[generate-video-test] Replicate input:', {
       model: normalizedModel,

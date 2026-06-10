@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { inferStoragePathFromUrl } from "@/lib/assets/library"
 import { resolveWan27Replicate } from "@/lib/server/wan-2.7-replicate"
+import { applyMinimalReplicateVideoModeration } from "@/lib/server/minimal-moderation"
 import { checkUserHasCredits } from "@/lib/credits"
 import { validateExternalReferenceUrl } from "@/lib/server/external-reference-url"
 import { resolveVideoPricingQuote } from "@/lib/video-pricing"
@@ -461,6 +462,12 @@ export function createGenerateVideoTool({
         throw new Error("Motion-copy video generation requires both an image and a video reference.")
       }
 
+      if (resolvedModel === "xai/grok-imagine-video-1.5" && !primaryImage) {
+        throw new Error(
+          "Grok Imagine Video 1.5 requires an input image for image-to-video generation.",
+        )
+      }
+
       if (!isMotionCopy && normalizedPrompt.length === 0) {
         throw new Error("A prompt is required for this video model.")
       }
@@ -562,6 +569,13 @@ export function createGenerateVideoTool({
           if (primaryVideo) replicateInput.video = primaryVideo
           if (duration != null) replicateInput.duration = duration
           if (aspectRatio) replicateInput.aspect_ratio = aspectRatio
+          if (resolution) replicateInput.resolution = resolution
+          break
+        case "xai/grok-imagine-video-1.5":
+          if (primaryImage) replicateInput.image = primaryImage
+          if (duration != null) replicateInput.duration = duration
+          if (aspectRatio) replicateInput.aspect_ratio = aspectRatio
+          if (resolution) replicateInput.resolution = resolution
           break
         case "kwaivgi/kling-v3-video":
           if (primaryImage) replicateInput.start_image = primaryImage
@@ -636,6 +650,7 @@ export function createGenerateVideoTool({
         default:
           throw new Error(`Unsupported video model: ${resolvedModel}`)
       }
+      applyMinimalReplicateVideoModeration(resolvedModel, replicateInput)
 
       const replicate = new Replicate({
         auth: process.env.REPLICATE_API_TOKEN,

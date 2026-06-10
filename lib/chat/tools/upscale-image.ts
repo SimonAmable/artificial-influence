@@ -215,6 +215,7 @@ export function createUpscaleImageTool({
         supabase,
         userId,
         imageUrl: sourceImageUrl,
+        modelIdentifier: resolvedModel,
         threadId,
         tool: "chat-upscale-image",
         referenceImageStoragePaths,
