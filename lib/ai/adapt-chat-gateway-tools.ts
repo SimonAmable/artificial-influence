@@ -30,11 +30,6 @@ const XAI_STRIPPED_JSON_SCHEMA_KEYS = new Set([
   "discriminator",
 ])
 
-const XAI_UNSUPPORTED_CHAT_TOOLS = new Set([
-  // This tool's large nested discriminated unions are rejected by xAI as invalid arguments.
-  "manageTemplate",
-])
-
 export function stripXaiUnsupportedJsonSchema(value: unknown): unknown {
   if (value === null || typeof value !== "object") {
     return value
@@ -85,10 +80,6 @@ export function adaptChatToolsForGatewayModel<T extends Record<string, Tool>>(
   const adapted = {} as T
 
   for (const [name, chatTool] of Object.entries(tools)) {
-    if (XAI_UNSUPPORTED_CHAT_TOOLS.has(name)) {
-      continue
-    }
-
     adapted[name as keyof T] = adaptToolForXaiGateway(chatTool) as T[keyof T]
   }
 

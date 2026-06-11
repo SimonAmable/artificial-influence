@@ -33,7 +33,6 @@ import { createListThreadMediaTool } from "@/lib/chat/tools/list-thread-media"
 import { createScheduleGenerationFollowUpTool } from "@/lib/chat/tools/schedule-generation-follow-up"
 import { createListAutomationsTool } from "@/lib/chat/tools/list-automations"
 import { createManageAutomationTool } from "@/lib/chat/tools/manage-automation"
-import { createManageTemplateTool } from "@/lib/chat/tools/manage-template"
 import { createManageSlideshowsTool } from "@/lib/chat/tools/manage-slideshows"
 import { createTextOverlayTool } from "@/lib/chat/tools/text-overlay"
 import {
@@ -227,9 +226,6 @@ export function createCreativeChatTools({
       editorProjectId,
       supabase,
       threadId,
-      userId,
-    }),
-    manageTemplate: createManageTemplateTool({
       userId,
     }),
     manageSlideshows: createManageSlideshowsTool({
