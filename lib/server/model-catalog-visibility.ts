@@ -11,6 +11,7 @@ export function isHiddenCatalogModelIdentifier(identifier: string): boolean {
   ) {
     return true
   }
+  if (identifier.startsWith("fal-ai/bytedance/seedream/")) return true
   if (identifier.startsWith("wan-video/wan-2.7-")) return true
   return false
 }

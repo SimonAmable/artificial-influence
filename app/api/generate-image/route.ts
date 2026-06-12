@@ -449,6 +449,7 @@ export async function POST(request: NextRequest) {
         prompt: finalPrompt,
         quality,
         referenceImageUrls,
+        resolutionPreset: size || resolution || null,
         seed: seed != null && !Number.isNaN(seed) ? seed : null,
       });
       const { requestId, endpointId: falEndpoint } = await submitFalImageQueue(

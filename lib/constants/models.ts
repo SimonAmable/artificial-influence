@@ -1346,6 +1346,50 @@ const Z_IMAGE_TURBO_PARAMS: ParameterDefinition[] = [
   },
 ];
 
+const FAL_SEEDREAM_IMAGE_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'enable_safety_checker',
+    type: 'boolean',
+    label: 'Safety checker',
+    description: 'Enable content moderation for input and output',
+    required: false,
+    default: false,
+    ui_type: 'switch',
+  },
+  {
+    name: 'size',
+    type: 'string',
+    label: 'Resolution preset',
+    description: 'Fal auto resolution preset (2K / 3K / 4K where supported)',
+    required: false,
+    default: '2K',
+    enum: ['2K', '3K', '4K'],
+    ui_type: 'select',
+  },
+  {
+    name: 'num_images',
+    type: 'number',
+    label: 'Number of Images',
+    description: 'Number of separate generations to run',
+    required: false,
+    default: 1,
+    min: 1,
+    max: 6,
+    ui_type: 'number',
+  },
+  {
+    name: 'seed',
+    type: 'number',
+    label: 'Seed',
+    description: 'Random seed for reproducibility',
+    required: false,
+    default: null,
+    min: 0,
+    max: 2147483647,
+    ui_type: 'number',
+  },
+];
+
 const FAL_WAN_IMAGE_PARAMS: ParameterDefinition[] = [
   {
     name: 'enable_safety_checker',
@@ -1808,13 +1852,14 @@ export const SEEDREAM_4_5_MODEL: Model = {
   id: 'model-seedream-4.5',
   identifier: MODEL_IDENTIFIERS.BYTEDANCE_SEEDREAM_4_5,
   name: 'Seedream 4.5',
-  description: 'Seedream 4.5: Upgraded Bytedance image model with stronger spatial understanding and world knowledge',
+  description:
+    'Seedream 4.5 on fal: text-to-image and multi-reference image editing with up to 4K output. Safety checker is disabled by default.',
   type: 'image',
-  provider: 'replicate',
+  provider: 'fal',
   is_active: true,
-  model_cost: 0.0025,
+  model_cost: 4,
   parameters: {
-    parameters: SEEDREAM_4_5_PARAMS,
+    parameters: FAL_SEEDREAM_IMAGE_PARAMS,
   },
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
@@ -1828,13 +1873,13 @@ export const SEEDREAM_5_LITE_MODEL: Model = {
   identifier: MODEL_IDENTIFIERS.BYTEDANCE_SEEDREAM_5_LITE,
   name: 'Seedream 5.0',
   description:
-    "ByteDance image model with built-in reasoning, example-based editing, and up to 3K resolution",
+    'Seedream 5.0 Lite on fal: reasoning-heavy text-to-image and multi-reference editing up to 3K. Safety checker is disabled by default.',
   type: 'image',
-  provider: 'replicate',
+  provider: 'fal',
   is_active: true,
-  model_cost: 0.002,
+  model_cost: 4,
   parameters: {
-    parameters: SEEDREAM_5_LITE_PARAMS,
+    parameters: FAL_SEEDREAM_IMAGE_PARAMS,
   },
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),

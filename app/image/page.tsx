@@ -196,6 +196,8 @@ const FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF = new Set([
   "fal-ai/wan/v2.7",
   "fal-ai/wan/v2.7/pro",
   "openai/gpt-image-2",
+  "bytedance/seedream-4.5",
+  "bytedance/seedream-5-lite",
 ])
 const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
   full_character:

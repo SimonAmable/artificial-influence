@@ -5,9 +5,15 @@ const {
   coerceWanImagePrompt,
   FAL_OPENAI_GPT_IMAGE_2_EDIT,
   FAL_OPENAI_GPT_IMAGE_2_T2I,
+  FAL_SEEDREAM_4_5_EDIT,
+  FAL_SEEDREAM_4_5_T2I,
+  FAL_SEEDREAM_5_LITE_EDIT,
+  FAL_SEEDREAM_5_LITE_T2I,
   FAL_WAN_27_PRO_EDIT,
   FAL_WAN_27_PRO_T2I,
   OPENAI_GPT_IMAGE_2_CANONICAL_ID,
+  SEEDREAM_4_5_CANONICAL_ID,
+  SEEDREAM_5_LITE_CANONICAL_ID,
   WAN_27_PRO_IMAGE_CANONICAL_ID,
 } = await import(new URL("./fal-image.ts", import.meta.url).href)
 
@@ -149,4 +155,74 @@ runTest("GPT Image 2 maps wide custom ratios to explicit dimensions", () => {
     width: 1344,
     height: 576,
   })
+})
+
+runTest("Seedream 4.5 routes prompt-only generations to Fal text-to-image with safety checker off", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: "16:9",
+    modelIdentifier: SEEDREAM_4_5_CANONICAL_ID,
+    numImages: 2,
+    prompt: "A polished perfume ad with crisp headline text",
+    referenceImageUrls: [],
+    resolutionPreset: "4K",
+  })
+
+  assert.equal(result.endpointId, FAL_SEEDREAM_4_5_T2I)
+  assert.equal(result.input.image_size, "auto_4K")
+  assert.equal(result.input.num_images, 2)
+  assert.equal(result.input.enable_safety_checker, false)
+  assert.ok(!("image_urls" in result.input))
+})
+
+runTest("Seedream 4.5 routes referenced generations to Fal edit", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: null,
+    modelIdentifier: SEEDREAM_4_5_CANONICAL_ID,
+    numImages: 1,
+    prompt: "Replace the product in Figure 1 with that in Figure 2",
+    referenceImageUrls: [
+      "https://example.com/ref-1.png",
+      "https://example.com/ref-2.png",
+    ],
+  })
+
+  assert.equal(result.endpointId, FAL_SEEDREAM_4_5_EDIT)
+  assert.equal(result.resolvedAspectRatio, "match_input_image")
+  assert.equal(result.input.image_size, "auto_2K")
+  assert.deepEqual(result.input.image_urls, [
+    "https://example.com/ref-1.png",
+    "https://example.com/ref-2.png",
+  ])
+  assert.equal(result.input.enable_safety_checker, false)
+})
+
+runTest("Seedream 5 Lite supports 3K preset and trims references to ten images", () => {
+  const references = Array.from({ length: 12 }, (_, index) => `https://example.com/ref-${index + 1}.png`)
+  const result = buildFalImageRequest({
+    aspectRatio: "1:1",
+    modelIdentifier: SEEDREAM_5_LITE_CANONICAL_ID,
+    numImages: 3,
+    prompt: "Blend the references into one frosted-glass product hero",
+    referenceImageUrls: references,
+    resolutionPreset: "3K",
+  })
+
+  assert.equal(result.endpointId, FAL_SEEDREAM_5_LITE_EDIT)
+  assert.equal(result.input.image_size, "auto_3K")
+  assert.equal(result.input.num_images, 3)
+  assert.equal((result.input.image_urls as string[]).length, 10)
+})
+
+runTest("Seedream 5 Lite routes prompt-only generations to Fal text-to-image", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: "4:3",
+    modelIdentifier: SEEDREAM_5_LITE_CANONICAL_ID,
+    numImages: 1,
+    prompt: "A cinematic product still on marble",
+    referenceImageUrls: [],
+  })
+
+  assert.equal(result.endpointId, FAL_SEEDREAM_5_LITE_T2I)
+  assert.equal(result.input.image_size, "landscape_4_3")
+  assert.equal(result.input.enable_safety_checker, false)
 })
