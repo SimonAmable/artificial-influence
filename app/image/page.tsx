@@ -20,6 +20,7 @@ import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import {
   type GenerateImageAcceptedPayload,
   isContentModerationError,
+  isContentModerationMessage,
   isInsufficientCreditsError,
   isInsufficientCreditsMessage,
 } from "@/lib/generate-image-client"
@@ -175,6 +176,18 @@ function showImageModerationToast(message: string) {
   })
 }
 
+function showImageGenerationErrorToast(message: string, err: unknown) {
+  if (isContentModerationError(err) || isContentModerationMessage(message)) {
+    showImageModerationToast(message)
+    return
+  }
+
+  toast.error("Image generation failed", {
+    id: "image-generation-error",
+    description: message,
+  })
+}
+
 const CHARACTER_SWAP_UI_MODEL_IDENTIFIER = "custom/character-swap"
 const CHARACTER_SWAP_BASE_MODEL_IDENTIFIER = "google/nano-banana-pro"
 const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
@@ -240,6 +253,10 @@ function ImagePageContent() {
   const [pendingRequests, setPendingRequests] = React.useState<PendingImageRequest[]>([])
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const reportImageInputError = React.useCallback((message: string) => {
+    setError(message)
+    toast.error(message, { id: "image-input-error" })
+  }, [])
   const [historyError, setHistoryError] = React.useState<string | null>(null)
   const [enhancePrompt, setEnhancePrompt] = React.useState(false)
   const historyAbortRef = React.useRef<AbortController | null>(null)
@@ -494,18 +511,18 @@ function ImagePageContent() {
       referenceImages.length === 0 &&
       !referenceImage
     ) {
-      setError("Please enter a prompt")
+      reportImageInputError("Please enter a prompt")
       return
     }
 
     if (isCharacterSwapModel) {
       if (!characterSwapCharacterImage?.file) {
-        setError("Please upload a reference character image")
+        reportImageInputError("Please upload a reference character image")
         return
       }
 
       if (!characterSwapSceneImage?.file) {
-        setError("Please upload a reference scene image")
+        reportImageInputError("Please upload a reference scene image")
         return
       }
     }
@@ -519,14 +536,14 @@ function ImagePageContent() {
       if (refImage.file) {
         // Validate file type
         if (!refImage.file.type.startsWith('image/')) {
-          setError('Reference images must be valid image files')
+          reportImageInputError('Reference images must be valid image files')
           return
         }
         
         // Validate file size (max 10MB)
         const maxSize = 10 * 1024 * 1024 // 10MB
         if (refImage.file.size > maxSize) {
-          setError('Reference images are too large. Maximum size is 10MB per image.')
+          reportImageInputError('Reference images are too large. Maximum size is 10MB per image.')
           return
         }
       }
@@ -634,8 +651,9 @@ function ImagePageContent() {
             const blob = await response.blob()
             const file = new File([blob], `reference-${Date.now()}.png`, { type: blob.type || 'image/png' })
             formData.append('referenceImages', file)
-          } catch (error) {
-            console.error('Error fetching reference image URL:', error)
+          } catch (fetchError) {
+            console.error('Error fetching reference image URL:', fetchError)
+            throw new Error('Could not load a reference image. Try re-uploading it or pick a different image.')
           }
         }
       }
@@ -702,12 +720,12 @@ function ImagePageContent() {
         toast.error('Too many active generations', {
           description: `${message} Wait for one to finish, then try again.`,
         })
-      } else if (isModeration) {
-        const normalizedMessage = normalizeModerationFailureMessage(message)
-        showImageModerationToast(message)
-        setError(normalizedMessage)
       } else {
-        setError(message)
+        const normalizedMessage = isModeration
+          ? normalizeModerationFailureMessage(message)
+          : message
+        showImageGenerationErrorToast(message, err)
+        setError(normalizedMessage)
       }
       void fetchImageHistory(20, { silent: true, replace: false })
     }

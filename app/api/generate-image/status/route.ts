@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { tryCompleteFalPendingImage } from '@/lib/server/fal-image-completion';
+import { isContentModerationMessage } from '@/lib/generate-image-client';
 
 function inferImageMimeType(storagePath: string) {
   const lower = storagePath.toLowerCase();
@@ -93,10 +94,19 @@ export async function GET(request: NextRequest) {
 
     const failedGeneration = generations.find((generation) => generation.status === 'failed');
     if (failedGeneration) {
+      const errorMessage = failedGeneration.error_message || 'Generation failed';
+      const isModeration = isContentModerationMessage(errorMessage);
       return NextResponse.json({
         status: 'failed',
         generationId: failedGeneration.id,
-        error: failedGeneration.error_message || 'Generation failed',
+        error: errorMessage,
+        ...(isModeration
+          ? {
+              errorCode: 'Content moderation',
+              details:
+                'The AI model flagged this request. Try different inputs or reference images.',
+            }
+          : {}),
       });
     }
 

@@ -28,6 +28,7 @@ import {
   isReplicateGptImage2Model,
 } from '@/lib/server/replicate-gpt-image';
 import { applyMinimalReplicateImageModeration } from '@/lib/server/minimal-moderation';
+import { isContentModerationMessage } from '@/lib/generate-image-client';
 
 const STALE_PENDING_MINUTES = 30;
 const FREE_CONCURRENCY_LIMIT = 1;
@@ -904,12 +905,22 @@ export async function POST(request: NextRequest) {
         try {
           const replicateResponse = JSON.parse(genError.responseBody);
           if (replicateResponse.error) {
-            console.error('[generate-image] Replicate error:', replicateResponse.error);
+            const replicateError = String(replicateResponse.error);
+            console.error('[generate-image] Replicate error:', replicateError);
+            if (isContentModerationMessage(replicateError)) {
+              return NextResponse.json(
+                {
+                  error: 'Content moderation',
+                  message: replicateError,
+                  details: 'The AI model flagged this request. Try different inputs or reference images.',
+                },
+                { status: 400 }
+              );
+            }
             return NextResponse.json(
-              { 
-                error: 'Content moderation',
-                message: replicateResponse.error,
-                details: 'The AI model flagged this request. Try different inputs or reference images.'
+              {
+                error: 'Failed to generate image',
+                message: replicateError,
               },
               { status: 400 }
             );
@@ -918,7 +929,19 @@ export async function POST(request: NextRequest) {
           // Fall through to generic error
         }
       }
-      
+
+      const errorMessage = genError instanceof Error ? genError.message : String(genError);
+      if (isContentModerationMessage(errorMessage)) {
+        return NextResponse.json(
+          {
+            error: 'Content moderation',
+            message: errorMessage,
+            details: 'The AI model flagged this request. Try different inputs or reference images.',
+          },
+          { status: 400 }
+        );
+      }
+
       // Re-throw for generic error handler
       throw genError;
     }

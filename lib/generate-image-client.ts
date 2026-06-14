@@ -57,27 +57,49 @@ export function isInsufficientCreditsError(err: unknown): boolean {
   return err instanceof Error && err.name === 'InsufficientCreditsError';
 }
 
+const CONTENT_MODERATION_CODE = 'Content moderation';
+
+/** Match provider / API text when structured error codes are missing (e.g. async poll). */
+export function isContentModerationMessage(message: string): boolean {
+  const haystack = message.trim().toLowerCase();
+  if (!haystack) return false;
+
+  return (
+    haystack.includes('content moderation') ||
+    haystack.includes('content policy') ||
+    haystack.includes('content filter') ||
+    haystack.includes('flagged this request') ||
+    haystack.includes('flagged this image') ||
+    haystack.includes('flagged as') ||
+    haystack.includes('violates our policy') ||
+    haystack.includes('violates our content policy') ||
+    haystack.includes('safety system') ||
+    haystack.includes('safety filter') ||
+    haystack.includes('safety checker') ||
+    haystack.includes('nsfw') ||
+    haystack.includes('not safe for work') ||
+    haystack.includes('sensitive content') ||
+    haystack.includes('inappropriate content') ||
+    haystack.includes('blocked by moderation') ||
+    haystack.includes('image moderation') ||
+    haystack.includes('responsible ai') ||
+    haystack.includes('rai policy') ||
+    /\bmoderation\b/.test(haystack)
+  );
+}
+
 /** Content moderation errors can arrive as API metadata or only as provider text after polling. */
 export function isContentModerationError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
 
   const apiError = err as Error & GenerateImageApiErrorDetails;
+  if (apiError.code === CONTENT_MODERATION_CODE) return true;
+
   const haystack = [err.name, err.message, apiError.code, apiError.details]
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-    .join(' ')
-    .toLowerCase();
+    .join(' ');
 
-  return (
-    apiError.code === 'Content moderation' ||
-    haystack.includes('content moderation') ||
-    haystack.includes('content policy') ||
-    haystack.includes('flagged this request') ||
-    haystack.includes('flagged this image') ||
-    haystack.includes('violates our policy') ||
-    haystack.includes('violates our content policy') ||
-    haystack.includes('safety system') ||
-    haystack.includes('safety filter')
-  );
+  return isContentModerationMessage(haystack);
 }
 
 export type GenerateImageResult =
@@ -172,7 +194,17 @@ export async function generateImageAndWait(
         throw new Error('Completed but no image URL');
       }
       if (statusData.status === 'failed') {
-        throw new Error(statusData.error || 'Generation failed');
+        throw makeApiError(
+          {
+            error: statusData.errorCode,
+            message: statusData.error,
+            details: statusData.details,
+          },
+          typeof statusData.error === 'string' && statusData.error.trim().length > 0
+            ? statusData.error
+            : 'Generation failed',
+          400
+        );
       }
       onProgress?.(`Waiting for result... (${i + 1})`);
     }
