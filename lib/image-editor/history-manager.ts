@@ -14,6 +14,10 @@ import {
   getLogicalTextStrokeWidth,
   type EditorTextboxWithHalo,
 } from "@/lib/image-editor/text-stroke-appearance"
+import {
+  applyBaseImageFilters,
+  readFilterSettingsFromCanvas,
+} from "@/lib/image-editor/filter-utils"
 
 /**
  * Serializes the current canvas state to JSON string
@@ -33,6 +37,7 @@ export function serializeCanvas(canvas: FabricCanvas): string {
       "editorTextBarPaddingX",
       "editorTextBarPaddingY",
       "editorTextBarFullWidth",
+      "editorFilterSettings",
     ])
   )
 }
@@ -67,6 +72,8 @@ export async function deserializeCanvas(
           )
           applyTextStrokeAppearance(t, logical, color)
         })
+        const filterSettings = readFilterSettingsFromCanvas(canvas)
+        applyBaseImageFilters(canvas, filterSettings)
         canvas.renderAll()
         resolve()
       }).catch(reject)

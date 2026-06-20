@@ -5,6 +5,7 @@ import type {
   TextSettings,
   ShapeSettings,
   EditorTextAlign,
+  ImageFilterSettings,
 } from "./types"
 
 // Tool definitions for toolbar
@@ -39,6 +40,14 @@ export const DEFAULT_SHAPE_SETTINGS: ShapeSettings = {
   rectangleFilled: false,
 }
 
+export const DEFAULT_IMAGE_FILTER_SETTINGS: ImageFilterSettings = {
+  grain: 0,
+  brightness: 0,
+  contrast: 0,
+  saturation: 0,
+  warmth: 0,
+}
+
 // Preset colors for color picker
 export const PRESET_COLORS = [
   "#ffffff", // White
@@ -63,6 +72,7 @@ export const INITIAL_EDITOR_STATE: ImageEditorState = {
   brushSettings: DEFAULT_BRUSH_SETTINGS,
   textSettings: DEFAULT_TEXT_SETTINGS,
   shapeSettings: DEFAULT_SHAPE_SETTINGS,
+  filterSettings: DEFAULT_IMAGE_FILTER_SETTINGS,
   currentImage: null,
   layers: [],
   selectedLayerId: null,

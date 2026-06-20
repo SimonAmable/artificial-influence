@@ -28,6 +28,8 @@ import {
 } from "@/lib/image-editor/canvas-center-snap"
 import { resolveImageUrlForFabric } from "@/lib/image-editor/canvas-image-url"
 import { serializeCanvas } from "@/lib/image-editor/history-manager"
+import { applyBaseImageFilters } from "@/lib/image-editor/filter-utils"
+import { getRememberedFilterSettings } from "@/lib/image-editor/filter-storage"
 import { CANVAS_SETTINGS, SHAPE_DEFAULTS } from "@/lib/image-editor/constants"
 import { applyTextStylePresetToTextbox, syncSnapchatBarTextboxLayout } from "@/lib/image-editor/apply-text-style-preset"
 import { isImageEditorSnapchatPreset } from "@/lib/image-editor/text-style-presets"
@@ -557,7 +559,13 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
       loadImageOntoCanvas(canvas, initialImage)
         .then(() => {
           hasLoadedInitialImage.current = true
-          dispatch({ type: "LOAD_IMAGE", url: initialImage })
+          const remembered = getRememberedFilterSettings()
+          applyBaseImageFilters(canvas, remembered)
+          dispatch({
+            type: "LOAD_IMAGE",
+            url: initialImage,
+            filterSettings: remembered,
+          })
           resizeCanvasToContainer()
           // Save initial state to history
           const serialized = serializeCanvas(canvas)

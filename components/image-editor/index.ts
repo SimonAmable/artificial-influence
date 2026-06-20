@@ -9,6 +9,7 @@ export { ImageEditorToolbar } from "./image-editor-toolbar"
 export { ImageEditorColorPicker } from "./image-editor-color-picker"
 export { ImageEditorLayers } from "./image-editor-layers"
 export { ImageEditorPromptBar } from "./image-editor-prompt-bar"
+export { ImageEditorFiltersPopover } from "./image-editor-filters-popover"
 export { ImageEditorEmptyState } from "./image-editor-empty-state"
 
 // Types

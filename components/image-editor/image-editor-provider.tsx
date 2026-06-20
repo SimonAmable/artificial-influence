@@ -8,8 +8,9 @@ import type {
   EditorTool,
   MaskMode,
   ImageEditorVariant,
+  ImageFilterSettings,
 } from "@/lib/image-editor/types"
-import { INITIAL_EDITOR_STATE } from "@/lib/image-editor/constants"
+import { INITIAL_EDITOR_STATE, DEFAULT_IMAGE_FILTER_SETTINGS } from "@/lib/image-editor/constants"
 import { textPresetSettingsForCanvas } from "@/lib/image-editor/text-style-presets"
 import { serializeCanvas, deserializeCanvas } from "@/lib/image-editor/history-manager"
 import {
@@ -17,6 +18,14 @@ import {
   loadImageOntoCanvas,
   exportCanvasToBlob,
 } from "@/lib/image-editor/fabric-utils"
+import {
+  applyBaseImageFilters,
+  readFilterSettingsFromCanvas,
+} from "@/lib/image-editor/filter-utils"
+import {
+  getRememberedFilterSettings,
+  setRememberedFilterSettings,
+} from "@/lib/image-editor/filter-storage"
 
 // Reducer
 function imageEditorReducer(
@@ -107,8 +116,27 @@ function imageEditorReducer(
         shapeSettings: { ...state.shapeSettings, rectangleFilled: action.filled },
       }
 
+    case "SET_FILTER_SETTINGS":
+      return {
+        ...state,
+        filterSettings: action.settings,
+        ...(action.silent ? {} : { isDirty: true }),
+      }
+
+    case "RESET_FILTER_SETTINGS":
+      return {
+        ...state,
+        filterSettings: DEFAULT_IMAGE_FILTER_SETTINGS,
+        isDirty: true,
+      }
+
     case "LOAD_IMAGE":
-      return { ...state, currentImage: action.url, isDirty: false }
+      return {
+        ...state,
+        currentImage: action.url,
+        isDirty: false,
+        filterSettings: action.filterSettings,
+      }
 
     case "CLEAR_IMAGE":
       return { ...state, currentImage: null, isDirty: false }
@@ -218,13 +246,14 @@ export function ImageEditorProvider({
   initialImage,
   variant = "full",
 }: ImageEditorProviderProps) {
-  const [state, dispatch] = React.useReducer(imageEditorReducer, {
+  const [state, dispatch] = React.useReducer(imageEditorReducer, undefined, () => ({
     ...INITIAL_EDITOR_STATE,
     currentImage: initialImage || null,
+    filterSettings: getRememberedFilterSettings(),
     ...(variant === "inpaint"
       ? { activeTool: "lasso" as EditorTool, showLayers: false }
       : {}),
-  })
+  }))
 
   // Convenience methods
   const setTool = React.useCallback((tool: EditorTool) => {
@@ -247,6 +276,43 @@ export function ImageEditorProvider({
     dispatch({ type: "SET_MASK_MODE", mode })
   }, [])
 
+  const syncFilterSettingsFromCanvas = React.useCallback(() => {
+    if (!state.canvas) return
+    const settings = readFilterSettingsFromCanvas(state.canvas)
+    dispatch({ type: "SET_FILTER_SETTINGS", settings, silent: true })
+  }, [state.canvas])
+
+  const setFilterSettings = React.useCallback(
+    (
+      settings: ImageFilterSettings,
+      options?: { saveHistory?: boolean }
+    ) => {
+      if (!state.canvas) return
+      applyBaseImageFilters(state.canvas, settings)
+      dispatch({ type: "SET_FILTER_SETTINGS", settings })
+      if (options?.saveHistory) {
+        setRememberedFilterSettings(settings)
+        const serialized = serializeCanvas(state.canvas)
+        dispatch({ type: "PUSH_HISTORY", state: serialized })
+      }
+    },
+    [state.canvas]
+  )
+
+  const resetFilterSettings = React.useCallback(
+    (options?: { saveHistory?: boolean }) => {
+      if (!state.canvas) return
+      applyBaseImageFilters(state.canvas, DEFAULT_IMAGE_FILTER_SETTINGS)
+      dispatch({ type: "RESET_FILTER_SETTINGS" })
+      if (options?.saveHistory) {
+        setRememberedFilterSettings(DEFAULT_IMAGE_FILTER_SETTINGS)
+        const serialized = serializeCanvas(state.canvas)
+        dispatch({ type: "PUSH_HISTORY", state: serialized })
+      }
+    },
+    [state.canvas]
+  )
+
   const canUndo = state.historyIndex > 0
   const canRedo = state.historyIndex < state.history.length - 1
 
@@ -259,8 +325,9 @@ export function ImageEditorProvider({
     if (prevState) {
       await deserializeCanvas(state.canvas, prevState)
       dispatch({ type: "UNDO" })
+      syncFilterSettingsFromCanvas()
     }
-  }, [state.canvas, state.historyIndex, state.history])
+  }, [state.canvas, state.historyIndex, state.history, syncFilterSettingsFromCanvas])
 
   const redo = React.useCallback(async () => {
     if (!state.canvas || state.historyIndex >= state.history.length - 1) return
@@ -271,8 +338,9 @@ export function ImageEditorProvider({
     if (nextState) {
       await deserializeCanvas(state.canvas, nextState)
       dispatch({ type: "REDO" })
+      syncFilterSettingsFromCanvas()
     }
-  }, [state.canvas, state.historyIndex, state.history])
+  }, [state.canvas, state.historyIndex, state.history, syncFilterSettingsFromCanvas])
 
   const saveToHistory = React.useCallback(() => {
     if (!state.canvas) return
@@ -293,7 +361,9 @@ export function ImageEditorProvider({
       // Load new image
       await loadImageOntoCanvas(canvas, url)
 
-      dispatch({ type: "LOAD_IMAGE", url })
+      const remembered = getRememberedFilterSettings()
+      dispatch({ type: "LOAD_IMAGE", url, filterSettings: remembered })
+      applyBaseImageFilters(canvas, remembered)
 
       // Save initial state to history
       const serialized = serializeCanvas(canvas)
@@ -323,6 +393,8 @@ export function ImageEditorProvider({
     setBrushSize,
     setCanvasAspectRatio,
     setMaskMode,
+    setFilterSettings,
+    resetFilterSettings,
     undo,
     redo,
     canUndo,

@@ -39,6 +39,16 @@ export interface ShapeSettings {
   rectangleFilled: boolean
 }
 
+export interface ImageFilterSettings {
+  grain: number
+  brightness: number
+  contrast: number
+  saturation: number
+  warmth: number
+}
+
+export type ImageFilterPresetId = "none" | "subtle-film" | "warm-vintage"
+
 // Layer definition
 export interface EditorLayer {
   id: string
@@ -60,6 +70,7 @@ export interface ImageEditorState {
   brushSettings: BrushSettings
   textSettings: TextSettings
   shapeSettings: ShapeSettings
+  filterSettings: ImageFilterSettings
 
   // Image state
   currentImage: string | null
@@ -99,7 +110,9 @@ export type ImageEditorAction =
     }
   | { type: "SET_SHAPE_STROKE_WIDTH"; width: number }
   | { type: "SET_RECTANGLE_FILLED"; filled: boolean }
-  | { type: "LOAD_IMAGE"; url: string }
+  | { type: "SET_FILTER_SETTINGS"; settings: ImageFilterSettings; silent?: boolean }
+  | { type: "RESET_FILTER_SETTINGS" }
+  | { type: "LOAD_IMAGE"; url: string; filterSettings: ImageFilterSettings }
   | { type: "CLEAR_IMAGE" }
   | { type: "ADD_LAYER"; layer: EditorLayer }
   | { type: "UPDATE_LAYER"; layerId: string; updates: Partial<EditorLayer> }
@@ -127,6 +140,11 @@ export interface ImageEditorContextType {
   setBrushSize: (size: number) => void
   setCanvasAspectRatio: (aspectRatio: number | null) => void
   setMaskMode: (mode: MaskMode) => void
+  setFilterSettings: (
+    settings: ImageFilterSettings,
+    options?: { saveHistory?: boolean }
+  ) => void
+  resetFilterSettings: (options?: { saveHistory?: boolean }) => void
   undo: () => void
   redo: () => void
   canUndo: boolean

@@ -13,6 +13,7 @@ import { ImageEditorLayers } from "./image-editor-layers"
 import { ImageEditorPromptBar } from "./image-editor-prompt-bar"
 import { ImageEditorEmptyState } from "./image-editor-empty-state"
 import { ImageEditorGoogleFontsLink } from "./image-editor-google-fonts-link"
+import { ImageEditorFiltersPopover } from "./image-editor-filters-popover"
 import { DownloadSimple } from "@phosphor-icons/react"
 import { downloadCanvas, uploadEditedImage } from "@/lib/image-editor/export-utils"
 import { KEYBOARD_SHORTCUTS } from "@/lib/image-editor/constants"
@@ -447,6 +448,7 @@ function ImageEditorInner({
             />
           )}
           <div className="flex shrink-0 items-center justify-center gap-2">
+            <ImageEditorFiltersPopover disabled={!hasImage} />
             <ImageEditorToolbar
               extendedTools={fullEditorSurface}
               onToggleFullscreen={toggleFullscreen}
