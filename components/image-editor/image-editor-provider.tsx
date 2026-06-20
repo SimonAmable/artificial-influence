@@ -18,6 +18,8 @@ import {
   loadImageOntoCanvas,
   exportCanvasToBlob,
 } from "@/lib/image-editor/fabric-utils"
+import { applyCanvasCrop } from "@/lib/image-editor/apply-canvas-crop"
+import { exportCanvasForCrop } from "@/lib/image-editor/export-utils"
 import {
   applyBaseImageFilters,
   readFilterSettingsFromCanvas,
@@ -26,6 +28,7 @@ import {
   getRememberedFilterSettings,
   setRememberedFilterSettings,
 } from "@/lib/image-editor/filter-storage"
+import type { CroppedAreaPixels } from "@/lib/utils/crop-image"
 
 // Reducer
 function imageEditorReducer(
@@ -374,6 +377,32 @@ export function ImageEditorProvider({
     }
   }, [state.canvas])
 
+  const applyCroppedImage = React.useCallback(
+    async (
+      sourceImageUrl: string,
+      croppedAreaPixels: CroppedAreaPixels
+    ): Promise<boolean> => {
+      const canvas = state.canvas
+      if (!canvas) return false
+
+      const result = await applyCanvasCrop(
+        canvas,
+        sourceImageUrl,
+        croppedAreaPixels
+      )
+      if (!result) return false
+
+      const nextFilters = state.filterSettings
+      dispatch({ type: "LOAD_IMAGE", url: result.url, filterSettings: nextFilters })
+      dispatch({ type: "SET_CANVAS_ASPECT_RATIO", aspectRatio: null })
+      applyBaseImageFilters(canvas, nextFilters)
+      const serialized = serializeCanvas(canvas)
+      dispatch({ type: "PUSH_HISTORY", state: serialized })
+      return true
+    },
+    [state.canvas, state.filterSettings]
+  )
+
   const exportImage = React.useCallback(async (format: "png" | "jpeg" = "png"): Promise<Blob | null> => {
     if (!state.canvas) return null
 
@@ -384,6 +413,20 @@ export function ImageEditorProvider({
       return null
     }
   }, [state.canvas])
+
+  const exportImageForCrop = React.useCallback(
+    async (format: "png" | "jpeg" = "png"): Promise<Blob | null> => {
+      if (!state.canvas) return null
+
+      try {
+        return await exportCanvasForCrop(state.canvas, format)
+      } catch (error) {
+        console.error("Failed to export image for crop:", error)
+        return null
+      }
+    },
+    [state.canvas]
+  )
 
   const contextValue: ImageEditorContextType = {
     state,
@@ -401,7 +444,9 @@ export function ImageEditorProvider({
     canRedo,
     saveToHistory,
     loadImage,
+    applyCroppedImage,
     exportImage,
+    exportImageForCrop,
   }
 
   return (

@@ -15,26 +15,8 @@ async function appendReferenceImagesToFormData(
   formData: FormData,
   referenceImageUrls: string[],
 ): Promise<void> {
-  for (let index = 0; index < referenceImageUrls.length; index += 1) {
-    const referenceImageUrl = referenceImageUrls[index]
-
-    try {
-      const response = await fetch(referenceImageUrl)
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-
-      const imageBlob = await response.blob()
-      const imageType = imageBlob.type || "image/png"
-      const imageExtension = imageType.split("/")[1] || "png"
-      const imageFile = new File([imageBlob], `reference-${index}.${imageExtension}`, {
-        type: imageType,
-      })
-
-      formData.append("referenceImages", imageFile)
-    } catch (error) {
-      console.error(`Error fetching workflow reference image ${index}:`, error)
-    }
+  for (const referenceImageUrl of referenceImageUrls) {
+    formData.append("referenceImageUrls", referenceImageUrl)
   }
 }
 

@@ -768,21 +768,8 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
 
       // Add reference images if any connected or manual images exist
       if (allReferenceImages.length > 0) {
-        // Fetch and append all reference images
-        for (let i = 0; i < allReferenceImages.length; i++) {
-          const referenceImageUrl = allReferenceImages[i]
-          try {
-            // Fetch the image and convert to blob
-            const imageResponse = await fetch(referenceImageUrl)
-            const imageBlob = await imageResponse.blob()
-            
-            // Create a File from the blob with unique name
-            const imageFile = new File([imageBlob], `reference-${i}.png`, { type: imageBlob.type })
-            formData.append("referenceImages", imageFile)
-          } catch (error) {
-            console.error(`Error fetching reference image ${i}:`, error)
-            // Continue with other reference images if one fails
-          }
+        for (const referenceImageUrl of allReferenceImages) {
+          formData.append("referenceImageUrls", referenceImageUrl)
         }
       }
 

@@ -56,6 +56,8 @@ interface ImageGridProps {
   className?: string
   onImageClick?: (imageUrl: string, index: number) => void
   onUseAsReference?: (imageUrl: string, index: number) => void
+  /** When set, Edit opens this handler instead of navigating to /inpaint */
+  onEdit?: (imageUrl: string, index: number) => void
   onRecreate?: (image: ImageData) => void
   onCreateAsset?: (imageUrl: string, index: number) => void
   onUpscale?: (imageUrl: string, index: number) => void
@@ -101,6 +103,7 @@ export function ImageGrid({
   className,
   onImageClick,
   onUseAsReference,
+  onEdit,
   onRecreate,
   onCreateAsset,
   onUpscale,
@@ -237,9 +240,13 @@ export function ImageGrid({
         onAgentAction("edit", data, index)
         return
       }
+      if (onEdit) {
+        onEdit(data.url, index)
+        return
+      }
       router.push(`/inpaint?image=${encodeURIComponent(data.url)}`)
     },
-    [isAgentMode, onAgentAction, router],
+    [isAgentMode, onAgentAction, onEdit, router],
   )
 
   const runRecreateAction = React.useCallback(

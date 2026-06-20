@@ -16,7 +16,9 @@ import { useModels } from "@/hooks/use-models"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { useRouter, useSearchParams } from "next/navigation"
 import { consumeImageGenerationIntent } from "@/lib/image/image-generation-intent"
+import { appendImageReferencesToFormData } from "@/lib/image/append-references-to-form-data"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { ImageEditorDialog } from "@/components/image-editor"
 import {
   type GenerateImageAcceptedPayload,
   isContentModerationError,
@@ -300,6 +302,8 @@ function ImagePageContent() {
   // Create asset dialog state
   const [createAssetDialogOpen, setCreateAssetDialogOpen] = React.useState(false)
   const [selectedImageForAsset, setSelectedImageForAsset] = React.useState<{ url: string; index: number } | null>(null)
+  const [imageEditorOpen, setImageEditorOpen] = React.useState(false)
+  const [imageEditorUrl, setImageEditorUrl] = React.useState<string | null>(null)
 
   // Upscale: which image is currently upscaling (by URL)
   const [upscalingImageUrl, setUpscalingImageUrl] = React.useState<string | null>(null)
@@ -640,23 +644,7 @@ function ImagePageContent() {
         .filter((u) => !manualUrlSet.has(u))
         .map((url) => ({ url }))
       const imagesToUpload = [...baseRefImages, ...extraFromAssetChips]
-
-      for (const refImage of imagesToUpload) {
-        if (refImage.file) {
-          formData.append('referenceImages', refImage.file)
-        } else if (refImage.url && !refImage.file) {
-          // For URLs from history/assets, we need to fetch and convert to file
-          try {
-            const response = await fetch(refImage.url)
-            const blob = await response.blob()
-            const file = new File([blob], `reference-${Date.now()}.png`, { type: blob.type || 'image/png' })
-            formData.append('referenceImages', file)
-          } catch (fetchError) {
-            console.error('Error fetching reference image URL:', fetchError)
-            throw new Error('Could not load a reference image. Try re-uploading it or pick a different image.')
-          }
-        }
-      }
+      appendImageReferencesToFormData(formData, imagesToUpload)
       
       // Add number of images when > 1
       if (!isCharacterSwapModel && selectedNumImages > 1) {
@@ -745,18 +733,7 @@ function ImagePageContent() {
 
   const handleUseAsReference = React.useCallback(async (imageUrl: string) => {
     try {
-      const response = await fetch(imageUrl)
-      if (!response.ok) {
-        throw new Error("Failed to fetch image for reference")
-      }
-
-      const blob = await response.blob()
-      const mimeType = blob.type || "image/png"
-      const extension = mimeType.split("/")[1] || "png"
-      const file = new File([blob], `reference-${Date.now()}.${extension}`, { type: mimeType })
-
-      // Always add to referenceImages (InfluencerInputBox displays referenceImages when onReferenceImagesChange is passed)
-      setReferenceImages((prev) => [...prev, { file, url: imageUrl }])
+      setReferenceImages((prev) => [...prev, { url: imageUrl }])
       setError(null)
       toast.success("Reference image added")
     } catch (err) {
@@ -982,6 +959,10 @@ function ImagePageContent() {
           onUseAsReference={(imageUrl) => {
             void handleUseAsReference(imageUrl)
           }}
+          onEdit={(imageUrl) => {
+            setImageEditorUrl(imageUrl)
+            setImageEditorOpen(true)
+          }}
           onRecreate={handleRecreate}
           onCreateAsset={handleCreateAsset}
           onUpscale={handleUpscale}
@@ -1144,6 +1125,22 @@ function ImagePageContent() {
           }}
         />
       )}
+
+      <ImageEditorDialog
+        open={imageEditorOpen}
+        onOpenChange={(open) => {
+          setImageEditorOpen(open)
+          if (!open) {
+            setImageEditorUrl(null)
+          }
+        }}
+        initialImage={imageEditorUrl ?? undefined}
+        onSave={() => {
+          toast.success("Image saved", {
+            description: "Your edited image has been saved.",
+          })
+        }}
+      />
     </div>
   )
 }

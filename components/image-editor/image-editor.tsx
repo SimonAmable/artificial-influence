@@ -13,11 +13,15 @@ import { ImageEditorLayers } from "./image-editor-layers"
 import { ImageEditorPromptBar } from "./image-editor-prompt-bar"
 import { ImageEditorEmptyState } from "./image-editor-empty-state"
 import { ImageEditorGoogleFontsLink } from "./image-editor-google-fonts-link"
+import { ImageEditorCropOverlay, type ImageEditorCropOverlayHandle } from "./image-editor-crop-overlay"
+import { ImageEditorCropBar } from "./image-editor-crop-bar"
 import { ImageEditorFiltersPopover } from "./image-editor-filters-popover"
 import { DownloadSimple } from "@phosphor-icons/react"
 import { downloadCanvas, uploadEditedImage } from "@/lib/image-editor/export-utils"
 import { KEYBOARD_SHORTCUTS } from "@/lib/image-editor/constants"
 import type { ImageEditorProps, EditorTool } from "@/lib/image-editor/types"
+import type { CroppedAreaPixels } from "@/lib/utils/crop-image"
+import type { CropAspectPresetId } from "@/lib/image-editor/crop-aspect-options"
 
 type EditorSurfaceTab = "inpaint" | "image-editor"
 
@@ -31,11 +35,20 @@ function ImageEditorInner({
   variant = "full",
 }: ImageEditorProps) {
   const pathname = usePathname()
-  const { state, setTool, setMaskMode, undo, redo, dispatch } = useImageEditor()
+  const { state, setTool, setMaskMode, undo, redo, dispatch, exportImageForCrop, applyCroppedImage } = useImageEditor()
   const { currentImage, showLayers, canvas, activeTool } = state
   const [isFullscreen, setIsFullscreen] = React.useState(false)
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState(false)
+  const [cropSourceUrl, setCropSourceUrl] = React.useState<string | null>(null)
+  const [croppedAreaPixels, setCroppedAreaPixels] = React.useState<CroppedAreaPixels | null>(null)
+  const [isApplyingCrop, setIsApplyingCrop] = React.useState(false)
+  const [isEnteringCrop, setIsEnteringCrop] = React.useState(false)
+  const [isCropMode, setIsCropMode] = React.useState(false)
+  const [cropAspectPreset, setCropAspectPreset] =
+    React.useState<CropAspectPresetId>("free")
+  const cropPreviousToolRef = React.useRef<EditorTool>("select")
+  const cropOverlayRef = React.useRef<ImageEditorCropOverlayHandle>(null)
   const [surfaceTab, setSurfaceTab] = React.useState<EditorSurfaceTab>(() => {
     if (mode !== "page" || variant !== "inpaint") return "inpaint"
     if (pathname?.includes("/image-editor")) return "image-editor"
@@ -55,15 +68,19 @@ function ImageEditorInner({
   const inpaintMaskSurface =
     variant === "inpaint" && (!splitInpaintPage || surfaceTab === "inpaint")
 
-  const showColorLayersStrip = fullEditorSurface || inpaintMaskSurface
+  const showColorLayersStrip =
+    (fullEditorSurface || inpaintMaskSurface) && !isCropMode
 
   const showInpaintTabBrushBar =
-    variant === "inpaint" && (!splitInpaintPage || surfaceTab === "inpaint")
+    variant === "inpaint" &&
+    (!splitInpaintPage || surfaceTab === "inpaint") &&
+    !isCropMode
 
   const showFullSurfaceStrokeBar =
     fullEditorSurface &&
     activeTool === "brush" &&
-    !(variant === "inpaint" && surfaceTab === "inpaint")
+    !(variant === "inpaint" && surfaceTab === "inpaint") &&
+    !isCropMode
 
   const canvasBottomPadding = React.useMemo(() => {
     if (sidebarChatOpen) return "pb-52 sm:pb-60"
@@ -72,6 +89,9 @@ function ImageEditorInner({
   }, [fullEditorSurface, generateBarOpen, sidebarChatOpen])
 
   const toolCanvasHint = React.useMemo(() => {
+    if (isCropMode && fullEditorSurface) {
+      return "Drag handles to resize · hold Shift to lock aspect."
+    }
     if (inpaintMaskSurface && activeTool === "lasso") {
       return "Paint on the canvas to define the inpaint mask."
     }
@@ -88,6 +108,8 @@ function ImageEditorInner({
         return null
       case "image":
         return "Choose an image to add as a layer."
+      case "crop":
+        return null
       case "select":
         return null
       default: {
@@ -95,7 +117,7 @@ function ImageEditorInner({
         return _never
       }
     }
-  }, [activeTool, fullEditorSurface, inpaintMaskSurface])
+  }, [activeTool, fullEditorSurface, inpaintMaskSurface, isCropMode])
 
   React.useLayoutEffect(() => {
     if (!pathname) return
@@ -121,14 +143,90 @@ function ImageEditorInner({
       )
   }, [])
 
+  const hasImage = !!(currentImage || initialImage)
+
+  const revokeCropSourceUrl = React.useCallback(() => {
+    setCropSourceUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current)
+      }
+      return null
+    })
+    setCroppedAreaPixels(null)
+  }, [])
+
+  const cancelCropMode = React.useCallback(() => {
+    revokeCropSourceUrl()
+    setIsCropMode(false)
+    setTool(cropPreviousToolRef.current)
+  }, [revokeCropSourceUrl, setTool])
+
+  const enterCropMode = React.useCallback(async () => {
+    if (!fullEditorSurface || !hasImage || !canvas || isEnteringCrop || isCropMode) {
+      return
+    }
+
+    cropPreviousToolRef.current = activeTool
+    setIsEnteringCrop(true)
+    try {
+      const blob = await exportImageForCrop()
+      if (!blob) return
+
+      revokeCropSourceUrl()
+      const url = URL.createObjectURL(blob)
+      setCropAspectPreset("free")
+      setCropSourceUrl(url)
+      setIsCropMode(true)
+    } finally {
+      setIsEnteringCrop(false)
+    }
+  }, [
+    activeTool,
+    canvas,
+    exportImageForCrop,
+    fullEditorSurface,
+    hasImage,
+    isCropMode,
+    isEnteringCrop,
+    revokeCropSourceUrl,
+  ])
+
+  const applyCropMode = React.useCallback(async () => {
+    const pixelCrop =
+      cropOverlayRef.current?.getPixelCrop() ?? croppedAreaPixels
+    if (!cropSourceUrl || !pixelCrop || isApplyingCrop) return
+
+    setIsApplyingCrop(true)
+    try {
+      const applied = await applyCroppedImage(cropSourceUrl, pixelCrop)
+      if (applied) {
+        revokeCropSourceUrl()
+        setIsCropMode(false)
+        setTool("select")
+      }
+    } finally {
+      setIsApplyingCrop(false)
+    }
+  }, [
+    applyCroppedImage,
+    cropSourceUrl,
+    croppedAreaPixels,
+    isApplyingCrop,
+    revokeCropSourceUrl,
+    setTool,
+  ])
+
   React.useEffect(() => {
     if (!splitInpaintPage) return
+
     if (surfaceTab === "image-editor") {
       setTool("select")
       if (!showLayers) {
         dispatch({ type: "TOGGLE_LAYERS" })
       }
     } else {
+      revokeCropSourceUrl()
+      setIsCropMode(false)
       setTool("lasso")
       setMaskMode("add")
       if (showLayers) {
@@ -137,6 +235,7 @@ function ImageEditorInner({
     }
   }, [
     dispatch,
+    revokeCropSourceUrl,
     setMaskMode,
     setTool,
     showLayers,
@@ -144,8 +243,19 @@ function ImageEditorInner({
     surfaceTab,
   ])
 
-  // Track if we have an image (either initial or loaded)
-  const hasImage = !!(currentImage || initialImage)
+  const cropSourceUrlRef = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    cropSourceUrlRef.current = cropSourceUrl
+  }, [cropSourceUrl])
+
+  React.useEffect(() => {
+    return () => {
+      const url = cropSourceUrlRef.current
+      if (url) {
+        URL.revokeObjectURL(url)
+      }
+    }
+  }, [])
 
   const toggleFullscreen = React.useCallback(() => {
     if (!isFullscreen) {
@@ -170,6 +280,20 @@ function ImageEditorInner({
       // Check for modifier keys
       const isCtrl = e.ctrlKey || e.metaKey
       const isShift = e.shiftKey
+
+      if (isCropMode) {
+        if (e.key === "Escape") {
+          e.preventDefault()
+          cancelCropMode()
+          return
+        }
+        if (e.key === "Enter") {
+          e.preventDefault()
+          void applyCropMode()
+          return
+        }
+        return
+      }
 
       // Undo: Ctrl+Z
       if (isCtrl && !isShift && e.key === "z") {
@@ -212,6 +336,10 @@ function ImageEditorInner({
         if (shortcut === "lasso") {
           setMaskMode("add")
         }
+        if (shortcut === "crop") {
+          void enterCropMode()
+          return
+        }
         setTool(shortcut as EditorTool)
         return
       }
@@ -236,7 +364,11 @@ function ImageEditorInner({
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [
+    applyCropMode,
+    cancelCropMode,
+    enterCropMode,
     fullEditorSurface,
+    isCropMode,
     undo,
     redo,
     setTool,
@@ -397,13 +529,37 @@ function ImageEditorInner({
           </div>
         )}
 
+        {isCropMode && (
+          <p className="mb-2 text-center text-[10px] leading-snug text-muted-foreground sm:hidden">
+            Drag handles to resize · hold Shift to lock aspect
+          </p>
+        )}
+
         <div className="relative flex-1 min-h-0 w-full rounded-xl overflow-hidden">
           <ImageEditorCanvas
-            className="absolute inset-0"
+            className={cn(
+              "absolute inset-0",
+              isCropMode && "invisible pointer-events-none"
+            )}
             initialImage={initialImage}
           />
 
-          {isGenerating && hasImage && (
+          {isEnteringCrop && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-zinc-950">
+              <p className="text-sm text-muted-foreground">Preparing crop…</p>
+            </div>
+          )}
+
+          {isCropMode && cropSourceUrl && (
+            <ImageEditorCropOverlay
+              ref={cropOverlayRef}
+              imageSrc={cropSourceUrl}
+              aspectPreset={cropAspectPreset}
+              onCropAreaChange={setCroppedAreaPixels}
+            />
+          )}
+
+          {isGenerating && hasImage && !isCropMode && (
             <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
               <div
                 className="absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-foreground/20 to-transparent"
@@ -433,37 +589,56 @@ function ImageEditorInner({
       {/* Bottom controls */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3 w-full max-w-5xl px-2 sm:px-4">
         <div className="flex w-full min-w-0 flex-row flex-nowrap items-center justify-center gap-2 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] sm:gap-3">
-          {showInpaintTabBrushBar && (
-            <ImageEditorInpaintBrushBar
-              inline
-              sizeLabel="Mask"
-              className="min-w-[min(100%,10rem)] shrink sm:min-w-48"
+          {isCropMode ? (
+            <ImageEditorCropBar
+              isApplying={isApplyingCrop}
+              canApply={Boolean(croppedAreaPixels)}
+              aspectPreset={cropAspectPreset}
+              onAspectPresetChange={setCropAspectPreset}
+              onCancel={cancelCropMode}
+              onApply={() => void applyCropMode()}
+              className="w-full"
             />
+          ) : (
+            <>
+              {showInpaintTabBrushBar && (
+                <ImageEditorInpaintBrushBar
+                  inline
+                  sizeLabel="Mask"
+                  className="min-w-[min(100%,10rem)] shrink sm:min-w-48"
+                />
+              )}
+              {showFullSurfaceStrokeBar && (
+                <ImageEditorInpaintBrushBar
+                  inline
+                  sizeLabel="Stroke"
+                  className="min-w-[min(100%,10rem)] shrink sm:min-w-48 sm:max-w-xs"
+                />
+              )}
+              <div className="flex shrink-0 items-center justify-center gap-2">
+                {!isCropMode && (
+                  <ImageEditorFiltersPopover disabled={!hasImage} />
+                )}
+                <ImageEditorToolbar
+                  extendedTools={fullEditorSurface}
+                  onToggleFullscreen={toggleFullscreen}
+                  isFullscreen={isFullscreen}
+                  showGenerateBarToggle={mode === "page" && fullEditorSurface}
+                  generateBarOpen={generateBarOpen}
+                  onToggleGenerateBar={() => setGenerateBarOpen((v) => !v)}
+                  showMaskModeToggle={inpaintMaskSurface}
+                  cropEnabled={hasImage && !isEnteringCrop && !isCropMode}
+                  cropActive={isCropMode}
+                  onEnterCropMode={() => void enterCropMode()}
+                  className="min-w-0 shrink"
+                />
+              </div>
+            </>
           )}
-          {showFullSurfaceStrokeBar && (
-            <ImageEditorInpaintBrushBar
-              inline
-              sizeLabel="Stroke"
-              className="min-w-[min(100%,10rem)] shrink sm:min-w-48 sm:max-w-xs"
-            />
-          )}
-          <div className="flex shrink-0 items-center justify-center gap-2">
-            <ImageEditorFiltersPopover disabled={!hasImage} />
-            <ImageEditorToolbar
-              extendedTools={fullEditorSurface}
-              onToggleFullscreen={toggleFullscreen}
-              isFullscreen={isFullscreen}
-              showGenerateBarToggle={mode === "page" && fullEditorSurface}
-              generateBarOpen={generateBarOpen}
-              onToggleGenerateBar={() => setGenerateBarOpen((v) => !v)}
-              showMaskModeToggle={inpaintMaskSurface}
-              className="min-w-0 shrink"
-            />
-          </div>
         </div>
 
         {/* Prompt bar (full editor surface only: toolbar can hide for more canvas) */}
-        {(!fullEditorSurface || generateBarOpen) && (
+        {(!fullEditorSurface || generateBarOpen) && !isCropMode && (
           <ImageEditorPromptBar
             onGeneratingChange={setIsGenerating}
             variant={fullEditorSurface ? "full" : variant}

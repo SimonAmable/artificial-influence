@@ -6,6 +6,7 @@ import {
   ArrowsIn,
   ArrowsOut,
   ChatCircle,
+  Crop,
   Cursor,
   Eraser,
   Image as ImageIcon,
@@ -34,6 +35,10 @@ interface ImageEditorToolbarProps {
   onToggleGenerateBar?: () => void
   /** Inpaint mask surface: paint vs erase mask icons before fullscreen. */
   showMaskModeToggle?: boolean
+  /** When false, crop tool is disabled (no image loaded). */
+  cropEnabled?: boolean
+  cropActive?: boolean
+  onEnterCropMode?: () => void
 }
 
 function toolMeta(id: EditorTool): { label: string; shortcut: string } | null {
@@ -67,6 +72,8 @@ function ToolGlyph({
       return <TextT size={size} weight={w} />
     case "image":
       return <ImageIcon size={size} weight={w} />
+    case "crop":
+      return <Crop size={size} weight={w} />
     default: {
       const _never: never = tool
       return _never
@@ -83,6 +90,9 @@ export function ImageEditorToolbar({
   generateBarOpen = false,
   onToggleGenerateBar,
   showMaskModeToggle = false,
+  cropEnabled = true,
+  cropActive = false,
+  onEnterCropMode,
 }: ImageEditorToolbarProps) {
   const { state, setTool, setMaskMode } = useImageEditor()
   const { activeTool, maskMode } = state
@@ -213,9 +223,11 @@ export function ImageEditorToolbar({
     | "arrow"
     | "text"
     | "image"
+    | "crop"
 
   const paletteButton = (paletteId: PaletteTool) => {
-    const pressed = activeTool === paletteId
+    const isCrop = paletteId === "crop"
+    const pressed = isCrop ? cropActive : activeTool === paletteId
     const meta = toolMeta(paletteId)!
     const label =
       paletteId === "image"
@@ -229,7 +241,13 @@ export function ImageEditorToolbar({
         variant="ghost"
         size="icon"
         className={toolButtonClasses({ pressed })}
-        onClick={() => setTool(paletteId)}
+        onClick={() => {
+          if (isCrop) {
+            onEnterCropMode?.()
+            return
+          }
+          setTool(paletteId)
+        }}
         title={label}
         aria-label={
           paletteId === "image"
@@ -237,6 +255,7 @@ export function ImageEditorToolbar({
             : label
         }
         aria-pressed={paletteId === "image" ? undefined : pressed}
+        disabled={isCrop && !cropEnabled}
       >
         <ToolGlyph
           tool={paletteId}
@@ -268,6 +287,8 @@ export function ImageEditorToolbar({
         {divider}
         {paletteButton("text")}
         {paletteButton("image")}
+        {divider}
+        {paletteButton("crop")}
 
         {showMaskModeToggle ? (
           <>

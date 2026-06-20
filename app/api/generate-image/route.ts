@@ -29,6 +29,10 @@ import {
 } from '@/lib/server/replicate-gpt-image';
 import { applyMinimalReplicateImageModeration } from '@/lib/server/minimal-moderation';
 import { isContentModerationMessage } from '@/lib/generate-image-client';
+import {
+  parseReferenceImageUrlsFromForm,
+  resolveFormReferenceImageUrl,
+} from '@/lib/server/form-reference-image-urls';
 
 const STALE_PENDING_MINUTES = 30;
 const FREE_CONCURRENCY_LIMIT = 1;
@@ -143,6 +147,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const prompt = formData.get('prompt') as string;
     const referenceImageFiles = formData.getAll('referenceImages') as File[];
+    const referenceImageUrlInputs = parseReferenceImageUrlsFromForm(formData);
     const enhancePromptValue = formData.get('enhancePrompt');
     const shouldEnhance = enhancePromptValue === 'true';
     const modelIdentifier = (formData.get('model') as string) || DEFAULT_IMAGE_MODEL_IDENTIFIER;
@@ -245,6 +250,7 @@ export async function POST(request: NextRequest) {
     console.log('[generate-image] FormData parsed:', {
       promptLength: prompt?.length || 0,
       referenceImageCount: referenceImageFiles.length,
+      referenceImageUrlCount: referenceImageUrlInputs.length,
       referenceImageSizes: referenceImageFiles.map(f => f.size),
       referenceImageTypes: referenceImageFiles.map(f => f.type),
       shouldEnhance,
@@ -274,6 +280,37 @@ export async function POST(request: NextRequest) {
     const referenceImageStoragePaths: string[] = [];
     const replicateGptImage2ReferenceImages: File[] = [];
     
+    if (referenceImageUrlInputs.length > 0) {
+      console.log(`[generate-image] Processing ${referenceImageUrlInputs.length} reference image URL(s)...`);
+
+      for (let i = 0; i < referenceImageUrlInputs.length; i += 1) {
+        const referenceImageUrl = referenceImageUrlInputs[i];
+
+        try {
+          const resolved = await resolveFormReferenceImageUrl(referenceImageUrl, {
+            modelIdentifier,
+            replicateGptImage2ReferenceImages,
+          });
+
+          referenceImageUrls.push(resolved.url);
+          if (resolved.storagePath) {
+            referenceImageStoragePaths.push(resolved.storagePath);
+          }
+
+          console.log(`[generate-image] ✓ Reference image URL ${i + 1}:`, resolved.url);
+        } catch (error) {
+          console.error(`[generate-image] Error processing reference image URL ${i + 1}:`, error);
+          return NextResponse.json(
+            {
+              error: `Failed to process reference image URL ${i + 1}`,
+              message: error instanceof Error ? error.message : 'Unknown error',
+            },
+            { status: 400 },
+          );
+        }
+      }
+    }
+
     if (referenceImageFiles.length > 0) {
       console.log(`[generate-image] Processing ${referenceImageFiles.length} reference image(s)...`);
       
@@ -374,7 +411,9 @@ export async function POST(request: NextRequest) {
       }
       
       console.log(`[generate-image] ✓ Processed ${referenceImageUrls.length} reference image(s)`);
-    } else {
+    }
+
+    if (referenceImageUrls.length === 0) {
       console.log('[generate-image] No reference images provided');
     }
 

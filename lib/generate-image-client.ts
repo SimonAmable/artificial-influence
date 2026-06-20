@@ -19,6 +19,24 @@ type GenerateImageApiErrorDetails = {
   details?: string;
 };
 
+async function readApiResponsePayload(response: Response): Promise<Record<string, unknown>> {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  }
+
+  const text = await response.text();
+  if (!text.trim()) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return { message: text, error: text };
+  }
+}
+
 function makeApiError(
   payload: { error?: unknown; message?: unknown; details?: unknown } | null | undefined,
   fallbackMessage: string,
@@ -139,12 +157,16 @@ export async function generateImageAndWait(
   const response = await fetch('/api/generate-image', { method: 'POST', body: formData });
 
   if (response.status === 402) {
-    const d = await response.json();
-    throw makeInsufficientCreditsError(d.message || d.error || 'Insufficient credits');
+    const d = await readApiResponsePayload(response);
+    throw makeInsufficientCreditsError(
+      (typeof d.message === 'string' && d.message) ||
+        (typeof d.error === 'string' && d.error) ||
+        'Insufficient credits'
+    );
   }
 
   if (response.status === 429) {
-    const d = await response.json();
+    const d = await readApiResponsePayload(response);
     const active = typeof d.activeGenerations === 'number' ? d.activeGenerations : undefined;
     const limit = typeof d.limit === 'number' ? d.limit : undefined;
     const tier = typeof d.tier === 'string' ? d.tier : undefined;
@@ -157,11 +179,15 @@ export async function generateImageAndWait(
   }
 
   if (!response.ok) {
-    const d = await response.json();
-    throw makeApiError(d, 'Failed to generate image', response.status);
+    const d = await readApiResponsePayload(response);
+    const fallback =
+      response.status === 413
+        ? 'Request is too large. Try using a smaller reference image or fewer references.'
+        : 'Failed to generate image';
+    throw makeApiError(d, fallback, response.status);
   }
 
-  const data = await response.json();
+  const data = await readApiResponsePayload(response);
 
   if (response.status === 202) {
     const predictionId = data.predictionId as string;
@@ -211,10 +237,15 @@ export async function generateImageAndWait(
     throw new Error('Generation timed out');
   }
 
-  if (data.image?.url) return { image: { url: data.image.url, mimeType: data.image.mimeType } };
-  if (data.images?.length) {
+  const image = data.image as { url?: string; mimeType?: string } | undefined;
+  if (image?.url) {
+    return { image: { url: image.url, mimeType: image.mimeType } };
+  }
+
+  const images = data.images as Array<{ url: string; mimeType?: string }> | undefined;
+  if (images?.length) {
     return {
-      images: data.images.map((img: { url: string; mimeType?: string }) => ({
+      images: images.map((img) => ({
         url: img.url,
         mimeType: img.mimeType || 'image/png',
       })),

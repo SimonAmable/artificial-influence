@@ -11,13 +11,14 @@ import {
 export function canvasToDataUrl(
   canvas: FabricCanvas,
   format: "png" | "jpeg" = "png",
-  quality: number = 1
+  quality: number = 1,
+  multiplier?: number
 ): string {
   return withHiddenExportArtifacts(canvas, () =>
     canvas.toDataURL({
       format,
       quality,
-      multiplier: getCanvasExportMultiplier(canvas),
+      multiplier: multiplier ?? getCanvasExportMultiplier(canvas),
     })
   )
 }
@@ -28,11 +29,20 @@ export function canvasToDataUrl(
 export async function canvasToBlob(
   canvas: FabricCanvas,
   format: "png" | "jpeg" = "png",
-  quality: number = 1
+  quality: number = 1,
+  multiplier?: number
 ): Promise<Blob> {
-  const dataUrl = canvasToDataUrl(canvas, format, quality)
+  const dataUrl = canvasToDataUrl(canvas, format, quality, multiplier)
   const response = await fetch(dataUrl)
   return response.blob()
+}
+
+/** Flatten the canvas at 1x for crop preview — matches on-screen layout. */
+export async function exportCanvasForCrop(
+  canvas: FabricCanvas,
+  format: "png" | "jpeg" = "png"
+): Promise<Blob> {
+  return canvasToBlob(canvas, format, 1, 1)
 }
 
 /**

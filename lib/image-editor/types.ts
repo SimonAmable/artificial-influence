@@ -1,4 +1,5 @@
 import type { Canvas as FabricCanvas } from "fabric"
+import type { CroppedAreaPixels } from "@/lib/utils/crop-image"
 
 // Tool types
 export type EditorTool =
@@ -9,6 +10,7 @@ export type EditorTool =
   | "brush"
   | "text"
   | "image"
+  | "crop"
 
 export type MaskMode = "add" | "erase"
 
@@ -151,7 +153,14 @@ export interface ImageEditorContextType {
   canRedo: boolean
   saveToHistory: () => void
   loadImage: (url: string) => Promise<void>
+  /** Replace canvas with a cropped result without clearing undo history. */
+  applyCroppedImage: (
+    sourceImageUrl: string,
+    croppedAreaPixels: CroppedAreaPixels
+  ) => Promise<boolean>
   exportImage: (format?: "png" | "jpeg") => Promise<Blob | null>
+  /** 1x canvas export for crop UI — matches what the user sees on screen. */
+  exportImageForCrop: (format?: "png" | "jpeg") => Promise<Blob | null>
 }
 
 /** `inpaint`: mask tool only, fixed Nano Banana 2, simplified generate UI */

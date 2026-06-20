@@ -307,6 +307,7 @@ export function setCanvasMode(canvas: FabricCanvas, tool: EditorTool): void {
     case "arrow":
     case "text":
     case "image":
+    case "crop":
       // These tools need click handlers, managed in canvas component
       // Temporarily disable selection while using these tools
       canvas.selection = false

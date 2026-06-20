@@ -17,6 +17,7 @@ export const TOOLS: { id: EditorTool; label: string; shortcut: string }[] = [
   { id: "brush", label: "Brush", shortcut: "B" },
   { id: "text", label: "Text", shortcut: "T" },
   { id: "image", label: "Image", shortcut: "I" },
+  { id: "crop", label: "Crop", shortcut: "C" },
 ]
 
 // Default brush settings
@@ -107,6 +108,7 @@ export const KEYBOARD_SHORTCUTS: Record<string, EditorTool | "undo" | "redo" | "
   b: "brush",
   t: "text",
   i: "image",
+  c: "crop",
 }
 
 // Shape defaults
