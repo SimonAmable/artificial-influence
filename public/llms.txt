@@ -10,6 +10,7 @@
 - [Lip sync](https://unican.app/lipsync): Match audio to a face with timing control.
 - [Motion copy](https://unican.app/motion-copy): Transfer motion from a reference video to a still.
 - [Image editing](https://unican.app/inpaint): Inpaint and regional edits.
+- [AI Influencer](https://unican.app/ai-influencer): Create, save, and generate custom AI characters and influencers.
 - [Canvas](https://unican.app/canvases): Node-based workflows you can rerun.
 - [Autopost](https://unican.app/autopost): Connect Instagram and publish on schedule.
 - [Free tools](https://unican.app/free-tools): Utilities for metadata removal, compression, TikTok repair, TikTok scrape-to-MP4, and TikTok discovery search (sign-in tools use Apify on the server).

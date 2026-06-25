@@ -22,6 +22,7 @@ export function getSitemapEntries(): Array<{
     { path: "/lipsync", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
     { path: "/motion-copy", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
     { path: "/inpaint", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
+    { path: "/ai-influencer", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
     { path: "/pricing", lastModified: DEFAULT_LAST, changeFrequency: "monthly", priority: 0.8 },
     { path: "/autopost", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
     { path: "/free-tools", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },

@@ -180,3 +180,84 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in.' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const {
+      prompt,
+      supabase_storage_path,
+      reference_images_supabase_storage_path,
+      model,
+      tool,
+      type,
+    } = body;
+
+    if (!prompt) {
+      return NextResponse.json(
+        { error: 'Missing prompt/name' },
+        { status: 400 }
+      );
+    }
+
+    const { data: generation, error: insertError } = await supabase
+      .from('generations')
+      .insert({
+        user_id: user.id,
+        prompt,
+        supabase_storage_path: supabase_storage_path || null,
+        reference_images_supabase_storage_path: reference_images_supabase_storage_path || null,
+        model: model || 'upload',
+        type: type || 'image',
+        tool: tool || 'ai_influencer',
+        status: 'completed',
+        is_public: true,
+      })
+      .select('*')
+      .single();
+
+    if (insertError) {
+      console.error('[generations] Error inserting generation:', insertError);
+      return NextResponse.json(
+        { error: 'Failed to create generation record', message: insertError.message },
+        { status: 500 }
+      );
+    }
+
+    let url = null;
+    if (generation.supabase_storage_path) {
+      url = supabase.storage.from('public-bucket').getPublicUrl(generation.supabase_storage_path).data.publicUrl;
+    }
+
+    let reference_image_urls: string[] = [];
+    if (Array.isArray(generation.reference_images_supabase_storage_path)) {
+      reference_image_urls = (generation.reference_images_supabase_storage_path as string[]).map((path: string) => {
+        return supabase.storage.from('public-bucket').getPublicUrl(path).data.publicUrl;
+      });
+    }
+
+    return NextResponse.json({
+      generation: {
+        ...generation,
+        url,
+        reference_image_urls,
+      }
+    });
+  } catch (error) {
+    console.error('[generations] Error in POST:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

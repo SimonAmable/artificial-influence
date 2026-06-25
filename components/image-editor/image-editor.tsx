@@ -50,7 +50,7 @@ function ImageEditorInner({
   const cropPreviousToolRef = React.useRef<EditorTool>("select")
   const cropOverlayRef = React.useRef<ImageEditorCropOverlayHandle>(null)
   const [surfaceTab, setSurfaceTab] = React.useState<EditorSurfaceTab>(() => {
-    if (mode !== "page" || variant !== "inpaint") return "inpaint"
+    if (variant !== "inpaint") return "inpaint"
     if (pathname?.includes("/image-editor")) return "image-editor"
     if (pathname?.includes("/inpaint")) return "inpaint"
     return "inpaint"
@@ -60,7 +60,7 @@ function ImageEditorInner({
   const containerRef = React.useRef<HTMLDivElement>(null)
 
   /** `/inpaint` and `/image-editor` pages use two tabs; this selects full tools vs inpaint-only */
-  const splitInpaintPage = mode === "page" && variant === "inpaint"
+  const splitInpaintPage = variant === "inpaint"
   const fullEditorSurface =
     variant === "full" || (splitInpaintPage && surfaceTab === "image-editor")
 
@@ -450,7 +450,7 @@ function ImageEditorInner({
           canvasBottomPadding
         )}
       >
-        {mode === "page" && variant === "inpaint" && (
+        {splitInpaintPage && (
           <div className="mb-3 flex w-full shrink-0 justify-center">
             <Tabs
               value={surfaceTab}
@@ -623,7 +623,7 @@ function ImageEditorInner({
                   extendedTools={fullEditorSurface}
                   onToggleFullscreen={toggleFullscreen}
                   isFullscreen={isFullscreen}
-                  showGenerateBarToggle={mode === "page" && fullEditorSurface}
+                  showGenerateBarToggle={fullEditorSurface}
                   generateBarOpen={generateBarOpen}
                   onToggleGenerateBar={() => setGenerateBarOpen((v) => !v)}
                   showMaskModeToggle={inpaintMaskSurface}

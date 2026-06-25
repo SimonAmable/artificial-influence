@@ -32,24 +32,30 @@ export async function getCroppedImg(
     throw new Error('No 2d context')
   }
 
+  // Ensure high quality smoothing
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+
   const rotRad = getRadianAngle(rotation)
+  const imgWidth = image.naturalWidth || image.width
+  const imgHeight = image.naturalHeight || image.height
 
   // Calculate bounding box of the rotated image
   const { width: bBoxWidth, height: bBoxHeight } = rotateSize(
-    image.width,
-    image.height,
+    imgWidth,
+    imgHeight,
     rotation
   )
 
   // Set canvas size to match the bounding box
-  canvas.width = bBoxWidth
-  canvas.height = bBoxHeight
+  canvas.width = Math.round(bBoxWidth)
+  canvas.height = Math.round(bBoxHeight)
 
   // Translate canvas context to a central location to allow rotating and flipping around the center
-  ctx.translate(bBoxWidth / 2, bBoxHeight / 2)
+  ctx.translate(canvas.width / 2, canvas.height / 2)
   ctx.rotate(rotRad)
   ctx.scale(flip.horizontal ? -1 : 1, flip.vertical ? -1 : 1)
-  ctx.translate(-image.width / 2, -image.height / 2)
+  ctx.translate(-imgWidth / 2, -imgHeight / 2)
 
   // Draw rotated image
   ctx.drawImage(image, 0, 0)
@@ -61,21 +67,31 @@ export async function getCroppedImg(
     throw new Error('No 2d context')
   }
 
+  // Ensure high quality smoothing on cropped context
+  croppedCtx.imageSmoothingEnabled = true
+  croppedCtx.imageSmoothingQuality = 'high'
+
+  // Round crop dimensions to prevent subpixel rendering blurriness
+  const cropX = Math.round(pixelCrop.x)
+  const cropY = Math.round(pixelCrop.y)
+  const cropWidth = Math.max(1, Math.round(pixelCrop.width))
+  const cropHeight = Math.max(1, Math.round(pixelCrop.height))
+
   // Set the size of the cropped canvas
-  croppedCanvas.width = pixelCrop.width
-  croppedCanvas.height = pixelCrop.height
+  croppedCanvas.width = cropWidth
+  croppedCanvas.height = cropHeight
 
   // Draw the cropped image onto the new canvas
   croppedCtx.drawImage(
     canvas,
-    pixelCrop.x,
-    pixelCrop.y,
-    pixelCrop.width,
-    pixelCrop.height,
+    cropX,
+    cropY,
+    cropWidth,
+    cropHeight,
     0,
     0,
-    pixelCrop.width,
-    pixelCrop.height
+    cropWidth,
+    cropHeight
   )
 
   // Return as blob

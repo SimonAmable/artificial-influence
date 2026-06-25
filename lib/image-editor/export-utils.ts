@@ -37,14 +37,12 @@ export async function canvasToBlob(
   return response.blob()
 }
 
-/** Flatten the canvas at native resolution so crop preserves image quality.
- *  Always uses multiplier=1 — crop must operate on the exact pixels the canvas
- *  holds, not a display-scaled or memory-capped version. */
+/** Flatten the canvas at native resolution so crop preserves image quality. */
 export async function exportCanvasForCrop(
   canvas: FabricCanvas,
   format: "png" | "jpeg" = "png"
 ): Promise<Blob> {
-  return canvasToBlob(canvas, format, 1, 1)
+  return canvasToBlob(canvas, format)
 }
 
 /**

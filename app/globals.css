@@ -283,52 +283,67 @@
 }
 
 /*
- * Scrollbars on nested scrollers only, not html/body.
- * Styling the page scroll with fixed width + buttons forces a classic scrollbar that
- * always eats layout width; the OS default on the document is usually overlay or slimmer.
- * Firefox: scrollbar-color thumb + transparent track.
+ * Global scrollbar styling: keep the track transparent and the scrollbar slim.
+ * Applies to the document and nested scrollers without forcing a visible gutter.
  */
+html,
+body,
 *:not(html):not(body) {
   scrollbar-width: thin;
   scrollbar-color: var(--muted-foreground) transparent;
 }
 
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
 *:not(html):not(body)::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 8px;
+  height: 8px;
 }
 
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
 *:not(html):not(body)::-webkit-scrollbar-track,
 *:not(html):not(body)::-webkit-scrollbar-track-piece {
   background: transparent;
 }
 
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
 *:not(html):not(body)::-webkit-scrollbar-thumb {
   background-color: color-mix(in oklch, var(--muted-foreground) 65%, transparent);
   border-radius: 9999px;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   background-clip: content-box;
 }
 
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
 *:not(html):not(body)::-webkit-scrollbar-thumb:hover {
   background-color: color-mix(in oklch, var(--muted-foreground) 85%, transparent);
 }
 
+html::-webkit-scrollbar-corner,
+body::-webkit-scrollbar-corner,
 *:not(html):not(body)::-webkit-scrollbar-corner {
   background: transparent;
 }
 
+html::-webkit-scrollbar-button,
+body::-webkit-scrollbar-button,
 *:not(html):not(body)::-webkit-scrollbar-button {
-  display: block;
-  background-color: color-mix(in oklch, var(--muted-foreground) 50%, transparent);
+  display: none;
 }
 
+html::-webkit-scrollbar-button:vertical,
+body::-webkit-scrollbar-button:vertical,
 *:not(html):not(body)::-webkit-scrollbar-button:vertical {
-  height: 12px;
+  height: 0;
 }
 
+html::-webkit-scrollbar-button:horizontal,
+body::-webkit-scrollbar-button:horizontal,
 *:not(html):not(body)::-webkit-scrollbar-button:horizontal {
-  width: 12px;
+  width: 0;
 }
 
 .mobile-nav-scrollless {

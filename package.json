@@ -71,6 +71,7 @@
     "html-to-image": "^1.11.11",
     "html2canvas": "^1.4.1",
     "jszip": "^3.10.1",
+    "liquid-glass-react": "github:rdev/liquid-glass-react",
     "lucide-react": "^0.562.0",
     "marked": "^17.0.1",
     "mediabunny": "^1.40.1",

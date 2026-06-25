@@ -97,6 +97,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/lipsync", label: "Lipsync" },
   { path: "/inpaint", label: "Image Editing" },
   { path: "/character-swap", label: "Character Swap" },
+  { path: "/ai-influencer", label: "AI Influencer" },
   { path: "/canvases", label: "Canvas" },
   { path: "/editor", label: "Editor" },
   { path: "/assets?tab=history", label: "History" },
@@ -202,6 +203,13 @@ export const megaNavGroups: MegaNavGroup[] = [
             description: "Create realistic character swaps",
             badge: "new",
             iconSrc: "/users-icon.svg",
+          },
+          {
+            path: "/ai-influencer",
+            label: "AI Influencer",
+            description: "Create and build custom AI characters",
+            badge: "new",
+            iconPhosphor: "robot",
           },
           {
             path: "/inpaint",
@@ -623,6 +631,12 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     href: "/character-swap",
     icon: "arrows-left-right",
     hint: "Swap a subject while keeping the scene.",
+  },
+  {
+    label: "AI Influencer",
+    href: "/ai-influencer",
+    icon: "robot",
+    hint: "Create custom AI characters and influencers.",
   },
   {
     label: "Workflow",

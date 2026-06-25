@@ -1193,10 +1193,42 @@ function ImagePageContent() {
           }
         }}
         initialImage={imageEditorUrl ?? undefined}
-        onSave={() => {
+        onSave={(editedImageUrl) => {
+          const originalItem = historyImages.find((img) => img.url === imageEditorUrl)
+          const newItem: ImageHistoryItem = {
+            id: `edit-${Date.now()}`,
+            url: editedImageUrl,
+            model: originalItem?.model ?? null,
+            prompt: originalItem?.prompt ?? "Edited Image",
+            tool: "image_editing",
+            aspectRatio: originalItem?.aspectRatio ?? null,
+            createdAt: new Date().toISOString(),
+            reference_image_urls: originalItem?.url ? [originalItem.url] : [],
+          }
+
+          setHistoryImages((prev) => prependUniqueHistoryItems(prev, [newItem]))
+
           toast.success("Image saved", {
             description: "Your edited image has been saved.",
           })
+
+          // Trigger local download
+          void (async () => {
+            try {
+              const res = await fetch(editedImageUrl)
+              const blob = await res.blob()
+              const blobUrl = URL.createObjectURL(blob)
+              const a = document.createElement("a")
+              a.href = blobUrl
+              a.download = `edited-${Date.now()}.png`
+              document.body.appendChild(a)
+              a.click()
+              document.body.removeChild(a)
+              URL.revokeObjectURL(blobUrl)
+            } catch (err) {
+              console.error("Failed to download image:", err)
+            }
+          })()
         }}
       />
     </div>
