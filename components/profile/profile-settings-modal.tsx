@@ -304,6 +304,7 @@ export function ProfileSettingsModal({
             memberSince={data.memberSince}
             hasCompletedOnboarding={data.hasCompletedOnboarding}
             userId={data.userId}
+            credits={data.credits}
             onDisplayNameChange={(name) =>
               setData((prev) => (prev ? { ...prev, displayName: name } : prev))
             }

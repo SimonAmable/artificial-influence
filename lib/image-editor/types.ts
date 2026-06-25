@@ -159,7 +159,7 @@ export interface ImageEditorContextType {
     croppedAreaPixels: CroppedAreaPixels
   ) => Promise<boolean>
   exportImage: (format?: "png" | "jpeg") => Promise<Blob | null>
-  /** 1x canvas export for crop UI — matches what the user sees on screen. */
+  /** Full-resolution canvas export for crop UI (crop overlay scales it to fit the viewport). */
   exportImageForCrop: (format?: "png" | "jpeg") => Promise<Blob | null>
 }
 

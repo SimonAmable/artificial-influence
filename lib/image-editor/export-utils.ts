@@ -37,7 +37,9 @@ export async function canvasToBlob(
   return response.blob()
 }
 
-/** Flatten the canvas at 1x for crop preview — matches on-screen layout. */
+/** Flatten the canvas at native resolution so crop preserves image quality.
+ *  Always uses multiplier=1 — crop must operate on the exact pixels the canvas
+ *  holds, not a display-scaled or memory-capped version. */
 export async function exportCanvasForCrop(
   canvas: FabricCanvas,
   format: "png" | "jpeg" = "png"

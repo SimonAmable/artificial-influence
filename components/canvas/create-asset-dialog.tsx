@@ -74,7 +74,6 @@ export function CreateAssetDialog({
   saveButtonLabel,
 }: CreateAssetDialogProps) {
   const [title, setTitle] = React.useState("")
-  const [visibility, setVisibility] = React.useState<AssetVisibility>("public")
   const [category, setCategory] = React.useState<AssetCategory>(getDefaultCategoryByType(initial.assetType))
   const [tagsInput, setTagsInput] = React.useState("")
   const [description, setDescription] = React.useState("")
@@ -83,11 +82,10 @@ export function CreateAssetDialog({
   React.useEffect(() => {
     if (!open) return
     setTitle(initial.title?.trim() || "Untitled Asset")
-    setVisibility(initial.visibility || "public")
     setCategory(initial.category || getDefaultCategoryByType(initial.assetType))
     setTagsInput((initial.tags || []).join(", "))
     setDescription((initial.description ?? "").trim() ? String(initial.description) : "")
-  }, [initial.assetType, initial.category, initial.description, initial.tags, initial.title, initial.visibility, open])
+  }, [initial.assetType, initial.category, initial.description, initial.tags, initial.title, open])
 
   const runAutofill = React.useCallback(async () => {
     if (!initial.url) return
@@ -155,7 +153,7 @@ export function CreateAssetDialog({
           description: description.trim() || null,
           assetType: initial.assetType,
           category,
-          visibility,
+          visibility: "private",
           tags,
           url: initial.url,
           uploadId: initial.uploadId,
@@ -171,7 +169,7 @@ export function CreateAssetDialog({
           description: description.trim() || null,
           assetType: initial.assetType,
           category,
-          visibility,
+          visibility: "private",
           tags,
           url: initial.url,
           uploadId: initial.uploadId,
@@ -247,20 +245,7 @@ export function CreateAssetDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Visibility</Label>
-              <Select value={visibility} onValueChange={(value) => setVisibility(value as AssetVisibility)} disabled={isAutofilling}>
-                <SelectTrigger className={isAutofilling ? "opacity-70" : ""}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="private">Private</SelectItem>
-                  <SelectItem value="public">Public</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
+          <div className="grid grid-cols-1 gap-3">
             <div className="space-y-2">
               <Label>Category</Label>
               <Select value={category} onValueChange={(value) => setCategory(value as AssetCategory)} disabled={isAutofilling}>

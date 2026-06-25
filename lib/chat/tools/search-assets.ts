@@ -61,10 +61,6 @@ export function createSearchAssetsTool({
         .enum(["character", "scene", "shorts", "element"])
         .optional()
         .describe("Optional asset category filter."),
-      includePublic: z
-        .boolean()
-        .optional()
-        .describe("Whether to also search public assets outside the user's private library."),
       limit: z
         .number()
         .int()
@@ -74,20 +70,15 @@ export function createSearchAssetsTool({
         .describe("Maximum number of assets to return."),
     }),
     strict: true,
-    execute: async ({ assetType, category, includePublic = false, limit = 8, query }) => {
+    execute: async ({ assetType, category, limit = 8, query }) => {
       let dbQuery = supabase
         .from("assets")
         .select(
           "id, title, description, asset_type, category, visibility, tags, asset_url, thumbnail_url, created_at, updated_at",
         )
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(Math.max(limit * 3, 24))
-
-      if (includePublic) {
-        dbQuery = dbQuery.or(`user_id.eq.${userId},visibility.eq.public`)
-      } else {
-        dbQuery = dbQuery.eq("user_id", userId)
-      }
 
       if (assetType) {
         dbQuery = dbQuery.eq("asset_type", assetType)
@@ -130,7 +121,19 @@ export function createSearchAssetsTool({
         .filter((asset) => normalizedQuery.length === 0 || asset.score > 0)
         .sort((a, b) => b.score - a.score || b.updatedAt.localeCompare(a.updatedAt))
         .slice(0, limit)
-        .map(({ score: _score, ...asset }) => asset)
+        .map((asset) => ({
+          assetType: asset.assetType,
+          category: asset.category,
+          createdAt: asset.createdAt,
+          description: asset.description,
+          id: asset.id,
+          tags: asset.tags,
+          thumbnailUrl: asset.thumbnailUrl,
+          title: asset.title,
+          updatedAt: asset.updatedAt,
+          url: asset.url,
+          visibility: asset.visibility,
+        }))
 
       return {
         assets,

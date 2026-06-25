@@ -24,8 +24,11 @@ export function convertCropToNaturalPixels(
 ): CroppedAreaPixels | null {
   if (!crop.width || !crop.height) return null
 
-  const displayWidth = image.width || image.clientWidth
-  const displayHeight = image.height || image.clientHeight
+  // getBoundingClientRect is reliable even before clientWidth settles; fall
+  // back to naturalWidth (1:1 scale) only if the element is truly invisible.
+  const rect = image.getBoundingClientRect()
+  const displayWidth = rect.width > 0 ? rect.width : image.naturalWidth
+  const displayHeight = rect.height > 0 ? rect.height : image.naturalHeight
   const { naturalWidth, naturalHeight } = image
 
   if (

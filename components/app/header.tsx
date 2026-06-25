@@ -231,7 +231,7 @@ export function Header() {
       <div className="flex h-[52px] min-w-0 items-center justify-between gap-2 overflow-visible px-4">
         <div className="flex min-w-0 shrink items-center gap-4 lg:gap-6">
           <Link
-            href="/"
+            href={user ? "/dashboard" : "/"}
             className="relative flex shrink-0 items-center justify-center rounded-full p-0.5 transition-opacity hover:opacity-80"
           >
             <span
@@ -363,7 +363,10 @@ export function Header() {
                 </Button>
               }
             >
-              <MobileAppSidebar authenticated={Boolean(user)} />
+              <MobileAppSidebar
+                authenticated={Boolean(user)}
+                onOpenProfileModal={() => openSettingsModal("profile")}
+              />
             </React.Suspense>
           </div>
         </div>
@@ -374,7 +377,7 @@ export function Header() {
               <button
                 type="button"
                 className={cn(
-                  "inline-flex shrink-0 items-center gap-1.5 tabular-nums",
+                  "hidden sm:inline-flex shrink-0 items-center gap-1.5 tabular-nums",
                   signedInHeaderPillClassName
                 )}
                 aria-label={

@@ -1197,12 +1197,12 @@ function VideoPageContent() {
 
   return (
     <div className={cn(
-      "h-screen bg-background overflow-hidden flex flex-col",
-      isRowLayout ? "p-0" : "p-4 sm:p-6 md:p-12"
+      "h-screen bg-background overflow-hidden flex flex-col pt-[60px]",
+      isRowLayout ? "px-0 pb-0" : "pb-4 px-4 sm:pb-6 sm:px-6 md:pb-12 md:px-12"
     )}>
       <div className={cn(
         "mx-auto overflow-hidden flex-1 min-h-0 flex flex-col",
-        isRowLayout ? "w-full pt-20" : "max-w-7xl pt-12"
+        isRowLayout ? "w-full pt-0" : "max-w-7xl pt-0"
       )}>
         <GeneratorLayout layoutMode={layoutMode} className="h-full flex-1 min-h-0">
           {isRowLayout ? (

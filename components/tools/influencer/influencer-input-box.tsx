@@ -568,7 +568,7 @@ export function InfluencerInputBox({
   return (
     <Card
       className={cn(
-        "w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative transition-colors",
+        "w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative transition-colors bg-background/95 backdrop-blur-sm",
         className,
         /* Card defaults to overflow-hidden; allow slash/@ palette to extend above the prompt */
         "overflow-visible"
@@ -741,18 +741,14 @@ export function InfluencerInputBox({
                       </SelectLabel>
                       {toolModels.map((model) => (
                         <SelectItem key={model.identifier} value={model.identifier}>
-                          <div className="flex items-center gap-3">
-                            <div className="rounded-md border border-border bg-muted/30 p-1.5 shrink-0">
-                              <ModelIcon identifier={model.identifier} size={20} />
-                            </div>
-                            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                              <span className="font-semibold text-sm">
-                                {formatModelName(model.identifier, model.name)}
-                              </span>
+                          <div className="flex items-center gap-2">
+                            <ModelIcon identifier={model.identifier} size={16} className="shrink-0" />
+                            <span className="font-semibold text-sm truncate max-w-[70vw] sm:max-w-none">
+                              {formatModelName(model.identifier, model.name)}
                               {model.description && (
-                                <span className="text-xs text-muted-foreground">{model.description}</span>
+                                <span className="font-normal text-muted-foreground"> — {model.description}</span>
                               )}
-                            </div>
+                            </span>
                           </div>
                         </SelectItem>
                       ))}
@@ -764,18 +760,14 @@ export function InfluencerInputBox({
                       </SelectLabel>
                       {imageModelsOnly.map((model) => (
                         <SelectItem key={model.identifier} value={model.identifier}>
-                          <div className="flex items-center gap-3">
-                            <div className="rounded-md border border-border bg-muted/30 p-1.5 shrink-0">
-                              <ModelIcon identifier={model.identifier} size={20} />
-                            </div>
-                            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                              <span className="font-semibold text-sm">
-                                {formatModelName(model.identifier, model.name)}
-                              </span>
+                          <div className="flex items-center gap-2">
+                            <ModelIcon identifier={model.identifier} size={16} className="shrink-0" />
+                            <span className="font-semibold text-sm truncate max-w-[70vw] sm:max-w-none">
+                              {formatModelName(model.identifier, model.name)}
                               {model.description && (
-                                <span className="text-xs text-muted-foreground">{model.description}</span>
+                                <span className="font-normal text-muted-foreground"> — {model.description}</span>
                               )}
-                            </div>
+                            </span>
                           </div>
                         </SelectItem>
                       ))}
@@ -784,18 +776,14 @@ export function InfluencerInputBox({
                 ) : (
                   models.map((model) => (
                     <SelectItem key={model.identifier} value={model.identifier}>
-                      <div className="flex items-center gap-3">
-                        <div className="rounded-md border border-border bg-muted/30 p-1.5 shrink-0">
-                          <ModelIcon identifier={model.identifier} size={20} />
-                        </div>
-                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                          <span className="font-semibold text-sm">
-                            {formatModelName(model.identifier, model.name)}
-                          </span>
+                      <div className="flex items-center gap-2">
+                        <ModelIcon identifier={model.identifier} size={16} className="shrink-0" />
+                        <span className="font-semibold text-sm truncate max-w-[70vw] sm:max-w-none">
+                          {formatModelName(model.identifier, model.name)}
                           {model.description && (
-                            <span className="text-xs text-muted-foreground">{model.description}</span>
+                            <span className="font-normal text-muted-foreground"> — {model.description}</span>
                           )}
-                        </div>
+                        </span>
                       </div>
                     </SelectItem>
                   ))

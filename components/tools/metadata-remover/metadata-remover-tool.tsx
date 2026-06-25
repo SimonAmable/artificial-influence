@@ -167,8 +167,8 @@ export function MetadataRemoverTool() {
             </p>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/image">
-              Open Image Studio
+            <Link href="/free-tools">
+              All tools
               <ArrowRight className="ml-2 size-4" />
             </Link>
           </Button>

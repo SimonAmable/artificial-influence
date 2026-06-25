@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
+import { cn } from "@/lib/utils"
 import {
   ArrowsOutSimple,
   ClockCounterClockwise,
@@ -18,6 +19,8 @@ import {
   MusicNote,
   PencilSimple,
   Plus,
+  Play,
+  SlidersHorizontal,
   Sparkle,
   Trash,
   UploadSimple,
@@ -44,6 +47,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Slider } from "@/components/ui/slider"
 import type { AssetCategory, AssetRecord, AssetType, AssetVisibility } from "@/lib/assets/types"
 import {
   ASSET_CATEGORIES,
@@ -294,6 +300,139 @@ function useDebouncedValue(value: string, delayMs: number) {
   return debounced
 }
 
+function FilterOptionsContent({
+  activeTab,
+  historyType,
+  setHistoryType,
+  assetVisibility,
+  setAssetVisibility,
+  assetCategory,
+  setCategory,
+  columnCount,
+  onColumnCountChange,
+  isMobile = false,
+}: {
+  activeTab: LibraryTab
+  historyType: GenerationType
+  setHistoryType: (type: GenerationType) => void
+  assetVisibility: AssetVisibility | "all"
+  setAssetVisibility: (visibility: AssetVisibility | "all") => void
+  assetCategory: AssetCategory | "all"
+  setCategory: (category: AssetCategory | "all") => void
+  columnCount: number
+  onColumnCountChange: (value: number) => void
+  isMobile?: boolean
+}) {
+  if (activeTab === "history") {
+    return (
+      <div className="space-y-4 p-4 text-foreground bg-card rounded-2xl">
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Media Type</label>
+          <div className="flex flex-wrap gap-1.5">
+            {HISTORY_TYPES.map((type) => (
+              <Button
+                key={type}
+                variant={historyType === type ? "default" : "outline"}
+                size="sm"
+                onClick={() => setHistoryType(type)}
+                className="rounded-full capitalize text-xs px-3 py-1 h-8"
+              >
+                {type}
+              </Button>
+            ))}
+          </div>
+        </div>
+        {isMobile && (
+          <div className="space-y-2 pt-3 border-t border-border/50">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Grid Columns</span>
+              <span className="text-sm font-medium text-primary">{columnCount}</span>
+            </div>
+            <Slider
+              value={[columnCount]}
+              onValueChange={(val) => onColumnCountChange(val[0])}
+              min={2}
+              max={6}
+              step={1}
+              className="py-2"
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (activeTab === "assets") {
+    return (
+      <div className="space-y-4 p-4 text-foreground bg-card rounded-2xl">
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Visibility</label>
+          <div className="flex gap-1.5">
+            <Button
+              variant={assetVisibility === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAssetVisibility("all")}
+              className="rounded-full text-xs px-3 py-1 h-8"
+            >
+              All
+            </Button>
+            <Button
+              variant={assetVisibility === "private" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAssetVisibility("private")}
+              className="rounded-full text-xs px-3 py-1 h-8"
+            >
+              Private
+            </Button>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Category</label>
+          <div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto pr-1">
+            <Button
+              variant={assetCategory === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setCategory("all")}
+              className="rounded-full text-xs px-3 py-1 h-8"
+            >
+              All categories
+            </Button>
+            {ASSET_CATEGORIES.map((cat) => (
+              <Button
+                key={cat}
+                variant={assetCategory === cat ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCategory(cat)}
+                className="rounded-full text-xs px-3 py-1 h-8"
+              >
+                {ASSET_CATEGORY_LABELS[cat]}
+              </Button>
+            ))}
+          </div>
+        </div>
+        {isMobile && (
+          <div className="space-y-2 pt-3 border-t border-border/50">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Grid Columns</span>
+              <span className="text-sm font-medium text-primary">{columnCount}</span>
+            </div>
+            <Slider
+              value={[columnCount]}
+              onValueChange={(val) => onColumnCountChange(val[0])}
+              min={2}
+              max={6}
+              step={1}
+              className="py-2"
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return null
+}
+
 function LibraryPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -307,6 +446,24 @@ function LibraryPageContent() {
 
   const [search, setSearch] = React.useState("")
   const debouncedSearch = useDebouncedValue(search.trim(), 250)
+  const [columnCount, setColumnCount] = React.useState(2)
+  const [isFilterOpen, setIsFilterOpen] = React.useState(false)
+
+  React.useEffect(() => {
+    const saved = window.localStorage.getItem("unican-assets-column-count")
+    if (saved) {
+      const parsed = parseInt(saved, 10)
+      if (!isNaN(parsed) && parsed >= 2 && parsed <= 6) {
+        setColumnCount(parsed)
+      }
+    }
+  }, [])
+
+  const handleColumnCountChange = React.useCallback((value: number) => {
+    setColumnCount(value)
+    window.localStorage.setItem("unican-assets-column-count", String(value))
+  }, [])
+
   const [historyType, setHistoryType] = React.useState<GenerationType>("all")
   const [assetVisibility, setAssetVisibility] = React.useState<AssetVisibility | "all">("all")
   const [assetCategory, setAssetCategory] = React.useState<AssetCategory | "all">("all")
@@ -675,10 +832,10 @@ function LibraryPageContent() {
         assetType: result.fileType,
         title: result.fileName,
         category: assetCategory !== "all" ? assetCategory : getDefaultCategoryByMediaType(result.fileType),
-        visibility: assetVisibility !== "all" ? assetVisibility : "private",
+        visibility: "private",
       })
     },
-    [assetCategory, assetVisibility, openSaveDraft],
+    [assetCategory, openSaveDraft],
   )
 
   const handleFileSelect = React.useCallback(
@@ -947,7 +1104,7 @@ function LibraryPageContent() {
       </AnimatePresence>
 
       <div className="container mx-auto px-4 pb-8 pt-14">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div className="mb-0 flex flex-wrap items-end justify-between gap-2">
           <div className="min-w-0">
             <h1 className="text-3xl font-bold tracking-tight">Library</h1>
           </div>
@@ -962,16 +1119,14 @@ function LibraryPageContent() {
           />
           <div className="flex flex-wrap items-center gap-2">
             {activeTab === "history" ? (
-              <Button variant="outline" className="gap-2" onClick={() => void fetchGenerations(historyType, false)}>
+              <Button variant="outline" size="icon" onClick={() => void fetchGenerations(historyType, false)} title="Refresh history">
                 <ClockCounterClockwise className="h-4 w-4" />
-                Refresh history
               </Button>
             ) : null}
             {activeTab === "assets" ? (
               <>
-                <Button variant="outline" className="gap-2" onClick={() => void refreshAssets()}>
+                <Button variant="outline" size="icon" onClick={() => void refreshAssets()} title="Refresh assets">
                   <ClockCounterClockwise className="h-4 w-4" />
-                  Refresh assets
                 </Button>
                 <Button onClick={() => fileInputRef.current?.click()} className="gap-2">
                   <UploadSimple className="h-4 w-4" />
@@ -981,9 +1136,8 @@ function LibraryPageContent() {
             ) : null}
             {activeTab === "brands" ? (
               <>
-                <Button variant="outline" className="gap-2" onClick={() => void refreshBrands()}>
+                <Button variant="outline" size="icon" onClick={() => void refreshBrands()} title="Refresh brands">
                   <ClockCounterClockwise className="h-4 w-4" />
-                  Refresh brands
                 </Button>
                 <Button className="gap-2" onClick={() => setBrandFlowOpen(true)}>
                   <Plus className="h-4 w-4" />
@@ -993,9 +1147,8 @@ function LibraryPageContent() {
             ) : null}
             {activeTab === "collections" ? (
               <>
-                <Button variant="outline" className="gap-2" onClick={() => void refreshCollections()}>
+                <Button variant="outline" size="icon" onClick={() => void refreshCollections()} title="Refresh collections">
                   <ClockCounterClockwise className="h-4 w-4" />
-                  Refresh collections
                 </Button>
                 <Button className="gap-2" onClick={() => setCollectionDialogOpen(true)}>
                   <Plus className="h-4 w-4" />
@@ -1006,15 +1159,15 @@ function LibraryPageContent() {
           </div>
         </div>
 
-        <div className="sticky top-[58px] z-30 -mx-4 mb-4 bg-background/90 px-4 py-2 backdrop-blur supports-backdrop-filter:bg-background/70">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="sticky top-[58px] z-30 -mx-4 mb-4 bg-background/90 px-4 pt-0.5 pb-2 border-b border-border/20 backdrop-blur supports-backdrop-filter:bg-background/70">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <Tabs value={activeTab} onValueChange={(value) => handleActiveTabChange(value as LibraryTab)}>
-              <TabsList className="h-auto max-w-full flex-wrap justify-start overflow-visible rounded-full p-0.5">
+              <TabsList className="h-auto max-w-full flex-wrap justify-start overflow-visible rounded-full p-0.5 bg-muted/60">
                 {LIBRARY_TABS.map((tab) => (
-                  <TabsTrigger key={tab} value={tab} className="shrink-0 gap-2 rounded-full px-4 py-1.5">
+                  <TabsTrigger key={tab} value={tab} className="shrink-0 gap-2 rounded-full px-4 py-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                     {tabLabels[tab]}
                     {tabCounts[tab] ? (
-                      <span className="rounded-full bg-background/80 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      <span className="hidden sm:inline-block rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                         {tabCounts[tab]}
                       </span>
                     ) : null}
@@ -1023,14 +1176,85 @@ function LibraryPageContent() {
               </TabsList>
             </Tabs>
 
-            <div className="relative min-w-0 lg:w-80">
-              <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search titles, prompts, tags..."
-                className="h-9 rounded-full pl-9"
-              />
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 min-w-0 md:w-64 lg:w-80 transition-all duration-300">
+                <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search..."
+                  className="h-9 rounded-full pl-9 bg-muted/40 border-border/50 focus:bg-background transition-all"
+                />
+              </div>
+
+              {(activeTab === "history" || activeTab === "assets") && (
+                <>
+                  {/* Desktop Popover Filters */}
+                  <div className="hidden sm:block">
+                    <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-9 w-9 rounded-full border-border/50 bg-muted/40 hover:bg-muted">
+                          <SlidersHorizontal className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-72 p-0 bg-card border-border/60 shadow-lg">
+                        <FilterOptionsContent
+                          activeTab={activeTab}
+                          historyType={historyType}
+                          setHistoryType={setHistoryType}
+                          assetVisibility={assetVisibility}
+                          setAssetVisibility={setAssetVisibility}
+                          assetCategory={assetCategory}
+                          setCategory={setAssetCategory}
+                          columnCount={columnCount}
+                          onColumnCountChange={handleColumnCountChange}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Mobile Sheet Filters */}
+                  <div className="block sm:hidden">
+                    <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                      <SheetTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-9 w-9 rounded-full border-border/50 bg-muted/40 hover:bg-muted">
+                          <SlidersHorizontal className="h-4 w-4" />
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent side="bottom" className="rounded-t-3xl border-t border-border/60 bg-card p-2 pb-6 max-h-[85vh]">
+                        <SheetHeader className="px-4 pt-3 pb-1">
+                          <SheetTitle className="text-left font-semibold text-lg">Filters</SheetTitle>
+                        </SheetHeader>
+                        <FilterOptionsContent
+                          activeTab={activeTab}
+                          historyType={historyType}
+                          setHistoryType={setHistoryType}
+                          assetVisibility={assetVisibility}
+                          setAssetVisibility={setAssetVisibility}
+                          assetCategory={assetCategory}
+                          setCategory={setAssetCategory}
+                          columnCount={columnCount}
+                          onColumnCountChange={handleColumnCountChange}
+                          isMobile={true}
+                        />
+                      </SheetContent>
+                    </Sheet>
+                  </div>
+
+                  {/* Desktop Columns Slider */}
+                  <div className="hidden lg:flex items-center gap-2 border-l border-border/40 pl-3">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">Columns: <span className="text-primary font-medium">{columnCount}</span></span>
+                    <Slider
+                      value={[columnCount]}
+                      onValueChange={(val) => handleColumnCountChange(val[0])}
+                      min={2}
+                      max={6}
+                      step={1}
+                      className="w-20"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1053,6 +1277,8 @@ function LibraryPageContent() {
               onDownload={downloadByUrl}
               onDelete={handleDeleteGeneration}
               onEditImage={openImageEditor}
+              columnCount={columnCount}
+              onColumnCountChange={handleColumnCountChange}
             />
           </TabsContent>
 
@@ -1076,6 +1302,8 @@ function LibraryPageContent() {
               }}
               onDelete={handleDeleteAsset}
               onEditImage={openImageEditor}
+              columnCount={columnCount}
+              onColumnCountChange={handleColumnCountChange}
             />
           </TabsContent>
 
@@ -1179,6 +1407,8 @@ function HistoryPanel({
   onDownload,
   onDelete,
   onEditImage,
+  columnCount,
+  onColumnCountChange,
 }: {
   activeType: GenerationType
   setActiveType: (type: GenerationType) => void
@@ -1195,18 +1425,19 @@ function HistoryPanel({
   onDownload: (url: string, type: AssetType, title?: string) => void
   onDelete: (generation: Generation) => void
   onEditImage: (url: string) => void
+  columnCount: number
+  onColumnCountChange: (value: number) => void
 }) {
+  const gridColsClass = {
+    2: "grid-cols-2",
+    3: "grid-cols-2 sm:grid-cols-3",
+    4: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
+    5: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
+    6: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6",
+  }[columnCount] || "grid-cols-2"
+
   return (
     <section className="space-y-3">
-      <Tabs value={activeType} onValueChange={(value) => setActiveType(value as GenerationType)}>
-        <TabsList className="mb-0 flex h-auto max-w-full flex-wrap justify-start gap-1 rounded-full p-0.5">
-          <TabsTrigger value="all" className="rounded-full">All</TabsTrigger>
-          <TabsTrigger value="image" className="rounded-full">Images</TabsTrigger>
-          <TabsTrigger value="video" className="rounded-full">Videos</TabsTrigger>
-          <TabsTrigger value="audio" className="rounded-full">Audio</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
       {state.initialLoading ? (
         <LoadingGrid label="Loading history..." />
       ) : state.error && state.items.length === 0 ? (
@@ -1218,14 +1449,28 @@ function HistoryPanel({
         />
       ) : (
         <div className="space-y-3">
-          <div className="text-sm text-muted-foreground">
-            Showing {items.length} of {state.pagination.total}
-            {searchQuery ? ` for "${searchQuery}"` : ""}
+          <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground mt-1 py-1">
+            <div className="truncate pr-1">
+              Showing {items.length} of {state.pagination.total}
+              {searchQuery ? ` for "${searchQuery}"` : ""}
+            </div>
+            {/* Mobile only columns slider */}
+            <div className="flex items-center gap-1.5 lg:hidden shrink-0">
+              <span className="text-[10px] sm:text-xs">Cols: <span className="text-primary font-medium">{columnCount}</span></span>
+              <Slider
+                value={[columnCount]}
+                onValueChange={(val) => onColumnCountChange(val[0])}
+                min={2}
+                max={6}
+                step={1}
+                className="w-14 sm:w-16"
+              />
+            </div>
           </div>
           {items.length === 0 ? (
             <EmptyState icon={<MagnifyingGlass className="h-7 w-7" />} title="No matching generations" />
           ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className={cn("grid gap-2 sm:gap-3", gridColsClass)}>
               {items.map((generation) => (
                 <GenerationCard
                   key={generation.id}
@@ -1237,6 +1482,7 @@ function HistoryPanel({
                   onDownload={onDownload}
                   onDelete={onDelete}
                   onEditImage={onEditImage}
+                  columnCount={columnCount}
                 />
               ))}
             </div>
@@ -1275,6 +1521,8 @@ function AssetsPanel({
   onEdit,
   onDelete,
   onEditImage,
+  columnCount,
+  onColumnCountChange,
 }: {
   visibility: AssetVisibility | "all"
   setVisibility: (visibility: AssetVisibility | "all") => void
@@ -1291,37 +1539,26 @@ function AssetsPanel({
   onEdit: (asset: AssetRecord) => void
   onDelete: (asset: AssetRecord) => void
   onEditImage: (url: string) => void
+  columnCount: number
+  onColumnCountChange: (value: number) => void
 }) {
   const emptyTitle =
     category !== "all"
       ? `No ${ASSET_CATEGORY_LABELS[category]} yet`
       : visibility === "private"
         ? "No private assets yet"
-        : visibility === "public"
-          ? "No public assets yet"
-          : "Nothing here yet"
+        : "Nothing here yet"
+
+  const gridColsClass = {
+    2: "grid-cols-2",
+    3: "grid-cols-2 sm:grid-cols-3",
+    4: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
+    5: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
+    6: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6",
+  }[columnCount] || "grid-cols-2"
 
   return (
     <section className="space-y-3">
-      <Tabs value={visibility} onValueChange={(value) => setVisibility(value as AssetVisibility | "all")}>
-        <TabsList className="mb-0 h-auto rounded-full p-0.5">
-          <TabsTrigger value="all" className="rounded-full">All</TabsTrigger>
-          <TabsTrigger value="private" className="rounded-full">Private</TabsTrigger>
-          <TabsTrigger value="public" className="rounded-full">Public</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <Tabs value={category} onValueChange={(value) => setCategory(value as AssetCategory | "all")}>
-        <TabsList className="flex h-auto max-w-full flex-wrap justify-start gap-1 rounded-full p-0.5">
-          <TabsTrigger value="all" className="rounded-full">All categories</TabsTrigger>
-          {ASSET_CATEGORIES.map((item) => (
-            <TabsTrigger key={item} value={item} className="rounded-full">
-              {ASSET_CATEGORY_LABELS[item]}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-
       {state.initialLoading ? (
         <LoadingGrid label="Loading assets..." />
       ) : state.error ? (
@@ -1334,21 +1571,41 @@ function AssetsPanel({
           action={<Button onClick={onUpload}>Create asset</Button>}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {state.items.map((asset) => (
-            <AssetCard
-              key={asset.id}
-              asset={asset}
-              isOwner={currentUserId !== null && asset.userId === currentUserId}
-              onOpen={onOpen}
-              onCopy={onCopy}
-              onReference={onReference}
-              onDownload={onDownload}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onEditImage={onEditImage}
-            />
-          ))}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
+            <div>
+              Showing {state.items.length} of {state.pagination.total}
+            </div>
+            {/* Mobile only columns slider */}
+            <div className="flex items-center gap-2 lg:hidden">
+              <span className="text-xs">Cols: <span className="text-primary font-medium">{columnCount}</span></span>
+              <Slider
+                value={[columnCount]}
+                onValueChange={(val) => onColumnCountChange(val[0])}
+                min={2}
+                max={6}
+                step={1}
+                className="w-20"
+              />
+            </div>
+          </div>
+          <div className={cn("grid gap-2 sm:gap-3", gridColsClass)}>
+            {state.items.map((asset) => (
+              <AssetCard
+                key={asset.id}
+                asset={asset}
+                isOwner={currentUserId !== null && asset.userId === currentUserId}
+                onOpen={onOpen}
+                onCopy={onCopy}
+                onReference={onReference}
+                onDownload={onDownload}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onEditImage={onEditImage}
+                columnCount={columnCount}
+              />
+            ))}
+          </div>
         </div>
       )}
     </section>
@@ -1364,6 +1621,7 @@ function GenerationCard({
   onDownload,
   onDelete,
   onEditImage,
+  columnCount,
 }: {
   generation: Generation
   onOpen: (generation: Generation) => void
@@ -1373,81 +1631,98 @@ function GenerationCard({
   onDownload: (url: string, type: AssetType, title?: string) => void
   onDelete: (generation: Generation) => void
   onEditImage: (url: string) => void
+  columnCount: number
 }) {
   return (
-    <article className="group overflow-hidden rounded-2xl border border-border/70 bg-card/50 shadow-sm transition-colors hover:border-foreground/20">
+    <article className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card/45 aspect-square shadow-sm transition-all hover:border-foreground/20 hover:shadow-md">
       <MediaPreview
         type={generation.type}
         url={generation.url}
         alt={generation.prompt || "Generated media"}
         onOpen={generation.type === "audio" ? undefined : () => onOpen(generation)}
       />
-      <div className="space-y-3 p-3">
-        <div className="flex items-center justify-between gap-2">
-          <Badge variant="outline" className="gap-1">
-            <MediaTypeIcon type={generation.type} className="h-3 w-3" />
-            <span className="capitalize">{generation.type}</span>
+
+      {/* Desktop Hover Overlay */}
+      <div className="absolute inset-0 bg-black/50 opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 z-10 flex flex-col justify-between p-3 pointer-events-none">
+        <div className="flex items-center justify-between pointer-events-auto">
+          <Badge variant="secondary" className="gap-1 bg-black/60 text-white border-none rounded-full capitalize text-[10px] py-0.5 px-2">
+            <MediaTypeIcon type={generation.type} className="h-2.5 w-2.5" />
+            {generation.type}
           </Badge>
-          <span className="shrink-0 text-xs text-muted-foreground">{formatDate(generation.created_at)}</span>
+          <span className="text-[10px] text-white/80 font-medium drop-shadow-sm">{formatDate(generation.created_at)}</span>
         </div>
 
-        {generation.model ? (
-          <p className="truncate text-xs text-muted-foreground">
-            Model: <span className="font-medium">{generation.model}</span>
+        {generation.prompt && (
+          <p className="line-clamp-2 text-[10px] text-white/95 leading-tight font-medium select-none text-left drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] pr-6">
+            {generation.prompt}
           </p>
-        ) : null}
+        )}
 
-        <p className="line-clamp-2 min-h-10 text-sm text-foreground">
-          {generation.prompt || "Untitled generation"}
-        </p>
-
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex items-center justify-between gap-1 pointer-events-auto">
           {generation.type !== "audio" ? (
-            <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => onOpen(generation)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 w-7 rounded-full p-0 bg-white/15 hover:bg-white/25 border-none text-white transition-colors"
+              onClick={() => onOpen(generation)}
+              title="Fullscreen"
+            >
               <ArrowsOutSimple className="h-3.5 w-3.5" />
-              Fullscreen
             </Button>
           ) : (
-            <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => onCopy(generation.url, generation.type)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 w-7 rounded-full p-0 bg-white/15 hover:bg-white/25 border-none text-white transition-colors"
+              onClick={() => onCopy(generation.url, generation.type)}
+              title="Copy"
+            >
               <Copy className="h-3.5 w-3.5" />
-              Copy
             </Button>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            className="gap-1.5"
-            onClick={() =>
-              onSave({
-                url: generation.url,
-                assetType: generation.type,
-                title: `${generation.type} ${generation.id.slice(0, 8)}`,
-                category: getDefaultCategoryByMediaType(generation.type),
-                visibility: "private",
-                sourceGenerationId: generation.id,
-                sourceNodeType: "generation-history",
-                description: generation.prompt ?? undefined,
-              })
-            }
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Save
-          </Button>
-        </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2 text-xs" onClick={() => onReference(generation.url)}>
-            <Sparkle className="h-3.5 w-3.5" />
-            Use as reference
-          </Button>
-          <DropdownActions
-            canEditImage={generation.type === "image"}
-            onEditImage={() => onEditImage(generation.url)}
-            onCopy={() => onCopy(generation.url, generation.type)}
-            onDownload={() => onDownload(generation.url, generation.type, generation.type)}
-            onDelete={() => onDelete(generation)}
-          />
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 px-2.5 rounded-full bg-white text-black hover:bg-white/90 border-none text-[10px] font-semibold transition-colors"
+              onClick={() =>
+                onSave({
+                  url: generation.url,
+                  assetType: generation.type,
+                  title: `${generation.type} ${generation.id.slice(0, 8)}`,
+                  category: getDefaultCategoryByMediaType(generation.type),
+                  visibility: "private",
+                  sourceGenerationId: generation.id,
+                  sourceNodeType: "generation-history",
+                  description: generation.prompt ?? undefined,
+                })
+              }
+            >
+              Save
+            </Button>
+            <DropdownActions
+              canEditImage={generation.type === "image"}
+              onEditImage={() => onEditImage(generation.url)}
+              onCopy={() => onCopy(generation.url, generation.type)}
+              onDownload={() => onDownload(generation.url, generation.type, generation.type)}
+              onDelete={() => onDelete(generation)}
+              className="h-7 w-7 rounded-full bg-white/15 hover:bg-white/25 border-none text-white transition-colors"
+            />
+          </div>
         </div>
+      </div>
+
+      {/* Mobile Floating Action Button (No Hover) */}
+      <div className="absolute right-2 bottom-2 z-10 sm:hidden">
+        <DropdownActions
+          canEditImage={generation.type === "image"}
+          onEditImage={() => onEditImage(generation.url)}
+          onCopy={() => onCopy(generation.url, generation.type)}
+          onDownload={() => onDownload(generation.url, generation.type, generation.type)}
+          onDelete={() => onDelete(generation)}
+          className="h-8 w-8 rounded-full bg-black/60 backdrop-blur border border-white/10 text-white hover:bg-black/85"
+        />
       </div>
     </article>
   )
@@ -1463,6 +1738,7 @@ function AssetCard({
   onEdit,
   onDelete,
   onEditImage,
+  columnCount,
 }: {
   asset: AssetRecord
   isOwner: boolean
@@ -1473,9 +1749,10 @@ function AssetCard({
   onEdit: (asset: AssetRecord) => void
   onDelete: (asset: AssetRecord) => void
   onEditImage: (url: string) => void
+  columnCount: number
 }) {
   return (
-    <article className="group overflow-hidden rounded-2xl border border-border/70 bg-card/50 shadow-sm transition-colors hover:border-foreground/20">
+    <article className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card/45 aspect-square shadow-sm transition-all hover:border-foreground/20 hover:shadow-md">
       <MediaPreview
         type={asset.assetType}
         url={asset.thumbnailUrl || asset.url}
@@ -1483,73 +1760,95 @@ function AssetCard({
         alt={asset.title}
         onOpen={asset.assetType === "audio" ? undefined : () => onOpen(asset)}
       />
-      <div className="space-y-3 p-3">
-        <div className="flex items-center justify-between gap-2">
-          <Badge variant="outline" className="gap-1">
-            <MediaTypeIcon type={asset.assetType} className="h-3 w-3" />
-            <span className="capitalize">{asset.assetType}</span>
+
+      {/* Desktop Hover Overlay */}
+      <div className="absolute inset-0 bg-black/50 opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 z-10 flex flex-col justify-between p-3 pointer-events-none">
+        <div className="flex items-center justify-between pointer-events-auto">
+          <Badge variant="secondary" className="gap-1 bg-black/60 text-white border-none rounded-full capitalize text-[10px] py-0.5 px-2">
+            <MediaTypeIcon type={asset.assetType} className="h-2.5 w-2.5" />
+            {asset.assetType}
           </Badge>
-          <span className="shrink-0 text-xs text-muted-foreground">{formatDate(asset.createdAt)}</span>
+          <span className="text-[10px] text-white/80 font-medium drop-shadow-sm">{formatDate(asset.createdAt)}</span>
         </div>
 
-        <div>
-          <p className="truncate text-sm font-medium text-foreground">{asset.title}</p>
-          <Badge variant="secondary" className="mt-2 w-fit text-xs">
+        <div className="text-left pr-6 select-none">
+          <p className="truncate text-xs font-semibold text-white drop-shadow-sm">{asset.title}</p>
+          <p className="mt-0.5 text-[10px] text-white/85 font-medium drop-shadow-sm">
             {ASSET_CATEGORY_LABELS[asset.category]}
-          </Badge>
+          </p>
         </div>
 
-        {asset.tags.length > 0 ? (
-          <div className="flex min-h-6 flex-wrap gap-1">
-            {asset.tags.slice(0, 3).map((tag) => (
-              <Badge key={tag} variant="outline" className="text-[10px]">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        ) : null}
-
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex items-center justify-between gap-1 pointer-events-auto">
           {asset.assetType !== "audio" ? (
-            <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => onOpen(asset)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 w-7 rounded-full p-0 bg-white/15 hover:bg-white/25 border-none text-white transition-colors"
+              onClick={() => onOpen(asset)}
+              title="Fullscreen"
+            >
               <ArrowsOutSimple className="h-3.5 w-3.5" />
-              Fullscreen
             </Button>
           ) : (
-            <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => onCopy(asset.url, asset.assetType)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 w-7 rounded-full p-0 bg-white/15 hover:bg-white/25 border-none text-white transition-colors"
+              onClick={() => onCopy(asset.url, asset.assetType)}
+              title="Copy"
+            >
               <Copy className="h-3.5 w-3.5" />
-              Copy
             </Button>
           )}
-          {isOwner ? (
-            <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => onEdit(asset)}>
-              <PencilSimple className="h-3.5 w-3.5" />
-              Edit
-            </Button>
-          ) : (
-            <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => onReference(asset.url)}>
-              <Sparkle className="h-3.5 w-3.5" />
-              Reference
-            </Button>
-          )}
-        </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2 text-xs" onClick={() => onReference(asset.url)}>
-            <Sparkle className="h-3.5 w-3.5" />
-            Use as reference
-          </Button>
-          <DropdownActions
-            canEditImage={asset.assetType === "image"}
-            canEditAsset={isOwner}
-            canDelete={isOwner}
-            onEditAsset={() => onEdit(asset)}
-            onEditImage={() => onEditImage(asset.url)}
-            onCopy={() => onCopy(asset.url, asset.assetType)}
-            onDownload={() => onDownload(asset.url, asset.assetType, asset.title)}
-            onDelete={() => onDelete(asset)}
-          />
+          <div className="flex items-center gap-1.5">
+            {isOwner ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-7 px-2.5 rounded-full bg-white text-black hover:bg-white/90 border-none text-[10px] font-semibold transition-colors"
+                onClick={() => onEdit(asset)}
+              >
+                Edit
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-7 px-2.5 rounded-full bg-white text-black hover:bg-white/90 border-none text-[10px] font-semibold transition-colors"
+                onClick={() => onReference(asset.url)}
+              >
+                Reference
+              </Button>
+            )}
+            <DropdownActions
+              canEditImage={asset.assetType === "image"}
+              canEditAsset={isOwner}
+              canDelete={isOwner}
+              onEditAsset={() => onEdit(asset)}
+              onEditImage={() => onEditImage(asset.url)}
+              onCopy={() => onCopy(asset.url, asset.assetType)}
+              onDownload={() => onDownload(asset.url, asset.assetType, asset.title)}
+              onDelete={() => onDelete(asset)}
+              className="h-7 w-7 rounded-full bg-white/15 hover:bg-white/25 border-none text-white transition-colors"
+            />
+          </div>
         </div>
+      </div>
+
+      {/* Mobile Floating Action Button (No Hover) */}
+      <div className="absolute right-2 bottom-2 z-10 sm:hidden">
+        <DropdownActions
+          canEditImage={asset.assetType === "image"}
+          canEditAsset={isOwner}
+          canDelete={isOwner}
+          onEditAsset={() => onEdit(asset)}
+          onEditImage={() => onEditImage(asset.url)}
+          onCopy={() => onCopy(asset.url, asset.assetType)}
+          onDownload={() => onDownload(asset.url, asset.assetType, asset.title)}
+          onDelete={() => onDelete(asset)}
+          className="h-8 w-8 rounded-full bg-black/60 backdrop-blur border border-white/10 text-white hover:bg-black/85"
+        />
       </div>
     </article>
   )
@@ -1569,45 +1868,73 @@ function MediaPreview({
   onOpen?: () => void
 }) {
   const src = playableUrl || url
+  const audioRef = React.useRef<HTMLAudioElement | null>(null)
+  const [isPlaying, setIsPlaying] = React.useState(false)
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!audioRef.current) return
+    if (isPlaying) {
+      audioRef.current.pause()
+    } else {
+      void audioRef.current.play()
+    }
+  }
+
+  React.useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    const handlePlay = () => setIsPlaying(true)
+    const handlePause = () => setIsPlaying(false)
+    audio.addEventListener("play", handlePlay)
+    audio.addEventListener("pause", handlePause)
+    return () => {
+      audio.removeEventListener("play", handlePlay)
+      audio.removeEventListener("pause", handlePause)
+    }
+  }, [])
 
   if (type === "image") {
     return (
-      <button type="button" className="relative block aspect-square w-full overflow-hidden bg-muted text-left" onClick={onOpen}>
+      <button type="button" className="relative block h-full w-full overflow-hidden bg-muted text-left" onClick={onOpen}>
         <Image src={url} alt={alt} fill className="object-cover transition-transform duration-300 group-hover:scale-105" />
-        {onOpen ? <PreviewPill /> : null}
       </button>
     )
   }
 
   if (type === "video") {
     return (
-      <div className="relative aspect-square w-full overflow-hidden bg-black">
+      <div className="relative h-full w-full overflow-hidden bg-black">
         <video src={src} className="h-full w-full object-cover" preload="metadata" muted playsInline />
         {onOpen ? (
-          <button type="button" className="absolute inset-0" onClick={onOpen} aria-label="Open video fullscreen">
-            <PreviewPill />
-          </button>
+          <button type="button" className="absolute inset-0" onClick={onOpen} aria-label="Open video fullscreen" />
         ) : null}
       </div>
     )
   }
 
   return (
-    <div className="flex aspect-square w-full flex-col items-center justify-center gap-4 bg-muted/50 p-5">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-background shadow-sm">
-        <MusicNote className="h-8 w-8 text-muted-foreground" />
-      </div>
-      <audio src={src} controls className="w-full" />
+    <div className="relative flex h-full w-full flex-col items-center justify-center bg-muted/40 p-4 text-center select-none overflow-hidden rounded-2xl">
+      <audio ref={audioRef} src={src} preload="metadata" />
+      <button
+        type="button"
+        onClick={togglePlay}
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95 z-20 pointer-events-auto"
+      >
+        {isPlaying ? (
+          <span className="flex gap-0.5 items-end h-4">
+            <span className="w-1 bg-current animate-[pulse_0.8s_infinite] h-4" />
+            <span className="w-1 bg-current animate-[pulse_0.8s_infinite_0.2s] h-3" />
+            <span className="w-1 bg-current animate-[pulse_0.8s_infinite_0.4s] h-4" />
+          </span>
+        ) : (
+          <Play className="h-5 w-5 text-current fill-current ml-0.5" />
+        )}
+      </button>
+      <span className="mt-2 text-xs text-muted-foreground font-medium truncate max-w-full px-2 drop-shadow-sm select-none">
+        {alt || "Audio track"}
+      </span>
     </div>
-  )
-}
-
-function PreviewPill() {
-  return (
-    <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/65 px-2.5 py-1 text-xs font-medium text-white opacity-0 backdrop-blur transition-opacity group-hover:opacity-100">
-      <ArrowsOutSimple className="h-3.5 w-3.5" />
-      Open
-    </span>
   )
 }
 
@@ -1620,6 +1947,7 @@ function DropdownActions({
   onCopy,
   onDownload,
   onDelete,
+  className,
 }: {
   canEditAsset?: boolean
   canEditImage?: boolean
@@ -1629,11 +1957,12 @@ function DropdownActions({
   onCopy: () => void
   onDownload: () => void
   onDelete: () => void
+  className?: string
 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
+        <Button variant="ghost" size="icon" className={cn("h-8 w-8", className)}>
           <DotsThreeVertical className="h-4 w-4" />
           <span className="sr-only">Open menu</span>
         </Button>

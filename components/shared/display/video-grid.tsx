@@ -218,14 +218,28 @@ export function VideoGrid({
   isLoadingSkeleton = false,
   className,
   showNativeControlsOnHoverOnly = false,
-  initialColumnCount = 3,
+  initialColumnCount = 2,
   onUseVideoAsReference,
   onSaveVideoAsAsset,
   onDelete,
 }: VideoGridProps) {
-  const [columnCount, setColumnCount] = React.useState(() =>
-    Math.min(Math.max(Math.round(initialColumnCount), 1), 4)
-  )
+  const [columnCount, setColumnCount] = React.useState(initialColumnCount)
+
+  React.useEffect(() => {
+    const saved = window.localStorage.getItem("unican-video-column-count")
+    if (saved) {
+      const parsed = parseInt(saved, 10)
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 4) {
+        setColumnCount(parsed)
+      }
+    }
+  }, [])
+
+  const handleColumnCountChange = React.useCallback((value: number) => {
+    setColumnCount(value)
+    window.localStorage.setItem("unican-video-column-count", String(value))
+  }, [])
+
   const [fullscreenVideo, setFullscreenVideo] = React.useState<{
     item: VideoHistoryItem
     index: number
@@ -324,7 +338,7 @@ export function VideoGrid({
           </label>
           <Slider
             value={[columnCount]}
-            onValueChange={(value) => setColumnCount(value[0])}
+            onValueChange={(value) => handleColumnCountChange(value[0])}
             min={1}
             max={4}
             step={1}

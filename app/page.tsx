@@ -75,7 +75,7 @@ export default async function Page() {
       console.error("Home onboarding check failed:", error)
     }
 
-    return redirect("/chat")
+    return redirect("/dashboard")
   }
 
   return (

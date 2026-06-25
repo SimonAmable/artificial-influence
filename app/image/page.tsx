@@ -307,6 +307,7 @@ function ImagePageContent() {
 
   // Upscale: which image is currently upscaling (by URL)
   const [upscalingImageUrl, setUpscalingImageUrl] = React.useState<string | null>(null)
+  const [removingBackgroundImageUrl, setRemovingBackgroundImageUrl] = React.useState<string | null>(null)
   const [removingMetadataImageUrl, setRemovingMetadataImageUrl] = React.useState<string | null>(null)
   const [shouldAutoGenerate, setShouldAutoGenerate] = React.useState(false)
   const autoGenerateHandoffConsumedRef = React.useRef(false)
@@ -893,6 +894,61 @@ function ImagePageContent() {
     }
   }, [])
 
+  const handleRemoveBackground = React.useCallback(async (imageUrl: string, _index: number) => {
+    setRemovingBackgroundImageUrl(imageUrl)
+    try {
+      const response = await fetch('/api/remove-background', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl }),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        const msg = data.error ?? data.message ?? 'Remove background failed'
+        if (response.status === 402) {
+          showCreditsUpsellToast({
+            message: msg,
+            description: "Remove background costs 1 credit.",
+            toastId: "image-credits-upsell",
+          })
+        } else {
+          toast.error(msg)
+        }
+        return
+      }
+
+      const outputUrl = data.imageUrl as string | undefined
+      if (!outputUrl) {
+        toast.error('Remove background failed')
+        return
+      }
+
+      setHistoryImages((prev) =>
+        prependUniqueHistoryItems(prev, [
+          {
+            url: outputUrl,
+            model: 'remove-background',
+            prompt: 'Background removed',
+            tool: 'remove-background',
+            type: 'image',
+            reference_image_urls: [imageUrl],
+          },
+        ])
+      )
+      void fetchImageHistory(20, { silent: true, replace: false })
+
+      toast.success('Background removed', {
+        action: { label: 'Open', onClick: () => window.open(outputUrl, '_blank') },
+      })
+    } catch (err) {
+      console.error('Remove background error:', err)
+      toast.error(err instanceof Error ? err.message : 'Remove background failed')
+    } finally {
+      setRemovingBackgroundImageUrl(null)
+    }
+  }, [fetchImageHistory])
+
   const handleRemoveMetadata = React.useCallback(async (imageUrl: string, _index: number) => {
     setRemovingMetadataImageUrl(imageUrl)
     try {
@@ -966,9 +1022,11 @@ function ImagePageContent() {
           onRecreate={handleRecreate}
           onCreateAsset={handleCreateAsset}
           onUpscale={handleUpscale}
+          onRemoveBackground={handleRemoveBackground}
           onRemoveMetadata={handleRemoveMetadata}
           onDelete={handleDeleteImage}
           upscalingImageUrl={upscalingImageUrl}
+          removingBackgroundImageUrl={removingBackgroundImageUrl}
           removingMetadataImageUrl={removingMetadataImageUrl}
         />
       )
@@ -1015,12 +1073,12 @@ function ImagePageContent() {
 
   return (
     <div className={cn(
-      "h-screen bg-background overflow-hidden flex flex-col",
-      isRowLayout ? "p-0" : "p-4 sm:p-6 md:p-12"
+      "h-screen bg-background overflow-hidden flex flex-col pt-[60px]",
+      isRowLayout ? "px-0 pb-0" : "pb-4 px-4 sm:pb-6 sm:px-6 md:pb-12 md:px-12"
     )}>
       <div className={cn(
         "mx-auto overflow-hidden flex-1 min-h-0 flex flex-col",
-        isRowLayout ? "w-full pt-10" : "max-w-7xl pt-12"
+        isRowLayout ? "w-full pt-0" : "max-w-7xl pt-0"
       )}>
         <GeneratorLayout layoutMode={layoutMode} className="h-full flex-1 min-h-0">
           {isRowLayout ? (

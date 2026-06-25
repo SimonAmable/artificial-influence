@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import {
+  ArrowRight,
   ArrowsDownUp,
   ArrowsOut,
   BookmarkSimple,
@@ -483,11 +484,19 @@ export function TikTokTrendSearchTool() {
               range, and remix them inside Motion Control.
             </p>
           </div>
-          {authState === "authenticated" ? null : (
+          <div className="flex flex-wrap gap-2">
+            {authState === "authenticated" ? null : (
+              <Button variant="outline" asChild>
+                <Link href="/login">Sign in first</Link>
+              </Button>
+            )}
             <Button variant="outline" asChild>
-              <Link href="/login">Sign in first</Link>
+              <Link href="/free-tools">
+                All tools
+                <ArrowRight className="ml-2 size-4" />
+              </Link>
             </Button>
-          )}
+          </div>
         </div>
 
         <form className="space-y-3" onSubmit={handleSearchSubmit}>

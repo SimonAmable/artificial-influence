@@ -5,6 +5,8 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { DashboardAgentPromptBox } from "@/components/dashboard/dashboard-agent-prompt-box"
+import { NoiseTexture } from "@/components/ui/noise-texture"
+import { ShineBorder } from "@/components/ui/shine-border"
 import { InfluencerInputBox } from "@/components/tools/influencer"
 import type { AudioUploadValue } from "@/components/shared/upload/audio-upload"
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
@@ -52,21 +54,46 @@ const HERO_TABS: Array<{
   label: string
   iconSrc: string
 }> = [
-  { id: "video", label: "Video", iconSrc: "/3d_icons/video.png" },
-  { id: "image", label: "Image", iconSrc: "/3d_icons/image.png" },
   { id: "agent", label: "Agent", iconSrc: "/3d_icons/agent.png" },
+  { id: "image", label: "Image", iconSrc: "/3d_icons/image.png" },
+  { id: "video", label: "Video", iconSrc: "/3d_icons/video.png" },
 ]
 
 const HERO_TAB_INDEX: Record<DashboardHeroMode, number> = {
-  video: 0,
+  agent: 0,
   image: 1,
-  agent: 2,
+  video: 2,
+}
+
+function GlowContainer({ children }: { children: React.ReactNode }) {
+  return (
+    <div 
+      className="relative mx-auto w-full max-w-4xl rounded-[28px] p-[2.5px] transition-all duration-500 ease-in-out z-10"
+      style={{
+        boxShadow: `
+          0 0 24px 2px color-mix(in oklch, var(--primary) 65%, transparent),
+          0 0 48px 4px color-mix(in oklch, var(--primary) 35%, transparent),
+          0 0 96px 8px color-mix(in oklch, var(--primary) 15%, transparent)
+        `
+      }}
+    >
+      <ShineBorder
+        borderWidth={3}
+        duration={12}
+        shineColor={["var(--primary)", "var(--foreground)", "var(--primary)"]}
+        className="rounded-[28px]"
+      />
+      <div className="rounded-[25.5px] overflow-hidden bg-background/95 backdrop-blur-md relative z-10">
+        {children}
+      </div>
+    </div>
+  )
 }
 
 export function DashboardHeroSection({ className }: { className?: string }) {
   const router = useRouter()
   const prefersReducedMotion = useReducedMotion()
-  const [activeTab, setActiveTab] = React.useState<DashboardHeroMode>("video")
+  const [activeTab, setActiveTab] = React.useState<DashboardHeroMode>("agent")
   const [tabDirection, setTabDirection] = React.useState(1)
 
   const { models: imageModels, isLoading: imageModelsLoading } = useModels("image")
@@ -356,22 +383,75 @@ export function DashboardHeroSection({ className }: { className?: string }) {
 
   return (
     <section
-      className={cn("relative flex w-full flex-col items-center justify-center overflow-hidden px-4", className)}
-      style={{ minHeight: `calc(100svh - ${APP_HEADER_HEIGHT_PX}px)` }}
+      className={cn("relative flex w-full flex-col items-center justify-center overflow-hidden px-4 bg-background", className)}
+      style={{ minHeight: "calc(100vh + 40px)" }}
     >
-      <div className="relative mx-auto flex w-full max-w-6xl flex-col items-center gap-8 py-14 sm:py-18">
-        <div className="space-y-4 text-center">
-          <h1 className="text-balance text-3xl font-medium tracking-tight text-foreground sm:text-4xl md:text-5xl">
+
+      {/* SVG Filter Definition for Stochastic Dithering (Halftone Spray-Paint Grain) */}
+      <svg className="absolute w-0 h-0 pointer-events-none select-none" aria-hidden="true">
+        <defs>
+          <filter id="stochastic-dither" x="-20%" y="-20%" width="140%" height="140%">
+            {/* 1. Generate high-frequency Perlin noise in color channels */}
+            <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="1" result="raw-noise" />
+            
+            {/* 2. Copy Red channel of noise to Alpha channel */}
+            <feColorMatrix in="raw-noise" type="matrix" values="
+              0 0 0 0 0
+              0 0 0 0 0
+              0 0 0 0 0
+              1 0 0 0 0" result="noise" />
+            
+            {/* 3. Mix the alpha channel of the source graphic with the noise.
+                Because the blurred glow clouds have low opacity (max ~0.20),
+                we amplify the SourceGraphic alpha (k2="7") to cover the full dither range. */}
+            <feComposite in="SourceGraphic" in2="noise" operator="arithmetic" k2="7" k3="1" k4="-0.85" result="mixed" />
+            
+            {/* 4. Threshold to binary discrete values (0 or 1) */}
+            <feComponentTransfer in="mixed" result="threshold">
+              <feFuncA type="discrete" tableValues="0 1" />
+            </feComponentTransfer>
+            
+            {/* 5. Color using original SourceGraphic colors */}
+            <feComposite operator="in" in="SourceGraphic" in2="threshold" />
+          </filter>
+        </defs>
+      </svg>
+
+      {/* Floating Glow Clouds (Primary Accent Color - Cyan/Teal) */}
+      <div 
+        className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none"
+        style={{
+          maskImage: "linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.9) 25%, rgba(0,0,0,0) 75%)",
+          WebkitMaskImage: "linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.9) 25%, rgba(0,0,0,0) 75%)",
+          filter: "url(#stochastic-dither)"
+        }}
+      >
+        {/* Glow Wave 1 - Left horizontal morphing wave */}
+        <div className="absolute -bottom-20 left-[-15%] w-[900px] h-[280px] bg-primary/35 blur-[120px] animate-glow-float opacity-85" />
+        
+        {/* Glow Wave 2 - Central wide horizontal morphing wave */}
+        <div className="absolute -bottom-32 left-1/2 -translate-x-1/2 w-[1300px] h-[340px] bg-primary/40 blur-[140px] animate-glow-float-reverse opacity-95" />
+        
+        {/* Glow Wave 3 - Right horizontal morphing wave */}
+        <div className="absolute -bottom-16 right-[-15%] w-[900px] h-[260px] bg-primary/35 blur-[110px] animate-glow-float-alt opacity-85" />
+      </div>
+
+      {/* Bottom Gradient Fade Overlay */}
+      <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-background to-transparent pointer-events-none z-[5]" />
+
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center gap-5 py-8 sm:py-12">
+        <div className="space-y-3 text-center">
+          <h1 className="text-balance text-2xl font-sans font-extrabold normal-case tracking-tight text-foreground sm:text-4xl md:text-5xl">
             <span>Create at the Speed of Thought</span>
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Jump into the right tool, keep the real controls, and hand the draft off without rebuilding it.
+            Ask Unican for any of image or video, in plain English, and we find the best model and prompt for the job.
           </p>
         </div>
 
         <div
           className={cn(
-            "inline-flex flex-wrap items-center justify-center gap-1 rounded-[2rem] border p-1 backdrop-blur",
+            "relative z-20 inline-flex flex-wrap items-center justify-center gap-1 rounded-full border p-[3px] backdrop-blur",
             "border-border/65 bg-muted/95",
             "shadow-[inset_0_2px_6px_rgba(0,0,0,0.10),inset_0_1px_2px_rgba(0,0,0,0.06),inset_0_-1px_1px_rgba(255,255,255,0.35)]",
             "dark:border-border/45 dark:bg-muted/55",
@@ -391,7 +471,7 @@ export function DashboardHeroSection({ className }: { className?: string }) {
                 role="tab"
                 aria-selected={isActive}
                 className={cn(
-                  "inline-flex min-h-11 min-w-[8.5rem] shrink-0 items-center justify-center gap-2 rounded-full border border-transparent px-5 py-3 text-center text-sm font-medium transition-[color,box-shadow,border-color,background-color]",
+                  "inline-flex min-h-8 min-w-[6.5rem] shrink-0 items-center justify-center gap-1.5 rounded-full border border-transparent px-3 py-1 text-center text-sm font-medium transition-[color,box-shadow,border-color,background-color]",
                   isActive
                     ? "border-border/80 bg-background text-foreground shadow-sm dark:border-border/60 dark:bg-card/90"
                     : "text-muted-foreground hover:bg-background/40 hover:text-foreground"
@@ -399,16 +479,16 @@ export function DashboardHeroSection({ className }: { className?: string }) {
               >
                 <span
                   className={cn(
-                    "relative flex size-6 items-center justify-center transition-transform duration-300 ease-out",
-                    isActive ? "scale-[1.2]" : "scale-100"
+                    "relative flex size-5 items-center justify-center transition-transform duration-300 ease-out",
+                    isActive ? "scale-[1.15]" : "scale-100"
                   )}
                 >
                   <Image
                     src={tab.iconSrc}
                     alt=""
-                    width={24}
-                    height={24}
-                    className="h-6 w-6 object-contain"
+                    width={20}
+                    height={20}
+                    className="h-5 w-5 object-contain"
                     aria-hidden
                   />
                 </span>
@@ -446,9 +526,9 @@ export function DashboardHeroSection({ className }: { className?: string }) {
             >
               {activeTab === "video" ? (
                 selectedVideoModel ? (
-                  <div className="mx-auto flex w-full justify-center">
+                  <GlowContainer>
                     <VideoInputBox
-                      className="mx-auto"
+                      className="mx-auto !border-transparent !bg-transparent !shadow-none"
                       videoModels={videoModels}
                       promptValue={videoPrompt}
                       onPromptChange={setVideoPrompt}
@@ -479,7 +559,7 @@ export function DashboardHeroSection({ className }: { className?: string }) {
                       attachedRefs={videoAttachedRefs}
                       onAttachedRefsChange={setVideoAttachedRefs}
                     />
-                  </div>
+                  </GlowContainer>
                 ) : (
                   <HeroLoadingCard label="Loading video tools..." />
                 )
@@ -487,9 +567,9 @@ export function DashboardHeroSection({ className }: { className?: string }) {
 
               {activeTab === "image" ? (
                 selectedImageModel || !imageModelsLoading ? (
-                  <div className="mx-auto flex w-full justify-center">
+                  <GlowContainer>
                     <InfluencerInputBox
-                      className="mx-auto"
+                      className="mx-auto !border-transparent !bg-transparent !shadow-none"
                       promptValue={imagePrompt}
                       onPromptChange={setImagePrompt}
                       onAttachedRefsChange={setImageAttachedRefs}
@@ -513,16 +593,16 @@ export function DashboardHeroSection({ className }: { className?: string }) {
                       showNumImagesSelector
                       allowedAssetTypes={["image"]}
                     />
-                  </div>
+                  </GlowContainer>
                 ) : (
                   <HeroLoadingCard label="Loading image tools..." />
                 )
               ) : null}
 
               {activeTab === "agent" ? (
-                <div className="mx-auto flex w-full justify-center">
+                <GlowContainer>
                   <DashboardAgentPromptBox
-                    className="mx-auto max-w-4xl"
+                    className="mx-auto max-w-4xl !shadow-none !bg-transparent"
                     promptValue={agentPrompt}
                     onPromptChange={setAgentPrompt}
                     attachedRefs={agentAttachedRefs}
@@ -543,7 +623,7 @@ export function DashboardHeroSection({ className }: { className?: string }) {
                     }}
                     isSubmitting={isAgentHandoffPending}
                   />
-                </div>
+                </GlowContainer>
               ) : null}
             </motion.div>
           </AnimatePresence>

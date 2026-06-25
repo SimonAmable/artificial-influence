@@ -17,6 +17,13 @@ import { toast } from "sonner"
 import { AudioModelOptionLabel } from "@/components/audio/audio-model-option-label"
 import { AudioVoiceSelector } from "@/components/audio/voice-selector"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -289,8 +296,6 @@ function DockPromptPanel({
   statusMessage,
   modelId,
   onModelChange,
-  referenceVideo,
-  onReferenceVideoChange,
   embedInDock = false,
 }: {
   mode: AudioMode
@@ -329,42 +334,6 @@ function DockPromptPanel({
           className="min-h-16 w-full resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           rows={3}
         />
-
-        {provider === "google" ? (
-          <div className="space-y-2">
-            {showGeminiAdvancedControls ? (
-              <div className="grid gap-3 lg:grid-cols-[160px_minmax(0,1fr)]">
-                <div className="space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Language
-                  </p>
-                  <Input
-                    value={languageCode}
-                    onChange={(event) => onLanguageCodeChange(event.target.value)}
-                    placeholder={DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE}
-                    className="h-9 border-border/60 bg-background/50 text-xs text-foreground placeholder:text-muted-foreground"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Style Prompt
-                  </p>
-                  <textarea
-                    value={stylePrompt}
-                    onChange={(event) => onStylePromptChange(event.target.value)}
-                    placeholder={DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT}
-                    className="min-h-20 w-full resize-none rounded-[14px] border border-border/60 bg-background/50 px-3 py-2 text-xs text-foreground outline-none placeholder:text-muted-foreground"
-                    rows={3}
-                  />
-                </div>
-              </div>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">
-                Using default Gemini settings. Enhance can auto-fill language and style.
-              </p>
-            )}
-          </div>
-        ) : null}
 
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
           <Select value={modelId} onValueChange={onModelChange}>
@@ -417,15 +386,69 @@ function DockPromptPanel({
           </Button>
 
           {provider === "google" ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowGeminiAdvancedControls((value) => !value)}
-              className="h-8 rounded-[14px] px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground hover:bg-accent/30 hover:text-foreground"
-            >
-              {showGeminiAdvancedControls ? "Hide advanced" : "Advanced controls"}
-            </Button>
+            <>
+              <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowGeminiAdvancedControls(true)}
+                  className="h-8 rounded-[14px] px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground hover:bg-accent/30 hover:text-foreground"
+                >
+                  Voice Design
+                </Button>
+
+              <Dialog open={showGeminiAdvancedControls} onOpenChange={setShowGeminiAdvancedControls}>
+                <DialogContent className="max-w-md rounded-[28px] border border-border/60 bg-card p-6 shadow-[0_28px_90px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+                  <DialogHeader>
+                    <DialogTitle className="font-display text-lg font-bold uppercase tracking-tight">
+                      Voice Design
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-muted-foreground">
+                      Configure language settings and style prompts for voice generation.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4 text-left">
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                        Language
+                      </p>
+                      <Select value={languageCode} onValueChange={onLanguageCodeChange}> 
+                        <SelectTrigger className="h-9 border-border/60 bg-background/50 text-xs text-foreground placeholder:text-muted-foreground">
+                          <SelectValue placeholder="Select language" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="en-US">English (US)</SelectItem>
+                          <SelectItem value="en-GB">English (UK)</SelectItem>
+                          <SelectItem value="es-ES">Spanish (ES)</SelectItem>
+                          <SelectItem value="fr-FR">French (FR)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                        Style Prompt
+                      </p>
+                      <textarea
+                        value={stylePrompt}
+                        onChange={(event) => onStylePromptChange(event.target.value)}
+                        placeholder={DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT}
+                        className="min-h-24 w-full resize-none rounded-[14px] border border-border/60 bg-background/50 px-3 py-2 text-xs text-foreground outline-none placeholder:text-muted-foreground"
+                        rows={4}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => setShowGeminiAdvancedControls(false)}
+                      className="h-8 rounded-[14px] bg-primary px-4 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                    >
+                      Done
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </>
           ) : null}
 
           <span className={cn("ml-auto", error ? "text-destructive" : "text-muted-foreground")}>
@@ -1011,7 +1034,7 @@ export function AudioStudioPage() {
         })}
       </div>
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-[1500px] flex-col px-4 pb-44 pt-14 sm:px-6 md:pb-40 lg:px-10">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-[1500px] flex-col px-4 pb-44 pt-[60px] sm:px-6 md:pb-40 lg:px-10">
         {!hasResults && !isHistoryLoading ? (
           <section className="relative z-10 mt-8 flex flex-1 flex-col items-center text-center">
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-muted-foreground">
@@ -1030,18 +1053,18 @@ export function AudioStudioPage() {
           </section>
         ) : (
           <section className="relative z-10 mt-8 flex-1">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  {mode === "voiceover" ? "Recent voiceovers" : "Recent voice changes"}
-                </p>
-                {mode === "change-voice" ? (
+            {mode === "change-voice" ? (
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Recent voice changes
+                  </p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Recent lip-sync generations created from the Change Voice flow.
                   </p>
-                ) : null}
+                </div>
               </div>
-            </div>
+            ) : null}
 
             {error ? (
               <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -1075,11 +1098,10 @@ export function AudioStudioPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 sm:px-6 md:px-8 md:pb-6">
         <div className="mx-auto max-w-[1180px]">
+  <ModeSelector mode={mode} onChange={setMode} />
           <div className="rounded-[28px] border border-border/60 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_96%,transparent),color-mix(in_oklch,var(--muted)_62%,transparent))] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.42),0_14px_44px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-xl">
             <div className="flex flex-col gap-3">
-              <div className="flex justify-start">
-                <ModeSelector mode={mode} onChange={setMode} />
-              </div>
+              
 
               {mode === "change-voice" ? (
                 <div className="hidden md:block">
@@ -1095,7 +1117,7 @@ export function AudioStudioPage() {
               ) : null}
 
               <div className="hidden md:grid md:min-h-[112px] md:grid-cols-[minmax(0,1fr)_min(240px,26vw)_160px] md:gap-3 md:items-stretch">
-                <div className="h-full min-h-0 min-w-0 overflow-y-auto rounded-[24px] border border-border/60 bg-background/30 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                <div className="h-full min-h-0 min-w-0 overflow-y-auto p-2.5">
                   {renderDockPromptPanel()}
                 </div>
                 <div className="flex h-full min-h-0 min-w-0 flex-col">
@@ -1163,7 +1185,7 @@ export function AudioStudioPage() {
                     disabled={isGenerating}
                   />
                 ) : null}
-                <div className="rounded-[24px] border border-border/60 bg-background/30 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                <div className="p-2.5">
                   {renderDockPromptPanel()}
                 </div>
                 <div className="flex items-stretch gap-2">

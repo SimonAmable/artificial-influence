@@ -392,7 +392,6 @@ export type SearchAssetsToolPart = {
   input?: {
     assetType?: "image" | "video" | "audio"
     category?: "character" | "scene" | "shorts" | "element"
-    includePublic?: boolean
     limit?: number
     query?: string
   }

@@ -353,8 +353,8 @@ export function VideoCompressorTool() {
             </p>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/video">
-              Open Video Studio
+            <Link href="/free-tools">
+              All tools
               <ArrowRight className="ml-2 size-4" />
             </Link>
           </Button>

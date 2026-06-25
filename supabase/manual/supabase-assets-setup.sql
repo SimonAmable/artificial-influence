@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS public.assets (
   description TEXT NULL,
   asset_type TEXT NOT NULL CHECK (asset_type IN ('image', 'video', 'audio')),
   category TEXT NOT NULL CHECK (category IN ('character', 'scene', 'texture', 'thumbnails', 'motion', 'audio', 'shorts', 'product')),
-  visibility TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private', 'public')),
+  visibility TEXT NOT NULL DEFAULT 'private' CHECK (visibility = 'private'),
   tags TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
   asset_url TEXT NOT NULL,
   supabase_storage_path TEXT NULL,
@@ -55,26 +55,31 @@ ALTER TABLE public.assets ENABLE ROW LEVEL SECURITY;
 
 -- 5) Policies (idempotent)
 DROP POLICY IF EXISTS "assets_select_own_or_public" ON public.assets;
-CREATE POLICY "assets_select_own_or_public"
+DROP POLICY IF EXISTS "assets_select_own" ON public.assets;
+CREATE POLICY "assets_select_own"
   ON public.assets
   FOR SELECT
-  USING (auth.uid() = user_id OR visibility = 'public');
+  TO authenticated
+  USING ((select auth.uid()) = user_id);
 
 DROP POLICY IF EXISTS "assets_insert_own" ON public.assets;
 CREATE POLICY "assets_insert_own"
   ON public.assets
   FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  TO authenticated
+  WITH CHECK ((select auth.uid()) = user_id AND visibility = 'private');
 
 DROP POLICY IF EXISTS "assets_update_own" ON public.assets;
 CREATE POLICY "assets_update_own"
   ON public.assets
   FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id AND visibility = 'private');
 
 DROP POLICY IF EXISTS "assets_delete_own" ON public.assets;
 CREATE POLICY "assets_delete_own"
   ON public.assets
   FOR DELETE
-  USING (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id);

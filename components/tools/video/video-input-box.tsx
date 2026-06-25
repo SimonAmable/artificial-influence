@@ -871,9 +871,9 @@ export function VideoInputBox({
   return (
     <Card
       className={cn(
-        "w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative overflow-visible",
+        "w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative overflow-visible bg-background/95 backdrop-blur-sm",
         className,
-        forceRowLayout && "backdrop-blur-xl bg-background/95 shadow-2xl border-2"
+        forceRowLayout && "shadow-2xl border-2"
       )}
       onDropCapture={handlePromptDrop}
       onDragOverCapture={handlePromptDragOver}

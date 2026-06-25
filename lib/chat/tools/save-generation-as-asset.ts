@@ -286,7 +286,7 @@ export function createSaveGenerationAsAssetTool({
 }: CreateSaveGenerationAsAssetToolOptions) {
   return tool({
     description:
-      "Save thread media or update an existing library asset. Create mode: pass **generationId**, **uploadId**, or **mediaId** (`upl_<uuid>` / `gen_<uuid>` from listThreadMedia, or raw generation UUID from listRecentGenerations). Uploads and generations are both supported. Update mode: pass **assetId** (from searchAssets) plus any metadata fields to change (title, description, category, tags, visibility). Only use after the user clearly confirms save or update. If metadata is omitted on create, infer category, title, and rich agent-context description.",
+      "Save thread media or update an existing private library asset. Create mode: pass **generationId**, **uploadId**, or **mediaId** (`upl_<uuid>` / `gen_<uuid>` from listThreadMedia, or raw generation UUID from listRecentGenerations). Uploads and generations are both supported. Update mode: pass **assetId** (from searchAssets) plus any metadata fields to change (title, description, category, tags). Only use after the user clearly confirms save or update. If metadata is omitted on create, infer category, title, and rich agent-context description.",
     inputSchema: z
       .object({
         assetId: z
@@ -332,10 +332,6 @@ export function createSaveGenerationAsAssetTool({
           .max(12)
           .optional()
           .describe("Optional tags. On create, merged with inferred tags when omitted."),
-        visibility: z
-          .enum(["private", "public"])
-          .optional()
-          .describe("Asset visibility. Defaults to private on create; unchanged on update if omitted."),
       })
       .superRefine((value, ctx) => {
         const isUpdate = typeof value.assetId === "string" && value.assetId.length > 0
@@ -353,12 +349,11 @@ export function createSaveGenerationAsAssetTool({
             value.category !== undefined ||
             value.title !== undefined ||
             value.description !== undefined ||
-            value.tags !== undefined ||
-            value.visibility !== undefined
+            value.tags !== undefined
           if (!hasMetadataChange) {
             ctx.addIssue({
               code: "custom",
-              message: "Provide at least one field to update (title, description, category, tags, or visibility).",
+              message: "Provide at least one field to update (title, description, category, or tags).",
               path: ["assetId"],
             })
           }
@@ -384,7 +379,6 @@ export function createSaveGenerationAsAssetTool({
       tags,
       title,
       uploadId,
-      visibility = "private",
     }) => {
       if (!confirmed) {
         throw new Error(
@@ -423,10 +417,6 @@ export function createSaveGenerationAsAssetTool({
         if (tags !== undefined) {
           updatePayload.tags = normalizeTags(tags)
         }
-        if (visibility !== undefined) {
-          updatePayload.visibility = visibility
-        }
-
         const { data: updatedAsset, error: updateError } = await supabase
           .from("assets")
           .update(updatePayload)
@@ -473,7 +463,7 @@ export function createSaveGenerationAsAssetTool({
           description,
           tags,
           title,
-          visibility,
+          visibility: "private",
         })
       }
 
@@ -485,7 +475,7 @@ export function createSaveGenerationAsAssetTool({
         description,
         tags,
         title,
-        visibility,
+        visibility: "private",
       })
     },
   })

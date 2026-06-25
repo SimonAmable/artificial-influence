@@ -400,7 +400,7 @@ export function CanvasSidebar({
                 />
               </div>
               <div className="flex gap-2 mb-3">
-                {(["all", "private", "public"] as const).map((visibility) => (
+                {(["all", "private"] as const).map((visibility) => (
                   <button
                     key={visibility}
                     onClick={() => {
@@ -413,7 +413,7 @@ export function CanvasSidebar({
                         : "border-white/10 text-zinc-400 hover:text-zinc-200"
                     )}
                   >
-                    {visibility === "all" ? "All" : visibility === "private" ? "Private" : "Public"}
+                    {visibility === "all" ? "All" : "Private"}
                   </button>
                 ))}
               </div>

@@ -54,13 +54,13 @@ function getBadgeClasses(badge: MegaNavBadge) {
       }
     case "popular":
       return {
-        pill: "bg-destructive text-destructive-foreground",
-        ring: "ring-1 ring-destructive/70 border-destructive/60",
+        pill: "bg-badge-popular text-badge-popular-foreground",
+        ring: "ring-1 ring-badge-popular/70 border-badge-popular/60",
       }
     case "beta":
       return {
-        pill: "bg-amber-500 text-white dark:bg-amber-400 dark:text-black",
-        ring: "ring-1 ring-amber-500/70 border-amber-500/60 dark:ring-amber-400/70 dark:border-amber-400/60",
+        pill: "bg-badge-beta text-badge-beta-foreground",
+        ring: "ring-1 ring-badge-beta/70 border-badge-beta/60",
       }
     default: {
       const _exhaustive: never = badge

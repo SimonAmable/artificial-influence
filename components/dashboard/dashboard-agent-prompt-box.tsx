@@ -57,6 +57,7 @@ export function DashboardAgentPromptBox({
 }) {
   const [assetModalOpen, setAssetModalOpen] = React.useState(false)
   const selectedModel = getChatGatewayModelOption(selectedModelId)
+  const isTransparent = className?.includes("!bg-transparent")
 
   const handleAssetSelect = React.useCallback((pick: AssetSelectionPick) => {
     onAttachedRefsChange([
@@ -70,7 +71,7 @@ export function DashboardAgentPromptBox({
 
   return (
     <>
-      <div className={cn("w-full", className)}>
+      <div className={cn("w-full", isTransparent && "p-2", className)}>
         {attachedRefs.length > 0 ? (
           <div className="mb-3 flex flex-wrap gap-2">
             {attachedRefs.map((ref) => (
@@ -92,8 +93,15 @@ export function DashboardAgentPromptBox({
           </div>
         ) : null}
 
-        <div className="rounded-[26px] p-1 transition-[box-shadow,ring-color] sm:p-2">
-          <InputGroup className="composer-depth items-end rounded-[22px] border-black/10 bg-background/95 p-1 backdrop-blur-sm has-[textarea]:rounded-[22px] dark:border-border/60">
+        <div className="rounded-[26px] transition-[box-shadow,ring-color]">
+          <InputGroup
+            className={cn(
+              "items-end rounded-[22px] p-1 has-[textarea]:rounded-[22px]",
+              isTransparent
+                ? "bg-transparent border-transparent shadow-none backdrop-blur-none"
+                : "composer-depth border-black/10 bg-background/95 backdrop-blur-sm dark:border-border/60"
+            )}
+          >
             <CommandTextarea
               textareaId="dashboard-agent-hero-textarea"
               value={promptValue}
@@ -101,7 +109,10 @@ export function DashboardAgentPromptBox({
               refs={attachedRefs}
               onRefsChange={onAttachedRefsChange}
               rows={3}
-              className="min-h-[72px] max-h-[180px] flex-1 px-3 py-2"
+              className={cn(
+                "min-h-[60px] max-h-[120px] flex-1",
+                isTransparent ? "px-1 py-0" : "px-3 py-1.5"
+              )}
               placeholder="Describe what you want. / for shortcuts, @ for brands & assets."
               slashCommands={CHAT_AGENT_COMMANDS}
               slashCommandsContext="Agent"
@@ -112,7 +123,10 @@ export function DashboardAgentPromptBox({
                 }
               }}
             />
-            <InputGroupAddon align="block-end" className="justify-between gap-2">
+            <InputGroupAddon
+              align="block-end"
+              className={cn("justify-between gap-2", isTransparent && "!pb-0 !pt-1 px-1")}
+            >
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

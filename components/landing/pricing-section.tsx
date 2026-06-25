@@ -32,13 +32,17 @@ type PricingPlan = {
   name: string;
   description: string;
   price: number;
-  priceId: string;
+  priceId?: string;
   interval: 'month' | 'year';
   currency: 'USD' | 'CAD';
   credits: number;
   features: PlanFeature[];
   popular?: boolean;
   priceNote?: string;
+  ctaLabel?: string;
+  ctaHref?: string;
+  creditsLabel?: string;
+  creditSummary?: string;
 };
 
 type PricingTab = 'monthly' | 'yearly' | 'one-time' | 'enterprise';
@@ -119,7 +123,36 @@ const personalSupportFeature: PlanFeature = {
   infoContent: <PersonalSupportPopoverBody />,
 };
 
+const freePlan: PricingPlan = {
+  id: 'free-monthly',
+  name: 'Free',
+  description: 'Limited access for testing the main image flow',
+  price: 0,
+  interval: 'month',
+  currency: 'USD',
+  credits: 10,
+  ctaLabel: 'Start free',
+  ctaHref: '/login?mode=signup',
+  creditsLabel: '10 credits',
+  creditSummary: 'Enough for 2 Nano Banana images',
+  features: [
+    {
+      name: 'Limited access to image tools',
+      info: 'Try the core image workflow with a small starter balance.',
+    },
+    {
+      name: '10 testing credits',
+      info: 'Enough for about 2 image tests so you can verify the flow.',
+    },
+    {
+      name: 'Upgrade when ready',
+      info: 'Move into a paid plan when you need more generations and broader access.',
+    },
+  ],
+};
+
 const monthlyPlans: PricingPlan[] = [
+  freePlan,
   {
     id: 'starter-monthly',
     name: 'Starter',
@@ -240,6 +273,10 @@ const monthlyPlans: PricingPlan[] = [
 ];
 
 const yearlyPlans: PricingPlan[] = [
+  {
+    ...freePlan,
+    id: 'free-yearly',
+  },
   {
     id: 'starter-yearly',
     name: 'Starter',
@@ -366,20 +403,6 @@ function formatPlanCurrency(amount: number, currency: 'USD' | 'CAD') {
   const prefix = currency === 'CAD' ? 'CA$' : '$';
   const body = amount % 1 === 0 ? amount.toFixed(0) : amount.toFixed(2);
   return `${prefix}${body}`;
-}
-
-function getYearlySavingsLabel(plan: PricingPlan, listMonthly?: number) {
-  if (plan.interval !== 'year' || listMonthly == null) {
-    return null;
-  }
-
-  const yearlyAtMonthlyRate = listMonthly * 12;
-  if (yearlyAtMonthlyRate <= 0 || plan.price >= yearlyAtMonthlyRate) {
-    return null;
-  }
-
-  const savingsPercent = Math.round((1 - plan.price / yearlyAtMonthlyRate) * 100);
-  return savingsPercent > 0 ? `Save ${savingsPercent}%` : null;
 }
 
 const enterpriseFeatures: PlanFeature[] = [
@@ -557,6 +580,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
   const router = useRouter();
   const supabase = createClient();
   const carouselRef = useRef<HTMLDivElement>(null);
+  const freeCardRef = useRef<HTMLDivElement>(null);
   const starterCardRef = useRef<HTMLDivElement>(null);
   const plusCardRef = useRef<HTMLDivElement>(null);
   const maxCardRef = useRef<HTMLDivElement>(null);
@@ -731,6 +755,15 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                       variant="outline"
                       size="sm"
                       className="rounded-full"
+                      onClick={() => scrollCardIntoView(freeCardRef.current)}
+                    >
+                      Free
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
                       onClick={() => scrollCardIntoView(starterCardRef.current)}
                     >
                       Starter
@@ -766,7 +799,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                   'snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
                   'sm:mx-auto sm:grid sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:overscroll-auto sm:pb-0 sm:px-0 sm:pt-0',
                   // 'lg:grid-cols-3', // hidden while Max plan is disabled — restore alongside Max plan
-                  'sm:max-w-3xl',
+                  'sm:max-w-5xl lg:grid-cols-3',
                   'sm:snap-none lg:gap-8',
                 ].join(' ')}
                 variants={cardList}
@@ -776,11 +809,18 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                   const annualMonthly = plan.price / 12;
                   const hasYearlyDiscount =
                     plan.interval === 'year' && listMonthly != null && annualMonthly < listMonthly;
-                  const savingsLabel = getYearlySavingsLabel(plan, listMonthly);
                   return (
                     <motion.div
                       key={plan.id}
-                      ref={plan.name === 'Starter' ? starterCardRef : plan.name === 'Plus' ? plusCardRef : maxCardRef}
+                      ref={
+                        plan.name === 'Free'
+                          ? freeCardRef
+                          : plan.name === 'Starter'
+                            ? starterCardRef
+                            : plan.name === 'Plus'
+                              ? plusCardRef
+                              : maxCardRef
+                      }
                       variants={cardFade}
                       transition={motionTransition}
                       className={`relative flex h-full min-h-0 max-sm:snap-center max-sm:shrink-0 max-sm:w-[85vw] max-sm:max-w-md flex-col bg-card rounded-lg border-2 p-8 shadow-lg transition-shadow hover:shadow-xl sm:w-auto sm:max-w-none ${
@@ -799,7 +839,11 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                         <h2 className="text-2xl font-bold mb-2">{plan.name}</h2>
                         <p className="text-muted-foreground mb-4">{plan.description}</p>
                         <div className="flex flex-col items-center gap-1">
-                          {hasYearlyDiscount ? (
+                          {plan.price === 0 ? (
+                            <div className="flex items-baseline justify-center gap-1">
+                              <span className="text-4xl font-bold tracking-tight">Free</span>
+                            </div>
+                          ) : hasYearlyDiscount ? (
                             <div
                               className="flex flex-col items-center gap-2 w-full"
                               aria-label={`${formatPlanCurrency(annualMonthly, plan.currency)} per month, billed annually (${formatPlanCurrency(plan.price, plan.currency)} per year), compared to ${formatPlanCurrency(listMonthly, plan.currency)} per month on the monthly plan`}
@@ -808,9 +852,9 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                                 <span className="text-3xl sm:text-4xl font-bold text-primary line-through decoration-2 decoration-primary">
                                   {formatPlanCurrency(listMonthly, plan.currency)}
                                 </span>
-                                <span className="text-5xl font-bold tracking-tight text-foreground">
-                                  {formatPlanCurrency(annualMonthly, plan.currency)}
-                                </span>
+                                 <span className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
+                                   {formatPlanCurrency(annualMonthly, plan.currency)}
+                                 </span>
                                 <span className="text-muted-foreground text-base font-medium">
                                   /month, billed annually
                                 </span>
@@ -821,79 +865,83 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                               className="flex items-baseline justify-center gap-1 flex-wrap"
                               aria-label={`${formatPlanCurrency(annualMonthly, plan.currency)} per month, billed annually (${formatPlanCurrency(plan.price, plan.currency)} per year)`}
                             >
-                              <span className="text-5xl font-bold tracking-tight">
-                                {formatPlanCurrency(annualMonthly, plan.currency)}
-                              </span>
+                               <span className="text-4xl sm:text-5xl font-bold tracking-tight">
+                                 {formatPlanCurrency(annualMonthly, plan.currency)}
+                               </span>
                               <span className="text-muted-foreground">/month, billed annually</span>
                             </div>
                           ) : plan.interval === 'year' ? (
                             <div className="flex items-baseline justify-center gap-1">
-                              <span className="text-5xl font-bold">
-                                {formatPlanCurrency(plan.price, plan.currency)}
-                              </span>
+                               <span className="text-4xl sm:text-5xl font-bold">
+                                 {formatPlanCurrency(plan.price, plan.currency)}
+                               </span>
                               <span className="text-muted-foreground">/year</span>
                             </div>
                           ) : (
                             <div className="flex items-baseline justify-center gap-1">
-                              <span className="text-5xl font-bold">
-                                {formatPlanCurrency(plan.price, plan.currency)}
-                              </span>
+                               <span className="text-4xl sm:text-5xl font-bold">
+                                 {formatPlanCurrency(plan.price, plan.currency)}
+                               </span>
                               <span className="text-muted-foreground">/{plan.interval}</span>
                             </div>
                           )}
                           {plan.priceNote ? (
                             <span className="text-xs text-muted-foreground">{plan.priceNote}</span>
                           ) : null}
-                          {savingsLabel ? (
-                            <span className="inline-flex items-center rounded-full border border-green-600/25 bg-green-600/10 px-3 py-1 text-xs font-semibold text-green-700 dark:border-green-400/30 dark:bg-green-400/10 dark:text-green-400">
-                              {savingsLabel}
-                            </span>
-                          ) : null}
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleSubscribe(plan.priceId, plan.id)}
-                        disabled={loading === plan.id}
-                        className="w-full py-3 px-6 rounded-lg font-semibold transition-colors mb-6 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {loading === plan.id ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <svg
-                              className="animate-spin h-5 w-5"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              ></circle>
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
-                            </svg>
-                            Processing...
-                          </span>
-                        ) : (
-                          'Subscribe'
-                        )}
-                      </button>
+                      {plan.price === 0 ? (
+                        <Link
+                          href={plan.ctaHref ?? '/login?mode=signup'}
+                          className="mb-6 inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 text-center font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                        >
+                          {plan.ctaLabel ?? 'Start free'}
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={() => handleSubscribe(plan.priceId!, plan.id)}
+                          disabled={loading === plan.id}
+                          className="w-full py-3 px-6 rounded-lg font-semibold transition-colors mb-6 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loading === plan.id ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <svg
+                                className="animate-spin h-5 w-5"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                ></circle>
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                ></path>
+                              </svg>
+                              Processing...
+                            </span>
+                          ) : (
+                            'Subscribe'
+                          )}
+                        </button>
+                      )}
 
                       <div className="flex flex-col items-center gap-2 mb-6">
-                        <div className="flex items-center justify-center gap-2">
-                          <Sparkle className="w-5 h-5 text-primary" weight="fill" />
-                          <span className="text-lg font-semibold text-primary">
-                            {plan.credits} credits per month
-                          </span>
-                        </div>
-                        <Popover>
+                          <div className="flex items-center justify-center gap-2">
+                            <Sparkle className="w-5 h-5 text-primary" weight="fill" />
+                            <span className="text-lg font-semibold text-primary">
+                            {plan.creditsLabel ?? `${plan.credits} credits per month`}
+                            </span>
+                          </div>
+                          <Popover>
                           <PopoverTrigger asChild>
                             <button
                               type="button"
@@ -903,10 +951,8 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                               <div className="flex items-start justify-center gap-1">
                                 <span className="flex flex-col items-center gap-0.5 text-center leading-snug">
                                   <span>
-                                    {`~${Math.floor(plan.credits / 4)}-${Math.floor(plan.credits / 2)} Nano Banana images`}
-                                  </span>
-                                  <span>
-                                    {`~${Math.floor(plan.credits / 20)} Kling 3.0 motion control videos`}
+                                    {plan.creditSummary ??
+                                      `~${Math.floor(plan.credits / 4)}-${Math.floor(plan.credits / 2)} Nano Banana images`}
                                   </span>
                                 </span>
                                 <Info className="w-3 h-3 shrink-0 mt-0.5" />
@@ -919,10 +965,9 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                               <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
                                 <li>2 credits = 1 Google Nano Banana image</li>
                                 <li>4 credits = 1 Nano Banana 2 or Nano Banana Pro image</li>
-                                <li>20 credits = 1 Kling 3.0 motion control video</li>
                               </ul>
                               <p className="text-xs text-muted-foreground">
-                                Totals above use these examples; other models use different amounts.
+                                Totals above use these image examples; other models use different amounts.
                               </p>
                             </div>
                           </PopoverContent>

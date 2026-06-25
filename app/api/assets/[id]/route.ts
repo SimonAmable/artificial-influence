@@ -47,7 +47,7 @@ export async function PATCH(
     const url = String(body.url || "").trim()
     const assetType = body.assetType as AssetType
     const category = body.category as AssetCategory
-    const visibility = body.visibility as AssetVisibility
+    const visibility = (body.visibility ?? "private") as AssetVisibility
 
     if (!title) return NextResponse.json({ error: "Title is required" }, { status: 400 })
     if (!url) return NextResponse.json({ error: "URL is required" }, { status: 400 })
@@ -59,6 +59,9 @@ export async function PATCH(
     }
     if (!["private", "public"].includes(visibility)) {
       return NextResponse.json({ error: "Invalid visibility" }, { status: 400 })
+    }
+    if (visibility === "public") {
+      return NextResponse.json({ error: "Public assets are disabled" }, { status: 400 })
     }
 
     const siteOrigin = request.nextUrl.origin
@@ -102,7 +105,7 @@ export async function PATCH(
       title,
       asset_type: assetType,
       category,
-      visibility,
+      visibility: "private",
       tags,
       asset_url: assetUrl,
       thumbnail_url: thumbnailUrl,

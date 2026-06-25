@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { Coin } from "@phosphor-icons/react"
 
 import { EditableDisplayName } from "@/components/profile/editable-display-name"
 import { ProfileLogoutButton } from "@/components/profile/profile-logout-button"
@@ -8,6 +9,7 @@ import { RestartOnboardingButton } from "@/components/profile/restart-onboarding
 import { LayoutModeToggleGroup } from "@/components/settings/layout-mode-toggle-group"
 import { ThemeToggleGroup } from "@/components/settings/theme-toggle-group"
 import { LayoutMode } from "@/components/shared/layout/layout-toggle"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
 export type ProfileSettingsPanelProps = {
@@ -16,6 +18,7 @@ export type ProfileSettingsPanelProps = {
   memberSince: string
   hasCompletedOnboarding: boolean
   userId: string
+  credits?: number
   variant?: "page" | "modal"
   onDisplayNameChange?: (name: string) => void
   onLogout?: () => void
@@ -29,6 +32,7 @@ export function ProfileSettingsPanel({
   memberSince,
   hasCompletedOnboarding,
   userId,
+  credits,
   variant = "page",
   onDisplayNameChange,
   onLogout,
@@ -49,6 +53,12 @@ export function ProfileSettingsPanel({
           onNameUpdated={onDisplayNameChange}
         />
         <p className="text-sm text-muted-foreground">{email}</p>
+        {credits !== undefined ? (
+          <Badge variant="secondary" className="gap-1 text-xs">
+            <Coin className="h-3 w-3" weight="fill" />
+            {credits} credits
+          </Badge>
+        ) : null}
         {!isModal ? (
           <p className="text-xs text-muted-foreground">Member since {memberSince}</p>
         ) : null}

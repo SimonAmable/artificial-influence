@@ -722,7 +722,6 @@ export function AssetSelectionModal({
                     <TabsList>
                       <TabsTrigger value="all">All</TabsTrigger>
                       <TabsTrigger value="private">Private</TabsTrigger>
-                      <TabsTrigger value="public">Public</TabsTrigger>
                     </TabsList>
                   </Tabs>
                 ) : null}

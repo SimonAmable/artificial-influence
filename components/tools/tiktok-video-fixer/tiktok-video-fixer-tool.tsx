@@ -317,8 +317,8 @@ export function TikTokVideoFixerTool() {
             </p>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/autopost">
-              Open Autopost
+            <Link href="/free-tools">
+              All tools
               <ArrowRight className="ml-2 size-4" />
             </Link>
           </Button>

@@ -1539,7 +1539,7 @@ export function OnboardingForm({
         return
       }
       setOnboardingCompletedLocal(userId)
-      router.push("/chat?onboarding=1")
+      router.push("/dashboard?onboarding=1")
       router.refresh()
     } finally {
       setPending(false)

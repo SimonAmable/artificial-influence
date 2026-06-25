@@ -65,13 +65,12 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from("assets")
       .select("*")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1)
 
-    if (visibility === "private") {
-      query = query.eq("user_id", user.id)
-    } else if (visibility === "public") {
-      query = query.eq("visibility", "public")
+    if (visibility === "private" || visibility === "public") {
+      query = query.eq("visibility", visibility)
     }
 
     if (category) {
@@ -98,11 +97,10 @@ export async function GET(request: NextRequest) {
       let countQuery = supabase
         .from("assets")
         .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
 
-      if (visibility === "private") {
-        countQuery = countQuery.eq("user_id", user.id)
-      } else if (visibility === "public") {
-        countQuery = countQuery.eq("visibility", "public")
+      if (visibility === "private" || visibility === "public") {
+        countQuery = countQuery.eq("visibility", visibility)
       }
 
       if (category) {
@@ -153,7 +151,7 @@ export async function POST(request: NextRequest) {
     const url = String(body.url || "").trim()
     const assetType = body.assetType as AssetType
     const category = body.category as AssetCategory
-    const visibility = body.visibility as AssetVisibility
+    const visibility = (body.visibility ?? "private") as AssetVisibility
 
     if (!title) return NextResponse.json({ error: "Title is required" }, { status: 400 })
     if (!url) return NextResponse.json({ error: "URL is required" }, { status: 400 })
@@ -165,6 +163,9 @@ export async function POST(request: NextRequest) {
     }
     if (!["private", "public"].includes(visibility)) {
       return NextResponse.json({ error: "Invalid visibility" }, { status: 400 })
+    }
+    if (visibility === "public") {
+      return NextResponse.json({ error: "Public assets are disabled" }, { status: 400 })
     }
 
     const tags = normalizeTags(Array.isArray(body.tags) ? (body.tags as string[]) : [])
@@ -210,7 +211,7 @@ export async function POST(request: NextRequest) {
       description: typeof body.description === "string" ? body.description.trim() || null : null,
       asset_type: assetType,
       category,
-      visibility,
+      visibility: "private",
       tags,
       asset_url: assetUrl,
       thumbnail_url: thumbnailUrl,

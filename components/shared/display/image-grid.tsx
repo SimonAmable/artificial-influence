@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
-import { ArrowsOutSimple, Copy, DownloadSimple, Check, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple, ShieldCheck } from "@phosphor-icons/react"
+import { ArrowsOutSimple, Copy, DownloadSimple, Check, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple, ShieldCheck, Eraser } from "@phosphor-icons/react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,8 +62,10 @@ interface ImageGridProps {
   onCreateAsset?: (imageUrl: string, index: number) => void
   onUpscale?: (imageUrl: string, index: number) => void
   onRemoveMetadata?: (imageUrl: string, index: number) => void
+  onRemoveBackground?: (imageUrl: string, index: number) => void
   upscalingImageUrl?: string | null
   removingMetadataImageUrl?: string | null
+  removingBackgroundImageUrl?: string | null
   onDelete?: (id: string, imageUrl: string, index: number) => void | Promise<void>
   basicActionsOnly?: boolean
   /** `direct` = /image-style navigation; `agent` = composer injection via onAgentAction */
@@ -79,7 +81,7 @@ interface ImageGridProps {
 function normalizeModelName(name: string): string {
   // Remove everything before and including the first slash
   const nameAfterSlash = name.includes('/') ? name.split('/').slice(1).join('/') : name
-  
+
   return nameAfterSlash
     .replace(/\-/g, ' ')       // Replace dashes with spaces
     .toLowerCase()             // Convert to lowercase
@@ -108,8 +110,10 @@ export function ImageGrid({
   onCreateAsset,
   onUpscale,
   onRemoveMetadata,
+  onRemoveBackground,
   upscalingImageUrl = null,
   removingMetadataImageUrl = null,
+  removingBackgroundImageUrl = null,
   onDelete,
   basicActionsOnly = false,
   actionStrategy = "direct",
@@ -121,6 +125,22 @@ export function ImageGrid({
   const isAgentMode = actionStrategy === "agent"
   const showExtendedActions = !basicActionsOnly || isAgentMode
   const [columnCount, setColumnCount] = React.useState(initialColumnCount)
+
+  React.useEffect(() => {
+    const saved = window.localStorage.getItem("unican-image-column-count")
+    if (saved) {
+      const parsed = parseInt(saved, 10)
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 6) {
+        setColumnCount(parsed)
+      }
+    }
+  }, [])
+
+  const handleColumnCountChange = React.useCallback((value: number) => {
+    setColumnCount(value)
+    window.localStorage.setItem("unican-image-column-count", String(value))
+  }, [])
+
   const [fullscreenImage, setFullscreenImage] = React.useState<ImageData | null>(null)
   const [copiedImageUrl, setCopiedImageUrl] = React.useState<string | null>(null)
   const [copiedPromptKey, setCopiedPromptKey] = React.useState<string | null>(null)
@@ -213,7 +233,7 @@ export function ImageGrid({
     if (!pendingDeleteImage) return
     const { id, url, index } = pendingDeleteImage
     setDeletingImageId(id)
-    
+
     try {
       await onDelete?.(id, url, index)
       setPendingDeleteImage(null)
@@ -271,6 +291,13 @@ export function ImageGrid({
     [isAgentMode, onAgentAction, router],
   )
 
+  const runRemoveBackgroundAction = React.useCallback(
+    (data: ImageData, index: number) => {
+      onRemoveBackground?.(data.url, index)
+    },
+    [onRemoveBackground],
+  )
+
   React.useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -309,7 +336,7 @@ export function ImageGrid({
             </label>
             <Slider
               value={[columnCount]}
-              onValueChange={(value) => setColumnCount(value[0])}
+              onValueChange={(value) => handleColumnCountChange(value[0])}
               min={1}
               max={6}
               step={1}
@@ -321,7 +348,7 @@ export function ImageGrid({
 
       {/* Image Grid - Masonry style with fixed row heights */}
       <div className="flex-1 min-h-0 overflow-auto p-0 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        <div 
+        <div
           className={cn(
             "grid w-full auto-rows-auto content-start items-start justify-items-stretch p-2",
             gridColsClass,
@@ -471,7 +498,7 @@ export function ImageGrid({
                     <Copy className="size-3.5" />
                   )}
                 </Button>
-                
+
                 {/* Dropdown menu with all options including Create Asset */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -488,8 +515,8 @@ export function ImageGrid({
                       <DotsThree className="size-4" weight="bold" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent 
-                    align="end" 
+                <DropdownMenuContent
+                  align="end"
                     className="w-48"
                     onClick={(event) => event.stopPropagation()}
                   >
@@ -602,7 +629,7 @@ export function ImageGrid({
                     </button>
                   )}
                 </div>
-                
+
                 {showExtendedActions ? (
                 <>
                 {/* Wide layout buttons. Narrow layouts collapse these into a single menu. */}
@@ -708,6 +735,28 @@ export function ImageGrid({
                           Upscale
                         </>
                       )}
+                      </Button>
+                  )}
+                  {onRemoveBackground && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={removingBackgroundImageUrl === item.data.url}
+                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        runRemoveBackgroundAction(item.data, index)
+                      }}
+                    >
+                      {removingBackgroundImageUrl === item.data.url ? (
+                        "Removing..."
+                      ) : (
+                        <>
+                          <Eraser className="mr-1 size-3" />
+                          Remove BG
+                        </>
+                      )}
                     </Button>
                   )}
                   {onRemoveMetadata && (
@@ -727,7 +776,7 @@ export function ImageGrid({
                     </Button>
                   )}
                 </div>
-                
+
                 {/* Narrow layout: a single overflow menu prevents controls from covering the media. */}
                 <div className="flex shrink-0 flex-col items-end gap-1 lg:hidden">
                   <DropdownMenu>
@@ -745,8 +794,8 @@ export function ImageGrid({
                         <DotsThree className="size-4" weight="bold" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent 
-                      align="end" 
+                    <DropdownMenuContent
+                      align="end"
                       className="w-48"
                       onClick={(event) => event.stopPropagation()}
                     >
@@ -878,6 +927,22 @@ export function ImageGrid({
                           </DropdownMenuItem>
                         </>
                       )}
+                      {onRemoveBackground && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              runRemoveBackgroundAction(item.data, index)
+                            }}
+                            className="cursor-pointer"
+                            disabled={removingBackgroundImageUrl === item.data.url}
+                          >
+                            <Eraser className="mr-2 size-4" />
+                            {removingBackgroundImageUrl === item.data.url ? "Removing..." : "Remove Background"}
+                          </DropdownMenuItem>
+                        </>
+                      )}
                       {onRemoveMetadata && (
                         <>
                           <DropdownMenuSeparator />
@@ -970,6 +1035,16 @@ export function ImageGrid({
                 icon: <ShieldCheck className="size-4" />,
                 disabled: removingMetadataImageUrl === url,
                 onClick: () => onRemoveMetadata(url, imageIndexByUrl),
+              })
+            }
+
+            if (onRemoveBackground && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "remove-background",
+                label: removingBackgroundImageUrl === url ? "Removing..." : "Remove Background",
+                icon: <Eraser className="size-4" />,
+                disabled: removingBackgroundImageUrl === url,
+                onClick: () => onRemoveBackground(url, imageIndexByUrl),
               })
             }
 

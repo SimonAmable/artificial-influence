@@ -22,7 +22,7 @@ export default async function OnboardingPage() {
     .maybeSingle()
 
   if (profile?.onboarding_completed_at) {
-    redirect("/chat")
+    redirect("/dashboard")
   }
 
   const fromSnapshot = parseStoredOnboardingPrefill(profile?.onboarding_json_data)

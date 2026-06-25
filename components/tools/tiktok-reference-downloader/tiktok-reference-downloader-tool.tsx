@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import {
+  ArrowRight,
   ArrowsOut,
   CircleNotch,
   DownloadSimple,
@@ -445,18 +446,26 @@ export function TikTokReferenceDownloaderTool() {
   return (
     <div className="min-h-screen bg-background px-4 pb-12 pt-24 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-10">
-        <div className="space-y-3">
-          <Badge variant="secondary" className="w-fit gap-1.5">
-            <FilmStrip className="size-3.5" weight="duotone" />
-            TikTok {"&"} Instagram
-          </Badge>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
-            TikTok {"&"} Instagram downloader
-          </h1>
-          <p className="text-sm text-muted-foreground sm:text-base">
-            Paste a public TikTok or Instagram post or reel link. Media is saved to your library—you get a stable link
-            for playback and download that won&apos;t expire like social platform links.
-          </p>
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-3xl space-y-3">
+            <Badge variant="secondary" className="w-fit gap-1.5">
+              <FilmStrip className="size-3.5" weight="duotone" />
+              TikTok {"&"} Instagram
+            </Badge>
+            <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
+              TikTok {"&"} Instagram downloader
+            </h1>
+            <p className="text-sm text-muted-foreground sm:text-base">
+              Paste a public TikTok or Instagram post or reel link. Media is saved to your library—you get a stable link
+              for playback and download that won&apos;t expire like social platform links.
+            </p>
+          </div>
+          <Button variant="outline" asChild>
+            <Link href="/free-tools">
+              All tools
+              <ArrowRight className="ml-2 size-4" />
+            </Link>
+          </Button>
         </div>
 
         <form className="space-y-6" onSubmit={handleSubmit}>
