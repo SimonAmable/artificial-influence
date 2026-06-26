@@ -382,9 +382,15 @@ function ImagePageContent() {
   React.useEffect(() => {
     const referenceImageUrl = searchParams.get("referenceImageUrl")
     if (!referenceImageUrl || referenceImageUrl === lastLoadedReferenceImageUrlRef.current) return
-    if (!/^https?:\/\//i.test(referenceImageUrl)) return
+    let resolvedReferenceImageUrl: string
+    try {
+      resolvedReferenceImageUrl = new URL(referenceImageUrl, window.location.origin).toString()
+    } catch {
+      return
+    }
+    if (!/^https?:\/\//i.test(resolvedReferenceImageUrl)) return
 
-    setReferenceImage({ url: referenceImageUrl })
+    setReferenceImage({ url: resolvedReferenceImageUrl })
     setReferenceImages([])
     lastLoadedReferenceImageUrlRef.current = referenceImageUrl
   }, [searchParams])

@@ -411,6 +411,7 @@ export default function AIInfluencerPage() {
     // Check if user has seen informational guide
     const guideSeen = localStorage.getItem("unican-influencer-guide-seen")
     if (!guideSeen) {
+      localStorage.setItem("unican-influencer-guide-seen", "true")
       setIsHelpOpen(true)
     }
   }, [fetchHistory])
@@ -495,8 +496,9 @@ export default function AIInfluencerPage() {
     (target: "image" | "video") => {
       if (!selectedCharacter?.url) return
 
+      const referenceImageUrl = new URL(selectedCharacter.url, window.location.origin).toString()
       const params = new URLSearchParams({
-        referenceImageUrl: selectedCharacter.url,
+        referenceImageUrl,
       })
 
       router.push(`/${target}?${params.toString()}`)

@@ -228,9 +228,15 @@ function VideoPageContent() {
   React.useEffect(() => {
     const referenceImageUrl = searchParams.get("referenceImageUrl")
     if (!referenceImageUrl || referenceImageUrl === lastLoadedReferenceImageUrlRef.current) return
-    if (!/^https?:\/\//i.test(referenceImageUrl)) return
+    let resolvedReferenceImageUrl: string
+    try {
+      resolvedReferenceImageUrl = new URL(referenceImageUrl, window.location.origin).toString()
+    } catch {
+      return
+    }
+    if (!/^https?:\/\//i.test(resolvedReferenceImageUrl)) return
 
-    setReferenceImages([{ url: referenceImageUrl }])
+    setReferenceImages([{ url: resolvedReferenceImageUrl }])
     lastLoadedReferenceImageUrlRef.current = referenceImageUrl
   }, [searchParams])
 

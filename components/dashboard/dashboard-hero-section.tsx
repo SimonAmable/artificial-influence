@@ -5,7 +5,6 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { DashboardAgentPromptBox } from "@/components/dashboard/dashboard-agent-prompt-box"
-import { NoiseTexture } from "@/components/ui/noise-texture"
 import { ShineBorder } from "@/components/ui/shine-border"
 import { InfluencerInputBox } from "@/components/tools/influencer"
 import type { AudioUploadValue } from "@/components/shared/upload/audio-upload"
@@ -44,8 +43,6 @@ import type {
 } from "@/lib/types/models"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-
-const APP_HEADER_HEIGHT_PX = 52
 
 type DashboardHeroMode = "video" | "image" | "agent"
 
@@ -386,62 +383,9 @@ export function DashboardHeroSection({ className }: { className?: string }) {
 
   return (
     <section
-      className={cn("relative flex w-full flex-col items-center justify-center overflow-hidden px-4 bg-background", className)}
+      className={cn("relative flex w-full flex-col items-center justify-center overflow-hidden bg-background px-4", className)}
       style={{ minHeight: "calc(100vh + 40px)" }}
     >
-
-      {/* SVG Filter Definition for Stochastic Dithering (Halftone Spray-Paint Grain) */}
-      <svg className="absolute w-0 h-0 pointer-events-none select-none" aria-hidden="true">
-        <defs>
-          <filter id="stochastic-dither" x="-20%" y="-20%" width="140%" height="140%">
-            {/* 1. Generate high-frequency Perlin noise in color channels */}
-            <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="1" result="raw-noise" />
-            
-            {/* 2. Copy Red channel of noise to Alpha channel */}
-            <feColorMatrix in="raw-noise" type="matrix" values="
-              0 0 0 0 0
-              0 0 0 0 0
-              0 0 0 0 0
-              1 0 0 0 0" result="noise" />
-            
-            {/* 3. Mix the alpha channel of the source graphic with the noise.
-                Because the blurred glow clouds have low opacity (max ~0.20),
-                we amplify the SourceGraphic alpha (k2="7") to cover the full dither range. */}
-            <feComposite in="SourceGraphic" in2="noise" operator="arithmetic" k2="7" k3="1" k4="-0.85" result="mixed" />
-            
-            {/* 4. Threshold to binary discrete values (0 or 1) */}
-            <feComponentTransfer in="mixed" result="threshold">
-              <feFuncA type="discrete" tableValues="0 1" />
-            </feComponentTransfer>
-            
-            {/* 5. Color using original SourceGraphic colors */}
-            <feComposite operator="in" in="SourceGraphic" in2="threshold" />
-          </filter>
-        </defs>
-      </svg>
-
-      {/* Floating Glow Clouds (Primary Accent Color - Cyan/Teal) */}
-      <div 
-        className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none"
-        style={{
-          maskImage: "linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.9) 25%, rgba(0,0,0,0) 75%)",
-          WebkitMaskImage: "linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.9) 25%, rgba(0,0,0,0) 75%)",
-          filter: "url(#stochastic-dither)"
-        }}
-      >
-        {/* Glow Wave 1 - Left horizontal morphing wave */}
-        <div className="absolute -bottom-20 left-[-15%] w-[900px] h-[280px] bg-primary/35 blur-[120px] animate-glow-float opacity-85" />
-        
-        {/* Glow Wave 2 - Central wide horizontal morphing wave */}
-        <div className="absolute -bottom-32 left-1/2 -translate-x-1/2 w-[1300px] h-[340px] bg-primary/40 blur-[140px] animate-glow-float-reverse opacity-95" />
-        
-        {/* Glow Wave 3 - Right horizontal morphing wave */}
-        <div className="absolute -bottom-16 right-[-15%] w-[900px] h-[260px] bg-primary/35 blur-[110px] animate-glow-float-alt opacity-85" />
-      </div>
-
-      {/* Bottom Gradient Fade Overlay */}
-      <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-background to-transparent pointer-events-none z-[5]" />
-
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center gap-5 py-8 sm:py-12">
         <div className="space-y-3 text-center">
           <h1 className="text-balance text-2xl font-sans font-extrabold normal-case tracking-tight text-foreground sm:text-4xl md:text-5xl">
