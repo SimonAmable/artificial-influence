@@ -65,10 +65,13 @@ const HERO_TAB_INDEX: Record<DashboardHeroMode, number> = {
   video: 2,
 }
 
-function GlowContainer({ children }: { children: React.ReactNode }) {
+function GlowContainer({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div 
-      className="relative mx-auto w-full max-w-4xl rounded-[28px] p-[2.5px] transition-all duration-500 ease-in-out z-10"
+    <div
+      className={cn(
+        "relative mx-auto w-full max-w-4xl rounded-[28px] p-[2.5px] transition-all duration-500 ease-in-out z-10",
+        className
+      )}
       style={{
         boxShadow: `
           0 0 24px 2px color-mix(in oklch, var(--primary) 65%, transparent),
@@ -480,7 +483,7 @@ export function DashboardHeroSection({ className }: { className?: string }) {
                 <span
                   className={cn(
                     "relative flex size-5 items-center justify-center transition-transform duration-300 ease-out",
-                    isActive ? "scale-[1.15]" : "scale-100"
+                    isActive ? "scale-[2]" : "scale-100"
                   )}
                 >
                   <Image
@@ -522,7 +525,7 @@ export function DashboardHeroSection({ className }: { className?: string }) {
                 duration: prefersReducedMotion ? 0.16 : 0.28,
                 ease: [0.22, 1, 0.36, 1],
               }}
-              className="w-full"
+              className="w-full flex justify-center"
             >
               {activeTab === "video" ? (
                 selectedVideoModel ? (
@@ -635,7 +638,7 @@ export function DashboardHeroSection({ className }: { className?: string }) {
 
 function HeroLoadingCard({ label }: { label: string }) {
   return (
-    <div className="mx-auto flex min-h-[18rem] w-full max-w-5xl items-center justify-center rounded-[32px] border border-border/60 bg-card/70 px-6 py-12 shadow-sm backdrop-blur">
+    <div className="mx-auto flex w-full max-w-5xl items-center justify-center rounded-[32px] border border-border/60 bg-card/70 px-6 py-12 shadow-sm backdrop-blur">
       <p className="text-sm text-muted-foreground">{label}</p>
     </div>
   )

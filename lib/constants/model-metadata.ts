@@ -252,7 +252,7 @@ export const QWEN_IMAGE_EDIT_PLUS_META: ModelMetadata = {
   identifier: 'qwen/qwen-image-edit-plus-lora',
   name: 'Qwen Image Edit Plus',
   description:
-    'Qwen image editing on Replicate with a preconfigured MCNL LoRA. Attach a reference image and describe the edit.',
+    'Qwen image editing on Replicate with a reference image. Attach one image and describe the edit.',
   type: 'image',
   provider: 'replicate',
   is_active: true,

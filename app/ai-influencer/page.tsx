@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import {
   Plus,
@@ -11,17 +12,16 @@ import {
   Sparkle,
   Info,
   X,
-  Check,
   GenderFemale,
   GenderMale,
   Globe,
   Eye,
   User,
-  ArrowCounterClockwise,
   Shuffle,
-  FileImage
+  FileImage,
+  DownloadSimple
 } from "@phosphor-icons/react"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -29,9 +29,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { GenerationLoadingSlots } from "@/components/shared/display/generation-loading-slots"
 import { cn } from "@/lib/utils"
 import { generateImageAndWait, isInsufficientCreditsError, isInsufficientCreditsMessage } from "@/lib/generate-image-client"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { downloadMediaFile, normalizeMediaModelName } from "@/components/shared/display/media-viewer-utils"
 import { toast } from "sonner"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 
@@ -40,6 +42,8 @@ interface ImageHistoryItem {
   url: string
   model: string | null
   prompt: string | null
+  displayName?: string | null
+  trackedPills?: string[]
   tool: string | null
   aspectRatio: string | null
   type: string | null
@@ -78,6 +82,137 @@ const HAIR_COLORS: { [key: string]: string } = {
   Pink: "#fb7185",
   Blue: "#3b82f6",
   Green: "#10b981"
+}
+
+function getCharacterDisplayName(item: ImageHistoryItem | null): string {
+  const explicitName = item?.displayName?.trim()
+  if (explicitName) return explicitName
+
+  const prompt = item?.prompt?.trim()
+  if (!prompt) return "Saved Character"
+
+  try {
+    const parsed = JSON.parse(prompt) as unknown
+    const jsonName = findCharacterDisplayNameInJson(parsed)
+    if (jsonName) {
+      return jsonName
+    }
+  } catch {
+    // Fallback to prompt heuristics below.
+  }
+
+  const namedMatch = prompt.match(/named\s+([^.,]+?)(?:\.|,|$)/i)
+  if (namedMatch?.[1]) {
+    return namedMatch[1].trim()
+  }
+
+  if (prompt.length <= 24) {
+    return prompt
+  }
+
+  return prompt.split(".")[0]?.trim() || "Saved Character"
+}
+
+function findCharacterDisplayNameInJson(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null
+  }
+
+  const record = value as Record<string, unknown>
+  const getStringField = (keys: string[]) => {
+    for (const key of keys) {
+      const entry = record[key]
+      if (typeof entry === "string" && entry.trim()) {
+        return entry.trim()
+      }
+    }
+    return null
+  }
+
+  const directName =
+    getStringField(["displayName", "displayname", "character_name", "title", "name"]) ??
+    getStringField(["subject", "main_subject"])
+  if (directName) {
+    return directName
+  }
+
+  const promptString = getStringField(["prompt"])
+  if (promptString) {
+    const namedMatch = promptString.match(/named\s+([^.,]+?)(?:\.|,|$)/i)
+    if (namedMatch?.[1]) {
+      return namedMatch[1].trim()
+    }
+  }
+
+  const imageDescription = record.image_description
+  if (imageDescription && typeof imageDescription === "object" && !Array.isArray(imageDescription)) {
+    const imageDescriptionRecord = imageDescription as Record<string, unknown>
+    const imageDescriptionString = (keys: string[]) => {
+      for (const key of keys) {
+        const entry = imageDescriptionRecord[key]
+        if (typeof entry === "string" && entry.trim()) {
+          return entry.trim()
+        }
+      }
+      return null
+    }
+
+    return imageDescriptionString(["displayName", "displayname", "character_name", "subject", "main_subject"])
+  }
+
+  return null
+}
+
+function getCharacterDownloadName(item: ImageHistoryItem | null): string {
+  const name = getCharacterDisplayName(item)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+
+  return name || "ai-influencer"
+}
+
+function buildCharacterAssetTags(
+  selectedTraits: Record<string, string>,
+  model: string | null,
+  isDirectSave: boolean
+): string[] {
+  const tags = new Set<string>(["character", "AI Influencer"])
+
+  Object.values(selectedTraits).forEach((value) => {
+    const tag = value.trim()
+    if (tag) tags.add(tag)
+  })
+
+  if (model && model !== "upload") {
+    tags.add(normalizeMediaModelName(model))
+  }
+
+  tags.add(isDirectSave ? "Saved Reference" : "AI Generated")
+
+  return Array.from(tags)
+}
+
+function buildCharacterGenerationPrompt(
+  name: string,
+  selectedTraits: Record<string, string>,
+  hasMultipleReferences: boolean
+): string {
+  const traitsPrompt = Object.entries(selectedTraits)
+    .map(([key, val]) => `${key}: ${val}`)
+    .join(", ")
+
+  let prompt = `A candid iPhone 17 selfie of an AI influencer named ${name}, captured with natural handheld framing, authentic front-camera realism, soft flash, and polished creator energy`
+
+  if (traitsPrompt) {
+    prompt += `. Features: ${traitsPrompt}`
+  }
+
+  if (hasMultipleReferences) {
+    prompt += `. Blend characteristics and facial structures from the reference images into one consistent identity while keeping the candid selfie feel`
+  }
+
+  return prompt
 }
 
 const CUSTOM_TRAIT_IMAGE = "/ai_influencer/custom_question_mark_icon.png"
@@ -190,6 +325,7 @@ function LiquidGlassCard({
 }
 
 export default function AIInfluencerPage() {
+  const router = useRouter()
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
   const [selectedCharacter, setSelectedCharacter] = React.useState<ImageHistoryItem | null>(null)
   
@@ -216,16 +352,41 @@ export default function AIInfluencerPage() {
   const fetchHistory = React.useCallback(async () => {
     setIsHistoryLoading(true)
     try {
-      const response = await fetch(`/api/generations?tool=ai_influencer&limit=30`)
-      if (!response.ok) throw new Error("Failed to fetch characters")
-      const data = await response.json()
-      
-      const parsed: ImageHistoryItem[] = (data.generations || [])
+      const [generationsResponse, assetsResponse] = await Promise.all([
+        fetch(`/api/generations?tool=ai_influencer&limit=30`),
+        fetch(`/api/assets?category=character&limit=100`),
+      ])
+      if (!generationsResponse.ok) throw new Error("Failed to fetch characters")
+      if (!assetsResponse.ok) throw new Error("Failed to fetch character assets")
+      const [generationData, assetData] = await Promise.all([
+        generationsResponse.json(),
+        assetsResponse.json(),
+      ])
+
+      const characterAssets = Array.isArray(assetData.assets) ? (assetData.assets as Array<{ title?: string; sourceGenerationId?: string | null; url?: string }>) : []
+      const assetTitleByGenerationId = new Map(
+        characterAssets
+          .filter((asset) => typeof asset.sourceGenerationId === "string" && asset.sourceGenerationId.trim().length > 0)
+          .map((asset) => [asset.sourceGenerationId as string, typeof asset.title === "string" ? asset.title : null] as const)
+          .filter(([, title]) => typeof title === "string" && title.trim().length > 0)
+      )
+      const assetTitleByUrl = new Map(
+        characterAssets
+          .filter((asset) => typeof asset.url === "string" && asset.url.trim().length > 0)
+          .map((asset) => [asset.url as string, typeof asset.title === "string" ? asset.title : null] as const)
+          .filter(([, title]) => typeof title === "string" && title.trim().length > 0)
+      )
+
+      const parsed: ImageHistoryItem[] = (generationData.generations || [])
         .map((gen: any) => ({
           id: gen.id,
           url: gen.url,
           model: gen.model,
           prompt: gen.prompt,
+          displayName:
+            assetTitleByGenerationId.get(gen.id) ||
+            assetTitleByUrl.get(gen.url) ||
+            null,
           tool: gen.tool,
           aspectRatio: gen.aspect_ratio,
           type: gen.type,
@@ -235,8 +396,10 @@ export default function AIInfluencerPage() {
         .filter((item: ImageHistoryItem) => typeof item.url === "string" && item.url.length > 0)
       
       setHistoryImages(parsed)
+      return parsed
     } catch (err) {
       console.error(err)
+      return []
     } finally {
       setIsHistoryLoading(false)
     }
@@ -262,6 +425,84 @@ export default function AIInfluencerPage() {
     setCustomInputs({})
     setEditingCustomTraitKey(null)
   }, [])
+
+  const handleDownloadSelectedCharacter = React.useCallback(async () => {
+    if (!selectedCharacter?.url) return
+
+    try {
+      await downloadMediaFile({
+        url: selectedCharacter.url,
+        kind: "image",
+        filenamePrefix: getCharacterDownloadName(selectedCharacter),
+      })
+      toast.success("Download started")
+    } catch (error) {
+      console.error(error)
+      toast.error("Could not download the character image")
+    }
+  }, [selectedCharacter])
+
+  const saveCharacterAsset = React.useCallback(
+    async ({
+      title,
+      url,
+      description,
+      tags,
+      model,
+      sourceGenerationId,
+      sourceMode,
+    }: {
+      title: string
+      url: string
+      description: string | null
+      tags: string[]
+      model: string | null
+      sourceGenerationId: string | null
+      sourceMode: "upload" | "generated"
+    }) => {
+      const response = await fetch("/api/assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          url,
+          assetType: "image",
+          category: "character",
+          visibility: "private",
+          tags,
+          description,
+          sourceNodeType: "ai_influencer",
+          sourceGenerationId,
+          metadata: {
+            source: "ai-influencer",
+            mode: sourceMode,
+            model,
+            description,
+            tags,
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string; message?: string }
+        throw new Error(payload.message || payload.error || "Failed to save character asset")
+      }
+    },
+    []
+  )
+
+  const openCharacterInStudio = React.useCallback(
+    (target: "image" | "video") => {
+      if (!selectedCharacter?.url) return
+
+      const params = new URLSearchParams({
+        referenceImageUrl: selectedCharacter.url,
+      })
+
+      router.push(`/${target}?${params.toString()}`)
+    },
+    [router, selectedCharacter?.url]
+  )
 
   // Detect mode based on uploaded reference files
   const getDetectedMode = () => {
@@ -372,29 +613,61 @@ export default function AIInfluencerPage() {
           throw new Error(errData.error || "Failed to save character in database")
         }
 
+        const payload = (await response.json()) as {
+          generation?: { id?: string; url?: string }
+        }
+        const savedGeneration = payload.generation ?? {}
+        const savedUrl = savedGeneration.url || uploadResult.url
+        const createdCharacter: ImageHistoryItem = {
+          id: typeof savedGeneration.id === "string" ? savedGeneration.id : `upload-${Date.now()}`,
+          url: savedUrl,
+          model: "upload",
+          displayName: name,
+          prompt: name,
+          tool: "ai_influencer",
+          aspectRatio: null,
+          type: "image",
+          createdAt: new Date().toISOString(),
+          reference_image_urls: [],
+        }
+        try {
+          await saveCharacterAsset({
+            title: name,
+            url: savedUrl,
+            description: `Uploaded character reference for ${name}`,
+            tags: buildCharacterAssetTags(selectedTraits, "upload", true),
+            model: "upload",
+            sourceGenerationId: typeof savedGeneration.id === "string" ? savedGeneration.id : null,
+            sourceMode: "upload",
+          })
+        } catch (assetError) {
+          console.error("[ai-influencer] saveCharacterAsset(upload)", assetError)
+        }
+
         toast.success("Character saved successfully!", { id: "influencer-toast" })
         handleReset()
-        void fetchHistory()
+        setSelectedCharacter(createdCharacter)
+        const refreshedHistory = await fetchHistory()
+        const matchingCharacter = refreshedHistory.find(
+          (item) => item.id === createdCharacter.id || item.url === createdCharacter.url
+        )
+        if (matchingCharacter) {
+          setSelectedCharacter({
+            ...matchingCharacter,
+            displayName: createdCharacter.displayName ?? matchingCharacter.displayName,
+            trackedPills: createdCharacter.trackedPills?.length
+              ? createdCharacter.trackedPills
+              : matchingCharacter.trackedPills,
+          })
+        }
       } else {
-        // Mode 2 & 3: Run model generation (Nano Banana 2)
+        // Mode 2 & 3: Run model generation with GPT Image 2
         toast.loading("Generating your AI Influencer (this may take a few seconds)...", { id: "influencer-toast" })
 
-        // Build premium prompt from selected traits
-        const traitsPrompt = Object.entries(selectedTraits)
-          .map(([key, val]) => `${key}: ${val}`)
-          .join(", ")
-
-        let prompt = `A highly detailed, professional studio portrait of an AI influencer named ${name}`
-        if (traitsPrompt) {
-          prompt += `. Features: ${traitsPrompt}`
-        }
-
-        if (uploadedFiles.length >= 2) {
-          prompt += `. Blend characteristics and facial structures from the reference images to merge into 1 consistent woman face.`
-        }
+        const prompt = buildCharacterGenerationPrompt(name, selectedTraits, uploadedFiles.length >= 2)
 
         const formData = new FormData()
-        formData.append("model", "google/nano-banana-2")
+        formData.append("model", "openai/gpt-image-2")
         formData.append("prompt", prompt)
         formData.append("enhancePrompt", "true")
         formData.append("tool", "ai_influencer")
@@ -405,10 +678,61 @@ export default function AIInfluencerPage() {
           formData.append("referenceImages", item.file)
         })
 
-        const result = await generateImageAndWait(formData)
+        let acceptedGenerationId: string | null = null
+        const result = await generateImageAndWait(
+          formData,
+          {
+            onAccepted: ({ generationId }) => {
+              acceptedGenerationId = generationId ?? null
+            },
+          }
+        )
+        const generatedUrl = "image" in result ? result.image.url : result.images[0]?.url
+        if (!generatedUrl) throw new Error("Failed to create character image")
+        const createdCharacter: ImageHistoryItem = {
+          id: acceptedGenerationId ?? `generated-${Date.now()}`,
+          url: generatedUrl,
+          model: "openai/gpt-image-2",
+          displayName: name,
+          trackedPills: Object.values(selectedTraits)
+            .map((value) => value.trim())
+            .filter(Boolean),
+          prompt,
+          tool: "ai_influencer",
+          aspectRatio: "1:1",
+          type: "image",
+          createdAt: new Date().toISOString(),
+          reference_image_urls: uploadedFiles.map((item) => item.url),
+        }
+        try {
+          await saveCharacterAsset({
+            title: name,
+            url: generatedUrl,
+            description: prompt,
+            tags: buildCharacterAssetTags(selectedTraits, "openai/gpt-image-2", false),
+            model: "openai/gpt-image-2",
+            sourceGenerationId: acceptedGenerationId,
+            sourceMode: "generated",
+          })
+        } catch (assetError) {
+          console.error("[ai-influencer] saveCharacterAsset(generated)", assetError)
+        }
         toast.success("AI Influencer created successfully!", { id: "influencer-toast" })
         handleReset()
-        void fetchHistory()
+        setSelectedCharacter(createdCharacter)
+        const refreshedHistory = await fetchHistory()
+        const matchingCharacter = refreshedHistory.find(
+          (item) => item.id === createdCharacter.id || item.url === createdCharacter.url
+        )
+        if (matchingCharacter) {
+          setSelectedCharacter({
+            ...matchingCharacter,
+            displayName: createdCharacter.displayName ?? matchingCharacter.displayName,
+            trackedPills: createdCharacter.trackedPills?.length
+              ? createdCharacter.trackedPills
+              : matchingCharacter.trackedPills,
+          })
+        }
       }
     } catch (err) {
       console.error(err)
@@ -470,8 +794,8 @@ export default function AIInfluencerPage() {
           Reset
         </Button>
       </div>
-      <ScrollArea className="flex-1 min-h-0 p-4">
-        <Accordion type="multiple" defaultValue={Object.keys(TRAITS)} className="space-y-2.5 pb-8">
+      <ScrollArea className="flex-1 min-h-0 px-4 pb-4">
+        <Accordion type="multiple" defaultValue={Object.keys(TRAITS)} className="space-y-2.5 pb-8 pr-1">
           
           {Object.entries(TRAITS).map(([key, category]) => {
             const CategoryIcon = category.icon
@@ -604,11 +928,11 @@ export default function AIInfluencerPage() {
   )
 
   return (
-    <div className="min-h-screen bg-black text-foreground flex flex-col pt-[52px]">
-      <div className="flex-1 w-full max-w-full flex flex-col lg:flex-row overflow-hidden h-[calc(100vh-52px)]">
+    <div className="h-[100dvh] min-h-0 overflow-hidden bg-black text-foreground flex flex-col pt-[52px]">
+      <div className="flex-1 min-h-0 w-full max-w-full flex flex-col lg:flex-row overflow-hidden min-w-0">
         
         {/* Left Column: Characters History (Narrow, Clean sidebar look) */}
-        <div className="w-full lg:w-[180px] shrink-0 border-b lg:border-b-0 lg:border-r border-border/40 bg-muted/5 flex flex-col h-1/4 lg:h-full">
+        <div className="w-full lg:w-[180px] shrink-0 min-w-0 border-b lg:border-b-0 lg:border-r border-border/40 bg-muted/5 flex flex-col h-1/4 lg:h-full min-h-0">
           <div className="p-4 flex items-center justify-between">
             <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-display">Characters</h2>
             <button
@@ -619,14 +943,14 @@ export default function AIInfluencerPage() {
               <Info className="size-3.5" />
             </button>
           </div>
-          <ScrollArea className="flex-1 px-3 pb-3">
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-1 gap-2.5">
+          <ScrollArea className="flex-1 min-h-0 px-3 pb-3">
+            <div className="flex gap-2.5 overflow-x-auto overflow-y-hidden pb-2 pr-1 touch-pan-x overscroll-x-contain [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-flow-row lg:grid-cols-1 lg:gap-2.5 lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0 lg:pr-0">
               
               {/* Reset/Create New Card */}
               <button
                 onClick={handleReset}
                 className={cn(
-                  "flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-border/40 bg-secondary/15 hover:bg-secondary/30 hover:border-primary/50 transition-all aspect-square w-full",
+                  "flex shrink-0 flex-col items-center justify-center p-3 rounded-xl border border-dashed border-border/40 bg-secondary/15 hover:bg-secondary/30 hover:border-primary/50 transition-all aspect-square w-[96px] sm:w-[108px] lg:w-full",
                   !selectedCharacter && "border-primary/45 bg-primary/5 shadow-[0_0_12px_rgba(168,85,247,0.06)]"
                 )}
               >
@@ -642,10 +966,10 @@ export default function AIInfluencerPage() {
                     key={item.id}
                     onClick={() => {
                       setSelectedCharacter(item)
-                      setCharacterName(item.prompt || "")
+                      setCharacterName(getCharacterDisplayName(item))
                     }}
                     className={cn(
-                      "group relative flex flex-col justify-end p-2 rounded-xl border border-border/30 bg-secondary/10 hover:bg-secondary/20 cursor-pointer transition-all aspect-square w-full overflow-hidden",
+                      "group relative flex shrink-0 flex-col justify-end p-2 rounded-xl border border-border/30 bg-secondary/10 hover:bg-secondary/20 cursor-pointer transition-all aspect-square w-[96px] sm:w-[108px] lg:w-full overflow-hidden",
                       isActive && "border-primary ring-1 ring-primary/30"
                     )}
                   >
@@ -665,8 +989,8 @@ export default function AIInfluencerPage() {
                       <Trash className="size-2.5 text-white" />
                     </button>
 
-                    <span className="relative z-10 text-[9px] font-bold text-white truncate max-w-full">
-                      {item.prompt || "Unnamed"}
+                    <span className="relative z-10 truncate max-w-full text-[10px] font-black uppercase tracking-[-0.03em] text-white drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
+                      {getCharacterDisplayName(item)}
                     </span>
                   </div>
                 )
@@ -676,31 +1000,80 @@ export default function AIInfluencerPage() {
         </div>
 
         {/* Middle Column: Preview & Action Canvas (Spacious, Centered card) */}
-        <div className="flex-1 flex flex-col justify-between items-center p-4 lg:px-8 lg:pt-0 lg:pb-8 bg-black relative overflow-y-auto h-2/4 lg:h-full">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-between items-center p-4 lg:px-8 lg:pt-0 lg:pb-8 bg-black relative overflow-hidden overflow-x-hidden h-2/4 lg:h-full">
           <div className="w-full max-w-lg flex-1 flex flex-col justify-start py-4 lg:py-0">
             
             {/* Main Preview Card with big round borders */}
-            <Card className="w-full aspect-[4/5] sm:aspect-square lg:aspect-[4/5] bg-secondary/5 border-border/40 overflow-hidden relative shadow-2xl flex flex-col justify-center items-center p-6 group rounded-2xl">
+            <Card className="w-full aspect-[4/5] sm:aspect-square lg:aspect-[4/5] bg-secondary/5 border-border/40 overflow-hidden relative shadow-2xl flex flex-col justify-center items-center p-0 group rounded-2xl">
               {selectedCharacter ? (
                 // Selected/Active Character Mode
                 <div className="absolute inset-0 w-full h-full">
                   <img
                     src={selectedCharacter.url}
                     alt={selectedCharacter.prompt || "AI Influencer"}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover object-center"
                   />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent p-6 pt-16 flex flex-col gap-2">
-                    <h3 className="text-base font-bold text-white font-display uppercase tracking-wide">{selectedCharacter.prompt || "Saved Character"}</h3>
-                    <div className="flex flex-wrap gap-1">
-                      <Badge className="bg-primary/20 text-primary border-primary/30 text-[9px]">
-                        {selectedCharacter.model === "upload" ? "Direct Save" : "AI Generated"}
-                      </Badge>
-                      {selectedCharacter.model && selectedCharacter.model !== "upload" && (
-                        <Badge variant="outline" className="text-white border-white/20 text-[9px]">
-                          {selectedCharacter.model}
-                        </Badge>
-                      )}
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08)_0%,rgba(0,0,0,0.12)_44%,rgba(0,0,0,0.88)_100%)]" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => void handleDownloadSelectedCharacter()}
+                    className="absolute right-4 top-4 z-20 size-11 rounded-full border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-md hover:bg-black/70"
+                    aria-label="Download character image"
+                  >
+                    <DownloadSimple className="size-4" />
+                  </Button>
+                  <div className="absolute inset-x-0 bottom-0 z-10 p-5 sm:p-6">
+                    <div className="flex min-w-0 flex-col gap-4">
+                      <div className="min-w-0">
+                        <h3 className="max-w-full truncate text-[30px] leading-[0.92] font-black uppercase tracking-[-0.05em] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)] sm:text-[38px]">
+                          {getCharacterDisplayName(selectedCharacter)}
+                        </h3>
+                        {selectedCharacter.trackedPills?.length ? (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {selectedCharacter.trackedPills.map((tag) => (
+                              <Badge
+                                key={tag}
+                                className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-semibold text-white backdrop-blur-md shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
+                              >
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Button
+                          type="button"
+                          onClick={() => openCharacterInStudio("image")}
+                          className="h-11 rounded-full border border-white/10 bg-white/10 text-[11px] font-bold uppercase tracking-wider text-white shadow-lg backdrop-blur-md hover:bg-white/15"
+                        >
+                          <FileImage className="mr-2 size-4" />
+                          Use in Image
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => openCharacterInStudio("video")}
+                          className="h-11 rounded-full border border-white/10 bg-white/10 text-[11px] font-bold uppercase tracking-wider text-white shadow-lg backdrop-blur-md hover:bg-white/15"
+                        >
+                          <Sparkle className="mr-2 size-4" />
+                          Use in Video
+                        </Button>
+                      </div>
                     </div>
+                  </div>
+                </div>
+              ) : isGenerating ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.09),transparent_45%),linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.78))] px-6">
+                  <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_0%,rgba(255,255,255,0.08)_50%,transparent_100%)] opacity-70 animate-pulse" />
+                  <div className="relative flex w-full max-w-[320px] justify-center">
+                    <GenerationLoadingSlots
+                      count={6}
+                      maxVisible={6}
+                      className="flex-wrap justify-center gap-2"
+                      tileClassName="h-12 w-12 rounded-2xl border-white/10 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
+                    />
                   </div>
                 </div>
               ) : (
@@ -724,8 +1097,10 @@ export default function AIInfluencerPage() {
                     {uploadedFiles.length === 0 ? (
                       <div className="text-center flex flex-col items-center max-w-sm">
                         <h4 className="text-sm font-bold text-foreground mb-1 font-display uppercase tracking-wider">Add reference photos</h4>
-                        <p className="text-xs text-muted-foreground leading-normal mt-1 max-w-[280px]">
-                          Upload up to 3 photos and we'll blend them into one new face, or just upload an existing character's photo and save it. No photos? Build the look with the traits on the right.
+                        <p className="text-xs text-muted-foreground leading-normal mt-1 max-w-[280px] space-y-1">
+                          <span className="block">Save characters instantly with 1 photo.</span>
+                          <span className="block">Blend 2-3 photos into one new face.</span>
+                          <span className="block">Or build a new character with the builder.</span>
                         </p>
                         <Button 
                           variant="secondary" 
@@ -813,73 +1188,51 @@ export default function AIInfluencerPage() {
             </Card>
 
             {/* Character Controls - Centered capsules */}
-            <div className="mt-6 flex flex-col gap-3 w-full items-center">
-              <div className="flex items-center gap-3 w-full max-w-md">
-                {!selectedCharacter ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleShuffle}
-                      disabled={isGenerating}
-                      className="size-11 shrink-0 rounded-full border-border/40 hover:bg-secondary/20 transition-colors shadow-sm bg-secondary/5"
-                      title="Randomize Traits"
-                    >
-                      <Shuffle className="size-4 text-foreground" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setIsBuilderSheetOpen(true)}
-                      className="size-11 shrink-0 rounded-full border-border/40 hover:bg-secondary/20 transition-colors shadow-sm bg-secondary/5 lg:hidden"
-                      title="Open Builder"
-                    >
-                      <User className="size-4 text-foreground" />
-                    </Button>
-                    <Button
-                      onClick={handleCreateTrigger}
-                      disabled={isGenerating}
-                      className="flex-1 h-11 font-bold text-xs uppercase tracking-wider bg-transparent border border-border/60 rounded-full text-foreground hover:bg-secondary/20 hover:border-foreground transition-all"
-                    >
-                      {isGenerating ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <ArrowsClockwise className="size-3.5 animate-spin" />
-                          Generating...
-                        </span>
-                      ) : (
-                        "Create character"
-                      )}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setIsBuilderSheetOpen(true)}
-                      className="size-11 shrink-0 rounded-full border-border/40 hover:bg-secondary/20 transition-colors shadow-sm bg-secondary/5 lg:hidden"
-                      title="Open Builder"
-                    >
-                      <User className="size-4 text-foreground" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleReset}
-                      className="w-full max-w-md h-11 font-bold text-xs uppercase tracking-wider border-border/40 hover:bg-secondary/20 rounded-full transition-all"
-                    >
-                      <ArrowCounterClockwise className="size-4 mr-2" />
-                      Reset Current Selection
-                    </Button>
-                  </>
-                )}
+            {!selectedCharacter && (
+              <div className="mt-6 flex flex-col gap-3 w-full items-center">
+                <div className="flex items-center gap-3 w-full max-w-md">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleShuffle}
+                    disabled={isGenerating}
+                    className="size-11 shrink-0 rounded-full border-border/40 hover:bg-secondary/20 transition-colors shadow-sm bg-secondary/5"
+                    title="Randomize Traits"
+                  >
+                    <Shuffle className="size-4 text-foreground" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsBuilderSheetOpen(true)}
+                    className="size-11 shrink-0 rounded-full border-border/40 hover:bg-secondary/20 transition-colors shadow-sm bg-secondary/5 lg:hidden"
+                    title="Open Builder"
+                  >
+                    <User className="size-4 text-foreground" />
+                  </Button>
+                  <Button
+                    onClick={handleCreateTrigger}
+                    disabled={isGenerating}
+                    className="flex-1 h-11 font-bold text-xs uppercase tracking-wider bg-transparent border border-border/60 rounded-full text-foreground hover:bg-secondary/20 hover:border-foreground transition-all"
+                  >
+                    {isGenerating ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <ArrowsClockwise className="size-3.5 animate-spin" />
+                        Generating...
+                      </span>
+                    ) : (
+                      "Create character"
+                    )}
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
 
           </div>
         </div>
 
         {/* Right Column: Visual Prompt Builder (Wider layout with custom grids) */}
-        <div className="hidden lg:flex w-full lg:w-[420px] shrink-0 border-t lg:border-t-0 lg:border-l border-border/40 bg-muted/5 flex-col h-1/4 lg:h-full">
+        <div className="hidden lg:flex w-full lg:w-[420px] shrink-0 border-t lg:border-t-0 lg:border-l border-border/40 bg-muted/5 flex-col h-1/4 lg:h-full min-h-0 overflow-hidden">
           <div className="p-4 border-b border-border/40 flex items-center justify-between">
             <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-display">Builder</h2>
             <Button 
@@ -891,7 +1244,7 @@ export default function AIInfluencerPage() {
               Reset
             </Button>
           </div>
-          <ScrollArea className="flex-1 p-4">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
             <Accordion type="multiple" defaultValue={Object.keys(TRAITS)} className="space-y-2.5 pb-8">
               
               {Object.entries(TRAITS).map(([key, category]) => {
@@ -1020,7 +1373,7 @@ export default function AIInfluencerPage() {
               })}
 
             </Accordion>
-          </ScrollArea>
+          </div>
         </div>
 
         </div>

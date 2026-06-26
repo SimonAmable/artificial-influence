@@ -1,4 +1,4 @@
--- Qwen Image Edit Plus (Replicate LoRA preset for MCNL editing)
+-- Qwen Image Edit Plus (Replicate image editing preset)
 -- Source: https://replicate.com/qwen/qwen-image-edit-plus-lora
 
 INSERT INTO public.models (
@@ -22,7 +22,7 @@ INSERT INTO public.models (
 ) VALUES (
   'qwen/qwen-image-edit-plus-lora',
   'Qwen Image Edit Plus',
-  'Qwen image editing on Replicate with a preconfigured MCNL LoRA. Attach a reference image and describe the edit; best for fast instruction-based photo edits.',
+  'Qwen image editing on Replicate with a reference image. Attach one image and describe the edit; best for fast instruction-based photo edits.',
   'image',
   'replicate',
   true,
@@ -81,7 +81,7 @@ INSERT INTO public.models (
         "name": "lora_scale",
         "type": "number",
         "label": "LoRA Scale",
-        "description": "Strength of the bundled MCNL LoRA preset",
+        "description": "Strength of the bundled style preset",
         "required": false,
         "default": 1,
         "min": 0,
@@ -121,19 +121,19 @@ ON CONFLICT (identifier) DO UPDATE SET
 
 UPDATE public.models
 SET agent_usage = $json${
-  "agentSummary": "Qwen Image Edit Plus on Replicate is an image-editing model with a preconfigured MCNL LoRA. It requires one reference image and a natural-language edit instruction.",
-  "bestFor": ["instruction-based photo edits", "fast edit iteration", "single-image restyling", "MCNL-tuned portrait and lifestyle edits"],
+  "agentSummary": "Qwen Image Edit Plus on Replicate is an image-editing model for one reference image and a natural-language edit instruction.",
+  "bestFor": ["instruction-based photo edits", "fast edit iteration", "single-image restyling", "portrait and lifestyle edits"],
   "avoidFor": ["text-to-image without a source image", "multi-reference compositing", "video", "transparent-background output"],
   "inputSemantics": {
     "prompt": "Describe the desired edit and what to preserve from the source image.",
     "image": "Required single reference image URL sent as a one-item array to Replicate.",
     "aspect_ratio": "Use match_input_image for edits unless the user requests a specific output ratio (1:1, 16:9, 9:16, 4:3, 3:4).",
     "go_fast": "Default true for speed; turn off only when the user prioritizes final quality over latency.",
-    "lora_scale": "Default 1 for the bundled MCNL LoRA; only change when the user explicitly asks to tune LoRA strength.",
-    "lora_weights": "Preconfigured MCNL LoRA URL; do not override unless the user supplies a different LoRA."
+    "lora_scale": "Default 1 for the bundled style preset; only change when the user explicitly asks to tune strength.",
+    "lora_weights": "Preconfigured style preset URL; do not override unless the user supplies a different preset."
   },
   "routingRules": [
-    "Choose when the user wants Qwen Image Edit Plus or MCNL-style Qwen edits with a single source image.",
+    "Choose when the user wants Qwen Image Edit Plus or a single-image Qwen edit.",
     "Require exactly one reference image; this model is edit-only.",
     "Prefer fal-ai/qwen-image-2 for text-to-image or multi-image editing without this LoRA preset."
   ],

@@ -283,8 +283,7 @@
 }
 
 /*
- * Global scrollbar styling: keep the track transparent and the scrollbar slim.
- * Applies to the document and nested scrollers without forcing a visible gutter.
+ * Global scrollbar styling: keep the scrollbar slim and transparent without hiding it.
  */
 html,
 body,

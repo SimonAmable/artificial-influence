@@ -126,7 +126,7 @@ const personalSupportFeature: PlanFeature = {
 const freePlan: PricingPlan = {
   id: 'free-monthly',
   name: 'Free',
-  description: 'Limited access for testing the main image flow',
+  description: 'Limited free access',
   price: 0,
   interval: 'month',
   currency: 'USD',
@@ -855,7 +855,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                                  <span className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
                                    {formatPlanCurrency(annualMonthly, plan.currency)}
                                  </span>
-                                <span className="text-muted-foreground text-base font-medium">
+                                <span className="text-muted-foreground text-sm font-medium">
                                   /month, billed annually
                                 </span>
                               </div>
@@ -868,7 +868,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                                <span className="text-4xl sm:text-5xl font-bold tracking-tight">
                                  {formatPlanCurrency(annualMonthly, plan.currency)}
                                </span>
-                              <span className="text-muted-foreground">/month, billed annually</span>
+                               <span className="text-muted-foreground text-sm">/month, billed annually</span>
                             </div>
                           ) : plan.interval === 'year' ? (
                             <div className="flex items-baseline justify-center gap-1">

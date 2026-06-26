@@ -278,7 +278,7 @@ export const megaNavGroups: MegaNavGroup[] = [
           {
             path: "/image?model=qwen/qwen-image-edit-plus-lora",
             label: "Qwen Image Edit Plus",
-            description: "MCNL LoRA image editing with a reference photo",
+            description: "Qwen image editing with a reference photo",
             badge: "new",
             iconSrc: "/ai_icons/qwen.svg",
           },

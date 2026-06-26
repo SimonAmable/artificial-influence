@@ -190,6 +190,7 @@ function VideoPageContent() {
   const pendingAutoGenerateModelRef = React.useRef<string | null>(null)
   const pendingIntentParametersRef = React.useRef<Record<string, unknown> | null>(null)
   const isGenerating = pendingRequests.length > 0
+  const lastLoadedReferenceImageUrlRef = React.useRef<string | null>(null)
 
   // Handle pre-loaded start frame from URL parameter (only load once)
   const hasLoadedFromUrl = React.useRef(false)
@@ -222,6 +223,15 @@ function VideoPageContent() {
       setInputVideo({ url: referenceVideoUrl })
       hasLoadedReferenceVideoFromUrl.current = true
     }
+  }, [searchParams])
+
+  React.useEffect(() => {
+    const referenceImageUrl = searchParams.get("referenceImageUrl")
+    if (!referenceImageUrl || referenceImageUrl === lastLoadedReferenceImageUrlRef.current) return
+    if (!/^https?:\/\//i.test(referenceImageUrl)) return
+
+    setReferenceImages([{ url: referenceImageUrl }])
+    lastLoadedReferenceImageUrlRef.current = referenceImageUrl
   }, [searchParams])
 
   // Initialize parameters when model changes; keep aspect ratio if the new model supports the same option.

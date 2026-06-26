@@ -312,6 +312,7 @@ function ImagePageContent() {
   const [shouldAutoGenerate, setShouldAutoGenerate] = React.useState(false)
   const autoGenerateHandoffConsumedRef = React.useRef(false)
   const pendingAutoGenerateModelRef = React.useRef<string | null>(null)
+  const lastLoadedReferenceImageUrlRef = React.useRef<string | null>(null)
 
   // Set default model when models load.
   React.useEffect(() => {
@@ -377,6 +378,16 @@ function ImagePageContent() {
     pendingAutoGenerateModelRef.current = intent.model
     setShouldAutoGenerate(true)
   }, [effectiveImageModels.length, router, searchParams])
+
+  React.useEffect(() => {
+    const referenceImageUrl = searchParams.get("referenceImageUrl")
+    if (!referenceImageUrl || referenceImageUrl === lastLoadedReferenceImageUrlRef.current) return
+    if (!/^https?:\/\//i.test(referenceImageUrl)) return
+
+    setReferenceImage({ url: referenceImageUrl })
+    setReferenceImages([])
+    lastLoadedReferenceImageUrlRef.current = referenceImageUrl
+  }, [searchParams])
 
   // When the model (or catalog) changes: keep aspect ratio if the new model supports it; else default.
   // First time we bind to a model, always apply that model's default (don't "retain" initial state).
