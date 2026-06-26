@@ -8,7 +8,7 @@ export const MIN_CREDIT_PACK_CREDITS =
   Math.ceil(MIN_CREDIT_PURCHASE_CENTS / CREDIT_PACK_CENTS_PER_CREDIT / CREDIT_PACK_STEP) *
   CREDIT_PACK_STEP;
 
-export const CREDIT_PACK_PRESETS = [100, 500, 1000, 3000] as const;
+export const CREDIT_PACK_PRESETS = [200, 500, 1000, 2000] as const;
 
 export type CreditPackValidationResult =
   | {

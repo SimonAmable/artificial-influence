@@ -7,10 +7,10 @@ import Link from 'next/link';
 import { getStoredAffiliateRef } from '@/hooks/use-affiliate-ref';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Sparkle, Info } from '@phosphor-icons/react';
+import { Info } from '@phosphor-icons/react';
 import { motion, useReducedMotion } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import { CreditPackCheckout } from '@/components/credits/credit-pack-checkout';
+import { CreditPackGrid } from '@/components/credits/credit-pack-grid';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -126,7 +126,7 @@ const personalSupportFeature: PlanFeature = {
 const freePlan: PricingPlan = {
   id: 'free-monthly',
   name: 'Free',
-  description: 'Limited free access',
+  description: 'Try for free. No commitment.',
   price: 0,
   interval: 'month',
   currency: 'USD',
@@ -504,12 +504,12 @@ function InfoPopover({
 
 function PlanFeatureList({ features, className }: { features: PlanFeature[]; className?: string }) {
   return (
-    <ul className={cn('space-y-3 mb-8', className)}>
+    <ul className={cn('mb-6 space-y-2.5', className)}>
       {features.map((feature, index) => (
         <li key={index} className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2 flex-1">
             <svg
-              className="w-5 h-5 text-primary mt-0.5 shrink-0"
+              className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/80"
               fill="none"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -519,7 +519,7 @@ function PlanFeatureList({ features, className }: { features: PlanFeature[]; cla
             >
               <path d="M5 13l4 4L19 7"></path>
             </svg>
-            <span className="text-sm">{feature.name}</span>
+            <span className="text-sm text-foreground/90">{feature.name}</span>
           </div>
           <InfoPopover label={`More information about ${feature.name}`}>
             {feature.infoContent ?? <p>{feature.info}</p>}
@@ -528,6 +528,19 @@ function PlanFeatureList({ features, className }: { features: PlanFeature[]; cla
       ))}
     </ul>
   );
+}
+
+function getSubscriptionCardBullets(plan: PricingPlan) {
+  switch (plan.name) {
+    case 'Free':
+      return ['All AI models', 'Personal use license', 'Community support'];
+    case 'Starter':
+      return ['All AI models', 'Commercial license', 'Unlimited Instagram & TikTok connections'];
+    case 'Plus':
+      return ['Everything in Starter', 'Priority support', 'Faster generations and more concurrency'];
+    default:
+      return ['Custom credit volume', 'Dedicated support', 'Tailored terms and onboarding'];
+  }
 }
 
 function scrollCardIntoView(el: HTMLElement | null) {
@@ -589,7 +602,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
   const pricingPlans = activePricingTab === 'yearly' ? yearlyPlans : monthlyPlans;
   const staticHeaderCopy = {
     title: 'Pick Your Plan',
-    description: 'Choose the perfect option depending on your needs',
+    description: 'Simple affordable pricing',
   };
   const headerCopy: Record<PricingTab, { footer: string }> = {
     monthly: {
@@ -665,12 +678,12 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
           ? compact
             ? 'w-full py-4 sm:py-6'
             : 'w-full py-16 sm:py-24'
-          : 'min-h-[90vh] pt-8 pb-4 sm:pt-12'
+          : 'min-h-[90vh] pt-4 pb-2 sm:pt-6'
       )}
     >
       <div className="max-w-7xl mx-auto">
         <motion.div
-          className={cn('text-center', compact ? 'mb-4 sm:mb-6' : 'mb-6 sm:mb-8')}
+          className={cn('text-center', compact ? 'mb-4 sm:mb-6' : 'mb-2 sm:mb-4')}
           initial={reduceMotion ? false : 'hidden'}
           animate="visible"
           variants={pageFade}
@@ -679,13 +692,13 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
           <div
             className={cn(
               'mx-auto flex max-w-5xl flex-col items-center justify-center',
-              compact ? 'mb-3 min-h-0' : 'mb-6 min-h-[116px]'
+              compact ? 'mb-3 min-h-0' : 'mb-2 min-h-0'
             )}
           >
-            <h1 className={cn('font-bold uppercase tracking-tight', compact ? 'mb-3 text-3xl sm:text-4xl' : 'mb-4 text-4xl')}>
+            <h1 className={cn('font-bold uppercase tracking-tight', compact ? 'mb-3 text-3xl sm:text-4xl' : 'mb-2 text-4xl')}>
               {staticHeaderCopy.title}
             </h1>
-            <p className={cn('max-w-5xl text-muted-foreground', compact ? 'text-base sm:text-lg' : 'text-xl')}>
+            <p className={cn('max-w-5xl text-muted-foreground', compact ? 'text-base sm:text-lg' : 'text-xs sm:text-sm')}>
               {staticHeaderCopy.description}
             </p>
           </div>
@@ -698,7 +711,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
             <TabsList
               variant="default"
               className={cn(
-                '!mx-auto grid !h-auto min-h-11 w-full max-w-xl grid-cols-4 gap-1 rounded-4xl p-1',
+                '!mx-auto grid !h-auto min-h-10 w-full max-w-xl grid-cols-4 gap-0.5 rounded-4xl p-0.5',
                 'border border-border/65 bg-muted/95',
                 'shadow-[inset_0_2px_6px_rgba(0,0,0,0.10),inset_0_1px_2px_rgba(0,0,0,0.06),inset_0_-1px_1px_rgba(255,255,255,0.35)]',
                 'dark:border-border/45 dark:bg-muted/55',
@@ -707,25 +720,25 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
             >
               <TabsTrigger
                 value="monthly"
-                className="flex min-h-9 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
+                className="flex min-h-8 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-1.5 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
               >
                 Monthly
               </TabsTrigger>
               <TabsTrigger
                 value="yearly"
-                className="flex min-h-9 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
+                className="flex min-h-8 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-1.5 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
               >
                 <span>Yearly</span>
               </TabsTrigger>
               <TabsTrigger
                 value="one-time"
-                className="flex min-h-9 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
+                className="flex min-h-8 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-1.5 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
               >
                 Credits
               </TabsTrigger>
               <TabsTrigger
                 value="enterprise"
-                className="flex min-h-9 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-2 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
+                className="flex min-h-8 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-1.5 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
               >
                 Enterprise
               </TabsTrigger>
@@ -795,7 +808,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                 ref={carouselRef}
                 className={[
                   'flex max-w-7xl mx-auto items-stretch',
-                  '-mx-4 flex-row gap-3 overflow-x-auto overscroll-x-contain pb-4 px-[calc((100vw-85vw)/2)] pt-5',
+                  '-mx-4 flex-row gap-3 overflow-x-auto overscroll-x-contain pb-4 px-[calc((100vw-85vw)/2)] pt-3',
                   'snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
                   'sm:mx-auto sm:grid sm:grid-cols-2 sm:gap-6 sm:overflow-visible sm:overscroll-auto sm:pb-0 sm:px-0 sm:pt-0',
                   // 'lg:grid-cols-3', // hidden while Max plan is disabled — restore alongside Max plan
@@ -823,65 +836,70 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                       }
                       variants={cardFade}
                       transition={motionTransition}
-                      className={`relative flex h-full min-h-0 max-sm:snap-center max-sm:shrink-0 max-sm:w-[85vw] max-sm:max-w-md flex-col bg-card rounded-lg border-2 p-8 shadow-lg transition-shadow hover:shadow-xl sm:w-auto sm:max-w-none ${
-                        plan.popular ? 'z-10 border-primary ring-2 ring-primary/20' : 'border-border'
-                      }`}
+                      className={cn(
+                        'relative flex h-full min-h-[460px] flex-col rounded-[22px] border border-border/70 bg-card/90 p-6 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset] transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-lg',
+                        'max-sm:snap-center max-sm:shrink-0 max-sm:w-[85vw] max-sm:max-w-md sm:w-auto sm:max-w-none',
+                        plan.popular ? 'bg-card/95' : ''
+                      )}
                     >
                       {plan.popular ? (
-                        <div className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-1/2">
-                          <span className="inline-flex rounded-full bg-primary px-4 py-1 text-sm font-semibold leading-none text-primary-foreground shadow-sm">
+                        <div className="pointer-events-none absolute right-4 top-4 z-20">
+                          <span className="inline-flex rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground backdrop-blur-sm">
                             Most Popular
                           </span>
                         </div>
                       ) : null}
 
-                      <div className="text-center mb-6">
-                        <h2 className="text-2xl font-bold mb-2">{plan.name}</h2>
-                        <p className="text-muted-foreground mb-4">{plan.description}</p>
-                        <div className="flex flex-col items-center gap-1">
+                      <div className="space-y-4">
+                        <div className="space-y-1 pr-20">
+                          <h2 className="text-2xl font-semibold tracking-tight">{plan.name}</h2>
+                          <p className="text-sm text-muted-foreground">{plan.description}</p>
+                        </div>
+
+                        <div className="space-y-1.5">
                           {plan.price === 0 ? (
-                            <div className="flex items-baseline justify-center gap-1">
-                              <span className="text-4xl font-bold tracking-tight">Free</span>
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-4xl font-semibold tracking-tight">Free</span>
                             </div>
                           ) : hasYearlyDiscount ? (
                             <div
-                              className="flex flex-col items-center gap-2 w-full"
+                              className="flex flex-col gap-2 w-full"
                               aria-label={`${formatPlanCurrency(annualMonthly, plan.currency)} per month, billed annually (${formatPlanCurrency(plan.price, plan.currency)} per year), compared to ${formatPlanCurrency(listMonthly, plan.currency)} per month on the monthly plan`}
                             >
-                              <div className="flex items-baseline justify-center gap-2 flex-wrap">
-                                <span className="text-3xl sm:text-4xl font-bold text-primary line-through decoration-2 decoration-primary">
+                              <div className="flex items-baseline gap-2 flex-wrap">
+                                <span className="text-3xl font-semibold text-primary line-through decoration-2 decoration-primary">
                                   {formatPlanCurrency(listMonthly, plan.currency)}
                                 </span>
-                                 <span className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
-                                   {formatPlanCurrency(annualMonthly, plan.currency)}
-                                 </span>
-                                <span className="text-muted-foreground text-sm font-medium">
+                                <span className="text-4xl font-semibold tracking-tight text-foreground">
+                                  {formatPlanCurrency(annualMonthly, plan.currency)}
+                                </span>
+                                <span className="text-xs font-medium text-muted-foreground">
                                   /month, billed annually
                                 </span>
                               </div>
                             </div>
                           ) : plan.interval === 'year' && listMonthly != null ? (
                             <div
-                              className="flex items-baseline justify-center gap-1 flex-wrap"
+                              className="flex items-baseline gap-1.5 flex-wrap"
                               aria-label={`${formatPlanCurrency(annualMonthly, plan.currency)} per month, billed annually (${formatPlanCurrency(plan.price, plan.currency)} per year)`}
                             >
-                               <span className="text-4xl sm:text-5xl font-bold tracking-tight">
-                                 {formatPlanCurrency(annualMonthly, plan.currency)}
-                               </span>
-                               <span className="text-muted-foreground text-sm">/month, billed annually</span>
+                              <span className="text-4xl font-semibold tracking-tight">
+                                {formatPlanCurrency(annualMonthly, plan.currency)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">/month, billed annually</span>
                             </div>
                           ) : plan.interval === 'year' ? (
-                            <div className="flex items-baseline justify-center gap-1">
-                               <span className="text-4xl sm:text-5xl font-bold">
-                                 {formatPlanCurrency(plan.price, plan.currency)}
-                               </span>
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-4xl font-semibold tracking-tight">
+                                {formatPlanCurrency(plan.price, plan.currency)}
+                              </span>
                               <span className="text-muted-foreground">/year</span>
                             </div>
                           ) : (
-                            <div className="flex items-baseline justify-center gap-1">
-                               <span className="text-4xl sm:text-5xl font-bold">
-                                 {formatPlanCurrency(plan.price, plan.currency)}
-                               </span>
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-4xl font-semibold tracking-tight">
+                                {formatPlanCurrency(plan.price, plan.currency)}
+                              </span>
                               <span className="text-muted-foreground">/{plan.interval}</span>
                             </div>
                           )}
@@ -891,91 +909,79 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                         </div>
                       </div>
 
-                      {plan.price === 0 ? (
-                        <Link
-                          href={plan.ctaHref ?? '/login?mode=signup'}
-                          className="mb-6 inline-flex w-full items-center justify-center rounded-lg bg-primary px-6 py-3 text-center font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                        >
-                          {plan.ctaLabel ?? 'Start free'}
-                        </Link>
-                      ) : (
-                        <button
-                          onClick={() => handleSubscribe(plan.priceId!, plan.id)}
-                          disabled={loading === plan.id}
-                          className="w-full py-3 px-6 rounded-lg font-semibold transition-colors mb-6 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {loading === plan.id ? (
-                            <span className="flex items-center justify-center gap-2">
-                              <svg
-                                className="animate-spin h-5 w-5"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                              >
-                                <circle
-                                  className="opacity-25"
-                                  cx="12"
-                                  cy="12"
-                                  r="10"
-                                  stroke="currentColor"
-                                  strokeWidth="4"
-                                ></circle>
-                                <path
-                                  className="opacity-75"
-                                  fill="currentColor"
-                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                ></path>
-                              </svg>
-                              Processing...
-                            </span>
-                          ) : (
-                            'Subscribe'
-                          )}
-                        </button>
-                      )}
+                      <div className="mt-5 space-y-3.5">
+                        <div className="space-y-1.5">
+                          <p className="text-sm font-medium text-foreground/90">
+                            {plan.creditsLabel ?? `${plan.credits} credits / month`}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {plan.creditSummary ??
+                              `~${Math.floor(plan.credits / 4)}-${Math.floor(plan.credits / 2)} Nano Banana images`}
+                          </p>
+                        </div>
 
-                      <div className="flex flex-col items-center gap-2 mb-6">
-                          <div className="flex items-center justify-center gap-2">
-                            <Sparkle className="w-5 h-5 text-primary" weight="fill" />
-                            <span className="text-lg font-semibold text-primary">
-                            {plan.creditsLabel ?? `${plan.credits} credits per month`}
-                            </span>
-                          </div>
-                          <Popover>
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              className="flex flex-col items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                              aria-label="Credit usage information"
-                            >
-                              <div className="flex items-start justify-center gap-1">
-                                <span className="flex flex-col items-center gap-0.5 text-center leading-snug">
-                                  <span>
-                                    {plan.creditSummary ??
-                                      `~${Math.floor(plan.credits / 4)}-${Math.floor(plan.credits / 2)} Nano Banana images`}
-                                  </span>
-                                </span>
-                                <Info className="w-3 h-3 shrink-0 mt-0.5" />
-                              </div>
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent className="max-w-sm" align="center" sideOffset={8}>
-                            <div className="space-y-2 text-sm">
-                              <p className="font-medium">Example credit costs</p>
-                              <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
-                                <li>2 credits = 1 Google Nano Banana image</li>
-                                <li>4 credits = 1 Nano Banana 2 or Nano Banana Pro image</li>
-                              </ul>
-                              <p className="text-xs text-muted-foreground">
-                                Totals above use these image examples; other models use different amounts.
-                              </p>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
+                        <ul className="space-y-2.5">
+                          {getSubscriptionCardBullets(plan).map((bullet) => (
+                            <li key={bullet} className="flex items-start gap-2 text-sm text-foreground/90">
+                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/70" />
+                              <span>{bullet}</span>
+                            </li>
+                          ))}
+                        </ul>
+
                       </div>
 
-                      <div className="mt-auto">
-                        <PlanFeatureList features={plan.features} className="mb-0" />
+                      <div className="mt-auto pt-5">
+                        {plan.price === 0 ? (
+                          <Link
+                            href={plan.ctaHref ?? '/login?mode=signup'}
+                            className={cn(
+                              'inline-flex w-full items-center justify-center rounded-2xl px-6 py-3 text-center font-semibold shadow-sm shadow-black/10 transition-all hover:shadow-md',
+                              'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                            )}
+                          >
+                            {plan.ctaLabel ?? 'Start free'}
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={() => handleSubscribe(plan.priceId!, plan.id)}
+                            disabled={loading === plan.id}
+                            className={cn(
+                              'w-full rounded-2xl px-6 py-3 font-semibold shadow-sm shadow-black/10 transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50',
+                              plan.popular
+                                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                            )}
+                          >
+                            {loading === plan.id ? (
+                              <span className="flex items-center justify-center gap-2">
+                                <svg
+                                  className="h-5 w-5 animate-spin"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <circle
+                                    className="opacity-25"
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                  ></circle>
+                                  <path
+                                    className="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                  ></path>
+                                </svg>
+                                Processing...
+                              </span>
+                            ) : (
+                              `Get ${plan.name}`
+                            )}
+                          </button>
+                        )}
                       </div>
                     </motion.div>
                   );
@@ -991,7 +997,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
               variants={pageFade}
               transition={motionTransition}
             >
-              <CreditPackCheckout redirectPath="/pricing" />
+              <CreditPackGrid redirectPath="/pricing" />
             </motion.div>
           ) : (
             <motion.div
