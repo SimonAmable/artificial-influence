@@ -266,7 +266,7 @@ function MediaTypeIcon({
   return <MusicNote className={className} />
 }
 
-function createHistoryUrl(type: GenerationType, limit: number, offset: number, search: string) {
+function createHistoryUrl(type: GenerationType, limit: number, offset: number, search: string, tool: string) {
   const params = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
@@ -278,6 +278,10 @@ function createHistoryUrl(type: GenerationType, limit: number, offset: number, s
 
   if (search.trim()) {
     params.set("search", search.trim())
+  }
+
+  if (tool && tool !== "all") {
+    params.set("tool", tool)
   }
 
   return `/api/generations?${params.toString()}`
@@ -300,14 +304,41 @@ function useDebouncedValue(value: string, delayMs: number) {
   return debounced
 }
 
+const HISTORY_TOOLS = [
+  { value: "all", label: "All Tools" },
+  { value: "image", label: "Image Studio" },
+  { value: "video", label: "Video Studio" },
+  { value: "lipsync", label: "Lip Sync" },
+  { value: "character_swap", label: "Character Swap" },
+  { value: "motion_copy", label: "Motion Copy" },
+  { value: "ai_influencer", label: "AI Influencer" },
+  { value: "remove-background", label: "Background Remover" },
+  { value: "upscale", label: "Upscale" },
+  { value: "chat-generation", label: "AI Chat Agent" },
+]
+
+const ASSET_SOURCES = [
+  { value: "all", label: "All Sources" },
+  { value: "upload", label: "Direct Upload" },
+  { value: "image-gen", label: "Image Studio" },
+  { value: "video-gen", label: "Video Studio" },
+  { value: "audio", label: "Audio Studio" },
+  { value: "ai_influencer", label: "AI Influencer" },
+  { value: "generation-history", label: "Saved History" },
+]
+
 function FilterOptionsContent({
   activeTab,
   historyType,
   setHistoryType,
+  historyTool,
+  setHistoryTool,
   assetVisibility,
   setAssetVisibility,
   assetCategory,
   setCategory,
+  assetSource,
+  setAssetSource,
   columnCount,
   onColumnCountChange,
   isMobile = false,
@@ -315,10 +346,14 @@ function FilterOptionsContent({
   activeTab: LibraryTab
   historyType: GenerationType
   setHistoryType: (type: GenerationType) => void
+  historyTool: string
+  setHistoryTool: (tool: string) => void
   assetVisibility: AssetVisibility | "all"
   setAssetVisibility: (visibility: AssetVisibility | "all") => void
   assetCategory: AssetCategory | "all"
   setCategory: (category: AssetCategory | "all") => void
+  assetSource: string
+  setAssetSource: (source: string) => void
   columnCount: number
   onColumnCountChange: (value: number) => void
   isMobile?: boolean
@@ -338,6 +373,22 @@ function FilterOptionsContent({
                 className="rounded-full capitalize text-xs px-3 py-1 h-8"
               >
                 {type}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Created with Tool</label>
+          <div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto pr-1">
+            {HISTORY_TOOLS.map((tool) => (
+              <Button
+                key={tool.value}
+                variant={historyTool === tool.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setHistoryTool(tool.value)}
+                className="rounded-full text-xs px-3 py-1 h-8"
+              >
+                {tool.label}
               </Button>
             ))}
           </div>
@@ -388,7 +439,7 @@ function FilterOptionsContent({
         </div>
         <div className="space-y-2">
           <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Category</label>
-          <div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto pr-1">
+          <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto pr-1">
             <Button
               variant={assetCategory === "all" ? "default" : "outline"}
               size="sm"
@@ -406,6 +457,22 @@ function FilterOptionsContent({
                 className="rounded-full text-xs px-3 py-1 h-8"
               >
                 {ASSET_CATEGORY_LABELS[cat]}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Source Tool</label>
+          <div className="flex flex-wrap gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+            {ASSET_SOURCES.map((src) => (
+              <Button
+                key={src.value}
+                variant={assetSource === src.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAssetSource(src.value)}
+                className="rounded-full text-xs px-3 py-1 h-8"
+              >
+                {src.label}
               </Button>
             ))}
           </div>
@@ -447,7 +514,8 @@ function LibraryPageContent() {
   const [search, setSearch] = React.useState("")
   const debouncedSearch = useDebouncedValue(search.trim(), 250)
   const [columnCount, setColumnCount] = React.useState(2)
-  const [isFilterOpen, setIsFilterOpen] = React.useState(false)
+  const [isPopoverOpen, setIsPopoverOpen] = React.useState(false)
+  const [isSheetOpen, setIsSheetOpen] = React.useState(false)
 
   React.useEffect(() => {
     const saved = window.localStorage.getItem("unican-assets-column-count")
@@ -465,8 +533,10 @@ function LibraryPageContent() {
   }, [])
 
   const [historyType, setHistoryType] = React.useState<GenerationType>("all")
+  const [historyTool, setHistoryTool] = React.useState<string>("all")
   const [assetVisibility, setAssetVisibility] = React.useState<AssetVisibility | "all">("all")
   const [assetCategory, setAssetCategory] = React.useState<AssetCategory | "all">("all")
+  const [assetSource, setAssetSource] = React.useState<string>("all")
   const [historyStates, setHistoryStates] = React.useState<Record<GenerationType, PaginatedState<Generation>>>({
     all: createEmptyPaginatedState<Generation>(HISTORY_PAGE_LIMIT),
     image: createEmptyPaginatedState<Generation>(HISTORY_PAGE_LIMIT),
@@ -603,6 +673,7 @@ function LibraryPageContent() {
       })
       if (assetVisibility !== "all") params.set("visibility", assetVisibility)
       if (assetCategory !== "all") params.set("category", assetCategory)
+      if (assetSource !== "all") params.set("sourceNodeType", assetSource)
       if (debouncedSearch) params.set("search", debouncedSearch)
 
       const response = await fetch(`/api/assets?${params.toString()}`)
@@ -639,7 +710,7 @@ function LibraryPageContent() {
         error: error instanceof Error ? error.message : "Failed to load assets",
       }))
     }
-  }, [assetCategory, assetVisibility, debouncedSearch])
+  }, [assetCategory, assetVisibility, assetSource, debouncedSearch])
 
   const fetchGenerations = React.useCallback(async (type: GenerationType, append: boolean) => {
     const currentState = historyStatesRef.current[type]
@@ -679,7 +750,7 @@ function LibraryPageContent() {
       }
 
       const offset = append && currentState.query === searchQuery ? currentState.nextOffset : 0
-      const response = await fetch(createHistoryUrl(type, HISTORY_PAGE_LIMIT, offset, searchQuery))
+      const response = await fetch(createHistoryUrl(type, HISTORY_PAGE_LIMIT, offset, searchQuery, historyTool))
       if (!response.ok) throw new Error("Failed to fetch generations")
 
       const data = (await response.json()) as HistoryResponse
@@ -721,7 +792,7 @@ function LibraryPageContent() {
         },
       }))
     }
-  }, [debouncedSearch])
+  }, [debouncedSearch, historyTool])
 
   const refreshBrands = React.useCallback(async () => {
     setBrandsLoading(true)
@@ -760,6 +831,15 @@ function LibraryPageContent() {
       void refreshAssets()
     }
   }, [activeTab, refreshAssets])
+
+  React.useEffect(() => {
+    setHistoryStates({
+      all: createEmptyPaginatedState<Generation>(HISTORY_PAGE_LIMIT),
+      image: createEmptyPaginatedState<Generation>(HISTORY_PAGE_LIMIT),
+      video: createEmptyPaginatedState<Generation>(HISTORY_PAGE_LIMIT),
+      audio: createEmptyPaginatedState<Generation>(HISTORY_PAGE_LIMIT),
+    })
+  }, [historyTool])
 
   React.useEffect(() => {
     const state = historyStates[historyType]
@@ -1191,7 +1271,7 @@ function LibraryPageContent() {
                 <>
                   {/* Desktop Popover Filters */}
                   <div className="hidden sm:block">
-                    <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                    <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="icon" className="h-9 w-9 rounded-full border-border/50 bg-muted/40 hover:bg-muted">
                           <SlidersHorizontal className="h-4 w-4" />
@@ -1202,10 +1282,14 @@ function LibraryPageContent() {
                           activeTab={activeTab}
                           historyType={historyType}
                           setHistoryType={setHistoryType}
+                          historyTool={historyTool}
+                          setHistoryTool={setHistoryTool}
                           assetVisibility={assetVisibility}
                           setAssetVisibility={setAssetVisibility}
                           assetCategory={assetCategory}
                           setCategory={setAssetCategory}
+                          assetSource={assetSource}
+                          setAssetSource={setAssetSource}
                           columnCount={columnCount}
                           onColumnCountChange={handleColumnCountChange}
                         />
@@ -1215,7 +1299,7 @@ function LibraryPageContent() {
 
                   {/* Mobile Sheet Filters */}
                   <div className="block sm:hidden">
-                    <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                    <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                       <SheetTrigger asChild>
                         <Button variant="outline" size="icon" className="h-9 w-9 rounded-full border-border/50 bg-muted/40 hover:bg-muted">
                           <SlidersHorizontal className="h-4 w-4" />
@@ -1229,10 +1313,14 @@ function LibraryPageContent() {
                           activeTab={activeTab}
                           historyType={historyType}
                           setHistoryType={setHistoryType}
+                          historyTool={historyTool}
+                          setHistoryTool={setHistoryTool}
                           assetVisibility={assetVisibility}
                           setAssetVisibility={setAssetVisibility}
                           assetCategory={assetCategory}
                           setCategory={setAssetCategory}
+                          assetSource={assetSource}
+                          setAssetSource={setAssetSource}
                           columnCount={columnCount}
                           onColumnCountChange={handleColumnCountChange}
                           isMobile={true}

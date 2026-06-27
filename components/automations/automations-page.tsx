@@ -17,6 +17,7 @@ import {
   Save,
   Star,
   Trash2,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -96,9 +97,11 @@ import {
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
-import { Collapsible as CollapsiblePrimitive } from "radix-ui"
+import { Collapsible as CollapsiblePrimitive, Dialog as DialogPrimitive } from "radix-ui"
 import { AutomationRunPreviewModal } from "@/components/automations/automation-run-preview-modal"
 import { Shimmer } from "@/components/ai-elements/shimmer"
+import { MessageParts } from "@/components/chat/message-parts"
+import type { UIMessage } from "ai"
 
 type AutomationApi = {
   id: string
@@ -348,6 +351,561 @@ function attachedRefFromAssetPick(pick: AssetSelectionPick): AttachedRef {
   }
 }
 
+function AutomationCardMedia({
+  threadId,
+  automationId = null,
+  isCommunity = false,
+}: {
+  threadId: string | null
+  automationId?: string | null
+  isCommunity?: boolean
+}) {
+  const [media, setMedia] = React.useState<{ type: "image" | "video" | "audio" | null; url: string | null }>({ type: null, url: null })
+  const [loading, setLoading] = React.useState(false)
+
+  React.useEffect(() => {
+    const url = isCommunity
+      ? automationId
+        ? `/api/automations/${automationId}/preview`
+        : null
+      : threadId
+        ? `/api/chat/threads/${threadId}`
+        : null
+
+    if (!url) {
+      setMedia({ type: null, url: null })
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error()
+        return res.json()
+      })
+      .then((data) => {
+        if (cancelled) return
+        const messages = data.messages ?? data.thread?.messages
+        if (Array.isArray(messages)) {
+          // Scan backwards to find the latest generated media
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const msg = messages[i];
+            if (msg.role !== "assistant" || !msg.parts) continue;
+            
+            for (const part of msg.parts) {
+              if (part.type === "tool-generateImage" || part.type === "tool-generateImageWithNanoBanana") {
+                const partObj = part as unknown as Record<string, unknown>;
+                const output = partObj.output as Record<string, unknown> | undefined;
+                if (output && output.status === "completed" && Array.isArray(output.images) && output.images.length > 0) {
+                  const firstImg = output.images[0];
+                  const url = typeof firstImg === "string" ? firstImg : (firstImg as Record<string, unknown>)?.url as string | undefined;
+                  if (url) {
+                    setMedia({ type: "image", url });
+                    return;
+                  }
+                }
+              } else if (part.type === "tool-generateVideo") {
+                const partObj = part as unknown as Record<string, unknown>;
+                const output = partObj.output as Record<string, unknown> | undefined;
+                if (output && output.status === "completed" && (output.video as Record<string, unknown>)?.url) {
+                  setMedia({ type: "video", url: (output.video as Record<string, unknown>).url as string });
+                  return;
+                }
+              } else if (part.type === "tool-generateAudio") {
+                const partObj = part as unknown as Record<string, unknown>;
+                const output = partObj.output as Record<string, unknown> | undefined;
+                if (output && output.status === "completed" && (output.audio as Record<string, unknown>)?.url) {
+                  setMedia({ type: "audio", url: (output.audio as Record<string, unknown>).url as string });
+                  return;
+                }
+              }
+            }
+          }
+        }
+        setMedia({ type: null, url: null })
+      })
+      .catch(() => {
+        if (!cancelled) setMedia({ type: null, url: null })
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [threadId, automationId, isCommunity])
+
+  if (loading) {
+    return <div className="h-full w-full animate-pulse bg-muted/40" />
+  }
+
+  if (media.url) {
+    if (media.type === "video") {
+      return (
+        <div className="relative h-full w-full">
+          <video src={media.url} muted playsInline className="h-full w-full object-cover" />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+            <Play className="h-8 w-8 text-white fill-white/80 opacity-80" />
+          </div>
+        </div>
+      )
+    }
+    return <img src={media.url} alt="" className="h-full w-full object-cover" />
+  }
+
+  // Fallback gradient placeholder
+  return (
+    <div className="h-full w-full bg-gradient-to-br from-primary/10 via-muted/30 to-background flex items-center justify-center">
+      <CalendarClock className="h-8 w-8 text-muted-foreground/30" />
+    </div>
+  )
+}
+
+function AutomationPreviewTab({
+  threadId: initialThreadId,
+  automationId,
+  isCommunity,
+  hasPreview,
+  activeRunId = null,
+  runTrigger = "scheduled",
+}: {
+  threadId: string | null
+  automationId: string
+  isCommunity: boolean
+  hasPreview: boolean
+  activeRunId?: string | null
+  runTrigger?: "manual" | "scheduled"
+}) {
+  const [runStatus, setRunStatus] = React.useState<"running" | "completed" | "failed" | null>(
+    activeRunId ? "running" : "completed"
+  )
+  const [threadId, setThreadId] = React.useState<string | null>(initialThreadId)
+  const [runError, setRunError] = React.useState<string | null>(null)
+  const [messages, setMessages] = React.useState<UIMessage[]>([])
+  const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const [pollExhausted, setPollExhausted] = React.useState(false)
+
+  // Reset state when inputs change
+  React.useEffect(() => {
+    setRunStatus(activeRunId ? "running" : "completed")
+    setThreadId(initialThreadId)
+    setRunError(null)
+    setMessages([])
+    setError(null)
+    setPollExhausted(false)
+  }, [activeRunId, initialThreadId, automationId, isCommunity])
+
+  React.useEffect(() => {
+    let cancelled = false
+    let pollCount = 0
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const ac = new AbortController()
+
+    const loadMessagesForThread = async (tid: string) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch(`/api/chat/threads/${tid}`, { signal: ac.signal })
+        const j = (await res.json().catch(() => ({}))) as { thread?: { messages?: UIMessage[] }; error?: string }
+        if (!res.ok) {
+          throw new Error(typeof j?.error === "string" ? j.error : "Failed to load thread")
+        }
+        if (cancelled) return
+        const msgs = Array.isArray(j.thread?.messages) ? j.thread.messages : []
+        setMessages(msgs)
+      } catch (e) {
+        if (cancelled || (e instanceof Error && e.name === "AbortError")) return
+        setError(e instanceof Error ? e.message : "Failed to load messages")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    const loadCommunityPreview = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch(`/api/automations/${automationId}/preview`, { signal: ac.signal })
+        const j = (await res.json().catch(() => ({}))) as { messages?: UIMessage[]; error?: string }
+        if (cancelled) return
+        if (!res.ok) {
+          setError(typeof j?.error === "string" ? j.error : "Failed to load preview")
+          return
+        }
+        const msgs = Array.isArray(j.messages) ? j.messages : []
+        setMessages(msgs)
+      } catch (e) {
+        if (cancelled || (e instanceof Error && e.name === "AbortError")) return
+        setError(e instanceof Error ? e.message : "Failed to load preview")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    const pollOnce = async (): Promise<boolean> => {
+      if (!activeRunId) return false
+      try {
+        const res = await fetch(`/api/automations/${automationId}/runs/${activeRunId}`, { signal: ac.signal })
+        const j = (await res.json().catch(() => ({}))) as { run?: AutomationRunApi; error?: string }
+        if (cancelled) return false
+        if (!res.ok) {
+          setError(typeof j?.error === "string" ? j.error : "Failed to load run status")
+          return false
+        }
+        const row = j.run
+        if (!row) {
+          setError("Run not found")
+          return false
+        }
+        setRunStatus(row.status)
+        setThreadId(row.thread_id)
+        setRunError(row.error)
+
+        if (row.status === "completed" && row.thread_id) {
+          await loadMessagesForThread(row.thread_id)
+          return false
+        }
+        if (row.status === "failed") {
+          return false
+        }
+        return row.status === "running"
+      } catch (e) {
+        if (cancelled) return false
+        return true
+      }
+    }
+
+    void (async () => {
+      if (isCommunity) {
+        await loadCommunityPreview()
+        return
+      }
+
+      if (activeRunId) {
+        const keepPolling = await pollOnce()
+        if (!keepPolling || cancelled) return
+
+        const schedule = () => {
+          if (cancelled) return
+          pollCount += 1
+          if (pollCount > 200) {
+            setPollExhausted(true)
+            return
+          }
+          timer = setTimeout(async () => {
+            const cont = await pollOnce()
+            if (cont && !cancelled) schedule()
+          }, 1500)
+        }
+        schedule()
+      } else if (initialThreadId) {
+        await loadMessagesForThread(initialThreadId)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+      ac.abort()
+    }
+  }, [activeRunId, initialThreadId, automationId, isCommunity])
+
+  if (isCommunity && !hasPreview) {
+    return (
+      <div className="flex h-full min-h-[300px] flex-col items-center justify-center p-6 text-center text-muted-foreground">
+        <CalendarClock className="mb-3 h-10 w-10 opacity-40" />
+        <p className="text-sm font-medium">No preview available yet</p>
+        <p className="mt-1 text-xs max-w-sm">This community automation hasn&apos;t shared a sample run.</p>
+      </div>
+    )
+  }
+
+  if (!isCommunity && !activeRunId && !initialThreadId) {
+    return (
+      <div className="flex h-full min-h-[300px] flex-col items-center justify-center p-6 text-center text-muted-foreground">
+        <CalendarClock className="mb-3 h-10 w-10 opacity-40" />
+        <p className="text-sm font-medium">No run output available yet</p>
+        <p className="mt-1 text-xs max-w-sm">Trigger a run using the &quot;Run now&quot; button in the header to generate media.</p>
+      </div>
+    )
+  }
+
+  const showRunningUi = runStatus === "running" && !pollExhausted
+  const showTranscript = runStatus === "completed" && messages.length > 0
+  const assistantMessages = messages.filter((m) => m.role === "assistant")
+
+  return (
+    <div className="space-y-6 p-5 sm:p-6 overflow-y-auto h-full max-h-full">
+      {pollExhausted && (
+        <p className="text-sm text-muted-foreground">
+          Still running, open the thread from Recent runs when it finishes, or try again later.
+        </p>
+      )}
+
+      {showRunningUi && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Automation is running…</span>
+          </div>
+          <Shimmer className="text-sm">Waiting for assistant response…</Shimmer>
+        </div>
+      )}
+
+      {runStatus === "failed" && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {runError || "Run failed"}
+        </div>
+      )}
+
+      {error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
+
+      {loading && runStatus === "completed" && messages.length === 0 && (
+        <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          Loading transcript…
+        </div>
+      )}
+
+      {showTranscript && assistantMessages.length > 0 && (
+        <div className="rounded-2xl border border-border/50 bg-muted/10 p-4 space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-border/30">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Generated Output</h3>
+            {threadId && !isCommunity && (
+              <Link
+                href={`/chat/${threadId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Open full thread
+              </Link>
+            )}
+          </div>
+          <div className="space-y-6">
+            {assistantMessages.map((msg) => (
+              <div key={msg.id} className="space-y-4">
+                <MessageParts
+                  message={msg}
+                  instagramConnectionsById={new Map()}
+                  onToolApprovalResponse={() => {}}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {runStatus === "completed" && !loading && messages.length === 0 && !error && (
+        <p className="text-sm text-muted-foreground">No messages generated in this run yet.</p>
+      )}
+    </div>
+  )
+}
+
+function AutomationHistoryTab({
+  runs,
+  loadingRuns,
+  automation,
+}: {
+  runs: AutomationRunApi[]
+  loadingRuns: boolean
+  automation: AutomationApi
+}) {
+  const [selectedRunId, setSelectedRunId] = React.useState<string | null>(null)
+  const selectedRun = runs.find((r) => r.id === selectedRunId) ?? runs[0] ?? null
+
+  React.useEffect(() => {
+    if (runs.length > 0 && !selectedRunId) {
+      setSelectedRunId(runs[0].id)
+    }
+  }, [runs, selectedRunId])
+
+  if (loadingRuns) {
+    return (
+      <div className="flex h-full min-h-[350px] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (runs.length === 0) {
+    return (
+      <div className="flex h-full min-h-[350px] flex-col items-center justify-center p-6 text-center text-muted-foreground">
+        <p className="text-sm font-medium">No runs recorded yet</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col md:flex-row h-full min-h-0 md:divide-x divide-border/50">
+      {/* Sidebar list of runs (desktop only) */}
+      <div className="hidden md:block w-[260px] shrink-0 overflow-y-auto p-4 space-y-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-2 mb-3">Past Runs</h3>
+        <div className="space-y-1.5">
+          {runs.map((r) => {
+            const isActive = selectedRun?.id === r.id
+            return (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => setSelectedRunId(r.id)}
+                className={cn(
+                  "w-full text-left rounded-xl border p-3 transition-colors flex flex-col gap-1.5",
+                  isActive
+                    ? "border-primary/40 bg-primary/5 text-foreground"
+                    : "border-border/50 bg-card hover:bg-muted/30"
+                )}
+              >
+                <div className="flex items-center justify-between gap-1.5">
+                  <Badge
+                    variant={
+                      r.status === "completed"
+                        ? "default"
+                        : r.status === "failed"
+                          ? "destructive"
+                          : "secondary"
+                    }
+                    className="text-[9px] h-4 px-1"
+                  >
+                    {r.status}
+                  </Badge>
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(r.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-1 text-[11px] text-muted-foreground">
+                  <span>{new Date(r.started_at).toLocaleDateString()}</span>
+                  <span className="capitalize">{r.run_trigger ?? "Scheduled"}</span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Main preview for selected run */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* Mobile run selector */}
+        <div className="md:hidden p-4 border-b border-border/40 bg-muted/10 shrink-0">
+          <Select
+            value={selectedRunId ?? undefined}
+            onValueChange={(val) => setSelectedRunId(val)}
+          >
+            <SelectTrigger className="w-full bg-background border-border/50 h-9 text-xs">
+              <SelectValue placeholder="Select a run to view" />
+            </SelectTrigger>
+            <SelectContent>
+              {runs.map((r) => {
+                const date = new Date(r.started_at)
+                const dateStr = date.toLocaleDateString()
+                const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                const statusStr = r.status.toUpperCase()
+                const triggerStr = r.run_trigger === "manual" ? "Manual" : "Scheduled"
+                return (
+                  <SelectItem key={r.id} value={r.id} className="text-xs">
+                    {dateStr} {timeStr} — {statusStr} ({triggerStr})
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Preview content */}
+        <div className="flex-1 overflow-y-auto min-w-0">
+          {selectedRun ? (
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-border/30 px-2">
+                <div>
+                  <h4 className="text-sm font-semibold">Run Details</h4>
+                  <p className="text-xs text-muted-foreground">Started on {new Date(selectedRun.started_at).toLocaleString()}</p>
+                </div>
+                {selectedRun.thread_id && (
+                  <Link
+                    href={`/chat/${selectedRun.thread_id}`}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Open full thread
+                  </Link>
+                )}
+              </div>
+              
+              {selectedRun.error && (
+                <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive mx-2">
+                  {selectedRun.error}
+                </div>
+              )}
+              
+              <AutomationPreviewTab
+                threadId={selectedRun.thread_id}
+                automationId={automation.id}
+                isCommunity={false}
+                hasPreview={false}
+              />
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AutomationTabNav({
+  activeTab,
+  onSelect,
+  variant,
+  isCommunity,
+}: {
+  activeTab: "preview" | "history" | "edit"
+  onSelect: (tab: "preview" | "history" | "edit") => void
+  variant: "sidebar" | "scroll"
+  isCommunity: boolean
+}) {
+  const tabs = [
+    { id: "preview" as const, label: "Preview", icon: Eye },
+    ...(!isCommunity ? [{ id: "history" as const, label: "History", icon: Clock }] : []),
+    { id: "edit" as const, label: isCommunity ? "Setup Details" : "Edit Setup", icon: Pencil },
+  ]
+
+  return (
+    <nav
+      className={cn(
+        variant === "sidebar" && "flex flex-col gap-0.5",
+        variant === "scroll" &&
+          "flex gap-1 overflow-x-auto overscroll-x-contain px-4 pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      )}
+    >
+      {tabs.map(({ id, label, icon: Icon }) => {
+        const isActive = id === activeTab
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onSelect(id)}
+            aria-current={isActive ? "page" : undefined}
+            className={cn(
+              "relative flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors text-left",
+              isActive
+                ? "bg-muted/80 text-foreground"
+                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+              variant === "sidebar" ? "w-full" : undefined
+            )}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            <span className="whitespace-nowrap">{label}</span>
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
 export function AutomationsPage() {
   const [scope, setScope] = React.useState<"mine" | "community">("mine")
   const [userId, setUserId] = React.useState<string | null>(null)
@@ -358,6 +916,7 @@ export function AutomationsPage() {
   const [newDialogOpen, setNewDialogOpen] = React.useState(false)
   const [automationDetailsOpen, setAutomationDetailsOpen] = React.useState(false)
   const [recentRunsOpen, setRecentRunsOpen] = React.useState(false)
+  const [activeTab, setActiveTab] = React.useState<"preview" | "history" | "edit">("preview")
   const [runs, setRuns] = React.useState<AutomationRunApi[]>([])
   const [loadingRuns, setLoadingRuns] = React.useState(false)
   const [editDetailsOpen, setEditDetailsOpen] = React.useState(false)
@@ -399,14 +958,7 @@ export function AutomationsPage() {
   const [isPublicAutomation, setIsPublicAutomation] = React.useState(false)
   const [cloningId, setCloningId] = React.useState<string | null>(null)
   const [settingPreviewRunId, setSettingPreviewRunId] = React.useState<string | null>(null)
-  const [previewRunModal, setPreviewRunModal] = React.useState<{
-    runId: string
-    threadId: string | null
-    status: "running" | "completed" | "failed"
-    runTrigger: "manual" | "scheduled"
-    error: string | null
-  } | null>(null)
-  const [communityPreviewOpen, setCommunityPreviewOpen] = React.useState(false)
+
   const [pendingManualRunPreview, setPendingManualRunPreview] = React.useState<{
     automationId: string
     runId: string
@@ -440,13 +992,7 @@ export function AutomationsPage() {
     if (!activeRunInfo) return
     if (autoOpenedRunIdRef.current === activeRunInfo.runId) return
     autoOpenedRunIdRef.current = activeRunInfo.runId
-    setPreviewRunModal({
-      runId: activeRunInfo.runId,
-      threadId: activeRunInfo.threadId,
-      status: "running",
-      runTrigger: "manual",
-      error: null,
-    })
+    setActiveTab("preview")
   }, [activeRunInfo])
 
   React.useEffect(() => {
@@ -498,7 +1044,6 @@ export function AutomationsPage() {
     setRecentRunsOpen(false)
     setNewDialogOpen(false)
     lastHydratedId.current = null
-    setCommunityPreviewOpen(false)
     setScope("community")
   }, [])
 
@@ -507,7 +1052,6 @@ export function AutomationsPage() {
     setAutomationDetailsOpen(false)
     setRecentRunsOpen(false)
     lastHydratedId.current = null
-    setCommunityPreviewOpen(false)
     setScope("mine")
   }, [])
 
@@ -892,7 +1436,6 @@ export function AutomationsPage() {
     }
     hydrateFromAutomation(selected)
     lastHydratedId.current = selectedId
-    setCommunityPreviewOpen(false)
   }, [selectedId, selected, hydrateFromAutomation])
 
   const save = async (options?: { closeAfter?: boolean }): Promise<boolean> => {
@@ -2055,79 +2598,182 @@ export function AutomationsPage() {
             </div>
           </div>
         ) : (
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {automations.map((a) => (
-              <li key={a.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewDialogOpen(false)
-                    setSelectedId(a.id)
-                    setEditDetailsOpen(false)
-                    skipResetEditOnDetailsCloseRef.current = false
-                    setAutomationDetailsOpen(true)
-                    setRecentRunsOpen(false)
-                  }}
-                  className={cn(
-                    "group flex h-full min-h-[156px] w-full flex-col justify-between rounded-2xl border p-4 text-left transition-colors",
-                    selectedId === a.id && (automationDetailsOpen || editDetailsOpen)
-                      ? "border-primary/40 bg-primary/10"
-                      : "border-border/50 bg-card/45 hover:border-border hover:bg-muted/25",
-                  )}
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="line-clamp-2 text-sm font-medium leading-5 text-foreground">
-                        {a.name}
-                      </span>
-                      <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                        {isCommunityScope ? (
-                          <>
-                            {a.user_id === userId ? (
-                              <Badge variant="default" className="h-5 rounded-full px-2 text-[10px]">
-                                Yours
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {automations.map((a) => {
+              const latestRunThreadId = a.latestRun?.thread_id ?? null
+              return (
+                <li key={a.id}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setNewDialogOpen(false)
+                      setSelectedId(a.id)
+                      setEditDetailsOpen(false)
+                      setActiveTab("preview")
+                      skipResetEditOnDetailsCloseRef.current = false
+                      setAutomationDetailsOpen(true)
+                      setRecentRunsOpen(false)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        setNewDialogOpen(false)
+                        setSelectedId(a.id)
+                        setEditDetailsOpen(false)
+                        setActiveTab("preview")
+                        skipResetEditOnDetailsCloseRef.current = false
+                        setAutomationDetailsOpen(true)
+                        setRecentRunsOpen(false)
+                      }
+                    }}
+                    className={cn(
+                      "group relative flex aspect-square h-auto w-full flex-col justify-end overflow-hidden rounded-2xl border text-left transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                      selectedId === a.id && automationDetailsOpen
+                        ? "border-primary bg-primary/5 shadow-md"
+                        : "border-border/50 bg-card/45 hover:border-border hover:shadow-lg",
+                    )}
+                  >
+                    {/* Media Preview Background */}
+                    <div className="absolute inset-0 -z-10 w-full h-full overflow-hidden transition-transform duration-500 group-hover:scale-105">
+                      <AutomationCardMedia
+                        threadId={latestRunThreadId as string | null}
+                        automationId={a.id}
+                        isCommunity={isCommunityScope}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/10" />
+                    </div>
+
+                    {/* Hover Quick Actions */}
+                    <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                      {isCommunityScope ? (
+                        <>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="size-8 rounded-full shadow-md bg-background/90 backdrop-blur hover:bg-background"
+                            disabled={cloningId === a.id}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void cloneFromCommunity(a)
+                            }}
+                          >
+                            {cloningId === a.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Plus className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="size-8 rounded-full shadow-md bg-background/90 backdrop-blur hover:bg-background text-foreground"
+                            disabled={!a.hasPreview}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setNewDialogOpen(false)
+                              setSelectedId(a.id)
+                              setEditDetailsOpen(false)
+                              setActiveTab("preview")
+                              skipResetEditOnDetailsCloseRef.current = false
+                              setAutomationDetailsOpen(true)
+                              setRecentRunsOpen(false)
+                            }}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="size-8 rounded-full shadow-md bg-background/90 backdrop-blur hover:bg-background text-foreground"
+                            disabled={runningId === a.id}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void runNow(a)
+                            }}
+                          >
+                            {runningId === a.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Play className="h-3.5 w-3.5 fill-current" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="size-8 rounded-full shadow-md bg-background/90 backdrop-blur hover:bg-background text-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setNewDialogOpen(false)
+                              setSelectedId(a.id)
+                              setEditDetailsOpen(false)
+                              setActiveTab("edit")
+                              skipResetEditOnDetailsCloseRef.current = false
+                              setAutomationDetailsOpen(true)
+                              setRecentRunsOpen(false)
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Title & Info overlay */}
+                    <div className="w-full p-4 flex flex-col gap-1.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="line-clamp-2 text-sm font-semibold leading-5 text-white drop-shadow">
+                          {a.name}
+                        </span>
+                        <div className="flex shrink-0 gap-1.5">
+                          {isCommunityScope ? (
+                            <>
+                              {a.user_id === userId ? (
+                                <Badge variant="default" className="h-4 rounded-full px-1.5 text-[9px] bg-primary text-primary-foreground border-0">
+                                  Yours
+                                </Badge>
+                              ) : null}
+                              {a.hasPreview ? (
+                                <Badge variant="outline" className="h-4 rounded-full px-1.5 text-[9px] border-white/30 text-white bg-black/30 backdrop-blur-sm">
+                                  Preview
+                                </Badge>
+                              ) : null}
+                            </>
+                          ) : (
+                            <>
+                              {a.is_public === true ? (
+                                <Badge variant="outline" className="h-4 rounded-full px-1.5 text-[9px] border-white/30 text-white bg-black/30 backdrop-blur-sm">
+                                  Public
+                                </Badge>
+                              ) : null}
+                              <Badge variant={a.is_active ? "default" : "secondary"} className="h-4 rounded-full px-1.5 text-[9px] border-0">
+                                {a.is_active ? "On" : "Off"}
                               </Badge>
-                            ) : null}
-                            {a.hasPreview ? (
-                              <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px]">
-                                Preview
-                              </Badge>
-                            ) : null}
-                          </>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <p className="line-clamp-2 text-xs leading-normal text-zinc-300 drop-shadow">
+                        {a.description?.trim() || describeCronHumanSummary(a.cron_schedule)}
+                      </p>
+
+                      <div className="mt-2.5 flex items-center justify-between border-t border-white/10 pt-2.5 text-[10px] text-zinc-400">
+                        <span className="line-clamp-1">{describeCronHumanSummary(a.cron_schedule)}</span>
+                        {!isCommunityScope && a.last_error ? (
+                          <span className="truncate text-red-400 font-medium">Error occurred</span>
                         ) : (
-                          <>
-                            {a.is_public === true ? (
-                              <Badge variant="outline" className="h-5 rounded-full px-2 text-[10px]">
-                                Public
-                              </Badge>
-                            ) : null}
-                            <Badge variant={a.is_active ? "default" : "secondary"} className="h-5 rounded-full px-2 text-[10px]">
-                              {a.is_active ? "On" : "Off"}
-                            </Badge>
-                          </>
+                          <Eye className="h-3.5 w-3.5 shrink-0 opacity-60" />
                         )}
                       </div>
                     </div>
-                    {a.description?.trim() ? (
-                      <p className="line-clamp-3 whitespace-pre-line text-xs leading-5 text-muted-foreground">
-                        {a.description.trim()}
-                      </p>
-                    ) : (
-                      <p className="line-clamp-3 text-xs leading-5 text-muted-foreground">
-                        {describeCronHumanSummary(a.cron_schedule)}
-                      </p>
-                    )}
                   </div>
-                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-border/35 pt-3 text-xs text-muted-foreground">
-                    <span className="line-clamp-1">{describeCronHumanSummary(a.cron_schedule)}</span>
-                    <Eye className="h-3.5 w-3.5 shrink-0 opacity-45 transition-opacity group-hover:opacity-80" />
-                  </div>
-                  {!isCommunityScope && a.last_error ? (
-                    <p className="mt-2 truncate text-xs text-destructive">{a.last_error}</p>
-                  ) : null}
-                </button>
-              </li>
-            ))}
+                </li>
+              )
+            })}
           </ul>
         )}
       </main>
@@ -2135,6 +2781,10 @@ export function AutomationsPage() {
       <Dialog
         open={Boolean(selected && automationDetailsOpen)}
         onOpenChange={(open) => {
+          if (!open && hasUnsavedEdits) {
+            setUnsavedCloseConfirmOpen(true)
+            return
+          }
           setAutomationDetailsOpen(open)
           if (!open) {
             setRecentRunsOpen(false)
@@ -2149,8 +2799,8 @@ export function AutomationsPage() {
         {selected ? (
           <DialogContent
             className={cn(
-              AUTOMATION_SHEET_DIALOG_CLASSNAME,
-              "overflow-y-auto sm:max-h-[min(92dvh,920px)] sm:!max-w-5xl",
+              "flex! h-[min(640px,90dvh)] max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[min(880px,calc(100vw-1.5rem))]! flex-col gap-0 overflow-hidden rounded-2xl border-border/60 bg-background p-0",
+              "sm:w-[calc(100%-2rem)] sm:max-w-[min(880px,calc(100vw-2rem))]!"
             )}
           >
             <DialogHeader className="sr-only">
@@ -2159,379 +2809,252 @@ export function AutomationsPage() {
                 Review, edit, run, or inspect this automation.
               </DialogDescription>
             </DialogHeader>
-            <div className="min-w-0 space-y-4 px-4 sm:px-6">
-              <div className="flex flex-row flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold">{selected.name}</h2>
-                {selected.description?.trim() ? (
-                  <p
-                    className="mt-1 line-clamp-3 whitespace-pre-line text-sm leading-snug text-muted-foreground"
-                    title={selected.description.trim()}
+
+            <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+              <aside className="hidden w-[148px] shrink-0 flex-col border-r border-border/60 bg-muted/20 px-2 py-2.5 lg:flex">
+                <DialogPrimitive.Close asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="mb-4 size-9 shrink-0 rounded-lg"
+                    aria-label="Close"
                   >
-                    {selected.description.trim()}
-                  </p>
-                ) : null}
-                {isCommunityScope ? (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {selected.hasPreview
-                      ? "Preview available. Open it to see what a run actually looks like."
-                      : "No preview yet. This automation hasn't shared a sample run."}
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {isCommunityScope ? (
-                  <>
-                    <Button
-                      variant={editDetailsOpen ? "secondary" : "outline"}
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={() => setEditDetailsOpen((o) => !o)}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      {editDetailsOpen ? "Close details" : "Details"}
-                      <ChevronDown
-                        className={cn("h-3.5 w-3.5 transition-transform", editDetailsOpen && "rotate-180")}
-                      />
-                    </Button>
-                    <Badge variant="outline" className="text-xs">
-                      Public
-                    </Badge>
-                    {selected.user_id === userId ? (
-                      <Badge variant="default" className="text-xs">
-                        Yours
-                      </Badge>
-                    ) : null}
-                    {selected.hasPreview ? (
-                      <Badge variant="secondary" className="text-xs">
-                        Preview
-                      </Badge>
-                    ) : null}
-                    {selected.user_id === userId ? (
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          const id = selected.id
-                          setScope("mine")
-                          lastHydratedId.current = null
-                          setSelectedId(id)
-                          setCommunityPreviewOpen(false)
-                        }}
-                      >
-                        Edit in Mine
-                      </Button>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </DialogPrimitive.Close>
+                <AutomationTabNav
+                  activeTab={activeTab}
+                  onSelect={setActiveTab}
+                  variant="sidebar"
+                  isCommunity={isCommunityScope}
+                />
+              </aside>
+
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                {/* Desktop header: Title + actions */}
+                <div className="hidden shrink-0 items-center justify-between border-b border-border/60 px-5 py-3 lg:flex">
+                  <span className="text-base font-semibold text-foreground truncate max-w-[240px]">
+                    {selected.name}
+                  </span>
+                  
+                  {/* Actions Row */}
+                  <div className="flex items-center gap-3">
+                    {!isCommunityScope ? (
+                      <>
+                        <div className="flex items-center gap-2 pr-3 border-r border-border/50 h-6">
+                          <Switch
+                            checked={selected.is_active}
+                            onCheckedChange={(v) => void toggleActive(selected, v)}
+                            id="active-switch-modal"
+                          />
+                          <Label htmlFor="active-switch-modal" className="text-xs font-medium cursor-pointer">
+                            Active
+                          </Label>
+                        </div>
+                        {runningId === selected.id ? (
+                          <Button variant="secondary" size="sm" disabled className="h-8">
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            Running…
+                          </Button>
+                        ) : (
+                          <Button variant="secondary" size="sm" onClick={() => void runNow(selected)} className="h-8">
+                            <Play className="mr-1.5 h-3.5 w-3.5 fill-current" />
+                            Run now
+                          </Button>
+                        )}
+                        <Button variant="outline" size="icon" className="size-8 rounded-lg text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(selected.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
                     ) : (
-                      <Button
-                        size="sm"
-                        disabled={cloningId === selected.id}
-                        onClick={() => void cloneFromCommunity(selected)}
-                      >
-                        {cloningId === selected.id ? (
-                          <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                        ) : null}
-                        Save to my automations
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={!selected.hasPreview}
-                      onClick={() => openCommunityPreview(selected)}
-                    >
-                      <Eye className="mr-1 h-4 w-4" />
-                      Open preview
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={() => {
-                        skipResetEditOnDetailsCloseRef.current = true
-                        setEditDetailsOpen(true)
-                        setAutomationDetailsOpen(false)
-                      }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                    {false ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="gap-1.5 shadow-sm"
-                        onClick={() => void save()}
-                      >
-                        <Save className="h-3.5 w-3.5" />
-                        Save edits
-                      </Button>
-                    ) : null}
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={selected.is_active}
-                        onCheckedChange={(v) => void toggleActive(selected, v)}
-                        id="active-switch"
-                      />
-                      <Label htmlFor="active-switch" className="text-sm">
-                        Active
-                      </Label>
-                    </div>
-                    {canShowViewSetPreview && selected.preview_run_id ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const previewRunId = selected.preview_run_id
-                          if (!previewRunId) return
-                          const row = runs.find((r) => r.id === previewRunId)
-                          const st = row?.status
-                          const status: "running" | "completed" | "failed" =
-                            st === "failed" ? "failed" : st === "running" ? "running" : "completed"
-                          setPreviewRunModal({
-                            runId: previewRunId,
-                            threadId: row?.thread_id ?? null,
-                            status,
-                            runTrigger: (row?.run_trigger ?? "scheduled") as "manual" | "scheduled",
-                            error: row?.error ?? null,
-                          })
-                        }}
-                      >
-                        <Eye className="mr-1 h-4 w-4" />
-                        View preview
-                      </Button>
-                    ) : null}
-                    {showViewLastManualBtn && pendingManualForSelected ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setPreviewRunModal({
-                            runId: pendingManualForSelected.runId,
-                            threadId: pendingManualForSelected.threadId,
-                            status: pendingManualForSelected.status,
-                            runTrigger: "manual",
-                            error: pendingManualForSelected.error,
-                          })
-                        }
-                      >
-                        <Eye className="mr-1 h-4 w-4" />
-                        View last run
-                      </Button>
-                    ) : null}
-                    {runningId === selected.id ? (
-                      (() => {
-                        const activeForSelected =
-                          activeRunInfo?.automationId === selected.id ? activeRunInfo : null
-                        const viewReady = Boolean(activeForSelected)
-                        return (
+                      <>
+                        {selected.user_id === userId ? (
                           <Button
-                            variant="secondary"
                             size="sm"
-                            disabled={!viewReady}
+                            className="h-8"
                             onClick={() => {
-                              if (!activeForSelected) return
-                              setPreviewRunModal({
-                                runId: activeForSelected.runId,
-                                threadId: activeForSelected.threadId,
-                                status: "running",
-                                runTrigger: "manual",
-                                error: null,
-                              })
+                              const id = selected.id
+                              setScope("mine")
+                              lastHydratedId.current = null
+                              setSelectedId(id)
+                              setCommunityPreviewOpen(false)
                             }}
                           >
-                            {viewReady ? (
-                              <Eye className="mr-1 h-4 w-4" />
-                            ) : (
-                              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                            Edit in Mine
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="h-8"
+                            disabled={cloningId === selected.id}
+                            onClick={() => void cloneFromCommunity(selected)}
+                          >
+                            {cloningId === selected.id ? (
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            ) : null}
+                            Save to mine
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Mobile header (includes scroll nav and actions) */}
+                <div className="shrink-0 border-b border-border/60 lg:hidden">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <DialogPrimitive.Close asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-9 shrink-0 rounded-lg"
+                        aria-label="Close"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </DialogPrimitive.Close>
+                    <span className="text-base font-semibold text-foreground truncate max-w-[160px]">
+                      {selected.name}
+                    </span>
+                    
+                    {/* Mobile quick actions (Run now or Clone/Edit in Mine) */}
+                    <div className="flex items-center gap-1.5">
+                      {!isCommunityScope ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            className={cn(
+                              "h-7 px-2.5 text-xs font-medium gap-1.5",
+                              selected.is_active
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:text-emerald-300"
+                                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                             )}
-                            {viewReady ? (
-                              <Shimmer as="span" duration={2} spread={3}>
-                                View current run
-                              </Shimmer>
+                            onClick={() => void toggleActive(selected, !selected.is_active)}
+                          >
+                            {selected.is_active ? (
+                              <>
+                                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                On
+                              </>
                             ) : (
-                              "Starting…"
+                              <>
+                                <span className="size-1.5 rounded-full bg-zinc-500" />
+                                Paused
+                              </>
                             )}
                           </Button>
-                        )
-                      })()
-                    ) : (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => void runNow(selected)}
-                      >
-                        <Play className="mr-1 h-4 w-4" />
-                        Run now
-                      </Button>
-                    )}
-                    <Button variant="outline" size="sm" onClick={() => setDeleteId(selected.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
 
-            {!isCommunityScope ? (
-              <CollapsiblePrimitive.Root open={recentRunsOpen} onOpenChange={setRecentRunsOpen}>
-                <div className="rounded-2xl border border-border/50 bg-background/70">
-                  <CollapsiblePrimitive.Trigger asChild>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium sm:px-5"
-                    >
-                      <span>Recent runs</span>
-                      <ChevronDown
-                        className={cn("h-4 w-4 text-muted-foreground transition-transform", recentRunsOpen && "rotate-180")}
-                      />
-                    </button>
-                  </CollapsiblePrimitive.Trigger>
-                  <CollapsiblePrimitive.Content
-                    className={cn(
-                      "overflow-hidden border-t border-border/40 px-4 py-4 text-sm transition-all sm:px-5",
-                      "data-[state=closed]:hidden",
-                    )}
-                  >
-                  {loadingRuns ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  ) : runs.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No runs yet.</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {runs.map((r) => {
-                        const isCurrentPreview =
-                          selected.is_public === true && selected.preview_run_id === r.id
-                        const canSetAsPreview =
-                          selected.is_public === true &&
-                          r.status === "completed" &&
-                          Boolean(r.thread_id) &&
-                          !isCurrentPreview
-                        const isSettingThis = settingPreviewRunId === r.id
-                        return (
-                          <li
-                            key={r.id}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 px-3 py-2 text-sm"
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge
-                                variant={
-                                  r.status === "completed"
-                                    ? "default"
-                                    : r.status === "failed"
-                                      ? "destructive"
-                                      : "secondary"
-                                }
-                              >
-                                {r.status}
-                              </Badge>
-                              <Badge
-                                variant={(r.run_trigger ?? "scheduled") === "manual" ? "outline" : "secondary"}
-                                className="text-[10px]"
-                              >
-                                {(r.run_trigger ?? "scheduled") === "manual" ? "Manual" : "Scheduled"}
-                              </Badge>
-                              {isCurrentPreview ? (
-                                <Badge variant="outline" className="gap-1 text-[10px]">
-                                  <Star className="h-3 w-3 fill-current" />
-                                  Current preview
-                                </Badge>
-                              ) : null}
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(r.started_at).toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 text-xs"
-                                onClick={() =>
-                                  setPreviewRunModal({
-                                    runId: r.id,
-                                    threadId: r.thread_id,
-                                    status: r.status as "running" | "completed" | "failed",
-                                    runTrigger: (r.run_trigger ?? "scheduled") as "manual" | "scheduled",
-                                    error: r.error,
-                                  })
-                                }
-                              >
-                                <Eye className="mr-1 h-3.5 w-3.5" />
-                                Preview
-                              </Button>
-                              {r.thread_id ? (
-                                <Link
-                                  href={`/chat/${r.thread_id}`}
-                                  className="text-xs font-medium text-primary hover:underline"
-                                >
-                                  Open thread
-                                </Link>
-                              ) : null}
-                              {canSetAsPreview ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={isSettingThis || settingPreviewRunId !== null}
-                                  onClick={() => void setCommunityPreviewRun(selected.id, r.id)}
-                                >
-                                  {isSettingThis ? (
-                                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Star className="mr-1 h-3.5 w-3.5" />
-                                  )}
-                                  Set as preview
-                                </Button>
-                              ) : null}
-                            </div>
-                            {r.error ? <p className="w-full text-xs text-destructive">{r.error}</p> : null}
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )}
-                  </CollapsiblePrimitive.Content>
+                          {runningId === selected.id ? (
+                            <Button variant="secondary" size="xs" disabled className="h-7 px-2 text-xs">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            </Button>
+                          ) : (
+                            <Button variant="secondary" size="xs" onClick={() => void runNow(selected)} className="h-7 px-2.5 text-xs gap-1">
+                              <Play className="h-3 w-3 fill-current" />
+                              Run
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {selected.user_id === userId ? (
+                            <Button
+                              size="xs"
+                              className="h-7 px-2.5 text-xs"
+                              onClick={() => {
+                                const id = selected.id
+                                setScope("mine")
+                                lastHydratedId.current = null
+                                setSelectedId(id)
+                                setCommunityPreviewOpen(false)
+                              }}
+                            >
+                              Edit
+                            </Button>
+                          ) : (
+                            <Button
+                              size="xs"
+                              className="h-7 px-2.5 text-xs"
+                              disabled={cloningId === selected.id}
+                              onClick={() => void cloneFromCommunity(selected)}
+                            >
+                              Save
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <AutomationTabNav
+                    activeTab={activeTab}
+                    onSelect={setActiveTab}
+                    variant="scroll"
+                    isCommunity={isCommunityScope}
+                  />
                 </div>
-              </CollapsiblePrimitive.Root>
-            ) : null}
+
+                {/* Content area: Dynamic layout based on tab */}
+                <div className={cn(
+                  "min-h-0 min-w-0 flex-1 flex flex-col",
+                  activeTab === "edit" ? "overflow-y-auto px-4 py-5 md:px-6 lg:px-5" : "h-full"
+                )}>
+                  {activeTab === "edit" && (
+                    <>
+                      <h2 className="mb-5 hidden text-base font-semibold text-foreground lg:block">
+                        {isCommunityScope ? "Setup Details" : "Edit Setup"}
+                      </h2>
+                      <div className="space-y-4">
+                        {renderAutomationFormFields("edit", {
+                          readOnly: isCommunityScope,
+                          showVisibility: !isCommunityScope,
+                          showManualSaveActions: !isCommunityScope,
+                        })}
+                      </div>
+                    </>
+                  )}
+
+                  {activeTab === "preview" && (
+                    <div className="flex-1 flex flex-col min-h-0 h-full">
+                      <div className="px-4 py-5 md:px-6 lg:px-5 pb-0 hidden lg:block">
+                        <h2 className="text-base font-semibold text-foreground">Latest Preview</h2>
+                      </div>
+                      <div className="flex-1 min-h-0">
+                        <AutomationPreviewTab
+                          threadId={activeRunInfo?.automationId === selected.id ? (activeRunInfo.threadId ?? null) : (selected.latestRun?.thread_id ?? null)}
+                          automationId={selected.id}
+                          isCommunity={isCommunityScope}
+                          hasPreview={selected.hasPreview ?? false}
+                          activeRunId={activeRunInfo?.automationId === selected.id ? activeRunInfo.runId : null}
+                          runTrigger="manual"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === "history" && !isCommunityScope && (
+                    <div className="flex-1 flex flex-col min-h-0 h-full">
+                      <div className="px-4 py-5 md:px-6 lg:px-5 pb-0 hidden lg:block">
+                        <h2 className="text-base font-semibold text-foreground">Run History</h2>
+                      </div>
+                      <div className="flex-1 min-h-0">
+                        <AutomationHistoryTab
+                          runs={runs}
+                          loadingRuns={loadingRuns}
+                          automation={selected}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </DialogContent>
         ) : null}
       </Dialog>
-
-      {selected ? (
-        <Dialog
-          open={Boolean(
-            editDetailsOpen &&
-              (!isCommunityScope || automationDetailsOpen),
-          )}
-          onOpenChange={handleEditDialogOpenChange}
-        >
-          <DialogContent
-            className={cn(
-              AUTOMATION_SHEET_DIALOG_CLASSNAME,
-              "overflow-y-auto sm:max-h-[min(92dvh,920px)] sm:!max-w-5xl",
-            )}
-          >
-            <DialogHeader className="sr-only">
-              <DialogTitle>{isCommunityScope ? selected.name : `Edit · ${selected.name}`}</DialogTitle>
-              <DialogDescription>
-                {isCommunityScope
-                  ? "Prompt, schedule, and attachments for this public automation."
-                  : "Update prompt, schedule, attachments, and visibility. Save when you are ready."}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="min-w-0 px-4 py-4 sm:px-6">
-              {renderAutomationFormFields("edit", {
-                readOnly: isCommunityScope,
-                showVisibility: !isCommunityScope,
-                showManualSaveActions: !isCommunityScope,
-              })}
-            </div>
-          </DialogContent>
-        </Dialog>
-      ) : null}
 
       <Dialog
         open={newDialogOpen}
@@ -2571,40 +3094,7 @@ export function AutomationsPage() {
         onSelect={handleAssetLibrarySelect}
       />
 
-      {selected && previewRunModal ? (
-        <AutomationRunPreviewModal
-          key={previewRunModal.runId}
-          open
-          onOpenChange={(o) => {
-            if (!o) setPreviewRunModal(null)
-          }}
-          automationId={selected.id}
-          automationName={selected.name}
-          runId={previewRunModal.runId}
-          initialThreadId={previewRunModal.threadId}
-          initialStatus={previewRunModal.status}
-          promptPreview={prompt.trim() || null}
-          templatePayload={previewTemplatePayload}
-          runTrigger={previewRunModal.runTrigger}
-          initialRunError={previewRunModal.error}
-        />
-      ) : null}
 
-      {selected && isCommunityScope && communityPreviewOpen ? (
-        <AutomationRunPreviewModal
-          key={`community-${selected.id}`}
-          open
-          onOpenChange={(o) => {
-            if (!o) setCommunityPreviewOpen(false)
-          }}
-          automationId={selected.id}
-          automationName={selected.name}
-          runId=""
-          source="community"
-          promptPreview={selected.prompt.trim() || null}
-          templatePayload={previewTemplatePayload}
-        />
-      ) : null}
 
       <AlertDialog open={unsavedCloseConfirmOpen} onOpenChange={setUnsavedCloseConfirmOpen}>
         <AlertDialogContent>

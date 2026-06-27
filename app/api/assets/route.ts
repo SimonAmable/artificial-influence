@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const visibility = searchParams.get("visibility") as AssetVisibility | null
     const category = searchParams.get("category") as AssetCategory | null
+    const sourceNodeType = searchParams.get("sourceNodeType")
     const search = (searchParams.get("search") || "").trim().toLowerCase()
     const limit = parseLimit(searchParams.get("limit"))
     const offset = parseOffset(searchParams.get("offset"))
@@ -75,6 +76,10 @@ export async function GET(request: NextRequest) {
 
     if (category) {
       query = query.eq("category", category)
+    }
+
+    if (sourceNodeType) {
+      query = query.eq("source_node_type", sourceNodeType)
     }
 
     const { data, error } = await query
@@ -105,6 +110,10 @@ export async function GET(request: NextRequest) {
 
       if (category) {
         countQuery = countQuery.eq("category", category)
+      }
+
+      if (sourceNodeType) {
+        countQuery = countQuery.eq("source_node_type", sourceNodeType)
       }
 
       const { count, error: countError } = await countQuery

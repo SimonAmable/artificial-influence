@@ -59,18 +59,19 @@ interface FlatNavItem {
 }
 
 const FLAT_NAV_ITEMS: FlatNavItem[] = [
-  { path: "/chat",        label: "Agent",       icon: ChatCircleDots,  badge: "beta" },
-  { path: "/automations", label: "Automations", icon: RobotIcon,       badge: "beta" },
-  { path: "/templates",   label: "Templates",   icon: FlowArrow,       badge: "new"  },
-  { path: "/slideshows",  label: "Slideshows",  icon: SquaresFour,     badge: "new"  },
-  { path: "/autopost",    label: "Autopost",    icon: PaperPlaneTilt,  badge: "new"  },
-  { path: "/image",       label: "Image",       icon: ImageIcon                      },
-  { path: "/video",       label: "Video",       icon: VideoIcon                      },
-  { path: "/audio",       label: "Audio",       icon: MicrophoneIcon                 },
-  { path: "/assets",      label: "Assets",      icon: FolderSimple,    badge: "new"  },
-  { path: "/canvases",    label: "Canvas",      icon: PencilSimple                   },
-  { path: "/free-tools",  label: "Free Tools",  icon: ShieldCheck                   },
-  { path: "/pricing",     label: "Pricing",     icon: CurrencyDollar                },
+  { path: "/chat",          label: "Agent",         icon: ChatCircleDots,  badge: "beta" },
+  { path: "/automations",   label: "Automations",   icon: RobotIcon,       badge: "beta" },
+  { path: "/templates",     label: "Templates",     icon: FlowArrow,       badge: "new"  },
+  { path: "/slideshows",    label: "Slideshows",    icon: SquaresFour,     badge: "new"  },
+  { path: "/autopost",      label: "Autopost",      icon: PaperPlaneTilt,  badge: "new"  },
+  { path: "/ai-influencer", label: "AI Influencer", icon: RobotIcon,       badge: "new"  },
+  { path: "/image",         label: "Image",         icon: ImageIcon                      },
+  { path: "/video",         label: "Video",         icon: VideoIcon                      },
+  { path: "/audio",         label: "Audio",         icon: MicrophoneIcon                 },
+  { path: "/assets",        label: "Assets",        icon: FolderSimple,    badge: "new"  },
+  { path: "/canvases",      label: "Canvas",        icon: PencilSimple                   },
+  { path: "/free-tools",    label: "Free Tools",    icon: ShieldCheck                   },
+  { path: "/pricing",       label: "Pricing",       icon: CurrencyDollar                },
 ]
 
 // ─── Single nav item ──────────────────────────────────────────────────────────

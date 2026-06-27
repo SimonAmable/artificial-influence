@@ -174,13 +174,6 @@ export const megaNavGroups: MegaNavGroup[] = [
         badge: "new",
         iconPhosphor: "squares-four",
       },
-      {
-        path: "/autopost",
-        label: "Autopost",
-        description: "Schedule and publish posts to Instagram and TikTok",
-        badge: "new",
-        iconPhosphor: "paper-plane-tilt",
-      },
     ],
   },
   {
@@ -410,6 +403,11 @@ export const megaNavGroups: MegaNavGroup[] = [
       { path: "/resources", label: "Resources", description: "Search live stock and meme references", iconPhosphor: "image", badge: "new" },
       { path: "/assets?tab=brands", label: "Brand", description: "Manage brand settings", iconSrc: "/logo.svg", badge: "new" },
     ],
+  },
+  {
+    label: "Autopost",
+    path: "/autopost",
+    badge: "new",
   },
   { label: "Canvas", path: "/canvases" },
   {
