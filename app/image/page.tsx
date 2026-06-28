@@ -11,6 +11,8 @@ import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
 import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Slider } from "@/components/ui/slider"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { useModels } from "@/hooks/use-models"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
@@ -18,6 +20,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { consumeImageGenerationIntent } from "@/lib/image/image-generation-intent"
 import { appendImageReferencesToFormData } from "@/lib/image/append-references-to-form-data"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import { SaveExampleDialog, type SaveExampleSnapshot } from "@/components/image/save-example-dialog"
 import { ImageEditorDialog } from "@/components/image-editor"
 import {
   type GenerateImageAcceptedPayload,
@@ -42,6 +45,8 @@ import {
 } from "@/lib/commands/ref-image-pipeline"
 import { stripImageMetadataAndDownload } from "@/lib/images/strip-metadata"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
+import { SavedExamplesGallery } from "@/components/image/saved-examples-gallery"
+import type { SavedExample } from "@/lib/examples/types"
 import {
   getParameterDefault,
   parseModelParameters,
@@ -252,18 +257,24 @@ function ImagePageContent() {
   const [characterSwapSceneImage, setCharacterSwapSceneImage] = React.useState<ImageUpload | null>(null)
   const [characterSwapMode, setCharacterSwapMode] = React.useState<CharacterSwapMode>("full_character")
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
+  const [savedExamples, setSavedExamples] = React.useState<SavedExample[]>([])
   const [pendingRequests, setPendingRequests] = React.useState<PendingImageRequest[]>([])
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
+  const [isExamplesLoading, setIsExamplesLoading] = React.useState(false)
+  const [libraryTab, setLibraryTab] = React.useState<"history" | "examples">("examples")
+  const [libraryColumnCount, setLibraryColumnCount] = React.useState(2)
   const [error, setError] = React.useState<string | null>(null)
   const reportImageInputError = React.useCallback((message: string) => {
     setError(message)
     toast.error(message, { id: "image-input-error" })
   }, [])
   const [historyError, setHistoryError] = React.useState<string | null>(null)
+  const [examplesError, setExamplesError] = React.useState<string | null>(null)
   const [enhancePrompt, setEnhancePrompt] = React.useState(false)
   const historyAbortRef = React.useRef<AbortController | null>(null)
   const historyRequestIdRef = React.useRef(0)
   const isGenerating = pendingRequests.length > 0
+  const hasInitializedTabRef = React.useRef(false)
 
   const { models: imageModels, isLoading: modelsLoading } = useModels('image')
   const effectiveImageModels = React.useMemo(() => {
@@ -302,6 +313,8 @@ function ImagePageContent() {
   // Create asset dialog state
   const [createAssetDialogOpen, setCreateAssetDialogOpen] = React.useState(false)
   const [selectedImageForAsset, setSelectedImageForAsset] = React.useState<{ url: string; index: number } | null>(null)
+  const [saveExampleDialogOpen, setSaveExampleDialogOpen] = React.useState(false)
+  const [saveExampleSnapshot, setSaveExampleSnapshot] = React.useState<SaveExampleSnapshot | null>(null)
   const [imageEditorOpen, setImageEditorOpen] = React.useState(false)
   const [imageEditorUrl, setImageEditorUrl] = React.useState<string | null>(null)
 
@@ -489,6 +502,13 @@ function ImagePageContent() {
         } else {
           setHistoryImages((prev) => mergeRemoteHistoryWithLocal(prev, imageRows))
         }
+
+        if (!hasInitializedTabRef.current) {
+          hasInitializedTabRef.current = true
+          if (imageRows.length > 0) {
+            setLibraryTab("history")
+          }
+        }
       }
     } catch (err) {
       if (controller.signal.aborted) {
@@ -514,6 +534,58 @@ function ImagePageContent() {
       historyAbortRef.current?.abort()
     }
   }, [fetchImageHistory])
+
+  const fetchSavedExamples = React.useCallback(async (signal?: AbortSignal) => {
+    setIsExamplesLoading(true)
+    setExamplesError(null)
+
+    try {
+      const response = await fetch("/api/examples?surface=image", {
+        signal,
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch saved examples")
+      }
+
+      const data = await response.json().catch(() => ({}))
+      setSavedExamples(Array.isArray(data.examples) ? data.examples : [])
+    } catch (error) {
+      if (!signal?.aborted) {
+        console.error("Error fetching saved examples:", error)
+        setExamplesError(error instanceof Error ? error.message : "Failed to fetch saved examples")
+        setSavedExamples([])
+      }
+    } finally {
+      if (!signal?.aborted) {
+        setIsExamplesLoading(false)
+      }
+    }
+  }, [])
+
+  React.useEffect(() => {
+    const controller = new AbortController()
+    void fetchSavedExamples(controller.signal)
+
+    return () => controller.abort()
+  }, [fetchSavedExamples])
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const saved = window.localStorage.getItem("unican-image-column-count")
+    if (!saved) return
+
+    const parsed = Number.parseInt(saved, 10)
+    if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 6) {
+      setLibraryColumnCount(parsed)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem("unican-image-column-count", String(libraryColumnCount))
+  }, [libraryColumnCount])
 
   // Handle image generation
   const handleGenerate = async () => {
@@ -606,6 +678,7 @@ function ImagePageContent() {
     const capturedModelParameters = { ...selectedModelParameters }
 
     setPendingRequests((prev) => [optimisticPendingRequest, ...prev])
+    setLibraryTab("history")
 
     try {
 
@@ -852,6 +925,110 @@ function ImagePageContent() {
     toast.success("Prompt and references copied to input")
   }, [])
 
+  const handleUseSavedExample = React.useCallback((
+    example: SavedExample,
+    promptOverride: string,
+    mediaInputs?: Record<string, { file?: File; url: string }>
+  ) => {
+    const nextPrompt = promptOverride.trim() || example.prompt
+    setPrompt(nextPrompt)
+    setAttachedCommandRefs([])
+    setReferenceImage(null)
+
+    const referenceMediaOrder = example.default_settings?.reference_media_order
+    let nextReferenceImages: Array<{ file?: File; url: string }> = []
+
+    if (Array.isArray(referenceMediaOrder) && referenceMediaOrder.length > 0) {
+      for (const item of referenceMediaOrder) {
+        if (item && typeof item === "object") {
+          if (item.type === "attachment" && typeof item.url === "string") {
+            const att = example.prompt_attachments.find((a) => a.url === item.url)
+            if (att) {
+              nextReferenceImages.push({ url: att.url })
+            } else {
+              nextReferenceImages.push({ url: item.url })
+            }
+          } else if (item.type === "input" && typeof item.id === "string") {
+            const inputMedia = mediaInputs?.[item.id]
+            if (inputMedia) {
+              nextReferenceImages.push(inputMedia)
+            }
+          }
+        }
+      }
+    } else {
+      const defaultAttachments = example.prompt_attachments
+        .filter((attachment) => attachment.url.trim().length > 0)
+        .map((attachment) => ({ url: attachment.url }))
+
+      const flatMediaInputs: Array<{ file?: File; url: string }> = []
+      if (mediaInputs) {
+        Object.values(mediaInputs).forEach((val) => {
+          if (val) flatMediaInputs.push(val)
+        })
+      }
+
+      nextReferenceImages = [
+        ...defaultAttachments,
+        ...flatMediaInputs,
+      ]
+    }
+    setReferenceImages(nextReferenceImages)
+
+    const defaultModel = typeof example.default_settings.model === "string"
+      ? example.default_settings.model
+      : null
+    if (defaultModel) {
+      setSelectedModel(defaultModel)
+    }
+
+    const defaultAspectRatio = typeof example.default_settings.aspect_ratio === "string"
+      ? example.default_settings.aspect_ratio
+      : null
+    if (defaultAspectRatio) {
+      setSelectedAspectRatio(defaultAspectRatio)
+    }
+
+    const defaultNumImages = typeof example.default_settings.num_images === "number"
+      ? example.default_settings.num_images
+      : null
+    if (defaultNumImages && Number.isFinite(defaultNumImages)) {
+      setSelectedNumImages(Math.max(1, Math.floor(defaultNumImages)))
+    }
+
+    const nextModelParameters =
+      example.default_settings.model_parameters &&
+      typeof example.default_settings.model_parameters === "object" &&
+      !Array.isArray(example.default_settings.model_parameters)
+        ? (example.default_settings.model_parameters as ModelInputValues)
+        : {}
+    setSelectedModelParameters(nextModelParameters)
+    setEnhancePrompt(example.default_settings.enhance_prompt === true)
+
+    toast.success(`Loaded "${example.title}"`)
+  }, [])
+
+  const handleSaveExampleFromHistory = React.useCallback((imageUrl: string) => {
+    const sourceImage = historyImages.find((img) => img.url === imageUrl)
+    if (!sourceImage) {
+      toast.error("Could not find that image in history")
+      return
+    }
+
+    setSaveExampleSnapshot({
+      prompt: sourceImage.prompt ?? "",
+      referenceImageUrls: sourceImage.reference_image_urls ?? [],
+      coverUrl: sourceImage.url,
+      selectedModel: sourceImage.model ?? "",
+      selectedAspectRatio: sourceImage.aspectRatio ?? "",
+      selectedNumImages: 1,
+      selectedModelParameters: {},
+      enhancePrompt: false,
+      sourceGenerationId: sourceImage.id ?? null,
+    })
+    setSaveExampleDialogOpen(true)
+  }, [historyImages])
+
   const handleCreateAsset = React.useCallback((imageUrl: string, index: number) => {
     setSelectedImageForAsset({ url: imageUrl, index })
     setCreateAssetDialogOpen(true)
@@ -1017,13 +1194,10 @@ function ImagePageContent() {
     return [...generating, ...completed]
   }, [historyImages, pendingRequests])
 
-  // Render generated image or showcase card
-  const renderShowcase = () => {
+  const renderHistoryGrid = () => {
     const hasImages = historyImages.length > 0
     const hasItems = gridItems.length > 0
 
-    // Always show grid if we have images OR are generating OR are loading
-    // Grid will show skeleton when loading, generating card when generating
     if (hasItems || isHistoryLoading) {
       return (
         <ImageGrid
@@ -1042,19 +1216,21 @@ function ImagePageContent() {
           onRemoveBackground={handleRemoveBackground}
           onRemoveMetadata={handleRemoveMetadata}
           onDelete={handleDeleteImage}
+          onSaveExample={handleSaveExampleFromHistory}
           upscalingImageUrl={upscalingImageUrl}
           removingBackgroundImageUrl={removingBackgroundImageUrl}
           removingMetadataImageUrl={removingMetadataImageUrl}
+          showColumnSlider={false}
+          columnCount={libraryColumnCount}
         />
       )
     }
 
-    // Show error state only for generation errors; history-only errors (e.g. not logged in) show showcase
     if (error) {
       return (
-        <Card className="w-full h-full flex flex-col">
-          <CardContent className="flex flex-col items-center justify-center flex-1 p-8">
-            <p className="text-destructive mb-4">{error}</p>
+        <Card className="flex h-full flex-col border-border/60 bg-card/70">
+          <CardContent className="flex flex-1 flex-col items-center justify-center p-8">
+            <p className="mb-4 text-destructive">{error}</p>
             <Button onClick={handleGenerate} variant="default">
               Try Again
             </Button>
@@ -1063,7 +1239,6 @@ function ImagePageContent() {
       )
     }
 
-    // Show empty state (InfluencerShowcaseCard) when no images and not generating
     return (
       <InfluencerShowcaseCard
         tool_title=""
@@ -1083,6 +1258,77 @@ function ImagePageContent() {
           },
         ]}
       />
+    )
+  }
+
+  const renderExamplesGrid = () => {
+    return (
+      <div className="h-full min-h-0 overflow-auto px-2 pb-4 sm:px-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <SavedExamplesGallery
+          examples={savedExamples}
+          isLoading={isExamplesLoading}
+          columnCount={libraryColumnCount}
+          onUseExample={handleUseSavedExample}
+        />
+      </div>
+    )
+  }
+
+  const renderLibrarySurface = () => {
+    return (
+      <Tabs value={libraryTab} onValueChange={(value) => setLibraryTab(value as "history" | "examples")} className="flex h-full min-h-0 flex-col gap-0">
+        <div className="mx-2 mb-2 flex flex-wrap items-center justify-between gap-3 px-1 py-1 sm:mx-4 sm:mb-3">
+          <TabsList
+            variant="default"
+            className={cn(
+              "h-auto p-0.5 rounded-full gap-0.5",
+              "border border-border/65 bg-muted/95",
+              "shadow-[inset_0_2px_6px_rgba(0,0,0,0.10),inset_0_1px_2px_rgba(0,0,0,0.06),inset_0_-1px_1px_rgba(255,255,255,0.35)]",
+              "dark:border-border/45 dark:bg-muted/55",
+              "dark:shadow-[inset_0_2px_12px_rgba(0,0,0,0.55),inset_0_1px_2px_rgba(0,0,0,0.45),inset_0_-1px_0_rgba(255,255,255,0.04)]"
+            )}
+          >
+            <TabsTrigger
+              value="history"
+              className={cn(
+                "rounded-full px-4 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground border border-transparent transition-[color,box-shadow,border-color,background-color] hover:text-foreground",
+                "data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm",
+                "dark:data-active:border-border/60 dark:data-active:bg-card/90"
+              )}
+            >
+              History
+            </TabsTrigger>
+            <TabsTrigger
+              value="examples"
+              className={cn(
+                "rounded-full px-4 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground border border-transparent transition-[color,box-shadow,border-color,background-color] hover:text-foreground",
+                "data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm",
+                "dark:data-active:border-border/60 dark:data-active:bg-card/90"
+              )}
+            >
+              Examples
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="flex items-center gap-3 sm:gap-4">
+            <label className="whitespace-nowrap text-xs font-medium text-muted-foreground sm:text-sm">
+              Columns: <span className="text-primary">{libraryColumnCount}</span>
+            </label>
+            <Slider
+              value={[libraryColumnCount]}
+              onValueChange={(value) => setLibraryColumnCount(value[0])}
+              min={1}
+              max={6}
+              step={1}
+              className="w-24 sm:w-32"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {libraryTab === "history" ? renderHistoryGrid() : renderExamplesGrid()}
+        </div>
+      </Tabs>
     )
   }
 
@@ -1117,15 +1363,15 @@ function ImagePageContent() {
                 */}
 
                 {/* Main Content - Full-screen grid fills entire screen excluding header and history column */}
-                <div className="flex-1 w-full h-full overflow-auto pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                  {renderShowcase()}
+                <div className="flex-1 w-full h-full overflow-hidden pb-0">
+                  {renderLibrarySurface()}
                 </div>
               </div>
 
               {/* Fixed Bottom Panel - Prompt Box (always visible) */}
               <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6">
                 <div className="pointer-events-none max-w-7xl mx-auto flex justify-center">
-                  <div className="pointer-events-auto w-full max-w-sm sm:max-w-lg lg:max-w-4xl">
+                  <div className="pointer-events-auto w-full max-w-sm sm:max-w-lg lg:max-w-4xl space-y-3">
                     {renderInputBox(true)}
                   </div>
                 </div>
@@ -1155,13 +1401,15 @@ function ImagePageContent() {
                     {/* Left Panel - Prompt Box (hidden on mobile, shown on desktop) */}
                     <div className="hidden lg:block lg:sticky lg:top-0 h-fit">
                       <div className="flex justify-center">
-                        {renderInputBox(false)}
+                        <div className="w-full max-w-[520px] space-y-3">
+                          {renderInputBox(false)}
+                        </div>
                       </div>
                     </div>
 
                     {/* Right Panel - Showcase (full-screen grid) */}
-                    <div className="w-full h-full overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                      {renderShowcase()}
+                    <div className="w-full h-full overflow-hidden">
+                      {renderLibrarySurface()}
                     </div>
                   </div>
                 </div>
@@ -1200,6 +1448,20 @@ function ImagePageContent() {
           }}
         />
       )}
+
+      <SaveExampleDialog
+        open={saveExampleDialogOpen}
+        onOpenChange={(open) => {
+          setSaveExampleDialogOpen(open)
+          if (!open) {
+            setSaveExampleSnapshot(null)
+          }
+        }}
+        snapshot={saveExampleSnapshot}
+        onSaved={() => {
+          void fetchSavedExamples()
+        }}
+      />
 
       <ImageEditorDialog
         open={imageEditorOpen}

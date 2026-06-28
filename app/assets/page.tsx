@@ -32,6 +32,7 @@ import { BrandKitCard } from "@/components/brand-kit/brand-kit-card"
 import { BrandKitNewFlowDialog } from "@/components/brand-kit/brand-kit-new-flow-dialog"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { CreateCollectionDialog } from "@/components/collections/create-collection-dialog"
+import { SaveExampleDialog, type SaveExampleSnapshot } from "@/components/image/save-example-dialog"
 import {
   FullscreenMediaViewer,
   type FullscreenMediaViewerAction,
@@ -557,6 +558,8 @@ function LibraryPageContent() {
   const [viewerItem, setViewerItem] = React.useState<ViewerItem | null>(null)
   const [copiedUrl, setCopiedUrl] = React.useState<string | null>(null)
   const [saveDraft, setSaveDraft] = React.useState<SaveAssetDraft | null>(null)
+  const [saveExampleDialogOpen, setSaveExampleDialogOpen] = React.useState(false)
+  const [saveExampleSnapshot, setSaveExampleSnapshot] = React.useState<SaveExampleSnapshot | null>(null)
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [editingAsset, setEditingAsset] = React.useState<AssetRecord | null>(null)
   const [editDialogOpen, setEditDialogOpen] = React.useState(false)
@@ -651,6 +654,67 @@ function LibraryPageContent() {
       router.push(`/image-editor?image=${encodeURIComponent(url)}`)
     },
     [router],
+  )
+
+  const openSaveExampleDialog = React.useCallback((snapshot: SaveExampleSnapshot) => {
+    setSaveExampleSnapshot(snapshot)
+    setSaveExampleDialogOpen(true)
+  }, [])
+
+  const handleAnimateUrl = React.useCallback(
+    (url: string, type: AssetType | MediaGenerationType) => {
+      if (type !== "image") {
+        toast.error("Animate is only available for image media")
+        return
+      }
+
+      router.push(`/video?startFrame=${encodeURIComponent(url)}`)
+    },
+    [router],
+  )
+
+  const handleSaveExampleFromAsset = React.useCallback(
+    (asset: AssetRecord) => {
+      if (asset.assetType !== "image") {
+        toast.error("Save Example is only available for image media")
+        return
+      }
+
+      openSaveExampleDialog({
+        prompt: asset.description?.trim() || asset.title,
+        referenceImageUrls: [asset.url],
+        coverUrl: asset.thumbnailUrl || asset.url,
+        selectedModel: "",
+        selectedAspectRatio: "auto",
+        selectedNumImages: 1,
+        selectedModelParameters: {},
+        enhancePrompt: false,
+        sourceGenerationId: asset.sourceGenerationId ?? null,
+      })
+    },
+    [openSaveExampleDialog],
+  )
+
+  const handleSaveExampleFromGeneration = React.useCallback(
+    (generation: Generation) => {
+      if (generation.type !== "image") {
+        toast.error("Save Example is only available for image media")
+        return
+      }
+
+      openSaveExampleDialog({
+        prompt: generation.prompt?.trim() || `Image generation ${generation.id.slice(0, 8)}`,
+        referenceImageUrls: generation.reference_image_urls ?? [],
+        coverUrl: generation.url,
+        selectedModel: generation.model ?? "",
+        selectedAspectRatio: generation.aspect_ratio ?? "auto",
+        selectedNumImages: 1,
+        selectedModelParameters: {},
+        enhancePrompt: false,
+        sourceGenerationId: generation.id,
+      })
+    },
+    [openSaveExampleDialog],
   )
 
   const openSaveDraft = React.useCallback((draft: SaveAssetDraft) => {
@@ -1035,6 +1099,22 @@ function LibraryPageContent() {
           icon: <Sparkle className="size-4" />,
           onClick: () => void copyReference(asset.url),
         },
+        ...(asset.assetType === "image"
+          ? [
+              {
+                id: "save-example",
+                label: "Save Example",
+                icon: <Sparkle className="size-4" weight="duotone" />,
+                onClick: () => handleSaveExampleFromAsset(asset),
+              } satisfies FullscreenMediaViewerAction,
+              {
+                id: "animate",
+                label: "Animate",
+                icon: <Play className="size-4" weight="fill" />,
+                onClick: () => handleAnimateUrl(asset.url, asset.assetType),
+              } satisfies FullscreenMediaViewerAction,
+            ]
+          : []),
         {
           id: "download",
           label: "Download",
@@ -1066,7 +1146,7 @@ function LibraryPageContent() {
         actions,
       })
     },
-    [copyMedia, copyReference, downloadByUrl, openImageEditor],
+    [copyMedia, copyReference, downloadByUrl, handleAnimateUrl, handleSaveExampleFromAsset, openImageEditor],
   )
 
   const openGenerationViewer = React.useCallback(
@@ -1089,6 +1169,22 @@ function LibraryPageContent() {
               description: generation.prompt ?? undefined,
             }),
         },
+        ...(generation.type === "image"
+          ? [
+              {
+                id: "save-example",
+                label: "Save Example",
+                icon: <Sparkle className="size-4" weight="duotone" />,
+                onClick: () => handleSaveExampleFromGeneration(generation),
+              } satisfies FullscreenMediaViewerAction,
+              {
+                id: "animate",
+                label: "Animate",
+                icon: <Play className="size-4" weight="fill" />,
+                onClick: () => handleAnimateUrl(generation.url, generation.type),
+              } satisfies FullscreenMediaViewerAction,
+            ]
+          : []),
         {
           id: "copy",
           label: "Copy",
@@ -1135,7 +1231,15 @@ function LibraryPageContent() {
         actions,
       })
     },
-    [copyMedia, copyReference, downloadByUrl, openImageEditor, openSaveDraft],
+    [
+      copyMedia,
+      copyReference,
+      downloadByUrl,
+      handleAnimateUrl,
+      handleSaveExampleFromGeneration,
+      openImageEditor,
+      openSaveDraft,
+    ],
   )
 
   const filteredBrandKits = React.useMemo(
@@ -1360,6 +1464,8 @@ function LibraryPageContent() {
               loadMoreRef={historyLoadMoreSentinelRef}
               onOpen={openGenerationViewer}
               onSave={openSaveDraft}
+              onSaveExample={handleSaveExampleFromGeneration}
+              onAnimate={(media) => handleAnimateUrl(media.url, media.type)}
               onCopy={copyMedia}
               onReference={copyReference}
               onDownload={downloadByUrl}
@@ -1381,6 +1487,8 @@ function LibraryPageContent() {
               onUpload={() => fileInputRef.current?.click()}
               currentUserId={currentUserId}
               onOpen={openAssetViewer}
+              onSaveExample={handleSaveExampleFromAsset}
+              onAnimate={(asset) => handleAnimateUrl(asset.url, asset.assetType)}
               onCopy={copyMedia}
               onReference={copyReference}
               onDownload={downloadByUrl}
@@ -1444,6 +1552,15 @@ function LibraryPageContent() {
         />
       )}
 
+      <SaveExampleDialog
+        open={saveExampleDialogOpen}
+        onOpenChange={(open) => {
+          setSaveExampleDialogOpen(open)
+          if (!open) setSaveExampleSnapshot(null)
+        }}
+        snapshot={saveExampleSnapshot}
+      />
+
       {editingAsset && (
         <CreateAssetDialog
           open={editDialogOpen}
@@ -1490,6 +1607,8 @@ function HistoryPanel({
   loadMoreRef,
   onOpen,
   onSave,
+  onSaveExample,
+  onAnimate,
   onCopy,
   onReference,
   onDownload,
@@ -1508,6 +1627,8 @@ function HistoryPanel({
   loadMoreRef: React.RefObject<HTMLDivElement | null>
   onOpen: (generation: Generation) => void
   onSave: (draft: SaveAssetDraft) => void
+  onSaveExample: (generation: Generation) => void
+  onAnimate: (media: Generation) => void
   onCopy: (url: string, type: AssetType) => void
   onReference: (url: string) => void
   onDownload: (url: string, type: AssetType, title?: string) => void
@@ -1565,6 +1686,8 @@ function HistoryPanel({
                   generation={generation}
                   onOpen={onOpen}
                   onSave={onSave}
+                  onSaveExample={onSaveExample}
+                  onAnimate={onAnimate}
                   onCopy={onCopy}
                   onReference={onReference}
                   onDownload={onDownload}
@@ -1603,6 +1726,8 @@ function AssetsPanel({
   onUpload,
   currentUserId,
   onOpen,
+  onSaveExample,
+  onAnimate,
   onCopy,
   onReference,
   onDownload,
@@ -1621,6 +1746,8 @@ function AssetsPanel({
   onUpload: () => void
   currentUserId: string | null
   onOpen: (asset: AssetRecord) => void
+  onSaveExample: (asset: AssetRecord) => void
+  onAnimate: (asset: AssetRecord) => void
   onCopy: (url: string, type: AssetType) => void
   onReference: (url: string) => void
   onDownload: (url: string, type: AssetType, title?: string) => void
@@ -1679,16 +1806,18 @@ function AssetsPanel({
           </div>
           <div className={cn("grid gap-2 sm:gap-3", gridColsClass)}>
             {state.items.map((asset) => (
-              <AssetCard
-                key={asset.id}
-                asset={asset}
-                isOwner={currentUserId !== null && asset.userId === currentUserId}
-                onOpen={onOpen}
-                onCopy={onCopy}
-                onReference={onReference}
-                onDownload={onDownload}
-                onEdit={onEdit}
-                onDelete={onDelete}
+                <AssetCard
+                  key={asset.id}
+                  asset={asset}
+                  isOwner={currentUserId !== null && asset.userId === currentUserId}
+                  onOpen={onOpen}
+                  onSaveExample={onSaveExample}
+                  onAnimate={onAnimate}
+                  onCopy={onCopy}
+                  onReference={onReference}
+                  onDownload={onDownload}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
                 onEditImage={onEditImage}
                 columnCount={columnCount}
               />
@@ -1704,6 +1833,8 @@ function GenerationCard({
   generation,
   onOpen,
   onSave,
+  onSaveExample,
+  onAnimate,
   onCopy,
   onReference,
   onDownload,
@@ -1714,6 +1845,8 @@ function GenerationCard({
   generation: Generation
   onOpen: (generation: Generation) => void
   onSave: (draft: SaveAssetDraft) => void
+  onSaveExample: (generation: Generation) => void
+  onAnimate: (generation: Generation) => void
   onCopy: (url: string, type: AssetType) => void
   onReference: (url: string) => void
   onDownload: (url: string, type: AssetType, title?: string) => void
@@ -1786,12 +1919,16 @@ function GenerationCard({
                   description: generation.prompt ?? undefined,
                 })
               }
-            >
+              >
               Save
             </Button>
             <DropdownActions
               canEditImage={generation.type === "image"}
+              canSaveExample={generation.type === "image"}
+              canAnimate={generation.type === "image"}
               onEditImage={() => onEditImage(generation.url)}
+              onSaveExample={() => onSaveExample(generation)}
+              onAnimate={() => onAnimate(generation)}
               onCopy={() => onCopy(generation.url, generation.type)}
               onDownload={() => onDownload(generation.url, generation.type, generation.type)}
               onDelete={() => onDelete(generation)}
@@ -1805,7 +1942,11 @@ function GenerationCard({
       <div className="absolute right-2 bottom-2 z-10 sm:hidden">
         <DropdownActions
           canEditImage={generation.type === "image"}
+          canSaveExample={generation.type === "image"}
+          canAnimate={generation.type === "image"}
           onEditImage={() => onEditImage(generation.url)}
+          onSaveExample={() => onSaveExample(generation)}
+          onAnimate={() => onAnimate(generation)}
           onCopy={() => onCopy(generation.url, generation.type)}
           onDownload={() => onDownload(generation.url, generation.type, generation.type)}
           onDelete={() => onDelete(generation)}
@@ -1820,6 +1961,8 @@ function AssetCard({
   asset,
   isOwner,
   onOpen,
+  onSaveExample,
+  onAnimate,
   onCopy,
   onReference,
   onDownload,
@@ -1831,6 +1974,8 @@ function AssetCard({
   asset: AssetRecord
   isOwner: boolean
   onOpen: (asset: AssetRecord) => void
+  onSaveExample: (asset: AssetRecord) => void
+  onAnimate: (asset: AssetRecord) => void
   onCopy: (url: string, type: AssetType) => void
   onReference: (url: string) => void
   onDownload: (url: string, type: AssetType, title?: string) => void
@@ -1913,8 +2058,12 @@ function AssetCard({
               canEditImage={asset.assetType === "image"}
               canEditAsset={isOwner}
               canDelete={isOwner}
+              canSaveExample={asset.assetType === "image"}
+              canAnimate={asset.assetType === "image"}
               onEditAsset={() => onEdit(asset)}
               onEditImage={() => onEditImage(asset.url)}
+              onSaveExample={() => onSaveExample(asset)}
+              onAnimate={() => onAnimate(asset)}
               onCopy={() => onCopy(asset.url, asset.assetType)}
               onDownload={() => onDownload(asset.url, asset.assetType, asset.title)}
               onDelete={() => onDelete(asset)}
@@ -1930,8 +2079,12 @@ function AssetCard({
           canEditImage={asset.assetType === "image"}
           canEditAsset={isOwner}
           canDelete={isOwner}
+          canSaveExample={asset.assetType === "image"}
+          canAnimate={asset.assetType === "image"}
           onEditAsset={() => onEdit(asset)}
           onEditImage={() => onEditImage(asset.url)}
+          onSaveExample={() => onSaveExample(asset)}
+          onAnimate={() => onAnimate(asset)}
           onCopy={() => onCopy(asset.url, asset.assetType)}
           onDownload={() => onDownload(asset.url, asset.assetType, asset.title)}
           onDelete={() => onDelete(asset)}
@@ -2030,8 +2183,12 @@ function DropdownActions({
   canEditAsset = false,
   canEditImage = false,
   canDelete = true,
+  canSaveExample = false,
+  canAnimate = false,
   onEditAsset,
   onEditImage,
+  onSaveExample,
+  onAnimate,
   onCopy,
   onDownload,
   onDelete,
@@ -2040,8 +2197,12 @@ function DropdownActions({
   canEditAsset?: boolean
   canEditImage?: boolean
   canDelete?: boolean
+  canSaveExample?: boolean
+  canAnimate?: boolean
   onEditAsset?: () => void
   onEditImage?: () => void
+  onSaveExample?: () => void
+  onAnimate?: () => void
   onCopy: () => void
   onDownload: () => void
   onDelete: () => void
@@ -2066,6 +2227,18 @@ function DropdownActions({
           <DropdownMenuItem onClick={onEditImage}>
             <PencilSimple className="mr-2 h-4 w-4" />
             Edit image
+          </DropdownMenuItem>
+        ) : null}
+        {canSaveExample && onSaveExample ? (
+          <DropdownMenuItem onClick={onSaveExample}>
+            <Sparkle className="mr-2 h-4 w-4" weight="duotone" />
+            Save Example
+          </DropdownMenuItem>
+        ) : null}
+        {canAnimate && onAnimate ? (
+          <DropdownMenuItem onClick={onAnimate}>
+            <Play className="mr-2 h-4 w-4" weight="fill" />
+            Animate
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem onClick={onCopy}>

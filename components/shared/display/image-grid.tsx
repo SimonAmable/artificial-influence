@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
-import { ArrowsOutSimple, Copy, DownloadSimple, Check, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple, ShieldCheck, Eraser } from "@phosphor-icons/react"
+import { ArrowsOutSimple, Copy, DownloadSimple, Check, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple, ShieldCheck, Eraser, Sparkle, ImageSquare } from "@phosphor-icons/react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,6 +60,7 @@ interface ImageGridProps {
   onEdit?: (imageUrl: string, index: number) => void
   onRecreate?: (image: ImageData) => void
   onCreateAsset?: (imageUrl: string, index: number) => void
+  onSaveExample?: (imageUrl: string, index: number) => void
   onUpscale?: (imageUrl: string, index: number) => void
   onRemoveMetadata?: (imageUrl: string, index: number) => void
   onRemoveBackground?: (imageUrl: string, index: number) => void
@@ -71,6 +72,9 @@ interface ImageGridProps {
   /** `direct` = /image-style navigation; `agent` = composer injection via onAgentAction */
   actionStrategy?: "direct" | "agent"
   onAgentAction?: (action: ImageGridAgentAction, image: ImageData, index: number) => void
+  /** Controlled column count when the slider is rendered outside the grid. */
+  columnCount?: number
+  onColumnCountChange?: (value: number) => void
   /** Initial column count for the layout slider (default 2). */
   initialColumnCount?: number
   /** Hide column count slider (e.g. embedded chat tool cards). */
@@ -108,6 +112,7 @@ export function ImageGrid({
   onEdit,
   onRecreate,
   onCreateAsset,
+  onSaveExample,
   onUpscale,
   onRemoveMetadata,
   onRemoveBackground,
@@ -118,28 +123,43 @@ export function ImageGrid({
   basicActionsOnly = false,
   actionStrategy = "direct",
   onAgentAction,
+  columnCount,
+  onColumnCountChange,
   initialColumnCount = 2,
   showColumnSlider = true,
 }: ImageGridProps) {
   const router = useRouter()
   const isAgentMode = actionStrategy === "agent"
   const showExtendedActions = !basicActionsOnly || isAgentMode
-  const [columnCount, setColumnCount] = React.useState(initialColumnCount)
+  const isColumnCountControlled = typeof columnCount === "number"
+  const [uncontrolledColumnCount, setUncontrolledColumnCount] = React.useState(initialColumnCount)
+  const activeColumnCount = isColumnCountControlled ? columnCount : uncontrolledColumnCount
+  const isCondensed = activeColumnCount >= 3 || basicActionsOnly
 
   React.useEffect(() => {
+    if (isColumnCountControlled) {
+      return
+    }
+
     const saved = window.localStorage.getItem("unican-image-column-count")
     if (saved) {
       const parsed = parseInt(saved, 10)
       if (!isNaN(parsed) && parsed >= 1 && parsed <= 6) {
-        setColumnCount(parsed)
+        setUncontrolledColumnCount(parsed)
       }
     }
-  }, [])
+  }, [isColumnCountControlled])
 
   const handleColumnCountChange = React.useCallback((value: number) => {
-    setColumnCount(value)
+    if (isColumnCountControlled) {
+      onColumnCountChange?.(value)
+      return
+    }
+
+    setUncontrolledColumnCount(value)
     window.localStorage.setItem("unican-image-column-count", String(value))
-  }, [])
+    onColumnCountChange?.(value)
+  }, [isColumnCountControlled, onColumnCountChange])
 
   const [fullscreenImage, setFullscreenImage] = React.useState<ImageData | null>(null)
   const [copiedImageUrl, setCopiedImageUrl] = React.useState<string | null>(null)
@@ -150,6 +170,207 @@ export function ImageGrid({
     url: string
     index: number
   } | null>(null)
+
+  const renderDropdownContent = (data: ImageData, index: number) => {
+    return (
+      <DropdownMenuContent
+        align="end"
+        className="w-56"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {/* Creative / reference options first */}
+        <DropdownMenuItem
+          onClick={(event) => {
+            event.stopPropagation()
+            runReferenceAction(data, index)
+          }}
+          className="cursor-pointer"
+        >
+          <ImageSquare className="mr-2 size-4" />
+          Use as Reference
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={(event) => {
+            event.stopPropagation()
+            runEditAction(data, index)
+          }}
+          className="cursor-pointer"
+        >
+          <PencilSimple className="mr-2 size-4" />
+          Edit Image
+        </DropdownMenuItem>
+        {(isAgentMode || onRecreate) && (
+          <DropdownMenuItem
+            onClick={(event) => {
+              event.stopPropagation()
+              runRecreateAction(data, index)
+            }}
+            className="cursor-pointer"
+          >
+            <ArrowsClockwise className="mr-2 size-4" />
+            Recreate
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem
+          onClick={(event) => {
+            event.stopPropagation()
+            runAnimateAction(data, index)
+          }}
+          className="cursor-pointer"
+        >
+          <Play className="mr-2 size-4" weight="fill" />
+          Animate
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
+        {/* Assets & Workflow actions */}
+        {showExtendedActions && onCreateAsset && (
+          <DropdownMenuItem
+            onClick={(event) => {
+              event.stopPropagation()
+              onCreateAsset(data.url, index)
+            }}
+            className="cursor-pointer"
+          >
+            <Plus className="mr-2 size-4" />
+            {isAgentMode ? "Save to Assets" : "Create Asset"}
+          </DropdownMenuItem>
+        )}
+        {onSaveExample && (
+          <DropdownMenuItem
+            onClick={(event) => {
+              event.stopPropagation()
+              onSaveExample(data.url, index)
+            }}
+            className="cursor-pointer"
+          >
+            <Sparkle className="mr-2 size-4" weight="duotone" />
+            Save Example
+          </DropdownMenuItem>
+        )}
+
+        <DropdownMenuSeparator />
+
+        {/* Basic utilities */}
+        <DropdownMenuItem
+          onClick={(event) => {
+            event.stopPropagation()
+            setFullscreenImage(data)
+          }}
+          className="cursor-pointer"
+        >
+          <ArrowsOutSimple className="mr-2 size-4" />
+          Full Screen
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={(event) => {
+            event.stopPropagation()
+            void handleDownload(data.url)
+          }}
+          className="cursor-pointer"
+        >
+          <DownloadSimple className="mr-2 size-4" />
+          Download
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={(event) => {
+            event.stopPropagation()
+            void handleCopy(data.url)
+          }}
+          className="cursor-pointer"
+        >
+          {copiedImageUrl === data.url ? (
+            <>
+              <Check className="mr-2 size-4" />
+              Copied Image
+            </>
+          ) : (
+            <>
+              <Copy className="mr-2 size-4" />
+              Copy Image
+            </>
+          )}
+        </DropdownMenuItem>
+        {data.prompt && (
+          <DropdownMenuItem
+            onClick={(event) => {
+              event.stopPropagation()
+              void handleCopyPrompt(data.prompt ?? "", `${data.url}-dropdown-prompt`)
+            }}
+            className="cursor-pointer"
+          >
+            <Copy className="mr-2 size-4" />
+            {copiedPromptKey === `${data.url}-dropdown-prompt` ? "Prompt Copied" : "Copy Prompt"}
+          </DropdownMenuItem>
+        )}
+
+        {/* AI editing utilities */}
+        {(onUpscale || onRemoveBackground || onRemoveMetadata) && (
+          <>
+            <DropdownMenuSeparator />
+            {onUpscale && (
+              <DropdownMenuItem
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onUpscale(data.url, index)
+                }}
+                className="cursor-pointer"
+                disabled={upscalingImageUrl === data.url}
+              >
+                <MagnifyingGlassPlus className="mr-2 size-4" />
+                {upscalingImageUrl === data.url ? "Upscaling..." : "Upscale Image"}
+              </DropdownMenuItem>
+            )}
+            {onRemoveBackground && (
+              <DropdownMenuItem
+                onClick={(event) => {
+                  event.stopPropagation()
+                  runRemoveBackgroundAction(data, index)
+                }}
+                className="cursor-pointer"
+                disabled={removingBackgroundImageUrl === data.url}
+              >
+                <Eraser className="mr-2 size-4" />
+                {removingBackgroundImageUrl === data.url ? "Removing BG..." : "Remove Background"}
+              </DropdownMenuItem>
+            )}
+            {onRemoveMetadata && (
+              <DropdownMenuItem
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onRemoveMetadata(data.url, index)
+                }}
+                className="cursor-pointer"
+                disabled={removingMetadataImageUrl === data.url}
+              >
+                <ShieldCheck className="mr-2 size-4" />
+                {removingMetadataImageUrl === data.url ? "Cleaning..." : "Remove Metadata"}
+              </DropdownMenuItem>
+            )}
+          </>
+        )}
+
+        {/* Destructive delete option */}
+        {showExtendedActions && data.id && onDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={(event) => {
+                event.stopPropagation()
+                requestDelete(data.id!, data.url, index)
+              }}
+              className="cursor-pointer text-destructive focus:text-destructive"
+              disabled={deletingImageId === data.id}
+            >
+              <Trash className="mr-2 size-4" />
+              {deletingImageId === data.id ? 'Deleting...' : 'Delete'}
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    )
+  }
 
   // Build unified items: either from items prop (slot-based) or from images + isGenerating + generatingCount (legacy)
   const items = React.useMemo((): GridItem[] => {
@@ -310,7 +531,7 @@ export function ImageGrid({
   }, [])
 
   // Grid column class mapping
-  const isOneColumn = columnCount === 1
+  const isOneColumn = activeColumnCount === 1
   const gridColsClass = {
     1: 'grid-cols-1 max-w-2xl mx-auto',
     2: 'grid-cols-2',
@@ -318,7 +539,7 @@ export function ImageGrid({
     4: 'grid-cols-4',
     5: 'grid-cols-5',
     6: 'grid-cols-6',
-  }[columnCount] || 'grid-cols-2'
+  }[activeColumnCount] || 'grid-cols-2'
 
   // Keep a small gap in multi-column mode so identical generating cards stay visually distinct.
   const gapClass = isOneColumn ? 'gap-4' : 'gap-1'
@@ -332,10 +553,10 @@ export function ImageGrid({
         <div className="p-3 pb-3 sm:p-4 sm:pb-4">
           <div className="flex w-full items-center justify-end gap-3 sm:gap-4">
             <label className="whitespace-nowrap text-xs font-medium text-foreground sm:text-sm">
-              Columns: <span className="text-primary">{columnCount}</span>
+              Columns: <span className="text-primary">{activeColumnCount}</span>
             </label>
             <Slider
-              value={[columnCount]}
+              value={[activeColumnCount]}
               onValueChange={(value) => handleColumnCountChange(value[0])}
               min={1}
               max={6}
@@ -451,10 +672,12 @@ export function ImageGrid({
 
               {/* Bottom gradient overlay for prompt readability - no solid background */}
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/85 via-black/35 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
-
-              <div className="absolute right-2 top-2 z-10 hidden flex-col items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100 lg:flex">
-                {/* Main action buttons - always visible on hover */}
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />              <div
+                className={cn(
+                  "absolute right-2 top-2 z-10 flex items-center gap-1 opacity-100 transition-opacity duration-200 lg:opacity-0 lg:group-hover:opacity-100",
+                  isCondensed ? "flex-row" : "flex-col"
+                )}
+              >
                 <Button
                   type="button"
                   variant="secondary"
@@ -481,25 +704,27 @@ export function ImageGrid({
                 >
                   <DownloadSimple className="size-3.5" />
                 </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    void handleCopy(item.data.url)
-                  }}
-                  aria-label="Copy image"
-                >
-                  {copiedImageUrl === item.data.url ? (
-                    <Check className="size-3.5" />
-                  ) : (
-                    <Copy className="size-3.5" />
-                  )}
-                </Button>
 
-                {/* Dropdown menu with all options including Create Asset */}
+                {!isCondensed && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void handleCopy(item.data.url)
+                    }}
+                    aria-label="Copy image"
+                  >
+                    {copiedImageUrl === item.data.url ? (
+                      <Check className="size-3.5" />
+                    ) : (
+                      <Copy className="size-3.5" />
+                    )}
+                  </Button>
+                )}
+
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -515,95 +740,7 @@ export function ImageGrid({
                       <DotsThree className="size-4" weight="bold" />
                     </Button>
                   </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                    className="w-48"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {showExtendedActions && onCreateAsset && (
-                      <>
-                        <DropdownMenuItem
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            onCreateAsset(item.data.url, index)
-                          }}
-                          className="cursor-pointer"
-                        >
-                          <Plus className="mr-2 size-4" />
-                          {isAgentMode ? "Save to Assets" : "Create Asset"}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    )}
-                    <DropdownMenuItem
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        setFullscreenImage(item.data)
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <ArrowsOutSimple className="mr-2 size-4" />
-                      Full Screen
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        void handleDownload(item.data.url)
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <DownloadSimple className="mr-2 size-4" />
-                      Download
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        void handleCopy(item.data.url)
-                      }}
-                      className="cursor-pointer"
-                    >
-                      {copiedImageUrl === item.data.url ? (
-                        <>
-                          <Check className="mr-2 size-4" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="mr-2 size-4" />
-                          Copy
-                        </>
-                      )}
-                    </DropdownMenuItem>
-                    {onRemoveMetadata && (
-                      <DropdownMenuItem
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          onRemoveMetadata(item.data.url, index)
-                        }}
-                        className="cursor-pointer"
-                        disabled={removingMetadataImageUrl === item.data.url}
-                      >
-                        <ShieldCheck className="mr-2 size-4" />
-                        {removingMetadataImageUrl === item.data.url ? "Cleaning..." : "Remove Metadata"}
-                      </DropdownMenuItem>
-                    )}
-                    {showExtendedActions && item.data.id && onDelete && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            requestDelete(item.data.id!, item.data.url, index)
-                          }}
-                          className="cursor-pointer text-destructive focus:text-destructive"
-                          disabled={deletingImageId === item.data.id}
-                        >
-                          <Trash className="mr-2 size-4" />
-                          {deletingImageId === item.data.id ? 'Deleting...' : 'Delete'}
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
+                  {renderDropdownContent(item.data, index)}
                 </DropdownMenu>
               </div>
 
@@ -629,356 +766,165 @@ export function ImageGrid({
                     </button>
                   )}
                 </div>
-
-                {showExtendedActions ? (
-                <>
-                {/* Wide layout buttons. Narrow layouts collapse these into a single menu. */}
-                <div className="hidden shrink-0 flex-col items-end gap-1 lg:flex">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={!item.data.prompt?.trim()}
-                    className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      void handleCopyPrompt(item.data.prompt ?? "", `${item.data.url}-button`)
-                    }}
-                  >
-                    {copiedPromptKey && copiedPromptKey.startsWith(item.data.url) ? "Copied" : "Copy Prompt"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      runReferenceAction(item.data, index)
-                    }}
-                  >
-                    Reference
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      runEditAction(item.data, index)
-                    }}
-                  >
-                    <PencilSimple className="mr-1 size-3" />
-                    Edit
-                  </Button>
-                  {(isAgentMode || onRecreate) && (
+                {showExtendedActions && !isCondensed ? (
+                  <div className="hidden shrink-0 flex-col items-end gap-1 lg:flex">
                     <Button
                       type="button"
                       variant="secondary"
                       size="sm"
-                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        runRecreateAction(item.data, index)
-                      }}
-                    >
-                      <ArrowsClockwise className="mr-1 size-3" />
-                      Recreate
-                    </Button>
-                  )}
-                  {onCreateAsset && isAgentMode ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onCreateAsset(item.data.url, index)
-                      }}
-                    >
-                      <Plus className="mr-1 size-3" />
-                      Save to Assets
-                    </Button>
-                  ) : null}
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      runAnimateAction(item.data, index)
-                    }}
-                  >
-                    <Play className="mr-1 size-3" weight="fill" />
-                    Animate
-                  </Button>
-                  {onUpscale && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={upscalingImageUrl === item.data.url}
+                      disabled={!item.data.prompt?.trim()}
                       className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={(event) => {
                         event.stopPropagation()
-                        onUpscale(item.data.url, index)
+                        void handleCopyPrompt(item.data.prompt ?? "", `${item.data.url}-button`)
                       }}
                     >
-                      {upscalingImageUrl === item.data.url ? (
-                        "Upscaling…"
-                      ) : (
-                        <>
-                          <MagnifyingGlassPlus className="mr-1 size-3" />
-                          Upscale
-                        </>
-                      )}
-                      </Button>
-                  )}
-                  {onRemoveBackground && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={removingBackgroundImageUrl === item.data.url}
-                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        runRemoveBackgroundAction(item.data, index)
-                      }}
-                    >
-                      {removingBackgroundImageUrl === item.data.url ? (
-                        "Removing..."
-                      ) : (
-                        <>
-                          <Eraser className="mr-1 size-3" />
-                          Remove BG
-                        </>
-                      )}
+                      {copiedPromptKey && copiedPromptKey.startsWith(item.data.url) ? "Copied" : "Copy Prompt"}
                     </Button>
-                  )}
-                  {onRemoveMetadata && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={removingMetadataImageUrl === item.data.url}
-                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onRemoveMetadata(item.data.url, index)
-                      }}
-                    >
-                      <ShieldCheck className="mr-1 size-3" />
-                      {removingMetadataImageUrl === item.data.url ? "Cleaning..." : "Clean"}
-                    </Button>
-                  )}
-                </div>
-
-                {/* Narrow layout: a single overflow menu prevents controls from covering the media. */}
-                <div className="flex shrink-0 flex-col items-end gap-1 lg:hidden">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                    {onSaveExample ? (
                       <Button
                         type="button"
                         variant="secondary"
-                        size="icon"
-                        className="h-8 w-8 rounded-full border border-white/20 bg-black/60 text-white hover:bg-black/80"
+                        size="sm"
+                        className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
                         onClick={(event) => {
                           event.stopPropagation()
+                          onSaveExample(item.data.url, index)
                         }}
-                        aria-label="More image actions"
                       >
-                        <DotsThree className="size-4" weight="bold" />
+                        <Sparkle className="mr-1 size-3" weight="duotone" />
+                        Save Example
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="w-48"
-                      onClick={(event) => event.stopPropagation()}
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        runReferenceAction(item.data, index)
+                      }}
                     >
-                      {showExtendedActions && onCreateAsset && (
-                        <>
-                          <DropdownMenuItem
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              onCreateAsset(item.data.url, index)
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <Plus className="mr-2 size-4" />
-                            Create Asset
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                        </>
-                      )}
-                      <DropdownMenuItem
+                      Reference
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        runEditAction(item.data, index)
+                      }}
+                    >
+                      <PencilSimple className="mr-1 size-3" />
+                      Edit
+                    </Button>
+                    {(isAgentMode || onRecreate) && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
                         onClick={(event) => {
                           event.stopPropagation()
-                          setFullscreenImage(item.data)
+                          runRecreateAction(item.data, index)
                         }}
-                        className="cursor-pointer"
                       >
-                        <ArrowsOutSimple className="mr-2 size-4" />
-                        Full Screen
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
+                        <ArrowsClockwise className="mr-1 size-3" />
+                        Recreate
+                      </Button>
+                    )}
+                    {onCreateAsset && isAgentMode ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
                         onClick={(event) => {
                           event.stopPropagation()
-                          void handleDownload(item.data.url)
+                          onCreateAsset(item.data.url, index)
                         }}
-                        className="cursor-pointer"
                       >
-                        <DownloadSimple className="mr-2 size-4" />
-                        Download
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
+                        <Plus className="mr-1 size-3" />
+                        Save to Assets
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        runAnimateAction(item.data, index)
+                      }}
+                    >
+                      <Play className="mr-1 size-3" weight="fill" />
+                      Animate
+                    </Button>
+                    {onUpscale && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={upscalingImageUrl === item.data.url}
+                        className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
                         onClick={(event) => {
                           event.stopPropagation()
-                          void handleCopy(item.data.url)
+                          onUpscale(item.data.url, index)
                         }}
-                        className="cursor-pointer"
                       >
-                        {copiedImageUrl === item.data.url ? (
-                          <>
-                            <Check className="mr-2 size-4" />
-                            Copied
-                          </>
+                        {upscalingImageUrl === item.data.url ? (
+                          "Upscaling…"
                         ) : (
                           <>
-                            <Copy className="mr-2 size-4" />
-                            Copy
+                            <MagnifyingGlassPlus className="mr-1 size-3" />
+                            Upscale
                           </>
                         )}
-                      </DropdownMenuItem>
-                      {showExtendedActions && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              void handleCopyPrompt(item.data.prompt ?? "", `${item.data.url}-mobile-prompt`)
-                            }}
-                            className="cursor-pointer"
-                            disabled={!item.data.prompt?.trim()}
-                          >
-                            <Copy className="mr-2 size-4" />
-                            {copiedPromptKey && copiedPromptKey.startsWith(item.data.url) ? "Copied Prompt" : "Copy Prompt"}
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                      <DropdownMenuItem
+                      </Button>
+                    )}
+                    {onRemoveBackground && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={removingBackgroundImageUrl === item.data.url}
+                        className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
                         onClick={(event) => {
                           event.stopPropagation()
-                          runAnimateAction(item.data, index)
+                          runRemoveBackgroundAction(item.data, index)
                         }}
-                        className="cursor-pointer"
                       >
-                        <Play className="mr-2 size-4" weight="fill" />
-                        Animate
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
+                        {removingBackgroundImageUrl === item.data.url ? (
+                          "Removing..."
+                        ) : (
+                          <>
+                            <Eraser className="mr-1 size-3" />
+                            Remove BG
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    {onRemoveMetadata && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={removingMetadataImageUrl === item.data.url}
+                        className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
                         onClick={(event) => {
                           event.stopPropagation()
-                          runReferenceAction(item.data, index)
+                          onRemoveMetadata(item.data.url, index)
                         }}
-                        className="cursor-pointer"
                       >
-                        <ArrowsOutSimple className="mr-2 size-4" />
-                        Use as Reference
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          runEditAction(item.data, index)
-                        }}
-                        className="cursor-pointer"
-                      >
-                        <PencilSimple className="mr-2 size-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      {(isAgentMode || onRecreate) && (
-                        <DropdownMenuItem
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            runRecreateAction(item.data, index)
-                          }}
-                          className="cursor-pointer"
-                        >
-                          <ArrowsClockwise className="mr-2 size-4" />
-                          Recreate
-                        </DropdownMenuItem>
-                      )}
-                      {showExtendedActions && onUpscale && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              onUpscale(item.data.url, index)
-                            }}
-                            className="cursor-pointer"
-                            disabled={upscalingImageUrl === item.data.url}
-                          >
-                            <MagnifyingGlassPlus className="mr-2 size-4" />
-                            {upscalingImageUrl === item.data.url ? "Upscaling…" : "Upscale"}
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                      {onRemoveBackground && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              runRemoveBackgroundAction(item.data, index)
-                            }}
-                            className="cursor-pointer"
-                            disabled={removingBackgroundImageUrl === item.data.url}
-                          >
-                            <Eraser className="mr-2 size-4" />
-                            {removingBackgroundImageUrl === item.data.url ? "Removing..." : "Remove Background"}
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                      {onRemoveMetadata && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              onRemoveMetadata(item.data.url, index)
-                            }}
-                            className="cursor-pointer"
-                            disabled={removingMetadataImageUrl === item.data.url}
-                          >
-                            <ShieldCheck className="mr-2 size-4" />
-                            {removingMetadataImageUrl === item.data.url ? "Cleaning..." : "Remove Metadata"}
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                      {showExtendedActions && item.data.id && onDelete && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              requestDelete(item.data.id!, item.data.url, index)
-                            }}
-                            className="cursor-pointer text-destructive focus:text-destructive"
-                            disabled={deletingImageId === item.data.id}
-                          >
-                            <Trash className="mr-2 size-4" />
-                            {deletingImageId === item.data.id ? "Deleting..." : "Delete"}
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                </>
+                        <ShieldCheck className="mr-1 size-3" />
+                        {removingMetadataImageUrl === item.data.url ? "Cleaning..." : "Clean"}
+                      </Button>
+                    )}
+                  </div>
                 ) : null}
               </div>
             </div>
@@ -1004,30 +950,96 @@ export function ImageGrid({
           copiedUrl={copiedImageUrl}
           actions={({ url, metadata }): FullscreenMediaViewerAction[] => {
             const imageIndexByUrl = normalizedImages.findIndex((img) => img.url === url)
-            const actions: FullscreenMediaViewerAction[] = [
-              {
-                id: "download",
-                label: "Download",
-                icon: <DownloadSimple className="size-4" />,
-                onClick: () => void handleDownload(url),
-              },
-              {
-                id: "copy",
-                label: "Copy",
-                icon: <Copy className="size-4" />,
-                onClick: () => void handleCopy(url),
-              },
-            ]
+            const itemData = imageIndexByUrl !== -1 ? normalizedImages[imageIndexByUrl] : null
+            const actions: FullscreenMediaViewerAction[] = []
 
-            if (onCreateAsset && imageIndexByUrl !== -1) {
+            // Copy Prompt
+            if (metadata.prompt) {
               actions.push({
-                id: "save-to-assets",
-                label: "Save to Assets",
-                icon: <Plus className="size-4" />,
-                onClick: () => onCreateAsset(url, imageIndexByUrl),
+                id: "copy-prompt",
+                label: copiedPromptKey === `${url}-fs-prompt` ? "Prompt Copied" : "Copy Prompt",
+                icon: <Copy className="size-4" />,
+                onClick: () => {
+                  if (metadata.prompt) {
+                    void handleCopyPrompt(metadata.prompt, `${url}-fs-prompt`)
+                  }
+                },
               })
             }
 
+            // Save Example
+            if (onSaveExample && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "save-example",
+                label: "Save Example",
+                icon: <Sparkle className="size-4" weight="duotone" />,
+                onClick: () => onSaveExample(url, imageIndexByUrl),
+              })
+            }
+
+            // Use as Reference
+            if ((onUseAsReference || isAgentMode) && itemData && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "reference",
+                label: "Use as Reference",
+                icon: <ImageSquare className="size-4" />,
+                onClick: () => runReferenceAction(itemData, imageIndexByUrl),
+              })
+            }
+
+            // Edit
+            if (onEdit && itemData && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "edit",
+                label: "Edit Image",
+                icon: <PencilSimple className="size-4" />,
+                onClick: () => runEditAction(itemData, imageIndexByUrl),
+              })
+            }
+
+            // Recreate
+            if ((onRecreate || isAgentMode) && itemData && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "recreate",
+                label: "Recreate",
+                icon: <ArrowsClockwise className="size-4" />,
+                onClick: () => runRecreateAction(itemData, imageIndexByUrl),
+              })
+            }
+
+            // Animate
+            if (itemData && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "animate",
+                label: "Animate Video",
+                icon: <Play className="size-4" weight="fill" />,
+                onClick: () => runAnimateAction(itemData, imageIndexByUrl),
+              })
+            }
+
+            // Upscale
+            if (onUpscale && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "upscale",
+                label: upscalingImageUrl === url ? "Upscaling..." : "Upscale Image",
+                icon: <MagnifyingGlassPlus className="size-4" />,
+                disabled: upscalingImageUrl === url,
+                onClick: () => onUpscale(url, imageIndexByUrl),
+              })
+            }
+
+            // Remove Background
+            if (onRemoveBackground && itemData && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "remove-background",
+                label: removingBackgroundImageUrl === url ? "Removing BG..." : "Remove Background",
+                icon: <Eraser className="size-4" />,
+                disabled: removingBackgroundImageUrl === url,
+                onClick: () => runRemoveBackgroundAction(itemData, imageIndexByUrl),
+              })
+            }
+
+            // Remove Metadata
             if (onRemoveMetadata && imageIndexByUrl !== -1) {
               actions.push({
                 id: "remove-metadata",
@@ -1038,16 +1050,33 @@ export function ImageGrid({
               })
             }
 
-            if (onRemoveBackground && imageIndexByUrl !== -1) {
+            // Save to Assets
+            if (onCreateAsset && imageIndexByUrl !== -1) {
               actions.push({
-                id: "remove-background",
-                label: removingBackgroundImageUrl === url ? "Removing..." : "Remove Background",
-                icon: <Eraser className="size-4" />,
-                disabled: removingBackgroundImageUrl === url,
-                onClick: () => onRemoveBackground(url, imageIndexByUrl),
+                id: "save-to-assets",
+                label: isAgentMode ? "Save to Assets" : "Create Asset",
+                icon: <Plus className="size-4" />,
+                onClick: () => onCreateAsset(url, imageIndexByUrl),
               })
             }
 
+            // Copy Image
+            actions.push({
+              id: "copy",
+              label: "Copy Image",
+              icon: <Copy className="size-4" />,
+              onClick: () => void handleCopy(url),
+            })
+
+            // Download
+            actions.push({
+              id: "download",
+              label: "Download",
+              icon: <DownloadSimple className="size-4" />,
+              onClick: () => void handleDownload(url),
+            })
+
+            // Delete
             if (onDelete && metadata.id) {
               const imageIndexById = normalizedImages.findIndex((img) => img.id === metadata.id)
               if (imageIndexById !== -1) {

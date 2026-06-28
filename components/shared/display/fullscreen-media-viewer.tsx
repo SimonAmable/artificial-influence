@@ -271,40 +271,40 @@ export function FullscreenMediaViewer({
                   </p>
                 </div>
               )}
+
+              {resolvedActions.length > 0 && (
+                <div className="mt-4 border-t border-border/50 pt-4">
+                  <p className="mb-3 text-xs font-medium text-muted-foreground">Actions</p>
+                  <div className="flex flex-col gap-2">
+                    {resolvedActions.map((action) => {
+                      const isCopied = copiedUrl === currentUrl && /copy/i.test(action.label)
+                      return (
+                        <Button
+                          key={action.id}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className={cn(
+                            "h-9 w-full justify-start gap-2",
+                            action.destructive &&
+                              "text-destructive hover:bg-destructive/10 hover:text-destructive",
+                          )}
+                          disabled={action.disabled}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            action.onClick(state)
+                          }}
+                        >
+                          {isCopied ? <Check className="size-4" /> : action.icon}
+                          {isCopied ? "Copied" : action.label}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-
-          {resolvedActions.length > 0 && (
-            <div className="p-4">
-              <p className="mb-3 text-xs font-medium text-muted-foreground">Actions</p>
-              <div className="flex flex-col gap-2">
-                {resolvedActions.map((action) => {
-                  const isCopied = copiedUrl === currentUrl && /copy/i.test(action.label)
-                  return (
-                    <Button
-                      key={action.id}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "h-9 w-full justify-start gap-2",
-                        action.destructive &&
-                          "text-destructive hover:bg-destructive/10 hover:text-destructive",
-                      )}
-                      disabled={action.disabled}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        action.onClick(state)
-                      }}
-                    >
-                      {isCopied ? <Check className="size-4" /> : action.icon}
-                      {isCopied ? "Copied" : action.label}
-                    </Button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

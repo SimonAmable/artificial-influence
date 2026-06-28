@@ -104,6 +104,42 @@ export async function downloadMediaFile({
   }
 }
 
+async function convertImageBlobToPng(blob: Blob): Promise<Blob> {
+  if (blob.type === "image/png") {
+    return blob
+  }
+
+  return new Promise<Blob>((resolve, reject) => {
+    const url = URL.createObjectURL(blob)
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const canvas = document.createElement("canvas")
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      const ctx = canvas.getContext("2d")
+      if (!ctx) {
+        reject(new Error("Failed to get canvas 2d context"))
+        return
+      }
+      ctx.drawImage(img, 0, 0)
+      canvas.toBlob((pngBlob) => {
+        if (pngBlob) {
+          resolve(pngBlob)
+        } else {
+          reject(new Error("Failed to convert image to PNG"))
+        }
+      }, "image/png")
+    }
+    img.onerror = (err) => {
+      URL.revokeObjectURL(url)
+      reject(err)
+    }
+    img.src = url
+  })
+}
+
 export async function copyMediaToClipboard({
   url,
   kind,
@@ -117,19 +153,28 @@ export async function copyMediaToClipboard({
       throw new Error("Failed to fetch media for clipboard copy")
     }
 
-    const blob = await response.blob()
+    let blob = await response.blob()
+
+    if (kind === "image") {
+      try {
+        blob = await convertImageBlobToPng(blob)
+      } catch (err) {
+        console.error("Failed to convert image to PNG for clipboard copy:", err)
+      }
+    }
+
     const canWriteMedia =
       typeof navigator !== "undefined" &&
       Boolean(navigator.clipboard) &&
       typeof ClipboardItem !== "undefined" &&
-      (blob.type.startsWith("image/") || blob.type.startsWith("video/"))
+      (blob.type === "image/png" || blob.type.startsWith("video/"))
 
     if (canWriteMedia) {
       await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
       return "media"
     }
-  } catch {
-    // Fall through to URL copy.
+  } catch (err) {
+    console.error("Clipboard media write failed, falling back to URL copy:", err)
   }
 
   if (!navigator?.clipboard) {
