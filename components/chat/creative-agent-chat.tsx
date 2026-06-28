@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import Image from "next/image"
@@ -459,28 +459,49 @@ export function CreativeAgentChat({
     [chatGatewayModelId],
   )
 
+  const initialMessagesRef = React.useRef(initialMessages)
+  const enablePersistenceRef = React.useRef(enablePersistence)
+  const syncUrlOnThreadCreateRef = React.useRef(syncUrlOnThreadCreate)
+  const routerRef = React.useRef(router)
+
+  React.useEffect(() => {
+    initialMessagesRef.current = initialMessages
+  }, [initialMessages])
+
+  React.useEffect(() => {
+    enablePersistenceRef.current = enablePersistence
+  }, [enablePersistence])
+
+  React.useEffect(() => {
+    syncUrlOnThreadCreateRef.current = syncUrlOnThreadCreate
+  }, [syncUrlOnThreadCreate])
+
+  React.useEffect(() => {
+    routerRef.current = router
+  }, [router])
+
   const chat = React.useMemo(
     () =>
       new Chat({
         id: resolvedUiChatBootstrapId,
-        messages: initialMessages,
+        messages: initialMessagesRef.current,
         onFinish: () => {
           const activeThreadId = threadIdRef.current
 
           const threadHref = activeThreadId ? `/chat/${activeThreadId}` : null
 
-          if (enablePersistence && syncUrlOnThreadCreate && threadHref && pathnameRef.current !== threadHref) {
-            router.replace(threadHref)
+          if (enablePersistenceRef.current && syncUrlOnThreadCreateRef.current && threadHref && pathnameRef.current !== threadHref) {
+            routerRef.current.replace(threadHref)
           }
 
-          if (enablePersistence && activeThreadId) {
+          if (enablePersistenceRef.current && activeThreadId) {
             const refreshed = intentSidebarRefreshedForThreadIdsRef.current
             if (!refreshed.has(activeThreadId)) {
               refreshed.add(activeThreadId)
-              router.refresh()
+              routerRef.current.refresh()
               /** Second pass after intent-title LLM (waitUntil) updates the DB. */
               window.setTimeout(() => {
-                router.refresh()
+                routerRef.current.refresh()
               }, 3200)
             }
           }
@@ -500,7 +521,7 @@ export function CreativeAgentChat({
             if (onboardingHandoff) {
               onboardingHandoffPendingRef.current = false
             }
-            if (enablePersistence && threadIdRef.current && messages.length > 0 && !forceFullMessages) {
+            if (enablePersistenceRef.current && threadIdRef.current && messages.length > 0 && !forceFullMessages) {
               return {
                 body: {
                   message: messages[messages.length - 1],
@@ -528,13 +549,7 @@ export function CreativeAgentChat({
           },
         }),
       }),
-    [
-      enablePersistence,
-      initialMessages,
-      resolvedUiChatBootstrapId,
-      router,
-      syncUrlOnThreadCreate,
-    ],
+    [resolvedUiChatBootstrapId],
   )
 
   const { addToolApprovalResponse, messages, sendMessage, setMessages, status, error, stop } = useChat({

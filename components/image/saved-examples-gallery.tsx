@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { createPortal } from "react-dom"
-import { Sparkle, UploadSimple, X } from "@phosphor-icons/react"
+import { PencilSimple, Sparkle, UploadSimple, X } from "@phosphor-icons/react"
 
 import type { SavedExample } from "@/lib/examples/types"
 import { Badge } from "@/components/ui/badge"
@@ -59,13 +59,16 @@ export function SavedExamplesGallery({
   const [activeExample, setActiveExample] = React.useState<SavedExample | null>(null)
   const [draftPrompt, setDraftPrompt] = React.useState("")
   const [inputValues, setInputValues] = React.useState<Record<string, string | File | null>>({})
+  const [isEditingPrompt, setIsEditingPrompt] = React.useState(false)
 
   React.useEffect(() => {
     if (!activeExample) {
       setInputValues({})
+      setIsEditingPrompt(false)
       return
     }
     setDraftPrompt(activeExample.prompt)
+    setIsEditingPrompt(false)
 
     const initialValues: Record<string, string | File | null> = {}
     activeExample.inputs.forEach((input) => {
@@ -298,21 +301,21 @@ export function SavedExamplesGallery({
                   </section>
 
                   {/* Element 2: INPUT CARD (Variables / Input Slots Manager) */}
-                  <section className="space-y-3">
-                    <Card className="rounded-3xl border border-border/70 bg-card p-4 shadow-sm">
-                      <div className="flex items-center justify-between gap-4 mb-4">
-                        <div className="space-y-0.5">
-                          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground text-left">
-                            Input variables
-                          </h3>
-                          <p className="text-xs text-muted-foreground text-left">
-                            Fill in these placeholder values for this example.
-                          </p>
+                  {activeExample.inputs && activeExample.inputs.length > 0 && (
+                    <section className="space-y-3">
+                      <Card className="rounded-3xl border border-border/70 bg-card py-2.5 px-3.5 shadow-sm">
+                        <div className="flex items-center justify-between gap-4 mb-2">
+                          <div className="space-y-0.5">
+                            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground text-left">
+                              Input variables
+                            </h3>
+                            <p className="text-xs text-muted-foreground text-left">
+                              Fill in these placeholder values for this example.
+                            </p>
+                          </div>
                         </div>
-                      </div>
 
-                      {activeExample.inputs.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="space-y-2.5">
                           {activeExample.inputs.map((input) => {
                             const isMedia = input.kind === "image" || input.kind === "video" || input.kind === "audio"
                             
@@ -323,11 +326,11 @@ export function SavedExamplesGallery({
                               const previewUrl = val instanceof File ? URL.createObjectURL(val) : (typeof val === "string" ? val : null)
 
                               return (
-                                <div key={input.id} className="space-y-1.5 text-left">
+                                <div key={input.id} className="space-y-1 text-left">
                                   <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                     {input.label} {input.required && <span className="text-destructive">*</span>}
                                   </label>
-                                  <div className="relative flex min-h-[110px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-background p-3 transition-colors">
+                                  <div className="relative flex min-h-[85px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-background py-2 px-3 transition-colors">
                                     {hasVal ? (
                                       <div className="relative flex w-full flex-col items-center gap-2">
                                         {isImage && previewUrl ? (
@@ -352,8 +355,8 @@ export function SavedExamplesGallery({
                                         </Button>
                                       </div>
                                     ) : (
-                                      <div className="flex flex-col items-center gap-2">
-                                        <UploadSimple className="size-5 text-muted-foreground/60" />
+                                      <div className="flex flex-col items-center gap-1">
+                                        <UploadSimple className="size-4 text-muted-foreground/60" />
                                         <span className="text-[11px] text-muted-foreground text-center">
                                           Upload a reference {input.kind}
                                         </span>
@@ -386,7 +389,7 @@ export function SavedExamplesGallery({
 
                             // Text input
                             return (
-                              <div key={input.id} className="space-y-1.5 text-left">
+                              <div key={input.id} className="space-y-1 text-left">
                                 <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                   {input.label} {input.required && <span className="text-destructive">*</span>}
                                 </label>
@@ -400,13 +403,9 @@ export function SavedExamplesGallery({
                             )
                           })}
                         </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground text-left">
-                          This example is ready to use as-is. No inputs detected yet.
-                        </p>
-                      )}
-                    </Card>
-                  </section>
+                      </Card>
+                    </section>
+                  )}
 
                   {/* Element 3: PROMPT BOX CARD (Replica style editor) */}
                   <section className="space-y-3">
@@ -417,15 +416,40 @@ export function SavedExamplesGallery({
                         <div className="flex items-start gap-2 pt-1 px-2">
                           <div className="flex-1 relative">
                             <div className="space-y-1.5 text-left">
-                              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pl-2">
-                                Prompt Text
-                              </label>
-                              <Textarea
-                                value={draftPrompt}
-                                onChange={(e) => setDraftPrompt(e.target.value)}
-                                className="min-h-[110px] w-full rounded-[24px] border border-border/70 bg-background p-3.5 text-sm leading-6 outline-none resize-none"
-                                placeholder="Edit the prompt before using the example"
-                              />
+                              <div className="flex items-center justify-between pl-2 pr-1 mb-1">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Prompt Text
+                                </label>
+                                {!isEditingPrompt && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="xs"
+                                    onClick={() => setIsEditingPrompt(true)}
+                                    className="h-6 rounded-full px-2.5 text-[10px] uppercase font-semibold text-primary hover:text-primary/80 hover:bg-primary/10 flex items-center gap-1"
+                                  >
+                                    <PencilSimple size={12} weight="bold" />
+                                    <span>Edit</span>
+                                  </Button>
+                                )}
+                              </div>
+                              {!isEditingPrompt ? (
+                                <div className="min-h-[110px] w-full rounded-[24px] border border-border/70 bg-muted/15 p-3.5 text-sm leading-6 text-foreground/90 text-left select-none cursor-default flex flex-col justify-start">
+                                  <p className="line-clamp-3 break-words whitespace-pre-wrap">
+                                    {draftPrompt || "No prompt description"}
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="relative">
+                                  <Textarea
+                                    value={draftPrompt}
+                                    onChange={(e) => setDraftPrompt(e.target.value)}
+                                    className="min-h-[110px] w-full rounded-[24px] border border-border/70 bg-background p-3.5 text-sm leading-6 outline-none resize-none"
+                                    placeholder="Edit the prompt before using the example"
+                                    autoFocus
+                                  />
+                                </div>
+                              )}
                             </div>
                           </div>
 
