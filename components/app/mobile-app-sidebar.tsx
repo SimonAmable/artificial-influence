@@ -18,6 +18,7 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   FolderSimple,
+  MagnifyingGlass,
   User,
 } from "@phosphor-icons/react"
 
@@ -65,6 +66,7 @@ const FLAT_NAV_ITEMS: FlatNavItem[] = [
   { path: "/slideshows",    label: "Slideshows",    icon: SquaresFour,     badge: "new"  },
   { path: "/autopost",      label: "Autopost",      icon: PaperPlaneTilt,  badge: "new"  },
   { path: "/ai-influencer", label: "AI Influencer", icon: RobotIcon,       badge: "new"  },
+  { path: "/explore",       label: "Explore",       icon: MagnifyingGlass, badge: "new"  },
   { path: "/image",         label: "Image",         icon: ImageIcon                      },
   { path: "/video",         label: "Video",         icon: VideoIcon                      },
   { path: "/audio",         label: "Audio",         icon: MicrophoneIcon                 },

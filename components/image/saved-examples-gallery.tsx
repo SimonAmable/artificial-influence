@@ -245,10 +245,10 @@ export function SavedExamplesGallery({
               <div className="mx-auto flex w-full max-w-none items-start justify-between gap-4">
                 <div className="space-y-1 text-left">
                   <h2 className="text-base font-semibold sm:text-lg text-foreground">
-                    Use Example
+                    Recreate Example
                   </h2>
                   <p className="text-xs text-muted-foreground">
-                    Adjust variables and prompt before adding them to your composer.
+                    Customize the prompt and inputs below to recreate this concept.
                   </p>
                 </div>
 
@@ -313,11 +313,8 @@ export function SavedExamplesGallery({
                         <div className="flex items-center justify-between gap-4 mb-2">
                           <div className="space-y-0.5">
                             <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground text-left">
-                              Input variables
+                              Inputs
                             </h3>
-                            <p className="text-xs text-muted-foreground text-left">
-                              Fill in these placeholder values for this example.
-                            </p>
                           </div>
                         </div>
 
@@ -451,7 +448,7 @@ export function SavedExamplesGallery({
                                     value={draftPrompt}
                                     onChange={(e) => setDraftPrompt(e.target.value)}
                                     className="min-h-[110px] w-full rounded-[24px] border border-border/70 bg-background p-3.5 text-sm leading-6 outline-none resize-none"
-                                    placeholder="Edit the prompt before using the example"
+                                    placeholder="Edit the prompt before recreating the example"
                                     autoFocus
                                   />
                                 </div>
@@ -466,7 +463,7 @@ export function SavedExamplesGallery({
                               className="bg-primary hover:bg-primary/80 text-primary-foreground font-semibold h-10 min-w-[100px] text-xs px-4 py-6 rounded-full transition-all duration-300"
                             >
                               <div className="flex flex-col items-center gap-0.5">
-                                <span className="text-sm font-semibold">Use</span>
+                                <span className="text-sm font-semibold">Recreate</span>
                                 <div className="flex items-center gap-0.5">
                                   <Sparkle size={8} weight="fill" />
                                   <span className="text-[10px]">Example</span>

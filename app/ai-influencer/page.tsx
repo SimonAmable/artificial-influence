@@ -689,7 +689,7 @@ export default function AIInfluencerPage() {
             },
           }
         )
-        const generatedUrl = "image" in result ? result.image.url : result.images[0]?.url
+        const generatedUrl = "image" in result ? result.image?.url : result.images[0]?.url
         if (!generatedUrl) throw new Error("Failed to create character image")
         const createdCharacter: ImageHistoryItem = {
           id: acceptedGenerationId ?? `generated-${Date.now()}`,
@@ -929,14 +929,75 @@ export default function AIInfluencerPage() {
     </div>
   )
 
+  const renderCharacterCards = () => {
+    return (
+      <>
+        {/* Reset/Create New Card */}
+        <button
+          onClick={handleReset}
+          className={cn(
+            "flex shrink-0 flex-col items-center justify-center p-3 rounded-xl border border-dashed border-border/40 bg-secondary/15 hover:bg-secondary/30 hover:border-primary/50 transition-all aspect-square w-[96px] sm:w-[108px] lg:w-full",
+            !selectedCharacter && "border-primary/45 bg-primary/5 shadow-[0_0_12px_rgba(168,85,247,0.06)]"
+          )}
+        >
+          <Plus className="size-4 text-primary mb-1" weight="bold" />
+          <span className="text-[10px] font-bold tracking-tight">Create new</span>
+        </button>
+
+        {/* Previously Generated Characters */}
+        {historyImages.map(item => {
+          const isActive = selectedCharacter?.id === item.id
+          return (
+            <div
+              key={item.id}
+              onClick={() => {
+                setSelectedCharacter(item)
+                setCharacterName(getCharacterDisplayName(item))
+              }}
+              className={cn(
+                "group relative flex shrink-0 flex-col justify-end p-2 rounded-xl border border-border/30 bg-secondary/10 hover:bg-secondary/20 cursor-pointer transition-all aspect-square w-[96px] sm:w-[108px] lg:w-full overflow-hidden",
+                isActive && "border-primary ring-1 ring-primary/30"
+              )}
+            >
+              <img
+                src={item.url}
+                alt={item.prompt || "Character"}
+                className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-102 transition-transform"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent h-1/2 p-2 pt-4 flex items-end" />
+              
+              {/* Delete button overlay */}
+              <button
+                onClick={(e) => handleDelete(item.id, e)}
+                className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-destructive rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                aria-label="Delete character"
+              >
+                <Trash className="size-2.5 text-white" />
+              </button>
+
+              <span className="relative z-10 truncate max-w-full text-[10px] font-black uppercase tracking-[-0.03em] text-white drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
+                {getCharacterDisplayName(item)}
+              </span>
+            </div>
+          )
+        })}
+      </>
+    )
+  }
+
   return (
-    <div className="h-[100dvh] min-h-0 overflow-hidden bg-black text-foreground flex flex-col pt-[52px]">
-      <div className="flex-1 min-h-0 w-full max-w-full flex flex-col lg:flex-row overflow-hidden min-w-0">
+    <div className="h-auto lg:h-[100dvh] min-h-0 overflow-y-auto lg:overflow-hidden bg-black text-foreground flex flex-col pt-[52px]">
+      <div className="flex-1 min-h-0 w-full max-w-full flex flex-col lg:flex-row overflow-visible lg:overflow-hidden min-w-0">
         
         {/* Left Column: Characters History (Narrow, Clean sidebar look) */}
-        <div className="w-full lg:w-[180px] shrink-0 min-w-0 border-b lg:border-b-0 lg:border-r border-border/40 bg-muted/5 flex flex-col h-1/4 lg:h-full min-h-0">
+        <div className="w-full lg:w-[180px] shrink-0 min-w-0 border-b lg:border-b-0 lg:border-r border-border/40 bg-muted/5 flex flex-col h-auto lg:h-full min-h-0">
           <div className="p-4 flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-display">Characters</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-display">Characters</h2>
+              <Badge variant="secondary" className="bg-secondary/45 text-muted-foreground border-border/30 text-[9px] font-bold px-1.5 py-0.5">
+                {historyImages.length}
+              </Badge>
+            </div>
             <button
               onClick={() => setIsHelpOpen(true)}
               className="text-muted-foreground hover:text-foreground transition-colors p-1"
@@ -945,64 +1006,24 @@ export default function AIInfluencerPage() {
               <Info className="size-3.5" />
             </button>
           </div>
-          <ScrollArea className="flex-1 min-h-0 px-3 pb-3">
-            <div className="flex gap-2.5 overflow-x-auto overflow-y-hidden pb-2 pr-1 touch-pan-x overscroll-x-contain [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-flow-row lg:grid-cols-1 lg:gap-2.5 lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0 lg:pr-0">
-              
-              {/* Reset/Create New Card */}
-              <button
-                onClick={handleReset}
-                className={cn(
-                  "flex shrink-0 flex-col items-center justify-center p-3 rounded-xl border border-dashed border-border/40 bg-secondary/15 hover:bg-secondary/30 hover:border-primary/50 transition-all aspect-square w-[96px] sm:w-[108px] lg:w-full",
-                  !selectedCharacter && "border-primary/45 bg-primary/5 shadow-[0_0_12px_rgba(168,85,247,0.06)]"
-                )}
-              >
-                <Plus className="size-4 text-primary mb-1" weight="bold" />
-                <span className="text-[10px] font-bold tracking-tight">Create new</span>
-              </button>
+          
+          {/* Mobile horizontal list container */}
+          <div className="block lg:hidden w-full overflow-x-auto px-3 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex gap-2.5 pb-2 touch-pan-x">
+              {renderCharacterCards()}
+            </div>
+          </div>
 
-              {/* Previously Generated Characters */}
-              {historyImages.map(item => {
-                const isActive = selectedCharacter?.id === item.id
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => {
-                      setSelectedCharacter(item)
-                      setCharacterName(getCharacterDisplayName(item))
-                    }}
-                    className={cn(
-                      "group relative flex shrink-0 flex-col justify-end p-2 rounded-xl border border-border/30 bg-secondary/10 hover:bg-secondary/20 cursor-pointer transition-all aspect-square w-[96px] sm:w-[108px] lg:w-full overflow-hidden",
-                      isActive && "border-primary ring-1 ring-primary/30"
-                    )}
-                  >
-                    <img
-                      src={item.url}
-                      alt={item.prompt || "Character"}
-                      className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-102 transition-transform"
-                    />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent h-1/2 p-2 pt-4 flex items-end" />
-                    
-                    {/* Delete button overlay */}
-                    <button
-                      onClick={(e) => handleDelete(item.id, e)}
-                      className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-destructive rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                      aria-label="Delete character"
-                    >
-                      <Trash className="size-2.5 text-white" />
-                    </button>
-
-                    <span className="relative z-10 truncate max-w-full text-[10px] font-black uppercase tracking-[-0.03em] text-white drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
-                      {getCharacterDisplayName(item)}
-                    </span>
-                  </div>
-                )
-              })}
+          {/* Desktop vertical scroll area */}
+          <ScrollArea className="hidden lg:block flex-1 min-h-0 px-3 pb-3">
+            <div className="grid grid-cols-1 gap-2.5 pr-1">
+              {renderCharacterCards()}
             </div>
           </ScrollArea>
         </div>
 
         {/* Middle Column: Preview & Action Canvas (Spacious, Centered card) */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-between items-center p-4 lg:px-8 lg:pt-0 lg:pb-8 bg-black relative overflow-hidden overflow-x-hidden h-2/4 lg:h-full">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-between items-center p-4 lg:px-8 lg:pt-0 lg:pb-8 bg-black relative overflow-visible lg:overflow-hidden h-auto lg:h-full">
           <div className="w-full max-w-lg flex-1 flex flex-col justify-start py-4 lg:py-0">
             
             {/* Main Preview Card with big round borders */}
