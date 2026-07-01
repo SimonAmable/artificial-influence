@@ -176,11 +176,11 @@ export const megaNavGroups: MegaNavGroup[] = [
       },
     ],
   },
-  {
-    label: "Explore",
-    path: "/explore",
-    badge: "new",
-  },
+  // {
+  //   label: "Explore",
+  //   path: "/explore",
+  //   badge: "new",
+  // },
   {
     label: "Image",
     path: "/image",
