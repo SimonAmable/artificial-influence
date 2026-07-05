@@ -96,7 +96,6 @@ export function Header() {
     pathname === "/onboarding" || pathname?.startsWith("/onboarding/")
   const [user, setUser] = React.useState<{ id: string; email?: string } | null>(null)
   const [loading, setLoading] = React.useState(true)
-  const [isScrolled, setIsScrolled] = React.useState(false)
   const [credits, setCredits] = React.useState<number | null>(null)
   const [profileModalOpen, setProfileModalOpen] = React.useState(false)
   const [profileModalTab, setProfileModalTab] = React.useState<SettingsTab>("profile")
@@ -118,22 +117,6 @@ export function Header() {
   const [openGroupLabel, setOpenGroupLabel] = React.useState<string | null>(null)
   const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const supportsHoverDropdowns = useFinePointerHoverDevice()
-
-  // Scroll detection
-  React.useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY >= 50)
-    }
-
-    // Check initial scroll position
-    handleScroll()
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    
-    return () => {
-      window.removeEventListener('scroll', handleScroll)
-    }
-  }, [])
 
   React.useEffect(() => {
     const supabase = createClient()
@@ -223,10 +206,7 @@ export function Header() {
 
   return (
     <header className={cn(
-      "fixed z-50 flex flex-col overflow-visible rounded-none bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 pointer-events-auto",
-      "transition-all duration-300 ease-in-out",
-      isScrolled ? "shadow-lg" : "",
-      isAuthPage ? "top-0 left-0 right-0 rounded-none" : isScrolled ? "top-4 left-4 right-4" : "top-0 left-0 right-0"
+      "fixed top-0 left-0 right-0 z-50 flex flex-col overflow-visible rounded-none bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 pointer-events-auto shadow-sm"
     )}>
       <div className="flex h-[52px] min-w-0 items-center justify-between gap-2 overflow-visible px-4">
         <div className="flex min-w-0 shrink items-center gap-4 lg:gap-6">
