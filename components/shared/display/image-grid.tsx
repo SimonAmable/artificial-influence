@@ -170,6 +170,7 @@ export function ImageGrid({
     url: string
     index: number
   } | null>(null)
+  const [failedUrls, setFailedUrls] = React.useState<Record<string, boolean>>({})
 
   const renderDropdownContent = (data: ImageData, index: number) => {
     return (
@@ -622,9 +623,16 @@ export function ImageGrid({
                 "group relative flex w-full min-w-0 cursor-pointer items-center justify-center bg-background",
                 isOneColumn ? "aspect-auto" : "aspect-square min-h-0"
               )}
-              onClick={() => setFullscreenImage(item.data)}
-              draggable
+              onClick={() => {
+                if (failedUrls[item.data.url]) return
+                setFullscreenImage(item.data)
+              }}
+              draggable={!failedUrls[item.data.url]}
               onDragStart={(e) => {
+                if (failedUrls[item.data.url]) {
+                  e.preventDefault()
+                  return
+                }
                 // Set data in the format AI chat expects (same as canvas image-gen nodes)
                 const nodeData = {
                   id: `image-grid-${index}`,
@@ -642,16 +650,32 @@ export function ImageGrid({
                 }
               }}
             >
-              <img
-                src={item.data.url}
-                alt={`Generated image ${index + 1}`}
-                className={cn(
-                  "w-auto h-auto object-contain pointer-events-none",
-                  isOneColumn ? "max-h-[50vh] max-w-full" : "max-w-full max-h-full"
-                )}
-                loading="lazy"
-                draggable={false}
-              />
+              {failedUrls[item.data.url] ? (
+                <div className={cn(
+                  "flex flex-col items-center justify-center bg-zinc-900 border border-white/10 text-muted-foreground p-6 pb-16 text-center gap-2 rounded-lg",
+                  isOneColumn ? "w-full aspect-square sm:aspect-video max-h-[50vh]" : "w-full h-full aspect-square"
+                )}>
+                  <div className="rounded-full bg-zinc-800 p-3 text-zinc-400">
+                    <ImageSquare className="size-6" />
+                  </div>
+                  <span className="text-xs font-semibold text-zinc-200">Image unavailable</span>
+                  <span className="text-[10px] text-zinc-400 max-w-[200px]">This image failed to load or has expired.</span>
+                </div>
+              ) : (
+                <img
+                  src={item.data.url}
+                  alt={`Generated image ${index + 1}`}
+                  className={cn(
+                    "w-auto h-auto object-contain pointer-events-none",
+                    isOneColumn ? "max-h-[50vh] max-w-full" : "max-w-full max-h-full"
+                  )}
+                  loading="lazy"
+                  draggable={false}
+                  onError={() => {
+                    setFailedUrls((prev) => ({ ...prev, [item.data.url]: true }))
+                  }}
+                />
+              )}
 
               {/* Upscaling overlay - generating animation over the image */}
               {upscalingImageUrl === item.data.url && (

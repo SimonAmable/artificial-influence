@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 
 const REMOVE_BG_MODEL_ID =
-  '851-labs/background-remover:a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc';
+  'fottoai/remove-bg-2';
 const CREDITS_COST = 1;
 
 function extractOutputUrl(output: unknown): string | null {
