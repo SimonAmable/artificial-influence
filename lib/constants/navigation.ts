@@ -104,7 +104,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/image", label: "Image" },
   { path: "/video", label: "Video" },
   { path: "/audio", label: "Audio" },
-  { path: "/assets?tab=brands", label: "Brand" },
+  { path: "/assets?tab=brands", label: "Brand", hiddenFor: ["presence-studio"] },
   { path: "/motion-copy", label: "Motion Copy" },
   { path: "/lipsync", label: "Lipsync" },
   { path: "/inpaint", label: "Image Editing" },
@@ -443,7 +443,14 @@ const baseMegaNavGroups: MegaNavGroup[] = [
       { path: "/assets", label: "Assets", description: "Store and sort your generated assets", iconPhosphor: "folder", badge: "new" },
       { path: "/assets?tab=history", label: "History", description: "Past generations and edits", iconPhosphor: "clock-counter-clockwise" },
       { path: "/resources", label: "Resources", description: "Search live stock and meme references", iconPhosphor: "image", badge: "new" },
-      { path: "/assets?tab=brands", label: "Brand", description: "Manage brand settings", iconSrc: "/logo.svg", badge: "new" },
+      {
+        path: "/assets?tab=brands",
+        label: "Brand",
+        description: "Manage brand settings",
+        iconSrc: "/logo.svg",
+        badge: "new",
+        hiddenFor: ["presence-studio"],
+      },
     ],
   },
   {
@@ -697,6 +704,7 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     href: "/brand",
     icon: "palette",
     hint: "Logos, colors, type, and voice for consistent AI output.",
+    hiddenFor: ["presence-studio"],
   },
   {
     label: "Motion Copy",

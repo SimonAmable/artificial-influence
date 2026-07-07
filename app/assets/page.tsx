@@ -61,6 +61,7 @@ import type { BrandKit } from "@/lib/brand-kit/types"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import type { SlideshowCollection } from "@/lib/slideshow/types"
 import { createClient } from "@/lib/supabase/client"
+import { isPresenceProduct } from "@/lib/product/require-presence"
 
 type LibraryTab = "history" | "assets" | "brands" | "collections"
 type GenerationType = "image" | "video" | "audio" | "all"
@@ -150,8 +151,14 @@ type ViewerItem = {
 
 const HISTORY_PAGE_LIMIT = 24
 const ASSET_PAGE_LIMIT = 200
-const LIBRARY_TABS: LibraryTab[] = ["history", "assets", "brands", "collections"]
-const HISTORY_TYPES: GenerationType[] = ["all", "image", "video", "audio"]
+const ALL_LIBRARY_TABS: LibraryTab[] = ["history", "assets", "brands", "collections"]
+
+function getLibraryTabs(): LibraryTab[] {
+  if (isPresenceProduct()) {
+    return ALL_LIBRARY_TABS.filter((tab) => tab !== "brands")
+  }
+  return ALL_LIBRARY_TABS
+}
 
 const tabLabels: Record<LibraryTab, string> = {
   history: "History",
@@ -160,9 +167,11 @@ const tabLabels: Record<LibraryTab, string> = {
   collections: "Collections",
 }
 
-function normalizeLibraryTab(value: string | null): LibraryTab {
-  return LIBRARY_TABS.includes(value as LibraryTab) ? (value as LibraryTab) : "assets"
+function normalizeLibraryTab(value: string | null, tabs: LibraryTab[] = getLibraryTabs()): LibraryTab {
+  return tabs.includes(value as LibraryTab) ? (value as LibraryTab) : "assets"
 }
+
+const HISTORY_TYPES: GenerationType[] = ["all", "image", "video", "audio"]
 
 const emptyHistoryMessages: Record<GenerationType, string> = {
   all: "No generations found.",
@@ -504,13 +513,22 @@ function FilterOptionsContent({
 function LibraryPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const libraryTabs = React.useMemo(() => getLibraryTabs(), [])
   const requestedTab = searchParams.get("tab")
-  const [activeTab, setActiveTab] = React.useState<LibraryTab>(() => normalizeLibraryTab(requestedTab))
+  const [activeTab, setActiveTab] = React.useState<LibraryTab>(() => normalizeLibraryTab(requestedTab, libraryTabs))
 
   React.useEffect(() => {
-    const nextTab = normalizeLibraryTab(requestedTab)
+    const nextTab = normalizeLibraryTab(requestedTab, libraryTabs)
     setActiveTab((current) => (current === nextTab ? current : nextTab))
-  }, [requestedTab])
+  }, [libraryTabs, requestedTab])
+
+  React.useEffect(() => {
+    if (requestedTab === "brands" && !libraryTabs.includes("brands")) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set("tab", "assets")
+      router.replace(`/assets?${params.toString()}`, { scroll: false })
+    }
+  }, [libraryTabs, requestedTab, router, searchParams])
 
   const [search, setSearch] = React.useState("")
   const debouncedSearch = useDebouncedValue(search.trim(), 250)
@@ -550,11 +568,13 @@ function LibraryPageContent() {
   const [brandKits, setBrandKits] = React.useState<BrandKit[]>([])
   const [brandsLoading, setBrandsLoading] = React.useState(false)
   const [brandsError, setBrandsError] = React.useState<string | null>(null)
+  const [brandsHasLoaded, setBrandsHasLoaded] = React.useState(false)
   const [brandFlowOpen, setBrandFlowOpen] = React.useState(false)
   const [collectionDialogOpen, setCollectionDialogOpen] = React.useState(false)
   const [collections, setCollections] = React.useState<SlideshowCollection[]>([])
   const [collectionsLoading, setCollectionsLoading] = React.useState(false)
   const [collectionsError, setCollectionsError] = React.useState<string | null>(null)
+  const [collectionsHasLoaded, setCollectionsHasLoaded] = React.useState(false)
   const [viewerItem, setViewerItem] = React.useState<ViewerItem | null>(null)
   const [copiedUrl, setCopiedUrl] = React.useState<string | null>(null)
   const [saveDraft, setSaveDraft] = React.useState<SaveAssetDraft | null>(null)
@@ -871,6 +891,7 @@ function LibraryPageContent() {
       setBrandsError(error instanceof Error ? error.message : "Failed to load brand kits")
     } finally {
       setBrandsLoading(false)
+      setBrandsHasLoaded(true)
     }
   }, [])
 
@@ -887,6 +908,7 @@ function LibraryPageContent() {
       setCollectionsError(error instanceof Error ? error.message : "Failed to load collections")
     } finally {
       setCollectionsLoading(false)
+      setCollectionsHasLoaded(true)
     }
   }, [])
 
@@ -917,16 +939,16 @@ function LibraryPageContent() {
   }, [activeTab, debouncedSearch, fetchGenerations, historyStates, historyType])
 
   React.useEffect(() => {
-    if (activeTab === "brands" && !brandsLoading && !brandsError && brandKits.length === 0) {
+    if (activeTab === "brands" && !brandsHasLoaded && !brandsLoading) {
       void refreshBrands()
     }
-  }, [activeTab, brandKits.length, brandsError, brandsLoading, refreshBrands])
+  }, [activeTab, brandsHasLoaded, brandsLoading, refreshBrands])
 
   React.useEffect(() => {
-    if (activeTab === "collections" && !collectionsLoading && !collectionsError && collections.length === 0) {
+    if (activeTab === "collections" && !collectionsHasLoaded && !collectionsLoading) {
       void refreshCollections()
     }
-  }, [activeTab, collections.length, collectionsError, collectionsLoading, refreshCollections])
+  }, [activeTab, collectionsHasLoaded, collectionsLoading, refreshCollections])
 
   React.useEffect(() => {
     if (activeTab !== "history") return
@@ -1343,11 +1365,11 @@ function LibraryPageContent() {
           </div>
         </div>
 
-        <div className="sticky top-[58px] z-30 -mx-4 mb-4 bg-background/90 px-4 pt-0.5 pb-2 border-b border-border/20 backdrop-blur supports-backdrop-filter:bg-background/70">
+        <div className="sticky top-[58px] z-30 -mx-4 mb-2 bg-background/90 px-4 pt-0.5 pb-2 border-b border-border/20 backdrop-blur supports-backdrop-filter:bg-background/70">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <Tabs value={activeTab} onValueChange={(value) => handleActiveTabChange(value as LibraryTab)}>
               <TabsList className="h-auto max-w-full flex-wrap justify-start overflow-visible rounded-full p-0.5 bg-muted/60">
-                {LIBRARY_TABS.map((tab) => (
+                {libraryTabs.map((tab) => (
                   <TabsTrigger key={tab} value={tab} className="shrink-0 gap-2 rounded-full px-4 py-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                     {tabLabels[tab]}
                     {tabCounts[tab] ? (
@@ -1451,8 +1473,8 @@ function LibraryPageContent() {
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(value) => handleActiveTabChange(value as LibraryTab)}>
-          <TabsContent value="history" className="mt-0">
+        <Tabs value={activeTab} onValueChange={(value) => handleActiveTabChange(value as LibraryTab)} className="w-full">
+          <TabsContent value="history" className="mt-0 w-full pt-3">
             <HistoryPanel
               activeType={historyType}
               setActiveType={setHistoryType}
@@ -1476,7 +1498,7 @@ function LibraryPageContent() {
             />
           </TabsContent>
 
-          <TabsContent value="assets" className="mt-0">
+          <TabsContent value="assets" className="mt-0 w-full pt-3">
             <AssetsPanel
               visibility={assetVisibility}
               setVisibility={setAssetVisibility}
@@ -1503,7 +1525,7 @@ function LibraryPageContent() {
             />
           </TabsContent>
 
-          <TabsContent value="brands" className="mt-0">
+          <TabsContent value="brands" className="mt-0 w-full pt-3">
             <BrandsPanel
               kits={filteredBrandKits}
               loading={brandsLoading}
@@ -1514,9 +1536,11 @@ function LibraryPageContent() {
             />
           </TabsContent>
 
-          <TabsContent value="collections" className="mt-0">
+          <TabsContent value="collections" className="mt-0 w-full pt-3">
             <CollectionsPanel
               collections={filteredCollections}
+              totalCount={collections.length}
+              searchQuery={debouncedSearch}
               loading={collectionsLoading}
               error={collectionsError}
               onRefresh={() => void refreshCollections()}
@@ -1646,13 +1670,14 @@ function HistoryPanel({
   }[columnCount] || "grid-cols-2"
 
   return (
-    <section className="space-y-3">
+    <section className="w-full space-y-3">
       {state.initialLoading ? (
         <LoadingGrid label="Loading history..." />
       ) : state.error && state.items.length === 0 ? (
-        <RetryState message={state.error} onRetry={onRefresh} />
+        <RetryState centered message={state.error} onRetry={onRefresh} />
       ) : state.items.length === 0 ? (
         <EmptyState
+          centered
           icon={<ClockCounterClockwise className="h-7 w-7" />}
           title={searchQuery ? `No results for "${searchQuery}"` : emptyHistoryMessages[activeType]}
         />
@@ -1773,13 +1798,14 @@ function AssetsPanel({
   }[columnCount] || "grid-cols-2"
 
   return (
-    <section className="space-y-3">
+    <section className="w-full space-y-3">
       {state.initialLoading ? (
         <LoadingGrid label="Loading assets..." />
       ) : state.error ? (
-        <RetryState message={state.error} onRetry={onRefresh} />
+        <RetryState centered message={state.error} onRetry={onRefresh} />
       ) : state.items.length === 0 ? (
         <EmptyState
+          centered
           icon={<Images className="h-7 w-7" />}
           title={emptyTitle}
           description="Drop a file anywhere on this page, or use Upload."
@@ -2276,7 +2302,7 @@ function BrandsPanel({
   onDeleted: (id: string) => void
 }) {
   return (
-    <section className="space-y-3">
+    <section className="w-full space-y-3">
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, index) => (
@@ -2284,9 +2310,10 @@ function BrandsPanel({
           ))}
         </div>
       ) : error ? (
-        <RetryState message={error} onRetry={onRefresh} />
+        <RetryState centered message={error} onRetry={onRefresh} />
       ) : kits.length === 0 ? (
         <EmptyState
+          centered
           icon={<FolderSimple className="h-7 w-7" />}
           title="No brand kits yet"
           description="Create one manually or from a website."
@@ -2305,6 +2332,8 @@ function BrandsPanel({
 
 function CollectionsPanel({
   collections,
+  totalCount,
+  searchQuery,
   loading,
   error,
   onRefresh,
@@ -2312,6 +2341,8 @@ function CollectionsPanel({
   onCopyReference,
 }: {
   collections: SlideshowCollection[]
+  totalCount: number
+  searchQuery: string
   loading: boolean
   error: string | null
   onRefresh: () => void
@@ -2319,17 +2350,23 @@ function CollectionsPanel({
   onCopyReference: (url: string, label?: string) => void
 }) {
   return (
-    <section className="space-y-3">
+    <section className="w-full space-y-3">
       {loading ? (
         <LoadingGrid label="Loading collections..." />
       ) : error ? (
-        <RetryState message={error} onRetry={onRefresh} />
-      ) : collections.length === 0 ? (
+        <RetryState centered message={error} onRetry={onRefresh} />
+      ) : totalCount === 0 ? (
         <EmptyState
+          centered
           icon={<FolderSimple className="h-7 w-7" />}
           title="No collections yet"
           description="Create a collection to group images for slideshows and templates."
           action={<Button onClick={onCreate}>Create collection</Button>}
+        />
+      ) : collections.length === 0 ? (
+        <EmptyState
+          icon={<MagnifyingGlass className="h-7 w-7" />}
+          title={searchQuery ? `No results for "${searchQuery}"` : "No matching collections"}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -2407,11 +2444,13 @@ function LoadingGrid({ label }: { label: string }) {
   )
 }
 
-function RetryState({ message, onRetry }: { message: string; onRetry: () => void }) {
+function RetryState({ message, onRetry, centered = false }: { message: string; onRetry: () => void; centered?: boolean }) {
   return (
-    <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border/70 bg-muted/20 py-14 text-center">
-      <p className="max-w-md text-sm text-muted-foreground">{message}</p>
-      <Button variant="outline" onClick={onRetry}>Retry</Button>
+    <div className={cn("flex w-full justify-center", centered && "min-h-[calc(100dvh-15rem)] items-center")}>
+      <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-2xl border border-dashed border-border/70 bg-muted/20 px-6 py-14 text-center">
+        <p className="text-sm text-muted-foreground">{message}</p>
+        <Button variant="outline" onClick={onRetry}>Retry</Button>
+      </div>
     </div>
   )
 }
@@ -2421,20 +2460,24 @@ function EmptyState({
   title,
   description,
   action,
+  centered = false,
 }: {
   icon: React.ReactNode
   title: string
   description?: string
   action?: React.ReactNode
+  centered?: boolean
 }) {
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center rounded-2xl border border-dashed border-border/70 bg-muted/20 px-6 py-14 text-center">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm">
-        {icon}
+    <div className={cn("flex w-full justify-center", centered && "min-h-[calc(100dvh-15rem)] items-center")}>
+      <div className="flex w-full max-w-md flex-col items-center rounded-2xl border border-dashed border-border/70 bg-muted/20 px-6 py-14 text-center">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm">
+          {icon}
+        </div>
+        <h3 className="text-lg font-semibold tracking-tight text-foreground">{title}</h3>
+        {description ? <p className="mt-2 text-sm text-muted-foreground">{description}</p> : null}
+        {action ? <div className="mt-6">{action}</div> : null}
       </div>
-      <h3 className="text-lg font-semibold tracking-tight text-foreground">{title}</h3>
-      {description ? <p className="mt-2 text-sm text-muted-foreground">{description}</p> : null}
-      {action ? <div className="mt-6">{action}</div> : null}
     </div>
   )
 }

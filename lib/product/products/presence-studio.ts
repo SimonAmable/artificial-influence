@@ -34,7 +34,6 @@ export const presenceStudioProduct: ProductConfig = {
     "/image",
     "/video",
     "/assets",
-    "/brand",
     "/ai-influencer",
     "/canvases",
     "/canvas",

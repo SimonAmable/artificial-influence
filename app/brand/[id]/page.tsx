@@ -1,6 +1,13 @@
+import { redirect } from "next/navigation"
+
 import { BrandKitEditor } from "@/components/brand-kit/brand-kit-editor"
+import { isPresenceProduct } from "@/lib/product/require-presence"
 
 export default async function BrandKitPage(props: { params: Promise<{ id: string }> }) {
+  if (isPresenceProduct()) {
+    redirect("/assets")
+  }
+
   const { id } = await props.params
 
   return (
