@@ -36,6 +36,7 @@ import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition } from "@/lib/types/models"
 import {
   DEFAULT_MOTION_COPY_MODEL_IDENTIFIER,
+  isHappyHorseModelIdentifier,
   isMotionCopyModelIdentifier,
   normalizeMotionCopyModelIdentifier,
 } from "@/lib/constants/models"
@@ -978,7 +979,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           // Apply node prompt after parameters spread so it is never overwritten by parameters.prompt (model default can be null)
           prompt: fullPrompt,
         }
-        if (modelIdentifier === "alibaba/happy-horse") {
+        if (isHappyHorseModelIdentifier(modelIdentifier)) {
           requestBody.enable_safety_checker = false
         }
 

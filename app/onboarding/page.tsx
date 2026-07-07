@@ -4,6 +4,12 @@ import { createClient } from "@/lib/supabase/server"
 import { OnboardingForm } from "@/app/onboarding/onboarding-form"
 import { parseStoredOnboardingPrefill } from "@/lib/onboarding/prefill"
 import type { CompleteOnboardingPayload } from "@/lib/onboarding/payload-schema"
+import { currentProduct } from "@/lib/product/current"
+
+const onboardingPageVariants = {
+  default: OnboardingForm,
+  presence: OnboardingForm,
+}
 
 export default async function OnboardingPage() {
   const supabase = await createClient()
@@ -22,7 +28,7 @@ export default async function OnboardingPage() {
     .maybeSingle()
 
   if (profile?.onboarding_completed_at) {
-    redirect("/dashboard")
+    redirect(currentProduct.defaultSignedInRoute)
   }
 
   const fromSnapshot = parseStoredOnboardingPrefill(profile?.onboarding_json_data)
@@ -34,6 +40,10 @@ export default async function OnboardingPage() {
     }
   }
 
+  const ProductOnboardingForm =
+    onboardingPageVariants[currentProduct.pageOverrides?.onboarding ?? "default"] ??
+    onboardingPageVariants.default
+
   return (
     <Suspense
       fallback={
@@ -42,7 +52,7 @@ export default async function OnboardingPage() {
         </div>
       }
     >
-      <OnboardingForm
+      <ProductOnboardingForm
         userId={user.id}
         initialPrefill={Object.keys(initialPrefill).length > 0 ? initialPrefill : null}
       />

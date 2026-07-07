@@ -1,8 +1,9 @@
+import { getCurrentProductSiteUrl } from "@/lib/product/current"
+
 /**
  * Canonical site origin for metadata, sitemap, robots, and JSON-LD.
- * Set NEXT_PUBLIC_SITE_URL in production (e.g. https://unican.app).
+ * Set NEXT_PUBLIC_SITE_URL in production (e.g. https://unican.ai).
  */
 export function getSiteBaseUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL ?? "https://unican.app"
-  return raw.replace(/\/$/, "")
+  return getCurrentProductSiteUrl()
 }

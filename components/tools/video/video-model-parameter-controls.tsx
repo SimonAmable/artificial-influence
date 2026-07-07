@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition } from "@/lib/types/models"
+import { isHappyHorseModelIdentifier } from "@/lib/constants/models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import {
   AspectRatioIcon,
@@ -364,7 +365,7 @@ export function VideoModelParameterControls({
           .filter((param) => {
             // Kling v3 / Omni: multi_prompt has its own MultiShotEditor in the input box
             if ((selectedModel.identifier === 'kwaivgi/kling-v3-video' || selectedModel.identifier === 'kwaivgi/kling-v3-omni-video') && param.name === 'multi_prompt') return false
-            if (selectedModel.identifier === 'alibaba/happy-horse' && param.name === 'enable_safety_checker') return false
+            if (isHappyHorseModelIdentifier(selectedModel.identifier) && param.name === 'enable_safety_checker') return false
             if (selectedModel.identifier === 'prunaai/p-video' && ["fps", "seed", "prompt_upsampling"].includes(param.name)) return false
             return true
           })

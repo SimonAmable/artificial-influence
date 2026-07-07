@@ -51,12 +51,23 @@ export type TikTokPublishOptions = {
   statusFetchedAt?: string
 }
 
+export type FanvuePublishOptions = {
+  audience: "subscribers" | "followers-and-subscribers"
+  priceCents?: number | null
+  mediaPreviewUuid?: string | null
+  mediaUuids: string[]
+  fanvuePostUuid?: string | null
+  uploadState?: "pending" | "processing" | "ready" | "failed"
+  thumbnailUrl?: string | null
+}
+
 export type AutopostJobMetadata = {
   carouselItems?: AutopostCarouselItem[]
   /** Required when media_type is story. */
   assetKind?: "image" | "video"
   publishOptions?: AutopostPublishOptions
   tiktok?: TikTokPublishOptions
+  fanvue?: FanvuePublishOptions
 }
 
 export type AutopostMediaType =
@@ -69,3 +80,4 @@ export type AutopostMediaType =
   | "tiktok_video_direct"
   | "tiktok_photo_upload"
   | "tiktok_photo_direct"
+  | "fanvue_post"

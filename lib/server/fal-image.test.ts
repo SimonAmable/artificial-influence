@@ -9,8 +9,11 @@ const {
   FAL_SEEDREAM_4_5_T2I,
   FAL_SEEDREAM_5_LITE_EDIT,
   FAL_SEEDREAM_5_LITE_T2I,
+  FAL_NANO_BANANA_2_LITE_EDIT,
+  FAL_NANO_BANANA_2_LITE_T2I,
   FAL_WAN_27_PRO_EDIT,
   FAL_WAN_27_PRO_T2I,
+  NANO_BANANA_2_LITE_CANONICAL_ID,
   OPENAI_GPT_IMAGE_2_CANONICAL_ID,
   SEEDREAM_4_5_CANONICAL_ID,
   SEEDREAM_5_LITE_CANONICAL_ID,
@@ -225,4 +228,34 @@ runTest("Seedream 5 Lite routes prompt-only generations to Fal text-to-image", (
   assert.equal(result.endpointId, FAL_SEEDREAM_5_LITE_T2I)
   assert.equal(result.input.image_size, "landscape_4_3")
   assert.equal(result.input.enable_safety_checker, false)
+})
+
+runTest("Nano Banana 2 Lite routes prompt-only generations to text-to-image with safety_tolerance 6", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: "16:9",
+    modelIdentifier: NANO_BANANA_2_LITE_CANONICAL_ID,
+    numImages: 2,
+    prompt: "A black lab swimming in a pool",
+    referenceImageUrls: [],
+  })
+
+  assert.equal(result.endpointId, FAL_NANO_BANANA_2_LITE_T2I)
+  assert.equal(result.input.aspect_ratio, "16:9")
+  assert.equal(result.input.safety_tolerance, "6")
+  assert.equal(result.input.num_images, 2)
+})
+
+runTest("Nano Banana 2 Lite routes referenced generations to edit with auto aspect ratio", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: "match_input_image",
+    modelIdentifier: NANO_BANANA_2_LITE_CANONICAL_ID,
+    numImages: 1,
+    prompt: "Make the scene sunset",
+    referenceImageUrls: ["https://example.com/ref-1.png"],
+  })
+
+  assert.equal(result.endpointId, FAL_NANO_BANANA_2_LITE_EDIT)
+  assert.equal(result.input.aspect_ratio, "auto")
+  assert.equal(result.input.safety_tolerance, "6")
+  assert.deepEqual(result.input.image_urls, ["https://example.com/ref-1.png"])
 })

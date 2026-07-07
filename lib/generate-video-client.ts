@@ -1,5 +1,4 @@
-const POLL_INTERVAL_MS = 5000
-const POLL_MAX_ATTEMPTS = 180
+import { waitForGenerationStatus } from "@/lib/generation-poll-manager"
 
 export interface GenerateVideoAcceptedPayload {
   generationId?: string
@@ -64,38 +63,45 @@ export async function generateVideoAndWait(
     acceptedCallback?.({ generationId, predictionId })
     onProgress?.("Video generation started, waiting for result...")
 
-    for (let index = 0; index < POLL_MAX_ATTEMPTS; index += 1) {
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
-
-      const statusResponse = await fetch(
-        `/api/generate-video/status?predictionId=${encodeURIComponent(predictionId)}`,
-      )
-      if (!statusResponse.ok) {
-        throw new Error("Failed to fetch video generation status")
-      }
-
-      const statusData = await statusResponse.json()
-      if (statusData.status === "completed") {
-        if (statusData.video?.url) {
-          return {
-            video: {
-              url: statusData.video.url as string,
-              mimeType: statusData.video.mimeType as string | undefined,
-            },
-          }
+    const pollResult = await waitForGenerationStatus<
+      | { ok: true; result: { video: { url: string; mimeType?: string } } }
+      | { ok: false; error: Error }
+    >({
+      predictionId,
+      statusEndpoint: "/api/generate-video/status",
+      timeoutMessage: "Video generation timed out",
+      fetchErrorMessage: "Failed to fetch video generation status",
+      mapCompleted: (statusData) => {
+        if (statusData.status !== "completed") {
+          return null
         }
+        const video = statusData.video as { url?: string; mimeType?: string } | undefined
+        if (!video?.url) {
+          return null
+        }
+        return {
+          ok: true,
+          result: {
+            video: {
+              url: video.url,
+              mimeType: video.mimeType,
+            },
+          },
+        }
+      },
+      mapFailed: (statusData) => ({
+        ok: false,
+        error: new Error(
+          typeof statusData.error === "string" ? statusData.error : "Video generation failed",
+        ),
+      }),
+    })
 
-        throw new Error("Video generation completed but no video URL was returned")
-      }
-
-      if (statusData.status === "failed") {
-        throw new Error(statusData.error || "Video generation failed")
-      }
-
-      onProgress?.(`Waiting for video result... (${index + 1})`)
+    if (!pollResult.ok) {
+      throw pollResult.error
     }
 
-    throw new Error("Video generation timed out")
+    return pollResult.result
   }
 
   if (data.video?.url) {

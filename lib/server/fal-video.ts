@@ -1,28 +1,47 @@
 import { fal } from "@fal-ai/client"
+import { getFalWebhookUrl } from "@/lib/server/fal-webhook-url"
 
-export const HAPPY_HORSE_CANONICAL_ID = "alibaba/happy-horse" as const
+export const HAPPY_HORSE_CANONICAL_ID = "alibaba/happy-horse/v1.1" as const
+export const HAPPY_HORSE_LEGACY_ID = "alibaba/happy-horse" as const
+export const GEMINI_OMNI_FLASH_CANONICAL_ID = "google/gemini-omni-flash" as const
 
-export const FAL_HAPPY_HORSE_T2V = "alibaba/happy-horse/text-to-video" as const
-export const FAL_HAPPY_HORSE_I2V = "alibaba/happy-horse/image-to-video" as const
-export const FAL_HAPPY_HORSE_REFERENCE = "alibaba/happy-horse/reference-to-video" as const
+export const FAL_HAPPY_HORSE_T2V = "alibaba/happy-horse/v1.1/text-to-video" as const
+export const FAL_HAPPY_HORSE_I2V = "alibaba/happy-horse/v1.1/image-to-video" as const
+export const FAL_HAPPY_HORSE_REFERENCE = "alibaba/happy-horse/v1.1/reference-to-video" as const
+export const FAL_GEMINI_OMNI_FLASH_T2V = "google/gemini-omni-flash" as const
 
-export type SupportedFalVideoModelIdentifier = typeof HAPPY_HORSE_CANONICAL_ID
+export type SupportedFalVideoModelIdentifier =
+  | typeof HAPPY_HORSE_CANONICAL_ID
+  | typeof GEMINI_OMNI_FLASH_CANONICAL_ID
 
 export type FalVideoEndpoint =
   | typeof FAL_HAPPY_HORSE_T2V
   | typeof FAL_HAPPY_HORSE_I2V
   | typeof FAL_HAPPY_HORSE_REFERENCE
+  | typeof FAL_GEMINI_OMNI_FLASH_T2V
 
 export interface FalVideoRequestOptions {
   aspectRatio?: string | null
   duration?: number | string | null
   imageUrl?: string | null
-  modelIdentifier: SupportedFalVideoModelIdentifier
+  modelIdentifier: string
   prompt?: string | null
   referenceImageUrls: string[]
   resolution?: "720p" | "1080p" | string | null
   seed?: number | string | null
 }
+
+const HAPPY_HORSE_ASPECT_RATIOS = new Set([
+  "16:9",
+  "9:16",
+  "1:1",
+  "4:3",
+  "3:4",
+  "21:9",
+  "9:21",
+  "5:4",
+  "4:5",
+])
 
 function configureFal() {
   const key = process.env.FAL_KEY
@@ -51,6 +70,11 @@ function normalizeDuration(value: FalVideoRequestOptions["duration"]): number {
   return Math.min(15, Math.max(3, Math.round(numeric)))
 }
 
+function normalizeGeminiOmniFlashDuration(value: FalVideoRequestOptions["duration"]): number {
+  const numeric = normalizeDuration(value)
+  return Math.min(10, Math.max(3, numeric === 5 ? 8 : numeric))
+}
+
 function normalizeResolution(
   value: FalVideoRequestOptions["resolution"],
 ): "720p" | "1080p" {
@@ -64,29 +88,53 @@ function normalizeSeed(value: FalVideoRequestOptions["seed"]): number | undefine
   return Math.max(0, Math.min(2147483647, Math.round(numeric)))
 }
 
-function normalizeAspectRatio(value: FalVideoRequestOptions["aspectRatio"]): string {
+function normalizeHappyHorseAspectRatio(value: FalVideoRequestOptions["aspectRatio"]): string {
   const aspectRatio = pickString(value) ?? "16:9"
-  if (["16:9", "9:16", "1:1", "4:3", "3:4"].includes(aspectRatio)) {
+  if (HAPPY_HORSE_ASPECT_RATIOS.has(aspectRatio)) {
     return aspectRatio
   }
   return "16:9"
 }
 
+function normalizeGeminiOmniFlashAspectRatio(
+  value: FalVideoRequestOptions["aspectRatio"],
+): "16:9" | "9:16" {
+  const aspectRatio = pickString(value) ?? "16:9"
+  return aspectRatio === "9:16" ? "9:16" : "16:9"
+}
+
+export function isHappyHorseModelIdentifier(modelIdentifier: string): boolean {
+  return (
+    modelIdentifier === HAPPY_HORSE_CANONICAL_ID ||
+    modelIdentifier === HAPPY_HORSE_LEGACY_ID
+  )
+}
+
+export function normalizeFalVideoModelIdentifier(
+  modelIdentifier: string,
+): SupportedFalVideoModelIdentifier | null {
+  if (isHappyHorseModelIdentifier(modelIdentifier)) {
+    return HAPPY_HORSE_CANONICAL_ID
+  }
+  if (modelIdentifier === GEMINI_OMNI_FLASH_CANONICAL_ID) {
+    return GEMINI_OMNI_FLASH_CANONICAL_ID
+  }
+  return null
+}
+
 export function isSupportedFalVideoModel(
   modelIdentifier: string,
 ): modelIdentifier is SupportedFalVideoModelIdentifier {
-  return modelIdentifier === HAPPY_HORSE_CANONICAL_ID
+  return normalizeFalVideoModelIdentifier(modelIdentifier) !== null
 }
 
-export function buildFalVideoRequest(options: FalVideoRequestOptions): {
+function buildHappyHorseFalVideoRequest(
+  options: FalVideoRequestOptions,
+): {
   endpointId: FalVideoEndpoint
   input: Record<string, unknown>
   mode: "text-to-video" | "image-to-video" | "reference-to-video"
 } {
-  if (options.modelIdentifier !== HAPPY_HORSE_CANONICAL_ID) {
-    throw new Error(`Unsupported Fal video model: ${options.modelIdentifier}`)
-  }
-
   const prompt = pickString(options.prompt)
   const imageUrl = pickString(options.imageUrl)
   const referenceImageUrls = options.referenceImageUrls
@@ -117,7 +165,7 @@ export function buildFalVideoRequest(options: FalVideoRequestOptions): {
         ...baseInput,
         prompt,
         image_urls: referenceImageUrls,
-        aspect_ratio: normalizeAspectRatio(options.aspectRatio),
+        aspect_ratio: normalizeHappyHorseAspectRatio(options.aspectRatio),
       },
     }
   }
@@ -149,9 +197,49 @@ export function buildFalVideoRequest(options: FalVideoRequestOptions): {
     input: {
       ...baseInput,
       prompt,
-      aspect_ratio: normalizeAspectRatio(options.aspectRatio),
+      aspect_ratio: normalizeHappyHorseAspectRatio(options.aspectRatio),
     },
   }
+}
+
+function buildGeminiOmniFlashFalVideoRequest(
+  options: FalVideoRequestOptions,
+): {
+  endpointId: FalVideoEndpoint
+  input: Record<string, unknown>
+  mode: "text-to-video"
+} {
+  const prompt = pickString(options.prompt)
+  if (!prompt) {
+    throw new Error("Gemini Omni Flash text-to-video requires a prompt.")
+  }
+
+  return {
+    endpointId: FAL_GEMINI_OMNI_FLASH_T2V,
+    mode: "text-to-video",
+    input: {
+      prompt,
+      aspect_ratio: normalizeGeminiOmniFlashAspectRatio(options.aspectRatio),
+      duration: normalizeGeminiOmniFlashDuration(options.duration),
+    },
+  }
+}
+
+export function buildFalVideoRequest(options: FalVideoRequestOptions): {
+  endpointId: FalVideoEndpoint
+  input: Record<string, unknown>
+  mode: "text-to-video" | "image-to-video" | "reference-to-video"
+} {
+  const normalizedModel = normalizeFalVideoModelIdentifier(options.modelIdentifier)
+  if (!normalizedModel) {
+    throw new Error(`Unsupported Fal video model: ${options.modelIdentifier}`)
+  }
+
+  if (normalizedModel === GEMINI_OMNI_FLASH_CANONICAL_ID) {
+    return buildGeminiOmniFlashFalVideoRequest(options)
+  }
+
+  return buildHappyHorseFalVideoRequest(options)
 }
 
 export async function submitFalVideoQueue(
@@ -159,8 +247,10 @@ export async function submitFalVideoQueue(
   input: Record<string, unknown>,
 ): Promise<{ requestId: string; endpointId: FalVideoEndpoint }> {
   configureFal()
+  const webhookUrl = getFalWebhookUrl()
   const submitted = await fal.queue.submit(endpointId, {
     input: input as never,
+    ...(webhookUrl ? { webhookUrl } : {}),
   })
   const requestId = submitted.request_id
   if (!requestId) {

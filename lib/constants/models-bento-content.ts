@@ -21,13 +21,14 @@ export const modelsBentoCopy = {
 
 /** Curated homepage cards so the landing page shows actual supported model names, not backend/provider buckets. */
 export const modelsBentoFeaturedIdentifiers = [
+  "google/nano-banana-2-lite",
   "google/nano-banana-2",
   "openai/gpt-image-2",
   "xai/grok-imagine-image",
   "bytedance/seedream-5-lite",
   "google/veo-3.1-fast",
   "bytedance/seedance-2.0",
-  "alibaba/happy-horse",
+  "alibaba/happy-horse/v1.1",
   "kwaivgi/kling-v3-motion-control",
 ] as const
 

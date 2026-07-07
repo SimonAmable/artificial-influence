@@ -22,6 +22,7 @@ import { MultiShotEditor, type MultiShotItem } from "@/components/tools/video/mu
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
+import { isHappyHorseModelIdentifier } from "@/lib/constants/models"
 import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
 import { brandRefsOnly, getImageAssetUrlsFromRefChips, getVideoAssetUrlsFromRefChips } from "@/lib/commands/ref-image-pipeline"
 import { allowedAssetTypesForVideoModel } from "@/lib/commands/allowed-asset-types"
@@ -186,7 +187,7 @@ export function VideoInputBox({
   const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
   const isPrunaPVideo = selectedModel.identifier === 'prunaai/p-video'
   const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
-  const isHappyHorse = selectedModel.identifier === 'alibaba/happy-horse'
+  const isHappyHorse = isHappyHorseModelIdentifier(selectedModel.identifier)
   const isKlingV3OrOmni = isKlingV3 || isKlingV3Omni
   const usesRefImageGallery = isKlingV3Omni || isSeedance2 || isHappyHorse
   const totalDuration = Number(parameters.duration) || 5

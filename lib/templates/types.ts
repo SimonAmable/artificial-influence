@@ -97,6 +97,7 @@ export interface Template {
   last_run_credits: number | null
   run_count: number
   visibility: TemplateVisibility
+  product_ids: string[]
   created_at: string
   updated_at: string
 }
@@ -129,6 +130,7 @@ export interface CreateTemplateInput {
   inputs: TemplateInput[]
   credits_cost?: number
   visibility?: TemplateVisibility
+  product_ids?: string[]
 }
 
 export interface UpdateTemplateInput {
@@ -146,6 +148,7 @@ export interface UpdateTemplateInput {
   credits_cost?: number
   credits_cost_locked?: boolean
   visibility?: TemplateVisibility
+  product_ids?: string[]
 }
 
 export const TEMPLATE_CATEGORIES: TemplateCategory[] = [

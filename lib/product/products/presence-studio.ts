@@ -1,0 +1,53 @@
+import type { ProductConfig } from "@/lib/product/types"
+
+export const presenceStudioProduct: ProductConfig = {
+  id: "presence-studio",
+  name: "Presence Studio",
+  siteUrl: "https://presencestudio.ai",
+  logo: "/logo.svg",
+  favicon: "/favicon.ico",
+  themeClass: "theme-presence",
+  metadata: {
+    title: "Presence Studio - AI influencer content studio",
+    titleTemplate: "%s | Presence Studio",
+    description:
+      "Create AI influencers, generate character-led content, reuse creator templates, and build a repeatable posting pipeline from one focused studio.",
+  },
+  landing: {
+    heroTitle: "Create and grow AI influencers",
+    heroDescription:
+      "Build consistent characters, generate influencer content, reuse proven templates, and prepare posts from one focused AI creator studio.",
+    primaryCtaLabel: "Start for free",
+    primaryCtaHref: "/login?mode=signup",
+    secondaryCtaLabel: "Explore templates",
+    secondaryCtaHref: "/templates",
+    previewAlt: "Presence Studio AI influencer workflow screenshot",
+  },
+  visibleRoutes: [
+    "/",
+    "/chat",
+    "/templates",
+    "/slideshows",
+    "/automations",
+    "/content",
+    "/autopost",
+    "/image",
+    "/video",
+    "/assets",
+    "/brand",
+    "/ai-influencer",
+    "/canvases",
+    "/canvas",
+    "/dashboard",
+    "/onboarding",
+    "/pricing",
+  ],
+  defaultSignedInRoute: "/dashboard",
+  assistantName: "Presence Agent",
+  pageOverrides: {
+    landing: "default",
+    onboarding: "default",
+    dashboard: "default",
+    pricing: "default",
+  },
+}

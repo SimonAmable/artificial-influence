@@ -198,6 +198,7 @@ function showImageGenerationErrorToast(message: string, err: unknown) {
 const CHARACTER_SWAP_UI_MODEL_IDENTIFIER = "custom/character-swap"
 const CHARACTER_SWAP_BASE_MODEL_IDENTIFIER = "google/nano-banana-pro"
 const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
+  "nano-banana-lite": "google/nano-banana-2-lite",
   "nano-banana": "google/nano-banana-2",
   flux2: "prunaai/flux-kontext-fast",
   "gpt-image": "openai/gpt-image-2",

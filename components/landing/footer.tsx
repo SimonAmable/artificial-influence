@@ -4,6 +4,7 @@ import {
   getFooterMegaNavColumns,
   type FooterMegaNavLink,
 } from "@/lib/constants/navigation"
+import { currentProduct } from "@/lib/product/current"
 import { cn } from "@/lib/utils"
 
 function FooterLinkList({
@@ -39,15 +40,16 @@ export function Footer() {
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-[url('/logo.svg')] bg-cover bg-center bg-no-repeat opacity-[0.05] dark:opacity-[0.06]"
+        style={{ backgroundImage: `url('${currentProduct.logo}')` }}
       />
       <div className="relative z-10">
         <div className="grid w-full gap-10 px-4 sm:px-6 lg:grid-cols-12 lg:gap-x-8 lg:px-8">
           <div className="lg:col-span-3">
             <p className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground">
-              UniCan
+              {currentProduct.name}
             </p>
             <p className="mt-4 max-w-md text-sm text-muted-foreground">
-              Image, video, audio, social automation, and agents in one place for creators and teams shipping content in 2026.
+              {currentProduct.metadata.description}
             </p>
           </div>
 
@@ -139,7 +141,7 @@ export function Footer() {
             </svg>
           </div>
           <div className="text-sm text-muted-foreground">
-            Copyright {new Date().getFullYear()} UniCan. All rights reserved.
+            Copyright {new Date().getFullYear()} {currentProduct.name}. All rights reserved.
           </div>
         </div>
       </div>

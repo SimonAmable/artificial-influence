@@ -6,6 +6,7 @@ import Link from "next/link"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { currentProduct } from "@/lib/product/current"
 
 const heroBackgroundMedia = [
   { kind: "video" as const, src: "/hero_showcase_images/demo_hero_vids/compressed/d1.webm" },
@@ -20,6 +21,7 @@ export function TempHero() {
   const [activeMediaIndex, setActiveMediaIndex] = React.useState(0)
   const activeMedia = heroBackgroundMedia[activeMediaIndex]
   const prefersReducedMotion = useReducedMotion()
+  const landing = currentProduct.landing
 
   const showNextMedia = React.useCallback(() => {
     setActiveMediaIndex((currentIndex) => (currentIndex + 1) % heroBackgroundMedia.length)
@@ -103,14 +105,12 @@ export function TempHero() {
               {...fadeUp(0.08)}
               className="text-balance text-3xl font-semibold leading-[0.94] tracking-[-0.05em] text-primary-foreground sm:text-4xl md:text-4xl lg:text-5xl xl:text-5xl dark:text-white"
             >
-              Introducing vibe marketing
+              {landing.heroTitle}
             </motion.h1>
             <motion.div {...fadeUp(0.2)} className="relative mt-5 w-full">
               <div className="pointer-events-none absolute inset-y-0 left-1/2 w-screen -translate-x-1/2 bg-black/28 backdrop-blur-[2px] dark:bg-black/38" />
               <p className="relative mx-auto max-w-2xl px-4 py-0.5 text-pretty text-sm font-semibold leading-6 text-primary-foreground/90 sm:px-6 sm:text-base md:text-base dark:text-white/84">
-                Like Cursor, but for marketing. Create AI UGC, AI influencer content, brainrot,
-                CGI-style campaigns, and static ads with natural language, and even schedule posts
-                to Instagram automatically.
+                {landing.heroDescription}
               </p>
             </motion.div>
           </div>
@@ -119,22 +119,22 @@ export function TempHero() {
             {...fadeUp(0.32)}
             className="mt-8 flex w-full max-w-md flex-col items-center justify-center gap-3 sm:flex-row"
           >
-            <Link href="/login?mode=signup" className="w-full sm:w-auto">
+            <Link href={landing.primaryCtaHref} className="w-full sm:w-auto">
               <Button
                 size="lg"
                 className="h-12 w-full rounded-full bg-background/92 px-6 text-sm font-semibold text-foreground shadow-lg shadow-black/10 backdrop-blur-sm hover:bg-background dark:bg-white dark:text-black dark:hover:bg-white/90"
               >
-                Start free
+                {landing.primaryCtaLabel}
                 <ArrowRight className="ml-2 size-4" />
               </Button>
             </Link>
-            <Link href="/#pricing" className="w-full sm:w-auto">
+            <Link href={landing.secondaryCtaHref} className="w-full sm:w-auto">
               <Button
                 size="lg"
                 variant="outline"
                 className="h-12 w-full rounded-full border-border/70 bg-background/10 px-6 text-sm font-semibold text-primary-foreground backdrop-blur-sm hover:bg-background/20 dark:border-white/20 dark:bg-black/20 dark:text-white dark:hover:bg-white/10"
               >
-                View pricing
+                {landing.secondaryCtaLabel}
               </Button>
             </Link>
           </motion.div>
@@ -150,7 +150,7 @@ export function TempHero() {
           <div className="relative mx-auto hidden aspect-[16/9.2] w-full max-w-[1120px] overflow-hidden rounded-[1.75rem] border border-border/60 bg-card/95 shadow-[0_22px_70px_rgba(15,23,42,0.12)] dark:shadow-[0_22px_70px_rgba(0,0,0,0.55)] md:block">
             <Image
               src="/page_screenshots_or_screenrecordings/agent.png"
-              alt="UniCan agent screenshot"
+              alt={landing.previewAlt}
               fill
               className="object-contain object-top"
             />
@@ -160,7 +160,7 @@ export function TempHero() {
           <div className="relative mx-auto aspect-[16/9.2] w-[min(92vw,30rem)] overflow-hidden rounded-[1.4rem] border border-border/60 bg-card/95 shadow-[0_22px_70px_rgba(15,23,42,0.12)] dark:shadow-[0_22px_70px_rgba(0,0,0,0.55)] md:hidden">
             <Image
               src="/page_screenshots_or_screenrecordings/agent.png"
-              alt="UniCan desktop preview"
+              alt={landing.previewAlt}
               fill
               className="object-contain object-top"
             />

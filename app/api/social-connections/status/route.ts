@@ -77,6 +77,7 @@ export async function GET() {
     const connections = ((rows ?? []) as SocialConnectionRow[]).map(toConnection)
     const instagram = connections.filter((connection) => connection.provider === "instagram")
     const tiktok = connections.filter((connection) => connection.provider === "tiktok")
+    const fanvue = connections.filter((connection) => connection.provider === "fanvue")
 
     return NextResponse.json({
       providers: {
@@ -88,6 +89,10 @@ export async function GET() {
           connected: tiktok.some((connection) => connection.status === "connected"),
           connections: tiktok,
         },
+        fanvue: {
+          connected: fanvue.some((connection) => connection.status === "connected"),
+          connections: fanvue,
+        },
       },
       instagram: {
         connected: instagram.some((connection) => connection.status === "connected"),
@@ -96,6 +101,10 @@ export async function GET() {
       tiktok: {
         connected: tiktok.some((connection) => connection.status === "connected"),
         connections: tiktok,
+      },
+      fanvue: {
+        connected: fanvue.some((connection) => connection.status === "connected"),
+        connections: fanvue,
       },
     })
   } catch (error) {

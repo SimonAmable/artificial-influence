@@ -28,6 +28,10 @@ import { generateVideoAndWait } from "@/lib/generate-video-client"
 import { isInsufficientCreditsMessage } from "@/lib/generate-image-client"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 import { resolveVideoPricingQuote } from "@/lib/video-pricing"
+import {
+  isHappyHorseModelIdentifier,
+  MODEL_IDENTIFIERS,
+} from "@/lib/constants/models"
 import type { VideoGridItem, VideoHistoryItem } from "@/components/shared/display/video-grid"
 import { toast } from "sonner"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
@@ -103,9 +107,11 @@ const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
   "wan-2.7": "wan-video/wan-2.7",
   "wan2.7": "wan-video/wan-2.7",
   "wan-27": "wan-video/wan-2.7",
-  "happy-horse": "alibaba/happy-horse",
-  "happyhorse": "alibaba/happy-horse",
-  "happy-horse-video": "alibaba/happy-horse",
+  "happy-horse": MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE,
+  "happyhorse": MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE,
+  "happy-horse-video": MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE,
+  "happy-horse-v1.1": MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE,
+  [MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE_LEGACY]: MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE,
 }
 
 function VideoPageContent() {
@@ -594,7 +600,7 @@ function VideoPageContent() {
     const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
     const isPrunaPVideo = selectedModel.identifier === 'prunaai/p-video'
     const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
-    const isHappyHorse = selectedModel.identifier === 'alibaba/happy-horse'
+    const isHappyHorse = isHappyHorseModelIdentifier(selectedModel.identifier)
     const isLipsync =
       selectedModel.identifier.includes('lipsync') ||
       selectedModel.identifier.includes('wav2lip') ||

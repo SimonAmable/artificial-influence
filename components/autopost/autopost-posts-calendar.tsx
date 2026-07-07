@@ -50,7 +50,9 @@ export function getJobCalendarAnchor(job: AutopostJobRow): Date | null {
 }
 
 function providerIconSrc(provider: string | null | undefined) {
-  return provider === "tiktok" ? "/brand_icons/tiktok-icon.svg" : "/brand_icons/instagram-icon.svg"
+  if (provider === "tiktok") return "/brand_icons/tiktok-icon.svg"
+  if (provider === "fanvue") return "/brand_icons/fanvue-icon.svg"
+  return "/brand_icons/instagram-icon.svg"
 }
 
 export type AutopostPostsCalendarProps = {

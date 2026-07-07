@@ -168,6 +168,7 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
     last_run_credits: initial?.last_run_credits ?? null,
     run_count: initial?.run_count ?? 0,
     visibility,
+    product_ids: initial?.product_ids ?? ["unican"],
     created_at: initial?.created_at ?? new Date().toISOString(),
     updated_at: initial?.updated_at ?? new Date().toISOString(),
   }

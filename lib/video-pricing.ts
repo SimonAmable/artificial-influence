@@ -51,6 +51,8 @@ function getDefaultDurationSeconds(modelIdentifier: string): number {
     case "xai/grok-imagine-video":
     case "xai/grok-imagine-video-1.5":
     case "alibaba/happy-horse":
+    case "alibaba/happy-horse/v1.1":
+    case "google/gemini-omni-flash":
     case "veed/fabric-1.0":
     default:
       return 5
@@ -83,7 +85,10 @@ function resolveCreditsPerSecond(input: VideoPricingQuoteInput): number | null {
       return 10
     }
     case "alibaba/happy-horse":
+    case "alibaba/happy-horse/v1.1":
       return resolution === "720p" ? 6 : 12
+    case "google/gemini-omni-flash":
+      return 10
     case "veed/fabric-1.0":
       return resolution === "480p" ? 4 : 6
     case "xai/grok-imagine-video":
@@ -184,10 +189,16 @@ function resolvePredictedDurationSeconds(input: VideoPricingQuoteInput): number 
       }
       return 5
     case "alibaba/happy-horse":
+    case "alibaba/happy-horse/v1.1":
       if (explicitDuration != null && explicitDuration > 0) {
         return roundDuration(explicitDuration, 3, 15)
       }
       return 5
+    case "google/gemini-omni-flash":
+      if (explicitDuration != null && explicitDuration > 0) {
+        return roundDuration(explicitDuration, 3, 10)
+      }
+      return 8
     default:
       if (explicitDuration != null && explicitDuration > 0) {
         return Math.max(1, Math.round(explicitDuration))

@@ -1,6 +1,6 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { fal } from "@fal-ai/client"
 import { createClient } from "@supabase/supabase-js"
-import type { SupabaseClient } from "@supabase/supabase-js"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
 import { configureFal } from "./fal-image"
@@ -33,24 +33,29 @@ type PendingFalImageRow = {
   chat_tool_call_id?: string | null
   replicate_prediction_id: string | null
   fal_endpoint_id: string | null
+  status: string
+  type: string
+}
+
+type CompleteFalImageOptions = {
+  /** When true (Fal webhook), skip queue.status and fetch the result directly. */
+  fromWebhook?: boolean
 }
 
 /**
- * If the row is a pending Fal image job, poll Fal once; when complete, persist to storage and deduct credits.
- * Returns updated status: pending | completed | failed.
+ * Complete a pending Fal image job using the service role (webhook, cron, agent tools).
+ * Idempotent: no-ops when the row is no longer pending.
  */
-export async function tryCompleteFalPendingImage(
-  supabaseUser: SupabaseClient,
-  userId: string,
+export async function completeFalPendingImageAdmin(
   predictionId: string,
+  options: CompleteFalImageOptions = {},
 ): Promise<{ status: "pending" | "completed" | "failed"; error?: string }> {
-  const { data: generation, error } = await supabaseUser
+  const { data: generation, error } = await supabaseAdmin
     .from("generations")
     .select(
       "id, user_id, model, prompt, aspect_ratio, tool, reference_images_supabase_storage_path, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type",
     )
     .eq("replicate_prediction_id", predictionId)
-    .eq("user_id", userId)
     .eq("type", "image")
     .maybeSingle()
 
@@ -58,38 +63,40 @@ export async function tryCompleteFalPendingImage(
     return { status: "pending" }
   }
 
-  const row = generation as PendingFalImageRow & { status: string; type: string }
+  const row = generation as PendingFalImageRow
   if (row.status !== "pending" || !row.fal_endpoint_id || !row.replicate_prediction_id) {
-    return { status: "pending" }
+    return { status: row.status === "completed" ? "completed" : row.status === "failed" ? "failed" : "pending" }
   }
 
   configureFal()
   const endpointId = row.fal_endpoint_id
   const requestId = row.replicate_prediction_id
 
-  let queueStatus
-  try {
-    queueStatus = await fal.queue.status(endpointId, { requestId })
-  } catch (e) {
-    console.error("[fal-image-completion] queue.status", e)
-    return { status: "pending" }
-  }
+  if (!options.fromWebhook) {
+    let queueStatus
+    try {
+      queueStatus = await fal.queue.status(endpointId, { requestId })
+    } catch (e) {
+      console.error("[fal-image-completion] queue.status", e)
+      return { status: "pending" }
+    }
 
-  if (queueStatus.status === "IN_QUEUE" || queueStatus.status === "IN_PROGRESS") {
-    return { status: "pending" }
-  }
+    if (queueStatus.status === "IN_QUEUE" || queueStatus.status === "IN_PROGRESS") {
+      return { status: "pending" }
+    }
 
-  if (queueStatus.status !== "COMPLETED") {
-    await supabaseAdmin
-      .from("generations")
-      .update({
-        status: "failed",
-        error_message: `Fal queue status: ${queueStatus.status}`,
-        finished_at: new Date().toISOString(),
-      })
-      .eq("id", row.id)
-    await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
-    return { status: "failed", error: "Fal generation failed" }
+    if (queueStatus.status !== "COMPLETED") {
+      await supabaseAdmin
+        .from("generations")
+        .update({
+          status: "failed",
+          error_message: `Fal queue status: ${queueStatus.status}`,
+          finished_at: new Date().toISOString(),
+        })
+        .eq("id", row.id)
+      await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
+      return { status: "failed", error: "Fal generation failed" }
+    }
   }
 
   let result
@@ -233,4 +240,51 @@ export async function tryCompleteFalPendingImage(
   await deductUserCredits(row.user_id, requiredCredits, supabaseAdmin)
 
   return { status: "completed" }
+}
+
+/**
+ * User-scoped completion for agent tools / slideshow resolver (not status polling).
+ */
+export async function tryCompleteFalPendingImage(
+  supabaseUser: SupabaseClient,
+  userId: string,
+  predictionId: string,
+): Promise<{ status: "pending" | "completed" | "failed"; error?: string }> {
+  const { data: generation, error } = await supabaseUser
+    .from("generations")
+    .select("id, status")
+    .eq("replicate_prediction_id", predictionId)
+    .eq("user_id", userId)
+    .eq("type", "image")
+    .maybeSingle()
+
+  if (error || !generation || generation.status !== "pending") {
+    return { status: generation?.status === "completed" ? "completed" : generation?.status === "failed" ? "failed" : "pending" }
+  }
+
+  return completeFalPendingImageAdmin(predictionId)
+}
+
+export async function markFalImageWebhookFailed(predictionId: string, errorMessage: string) {
+  const { data: generation } = await supabaseAdmin
+    .from("generations")
+    .select("id, status")
+    .eq("replicate_prediction_id", predictionId)
+    .eq("type", "image")
+    .eq("status", "pending")
+    .maybeSingle()
+
+  if (!generation) {
+    return
+  }
+
+  await supabaseAdmin
+    .from("generations")
+    .update({
+      status: "failed",
+      error_message: errorMessage,
+      finished_at: new Date().toISOString(),
+    })
+    .eq("id", generation.id)
+  await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
 }

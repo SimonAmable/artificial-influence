@@ -3,8 +3,7 @@
  * Handles both sync (200) and async (202 + poll) responses.
  */
 
-const POLL_INTERVAL_MS = 2500;
-const POLL_MAX_ATTEMPTS = 240; // ~10 min
+import { waitForGenerationStatus } from '@/lib/generation-poll-manager';
 
 /** POST /api/generate-image 402, plain Error so devtools don’t surface a custom class name. */
 function makeInsufficientCreditsError(message: string): Error {
@@ -89,6 +88,9 @@ export function isContentModerationMessage(message: string): boolean {
     haystack.includes('flagged this request') ||
     haystack.includes('flagged this image') ||
     haystack.includes('flagged as') ||
+    haystack.includes('content_policy_violation') ||
+    haystack.includes('content checker') ||
+    haystack.includes('flagged by a content') ||
     haystack.includes('violates our policy') ||
     haystack.includes('violates our content policy') ||
     haystack.includes('safety system') ||
@@ -199,28 +201,44 @@ export async function generateImageAndWait(
 
     acceptedCallback?.({ generationId, predictionId });
     onProgress?.('Generation started, waiting for result...');
-    for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-      const statusRes = await fetch(`/api/generate-image/status?predictionId=${encodeURIComponent(predictionId)}`);
-      if (!statusRes.ok) throw new Error('Failed to fetch generation status');
-      const statusData = await statusRes.json();
 
-      if (statusData.status === 'completed') {
-        if (statusData.images?.length) {
+    const pollResult = await waitForGenerationStatus<
+      | { ok: true; result: GenerateImageResult }
+      | { ok: false; error: Error }
+    >({
+      predictionId,
+      statusEndpoint: '/api/generate-image/status',
+      timeoutMessage: 'Generation timed out',
+      fetchErrorMessage: 'Failed to fetch generation status',
+      mapCompleted: (statusData) => {
+        if (statusData.status !== 'completed') {
+          return null;
+        }
+        if (Array.isArray(statusData.images) && statusData.images.length > 0) {
           return {
-            images: statusData.images.map((img: { url: string; mimeType?: string }) => ({
-              url: img.url,
-              mimeType: img.mimeType || 'image/png',
-            })),
+            ok: true,
+            result: {
+              images: (statusData.images as Array<{ url: string; mimeType?: string }>).map((img) => ({
+                url: img.url,
+                mimeType: img.mimeType || 'image/png',
+              })),
+            },
           };
         }
-        if (statusData.image?.url) {
-          return { image: { url: statusData.image.url, mimeType: statusData.image.mimeType || 'image/png' } };
+        const image = statusData.image as { url?: string; mimeType?: string } | undefined;
+        if (image?.url) {
+          return {
+            ok: true,
+            result: {
+              image: { url: image.url, mimeType: image.mimeType || 'image/png' },
+            },
+          };
         }
-        throw new Error('Completed but no image URL');
-      }
-      if (statusData.status === 'failed') {
-        throw makeApiError(
+        return null;
+      },
+      mapFailed: (statusData) => ({
+        ok: false,
+        error: makeApiError(
           {
             error: statusData.errorCode,
             message: statusData.error,
@@ -229,12 +247,16 @@ export async function generateImageAndWait(
           typeof statusData.error === 'string' && statusData.error.trim().length > 0
             ? statusData.error
             : 'Generation failed',
-          400
-        );
-      }
-      onProgress?.(`Waiting for result... (${i + 1})`);
+          400,
+        ),
+      }),
+    });
+
+    if (!pollResult.ok) {
+      throw pollResult.error;
     }
-    throw new Error('Generation timed out');
+
+    return pollResult.result;
   }
 
   const image = data.image as { url?: string; mimeType?: string } | undefined;

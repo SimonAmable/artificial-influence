@@ -1,6 +1,9 @@
 /**
  * Shared navigation items for app header and canvas header
  */
+import { currentProduct } from "@/lib/product/current"
+import type { ProductConfig, ProductId } from "@/lib/product/types"
+import { isRouteVisibleForProduct } from "@/lib/product/visibility"
 
 export interface NavigationItem {
   path: string
@@ -13,6 +16,8 @@ export interface NavigationItem {
    * Custom styling class names for the navigation item
    */
   className?: string
+  products?: ProductId[]
+  hiddenFor?: ProductId[]
 }
 
 export type MegaNavBadge = "new" | "popular" | "beta"
@@ -46,6 +51,8 @@ export interface MegaNavItem {
   iconPhosphor?: MegaNavPhosphorIcon
   /** Replicate-style model id, surfaced on menu items as data-model-identifier */
   modelIdentifier?: string
+  products?: ProductId[]
+  hiddenFor?: ProductId[]
 }
 
 export interface MegaNavSection {
@@ -59,6 +66,8 @@ export interface MegaNavGroup {
   path?: string
   sections?: MegaNavSection[]
   simpleItems?: MegaNavItem[]
+  products?: ProductId[]
+  hiddenFor?: ProductId[]
 }
 
 export type DashboardToolIcon =
@@ -81,6 +90,8 @@ export interface DashboardToolNavItem {
   href: string
   hint: string
   icon: DashboardToolIcon
+  products?: ProductId[]
+  hiddenFor?: ProductId[]
 }
 
 const baseNavigationItems: NavigationItem[] = [
@@ -88,7 +99,8 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/chat", label: "Agent" },
   { path: "/templates", label: "Templates" },
   { path: "/slideshows", label: "Slideshows" },
-  { path: "/autopost", label: "Autopost" },
+  { path: "/content", label: "Content", products: ["presence-studio"] },
+  { path: "/autopost", label: "Autopost", hiddenFor: ["presence-studio"] },
   { path: "/image", label: "Image" },
   { path: "/video", label: "Video" },
   { path: "/audio", label: "Audio" },
@@ -113,9 +125,20 @@ const baseNavigationItems: NavigationItem[] = [
  * - Test pages (containing "test" in path or label) get yellow styling
  * - Dev-only items are filtered out in production
  */
-export function getNavigationItems(): NavigationItem[] {
+function itemAllowsProduct(
+  item: { products?: ProductId[]; hiddenFor?: ProductId[] },
+  productId: ProductId,
+) {
+  if (item.hiddenFor?.includes(productId)) return false
+  if (item.products?.length && !item.products.includes(productId)) return false
+  return true
+}
+
+export function getNavigationItems(product: ProductConfig = currentProduct): NavigationItem[] {
   const items = baseNavigationItems
     .filter((item) => !item.devOnly || process.env.NODE_ENV === "development")
+    .filter((item) => itemAllowsProduct(item, product.id))
+    .filter((item) => isRouteVisibleForProduct(item.path, product))
     .map((item) => {
       // Apply yellow styling for test pages
       const isTestPage =
@@ -140,7 +163,7 @@ export const navigationItems = getNavigationItems()
  * Dedicated desktop mega-menu data.
  * Keep this separate so existing navigationItems consumers are unaffected.
  */
-export const megaNavGroups: MegaNavGroup[] = [
+const baseMegaNavGroups: MegaNavGroup[] = [
   {
     label: "Agent",
     path: "/chat",
@@ -240,6 +263,13 @@ export const megaNavGroups: MegaNavGroup[] = [
       {
         title: "Models",
         items: [
+          {
+            path: "/image?model=google/nano-banana-2-lite",
+            label: "Nano Banana 2 Lite",
+            description: "Fast, low-cost Nano Banana generation",
+            badge: "new",
+            iconSrc: "/ai_icons/gemini-color.svg",
+          },
           {
             path: "/image?model=google/nano-banana-2",
             label: "Nano Banana 2",
@@ -351,11 +381,18 @@ export const megaNavGroups: MegaNavGroup[] = [
         title: "Models",
         items: [
           {
-            path: "/video?model=alibaba/happy-horse",
-            label: "Happy Horse",
+            path: "/video?model=alibaba/happy-horse/v1.1",
+            label: "Happy Horse 1.1",
             description: "Unified text, image, and reference-to-video generation",
             badge: "new",
             iconSrc: "/ai_icons/qwen.svg",
+          },
+          {
+            path: "/video?model=google/gemini-omni-flash",
+            label: "Gemini Omni Flash",
+            description: "Gemini text-to-video with synchronized audio",
+            badge: "new",
+            iconSrc: "/ai_icons/gemini-color.svg",
           },
           {
             path: "/video?model=google/veo-3.1-fast",
@@ -410,9 +447,16 @@ export const megaNavGroups: MegaNavGroup[] = [
     ],
   },
   {
+    label: "Content",
+    path: "/content",
+    badge: "new",
+    products: ["presence-studio"],
+  },
+  {
     label: "Autopost",
     path: "/autopost",
     badge: "new",
+    hiddenFor: ["presence-studio"],
   },
   { label: "Canvas", path: "/canvases" },
   {
@@ -472,6 +516,40 @@ export const megaNavGroups: MegaNavGroup[] = [
   { label: "Pricing", path: "/pricing" },
 ]
 
+function filterMegaNavItems(items: MegaNavItem[] | undefined, product: ProductConfig) {
+  return (items ?? []).filter(
+    (item) =>
+      itemAllowsProduct(item, product.id) &&
+      isRouteVisibleForProduct(item.path, product),
+  )
+}
+
+export function getMegaNavGroups(product: ProductConfig = currentProduct): MegaNavGroup[] {
+  return baseMegaNavGroups
+    .filter((group) => itemAllowsProduct(group, product.id))
+    .map((group) => {
+      const simpleItems = filterMegaNavItems(group.simpleItems, product)
+      const sections = group.sections
+        ?.map((section) => ({
+          ...section,
+          items: filterMegaNavItems(section.items, product),
+        }))
+        .filter((section) => section.items.length > 0)
+
+      return {
+        ...group,
+        simpleItems,
+        sections,
+      }
+    })
+    .filter((group) => {
+      const hasVisiblePath = group.path ? isRouteVisibleForProduct(group.path, product) : false
+      return hasVisiblePath || Boolean(group.simpleItems?.length) || Boolean(group.sections?.length)
+    })
+}
+
+export const megaNavGroups = getMegaNavGroups()
+
 /** Minimal link shape for footer columns (mirrors mega menu). */
 export interface FooterMegaNavLink {
   path: string
@@ -505,11 +583,12 @@ export function getFooterMegaNavColumns(): {
   const toLinks = (items: MegaNavItem[]): FooterMegaNavLink[] =>
     items.map((i) => ({ path: i.path, label: i.label }))
 
-  const imageGroup = megaNavGroups.find((g) => g.label === "Image")
-  const videoGroup = megaNavGroups.find((g) => g.label === "Video")
-  const agentGroup = megaNavGroups.find((g) => g.label === "Agent")
-  const assetsGroup = megaNavGroups.find((g) => g.label === "Assets")
-  const freeToolsGroup = megaNavGroups.find((g) => g.label === "Free Tools")
+  const groups = getMegaNavGroups()
+  const imageGroup = groups.find((g) => g.label === "Image")
+  const videoGroup = groups.find((g) => g.label === "Video")
+  const agentGroup = groups.find((g) => g.label === "Agent")
+  const assetsGroup = groups.find((g) => g.label === "Assets")
+  const freeToolsGroup = groups.find((g) => g.label === "Free Tools")
 
   const imageTools = toLinks(
     imageGroup?.sections?.find((s) => s.title === "Features")?.items ?? [],
@@ -536,7 +615,7 @@ export function getFooterMegaNavColumns(): {
       otherTools.push({ path: item.path, label: item.label })
     }
   }
-  for (const g of megaNavGroups) {
+  for (const g of groups) {
     if (g.path && !g.sections?.length && !g.simpleItems?.length) {
       otherTools.push({ path: g.path, label: g.label })
     }
@@ -582,10 +661,18 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     hint: "Create repeatable collection and AI-powered image slideshows.",
   },
   {
+    label: "Content",
+    href: "/content",
+    icon: "palette",
+    hint: "Upload Fanvue vault media and schedule posts.",
+    products: ["presence-studio"],
+  },
+  {
     label: "Autopost",
     href: "/autopost",
     icon: "palette",
     hint: "Schedule and publish posts to Instagram and TikTok.",
+    hiddenFor: ["presence-studio"],
   },
   {
     label: "Image Studio",
@@ -672,3 +759,7 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     hint: "Search live stock references and meme sources.",
   },
 ]
+
+export function getDashboardToolNavItems(product: ProductConfig = currentProduct): DashboardToolNavItem[] {
+  return dashboardToolNavItems.filter((item) => itemAllowsProduct(item, product.id))
+}

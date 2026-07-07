@@ -26,10 +26,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  megaNavGroups,
+  getMegaNavGroups,
   type MegaNavGroup,
   type MegaNavItem,
 } from "@/lib/constants/navigation"
+import { currentProduct } from "@/lib/product/current"
 import {
   ProfileSettingsModal,
   type SettingsTab,
@@ -89,7 +90,6 @@ export function Header() {
   const isCharacterSwapPage = pathname === "/character-swap"
   const isMotionCopyPage = pathname === "/motion-copy"
   const isLipsyncPage = pathname === "/lipsync"
-  const isAuthPage = pathname === "/login"
   const isCanvasPage = pathname === "/canvas"
   const isCanvasDetailPage = pathname?.startsWith("/canvas/")
   const isOnboardingPage =
@@ -117,6 +117,7 @@ export function Header() {
   const [openGroupLabel, setOpenGroupLabel] = React.useState<string | null>(null)
   const closeTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const supportsHoverDropdowns = useFinePointerHoverDevice()
+  const megaNavGroups = React.useMemo(() => getMegaNavGroups(currentProduct), [])
 
   React.useEffect(() => {
     const supabase = createClient()
@@ -211,7 +212,7 @@ export function Header() {
       <div className="flex h-[52px] min-w-0 items-center justify-between gap-2 overflow-visible px-4">
         <div className="flex min-w-0 shrink items-center gap-4 lg:gap-6">
           <Link
-            href={user ? "/dashboard" : "/"}
+            href={user ? currentProduct.defaultSignedInRoute : "/"}
             className="relative flex shrink-0 items-center justify-center rounded-full p-0.5 transition-opacity hover:opacity-80"
           >
             <span
@@ -219,8 +220,8 @@ export function Header() {
               className="pointer-events-none absolute left-1/2 top-1/2 h-11 w-11 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/5 shadow-lg dark:bg-white/6"
             />
             <Image
-              src="/logo.svg"
-              alt="Logo"
+              src={currentProduct.logo}
+              alt={`${currentProduct.name} logo`}
               width={24}
               height={24}
               className="relative z-10 h-6 w-6 dark:invert"
@@ -384,15 +385,16 @@ export function Header() {
                 )}
               </button>
               <Button
-                variant="secondary"
+                variant="outline"
+                size="icon"
                 asChild
                 className={cn(
-                  "size-9 rounded-full border border-border/70 bg-secondary/40 p-0 text-foreground shadow-sm transition-colors hover:bg-secondary/70 hover:text-foreground",
+                  "shadow-md",
                   (pathname === "/history" || pathname === "/assets") && "bg-secondary/70"
                 )}
               >
-                <Link href="/assets?tab=history" aria-label="Open library history" className="inline-flex items-center justify-center">
-                  <FolderSimple className="h-4 w-4 shrink-0 text-muted-foreground" weight="duotone" />
+                <Link href="/assets?tab=history" aria-label="Open library history">
+                  <FolderSimple className="h-[1.2rem] w-[1.2rem]" />
                 </Link>
               </Button>
               <Button
@@ -423,7 +425,7 @@ export function Header() {
             <>
               <Link 
                 href="/login" 
-                className="text-primary underline-offset-4 hover:underline text-sm font-medium"
+                className="hidden text-sm font-medium text-primary underline-offset-4 hover:underline sm:inline"
               >
                 Login
               </Link>

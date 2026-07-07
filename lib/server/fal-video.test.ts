@@ -2,9 +2,11 @@ import assert from "node:assert/strict"
 
 const {
   buildFalVideoRequest,
+  FAL_GEMINI_OMNI_FLASH_T2V,
   FAL_HAPPY_HORSE_I2V,
   FAL_HAPPY_HORSE_REFERENCE,
   FAL_HAPPY_HORSE_T2V,
+  GEMINI_OMNI_FLASH_CANONICAL_ID,
   HAPPY_HORSE_CANONICAL_ID,
 } = await import(new URL("./fal-video.ts", import.meta.url).href)
 
@@ -90,4 +92,20 @@ runTest("Happy Horse reference mode wins over start frame and trims to nine imag
     "https://example.com/ref-9.png",
   ])
   assert.ok(!("image_url" in result.input))
+})
+
+runTest("Gemini Omni Flash routes prompt-only generations to text-to-video", () => {
+  const result = buildFalVideoRequest({
+    aspectRatio: "9:16",
+    duration: 6,
+    modelIdentifier: GEMINI_OMNI_FLASH_CANONICAL_ID,
+    prompt: "A lighthouse at dusk with crashing waves",
+    referenceImageUrls: [],
+  })
+
+  assert.equal(result.endpointId, FAL_GEMINI_OMNI_FLASH_T2V)
+  assert.equal(result.mode, "text-to-video")
+  assert.equal(result.input.prompt, "A lighthouse at dusk with crashing waves")
+  assert.equal(result.input.aspect_ratio, "9:16")
+  assert.equal(result.input.duration, 6)
 })

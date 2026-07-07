@@ -105,6 +105,37 @@ export const NANO_BANANA_2_META: ModelMetadata = {
   ],
 };
 
+export const NANO_BANANA_2_LITE_META: ModelMetadata = {
+  id: 'nano-banana-2-lite-meta',
+  identifier: 'google/nano-banana-2-lite',
+  name: 'Nano Banana 2 Lite',
+  description:
+    'Fast, cost-efficient Nano Banana on fal: text-to-image and multi-reference editing at 1K.',
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 2.0,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['auto', 'match_input_image', '21:9', '16:9', '3:2', '4:3', '5:4', '1:1', '4:5', '3:4', '2:3', '9:16', '4:1', '1:4', '8:1', '1:8'],
+  customParameters: [
+    {
+      name: 'output_format',
+      label: 'Output Format',
+      options: ['png', 'jpeg', 'webp'],
+      default: 'png',
+      description: 'Image file format',
+    },
+    {
+      name: 'safety_tolerance',
+      label: 'Safety tolerance',
+      options: ['1', '2', '3', '4', '5', '6'],
+      default: '6',
+      description: '1 is strictest, 6 is least strict',
+    },
+  ],
+};
+
 export const NANO_BANANA_PRO_META: ModelMetadata = {
   id: '0a08af2c-bece-4783-84cb-5659b37e518f',
   identifier: 'google/nano-banana-pro',
@@ -678,18 +709,18 @@ export const SEEDANCE_2_0_META: ModelMetadata = {
 };
 
 export const HAPPY_HORSE_META: ModelMetadata = {
-  id: 'happy-horse-meta',
-  identifier: 'alibaba/happy-horse',
-  name: 'Happy Horse',
+  id: 'happy-horse-v1.1-meta',
+  identifier: 'alibaba/happy-horse/v1.1',
+  name: 'Happy Horse 1.1',
   description:
-    'Alibaba Happy Horse on fal: text-to-video, image-to-video, or reference-to-video under one model selector.',
+    'Alibaba Happy Horse 1.1 on fal: text-to-video, image-to-video, or reference-to-video under one model selector.',
   type: 'video',
   provider: 'fal',
   is_active: true,
   model_cost: 20,
   supports_reference_image: true,
   supports_reference_video: false,
-  aspect_ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+  aspect_ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21', '5:4', '4:5'],
   supports_first_frame: true,
   customParameters: [
     {
@@ -702,9 +733,40 @@ export const HAPPY_HORSE_META: ModelMetadata = {
     {
       name: 'aspect_ratio',
       label: 'Aspect Ratio',
-      options: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+      options: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21', '5:4', '4:5'],
       default: '16:9',
       description: 'Used for text-to-video and reference-to-video',
+    },
+  ],
+};
+
+export const GEMINI_OMNI_FLASH_META: ModelMetadata = {
+  id: 'gemini-omni-flash-meta',
+  identifier: 'google/gemini-omni-flash',
+  name: 'Gemini Omni Flash',
+  description:
+    'Google Gemini Omni Flash on fal: text-to-video with synchronized audio, 16:9 or 9:16, 3–10 seconds.',
+  type: 'video',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 10,
+  supports_reference_image: false,
+  supports_reference_video: false,
+  aspect_ratios: ['16:9', '9:16'],
+  customParameters: [
+    {
+      name: 'aspect_ratio',
+      label: 'Aspect Ratio',
+      options: ['16:9', '9:16'],
+      default: '16:9',
+      description: 'Video aspect ratio',
+    },
+    {
+      name: 'duration',
+      label: 'Duration',
+      options: ['3', '4', '5', '6', '7', '8', '9', '10'],
+      default: '8',
+      description: 'Video duration in seconds',
     },
   ],
 };
@@ -784,6 +846,7 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
   GOOGLE_NANO_BANANA_META,
   NANO_BANANA_PRO_META,
   NANO_BANANA_2_META,
+  NANO_BANANA_2_LITE_META,
   SEEDREAM_4_5_META,
   SEEDREAM_5_LITE_META,
   GROK_IMAGINE_IMAGE_QUALITY_META,
@@ -809,6 +872,7 @@ export const VIDEO_MODELS_METADATA: ModelMetadata[] = [
   HAILUO_2_3_FAST_META,
   SEEDANCE_2_0_META,
   HAPPY_HORSE_META,
+  GEMINI_OMNI_FLASH_META,
   P_VIDEO_META,
 ];
 
@@ -865,7 +929,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     P_VIDEO_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
-  fal: [WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, HAPPY_HORSE_META],
+  fal: [WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META],
   xai: [GROK_IMAGINE_META],
 };
 

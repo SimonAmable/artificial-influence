@@ -1,4 +1,5 @@
 import type { Model } from "@/lib/types/models"
+import { isHappyHorseModelIdentifier } from "@/lib/constants/models"
 import type { AttachedRef } from "./types"
 
 function imageAssetRefs(refs: AttachedRef[]): AttachedRef[] {
@@ -31,7 +32,7 @@ export function getVideoChipSlotInfo(model: Model, attachedRefs: AttachedRef[], 
   const vids = videoAssetRefs(attachedRefs)
   const isOmni = id === "kwaivgi/kling-v3-omni-video"
   const isSeedance = id === "bytedance/seedance-2.0"
-  const isHappyHorse = id === "alibaba/happy-horse"
+  const isHappyHorse = isHappyHorseModelIdentifier(id)
   const useOmniStyleChips = isOmni || (isSeedance && opts.hasReferenceVideo) || isHappyHorse
 
   const supportsInput =

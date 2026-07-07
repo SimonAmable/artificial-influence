@@ -1,3 +1,4 @@
+import { currentProduct } from "@/lib/product/current"
 import { getSiteBaseUrl } from "@/lib/seo/site-url"
 
 /**
@@ -9,14 +10,14 @@ export function SitewideJsonLd() {
     {
       "@context": "https://schema.org",
       "@type": "Organization",
-      name: "UniCan",
+      name: currentProduct.name,
       url: base,
-      logo: `${base}/logo.svg`,
+      logo: `${base}${currentProduct.logo}`,
     },
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
-      name: "UniCan",
+      name: currentProduct.name,
       url: base,
       potentialAction: {
         "@type": "SearchAction",
@@ -31,7 +32,6 @@ export function SitewideJsonLd() {
   return (
     <script
       type="application/ld+json"
-      // eslint-disable-next-line react/no-danger -- JSON-LD is server-rendered and static
       dangerouslySetInnerHTML={{ __html: JSON.stringify(graph) }}
     />
   )

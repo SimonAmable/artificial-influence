@@ -250,6 +250,37 @@
     inset 0 -1px 1px rgba(255, 255, 255, 0.05);
 }
 
+.theme-unican {
+  /* UniCan uses the default shadcn token set above. */
+}
+
+.theme-presence {
+  --primary: oklch(0.82 0.24 145);
+  --primary-foreground: oklch(0.985 0 0);
+  --accent: oklch(0.82 0.24 145);
+  --accent-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.72 0.21 145);
+  --chart-1: oklch(0.82 0.24 145);
+  --chart-2: oklch(0.72 0.2 160);
+  --chart-3: oklch(0.65 0.18 190);
+  --sidebar-primary: oklch(0.82 0.24 145);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.82 0.24 145);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+}
+
+.theme-presence.dark {
+  --primary: oklch(0.84 0.25 145);
+  --primary-foreground: oklch(0.985 0 0);
+  --accent: oklch(0.84 0.25 145);
+  --accent-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.84 0.25 145);
+  --sidebar-primary: oklch(0.84 0.25 145);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.84 0.25 145);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+}
+
 /* Overlay scrollbars on .container when it's the scroll host */
 .container {
   overflow-y: auto;

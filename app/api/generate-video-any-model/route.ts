@@ -5,7 +5,9 @@ import { checkUserHasCredits, deductUserCreditsUpTo } from '@/lib/credits';
 import { inferStoragePathFromUrl } from '@/lib/assets/library';
 import {
   buildFalVideoRequest,
+  isHappyHorseModelIdentifier,
   isSupportedFalVideoModel,
+  normalizeFalVideoModelIdentifier,
   submitFalVideoQueue,
 } from '@/lib/server/fal-video';
 import { resolveWan27Replicate } from '@/lib/server/wan-2.7-replicate';
@@ -86,6 +88,8 @@ export async function POST(request: NextRequest) {
 
     const normalizedModel =
       typeof model === 'string' ? normalizeMotionCopyModelIdentifier(model) ?? model : model;
+    const catalogModelIdentifier =
+      normalizeFalVideoModelIdentifier(normalizedModel) ?? normalizedModel;
     const isMotionCopy = isMotionCopyModelIdentifier(normalizedModel);
     const motionCopyImage = image || body.imagePublicUrl;
     const motionCopyVideo = body.video || body.videoPublicUrl;
@@ -101,7 +105,7 @@ export async function POST(request: NextRequest) {
     const hasReferenceVideo =
       typeof body.reference_video === 'string' ||
       (Array.isArray(body.reference_videos) && body.reference_videos.some((value: unknown) => typeof value === 'string'));
-    const isHappyHorse = normalizedModel === 'alibaba/happy-horse';
+    const isHappyHorse = isHappyHorseModelIdentifier(catalogModelIdentifier);
     const happyHorseReferenceImages = Array.isArray(body.reference_images)
       ? body.reference_images.filter(
           (value: unknown): value is string => typeof value === 'string' && value.length > 0,
@@ -145,20 +149,20 @@ export async function POST(request: NextRequest) {
     const { data: modelData, error: modelError } = await supabase
         .from('models')
         .select('model_cost, model_cost_per_second, provider')
-        .eq('identifier', normalizedModel)
+        .eq('identifier', catalogModelIdentifier)
         .eq('type', 'video')
         .eq('is_active', true)
         .single();
 
     if (modelError || !modelData) {
       return NextResponse.json(
-        { error: `Model "${normalizedModel}" not found or is inactive` },
+        { error: `Model "${catalogModelIdentifier}" not found or is inactive` },
         { status: 400 }
       );
     }
 
     const pricingQuote = resolveVideoPricingQuote({
-      modelIdentifier: normalizedModel,
+      modelIdentifier: catalogModelIdentifier,
       modelCost: modelData.model_cost,
       modelCostPerSecond: modelData.model_cost_per_second,
       duration: otherParams.duration,
@@ -186,7 +190,7 @@ export async function POST(request: NextRequest) {
 
     const modelProvider = typeof modelData.provider === 'string' ? modelData.provider : null;
 
-    if (modelProvider === 'fal' && isSupportedFalVideoModel(normalizedModel)) {
+    if (modelProvider === 'fal' && isSupportedFalVideoModel(catalogModelIdentifier)) {
       const referenceImageStoragePaths = collectStoragePaths([
         image,
         first_frame_image,
@@ -205,7 +209,7 @@ export async function POST(request: NextRequest) {
             : typeof first_frame_image === 'string'
               ? first_frame_image
               : null,
-        modelIdentifier: normalizedModel,
+        modelIdentifier: catalogModelIdentifier,
         prompt: typeof prompt === 'string' ? prompt : null,
         referenceImageUrls: happyHorseReferenceImages,
         resolution:
@@ -229,7 +233,7 @@ export async function POST(request: NextRequest) {
           reference_images_supabase_storage_path:
             referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
           reference_videos_supabase_storage_path: null,
-          model: normalizedModel,
+          model: catalogModelIdentifier,
           type: 'video',
           is_public: true,
           tool: typeof body.tool === 'string' ? body.tool : null,
@@ -262,7 +266,7 @@ export async function POST(request: NextRequest) {
 
     if (modelProvider === 'fal') {
       return NextResponse.json(
-        { error: `Unsupported Fal video model: ${normalizedModel}` },
+        { error: `Unsupported Fal video model: ${catalogModelIdentifier}` },
         { status: 400 },
       );
     }

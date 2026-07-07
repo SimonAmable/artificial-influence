@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { dashboardToolNavItems, type DashboardToolIcon } from "@/lib/constants/navigation"
+import { dashboardToolNavItems, getDashboardToolNavItems, type DashboardToolIcon } from "@/lib/constants/navigation"
 import {
   ImageIcon,
   VideoIcon,
@@ -87,7 +87,7 @@ export function FeatureButtonGrid() {
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
-        {dashboardToolNavItems.map((tool) => {
+        {getDashboardToolNavItems().map((tool) => {
           const Icon = toolIconMap[tool.icon]
           return (
             <Tooltip key={tool.href}>

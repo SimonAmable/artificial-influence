@@ -1,8 +1,12 @@
 "use client"
 
 import * as React from "react"
+import {
+  subscribeGenerationStatus,
+  type GenerationPollStatus,
+} from "@/lib/generation-poll-manager"
 
-export type GenerationPollStatus = "pending" | "completed" | "failed"
+export type { GenerationPollStatus }
 
 export type ImageGenerationPollResult = {
   error?: string
@@ -32,134 +36,6 @@ type UseGenerationStatusOptions<T> = {
   mapFailed: (data: Record<string, unknown>) => T
   timeoutMessage: string
   fetchErrorMessage: string
-  maxAttempts?: number
-  intervalMs?: number
-}
-
-const DEFAULT_MAX_ATTEMPTS = 180
-const DEFAULT_INTERVAL_MS = 5000
-
-async function pollPredictionStatus<T>({
-  predictionId,
-  statusEndpoint,
-  mapCompleted,
-  mapFailed,
-  timeoutMessage,
-  fetchErrorMessage,
-  maxAttempts,
-  intervalMs,
-  isCancelled,
-}: {
-  predictionId: string
-  statusEndpoint: string
-  mapCompleted: (data: Record<string, unknown>) => T | null
-  mapFailed: (data: Record<string, unknown>) => T
-  timeoutMessage: string
-  fetchErrorMessage: string
-  maxAttempts: number
-  intervalMs: number
-  isCancelled: () => boolean
-}): Promise<T | null> {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    try {
-      const response = await fetch(
-        `${statusEndpoint}?predictionId=${encodeURIComponent(predictionId)}`,
-        { cache: "no-store" },
-      )
-
-      if (!response.ok) {
-        if (isCancelled()) return null
-        if (response.status === 401 || response.status === 403 || response.status >= 500) {
-          return mapFailed({ error: fetchErrorMessage })
-        }
-        if (response.status === 404) {
-          await new Promise((resolve) => setTimeout(resolve, intervalMs))
-          continue
-        }
-        return null
-      }
-
-      const data = (await response.json()) as Record<string, unknown>
-      if (isCancelled()) return null
-
-      if (data.status === "completed") {
-        return mapCompleted(data)
-      }
-
-      if (data.status === "failed") {
-        return mapFailed(data)
-      }
-    } catch {
-      if (!isCancelled()) {
-        return mapFailed({ error: fetchErrorMessage })
-      }
-      return null
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, intervalMs))
-    if (isCancelled()) return null
-  }
-
-  if (!isCancelled()) {
-    return mapFailed({ error: timeoutMessage })
-  }
-
-  return null
-}
-
-export function useGenerationStatus<T>({
-  enabled,
-  predictionId,
-  statusEndpoint,
-  mapCompleted,
-  mapFailed,
-  timeoutMessage,
-  fetchErrorMessage,
-  maxAttempts = DEFAULT_MAX_ATTEMPTS,
-  intervalMs = DEFAULT_INTERVAL_MS,
-}: UseGenerationStatusOptions<T>) {
-  const [polledState, setPolledState] = React.useState<T | null>(null)
-
-  React.useEffect(() => {
-    if (!enabled || !predictionId) {
-      return
-    }
-
-    let cancelled = false
-    const isCancelled = () => cancelled
-
-    void pollPredictionStatus({
-      predictionId,
-      statusEndpoint,
-      mapCompleted,
-      mapFailed,
-      timeoutMessage,
-      fetchErrorMessage,
-      maxAttempts,
-      intervalMs,
-      isCancelled,
-    }).then((result) => {
-      if (!cancelled && result) {
-        setPolledState(result)
-      }
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [
-    enabled,
-    predictionId,
-    statusEndpoint,
-    mapCompleted,
-    mapFailed,
-    timeoutMessage,
-    fetchErrorMessage,
-    maxAttempts,
-    intervalMs,
-  ])
-
-  return polledState
 }
 
 function mapImageCompleted(data: Record<string, unknown>): ImageGenerationPollResult | null {
@@ -221,6 +97,46 @@ function mapVideoFailed(data: Record<string, unknown>): VideoGenerationPollResul
   }
 }
 
+export function useGenerationStatus<T>({
+  enabled,
+  predictionId,
+  statusEndpoint,
+  mapCompleted,
+  mapFailed,
+  timeoutMessage,
+  fetchErrorMessage,
+}: UseGenerationStatusOptions<T>) {
+  const [polledState, setPolledState] = React.useState<T | null>(null)
+
+  React.useEffect(() => {
+    if (!enabled || !predictionId) {
+      return
+    }
+
+    return subscribeGenerationStatus(
+      {
+        predictionId,
+        statusEndpoint,
+        mapCompleted,
+        mapFailed,
+        timeoutMessage,
+        fetchErrorMessage,
+      },
+      setPolledState,
+    )
+  }, [
+    enabled,
+    predictionId,
+    statusEndpoint,
+    mapCompleted,
+    mapFailed,
+    timeoutMessage,
+    fetchErrorMessage,
+  ])
+
+  return polledState
+}
+
 export function useImageGenerationPoll(
   predictionId: string | undefined,
   enabled: boolean,
@@ -230,11 +146,7 @@ export function useImageGenerationPoll(
     predictionId,
     statusEndpoint: "/api/generate-image/status",
     mapCompleted: mapImageCompleted,
-    mapFailed: (data) =>
-      mapImageFailed({
-        error: typeof data.error === "string" ? data.error : "Image generation failed.",
-        generationId: data.generationId,
-      }),
+    mapFailed: mapImageFailed,
     timeoutMessage: "Image generation timed out while waiting for completion.",
     fetchErrorMessage: "Failed to fetch image status.",
   })
@@ -249,11 +161,7 @@ export function useVideoGenerationPoll(
     predictionId,
     statusEndpoint: "/api/generate-video/status",
     mapCompleted: mapVideoCompleted,
-    mapFailed: (data) =>
-      mapVideoFailed({
-        error: typeof data.error === "string" ? data.error : "Video generation failed.",
-        generationId: data.generationId,
-      }),
+    mapFailed: mapVideoFailed,
     timeoutMessage: "Video generation timed out while waiting for completion.",
     fetchErrorMessage: "Failed to fetch video status.",
   })

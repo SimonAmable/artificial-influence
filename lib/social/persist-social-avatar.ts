@@ -23,7 +23,7 @@ function extFromMime(mime: string): string {
  */
 export async function persistSocialAvatarUrl(params: {
   userId: string
-  provider: "instagram" | "tiktok"
+  provider: "instagram" | "tiktok" | "fanvue"
   accountId: string
   sourceUrl: string | null | undefined
 }): Promise<string | null> {

@@ -40,7 +40,10 @@ export const MODEL_IDENTIFIERS = {
   MINIMAX_HAILUO_2_3_FAST: 'minimax/hailuo-2.3-fast',
   GOOGLE_VEO_3_1_FAST: 'google/veo-3.1-fast',
   BYTEDANCE_SEEDANCE_2_0: 'bytedance/seedance-2.0',
-  ALIBABA_HAPPY_HORSE: 'alibaba/happy-horse',
+  ALIBABA_HAPPY_HORSE: 'alibaba/happy-horse/v1.1',
+  ALIBABA_HAPPY_HORSE_LEGACY: 'alibaba/happy-horse',
+  GOOGLE_GEMINI_OMNI_FLASH: 'google/gemini-omni-flash',
+  GOOGLE_NANO_BANANA_2_LITE: 'google/nano-banana-2-lite',
   PRUNAAI_P_VIDEO: 'prunaai/p-video',
   XAI_GROK_IMAGINE_VIDEO: 'xai/grok-imagine-video',
   XAI_GROK_IMAGINE_VIDEO_1_5: 'xai/grok-imagine-video-1.5',
@@ -58,6 +61,13 @@ export function isMotionCopyModelIdentifier(identifier: string | null | undefine
   return (
     identifier === MODEL_IDENTIFIERS.KWAIVGI_KLING_V2_6 ||
     identifier === MODEL_IDENTIFIERS.KWAIVGI_KLING_V3_MOTION
+  );
+}
+
+export function isHappyHorseModelIdentifier(identifier: string | null | undefined): boolean {
+  return (
+    identifier === MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE ||
+    identifier === MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE_LEGACY
   );
 }
 
@@ -614,7 +624,7 @@ const HAPPY_HORSE_VIDEO_PARAMS: ParameterDefinition[] = [
     description: 'Used for text-to-video and reference-to-video. Ignored for image-to-video.',
     required: false,
     default: '16:9',
-    enum: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+    enum: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21', '5:4', '4:5'],
     ui_type: 'select',
   },
   {
@@ -1678,11 +1688,11 @@ export const SEEDANCE_2_0_VIDEO_MODEL: Model = {
 };
 
 export const HAPPY_HORSE_VIDEO_MODEL: Model = {
-  id: 'model-happy-horse',
+  id: 'model-happy-horse-v1.1',
   identifier: MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE,
-  name: 'Happy Horse',
+  name: 'Happy Horse 1.1',
   description:
-    'Alibaba Happy Horse on fal: text-to-video, image-to-video, or reference-to-video under one model selector.',
+    'Alibaba Happy Horse 1.1 on fal: text-to-video, image-to-video, or reference-to-video under one model selector.',
   type: 'video',
   provider: 'fal',
   is_active: true,
@@ -1693,6 +1703,108 @@ export const HAPPY_HORSE_VIDEO_MODEL: Model = {
   supports_reference_image: true,
   supports_reference_video: false,
   supports_first_frame: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+export const GEMINI_OMNI_FLASH_VIDEO_MODEL: Model = {
+  id: 'model-gemini-omni-flash',
+  identifier: MODEL_IDENTIFIERS.GOOGLE_GEMINI_OMNI_FLASH,
+  name: 'Gemini Omni Flash',
+  description:
+    'Google Gemini Omni Flash on fal: text-to-video with synchronized audio, 16:9 or 9:16, 3–10 seconds.',
+  type: 'video',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 10,
+  model_cost_per_second: 10,
+  parameters: {
+    parameters: [
+      {
+        name: 'aspect_ratio',
+        type: 'string',
+        label: 'Aspect Ratio',
+        required: false,
+        default: '16:9',
+        enum: ['16:9', '9:16'],
+        ui_type: 'select',
+      },
+      {
+        name: 'duration',
+        type: 'number',
+        label: 'Duration',
+        description: 'Video duration in seconds',
+        required: false,
+        default: 8,
+        min: 3,
+        max: 10,
+        ui_type: 'number',
+      },
+    ],
+  },
+  aspect_ratios: ['16:9', '9:16'],
+  default_aspect_ratio: '16:9',
+  duration_options: [3, 4, 5, 6, 7, 8, 9, 10],
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+export const NANO_BANANA_2_LITE_MODEL: Model = {
+  id: 'model-nano-banana-2-lite',
+  identifier: MODEL_IDENTIFIERS.GOOGLE_NANO_BANANA_2_LITE,
+  name: 'Nano Banana 2 Lite',
+  description:
+    'Fast, cost-efficient Nano Banana on fal: text-to-image and multi-reference editing at 1K with low safety filtering.',
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 2,
+  parameters: {
+    parameters: [
+      {
+        name: 'aspect_ratio',
+        type: 'string',
+        label: 'Aspect Ratio',
+        required: false,
+        default: 'auto',
+        enum: ['auto', 'match_input_image', '21:9', '16:9', '3:2', '4:3', '5:4', '1:1', '4:5', '3:4', '2:3', '9:16', '4:1', '1:4', '8:1', '1:8'],
+        ui_type: 'select',
+      },
+      {
+        name: 'num_images',
+        type: 'number',
+        label: 'Number of images',
+        required: false,
+        default: 1,
+        min: 1,
+        max: 4,
+        ui_type: 'number',
+      },
+      {
+        name: 'output_format',
+        type: 'string',
+        label: 'Output format',
+        required: false,
+        default: 'png',
+        enum: ['png', 'jpeg', 'webp'],
+        ui_type: 'select',
+      },
+      {
+        name: 'safety_tolerance',
+        type: 'string',
+        label: 'Safety tolerance',
+        description: '1 is strictest, 6 is least strict.',
+        required: false,
+        default: '6',
+        enum: ['1', '2', '3', '4', '5', '6'],
+        ui_type: 'select',
+      },
+    ],
+  },
+  aspect_ratios: ['auto', 'match_input_image', '21:9', '16:9', '3:2', '4:3', '5:4', '1:1', '4:5', '3:4', '2:3', '9:16', '4:1', '1:4', '8:1', '1:8'],
+  default_aspect_ratio: 'auto',
+  supports_reference_image: true,
+  max_images: 4,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -1931,6 +2043,7 @@ export const GOOGLE_GEMINI_3_1_FLASH_TTS_MODEL: Model = {
 export const IMAGE_MODELS = [
   GOOGLE_NANO_BANANA_MODEL,
   NANO_BANANA_PRO_MODEL,
+  NANO_BANANA_2_LITE_MODEL,
   GPT_IMAGE_1_5_MODEL,
   FAL_WAN_27_IMAGE_MODEL,
   FAL_WAN_27_PRO_IMAGE_MODEL,
@@ -1953,6 +2066,7 @@ export const VIDEO_MODELS = [
   VEO_3_1_FAST_MODEL,
   SEEDANCE_2_0_VIDEO_MODEL,
   HAPPY_HORSE_VIDEO_MODEL,
+  GEMINI_OMNI_FLASH_VIDEO_MODEL,
   P_VIDEO_MODEL,
 ] as const;
 
@@ -1971,6 +2085,7 @@ export const ALL_MODELS = [
 const IMAGE_MODELS_FIXED = [
   GOOGLE_NANO_BANANA_MODEL,
   NANO_BANANA_PRO_MODEL,
+  NANO_BANANA_2_LITE_MODEL,
   GPT_IMAGE_1_5_MODEL,
   FAL_WAN_27_IMAGE_MODEL,
   FAL_WAN_27_PRO_IMAGE_MODEL,
@@ -1993,6 +2108,7 @@ const VIDEO_MODELS_FIXED = [
   VEO_3_1_FAST_MODEL,
   SEEDANCE_2_0_VIDEO_MODEL,
   HAPPY_HORSE_VIDEO_MODEL,
+  GEMINI_OMNI_FLASH_VIDEO_MODEL,
   P_VIDEO_MODEL,
 ] as const;
 

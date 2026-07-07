@@ -16,9 +16,14 @@ import { PricingSection } from "@/components/landing/pricing-section"
 import { FinalCTASection } from "@/components/landing/final-cta-section"
 import { Footer } from "@/components/landing/footer"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
+import { currentProduct } from "@/lib/product/current"
 
 const HOME_AUTH_TIMEOUT_MS = 2500
 const HOME_PROFILE_TIMEOUT_MS = 2500
+const landingPageVariants = {
+  default: DefaultLandingPage,
+  presence: DefaultLandingPage,
+}
 
 async function withTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs: number): Promise<T> {
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined
@@ -75,9 +80,17 @@ export default async function Page() {
       console.error("Home onboarding check failed:", error)
     }
 
-    return redirect("/dashboard")
+    return redirect(currentProduct.defaultSignedInRoute)
   }
 
+  const LandingPage =
+    landingPageVariants[currentProduct.pageOverrides?.landing ?? "default"] ??
+    landingPageVariants.default
+
+  return <LandingPage />
+}
+
+function DefaultLandingPage() {
   return (
     <>
       <div className="flex min-h-dvh bg-background">

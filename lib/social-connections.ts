@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-export type SocialProvider = "instagram" | "tiktok"
+export type SocialProvider = "instagram" | "tiktok" | "fanvue"
 export type SocialConnectionStatus = "connected" | "disconnected" | "error" | "expired"
 
 type JsonRecord = Record<string, unknown>
@@ -95,6 +95,65 @@ export async function markInstagramSocialConnectionDisconnected(
     .eq("user_id", params.userId)
     .eq("provider", "instagram")
     .eq("provider_account_id", params.instagramUserId)
+}
+
+export async function upsertFanvueSocialConnection(
+  supabase: SupabaseClient,
+  row: {
+    userId: string
+    fanvueUuid: string
+    username: string | null
+    displayName: string | null
+    avatarUrl: string | null
+    accessTokenEncrypted: string
+    accessTokenLast4: string | null
+    refreshTokenEncrypted: string | null
+    refreshTokenLast4: string | null
+    tokenExpiresAt: string | null
+    refreshTokenExpiresAt: string | null
+    scopes: string[]
+    metadata: unknown
+  }
+) {
+  return supabase.from("social_connections").upsert(
+    {
+      user_id: row.userId,
+      provider: "fanvue" satisfies SocialProvider,
+      provider_account_id: row.fanvueUuid,
+      username: row.username,
+      display_name: row.displayName,
+      avatar_url: row.avatarUrl,
+      access_token_encrypted: row.accessTokenEncrypted,
+      access_token_last4: row.accessTokenLast4,
+      refresh_token_encrypted: row.refreshTokenEncrypted,
+      refresh_token_last4: row.refreshTokenLast4,
+      token_expires_at: row.tokenExpiresAt,
+      refresh_token_expires_at: row.refreshTokenExpiresAt,
+      scopes: row.scopes,
+      status: "connected" satisfies SocialConnectionStatus,
+      metadata: objectMetadata(row.metadata),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,provider,provider_account_id" }
+  )
+}
+
+export async function markFanvueSocialConnectionDisconnected(
+  supabase: SupabaseClient,
+  params: {
+    userId: string
+    connectionId: string
+  }
+) {
+  return supabase
+    .from("social_connections")
+    .update({
+      status: "disconnected" satisfies SocialConnectionStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", params.userId)
+    .eq("provider", "fanvue")
+    .eq("id", params.connectionId)
 }
 
 export async function upsertTikTokSocialConnection(

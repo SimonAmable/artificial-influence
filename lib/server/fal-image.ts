@@ -1,4 +1,5 @@
 import { fal } from "@fal-ai/client"
+import { getFalWebhookUrl } from "@/lib/server/fal-webhook-url"
 import { aspectRatioToDimensions } from "@/lib/utils/model-parameters"
 
 export const OPENAI_GPT_IMAGE_2_CANONICAL_ID = "openai/gpt-image-2" as const
@@ -7,6 +8,7 @@ export const WAN_27_IMAGE_CANONICAL_ID = "fal-ai/wan/v2.7" as const
 export const WAN_27_PRO_IMAGE_CANONICAL_ID = "fal-ai/wan/v2.7/pro" as const
 export const SEEDREAM_4_5_CANONICAL_ID = "bytedance/seedream-4.5" as const
 export const SEEDREAM_5_LITE_CANONICAL_ID = "bytedance/seedream-5-lite" as const
+export const NANO_BANANA_2_LITE_CANONICAL_ID = "google/nano-banana-2-lite" as const
 
 export const FAL_OPENAI_GPT_IMAGE_2_T2I = "openai/gpt-image-2" as const
 export const FAL_OPENAI_GPT_IMAGE_2_EDIT = "openai/gpt-image-2/edit" as const
@@ -20,6 +22,8 @@ export const FAL_SEEDREAM_4_5_T2I = "fal-ai/bytedance/seedream/v4.5/text-to-imag
 export const FAL_SEEDREAM_4_5_EDIT = "fal-ai/bytedance/seedream/v4.5/edit" as const
 export const FAL_SEEDREAM_5_LITE_T2I = "fal-ai/bytedance/seedream/v5/lite/text-to-image" as const
 export const FAL_SEEDREAM_5_LITE_EDIT = "fal-ai/bytedance/seedream/v5/lite/edit" as const
+export const FAL_NANO_BANANA_2_LITE_T2I = "google/nano-banana-2-lite" as const
+export const FAL_NANO_BANANA_2_LITE_EDIT = "google/nano-banana-2-lite/edit" as const
 
 export type SupportedFalImageModelIdentifier =
   | typeof OPENAI_GPT_IMAGE_2_CANONICAL_ID
@@ -28,6 +32,7 @@ export type SupportedFalImageModelIdentifier =
   | typeof WAN_27_PRO_IMAGE_CANONICAL_ID
   | typeof SEEDREAM_4_5_CANONICAL_ID
   | typeof SEEDREAM_5_LITE_CANONICAL_ID
+  | typeof NANO_BANANA_2_LITE_CANONICAL_ID
 
 export type FalImageEndpoint =
   | typeof FAL_OPENAI_GPT_IMAGE_2_T2I
@@ -42,6 +47,8 @@ export type FalImageEndpoint =
   | typeof FAL_SEEDREAM_4_5_EDIT
   | typeof FAL_SEEDREAM_5_LITE_T2I
   | typeof FAL_SEEDREAM_5_LITE_EDIT
+  | typeof FAL_NANO_BANANA_2_LITE_T2I
+  | typeof FAL_NANO_BANANA_2_LITE_EDIT
 
 const FAL_IMAGE_MODEL_CONFIG: Record<
   SupportedFalImageModelIdentifier,
@@ -79,6 +86,11 @@ const FAL_IMAGE_MODEL_CONFIG: Record<
   [SEEDREAM_5_LITE_CANONICAL_ID]: {
     textEndpointId: FAL_SEEDREAM_5_LITE_T2I,
     editEndpointId: FAL_SEEDREAM_5_LITE_EDIT,
+    maxReferenceImages: 10,
+  },
+  [NANO_BANANA_2_LITE_CANONICAL_ID]: {
+    textEndpointId: FAL_NANO_BANANA_2_LITE_T2I,
+    editEndpointId: FAL_NANO_BANANA_2_LITE_EDIT,
     maxReferenceImages: 10,
   },
 }
@@ -238,6 +250,34 @@ function isSeedreamFalImageModel(
   )
 }
 
+const NANO_BANANA_2_LITE_ASPECT_RATIOS = new Set([
+  "auto",
+  "21:9",
+  "16:9",
+  "3:2",
+  "4:3",
+  "5:4",
+  "1:1",
+  "4:5",
+  "3:4",
+  "2:3",
+  "9:16",
+  "4:1",
+  "1:4",
+  "8:1",
+  "1:8",
+])
+
+function normalizeNanoBananaLiteAspectRatio(
+  value: string | null | undefined,
+  isEdit: boolean,
+): string {
+  const aspect = (value || (isEdit ? "match_input_image" : "auto")).trim()
+  if (aspect === "match_input_image") return "auto"
+  if (NANO_BANANA_2_LITE_ASPECT_RATIOS.has(aspect)) return aspect
+  return isEdit ? "auto" : "auto"
+}
+
 export function buildFalImageRequest(options: FalImageRequestOptions): {
   endpointId: FalImageEndpoint
   input: Record<string, unknown>
@@ -365,6 +405,27 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
     return { endpointId, input, resolvedAspectRatio }
   }
 
+  if (options.modelIdentifier === NANO_BANANA_2_LITE_CANONICAL_ID) {
+    const input: Record<string, unknown> = {
+      prompt: options.prompt,
+      aspect_ratio: normalizeNanoBananaLiteAspectRatio(resolvedAspectRatio, isEdit),
+      num_images: Math.min(4, Math.max(1, options.numImages)),
+      output_format: normalizeOutputFormat(options.outputFormat),
+      safety_tolerance: "6",
+      limit_generations: true,
+    }
+
+    if (options.seed != null && !Number.isNaN(Number(options.seed))) {
+      input.seed = Math.round(Number(options.seed))
+    }
+
+    if (isEdit) {
+      input.image_urls = referenceImageUrls
+    }
+
+    return { endpointId, input, resolvedAspectRatio }
+  }
+
   throw new Error(`Unsupported Fal image model: ${options.modelIdentifier}`)
 }
 
@@ -373,8 +434,10 @@ export async function submitFalImageQueue(
   input: Record<string, unknown>,
 ): Promise<{ requestId: string; endpointId: FalImageEndpoint }> {
   configureFal()
+  const webhookUrl = getFalWebhookUrl()
   const submitted = await fal.queue.submit(endpointId, {
     input: input as never,
+    ...(webhookUrl ? { webhookUrl } : {}),
   })
   const requestId = submitted.request_id
   if (!requestId) {

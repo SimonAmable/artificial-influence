@@ -11,6 +11,7 @@ import type {
 import { normalizeTemplateInputs } from "@/lib/templates/input-utils"
 import { guessCreditsCost } from "@/lib/templates/types"
 import type { TemplateInputValues } from "@/lib/templates/prompt-filler"
+import { currentProduct } from "@/lib/product/current"
 
 function mapTemplateRow(row: Record<string, unknown>): Template {
   const promptAttachments = Array.isArray(row.prompt_attachments)
@@ -27,7 +28,16 @@ function mapTemplateRow(row: Record<string, unknown>): Template {
     ...(row as Omit<Template, "inputs">),
     prompt_attachments: promptAttachments as TemplatePromptAttachment[],
     inputs: normalizeTemplateInputs(row.inputs),
+    product_ids: Array.isArray(row.product_ids)
+      ? row.product_ids.filter((item): item is string => typeof item === "string")
+      : ["unican"],
   }
+}
+
+function scopeTemplatesToCurrentProduct<T extends { contains: (column: string, value: string[]) => T }>(
+  query: T,
+): T {
+  return query.contains("product_ids", [currentProduct.id])
 }
 
 export async function createTemplate(
@@ -54,6 +64,7 @@ export async function createTemplate(
       inputs: input.inputs,
       credits_cost: creditsCost,
       visibility: input.visibility ?? "private",
+      product_ids: [currentProduct.id],
     })
     .select("*")
     .single()
@@ -77,6 +88,7 @@ export async function updateTemplate(
     .from("templates")
     .select("creator_id")
     .eq("id", templateId)
+    .contains("product_ids", [currentProduct.id])
     .single()
 
   if (!existing || existing.creator_id !== userId) {
@@ -98,6 +110,7 @@ export async function updateTemplate(
   if (input.credits_cost !== undefined) updates.credits_cost = input.credits_cost
   if (input.credits_cost_locked !== undefined) updates.credits_cost_locked = input.credits_cost_locked
   if (input.visibility !== undefined) updates.visibility = input.visibility
+  if (input.product_ids !== undefined) updates.product_ids = input.product_ids
 
   const { data, error } = await supabase
     .from("templates")
@@ -122,6 +135,7 @@ export async function deleteTemplate(templateId: string, userId: string): Promis
     .delete()
     .eq("id", templateId)
     .eq("creator_id", userId)
+    .contains("product_ids", [currentProduct.id])
 
   if (error) {
     console.error("Error deleting template:", error)
@@ -135,7 +149,9 @@ export async function getTemplateById(
 ): Promise<Template | null> {
   const supabase = await createClient()
 
-  let query = supabase.from("templates").select("*").eq("id", templateId)
+  let query = scopeTemplatesToCurrentProduct(
+    supabase.from("templates").select("*").eq("id", templateId),
+  )
 
   if (userId) {
     query = query.or(`visibility.eq.public,creator_id.eq.${userId}`)
@@ -157,7 +173,9 @@ export async function getTemplateBySlugForUser(
 ): Promise<Template | null> {
   const supabase = await createClient()
 
-  const { data, error } = await supabase.from("templates").select("*").eq("slug", slug).maybeSingle()
+  const { data, error } = await scopeTemplatesToCurrentProduct(
+    supabase.from("templates").select("*").eq("slug", slug),
+  ).maybeSingle()
 
   if (error) {
     console.error("Error fetching template by slug:", error)
@@ -175,11 +193,11 @@ export async function getTemplateBySlugForUser(
 export async function listPublicTemplates(category?: string): Promise<Template[]> {
   const supabase = await createClient()
 
-  let query = supabase
+  let query = scopeTemplatesToCurrentProduct(supabase
     .from("templates")
     .select("*")
     .eq("visibility", "public")
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: false }))
 
   if (category && category !== "all") {
     query = query.eq("category", category)
@@ -202,10 +220,10 @@ export async function listTemplatesForGallery(
 ): Promise<Template[]> {
   const supabase = await createClient()
 
-  let query = supabase
+  let query = scopeTemplatesToCurrentProduct(supabase
     .from("templates")
     .select("*")
-    .order("updated_at", { ascending: false })
+    .order("updated_at", { ascending: false }))
 
   if (userId) {
     query = query.or(`visibility.eq.public,creator_id.eq.${userId}`)
@@ -244,6 +262,7 @@ export async function listUserTemplates(userId: string): Promise<Template[]> {
     .from("templates")
     .select("*")
     .eq("creator_id", userId)
+    .contains("product_ids", [currentProduct.id])
     .order("updated_at", { ascending: false })
 
   if (error) {

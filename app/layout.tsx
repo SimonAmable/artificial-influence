@@ -12,22 +12,26 @@ import { SitewideJsonLd } from "@/components/seo/sitewide-jsonld"
 import { getSiteBaseUrl } from "@/lib/seo/site-url"
 import { PricingUpsellController } from "@/components/pricing/pricing-upsell-controller"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { currentProduct } from "@/lib/product/current"
 
 const siteBase = getSiteBaseUrl()
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteBase),
   title: {
-    default: "UniCan - Automate faceless content and Instagram marketing with AI",
-    template: "%s | UniCan",
+    default: currentProduct.metadata.title,
+    template: currentProduct.metadata.titleTemplate,
   },
-  description:
-    "Create more content in less time with easy-to-use AI agents trained for high-quality image, video, and audio generation, plus TikTok and Instagram autoposting to put growth on autopilot.",
+  description: currentProduct.metadata.description,
+  icons: {
+    icon: currentProduct.favicon,
+  },
   openGraph: {
-    siteName: "UniCan",
+    siteName: currentProduct.name,
     type: "website",
     locale: "en_US",
     url: siteBase,
+    images: currentProduct.metadata.ogImage ? [currentProduct.metadata.ogImage] : undefined,
   },
   twitter: {
     card: "summary_large_image",
@@ -42,6 +46,8 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      className={currentProduct.themeClass}
+      data-product={currentProduct.id}
       suppressHydrationWarning
     >
       <body className="font-sans antialiased">

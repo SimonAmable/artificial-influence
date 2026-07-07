@@ -5,8 +5,8 @@ export const SOCIAL_OAUTH_RETURN_COOKIE = "social_oauth_return" as const
 
 export function parseSocialOAuthReturnPath(
   raw: string | null | undefined
-): "/onboarding" | "/autopost" | null {
-  if (raw === "/onboarding" || raw === "/autopost") {
+): "/onboarding" | "/autopost" | "/content" | null {
+  if (raw === "/onboarding" || raw === "/autopost" || raw === "/content") {
     return raw
   }
   return null

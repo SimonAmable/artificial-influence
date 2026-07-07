@@ -15,11 +15,14 @@ import {
 import { normalizeTikTokVideoUrlToStorage } from "@/lib/tiktok/normalize-video"
 import { isTikTokDirectPostFeatureEnabled } from "@/lib/tiktok/direct-post-feature"
 import { getValidTikTokAccessToken } from "@/lib/tiktok/token-service"
+import { getValidFanvueAccessToken } from "@/lib/fanvue/token-service"
+import { createFanvuePost } from "@/lib/fanvue/posts"
+import { FanvueApiError } from "@/lib/fanvue/client"
 
 export type PublishAutopostJobResult =
   | {
       ok: true
-      provider: "instagram" | "tiktok"
+      provider: "instagram" | "tiktok" | "fanvue"
       instagramMediaId?: string
       containerId?: string
       publishId?: string
@@ -453,6 +456,118 @@ export async function refreshTikTokAutopostJobStatus(
   }
 }
 
+async function publishFanvueAutopostJob(
+  supabase: SupabaseClient,
+  row: AutopostJobRow,
+  jobId: string,
+  options: { forceQueuedBeforeDue?: boolean }
+): Promise<PublishAutopostJobResult> {
+  const connectionId = row.social_connection_id
+  if (!connectionId) {
+    return { ok: false, error: "Pick a connected Fanvue account before publishing.", statusCode: 400 }
+  }
+
+  const metadata = parseMetadata(row.metadata)
+  const fanvue = metadata.fanvue
+  if (!fanvue?.mediaUuids?.length) {
+    return { ok: false, error: "Fanvue post is missing vault media.", statusCode: 400 }
+  }
+
+  if (row.scheduled_at && !options.forceQueuedBeforeDue) {
+    const due = new Date(row.scheduled_at).getTime()
+    if (Number.isFinite(due) && due > Date.now()) {
+      return { ok: false, error: "This post is not due yet.", statusCode: 400 }
+    }
+  }
+
+  let token
+  try {
+    token = await getValidFanvueAccessToken(supabase, {
+      connectionId,
+      userId: row.user_id,
+    })
+  } catch (tokenError) {
+    return {
+      ok: false,
+      error: tokenError instanceof Error ? tokenError.message : "Could not read Fanvue credentials.",
+      statusCode: 400,
+    }
+  }
+
+  const claimError = await claimJobForProcessing(supabase, row, jobId)
+  if (claimError) {
+    return claimError
+  }
+
+  try {
+    const scheduledAt = row.scheduled_at
+    const publishAt =
+      scheduledAt && new Date(scheduledAt).getTime() > Date.now() ? scheduledAt : null
+
+    const result = await createFanvuePost(token.accessToken, {
+      text: row.caption,
+      mediaUuids: fanvue.mediaUuids,
+      mediaPreviewUuid: fanvue.mediaPreviewUuid,
+      price: fanvue.priceCents ?? undefined,
+      audience: fanvue.audience,
+      publishAt,
+    })
+
+    const publishedAt = new Date().toISOString()
+    const nextStatus = publishAt ? "queued" : "published"
+
+    const { error: successUpdateError } = await supabase
+      .from("autopost_jobs")
+      .update({
+        status: nextStatus,
+        published_at: publishAt ? null : publishedAt,
+        provider_publish_id: result.uuid,
+        last_error: null,
+        metadata: {
+          ...metadata,
+          fanvue: {
+            ...fanvue,
+            fanvuePostUuid: result.uuid,
+          },
+        },
+        updated_at: publishedAt,
+      })
+      .eq("id", jobId)
+      .eq("user_id", row.user_id)
+
+    if (successUpdateError) {
+      console.error("[autopost/publish-job] Fanvue success update failed:", successUpdateError)
+    }
+
+    return { ok: true, provider: "fanvue", publishId: result.uuid, status: nextStatus }
+  } catch (publishError) {
+    const message =
+      publishError instanceof FanvueApiError
+        ? publishError.message
+        : publishError instanceof Error
+          ? publishError.message
+          : "Fanvue publishing failed."
+
+    const { error: failUpdateError } = await supabase
+      .from("autopost_jobs")
+      .update({
+        status: "failed",
+        last_error: message,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", jobId)
+      .eq("user_id", row.user_id)
+
+    if (failUpdateError) {
+      console.error("[autopost/publish-job] Fanvue fail update failed:", failUpdateError)
+    }
+
+    const statusCode =
+      publishError instanceof FanvueApiError && publishError.status ? publishError.status : 502
+    return { ok: false, error: message, statusCode }
+  }
+}
+
 /**
  * Loads the job, validates status, publishes to Instagram, and updates the row.
  * Works with the user-scoped server client (RLS) or the service role client.
@@ -505,6 +620,10 @@ export async function publishAutopostJob(
         statusCode: 400,
       }
     }
+  }
+
+  if ((row.provider ?? "instagram") === "fanvue") {
+    return publishFanvueAutopostJob(supabase, row, jobId, { forceQueuedBeforeDue })
   }
 
   if ((row.provider ?? "instagram") === "tiktok") {

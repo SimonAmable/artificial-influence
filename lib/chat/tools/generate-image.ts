@@ -47,6 +47,7 @@ const JSON_SUPPORTED_MODELS = new Set([
   "google/nano-banana",
   "google/nano-banana-pro",
   "google/nano-banana-2",
+  "google/nano-banana-2-lite",
   "bytedance/seedream-4.5",
 ])
 
