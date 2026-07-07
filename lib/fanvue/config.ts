@@ -6,10 +6,14 @@ export const FANVUE_OAUTH_SCOPES = [
   "openid",
   "offline_access",
   "offline",
-  "read:self",
-  "write:post",
-  "write:media",
+  "read:creator",
+  "read:insights",
   "read:media",
+  "read:post",
+  "read:self",
+  "read:tracking_links",
+  "write:media",
+  "write:post",
 ].join(" ")
 
 export function resolveFanvueOAuthRedirectUri(requestUrl: URL): string {

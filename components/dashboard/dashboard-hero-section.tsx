@@ -71,16 +71,17 @@ function GlowContainer({ children, className }: { children: React.ReactNode; cla
       )}
       style={{
         boxShadow: `
-          0 0 24px 2px color-mix(in oklch, var(--foreground) 65%, transparent),
-          0 0 48px 4px color-mix(in oklch, var(--foreground) 35%, transparent),
-          0 0 96px 8px color-mix(in oklch, var(--foreground) 15%, transparent)
+          0 0 24px 2px color-mix(in oklch, var(--foreground) 55%, transparent),
+          0 0 48px 4px color-mix(in oklch, var(--primary) 35%, transparent),
+          0 0 72px 6px color-mix(in oklch, var(--primary) 20%, transparent),
+          0 0 96px 8px color-mix(in oklch, var(--foreground) 12%, transparent)
         `
       }}
     >
       <ShineBorder
         borderWidth={3}
         duration={12}
-        shineColor={["var(--foreground)", "var(--muted-foreground)", "var(--foreground)"]}
+        shineColor={["var(--foreground)", "var(--primary)", "var(--foreground)"]}
         className="rounded-[28px]"
       />
       <div className="rounded-[25.5px] overflow-hidden bg-background/95 backdrop-blur-md relative z-10">
