@@ -66,31 +66,24 @@ function GlowContainer({ children, className }: { children: React.ReactNode; cla
   return (
     <div
       className={cn(
-        "relative mx-auto w-full max-w-4xl overflow-visible rounded-[28px] p-[3px] transition-all duration-500 ease-in-out z-10",
-        "[--glow-fg:color-mix(in_oklch,var(--foreground)_32%,transparent)]",
-        "[--glow-primary:color-mix(in_oklch,var(--primary)_58%,transparent)]",
-        "dark:[--glow-fg:color-mix(in_oklch,var(--foreground)_50%,transparent)]",
-        "dark:[--glow-primary:color-mix(in_oklch,var(--primary)_38%,transparent)]",
+        "relative mx-auto w-full max-w-4xl rounded-[28px] p-[2.5px] transition-all duration-500 ease-in-out z-10",
         className
       )}
       style={{
         boxShadow: `
-          0 0 20px 2px var(--glow-fg),
-          0 0 40px 6px var(--glow-primary),
-          0 0 64px 10px var(--glow-primary),
-          0 0 88px 16px var(--glow-fg)
-        `,
+          0 0 24px 2px color-mix(in oklch, var(--foreground) 65%, transparent),
+          0 0 48px 4px color-mix(in oklch, var(--foreground) 35%, transparent),
+          0 0 96px 8px color-mix(in oklch, var(--foreground) 15%, transparent)
+        `
       }}
     >
       <ShineBorder
-        borderWidth={2}
+        borderWidth={3}
         duration={12}
-        glowOpacity={1}
-        glowBlur={18}
-        shineColor={["var(--foreground)", "var(--primary)", "var(--foreground)"]}
-        className="-inset-1 rounded-[30px]"
+        shineColor={["var(--foreground)", "var(--muted-foreground)", "var(--foreground)"]}
+        className="rounded-[28px]"
       />
-      <div className="relative overflow-hidden rounded-[25px] bg-background/95 backdrop-blur-md">
+      <div className="rounded-[25.5px] overflow-hidden bg-background/95 backdrop-blur-md relative z-10">
         {children}
       </div>
     </div>
