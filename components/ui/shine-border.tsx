@@ -20,6 +20,16 @@ interface ShineBorderProps extends React.HTMLAttributes<HTMLDivElement> {
    * @default "#000000"
    */
   shineColor?: string | string[]
+  /**
+   * Opacity of the blurred glow layer
+   * @default 0.85
+   */
+  glowOpacity?: number
+  /**
+   * Blur radius of the glow layer in pixels
+   * @default 12
+   */
+  glowBlur?: number
 }
 
 /**
@@ -31,6 +41,8 @@ export function ShineBorder({
   borderWidth = 1,
   duration = 14,
   shineColor = "#000000",
+  glowOpacity = 0.85,
+  glowBlur = 12,
   className,
   style,
   ...props
@@ -58,8 +70,8 @@ export function ShineBorder({
         style={
           {
             ...commonStyles,
-            filter: "blur(12px)",
-            opacity: 0.85,
+            filter: `blur(${glowBlur}px)`,
+            opacity: glowOpacity,
           } as React.CSSProperties
         }
         className="motion-safe:animate-shine pointer-events-none absolute inset-0 size-full rounded-[inherit] will-change-[background-position]"
