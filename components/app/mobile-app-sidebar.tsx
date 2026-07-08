@@ -143,7 +143,7 @@ function MobileNavSheetBody({
 
   return (
     <>
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
+      <SidebarHeader className="px-4 py-3">
         <Link
           href={authenticated ? currentProduct.defaultSignedInRoute : "/"}
           className="flex min-w-0 items-center gap-2.5"
@@ -164,8 +164,8 @@ function MobileNavSheetBody({
           <span
             className={
               currentProduct.logoSizePx
-                ? "min-w-0 truncate font-brand text-lg font-semibold uppercase leading-none tracking-[0.14em] text-sidebar-foreground"
-                : "min-w-0 truncate font-brand text-sm font-semibold uppercase tracking-[0.12em] text-sidebar-foreground"
+                ? "min-w-0 truncate font-brand text-lg font-semibold uppercase leading-none tracking-[0.14em] text-foreground"
+                : "min-w-0 truncate font-brand text-sm font-semibold uppercase tracking-[0.12em] text-foreground"
             }
             style={
               currentProduct.logoSizePx
@@ -197,7 +197,7 @@ function MobileNavSheetBody({
       </SidebarContent>
 
       {authenticated ? (
-        <SidebarFooter className="border-t border-sidebar-border p-2">
+        <SidebarFooter className="p-2">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -238,7 +238,7 @@ function MobileNavTriggerButton({
     <Button
       type="button"
       variant="outline"
-      className="justify-between gap-2 shadow-md"
+      className="justify-between gap-2 border-border/70 bg-background/70 shadow-md backdrop-blur-md hover:bg-background/90"
       aria-expanded={openMobile}
       aria-controls="mobile-app-sidebar"
       onClick={() => setOpenMobile(true)}
@@ -274,7 +274,7 @@ function MobileNavSheet({
       <SheetContent
         id="mobile-app-sidebar"
         side="left"
-        className="flex h-dvh w-[min(100vw-2rem,18rem)] flex-col gap-0 border-sidebar-border bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+        className="flex h-dvh w-[min(100vw-2rem,18rem)] flex-col gap-0 bg-background p-0 text-foreground [&>button]:hidden"
       >
         <SheetHeader className="sr-only">
           <SheetTitle>Menu</SheetTitle>
@@ -282,7 +282,7 @@ function MobileNavSheet({
         <div
           data-sidebar="sidebar"
           data-mobile="true"
-          className="flex min-h-0 flex-1 flex-col bg-sidebar text-sidebar-foreground"
+          className="flex min-h-0 flex-1 flex-col bg-background text-foreground"
         >
           <MobileNavSheetBody
             authenticated={authenticated}

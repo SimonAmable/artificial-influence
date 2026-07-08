@@ -8,11 +8,13 @@ import {
   FANVUE_OAUTH_VERIFIER_COOKIE,
 } from "@/lib/fanvue/oauth"
 import { resolveFanvueOAuthRedirectUri } from "@/lib/fanvue/config"
+import { verifyFanvueOAuthState } from "@/lib/fanvue/oauth-state"
 import { fetchFanvueUserProfile } from "@/lib/fanvue/profile"
 import { requirePresenceProductResponse } from "@/lib/product/require-presence"
 import { persistSocialAvatarUrl } from "@/lib/social/persist-social-avatar"
 import {
   createSocialOAuthFinishRedirect,
+  parseSocialOAuthReturnPath,
   SOCIAL_OAUTH_RETURN_COOKIE,
 } from "@/lib/social/oauth-return"
 import { upsertFanvueSocialConnection } from "@/lib/social-connections"
@@ -40,9 +42,10 @@ export async function GET(request: Request) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || requestUrl.origin
   const cookieStore = await cookies()
   const socialReturnCookie = cookieStore.get(SOCIAL_OAUTH_RETURN_COOKIE)?.value
+  let oauthReturnPath = parseSocialOAuthReturnPath(socialReturnCookie) ?? "/content"
 
   const finish = (params: Record<string, string>) =>
-    createSocialOAuthFinishRedirect(appUrl, socialReturnCookie ?? "/content", params, [
+    createSocialOAuthFinishRedirect(appUrl, oauthReturnPath, params, [
       { name: FANVUE_OAUTH_STATE_COOKIE },
       { name: FANVUE_OAUTH_VERIFIER_COOKIE },
     ])
@@ -78,9 +81,24 @@ export async function GET(request: Request) {
     }
 
     const stateCookieValue = cookieStore.get(FANVUE_OAUTH_STATE_COOKIE)?.value
-    const verifier = cookieStore.get(FANVUE_OAUTH_VERIFIER_COOKIE)?.value
+    const verifierCookie = cookieStore.get(FANVUE_OAUTH_VERIFIER_COOKIE)?.value
+    const signedState = verifyFanvueOAuthState(state)
 
-    if (!stateCookieValue || stateCookieValue !== state || !verifier) {
+    let verifier: string | undefined
+    if (signedState) {
+      if (signedState.userId !== user.id) {
+        return finish({
+          provider: "fanvue",
+          error: "Invalid Fanvue OAuth state.",
+        })
+      }
+      verifier = signedState.verifier
+      oauthReturnPath = signedState.returnPath
+    } else if (stateCookieValue && stateCookieValue === state && verifierCookie) {
+      verifier = verifierCookie
+    }
+
+    if (!verifier) {
       return finish({
         provider: "fanvue",
         error: "Invalid Fanvue OAuth state.",

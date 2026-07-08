@@ -5,7 +5,7 @@ import { Header } from "@/components/app/header"
 import { TermsAcceptanceGate } from "@/components/app/terms-acceptance-gate"
 import { LayoutModeProviderWrapper } from "@/components/shared/layout/layout-mode-provider-wrapper"
 import { Toaster } from "@/components/ui/sonner"
-import { AIChat } from "@/components/ai-chat"
+import { AIChatDesktopDock, AIChatProvider } from "@/components/ai-chat"
 import { Analytics } from "@vercel/analytics/next"
 import { AffiliateRefCapture } from "@/components/affiliate/affiliate-ref-capture"
 import { SitewideJsonLd } from "@/components/seo/sitewide-jsonld"
@@ -62,15 +62,19 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <TooltipProvider>
-            <LayoutModeProviderWrapper>
-              <AffiliateRefCapture />
-              <Header />
-              <main>{children}</main>
-            </LayoutModeProviderWrapper>
-            <Toaster />
-            <PricingUpsellController />
-            <AIChat />
-            <TermsAcceptanceGate />
+            <AIChatProvider>
+              <LayoutModeProviderWrapper>
+                <AffiliateRefCapture />
+                <Header />
+                <div className="flex w-full items-start">
+                  <main className="min-w-0 flex-1">{children}</main>
+                  <AIChatDesktopDock />
+                </div>
+              </LayoutModeProviderWrapper>
+              <Toaster />
+              <PricingUpsellController />
+              <TermsAcceptanceGate />
+            </AIChatProvider>
           </TooltipProvider>
         </ThemeProvider>
         <Analytics />

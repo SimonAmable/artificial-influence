@@ -32,3 +32,7 @@ export function resolveFanvueOAuthRedirectUri(requestUrl: URL): string {
   }
   return `${requestUrl.origin}/api/fanvue/callback`
 }
+
+export function resolveFanvueOAuthOrigin(requestUrl: URL): string {
+  return new URL(resolveFanvueOAuthRedirectUri(requestUrl)).origin
+}

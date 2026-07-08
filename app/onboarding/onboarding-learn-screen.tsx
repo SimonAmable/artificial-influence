@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import { ProductLogo } from "@/components/product/product-logo"
 import type { UIMessage } from "ai"
 import {

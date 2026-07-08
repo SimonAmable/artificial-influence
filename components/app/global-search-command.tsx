@@ -207,7 +207,7 @@ export function GlobalSearchCommand() {
       <Button
         type="button"
         variant="outline"
-        className="hidden h-9 min-w-0 gap-2 rounded-full border-border/70 bg-secondary/40 px-3 text-muted-foreground shadow-sm hover:bg-secondary/70 hover:text-foreground md:inline-flex"
+        className="hidden h-9 min-w-0 gap-2 rounded-full border-border/70 bg-secondary/40 px-3 text-muted-foreground shadow-sm backdrop-blur-md hover:bg-secondary/70 hover:text-foreground md:inline-flex"
         onClick={() => setOpen(true)}
       >
         <MagnifyingGlass className="h-4 w-4" />
@@ -220,7 +220,7 @@ export function GlobalSearchCommand() {
         type="button"
         variant="outline"
         size="icon"
-        className="size-9 rounded-full border-border/70 bg-secondary/40 shadow-sm md:hidden"
+        className="size-9 rounded-full border-border/70 bg-secondary/40 shadow-sm backdrop-blur-md md:hidden"
         aria-label="Search tools and templates"
         onClick={() => setOpen(true)}
       >

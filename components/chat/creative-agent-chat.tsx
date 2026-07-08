@@ -265,8 +265,7 @@ function formatThreadUpdatedAt(value: string) {
 
 const EMPTY_STATE_TITLE = "What will we create today?"
 
-const EMPTY_STATE_DESCRIPTION =
-  "Copy the best carousels, ads, AI influencers, and AI UGC, all by chatting."
+const EMPTY_STATE_DESCRIPTION = "Your AI assistant for website tasks."
 
 const STARTER_PROMPTS: { label: string; prompt: string }[] = [
   {
@@ -1616,9 +1615,11 @@ export function CreativeAgentChat({
     <div
       className={cn(
         "flex flex-col",
-        compact
+        sidebarLikeEmbed
           ? "h-full min-h-0 bg-transparent pt-0"
-          : "h-dvh min-h-0 overflow-hidden bg-background pt-16 md:pt-20 px-0 lg:px-4",
+          : compact
+            ? "h-full min-h-0 bg-transparent pt-0"
+            : "h-dvh min-h-0 overflow-hidden bg-background pt-16 md:pt-20 px-0 lg:px-4",
       )}
     >
       {compact && mobileThreads !== undefined ? (
@@ -1996,142 +1997,148 @@ export function CreativeAgentChat({
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <Select
-                        value={chatGatewayModelId}
-                        onValueChange={(value) => {
-                          chatGatewayModelRef.current = value
-                          setChatGatewayModelId(value)
-                        }}
-                        disabled={
-                          !authReady ||
-                          isCreatingThread ||
-                          isBootstrappingOnboarding ||
-                          status === "submitted" ||
-                          status === "streaming"
-                        }
-                      >
-                        <SelectTrigger
-                          size="sm"
-                          aria-label="Chat model"
-                          className="h-9 w-fit min-w-0 max-w-[min(100%,16rem)] shrink border-border/50 bg-background/40 px-2.5 hover:bg-background/60"
+                      {!sidebarLikeEmbed ? (
+                        <Select
+                          value={chatGatewayModelId}
+                          onValueChange={(value) => {
+                            chatGatewayModelRef.current = value
+                            setChatGatewayModelId(value)
+                          }}
+                          disabled={
+                            !authReady ||
+                            isCreatingThread ||
+                            isBootstrappingOnboarding ||
+                            status === "submitted" ||
+                            status === "streaming"
+                          }
                         >
-                          <SelectValue placeholder="Model">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <ModelIcon
-                                identifier={selectedChatGatewayOption.id}
-                                size={16}
-                                srcOverride={selectedChatGatewayOption.iconPath}
-                              />
-                              <span className="truncate">{selectedChatGatewayOption.label}</span>
-                            </div>
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent align="start" position="popper" sideOffset={4} className="w-[min(calc(100vw-2rem),22rem)]">
-                          {CHAT_GATEWAY_MODEL_OPTIONS.map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              <div className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
-                                <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border bg-muted/30">
-                                  <ModelIcon identifier={option.id} size={20} srcOverride={option.iconPath} />
-                                </div>
-                                <div className="flex min-w-0 flex-col gap-0.5">
-                                  <span className="text-sm font-semibold">{option.label}</span>
-                                  {option.description ? (
-                                    <span className="text-xs text-muted-foreground">{option.description}</span>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
+                          <SelectTrigger
                             size="sm"
-                            className="h-9 shrink-0 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-                            aria-label={`Skills loaded in this chat: ${loadedSkillsCount}. Open skill picker.`}
-                            disabled={
-                              !authReady ||
-                              !userId ||
-                              isCreatingThread ||
-                              isBootstrappingOnboarding ||
-                              status === "submitted" ||
-                              status === "streaming"
-                            }
-                            onClick={() => setSkillLoadModalOpen(true)}
+                            aria-label="Chat model"
+                            className="h-9 w-fit min-w-0 max-w-[min(100%,16rem)] shrink border-border/50 bg-background/40 px-2.5 hover:bg-background/60"
                           >
-                            <Books className="size-4" weight="duotone" />
-                            <Badge
-                              variant="secondary"
-                              className="h-5 min-w-5 rounded-full px-1.5 text-[10px] font-medium tabular-nums"
+                            <SelectValue placeholder="Model">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <ModelIcon
+                                  identifier={selectedChatGatewayOption.id}
+                                  size={16}
+                                  srcOverride={selectedChatGatewayOption.iconPath}
+                                />
+                                <span className="truncate">{selectedChatGatewayOption.label}</span>
+                              </div>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent align="start" position="popper" sideOffset={4} className="w-[min(calc(100vw-2rem),22rem)]">
+                            {CHAT_GATEWAY_MODEL_OPTIONS.map((option) => (
+                              <SelectItem key={option.id} value={option.id}>
+                                <div className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
+                                  <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border bg-muted/30">
+                                    <ModelIcon identifier={option.id} size={20} srcOverride={option.iconPath} />
+                                  </div>
+                                  <div className="flex min-w-0 flex-col gap-0.5">
+                                    <span className="text-sm font-semibold">{option.label}</span>
+                                    {option.description ? (
+                                      <span className="text-xs text-muted-foreground">{option.description}</span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : null}
+                      {!sidebarLikeEmbed ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-9 shrink-0 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                              aria-label={`Skills loaded in this chat: ${loadedSkillsCount}. Open skill picker.`}
+                              disabled={
+                                !authReady ||
+                                !userId ||
+                                isCreatingThread ||
+                                isBootstrappingOnboarding ||
+                                status === "submitted" ||
+                                status === "streaming"
+                              }
+                              onClick={() => setSkillLoadModalOpen(true)}
                             >
-                              {loadedSkillsCount}
-                            </Badge>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-56">
-                          Unique skills successfully loaded in this chat (via activateSkill). Click to ask the
-                          agent to load one.
-                        </TooltipContent>
-                      </Tooltip>
+                              <Books className="size-4" weight="duotone" />
+                              <Badge
+                                variant="secondary"
+                                className="h-5 min-w-5 rounded-full px-1.5 text-[10px] font-medium tabular-nums"
+                              >
+                                {loadedSkillsCount}
+                              </Badge>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-56">
+                            Unique skills successfully loaded in this chat (via activateSkill). Click to ask the
+                            agent to load one.
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 max-w-[14rem] shrink min-w-0 gap-1.5 rounded-full px-2 text-xs font-medium text-muted-foreground hover:text-foreground sm:px-3"
-                            aria-label={
-                              generationApprovalMode === "ask"
-                                ? "Ask before generation"
-                                : "Auto-run generation without asking"
-                            }
-                            disabled={
-                              !authReady ||
-                              isCreatingThread ||
-                              isBootstrappingOnboarding ||
-                              status === "submitted" ||
-                              status === "streaming"
-                            }
-                          >
-                            {generationApprovalMode === "ask" ? (
-                              <HandPalm className="size-4 shrink-0" weight="duotone" />
-                            ) : (
-                              <Lightning className="size-4 shrink-0" weight="duotone" />
-                            )}
-                            <span className="hidden truncate md:inline">
-                              {generationApprovalMode === "ask"
-                                ? "Ask before generation"
-                                : "Auto-run generation"}
-                            </span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" side="top" sideOffset={4} className="w-64">
-                          <DropdownMenuLabel className="font-normal text-muted-foreground">
-                            Generation approval
-                          </DropdownMenuLabel>
-                          <DropdownMenuItem
-                            onClick={() => updateGenerationApprovalMode("auto")}
-                            className="gap-3"
-                          >
-                            <Lightning className="size-4 text-muted-foreground" weight="duotone" />
-                            <span className="min-w-0 flex-1">Auto-run without asking</span>
-                            {generationApprovalMode === "auto" ? <Check className="size-4" /> : null}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => updateGenerationApprovalMode("ask")}
-                            className="gap-3"
-                          >
-                            <HandPalm className="size-4 text-muted-foreground" weight="duotone" />
-                            <span className="min-w-0 flex-1">Confirm before running</span>
-                            {generationApprovalMode === "ask" ? <Check className="size-4" /> : null}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {!sidebarLikeEmbed ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-9 max-w-[14rem] shrink min-w-0 gap-1.5 rounded-full px-2 text-xs font-medium text-muted-foreground hover:text-foreground sm:px-3"
+                              aria-label={
+                                generationApprovalMode === "ask"
+                                  ? "Ask before generation"
+                                  : "Auto-run generation without asking"
+                              }
+                              disabled={
+                                !authReady ||
+                                isCreatingThread ||
+                                isBootstrappingOnboarding ||
+                                status === "submitted" ||
+                                status === "streaming"
+                              }
+                            >
+                              {generationApprovalMode === "ask" ? (
+                                <HandPalm className="size-4 shrink-0" weight="duotone" />
+                              ) : (
+                                <Lightning className="size-4 shrink-0" weight="duotone" />
+                              )}
+                              <span className="hidden truncate md:inline">
+                                {generationApprovalMode === "ask"
+                                  ? "Ask before generation"
+                                  : "Auto-run generation"}
+                              </span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" side="top" sideOffset={4} className="w-64">
+                            <DropdownMenuLabel className="font-normal text-muted-foreground">
+                              Generation approval
+                            </DropdownMenuLabel>
+                            <DropdownMenuItem
+                              onClick={() => updateGenerationApprovalMode("auto")}
+                              className="gap-3"
+                            >
+                              <Lightning className="size-4 text-muted-foreground" weight="duotone" />
+                              <span className="min-w-0 flex-1">Auto-run without asking</span>
+                              {generationApprovalMode === "auto" ? <Check className="size-4" /> : null}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => updateGenerationApprovalMode("ask")}
+                              className="gap-3"
+                            >
+                              <HandPalm className="size-4 text-muted-foreground" weight="duotone" />
+                              <span className="min-w-0 flex-1">Confirm before running</span>
+                              {generationApprovalMode === "ask" ? <Check className="size-4" /> : null}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : null}
                       <SpeechInput
                         forceServerTranscription
                         variant="ghost"

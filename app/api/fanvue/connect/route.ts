@@ -1,13 +1,11 @@
-import { randomBytes } from "crypto"
 import { NextResponse } from "next/server"
 
 import {
   buildFanvueAuthorizeUrl,
-  FANVUE_OAUTH_STATE_COOKIE,
-  FANVUE_OAUTH_VERIFIER_COOKIE,
   generateFanvuePkcePair,
 } from "@/lib/fanvue/oauth"
-import { resolveFanvueOAuthRedirectUri } from "@/lib/fanvue/config"
+import { resolveFanvueOAuthOrigin, resolveFanvueOAuthRedirectUri } from "@/lib/fanvue/config"
+import { createFanvueOAuthState } from "@/lib/fanvue/oauth-state"
 import { requirePresenceProductResponse } from "@/lib/product/require-presence"
 import {
   parseSocialOAuthReturnPath,
@@ -31,9 +29,14 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${requestUrl.origin}/login?next=/content`, 302)
     }
 
-    const clientId = process.env.FANVUE_OAUTH_CLIENT_ID?.trim()
     const redirectUri = resolveFanvueOAuthRedirectUri(requestUrl)
+    const oauthOrigin = resolveFanvueOAuthOrigin(requestUrl)
+    if (oauthOrigin !== requestUrl.origin) {
+      const canonicalConnect = new URL(`${requestUrl.pathname}${requestUrl.search}`, oauthOrigin)
+      return NextResponse.redirect(canonicalConnect.toString(), 302)
+    }
 
+    const clientId = process.env.FANVUE_OAUTH_CLIENT_ID?.trim()
     if (!clientId) {
       return NextResponse.json(
         { error: "Fanvue OAuth is not configured. Missing FANVUE_OAUTH_CLIENT_ID." },
@@ -41,8 +44,20 @@ export async function GET(request: Request) {
       )
     }
 
-    const state = randomBytes(24).toString("base64url")
+    const returnPath = parseSocialOAuthReturnPath(requestUrl.searchParams.get("next")) ?? "/content"
     const { verifier, challenge } = generateFanvuePkcePair()
+    const state = createFanvueOAuthState({
+      verifier,
+      userId: user.id,
+      returnPath,
+    })
+
+    if (!state) {
+      return NextResponse.json(
+        { error: "Fanvue OAuth is not configured. Missing FANVUE_OAUTH_CLIENT_SECRET." },
+        { status: 500 }
+      )
+    }
     const authorizeUrl = buildFanvueAuthorizeUrl({
       clientId,
       redirectUri,
@@ -52,7 +67,6 @@ export async function GET(request: Request) {
 
     const response = NextResponse.redirect(authorizeUrl, 302)
 
-    const returnPath = parseSocialOAuthReturnPath(requestUrl.searchParams.get("next")) ?? "/content"
     response.cookies.set(SOCIAL_OAUTH_RETURN_COOKIE, returnPath, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -60,17 +74,6 @@ export async function GET(request: Request) {
       maxAge: 60 * 10,
       path: "/",
     })
-
-    const cookieOpts = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
-      maxAge: 60 * 10,
-      path: "/",
-    }
-
-    response.cookies.set(FANVUE_OAUTH_STATE_COOKIE, state, cookieOpts)
-    response.cookies.set(FANVUE_OAUTH_VERIFIER_COOKIE, verifier, cookieOpts)
 
     return response
   } catch (error) {

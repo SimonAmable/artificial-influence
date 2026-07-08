@@ -37,9 +37,12 @@ import {
 } from "@/components/profile/profile-settings-modal"
 import { useNotificationsRead } from "@/lib/notifications/use-notifications-read"
 
-/** Matches signed-in header pills (credits, assets) for one surface style. */
+/** Matches signed-in header pills (credits, search) and icon controls for one surface style. */
 const signedInHeaderPillClassName =
-  "h-auto min-h-9 rounded-full border border-border/70 bg-secondary/40 px-3 py-1.5 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-secondary/70 hover:text-foreground aria-expanded:bg-secondary/50"
+  "h-auto min-h-9 rounded-full border border-border/70 bg-secondary/40 px-3 py-1.5 text-sm font-semibold text-foreground shadow-sm backdrop-blur-md transition-colors hover:bg-secondary/70 hover:text-foreground aria-expanded:bg-secondary/50"
+
+const signedInHeaderIconButtonClassName =
+  "border-border/70 bg-background/70 shadow-md backdrop-blur-md hover:bg-background/90 aria-expanded:bg-background/90"
 
 function isGroupActive(pathname: string, group: MegaNavGroup) {
   if (group.path && pathname === group.path) return true
@@ -346,7 +349,12 @@ export function Header() {
           <div className="xl:hidden">
             <React.Suspense
               fallback={
-                <Button variant="outline" className="justify-between gap-2 shadow-md" disabled type="button">
+                <Button
+                  variant="outline"
+                  className={cn("justify-between gap-2", signedInHeaderIconButtonClassName)}
+                  disabled
+                  type="button"
+                >
                   <span className="min-w-16 select-none text-muted-foreground">Menu</span>
                   <CaretDownIcon className="h-4 w-4 opacity-50" />
                 </Button>
@@ -397,7 +405,7 @@ export function Header() {
                 size="icon"
                 asChild
                 className={cn(
-                  "shadow-md",
+                  signedInHeaderIconButtonClassName,
                   (pathname === "/history" || pathname === "/assets") && "bg-secondary/70"
                 )}
               >
@@ -409,7 +417,7 @@ export function Header() {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="relative shadow-md"
+                className={cn("relative", signedInHeaderIconButtonClassName)}
                 aria-label={
                   notificationsUnread
                     ? "Open account settings (unread notifications)"

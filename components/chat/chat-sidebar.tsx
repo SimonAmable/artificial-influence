@@ -236,7 +236,7 @@ export function ChatSidebar({
   return (
     <aside
       className={cn(
-        "hidden shrink-0 border-r border-border/60 bg-background text-foreground transition-[width] duration-200 md:flex md:h-[calc(100dvh-60px)] md:min-h-0 md:flex-col",
+        "hidden shrink-0 bg-background text-foreground transition-[width] duration-200 md:flex md:h-[calc(100dvh-60px)] md:min-h-0 md:flex-col",
         collapsed ? "w-14" : "w-[292px]",
       )}
     >
@@ -254,7 +254,6 @@ export function ChatSidebar({
               <CaretDoubleRight className="size-4" aria-hidden />
             </Button>
           </IconTooltip>
-          <div className="my-1 h-px w-full bg-border/60" aria-hidden />
           <CollapsedHistoryMenu currentThreadId={currentThreadId} threads={sidebarThreads} />
           <IconTooltip label="New chat">
             <NewChatButton

@@ -10,16 +10,18 @@ import {
   CircleNotch,
   ClockCounterClockwise,
   NotePencil,
+  XIcon,
 } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { cn } from "@/lib/utils"
 import {
   clearStoredSidebarThreadId,
   getStoredSidebarThreadId,
@@ -33,19 +35,83 @@ const SidebarCreativeAgentChat = dynamic(
   { ssr: false },
 )
 
-export function AIChat() {
-  const pathname = usePathname()
+const DESKTOP_CHAT_PANEL_WIDTH_PX = 384
+const DESKTOP_CHAT_DOCK_PADDING_PX = 12
+const DESKTOP_CHAT_SLOT_WIDTH_PX =
+  DESKTOP_CHAT_PANEL_WIDTH_PX + DESKTOP_CHAT_DOCK_PADDING_PX * 2
 
-  if (pathname === "/chat" || pathname.startsWith("/chat/")) {
-    return null
-  }
-
-  return <AIChatSidebar />
+function AIChatPanelShell({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      className={cn(
+        "flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl bg-background shadow-depth-m",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  )
 }
 
-function AIChatSidebar() {
-  const router = useRouter()
+function AIChatPanelBody({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}>
+      {children}
+    </div>
+  )
+}
+
+type AIChatContextValue = {
+  open: boolean
+  isMobile: boolean
+  setSidebarOpen: (next: boolean) => void
+  hideOnChatPage: boolean
+  hideFloatingChatLauncher: boolean
+  panelBody: React.ReactNode
+}
+
+const AIChatContext = React.createContext<AIChatContextValue | null>(null)
+
+function useAIChatContext() {
+  const context = React.useContext(AIChatContext)
+
+  if (!context) {
+    throw new Error("useAIChatContext must be used within AIChatProvider")
+  }
+
+  return context
+}
+
+function useAIChatSidebarHidden(pathname: string | null) {
+  return pathname === "/chat" || (pathname?.startsWith("/chat/") ?? false)
+}
+
+function useHideFloatingChatLauncher(pathname: string | null) {
+  return (
+    pathname === "/image-editor" ||
+    pathname === "/inpaint" ||
+    (pathname?.startsWith("/image-editor/") ?? false)
+  )
+}
+
+export function AIChatProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const isMobile = useIsMobile()
+  const hideOnChatPage = useAIChatSidebarHidden(pathname)
+  const hideFloatingChatLauncher = useHideFloatingChatLauncher(pathname)
   const [open, setOpen] = React.useState(false)
   const [authReady, setAuthReady] = React.useState(false)
   const [userId, setUserId] = React.useState<string | null>(null)
@@ -56,7 +122,6 @@ function AIChatSidebar() {
   const [chatRenderKey, setChatRenderKey] = React.useState(0)
   const userIdRef = React.useRef<string | null>(null)
 
-  /** When the sheet closes we clear hydration flags so the next open refetches DB (parent never receives live messages from the child). */
   const setSidebarOpen = React.useCallback((next: boolean) => {
     setOpen(next)
     if (!next) {
@@ -77,10 +142,18 @@ function AIChatSidebar() {
   }, [])
 
   React.useEffect(() => {
+    if (hideOnChatPage) {
+      return
+    }
+
+    const dockedWidth = !isMobile && open ? DESKTOP_CHAT_SLOT_WIDTH_PX : 0
+
     window.dispatchEvent(
-      new CustomEvent("chat-visibility", { detail: { open } }),
+      new CustomEvent("chat-visibility", {
+        detail: { open, docked: !isMobile, width: dockedWidth },
+      }),
     )
-  }, [open])
+  }, [hideOnChatPage, isMobile, open])
 
   React.useEffect(() => {
     const handleOpen = () => setSidebarOpen(true)
@@ -255,108 +328,234 @@ function AIChatSidebar() {
     router.push("/chat")
   }, [router, setSidebarOpen])
 
-  const hideFloatingChatLauncher =
-    pathname === "/image-editor" ||
-    pathname === "/inpaint" ||
-    pathname?.startsWith("/image-editor/")
+  const panelBody = (
+    <AIChatPanelBody>
+      <AIChatPanelHeader
+        authReady={authReady}
+        userId={userId}
+        onClose={() => setSidebarOpen(false)}
+        onNewChat={handleNewChat}
+        onOpenFullChat={handleOpenFullChat}
+        onOpenHistory={handleOpenHistory}
+        useSheetPrimitives={isMobile}
+      />
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {!authReady || isHydratingThread ? (
+          <div className="flex h-full items-center justify-center gap-2 px-4 text-sm text-muted-foreground">
+            <CircleNotch className="h-4 w-4 animate-spin" />
+            Restoring your chat...
+          </div>
+        ) : (
+          <SidebarCreativeAgentChat
+            key={chatRenderKey}
+            compact
+            enablePersistence
+            initialMessages={initialMessages}
+            initialThreadId={initialThreadId}
+            onThreadIdChange={handleThreadIdChange}
+          />
+        )}
+      </div>
+    </AIChatPanelBody>
+  )
+
+  const contextValue = React.useMemo<AIChatContextValue>(
+    () => ({
+      open,
+      isMobile,
+      setSidebarOpen,
+      hideOnChatPage,
+      hideFloatingChatLauncher,
+      panelBody,
+    }),
+    [hideFloatingChatLauncher, hideOnChatPage, isMobile, open, panelBody, setSidebarOpen],
+  )
 
   return (
-    <>
-      {!open && !hideFloatingChatLauncher ? (
-        <Button
-          onClick={() => setSidebarOpen(true)}
-          className="fixed right-6 bottom-6 z-60 h-14 w-14 rounded-full shadow-depth-l"
-          size="icon"
-        >
-          <ProductLogo size={22} alt="" />
-        </Button>
-      ) : null}
+    <AIChatContext.Provider value={contextValue}>
+      {children}
+      {!hideOnChatPage ? <AIChatLauncher /> : null}
+      {!hideOnChatPage ? <AIChatMobileSheet /> : null}
+    </AIChatContext.Provider>
+  )
+}
 
-      <Sheet open={open} onOpenChange={setSidebarOpen}>
-        {open ? (
-          <SheetContent
-            side="right"
-            className="flex h-full w-full max-w-[540px] flex-col overflow-hidden p-0"
-          >
-            <SheetHeader className="gap-2 border-b border-border/60 px-4 py-4 pr-14 text-left">
-              <div className="flex items-center justify-between gap-3">
-                <SheetTitle className="flex min-w-0 items-center gap-2 text-base">
-                  <span className="flex size-5 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/40">
-                    <ProductLogo size={12} alt="Website AI" />
-                  </span>
-                  <span className="truncate">{UNICAN_ASSISTANT_NAME}</span>
-                </SheetTitle>
-                <div className="flex items-center gap-1">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="rounded-full"
-                        onClick={handleNewChat}
-                        aria-label="New chat"
-                      >
-                        <NotePencil className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" sideOffset={8}>New chat</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="rounded-full"
-                        onClick={handleOpenFullChat}
-                        aria-label="Open current chat in full page"
-                      >
-                        <ArrowSquareOut className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" sideOffset={8}>Open current chat</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="rounded-full"
-                        onClick={handleOpenHistory}
-                        aria-label="Open chat history"
-                        disabled={!authReady || !userId}
-                      >
-                        <ClockCounterClockwise className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" sideOffset={8}>Chat history</TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
-              <SheetDescription>Your AI assistant for website tasks.</SheetDescription>
-            </SheetHeader>
-            <div className="min-h-0 flex-1 overflow-hidden">
-              {!authReady || isHydratingThread ? (
-                <div className="flex h-full items-center justify-center gap-2 px-4 text-sm text-muted-foreground">
-                  <CircleNotch className="h-4 w-4 animate-spin" />
-                  Restoring your chat...
-                </div>
-              ) : (
-                <SidebarCreativeAgentChat
-                  key={chatRenderKey}
-                  compact
-                  enablePersistence
-                  initialMessages={initialMessages}
-                  initialThreadId={initialThreadId}
-                  onThreadIdChange={handleThreadIdChange}
-                />
-              )}
-            </div>
-          </SheetContent>
-        ) : null}
-      </Sheet>
+export function AIChatDesktopDock() {
+  const { open, isMobile, hideOnChatPage, panelBody } = useAIChatContext()
+
+  if (hideOnChatPage || isMobile || !open) {
+    return null
+  }
+
+  return (
+    <aside
+      aria-label={`${UNICAN_ASSISTANT_NAME} chat`}
+      className="sticky top-[52px] box-border flex h-[calc(100dvh-52px)] shrink-0 flex-col p-3"
+      style={{ width: DESKTOP_CHAT_SLOT_WIDTH_PX }}
+    >
+      <AIChatPanelShell>{panelBody}</AIChatPanelShell>
+    </aside>
+  )
+}
+
+function AIChatLauncher() {
+  const { open, hideFloatingChatLauncher, setSidebarOpen } = useAIChatContext()
+
+  if (open || hideFloatingChatLauncher) {
+    return null
+  }
+
+  return (
+    <Button
+      onClick={() => setSidebarOpen(true)}
+      className="fixed right-6 bottom-6 z-60 h-14 w-14 rounded-full shadow-depth-l"
+      size="icon"
+    >
+      <ProductLogo size={22} alt="" />
+    </Button>
+  )
+}
+
+function AIChatMobileSheet() {
+  const { open, isMobile, setSidebarOpen, panelBody } = useAIChatContext()
+
+  if (!isMobile) {
+    return null
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={setSidebarOpen}>
+      {open ? (
+        <SheetContent
+          side="right"
+          showCloseButton={false}
+          className="flex h-full w-full max-w-none flex-col overflow-visible border-0 bg-transparent p-3 shadow-none data-[side=right]:w-full sm:max-w-none"
+        >
+          <AIChatPanelShell>{panelBody}</AIChatPanelShell>
+        </SheetContent>
+      ) : null}
+    </Sheet>
+  )
+}
+
+/** @deprecated Use AIChatProvider + AIChatDesktopDock in layout instead. */
+export function AIChat() {
+  return null
+}
+
+type AIChatPanelHeaderProps = {
+  authReady: boolean
+  userId: string | null
+  onClose: () => void
+  onNewChat: () => void
+  onOpenFullChat: () => void
+  onOpenHistory: () => void
+  useSheetPrimitives: boolean
+}
+
+function AIChatPanelHeader({
+  authReady,
+  userId,
+  onClose,
+  onNewChat,
+  onOpenFullChat,
+  onOpenHistory,
+  useSheetPrimitives,
+}: AIChatPanelHeaderProps) {
+  const headerClassName =
+    "flex shrink-0 items-center gap-2 border-b border-border/50 px-3 py-2.5 sm:px-4 sm:py-3"
+  const titleClassName =
+    "flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-foreground sm:text-base"
+
+  const titleContent = (
+    <>
+      <span className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/40">
+        <ProductLogo size={14} alt="Website AI" />
+      </span>
+      <span className="truncate">{UNICAN_ASSISTANT_NAME}</span>
     </>
+  )
+
+  const toolbarButtons = (
+    <div className="flex shrink-0 items-center gap-0.5">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="rounded-full"
+            onClick={onNewChat}
+            aria-label="New chat"
+          >
+            <NotePencil className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={8}>
+          New chat
+        </TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="rounded-full"
+            onClick={onOpenFullChat}
+            aria-label="Open current chat in full page"
+          >
+            <ArrowSquareOut className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={8}>
+          Open current chat
+        </TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="rounded-full"
+            onClick={onOpenHistory}
+            aria-label="Open chat history"
+            disabled={!authReady || !userId}
+          >
+            <ClockCounterClockwise className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={8}>
+          Chat history
+        </TooltipContent>
+      </Tooltip>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className="rounded-full"
+        onClick={onClose}
+        aria-label="Close chat"
+      >
+        <XIcon className="h-4 w-4" />
+      </Button>
+    </div>
+  )
+
+  if (useSheetPrimitives) {
+    return (
+      <SheetHeader className={cn("flex-row p-0 text-left", headerClassName)}>
+        <SheetTitle className={titleClassName}>{titleContent}</SheetTitle>
+        {toolbarButtons}
+      </SheetHeader>
+    )
+  }
+
+  return (
+    <div className={headerClassName}>
+      <h2 className={titleClassName}>{titleContent}</h2>
+      {toolbarButtons}
+    </div>
   )
 }
