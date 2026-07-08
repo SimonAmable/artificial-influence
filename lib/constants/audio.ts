@@ -123,11 +123,13 @@ export function getAudioProviderForModel(modelId?: string | null): AudioProvider
   return getAudioModelOption(modelId)?.provider ?? DEFAULT_AUDIO_PROVIDER
 }
 
+import { productLogo } from "@/lib/product/branding"
+
 /** Icon shown next to TTS model options (brand logo for Inworld, Gemini mark for Google). */
 export function getAudioModelIconSrc(modelId?: string | null) {
   return getAudioProviderForModel(modelId) === "google"
     ? "/ai_icons/gemini-color.svg"
-    : "/logo.svg"
+    : productLogo
 }
 
 export function getAudioModelLabel(modelId?: string | null) {

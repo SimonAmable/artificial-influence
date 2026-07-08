@@ -1,4 +1,6 @@
 import type { FeatureLandingConfig } from "@/lib/types/feature-landing"
+import { productOgImage } from "@/lib/product/branding"
+import { currentProduct } from "@/lib/product/current"
 import { getSiteBaseUrl } from "@/lib/seo/site-url"
 
 type JsonLdProps = {
@@ -24,7 +26,7 @@ export function FeatureLandingJsonLd({ config }: JsonLdProps) {
   const base = getSiteBaseUrl()
   const path = `/${config.slug}`
   const canonical = config.seo.canonical ?? `${base}${path}`
-  const ogImage = config.seo.ogImage ?? `${base}/logo.svg`
+  const ogImage = config.seo.ogImage ?? `${base}${productOgImage}`
   const structured = config.seo.structuredData
 
   const graph: Record<string, unknown>[] = [
@@ -69,7 +71,7 @@ export function FeatureLandingJsonLd({ config }: JsonLdProps) {
   if (structured?.includeSoftwareApplication !== false) {
     graph.push({
       "@type": "SoftwareApplication",
-      name: "UniCan",
+      name: currentProduct.name,
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       url: base,

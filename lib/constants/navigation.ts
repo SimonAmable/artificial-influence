@@ -2,6 +2,7 @@
  * Shared navigation items for app header and canvas header
  */
 import { currentProduct } from "@/lib/product/current"
+import { productLogo } from "@/lib/product/branding"
 import type { ProductConfig, ProductId } from "@/lib/product/types"
 import { isRouteVisibleForProduct, isVisibleByProductMetadata } from "@/lib/product/visibility"
 
@@ -447,7 +448,7 @@ const baseMegaNavGroups: MegaNavGroup[] = [
         path: "/assets?tab=brands",
         label: "Brand",
         description: "Manage brand settings",
-        iconSrc: "/logo.svg",
+        iconSrc: productLogo,
         badge: "new",
         hiddenFor: ["presence-studio"],
       },

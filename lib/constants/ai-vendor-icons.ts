@@ -1,3 +1,6 @@
+import { currentProduct } from "@/lib/product/current"
+import { productLogoNeedsInvert } from "@/lib/product/branding"
+
 /**
  * Maps model identifier vendor slug (prefix before `/`) to logos in `public/ai_icons/`.
  * File names must match assets in `public/ai_icons/`.
@@ -9,11 +12,14 @@ export const AI_MONOCHROME_ICON_PATHS = new Set<string>([
   "/ai_icons/openai.svg",
   "/ai_icons/minimax.svg",
   "/ai_icons/flux.svg",
-  "/logo.svg",
   "/users-icon.svg",
 ])
 
 export function isAiMonochromeIconPath(src: string): boolean {
+  if (src === currentProduct.logo) {
+    return productLogoNeedsInvert()
+  }
+
   return AI_MONOCHROME_ICON_PATHS.has(src)
 }
 

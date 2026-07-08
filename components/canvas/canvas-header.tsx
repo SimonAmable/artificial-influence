@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
+import { ProductLogo } from "@/components/product/product-logo"
 import { useRouter } from "next/navigation"
 import { FloppyDisk, Play, CircleNotch, GearSix, CaretDownIcon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -87,13 +87,7 @@ export function CanvasHeader({
         <DropdownMenu >
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-1 hover:opacity-80 transition-opacity group">
-              <Image 
-                src="/logo.svg" 
-                alt="Logo" 
-                width={32} 
-                height={32}
-                className="h-6 w-6"
-              />
+              <ProductLogo size={24} className="h-6 w-6" alt="Logo" />
               <CaretDownIcon className="h-3 w-3 text-zinc-400 group-hover:text-zinc-100 transition-colors" />
             </button>
           </DropdownMenuTrigger>

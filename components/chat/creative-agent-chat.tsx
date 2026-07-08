@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
+import { ProductLogo } from "@/components/product/product-logo"
 import Link from "next/link"
 import type { UIMessage } from "ai"
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai"
@@ -1707,13 +1707,7 @@ export function CreativeAgentChat({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="flex size-5 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/30">
-                  <Image
-                    src="/logo.svg"
-                    alt="Website AI"
-                    width={12}
-                    height={12}
-                    className="dark:invert"
-                  />
+                  <ProductLogo size={12} alt="Website AI" />
                 </span>
                 <p className="truncate text-sm font-semibold">Chat</p>
               </div>
@@ -1747,13 +1741,7 @@ export function CreativeAgentChat({
                         !authReady && "animate-pulse",
                       )}
                     >
-                      <Image
-                        src="/logo.svg"
-                        alt="Website AI"
-                        width={22}
-                        height={22}
-                        className="dark:invert"
-                      />
+                      <ProductLogo size={22} alt="Website AI" />
                     </span>
                   )}
                   title={EMPTY_STATE_TITLE}
@@ -1802,13 +1790,7 @@ export function CreativeAgentChat({
                   ) : (
                     <div className="flex w-full min-w-0 max-w-3xl items-start gap-3">
                       <span className="mt-1 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/40">
-                        <Image
-                          src="/logo.svg"
-                          alt="Website AI"
-                          width={16}
-                          height={16}
-                          className="dark:invert"
-                        />
+                        <ProductLogo size={16} alt="Website AI" />
                       </span>
                       <div className="min-w-0 flex-1 space-y-3 text-left text-[15px] leading-7 text-foreground">
                         <MessageParts
@@ -1845,13 +1827,7 @@ export function CreativeAgentChat({
               <Message from="assistant" className="mb-2">
                 <div className="flex w-full min-w-0 max-w-3xl items-center gap-3">
                   <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/40">
-                    <Image
-                      src="/logo.svg"
-                      alt="Website AI"
-                      width={16}
-                      height={16}
-                      className="dark:invert"
-                    />
+                    <ProductLogo size={16} alt="Website AI" />
                   </span>
                   <div className="min-w-0 flex-1 text-left text-sm text-foreground">
                     <Shimmer className="leading-none">Thinking...</Shimmer>

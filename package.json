@@ -12,6 +12,7 @@
     "ngrok": "ngrok http 3000",
     "typecheck": "npx tsc --noEmit",
     "check:chat-prompts": "node --experimental-strip-types scripts/check-chat-prompt-regression.mjs",
+    "check:product-logo": "node scripts/check-product-logo.mjs",
     "check:ffmpeg-ass": "node --experimental-strip-types scripts/check-ffmpeg-ass.mjs",
     "snapshot:ffmpeg": "node scripts/create-ffmpeg-sandbox-snapshot.mjs"
   },

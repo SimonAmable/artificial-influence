@@ -2,6 +2,8 @@
 
 import { Instagram } from "lucide-react"
 
+import { currentProduct } from "@/lib/product/current"
+import { productLogo } from "@/lib/product/branding"
 import { cn } from "@/lib/utils"
 
 type AutomationLogoConnectionProps = {
@@ -31,9 +33,9 @@ export function AutomationLogoConnection({
       <div className="relative z-1 flex shrink-0 flex-col items-center gap-2">
         <div className="rounded-2xl bg-white p-3 shadow-lg ring-1 ring-white/20">
           {/* eslint-disable-next-line @next/next/no-img-element -- public app mark */}
-          <img src="/logo.svg" alt="" width={48} height={48} className="h-12 w-12" />
+          <img src={productLogo} alt="" width={48} height={48} className="h-12 w-12" />
         </div>
-        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">UniCan</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">{currentProduct.name}</span>
       </div>
 
       <div className="relative z-1 min-h-[72px] min-w-0 flex-1">

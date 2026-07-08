@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import dynamic from "next/dynamic"
-import Image from "next/image"
+import { ProductLogo } from "@/components/product/product-logo"
 import { usePathname, useRouter } from "next/navigation"
 import type { UIMessage } from "ai"
 import {
@@ -268,7 +268,7 @@ function AIChatSidebar() {
           className="fixed right-6 bottom-6 z-60 h-14 w-14 rounded-full shadow-depth-l"
           size="icon"
         >
-          <Image src="/logo.svg" alt="" width={22} height={22} className="dark:invert" />
+          <ProductLogo size={22} alt="" />
         </Button>
       ) : null}
 
@@ -282,13 +282,7 @@ function AIChatSidebar() {
               <div className="flex items-center justify-between gap-3">
                 <SheetTitle className="flex min-w-0 items-center gap-2 text-base">
                   <span className="flex size-5 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/40">
-                    <Image
-                      src="/logo.svg"
-                      alt="Website AI"
-                      width={12}
-                      height={12}
-                      className="dark:invert"
-                    />
+                    <ProductLogo size={12} alt="Website AI" />
                   </span>
                   <span className="truncate">{UNICAN_ASSISTANT_NAME}</span>
                 </SheetTitle>

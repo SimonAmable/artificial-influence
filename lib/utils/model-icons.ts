@@ -1,9 +1,11 @@
+import { productLogo } from "@/lib/product/branding"
+
 /**
  * Maps model identifiers to their corresponding icon paths in public/ai_icons
  */
 export function getModelIconPath(identifier: string): string | null {
   if (identifier === 'custom/character-swap') {
-    return '/logo.svg'
+    return productLogo
   }
 
   // Extract the provider/prefix from identifier (e.g., "google/nano-banana" -> "google")

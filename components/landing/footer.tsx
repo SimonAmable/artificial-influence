@@ -39,7 +39,7 @@ export function Footer() {
     <footer className="relative w-full overflow-hidden bg-background py-12">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[url('/logo.svg')] bg-cover bg-center bg-no-repeat opacity-[0.05] dark:opacity-[0.06]"
+        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.05] dark:opacity-[0.06]"
         style={{ backgroundImage: `url('${currentProduct.logo}')` }}
       />
       <div

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
+import { ProductLogo } from "@/components/product/product-logo"
 import { useRouter } from "next/navigation"
 import { Plus } from "@phosphor-icons/react"
 import { Conversation, ConversationContent, ConversationEmptyState } from "@/components/ai-elements/conversation"
@@ -38,13 +38,7 @@ export function MockChatHero({
                 className="pb-0"
                 icon={(
                   <span className="flex size-12 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/30">
-                    <Image
-                      src="/logo.svg"
-                      alt="Website AI"
-                      width={22}
-                      height={22}
-                      className="dark:invert"
-                    />
+                    <ProductLogo size={22} alt="Website AI" />
                   </span>
                 )}
                 title="Start a conversation"

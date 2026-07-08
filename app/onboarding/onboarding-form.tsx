@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
+import { ProductLogo } from "@/components/product/product-logo"
+import { productLogoNeedsInvert } from "@/lib/product/branding"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
@@ -1624,12 +1625,10 @@ export function OnboardingForm({
             <OnboardingProgressBar step={step} totalSteps={totalSteps} />
             {step !== 0 ? (
               <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary p-2.5 shadow-sm">
-                <Image
-                  src="/logo.svg"
+                <ProductLogo
+                  size={28}
                   alt=""
-                  width={28}
-                  height={28}
-                  className="invert opacity-95"
+                  className={productLogoNeedsInvert() ? "invert opacity-95" : "opacity-95"}
                 />
               </div>
             ) : null}
@@ -1650,12 +1649,10 @@ export function OnboardingForm({
             {step === 0 && (
               <div className="flex w-full max-w-md flex-col items-center gap-8 py-4 text-center">
                 <div className="flex size-24 shrink-0 items-center justify-center rounded-full border-2 border-primary/50 bg-card/30 p-4 shadow-[0_0_32px_-4px] shadow-primary/25">
-                  <Image
-                    src="/logo.svg"
+                  <ProductLogo
+                    size={48}
                     alt=""
-                    width={48}
-                    height={48}
-                    className="invert opacity-95"
+                    className={productLogoNeedsInvert() ? "invert opacity-95" : "opacity-95"}
                   />
                 </div>
                 <div className="space-y-3">

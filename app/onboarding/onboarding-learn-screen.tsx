@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
+import { ProductLogo } from "@/components/product/product-logo"
 import type { UIMessage } from "ai"
 import {
   ArrowSquareOut,
@@ -247,13 +247,7 @@ export function OnboardingLearnScreen({
                             ) : (
                               <div className="flex w-full min-w-0 max-w-3xl items-start gap-3">
                                 <span className="mt-1 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-muted/40">
-                                  <Image
-                                    src="/logo.svg"
-                                    alt=""
-                                    width={16}
-                                    height={16}
-                                    className="dark:invert"
-                                  />
+                                  <ProductLogo size={16} alt="" />
                                 </span>
                                 <div className="min-w-0 flex-1 space-y-3 text-left text-[15px] leading-7 text-foreground">
                                   <MessageParts
