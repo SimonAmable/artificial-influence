@@ -1377,7 +1377,7 @@ function ImagePageContent() {
 
               {/* Fixed Bottom Panel - Prompt Box (always visible) */}
               <div
-                className="pointer-events-none fixed bottom-0 left-0 z-50 p-4 transition-[right] duration-200 ease-linear sm:p-6"
+                className="pointer-events-none fixed bottom-0 left-0 z-50 p-4 transition-[right] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] sm:p-6"
                 style={fixedPromptPanelStyle}
               >
                 <div className="pointer-events-none max-w-7xl mx-auto flex justify-center">
@@ -1427,7 +1427,7 @@ function ImagePageContent() {
 
               {/* Fixed Bottom Panel - Prompt Box (mobile only) */}
               <div
-                className="pointer-events-none fixed bottom-0 left-0 z-50 p-4 transition-[right] duration-200 ease-linear sm:p-6 lg:hidden"
+                className="pointer-events-none fixed bottom-0 left-0 z-50 p-4 transition-[right] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] sm:p-6 lg:hidden"
                 style={fixedPromptPanelStyle}
               >
                 <div className="pointer-events-none max-w-7xl mx-auto flex justify-center">

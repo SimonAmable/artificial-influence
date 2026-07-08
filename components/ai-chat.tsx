@@ -2,6 +2,13 @@
 
 import * as React from "react"
 import dynamic from "next/dynamic"
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+} from "framer-motion"
 import { ProductLogo } from "@/components/product/product-logo"
 import { usePathname, useRouter } from "next/navigation"
 import type { UIMessage } from "ai"
@@ -39,6 +46,10 @@ const DESKTOP_CHAT_PANEL_WIDTH_PX = 384
 const DESKTOP_CHAT_DOCK_PADDING_PX = 12
 const DESKTOP_CHAT_SLOT_WIDTH_PX =
   DESKTOP_CHAT_PANEL_WIDTH_PX + DESKTOP_CHAT_DOCK_PADDING_PX * 2
+const CHAT_DOCK_TRANSITION = {
+  duration: 0.28,
+  ease: [0.32, 0.72, 0, 1] as const,
+}
 
 function AIChatPanelShell({
   children,
@@ -82,6 +93,7 @@ type AIChatContextValue = {
   panelBody: React.ReactNode
   /** Viewport inset (px) for fixed bottom UI when the desktop chat dock is open. */
   dockInsetRight: number
+  dockWidthMotion: ReturnType<typeof useMotionValue<number>>
 }
 
 const AIChatContext = React.createContext<AIChatContextValue | null>(null)
@@ -117,9 +129,12 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const isMobile = useIsMobile()
+  const prefersReducedMotion = useReducedMotion()
   const hideOnChatPage = useAIChatSidebarHidden(pathname)
   const hideFloatingChatLauncher = useHideFloatingChatLauncher(pathname)
   const [open, setOpen] = React.useState(false)
+  const dockWidthMotion = useMotionValue(0)
+  const [dockInsetRight, setDockInsetRight] = React.useState(0)
   const [authReady, setAuthReady] = React.useState(false)
   const [userId, setUserId] = React.useState<string | null>(null)
   const [initialMessages, setInitialMessages] = React.useState<UIMessage[]>([])
@@ -149,18 +164,41 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   React.useEffect(() => {
+    return dockWidthMotion.on("change", (value) => {
+      setDockInsetRight(value)
+    })
+  }, [dockWidthMotion])
+
+  React.useEffect(() => {
+    if (hideOnChatPage || isMobile) {
+      dockWidthMotion.set(0)
+      return
+    }
+
+    const target = open ? DESKTOP_CHAT_SLOT_WIDTH_PX : 0
+
+    if (prefersReducedMotion) {
+      dockWidthMotion.set(target)
+      return
+    }
+
+    const controls = animate(dockWidthMotion, target, CHAT_DOCK_TRANSITION)
+    return () => controls.stop()
+  }, [dockWidthMotion, hideOnChatPage, isMobile, open, prefersReducedMotion])
+
+  React.useEffect(() => {
     if (hideOnChatPage) {
       return
     }
 
-    const dockedWidth = !isMobile && open ? DESKTOP_CHAT_SLOT_WIDTH_PX : 0
+    const dockedWidth = !isMobile ? dockInsetRight : 0
 
     window.dispatchEvent(
       new CustomEvent("chat-visibility", {
         detail: { open, docked: !isMobile, width: dockedWidth },
       }),
     )
-  }, [hideOnChatPage, isMobile, open])
+  }, [dockInsetRight, hideOnChatPage, isMobile, open])
 
   React.useEffect(() => {
     const handleOpen = () => setSidebarOpen(true)
@@ -366,9 +404,6 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
     </AIChatPanelBody>
   )
 
-  const dockInsetRight =
-    hideOnChatPage || isMobile || !open ? 0 : DESKTOP_CHAT_SLOT_WIDTH_PX
-
   const contextValue = React.useMemo<AIChatContextValue>(
     () => ({
       open,
@@ -378,9 +413,11 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
       hideFloatingChatLauncher,
       panelBody,
       dockInsetRight,
+      dockWidthMotion,
     }),
     [
       dockInsetRight,
+      dockWidthMotion,
       hideFloatingChatLauncher,
       hideOnChatPage,
       isMobile,
@@ -400,38 +437,86 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function AIChatDesktopDock() {
-  const { open, isMobile, hideOnChatPage, panelBody } = useAIChatContext()
+  const { open, isMobile, hideOnChatPage, panelBody, dockWidthMotion } =
+    useAIChatContext()
+  const prefersReducedMotion = useReducedMotion()
+  const [renderDock, setRenderDock] = React.useState(open)
 
-  if (hideOnChatPage || isMobile || !open) {
+  React.useEffect(() => {
+    if (open) {
+      setRenderDock(true)
+    }
+  }, [open])
+
+  React.useEffect(() => {
+    if (open || !renderDock) {
+      return
+    }
+
+    if (prefersReducedMotion) {
+      setRenderDock(false)
+      return
+    }
+
+    return dockWidthMotion.on("change", (value) => {
+      if (value <= 1) {
+        setRenderDock(false)
+      }
+    })
+  }, [dockWidthMotion, open, prefersReducedMotion, renderDock])
+
+  if (hideOnChatPage || isMobile || !renderDock) {
     return null
   }
 
   return (
-    <aside
+    <motion.aside
       aria-label={`${UNICAN_ASSISTANT_NAME} chat`}
-      className="sticky top-[52px] box-border flex h-[calc(100dvh-52px)] shrink-0 flex-col p-3"
-      style={{ width: DESKTOP_CHAT_SLOT_WIDTH_PX }}
+      className="sticky top-[52px] box-border flex h-[calc(100dvh-52px)] min-w-0 shrink-0 flex-col overflow-hidden p-3"
+      style={{ width: dockWidthMotion }}
     >
-      <AIChatPanelShell>{panelBody}</AIChatPanelShell>
-    </aside>
+      <motion.div
+        className="h-full shrink-0"
+        style={{ width: DESKTOP_CHAT_SLOT_WIDTH_PX }}
+        initial={false}
+        animate={
+          prefersReducedMotion
+            ? { opacity: open ? 1 : 0 }
+            : { opacity: open ? 1 : 0, x: open ? 0 : 20 }
+        }
+        transition={CHAT_DOCK_TRANSITION}
+      >
+        <AIChatPanelShell>{panelBody}</AIChatPanelShell>
+      </motion.div>
+    </motion.aside>
   )
 }
 
 function AIChatLauncher() {
   const { open, hideFloatingChatLauncher, setSidebarOpen } = useAIChatContext()
-
-  if (open || hideFloatingChatLauncher) {
-    return null
-  }
+  const prefersReducedMotion = useReducedMotion()
 
   return (
-    <Button
-      onClick={() => setSidebarOpen(true)}
-      className="fixed right-6 bottom-6 z-60 h-14 w-14 rounded-full shadow-depth-l"
-      size="icon"
-    >
-      <ProductLogo size={22} alt="" />
-    </Button>
+    <AnimatePresence>
+      {!open && !hideFloatingChatLauncher ? (
+        <motion.div
+          key="ai-chat-launcher"
+          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9, y: 8 }}
+          transition={{ duration: 0.22, ease: CHAT_DOCK_TRANSITION.ease }}
+          className="fixed right-6 bottom-6 z-60"
+        >
+          <Button
+            onClick={() => setSidebarOpen(true)}
+            className="h-14 w-14 rounded-full shadow-depth-l"
+            size="icon"
+          >
+            <ProductLogo size={22} alt="" />
+          </Button>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   )
 }
 
@@ -444,15 +529,13 @@ function AIChatMobileSheet() {
 
   return (
     <Sheet open={open} onOpenChange={setSidebarOpen}>
-      {open ? (
-        <SheetContent
-          side="right"
-          showCloseButton={false}
-          className="flex h-full w-full max-w-none flex-col overflow-visible border-0 bg-transparent p-3 shadow-none data-[side=right]:w-full sm:max-w-none"
-        >
-          <AIChatPanelShell>{panelBody}</AIChatPanelShell>
-        </SheetContent>
-      ) : null}
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="flex h-full w-full max-w-none flex-col overflow-visible border-0 bg-transparent p-3 shadow-none duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-[side=right]:w-full sm:max-w-none"
+      >
+        <AIChatPanelShell>{panelBody}</AIChatPanelShell>
+      </SheetContent>
     </Sheet>
   )
 }
