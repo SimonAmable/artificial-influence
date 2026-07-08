@@ -24,6 +24,11 @@ type SignedPartResponse = {
   url: string
 }
 
+type MediaVariant = {
+  variantType?: string
+  url?: string
+}
+
 type MediaDetailResponse = {
   uuid?: string
   name?: string | null
@@ -32,13 +37,47 @@ type MediaDetailResponse = {
   status?: string | null
   thumbnailUrl?: string | null
   createdAt?: string | null
+  variants?: MediaVariant[]
+}
+
+type FanvuePagination = {
+  page?: number
+  size?: number
+  hasMore?: boolean
 }
 
 type MediaListResponse = {
   data?: MediaDetailResponse[]
   items?: MediaDetailResponse[]
+  pagination?: FanvuePagination
   nextCursor?: string | null
   cursor?: string | null
+}
+
+const FANVUE_MEDIA_VARIANTS = "thumbnail,thumbnail_gallery,main"
+
+function resolveFanvuePageParams(params?: { cursor?: string; limit?: number }) {
+  const parsedPage = Number(params?.cursor)
+  const page = Number.isFinite(parsedPage) && parsedPage >= 1 ? Math.floor(parsedPage) : 1
+  const size = Math.min(Math.max(params?.limit ?? 50, 1), 50)
+  return { page, size }
+}
+
+function resolveNextPageCursor(pagination?: FanvuePagination): string | null {
+  if (!pagination?.hasMore) return null
+  return String((pagination.page ?? 1) + 1)
+}
+
+function pickThumbnailUrl(item: MediaDetailResponse): string | null {
+  if (item.thumbnailUrl) return item.thumbnailUrl
+
+  const variants = item.variants ?? []
+  const thumbnail =
+    variants.find((variant) => variant.variantType === "thumbnail") ??
+    variants.find((variant) => variant.variantType === "thumbnail_gallery") ??
+    variants.find((variant) => variant.variantType === "main")
+
+  return thumbnail?.url ?? null
 }
 
 function inferFanvueMediaType(mimeType: string): "image" | "video" | "audio" | "document" {
@@ -56,7 +95,7 @@ function normalizeMediaItem(item: MediaDetailResponse): FanvueMediaListItem | nu
     filename: item.filename ?? null,
     mediaType: item.mediaType ?? null,
     status: item.status ?? null,
-    thumbnailUrl: item.thumbnailUrl ?? null,
+    thumbnailUrl: pickThumbnailUrl(item),
     createdAt: item.createdAt ?? null,
   }
 }
@@ -65,24 +104,32 @@ export async function listFanvueMedia(
   accessToken: string,
   params?: { cursor?: string; limit?: number }
 ): Promise<{ items: FanvueMediaListItem[]; nextCursor: string | null }> {
+  const { page, size } = resolveFanvuePageParams(params)
   const response = await fanvueApiRequest<MediaListResponse>({
     accessToken,
-    path: "/users/media",
+    path: "/media",
     searchParams: {
-      cursor: params?.cursor,
-      limit: params?.limit ?? 50,
+      page,
+      size,
+      variants: FANVUE_MEDIA_VARIANTS,
     },
   })
 
   const raw = response.data ?? response.items ?? []
   const items = raw.map(normalizeMediaItem).filter((item): item is FanvueMediaListItem => item !== null)
-  return { items, nextCursor: response.nextCursor ?? response.cursor ?? null }
+  return {
+    items,
+    nextCursor: resolveNextPageCursor(response.pagination) ?? response.nextCursor ?? response.cursor ?? null,
+  }
 }
 
 export async function getFanvueMedia(accessToken: string, mediaUuid: string): Promise<FanvueMediaListItem | null> {
   const response = await fanvueApiRequest<MediaDetailResponse>({
     accessToken,
     path: `/media/${encodeURIComponent(mediaUuid)}`,
+    searchParams: {
+      variants: FANVUE_MEDIA_VARIANTS,
+    },
   })
   return normalizeMediaItem(response)
 }
@@ -215,16 +262,21 @@ export async function listFanvueVaultFolderMedia(
   folderName: string,
   params?: { cursor?: string; limit?: number }
 ): Promise<{ items: FanvueMediaListItem[]; nextCursor: string | null }> {
+  const { page, size } = resolveFanvuePageParams(params)
   const response = await fanvueApiRequest<MediaListResponse>({
     accessToken,
     path: `/vault/folders/${encodeURIComponent(folderName)}/media`,
     searchParams: {
-      cursor: params?.cursor,
-      limit: params?.limit ?? 50,
+      page,
+      size,
+      variants: FANVUE_MEDIA_VARIANTS,
     },
   })
 
   const raw = response.data ?? response.items ?? []
   const items = raw.map(normalizeMediaItem).filter((item): item is FanvueMediaListItem => item !== null)
-  return { items, nextCursor: response.nextCursor ?? response.cursor ?? null }
+  return {
+    items,
+    nextCursor: resolveNextPageCursor(response.pagination) ?? response.nextCursor ?? response.cursor ?? null,
+  }
 }
