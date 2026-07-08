@@ -2,7 +2,9 @@ export const FANVUE_AUTH_BASE_URL = process.env.FANVUE_AUTH_BASE_URL?.trim() || 
 export const FANVUE_API_BASE_URL = process.env.FANVUE_API_BASE_URL?.trim() || "https://api.fanvue.com"
 export const FANVUE_API_VERSION = process.env.FANVUE_API_VERSION?.trim() || "2025-06-26"
 
-export const FANVUE_OAUTH_SCOPES = [
+const FANVUE_DEFAULT_SCOPES = ["openid", "offline_access", "offline"] as const
+
+const FANVUE_APP_SCOPES = [
   "read:creator",
   "read:insights",
   "read:media",
@@ -11,10 +13,20 @@ export const FANVUE_OAUTH_SCOPES = [
   "read:tracking_links",
   "write:media",
   "write:post",
-].join(" ")
+] as const
+
+export const FANVUE_OAUTH_SCOPES = [...FANVUE_DEFAULT_SCOPES, ...FANVUE_APP_SCOPES].join(" ")
+
+function readConfiguredFanvueRedirectUri(): string | undefined {
+  const configured =
+    process.env.FANVUE_OAUTH_REDIRECT_URI?.trim() ||
+    process.env.FANVUE_OAUTH_REDIRECT_URL?.trim()
+
+  return configured || undefined
+}
 
 export function resolveFanvueOAuthRedirectUri(requestUrl: URL): string {
-  const configured = process.env.FANVUE_OAUTH_REDIRECT_URI?.trim()
+  const configured = readConfiguredFanvueRedirectUri()
   if (configured) {
     return configured
   }
