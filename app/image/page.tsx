@@ -45,6 +45,7 @@ import {
 } from "@/lib/commands/ref-image-pipeline"
 import { stripImageMetadataAndDownload } from "@/lib/images/strip-metadata"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
+import { useAIChatDockInsetRight } from "@/components/ai-chat"
 import { SavedExamplesGallery } from "@/components/image/saved-examples-gallery"
 import type { SavedExample } from "@/lib/examples/types"
 import {
@@ -248,6 +249,11 @@ function ImagePageContent() {
   }
   
   const { layoutMode } = layoutModeContext
+  const chatDockInsetRight = useAIChatDockInsetRight()
+  const fixedPromptPanelStyle = React.useMemo(
+    () => ({ right: chatDockInsetRight }),
+    [chatDockInsetRight],
+  )
 
   // State management
   const [prompt, setPrompt] = React.useState("")
@@ -1370,7 +1376,10 @@ function ImagePageContent() {
               </div>
 
               {/* Fixed Bottom Panel - Prompt Box (always visible) */}
-              <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6">
+              <div
+                className="pointer-events-none fixed bottom-0 left-0 z-50 p-4 transition-[right] duration-200 ease-linear sm:p-6"
+                style={fixedPromptPanelStyle}
+              >
                 <div className="pointer-events-none max-w-7xl mx-auto flex justify-center">
                   <div className="pointer-events-auto w-full max-w-sm sm:max-w-lg lg:max-w-4xl space-y-3">
                     {renderInputBox(true)}
@@ -1417,7 +1426,10 @@ function ImagePageContent() {
               </div>
 
               {/* Fixed Bottom Panel - Prompt Box (mobile only) */}
-              <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6 lg:hidden">
+              <div
+                className="pointer-events-none fixed bottom-0 left-0 z-50 p-4 transition-[right] duration-200 ease-linear sm:p-6 lg:hidden"
+                style={fixedPromptPanelStyle}
+              >
                 <div className="pointer-events-none max-w-7xl mx-auto flex justify-center">
                   <div className="pointer-events-auto w-full max-w-sm sm:max-w-lg lg:max-w-4xl">
                     {renderInputBox(false)}

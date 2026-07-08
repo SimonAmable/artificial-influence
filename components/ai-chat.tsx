@@ -80,6 +80,8 @@ type AIChatContextValue = {
   hideOnChatPage: boolean
   hideFloatingChatLauncher: boolean
   panelBody: React.ReactNode
+  /** Viewport inset (px) for fixed bottom UI when the desktop chat dock is open. */
+  dockInsetRight: number
 }
 
 const AIChatContext = React.createContext<AIChatContextValue | null>(null)
@@ -92,6 +94,11 @@ function useAIChatContext() {
   }
 
   return context
+}
+
+/** Right inset (px) for fixed bottom panels so they stay clear of the desktop chat dock. */
+export function useAIChatDockInsetRight() {
+  return useAIChatContext().dockInsetRight
 }
 
 function useAIChatSidebarHidden(pathname: string | null) {
@@ -359,6 +366,9 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
     </AIChatPanelBody>
   )
 
+  const dockInsetRight =
+    hideOnChatPage || isMobile || !open ? 0 : DESKTOP_CHAT_SLOT_WIDTH_PX
+
   const contextValue = React.useMemo<AIChatContextValue>(
     () => ({
       open,
@@ -367,8 +377,17 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
       hideOnChatPage,
       hideFloatingChatLauncher,
       panelBody,
+      dockInsetRight,
     }),
-    [hideFloatingChatLauncher, hideOnChatPage, isMobile, open, panelBody, setSidebarOpen],
+    [
+      dockInsetRight,
+      hideFloatingChatLauncher,
+      hideOnChatPage,
+      isMobile,
+      open,
+      panelBody,
+      setSidebarOpen,
+    ],
   )
 
   return (
