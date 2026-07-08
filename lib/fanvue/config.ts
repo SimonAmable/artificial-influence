@@ -3,9 +3,6 @@ export const FANVUE_API_BASE_URL = process.env.FANVUE_API_BASE_URL?.trim() || "h
 export const FANVUE_API_VERSION = process.env.FANVUE_API_VERSION?.trim() || "2025-06-26"
 
 export const FANVUE_OAUTH_SCOPES = [
-  "openid",
-  "offline_access",
-  "offline",
   "read:creator",
   "read:insights",
   "read:media",
