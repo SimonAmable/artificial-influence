@@ -31,7 +31,6 @@ export const presenceStudioProduct: ProductConfig = {
     "/",
     "/chat",
     "/templates",
-    "/slideshows",
     "/automations",
     "/content",
     "/autopost",

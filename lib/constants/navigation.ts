@@ -3,7 +3,7 @@
  */
 import { currentProduct } from "@/lib/product/current"
 import type { ProductConfig, ProductId } from "@/lib/product/types"
-import { isRouteVisibleForProduct } from "@/lib/product/visibility"
+import { isRouteVisibleForProduct, isVisibleByProductMetadata } from "@/lib/product/visibility"
 
 export interface NavigationItem {
   path: string
@@ -769,5 +769,9 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
 ]
 
 export function getDashboardToolNavItems(product: ProductConfig = currentProduct): DashboardToolNavItem[] {
-  return dashboardToolNavItems.filter((item) => itemAllowsProduct(item, product.id))
+  return dashboardToolNavItems.filter(
+    (item) =>
+      isVisibleByProductMetadata(item, product.id) &&
+      isRouteVisibleForProduct(item.href, product),
+  )
 }

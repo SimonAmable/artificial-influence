@@ -12,6 +12,7 @@ import { SitewideJsonLd } from "@/components/seo/sitewide-jsonld"
 import { getSiteBaseUrl } from "@/lib/seo/site-url"
 import { PricingUpsellController } from "@/components/pricing/pricing-upsell-controller"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { fontBrand } from "@/lib/fonts/brand"
 import { currentProduct } from "@/lib/product/current"
 
 const siteBase = getSiteBaseUrl()
@@ -48,7 +49,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={currentProduct.themeClass}
+      className={`${currentProduct.themeClass} ${fontBrand.variable}`}
       data-product={currentProduct.id}
       suppressHydrationWarning
     >

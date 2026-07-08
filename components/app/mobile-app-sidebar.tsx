@@ -10,6 +10,7 @@ import {
   CurrencyDollar,
   FlowArrow,
   Microphone as MicrophoneIcon,
+  Palette,
   PaperPlaneTilt,
   PencilSimple,
   Robot as RobotIcon,
@@ -48,6 +49,8 @@ import {
   megaNavPathMatches,
 } from "@/lib/navigation/mobile-sidebar"
 import { currentProduct } from "@/lib/product/current"
+import type { ProductId } from "@/lib/product/types"
+import { isRouteVisibleForProduct, isVisibleByProductMetadata } from "@/lib/product/visibility"
 
 // ─── Nav item definitions ────────────────────────────────────────────────────
 
@@ -58,6 +61,8 @@ interface FlatNavItem {
   label: string
   icon: React.ElementType
   badge?: NavBadge
+  products?: ProductId[]
+  hiddenFor?: ProductId[]
 }
 
 const FLAT_NAV_ITEMS: FlatNavItem[] = [
@@ -65,7 +70,8 @@ const FLAT_NAV_ITEMS: FlatNavItem[] = [
   { path: "/automations",   label: "Automations",   icon: RobotIcon,       badge: "beta" },
   { path: "/templates",     label: "Templates",     icon: FlowArrow,       badge: "new"  },
   { path: "/slideshows",    label: "Slideshows",    icon: SquaresFour,     badge: "new"  },
-  { path: "/autopost",      label: "Autopost",      icon: PaperPlaneTilt,  badge: "new"  },
+  { path: "/content",       label: "Content",       icon: Palette,         badge: "new", products: ["presence-studio"] },
+  { path: "/autopost",      label: "Autopost",      icon: PaperPlaneTilt,  badge: "new", hiddenFor: ["presence-studio"] },
   { path: "/ai-influencer", label: "AI Influencer", icon: RobotIcon,       badge: "new"  },
   { path: "/explore",       label: "Explore",       icon: MagnifyingGlass, badge: "new"  },
   { path: "/image",         label: "Image",         icon: ImageIcon                      },
@@ -76,6 +82,14 @@ const FLAT_NAV_ITEMS: FlatNavItem[] = [
   { path: "/free-tools",    label: "Free Tools",    icon: ShieldCheck                   },
   { path: "/pricing",       label: "Pricing",       icon: CurrencyDollar                },
 ]
+
+function getMobileFlatNavItems(product = currentProduct): FlatNavItem[] {
+  return FLAT_NAV_ITEMS.filter(
+    (item) =>
+      isVisibleByProductMetadata(item, product.id) &&
+      isRouteVisibleForProduct(item.path, product),
+  )
+}
 
 // ─── Single nav item ──────────────────────────────────────────────────────────
 
@@ -98,7 +112,7 @@ function FlatNavLink({
       <SidebarMenuButton asChild isActive={active}>
         <Link href={item.path} onClick={onNavigate}>
           <Icon className="size-4 shrink-0" weight="duotone" aria-hidden />
-          <span className="truncate">{item.label}</span>
+          <span className="truncate font-bold">{item.label}</span>
           {item.badge ? (
             <span className="ml-auto shrink-0">
               <MenuBadge badge={item.badge} />
@@ -150,8 +164,8 @@ function MobileNavSheetBody({
           <span
             className={
               currentProduct.logoSizePx
-                ? "min-w-0 truncate text-xl font-bold uppercase leading-none text-sidebar-foreground"
-                : "min-w-0 truncate text-base font-bold uppercase text-sidebar-foreground"
+                ? "min-w-0 truncate font-brand text-lg font-semibold uppercase leading-none tracking-[0.14em] text-sidebar-foreground"
+                : "min-w-0 truncate font-brand text-sm font-semibold uppercase tracking-[0.12em] text-sidebar-foreground"
             }
             style={
               currentProduct.logoSizePx
@@ -168,7 +182,7 @@ function MobileNavSheetBody({
         <SidebarGroup className="p-2">
           <SidebarGroupContent>
             <SidebarMenu>
-              {FLAT_NAV_ITEMS.map((item) => (
+              {getMobileFlatNavItems().map((item) => (
                 <FlatNavLink
                   key={item.path}
                   item={item}
@@ -195,7 +209,7 @@ function MobileNavSheetBody({
                 }}
               >
                 <User className="size-4 shrink-0" weight="duotone" aria-hidden />
-                <span>Profile &amp; settings</span>
+                <span className="font-bold">Profile &amp; settings</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

@@ -207,7 +207,7 @@ export function Header() {
 
   return (
     <header className={cn(
-      "fixed top-0 left-0 right-0 z-50 flex flex-col overflow-visible rounded-none bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 pointer-events-auto shadow-sm"
+      "fixed top-0 left-0 right-0 z-50 flex flex-col overflow-visible rounded-none pointer-events-auto"
     )}>
       <div className="flex h-[52px] min-w-0 items-center justify-between gap-2 overflow-visible px-4">
         <div className="flex min-w-0 shrink items-center gap-4 lg:gap-6">
