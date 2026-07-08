@@ -25,7 +25,9 @@ export const metadata: Metadata = {
   description: currentProduct.metadata.description,
   icons: {
     icon: currentProduct.favicon,
+    apple: currentProduct.appleTouchIcon,
   },
+  manifest: currentProduct.webManifest,
   openGraph: {
     siteName: currentProduct.name,
     type: "website",

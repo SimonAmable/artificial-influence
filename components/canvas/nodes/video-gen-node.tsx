@@ -39,6 +39,7 @@ import {
   isHappyHorseModelIdentifier,
   isMotionCopyModelIdentifier,
   normalizeMotionCopyModelIdentifier,
+  usesFalMultimodalVideoInputs,
 } from "@/lib/constants/models"
 import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
 import { VideoModelParameterControls } from "@/components/tools/video/video-model-parameter-controls"
@@ -1034,7 +1035,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         }
 
         const isKlingOmniNode = modelIdentifier === "kwaivgi/kling-v3-omni-video"
-        if ((isKlingOmniNode || isSeedance2) && chipSlots.omniStyleImageChipUrls.length > 0) {
+        if ((isKlingOmniNode || isSeedance2 || usesFalMultimodalVideoInputs(modelIdentifier)) && chipSlots.omniStyleImageChipUrls.length > 0) {
           const existing = Array.isArray(requestBody.reference_images)
             ? (requestBody.reference_images as string[])
             : []

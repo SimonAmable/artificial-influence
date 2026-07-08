@@ -42,6 +42,10 @@ export function Footer() {
         className="pointer-events-none absolute inset-0 bg-[url('/logo.svg')] bg-cover bg-center bg-no-repeat opacity-[0.05] dark:opacity-[0.06]"
         style={{ backgroundImage: `url('${currentProduct.logo}')` }}
       />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 z-1 h-5 bg-linear-to-b from-background to-transparent"
+      />
       <div className="relative z-10">
         <div className="grid w-full gap-10 px-4 sm:px-6 lg:grid-cols-12 lg:gap-x-8 lg:px-8">
           <div className="lg:col-span-3">
@@ -126,7 +130,7 @@ export function Footer() {
         </div>
 
         <div className="mt-10 w-full px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2 border-t pt-6 pb-4">
+          <div className="flex items-center gap-2 pt-6 pb-4">
             <span className="text-xs text-muted-foreground">
               Chat with AI to learn more
             </span>

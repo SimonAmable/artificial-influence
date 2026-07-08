@@ -22,7 +22,7 @@ import { MultiShotEditor, type MultiShotItem } from "@/components/tools/video/mu
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
-import { isHappyHorseModelIdentifier } from "@/lib/constants/models"
+import { usesFalMultimodalVideoInputs } from "@/lib/constants/models"
 import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
 import { brandRefsOnly, getImageAssetUrlsFromRefChips, getVideoAssetUrlsFromRefChips } from "@/lib/commands/ref-image-pipeline"
 import { allowedAssetTypesForVideoModel } from "@/lib/commands/allowed-asset-types"
@@ -187,11 +187,11 @@ export function VideoInputBox({
   const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
   const isPrunaPVideo = selectedModel.identifier === 'prunaai/p-video'
   const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
-  const isHappyHorse = isHappyHorseModelIdentifier(selectedModel.identifier)
+  const isFalMultimodalVideo = usesFalMultimodalVideoInputs(selectedModel.identifier)
   const isKlingV3OrOmni = isKlingV3 || isKlingV3Omni
-  const usesRefImageGallery = isKlingV3Omni || isSeedance2 || isHappyHorse
+  const usesRefImageGallery = isKlingV3Omni || isSeedance2 || isFalMultimodalVideo
   const totalDuration = Number(parameters.duration) || 5
-  const maxReferenceImages = isSeedance2 || isHappyHorse ? 9 : inputVideo ? 4 : 7
+  const maxReferenceImages = isSeedance2 || isFalMultimodalVideo ? 9 : inputVideo ? 4 : 7
 
   // Determine if we need prompt
   const needsPrompt = !isMotionCopyModel && !isLipsyncModel
@@ -223,14 +223,14 @@ export function VideoInputBox({
     [selectedModel, attachedRefs, inputImage, lastFrameImage, inputVideo]
   )
 
-  const happyHorseReferenceMode =
-    isHappyHorse &&
+  const falMultimodalReferenceMode =
+    isFalMultimodalVideo &&
     (referenceImages.length > 0 || chipSlotInfo.omniStyleImageChipUrls.length > 0)
 
   React.useEffect(() => {
-    if (!happyHorseReferenceMode || !inputImage) return
+    if (!falMultimodalReferenceMode || !inputImage) return
     onInputImageChange(null)
-  }, [happyHorseReferenceMode, inputImage, onInputImageChange])
+  }, [falMultimodalReferenceMode, inputImage, onInputImageChange])
 
   const removeAttachedRef = React.useCallback(
     (ref: AttachedRef) => {
@@ -310,7 +310,7 @@ export function VideoInputBox({
       referenceImages.length + chipSlotInfo.omniStyleImageChipUrls.length >= maxReferenceImages
     )
       return
-    if (isHappyHorse && inputImage) {
+    if (isFalMultimodalVideo && inputImage) {
       onInputImageChange(null)
     }
     const next: ImageUpload = { file, url: URL.createObjectURL(file) }
@@ -354,8 +354,8 @@ export function VideoInputBox({
     if (isKlingV3OrOmni && !multiShotMode) {
       return mergedPromptForReady.length > 0 || !!inputImage || hasRefChips
     }
-    if (isHappyHorse) {
-      if (happyHorseReferenceMode) {
+    if (isFalMultimodalVideo) {
+      if (falMultimodalReferenceMode) {
         return mergedPromptForReady.length > 0
       }
       return mergedPromptForReady.length > 0 || !!inputImage
@@ -395,8 +395,8 @@ export function VideoInputBox({
     modelSupportsImage,
     modelSupportsLastFrame,
     lastFrameImage,
-    isHappyHorse,
-    happyHorseReferenceMode,
+    isFalMultimodalVideo,
+    falMultimodalReferenceMode,
     isPrunaPVideo,
     isSeedance2,
     isWan27,
@@ -468,8 +468,8 @@ export function VideoInputBox({
       return "input"
     }
 
-    if (isHappyHorse) {
-      if (happyHorseReferenceMode) return "reference"
+    if (isFalMultimodalVideo) {
+      if (falMultimodalReferenceMode) return "reference"
       return "input"
     }
 
@@ -483,8 +483,8 @@ export function VideoInputBox({
     return null
   }, [
     inputImage,
-    isHappyHorse,
-    happyHorseReferenceMode,
+    isFalMultimodalVideo,
+    falMultimodalReferenceMode,
     isLipsyncModel,
     isMotionCopyModel,
     lastFrameImage,
@@ -497,13 +497,13 @@ export function VideoInputBox({
     if (nextImageDropSlot === "lastFrame") return isKlingV3OrOmni ? "End Frame" : "Last Frame"
     if (nextImageDropSlot === "input") {
       if (selectedModel.identifier === "minimax/hailuo-2.3-fast") return "First Frame"
-      if (isHappyHorse) return "Start Frame"
+      if (isFalMultimodalVideo) return "Start Frame"
       if (isKlingV3OrOmni) return "Start Frame"
       if (isMotionCopyModel || isLipsyncModel) return "Reference Image"
       return "Input Image"
     }
     return "Reference Image"
-  }, [isHappyHorse, isKlingV3OrOmni, isLipsyncModel, isMotionCopyModel, nextImageDropSlot, selectedModel.identifier])
+  }, [isFalMultimodalVideo, isKlingV3OrOmni, isLipsyncModel, isMotionCopyModel, nextImageDropSlot, selectedModel.identifier])
 
   const canAcceptImageDrop = nextImageDropSlot !== null
   const canAcceptPromptDrop = needsPrompt && (canAcceptImageDrop || canDropReferenceVideo)
@@ -731,14 +731,14 @@ export function VideoInputBox({
                 {modelSupportsImage && (
                   <DropdownMenuItem
                     onClick={() => inputRef.current?.click()}
-                    disabled={!!inputImage || chipSlotInfo.inputSlotFromChip || happyHorseReferenceMode}
+                    disabled={!!inputImage || chipSlotInfo.inputSlotFromChip || falMultimodalReferenceMode}
                     className="flex items-center justify-between gap-2"
                   >
                     <span className="flex items-center">
                       <FilePlus className="size-4 mr-2 shrink-0" />
                       {selectedModel.identifier === "minimax/hailuo-2.3-fast"
                         ? "Upload First Frame"
-                        : isHappyHorse
+                        : isFalMultimodalVideo
                           ? "Upload Start Frame"
                         : "Upload Input Image"}
                     </span>
@@ -785,7 +785,7 @@ export function VideoInputBox({
                   >
                     <span className="flex items-center text-sm font-medium">
                       <FilePlus className="mr-2 size-4 shrink-0" />
-                        {isSeedance2 || isHappyHorse ? "Reference image" : "Add reference image"}
+                        {isSeedance2 || isFalMultimodalVideo ? "Reference image" : "Add reference image"}
                     </span>
                     {isSeedance2 ? (
                       <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
@@ -922,7 +922,7 @@ export function VideoInputBox({
                   {inputImage?.url
                     ? selectedModel.identifier === "minimax/hailuo-2.3-fast"
                       ? "First Frame"
-                      : isHappyHorse
+                      : isFalMultimodalVideo
                         ? "Start Frame"
                       : isKlingV3OrOmni
                         ? "Start Frame"

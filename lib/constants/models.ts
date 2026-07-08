@@ -71,6 +71,15 @@ export function isHappyHorseModelIdentifier(identifier: string | null | undefine
   );
 }
 
+export function isGeminiOmniFlashModelIdentifier(identifier: string | null | undefined): boolean {
+  return identifier === MODEL_IDENTIFIERS.GOOGLE_GEMINI_OMNI_FLASH;
+}
+
+/** Fal unified video models that route t2v / i2v / reference-to-video from one catalog id. */
+export function usesFalMultimodalVideoInputs(identifier: string | null | undefined): boolean {
+  return isHappyHorseModelIdentifier(identifier) || isGeminiOmniFlashModelIdentifier(identifier);
+}
+
 export function normalizeMotionCopyModelIdentifier(
   identifier: string | null | undefined,
 ): string | null | undefined {
@@ -1712,7 +1721,7 @@ export const GEMINI_OMNI_FLASH_VIDEO_MODEL: Model = {
   identifier: MODEL_IDENTIFIERS.GOOGLE_GEMINI_OMNI_FLASH,
   name: 'Gemini Omni Flash',
   description:
-    'Google Gemini Omni Flash on fal: text-to-video with synchronized audio, 16:9 or 9:16, 3–10 seconds.',
+    'Google Gemini Omni Flash on fal: text-to-video, image-to-video, or reference-to-video with synchronized audio.',
   type: 'video',
   provider: 'fal',
   is_active: true,
@@ -1721,9 +1730,19 @@ export const GEMINI_OMNI_FLASH_VIDEO_MODEL: Model = {
   parameters: {
     parameters: [
       {
+        name: 'image',
+        type: 'string',
+        label: 'Start Frame',
+        description: 'Optional first frame for image-to-video. Disabled when reference images are attached.',
+        required: false,
+        default: null,
+        ui_type: 'text',
+      },
+      {
         name: 'aspect_ratio',
         type: 'string',
         label: 'Aspect Ratio',
+        description: 'Used for text-to-video and reference-to-video.',
         required: false,
         default: '16:9',
         enum: ['16:9', '9:16'],
@@ -1744,6 +1763,8 @@ export const GEMINI_OMNI_FLASH_VIDEO_MODEL: Model = {
   },
   aspect_ratios: ['16:9', '9:16'],
   default_aspect_ratio: '16:9',
+  supports_reference_image: true,
+  supports_first_frame: true,
   duration_options: [3, 4, 5, 6, 7, 8, 9, 10],
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),

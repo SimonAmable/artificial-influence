@@ -224,7 +224,7 @@ export function Header() {
               alt={`${currentProduct.name} logo`}
               width={24}
               height={24}
-              className="relative z-10 h-6 w-6 dark:invert"
+              className={currentProduct.logoClassName ?? "relative z-10 h-6 w-6 dark:invert"}
             />
           </Link>
           {/* Desktop navigation — sheet below xl to avoid cramped tablets */}

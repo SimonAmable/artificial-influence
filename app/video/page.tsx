@@ -31,6 +31,7 @@ import { resolveVideoPricingQuote } from "@/lib/video-pricing"
 import {
   isHappyHorseModelIdentifier,
   MODEL_IDENTIFIERS,
+  usesFalMultimodalVideoInputs,
 } from "@/lib/constants/models"
 import type { VideoGridItem, VideoHistoryItem } from "@/components/shared/display/video-grid"
 import { toast } from "sonner"
@@ -601,6 +602,7 @@ function VideoPageContent() {
     const isPrunaPVideo = selectedModel.identifier === 'prunaai/p-video'
     const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
     const isHappyHorse = isHappyHorseModelIdentifier(selectedModel.identifier)
+    const isFalMultimodalVideo = usesFalMultimodalVideoInputs(selectedModel.identifier)
     const isLipsync =
       selectedModel.identifier.includes('lipsync') ||
       selectedModel.identifier.includes('wav2lip') ||
@@ -626,8 +628,8 @@ function VideoPageContent() {
       hasLastFrame: !!(lastFrameImage?.file || lastFrameImage?.url),
       hasReferenceVideo: !!(inputVideo?.file || inputVideo?.url),
     })
-    const happyHorseReferenceMode =
-      isHappyHorse && (referenceImages.length > 0 || chipSlots.omniStyleImageChipUrls.length > 0)
+    const falMultimodalReferenceMode =
+      isFalMultimodalVideo && (referenceImages.length > 0 || chipSlots.omniStyleImageChipUrls.length > 0)
 
     const refErr = validateVideoAttachedRefs(attachedCommandRefs, selectedModel)
     if (refErr) {
@@ -700,7 +702,7 @@ function VideoPageContent() {
             !!chipSlots.startImageChipUrl ||
             !!chipSlots.lastFrameChipUrl)) ||
         (isHappyHorse &&
-          !happyHorseReferenceMode &&
+          !falMultimodalReferenceMode &&
           (!!inputImage || !!chipSlots.startImageChipUrl))
       if (!allowNoPrompt) {
         setError("Please enter a prompt")
@@ -731,7 +733,8 @@ function VideoPageContent() {
       isPrunaPVideo,
       isWan27,
       isHappyHorse,
-      happyHorseReferenceMode,
+      isFalMultimodalVideo,
+      falMultimodalReferenceMode,
       isLipsync,
     }
 
@@ -769,7 +772,8 @@ function VideoPageContent() {
       const isPrunaPVideo = capture.isPrunaPVideo
       const isWan27 = capture.isWan27
       const isHappyHorse = capture.isHappyHorse
-      const happyHorseReferenceMode = capture.happyHorseReferenceMode
+      const isFalMultimodalVideo = capture.isFalMultimodalVideo
+      const falMultimodalReferenceMode = capture.falMultimodalReferenceMode
       const isLipsync = capture.isLipsync
 
       try {
@@ -831,7 +835,7 @@ function VideoPageContent() {
       }
       
       // Handle other models with image uploads
-      else if (inputImage?.file && !(isHappyHorse && happyHorseReferenceMode)) {
+      else if (inputImage?.file && !(isFalMultimodalVideo && falMultimodalReferenceMode)) {
         const imageUpload = await uploadImageToSupabase(inputImage.file, user.id, 'video-gen-input-images')
         if (selectedModel.identifier === 'kwaivgi/kling-v2.6') {
           requestBody.start_image = imageUpload.url
@@ -846,7 +850,7 @@ function VideoPageContent() {
         }
       }
       // Handle pre-loaded images from URL (no file to upload)
-      else if (inputImage?.url && !(isHappyHorse && happyHorseReferenceMode)) {
+      else if (inputImage?.url && !(isFalMultimodalVideo && falMultimodalReferenceMode)) {
         const firstUrl =
           isWan27
             ? await resolveBlobOrDataImageUrlForReplicate(
@@ -986,7 +990,7 @@ function VideoPageContent() {
       }
 
       // Kling v3 Omni / Seedance 2.0: extra reference images
-      if ((isKlingV3Omni || isSeedance2 || isHappyHorse) && referenceImages.length > 0) {
+      if ((isKlingV3Omni || isSeedance2 || isFalMultimodalVideo) && referenceImages.length > 0) {
         const refUrls: string[] = []
         for (const ref of referenceImages) {
           if (ref.file) {
@@ -998,7 +1002,7 @@ function VideoPageContent() {
         }
         if (refUrls.length > 0) requestBody.reference_images = refUrls
       }
-      if ((isKlingV3Omni || isSeedance2 || isHappyHorse) && chipSlots.omniStyleImageChipUrls.length > 0) {
+      if ((isKlingV3Omni || isSeedance2 || isFalMultimodalVideo) && chipSlots.omniStyleImageChipUrls.length > 0) {
         const existing = Array.isArray(requestBody.reference_images)
           ? (requestBody.reference_images as string[])
           : []

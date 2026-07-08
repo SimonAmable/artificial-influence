@@ -1,5 +1,5 @@
 import type { Model } from "@/lib/types/models"
-import { isHappyHorseModelIdentifier } from "@/lib/constants/models"
+import { usesFalMultimodalVideoInputs } from "@/lib/constants/models"
 import type { AttachedRef } from "./types"
 
 function imageAssetRefs(refs: AttachedRef[]): AttachedRef[] {
@@ -23,7 +23,7 @@ export type VideoChipSlotOptions = {
 /**
  * Maps @ image/video library assets to model input slots (same URLs sent to the API as manual uploads).
  * - Kling Omni: first image @ = start frame when no manual start; remaining image @ = style reference_images; video @ = reference_video.
- * - Happy Horse: image @ chips are always reference images, which switches the model into reference-to-video mode.
+ * - Fal multimodal video (Happy Horse, Gemini Omni Flash): image @ chips are always reference images.
  * - Other models: first image @ = input/start when supported; second image @ = last frame when supported; first video @ = reference video when supported.
  */
 export function getVideoChipSlotInfo(model: Model, attachedRefs: AttachedRef[], opts: VideoChipSlotOptions) {
@@ -32,8 +32,8 @@ export function getVideoChipSlotInfo(model: Model, attachedRefs: AttachedRef[], 
   const vids = videoAssetRefs(attachedRefs)
   const isOmni = id === "kwaivgi/kling-v3-omni-video"
   const isSeedance = id === "bytedance/seedance-2.0"
-  const isHappyHorse = isHappyHorseModelIdentifier(id)
-  const useOmniStyleChips = isOmni || (isSeedance && opts.hasReferenceVideo) || isHappyHorse
+  const isFalMultimodalVideo = usesFalMultimodalVideoInputs(id)
+  const useOmniStyleChips = isOmni || (isSeedance && opts.hasReferenceVideo) || isFalMultimodalVideo
 
   const supportsInput =
     model.parameters?.parameters?.some((p) =>
@@ -53,7 +53,7 @@ export function getVideoChipSlotInfo(model: Model, attachedRefs: AttachedRef[], 
   const omniStyleImageRefs: AttachedRef[] = []
 
   if (useOmniStyleChips) {
-    if (!isHappyHorse && !opts.hasInputImage && imgs[imgIdx]) {
+    if (!isFalMultimodalVideo && !opts.hasInputImage && imgs[imgIdx]) {
       startImageChipUrl = imgs[imgIdx].assetUrl!.trim()
       startImageRef = imgs[imgIdx]
       imgIdx++

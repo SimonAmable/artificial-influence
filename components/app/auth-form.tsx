@@ -8,6 +8,7 @@ import { ArrowLeftIcon, EnvelopeSimpleIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
 import { createClient } from "@/lib/supabase/client"
+import { currentProduct } from "@/lib/product/current"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -233,7 +234,13 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
             <div className="space-y-7">
               <div className="space-y-4 text-center">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                  <Image src="logo.svg" alt="Logo" width={32} height={32} />
+                  <Image
+                    src={currentProduct.logo}
+                    alt={`${currentProduct.name} logo`}
+                    width={32}
+                    height={32}
+                    className={currentProduct.logoClassName ? "h-8 w-8" : "dark:invert"}
+                  />
                 </div>
                 <div className="space-y-2">
                   <h1 className="text-3xl font-semibold tracking-tight ">

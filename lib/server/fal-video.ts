@@ -9,6 +9,8 @@ export const FAL_HAPPY_HORSE_T2V = "alibaba/happy-horse/v1.1/text-to-video" as c
 export const FAL_HAPPY_HORSE_I2V = "alibaba/happy-horse/v1.1/image-to-video" as const
 export const FAL_HAPPY_HORSE_REFERENCE = "alibaba/happy-horse/v1.1/reference-to-video" as const
 export const FAL_GEMINI_OMNI_FLASH_T2V = "google/gemini-omni-flash" as const
+export const FAL_GEMINI_OMNI_FLASH_I2V = "google/gemini-omni-flash/image-to-video" as const
+export const FAL_GEMINI_OMNI_FLASH_REFERENCE = "google/gemini-omni-flash/reference-to-video" as const
 
 export type SupportedFalVideoModelIdentifier =
   | typeof HAPPY_HORSE_CANONICAL_ID
@@ -19,6 +21,8 @@ export type FalVideoEndpoint =
   | typeof FAL_HAPPY_HORSE_I2V
   | typeof FAL_HAPPY_HORSE_REFERENCE
   | typeof FAL_GEMINI_OMNI_FLASH_T2V
+  | typeof FAL_GEMINI_OMNI_FLASH_I2V
+  | typeof FAL_GEMINI_OMNI_FLASH_REFERENCE
 
 export interface FalVideoRequestOptions {
   aspectRatio?: string | null
@@ -207,9 +211,52 @@ function buildGeminiOmniFlashFalVideoRequest(
 ): {
   endpointId: FalVideoEndpoint
   input: Record<string, unknown>
-  mode: "text-to-video"
+  mode: "text-to-video" | "image-to-video" | "reference-to-video"
 } {
   const prompt = pickString(options.prompt)
+  const imageUrl = pickString(options.imageUrl)
+  const referenceImageUrls = options.referenceImageUrls
+    .map((url) => pickString(url))
+    .filter((url): url is string => Boolean(url))
+    .slice(0, 9)
+
+  const baseInput: Record<string, unknown> = {
+    aspect_ratio: normalizeGeminiOmniFlashAspectRatio(options.aspectRatio),
+    duration: normalizeGeminiOmniFlashDuration(options.duration),
+  }
+
+  if (referenceImageUrls.length > 0) {
+    if (!prompt) {
+      throw new Error("Gemini Omni Flash reference-to-video requires a prompt.")
+    }
+
+    return {
+      endpointId: FAL_GEMINI_OMNI_FLASH_REFERENCE,
+      mode: "reference-to-video",
+      input: {
+        ...baseInput,
+        prompt,
+        image_urls: referenceImageUrls,
+      },
+    }
+  }
+
+  if (imageUrl) {
+    if (!prompt) {
+      throw new Error("Gemini Omni Flash image-to-video requires a prompt.")
+    }
+
+    return {
+      endpointId: FAL_GEMINI_OMNI_FLASH_I2V,
+      mode: "image-to-video",
+      input: {
+        ...baseInput,
+        prompt,
+        image_url: imageUrl,
+      },
+    }
+  }
+
   if (!prompt) {
     throw new Error("Gemini Omni Flash text-to-video requires a prompt.")
   }
@@ -218,9 +265,8 @@ function buildGeminiOmniFlashFalVideoRequest(
     endpointId: FAL_GEMINI_OMNI_FLASH_T2V,
     mode: "text-to-video",
     input: {
+      ...baseInput,
       prompt,
-      aspect_ratio: normalizeGeminiOmniFlashAspectRatio(options.aspectRatio),
-      duration: normalizeGeminiOmniFlashDuration(options.duration),
     },
   }
 }

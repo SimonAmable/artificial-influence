@@ -390,7 +390,7 @@ const baseMegaNavGroups: MegaNavGroup[] = [
           {
             path: "/video?model=google/gemini-omni-flash",
             label: "Gemini Omni Flash",
-            description: "Gemini text-to-video with synchronized audio",
+            description: "Gemini video from text, image, or references",
             badge: "new",
             iconSrc: "/ai_icons/gemini-color.svg",
           },

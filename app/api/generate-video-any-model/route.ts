@@ -5,7 +5,6 @@ import { checkUserHasCredits, deductUserCreditsUpTo } from '@/lib/credits';
 import { inferStoragePathFromUrl } from '@/lib/assets/library';
 import {
   buildFalVideoRequest,
-  isHappyHorseModelIdentifier,
   isSupportedFalVideoModel,
   normalizeFalVideoModelIdentifier,
   submitFalVideoQueue,
@@ -13,8 +12,10 @@ import {
 import { resolveWan27Replicate } from '@/lib/server/wan-2.7-replicate';
 import { applyMinimalReplicateVideoModeration } from '@/lib/server/minimal-moderation';
 import {
+  isHappyHorseModelIdentifier,
   isMotionCopyModelIdentifier,
   normalizeMotionCopyModelIdentifier,
+  usesFalMultimodalVideoInputs,
 } from '@/lib/constants/models';
 import { resolveVideoPricingQuote } from '@/lib/video-pricing';
 import {
@@ -105,19 +106,22 @@ export async function POST(request: NextRequest) {
     const hasReferenceVideo =
       typeof body.reference_video === 'string' ||
       (Array.isArray(body.reference_videos) && body.reference_videos.some((value: unknown) => typeof value === 'string'));
+    const isFalMultimodalVideo = usesFalMultimodalVideoInputs(catalogModelIdentifier);
     const isHappyHorse = isHappyHorseModelIdentifier(catalogModelIdentifier);
-    const happyHorseReferenceImages = Array.isArray(body.reference_images)
+    const falMultimodalReferenceImages = Array.isArray(body.reference_images)
       ? body.reference_images.filter(
           (value: unknown): value is string => typeof value === 'string' && value.length > 0,
         )
       : [];
-    const hasHappyHorseReferenceInputs = isHappyHorse && happyHorseReferenceImages.length > 0;
+    const hasFalMultimodalReferenceInputs =
+      isFalMultimodalVideo && falMultimodalReferenceImages.length > 0;
     const hasHappyHorseStartImage =
       isHappyHorse &&
       (typeof image === 'string' && image.length > 0 ||
         typeof first_frame_image === 'string' && first_frame_image.length > 0);
     const allowsPromptlessRequest =
-      hasMotionCopyInputs || (isHappyHorse && hasHappyHorseStartImage && !hasHappyHorseReferenceInputs);
+      hasMotionCopyInputs ||
+      (isHappyHorse && hasHappyHorseStartImage && !hasFalMultimodalReferenceInputs);
 
     if (isMotionCopy && !hasMotionCopyInputs) {
       return NextResponse.json(
@@ -211,7 +215,7 @@ export async function POST(request: NextRequest) {
               : null,
         modelIdentifier: catalogModelIdentifier,
         prompt: typeof prompt === 'string' ? prompt : null,
-        referenceImageUrls: happyHorseReferenceImages,
+        referenceImageUrls: isFalMultimodalVideo ? falMultimodalReferenceImages : [],
         resolution:
           typeof otherParams.resolution === 'string' ? otherParams.resolution : null,
         seed:

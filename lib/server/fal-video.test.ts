@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 
 const {
   buildFalVideoRequest,
+  FAL_GEMINI_OMNI_FLASH_I2V,
+  FAL_GEMINI_OMNI_FLASH_REFERENCE,
   FAL_GEMINI_OMNI_FLASH_T2V,
   FAL_HAPPY_HORSE_I2V,
   FAL_HAPPY_HORSE_REFERENCE,
@@ -108,4 +110,42 @@ runTest("Gemini Omni Flash routes prompt-only generations to text-to-video", () 
   assert.equal(result.input.prompt, "A lighthouse at dusk with crashing waves")
   assert.equal(result.input.aspect_ratio, "9:16")
   assert.equal(result.input.duration, 6)
+})
+
+runTest("Gemini Omni Flash routes single-image generations to image-to-video", () => {
+  const result = buildFalVideoRequest({
+    aspectRatio: "16:9",
+    duration: 8,
+    imageUrl: "https://example.com/start.png",
+    modelIdentifier: GEMINI_OMNI_FLASH_CANONICAL_ID,
+    prompt: "The dog wags its tail",
+    referenceImageUrls: [],
+  })
+
+  assert.equal(result.endpointId, FAL_GEMINI_OMNI_FLASH_I2V)
+  assert.equal(result.mode, "image-to-video")
+  assert.equal(result.input.image_url, "https://example.com/start.png")
+  assert.equal(result.input.prompt, "The dog wags its tail")
+})
+
+runTest("Gemini Omni Flash reference mode wins over start frame", () => {
+  const result = buildFalVideoRequest({
+    aspectRatio: "9:16",
+    duration: 5,
+    imageUrl: "https://example.com/start.png",
+    modelIdentifier: GEMINI_OMNI_FLASH_CANONICAL_ID,
+    prompt: "A cat plays with yarn",
+    referenceImageUrls: [
+      "https://example.com/ref-1.png",
+      "https://example.com/ref-2.png",
+    ],
+  })
+
+  assert.equal(result.endpointId, FAL_GEMINI_OMNI_FLASH_REFERENCE)
+  assert.equal(result.mode, "reference-to-video")
+  assert.deepEqual(result.input.image_urls, [
+    "https://example.com/ref-1.png",
+    "https://example.com/ref-2.png",
+  ])
+  assert.ok(!("image_url" in result.input))
 })

@@ -4,8 +4,11 @@ export const presenceStudioProduct: ProductConfig = {
   id: "presence-studio",
   name: "Presence Studio",
   siteUrl: "https://presencestudio.ai",
-  logo: "/logo.svg",
-  favicon: "/favicon.ico",
+  logo: "/presence_studio_logo.png",
+  logoClassName: "relative z-10 h-6 w-6",
+  favicon: "/presence-studio/favicon.ico",
+  appleTouchIcon: "/presence-studio/apple-touch-icon.png",
+  webManifest: "/presence-studio/site.webmanifest",
   themeClass: "theme-presence",
   metadata: {
     title: "Presence Studio - AI influencer content studio",

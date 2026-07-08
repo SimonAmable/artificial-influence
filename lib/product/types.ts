@@ -24,7 +24,11 @@ export interface ProductConfig {
   name: string
   siteUrl: string
   logo: string
+  /** Extra classes for header/shell logo images (e.g. skip dark:invert for full-color PNGs). */
+  logoClassName?: string
   favicon: string
+  appleTouchIcon?: string
+  webManifest?: string
   themeClass: string
   metadata: ProductMetadataConfig
   landing: ProductLandingContent
