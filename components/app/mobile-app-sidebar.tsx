@@ -47,6 +47,7 @@ import {
   isPageInMegaNavigation,
   megaNavPathMatches,
 } from "@/lib/navigation/mobile-sidebar"
+import { currentProduct } from "@/lib/product/current"
 
 // ─── Nav item definitions ────────────────────────────────────────────────────
 
@@ -124,18 +125,42 @@ function MobileNavSheetBody({
   const searchParams = useSearchParams()
   const search = searchParams?.toString() ?? ""
 
+  const sidebarLogoSize = currentProduct.logoSizePx ?? 22
+
   return (
     <>
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
-        <Link href={authenticated ? "/dashboard" : "/"} className="flex items-center gap-2.5" onClick={onNavigate}>
+        <Link
+          href={authenticated ? currentProduct.defaultSignedInRoute : "/"}
+          className="flex min-w-0 items-center gap-2.5"
+          onClick={onNavigate}
+        >
           <Image
-            src="/logo.svg"
-            alt="UniCan logo"
-            width={22}
-            height={22}
-            className="h-[22px] w-[22px] dark:invert"
+            src={currentProduct.logo}
+            alt={`${currentProduct.name} logo`}
+            width={sidebarLogoSize}
+            height={sidebarLogoSize}
+            className={currentProduct.logoClassName ?? "h-[22px] w-[22px] shrink-0 dark:invert"}
+            style={
+              currentProduct.logoSizePx
+                ? { width: sidebarLogoSize, height: sidebarLogoSize }
+                : undefined
+            }
           />
-          <span className="text-base font-bold uppercase text-sidebar-foreground">UniCan</span>
+          <span
+            className={
+              currentProduct.logoSizePx
+                ? "min-w-0 truncate text-xl font-bold uppercase leading-none text-sidebar-foreground"
+                : "min-w-0 truncate text-base font-bold uppercase text-sidebar-foreground"
+            }
+            style={
+              currentProduct.logoSizePx
+                ? { lineHeight: `${sidebarLogoSize}px` }
+                : undefined
+            }
+          >
+            {currentProduct.name}
+          </span>
         </Link>
       </SidebarHeader>
 

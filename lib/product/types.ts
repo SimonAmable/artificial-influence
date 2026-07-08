@@ -24,6 +24,8 @@ export interface ProductConfig {
   name: string
   siteUrl: string
   logo: string
+  /** Header logo display size in px (fits inside the 44px circle on the 52px bar). */
+  logoSizePx?: number
   /** Extra classes for header/shell logo images (e.g. skip dark:invert for full-color PNGs). */
   logoClassName?: string
   favicon: string

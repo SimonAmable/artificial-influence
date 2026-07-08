@@ -222,9 +222,17 @@ export function Header() {
             <Image
               src={currentProduct.logo}
               alt={`${currentProduct.name} logo`}
-              width={24}
-              height={24}
-              className={currentProduct.logoClassName ?? "relative z-10 h-6 w-6 dark:invert"}
+              width={currentProduct.logoSizePx ?? 32}
+              height={currentProduct.logoSizePx ?? 32}
+              className={
+                currentProduct.logoClassName ??
+                "relative z-10 h-8 w-8 dark:invert"
+              }
+              style={
+                currentProduct.logoSizePx
+                  ? { width: currentProduct.logoSizePx, height: currentProduct.logoSizePx }
+                  : undefined
+              }
             />
           </Link>
           {/* Desktop navigation — sheet below xl to avoid cramped tablets */}
