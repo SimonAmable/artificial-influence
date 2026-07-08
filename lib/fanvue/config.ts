@@ -2,7 +2,7 @@ export const FANVUE_AUTH_BASE_URL = process.env.FANVUE_AUTH_BASE_URL?.trim() || 
 export const FANVUE_API_BASE_URL = process.env.FANVUE_API_BASE_URL?.trim() || "https://api.fanvue.com"
 export const FANVUE_API_VERSION = process.env.FANVUE_API_VERSION?.trim() || "2025-06-26"
 
-const FANVUE_DEFAULT_SCOPES = ["openid", "offline_access", "offline"] as const
+const FANVUE_DEFAULT_SCOPES = ["openid", "offline_access"] as const
 
 const FANVUE_APP_SCOPES = [
   "read:creator",
@@ -11,6 +11,7 @@ const FANVUE_APP_SCOPES = [
   "read:post",
   "read:self",
   "read:tracking_links",
+  "write:creator",
   "write:media",
   "write:post",
 ] as const

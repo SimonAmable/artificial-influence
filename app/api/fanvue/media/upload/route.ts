@@ -46,6 +46,7 @@ export async function POST(request: Request) {
       mimeType: file.type || "application/octet-stream",
       buffer,
       displayName: file.name,
+      creatorUserUuid: token.connection.provider_account_id,
     })
 
     await upsertFanvueMediaCache(supabase, {

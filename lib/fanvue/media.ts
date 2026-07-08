@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { fanvueApiRequest, fanvueApiUploadPart } from "@/lib/fanvue/client"
+import { FanvueApiError, fanvueApiRequest, fanvueApiUploadPart } from "@/lib/fanvue/client"
 
 export type FanvueMediaListItem = {
   uuid: string
@@ -22,6 +22,11 @@ type UploadSessionResponse = {
 
 type SignedPartResponse = {
   url: string
+}
+
+type CompleteUploadPart = {
+  PartNumber: number
+  ETag?: string
 }
 
 type MediaVariant = {
@@ -100,6 +105,41 @@ function normalizeMediaItem(item: MediaDetailResponse): FanvueMediaListItem | nu
   }
 }
 
+async function resolveSignedPartUploadUrl(params: {
+  accessToken: string
+  uploadId: string
+  partNumber: number
+  creatorUserUuid?: string
+}): Promise<string> {
+  try {
+    const response = await fanvueApiRequest<SignedPartResponse | string>({
+      accessToken: params.accessToken,
+      path: `/media/uploads/${encodeURIComponent(params.uploadId)}/parts/${params.partNumber}/url`,
+    })
+    const url = typeof response === "string" ? response : response.url
+    if (url?.trim()) return url
+  } catch (error) {
+    if (!(error instanceof FanvueApiError) || error.status !== 404) {
+      throw error
+    }
+  }
+
+  if (!params.creatorUserUuid) {
+    throw new Error("Fanvue upload URL endpoint not available for this account.")
+  }
+
+  const creatorResponse = await fanvueApiRequest<SignedPartResponse | string>({
+    accessToken: params.accessToken,
+    path: `/creators/${encodeURIComponent(params.creatorUserUuid)}/media/uploads/${encodeURIComponent(params.uploadId)}/parts/${params.partNumber}/url`,
+  })
+
+  const creatorUrl = typeof creatorResponse === "string" ? creatorResponse : creatorResponse.url
+  if (!creatorUrl?.trim()) {
+    throw new Error(`Fanvue did not return an upload URL for part ${params.partNumber}.`)
+  }
+  return creatorUrl
+}
+
 export async function listFanvueMedia(
   accessToken: string,
   params?: { cursor?: string; limit?: number }
@@ -164,6 +204,7 @@ export async function uploadFanvueMediaBuffer(params: {
   mimeType: string
   buffer: Buffer
   displayName?: string
+  creatorUserUuid?: string
 }): Promise<FanvueMediaListItem> {
   const mediaType = inferFanvueMediaType(params.mimeType)
   const session = await fanvueApiRequest<UploadSessionResponse>({
@@ -180,25 +221,32 @@ export async function uploadFanvueMediaBuffer(params: {
   const partSize = session.partSize
   const totalParts =
     session.totalParts ?? Math.max(1, Math.ceil(params.buffer.byteLength / Math.max(partSize, 1)))
+  const completedParts: CompleteUploadPart[] = []
 
   for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
     const start = (partNumber - 1) * partSize
     const end = Math.min(start + partSize, params.buffer.byteLength)
     const chunk = params.buffer.subarray(start, end)
 
-    const signed = await fanvueApiRequest<SignedPartResponse>({
+    const signedUrl = await resolveSignedPartUploadUrl({
       accessToken: params.accessToken,
-      path: `/media/uploads/${encodeURIComponent(session.uploadId)}/parts/${partNumber}`,
+      uploadId: session.uploadId,
+      partNumber,
+      creatorUserUuid: params.creatorUserUuid,
     })
 
-    await fanvueApiUploadPart(signed.url, chunk, params.mimeType)
+    const etag = await fanvueApiUploadPart(signedUrl, chunk, params.mimeType)
+    completedParts.push({
+      PartNumber: partNumber,
+      ...(etag ? { ETag: etag } : {}),
+    })
   }
 
   await fanvueApiRequest({
     accessToken: params.accessToken,
-    method: "POST",
-    path: `/media/uploads/${encodeURIComponent(session.uploadId)}/complete`,
-    body: {},
+    method: "PATCH",
+    path: `/media/uploads/${encodeURIComponent(session.uploadId)}`,
+    body: { parts: completedParts },
   })
 
   return waitForFanvueMediaReady(params.accessToken, session.mediaUuid)

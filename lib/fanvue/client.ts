@@ -64,7 +64,11 @@ export async function fanvueApiRequest<T>(options: FanvueRequestOptions): Promis
   return json as T
 }
 
-export async function fanvueApiUploadPart(url: string, body: Buffer, contentType = "application/octet-stream") {
+export async function fanvueApiUploadPart(
+  url: string,
+  body: Buffer,
+  contentType = "application/octet-stream"
+): Promise<string | null> {
   const response = await fetch(url, {
     method: "PUT",
     headers: { "Content-Type": contentType },
@@ -74,4 +78,6 @@ export async function fanvueApiUploadPart(url: string, body: Buffer, contentType
   if (!response.ok) {
     throw new FanvueApiError(`Fanvue media part upload failed (${response.status}).`, response.status)
   }
+
+  return response.headers.get("etag")
 }
