@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 
 import {
   addMediaToFanvueVaultFolder,
+  isFanvueMediaBrowsable,
   loadHydratedFanvueMedia,
   removeMediaFromFanvueVaultFolder,
 } from "@/lib/fanvue/media"
@@ -33,6 +34,7 @@ export async function GET(request: Request, context: RouteContext) {
     const requestUrl = new URL(request.url)
     const connectionId = requestUrl.searchParams.get("connectionId")?.trim() ?? ""
     const cursor = requestUrl.searchParams.get("cursor")?.trim() || undefined
+    const includeIncomplete = requestUrl.searchParams.get("includeIncomplete") === "1"
 
     if (!connectionId) {
       return NextResponse.json({ error: "connectionId is required." }, { status: 400 })
@@ -54,7 +56,16 @@ export async function GET(request: Request, context: RouteContext) {
       singlePage: Boolean(cursor),
     })
 
-    return NextResponse.json({ items, nextCursor, folderName })
+    const visibleItems = includeIncomplete
+      ? items
+      : items.filter((item) => isFanvueMediaBrowsable(item))
+
+    return NextResponse.json({
+      items: visibleItems,
+      nextCursor,
+      folderName,
+      hiddenIncompleteCount: includeIncomplete ? 0 : items.length - visibleItems.length,
+    })
   } catch (error) {
     console.error("[fanvue/vault/folders/[name]/media] GET exception:", error)
     return NextResponse.json(

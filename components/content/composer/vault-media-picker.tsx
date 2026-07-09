@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import { isFanvueMediaFailedStatus } from "@/lib/fanvue/media"
+import { isFanvueMediaBrowsable } from "@/lib/fanvue/media"
 
 type VaultMediaPickerProps = {
   connectionId: string
@@ -58,7 +58,7 @@ export function VaultMediaPicker({
         throw new Error(data.error || "Failed to load media.")
       }
       if (version !== loadVersion.current) return
-      setItems((data.items ?? []).filter((item) => !isFanvueMediaFailedStatus(item.status)))
+      setItems((data.items ?? []).filter((item) => isFanvueMediaBrowsable(item)))
     } catch (error) {
       if (version !== loadVersion.current) return
       toast.error(error instanceof Error ? error.message : "Failed to load media.")

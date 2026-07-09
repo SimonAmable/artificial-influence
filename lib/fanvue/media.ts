@@ -87,6 +87,38 @@ export function isFanvueMediaProcessingStatus(status: string | null | undefined)
   return normalized === "processing" || normalized === "created" || normalized === "uploading"
 }
 
+export function isFanvueMediaIncompleteStatus(status: string | null | undefined): boolean {
+  return isFanvueMediaFailedStatus(status) || isFanvueMediaProcessingStatus(status)
+}
+
+type FanvueMediaBrowsableFields = Pick<
+  FanvueMediaListItem,
+  "status" | "thumbnailUrl" | "name" | "filename"
+>
+
+export function isFanvueMediaBrowsable(item: FanvueMediaBrowsableFields): boolean {
+  if (isFanvueMediaIncompleteStatus(item.status)) return false
+  if (item.thumbnailUrl) return true
+  if (isFanvueMediaReadyStatus(item.status)) return true
+  return Boolean(item.name?.trim() || item.filename?.trim())
+}
+
+export function partitionFanvueMediaItems(items: FanvueMediaListItem[]): {
+  browsable: FanvueMediaListItem[]
+  hidden: FanvueMediaListItem[]
+} {
+  const browsable: FanvueMediaListItem[] = []
+  const hidden: FanvueMediaListItem[] = []
+  for (const item of items) {
+    if (isFanvueMediaBrowsable(item)) {
+      browsable.push(item)
+    } else {
+      hidden.push(item)
+    }
+  }
+  return { browsable, hidden }
+}
+
 function resolveFanvuePageParams(params?: { cursor?: string; limit?: number }) {
   const parsedPage = Number(params?.cursor)
   const page = Number.isFinite(parsedPage) && parsedPage >= 1 ? Math.floor(parsedPage) : 1

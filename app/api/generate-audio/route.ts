@@ -6,18 +6,17 @@ import {
   getDefaultAudioVoiceId,
 } from "@/lib/constants/audio"
 import { resolveAudioProvider, synthesizeSpeech } from "@/lib/server/audio-tts"
-import { createClient } from "@/lib/supabase/server"
+import { getAuthenticatedRequestContext } from "@/lib/server/request-auth"
 
 export async function POST(request: NextRequest) {
   const requestStartTime = Date.now()
   console.log("[generate-audio] ===== Request started =====")
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const { supabase, user, error: authError } = await getAuthenticatedRequestContext(
+      request,
+      ["generations:write"]
+    )
 
     if (authError || !user) {
       console.error(
@@ -99,6 +98,8 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(storagePath)
     const url = urlData.publicUrl
 
+    let savedGenerationId: string | null = null
+
     try {
       const generationData = {
         user_id: user.id,
@@ -123,6 +124,7 @@ export async function POST(request: NextRequest) {
           saveError
         )
       } else {
+        savedGenerationId = savedData?.id ?? null
         console.log(
           "[generate-audio] Generation saved to database with ID:",
           savedData?.id
@@ -141,6 +143,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       audio: { url, mimeType: result.mimeType },
+      generationId: savedGenerationId,
       usage: result.usage
         ? {
             ...result.usage,

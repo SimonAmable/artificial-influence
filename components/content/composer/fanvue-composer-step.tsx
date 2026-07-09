@@ -153,9 +153,10 @@ export function FanvueComposerStep({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
       <div className="space-y-2">
-        <Label className="text-sm font-medium text-muted-foreground">Posting as</Label>
+        <Label className="text-base font-semibold">Posting as</Label>
         <FanvueAccountSelect
           connections={connections}
           value={connection.id}
@@ -172,9 +173,13 @@ export function FanvueComposerStep({
           onSelectMedia={setSelectedMedia}
           onUploaded={setSelectedMedia}
         />
-        <Button type="button" variant="link" className="h-auto px-0 text-xs text-muted-foreground" onClick={onGoToMediaTab}>
+        <button
+          type="button"
+          className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:underline focus-visible:outline-none"
+          onClick={onGoToMediaTab}
+        >
           Browse full media library
-        </Button>
+        </button>
       </div>
 
       <div className="space-y-2">
@@ -276,8 +281,9 @@ export function FanvueComposerStep({
           />
         </div>
       ) : null}
+      </div>
 
-      <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+      <div className="flex shrink-0 flex-wrap justify-end gap-2 pt-6">
         <Button
           type="button"
           variant="outline"

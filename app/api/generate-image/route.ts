@@ -4,7 +4,7 @@ import { xai } from '@ai-sdk/xai';
 import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
 import { enhancePrompt, enhancePromptForJSONModels } from '@/lib/prompt-enhancement';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthenticatedRequestContext } from '@/lib/server/request-auth';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 import {
   aspectRatioToDimensions,
@@ -47,8 +47,10 @@ export async function POST(request: NextRequest) {
 
     // Get authenticated user
     console.log('[generate-image] Authenticating user...');
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { supabase, user, error: authError } = await getAuthenticatedRequestContext(
+      request,
+      ['generations:write'],
+    );
     
     if (authError || !user) {
       console.error('[generate-image] Authentication failed:', authError?.message || 'No user');
@@ -1070,13 +1072,16 @@ export async function POST(request: NextRequest) {
         if (saveError) {
           console.error('[generate-image] Error saving generation to database:', saveError);
           // Don't throw - we don't want to fail the request if database save fails
+          return null;
         } else {
           console.log('[generate-image] ✓ Generation saved to database with ID:', savedData?.id);
+          return savedData ?? null;
         }
       } catch (error) {
         console.error('[generate-image] Exception saving generation to database:', error);
         // Don't throw - we don't want to fail the request if database save fails
       }
+      return null;
     };
 
     // Upload generated image(s) to storage and return URLs
@@ -1094,7 +1099,7 @@ export async function POST(request: NextRequest) {
       const imageStoragePaths = imageResults.map(r => r.storagePath);
 
       // Save each generation to database
-      await Promise.all(
+      const savedGenerations = await Promise.all(
         imageStoragePaths.map((storagePath) =>
           saveGenerationToDatabase(
             storagePath,
@@ -1107,7 +1112,7 @@ export async function POST(request: NextRequest) {
       const totalTime = Date.now() - requestStartTime;
       console.log('[generate-image] ✓ All images uploaded in', totalUploadTime, 'ms');
 
-      await deductUserCredits(user.id, requiredCredits);
+      await deductUserCredits(user.id, requiredCredits, supabase);
       console.log('[generate-image] ✓ Credits deducted:', requiredCredits);
       console.log('[generate-image] ===== Request completed successfully in', totalTime, 'ms =====');
 
@@ -1118,13 +1123,14 @@ export async function POST(request: NextRequest) {
         })),
         warnings: result.warnings,
         creditsUsed: requiredCredits,
+        generationIds: savedGenerations.map((generation) => generation?.id).filter(Boolean),
       });
     } else if (result.image) {
       // Single image
       const { url: imageUrl, storagePath: imageStoragePath } = await uploadImageToStorage(result.image.base64);
 
       // Save generation to database
-      await saveGenerationToDatabase(
+      const savedGeneration = await saveGenerationToDatabase(
         imageStoragePath,
         provider === 'xai' ? referenceImageStoragePaths : replicateReferenceImageStoragePaths,
       );
@@ -1133,7 +1139,7 @@ export async function POST(request: NextRequest) {
       const totalTime = Date.now() - requestStartTime;
       console.log('[generate-image] ✓ Image uploaded in', totalUploadTime, 'ms');
 
-      await deductUserCredits(user.id, requiredCredits);
+      await deductUserCredits(user.id, requiredCredits, supabase);
       console.log('[generate-image] ✓ Credits deducted:', requiredCredits);
       console.log('[generate-image] ===== Request completed successfully in', totalTime, 'ms =====');
 
@@ -1145,6 +1151,7 @@ export async function POST(request: NextRequest) {
         warnings: result.warnings,
         providerMetadata: result.providerMetadata,
         creditsUsed: requiredCredits,
+        generationId: savedGeneration?.id ?? null,
       });
     } else {
       console.error('[generate-image] No image in result object');

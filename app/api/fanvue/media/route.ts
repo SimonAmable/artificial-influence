@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { loadHydratedFanvueMedia } from "@/lib/fanvue/media"
+import { isFanvueMediaBrowsable, loadHydratedFanvueMedia } from "@/lib/fanvue/media"
 import { getValidFanvueAccessToken } from "@/lib/fanvue/token-service"
 import { requirePresenceProductResponse } from "@/lib/product/require-presence"
 import { createClient } from "@/lib/supabase/server"
@@ -26,6 +26,7 @@ export async function GET(request: Request) {
     const query = requestUrl.searchParams.get("q")?.trim().toLowerCase() ?? ""
     const mediaType = requestUrl.searchParams.get("mediaType")?.trim() || undefined
     const mediaSource = requestUrl.searchParams.get("mediaSource")?.trim() || undefined
+    const includeIncomplete = requestUrl.searchParams.get("includeIncomplete") === "1"
 
     if (!connectionId) {
       return NextResponse.json({ error: "connectionId is required." }, { status: 400 })
@@ -55,7 +56,17 @@ export async function GET(request: Request) {
       return haystack.includes(query)
     })
 
-    return NextResponse.json({ items: filtered, nextCursor })
+    const visibleItems = includeIncomplete
+      ? filtered
+      : filtered.filter((item) => isFanvueMediaBrowsable(item))
+
+    return NextResponse.json({
+      items: visibleItems,
+      nextCursor,
+      hiddenIncompleteCount: includeIncomplete
+        ? 0
+        : filtered.length - visibleItems.length,
+    })
   } catch (error) {
     console.error("[fanvue/media] GET exception:", error)
     return NextResponse.json(

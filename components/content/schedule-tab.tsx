@@ -306,27 +306,36 @@ export function ScheduleTab({ connections, selectedConnectionId, onGoToMediaTab 
         <div className="fixed inset-0 z-50 bg-background/80 p-4 backdrop-blur-sm" onClick={() => setComposerOpen(false)}>
           <div className="mx-auto flex h-full w-full max-w-3xl items-center justify-center">
             <Card
-              className="flex max-h-[90vh] w-full flex-col overflow-hidden rounded-[28px]"
+              className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden rounded-[28px]"
               onClick={(event) => event.stopPropagation()}
             >
-              <CardHeader className="border-b border-border/60">
-                <CardTitle className="text-lg font-semibold tracking-tight">Create Fanvue post</CardTitle>
+              <CardHeader className="shrink-0 space-y-1.5 px-8 pt-8 pb-4">
+                <CardTitle className="text-2xl font-semibold tracking-tight">
+                  {composerState.step === "account" ? "Choose account" : "Create Fanvue post"}
+                </CardTitle>
+                <CardDescription className="text-base">
+                  {composerState.step === "account"
+                    ? "Select which Fanvue account this post should go to."
+                    : "Add media, write a caption, and publish or schedule."}
+                </CardDescription>
               </CardHeader>
-              <CardContent className="overflow-y-auto p-6">
+              <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-8 pb-8 pt-2">
                 {composerState.step === "account" ? (
-                  <AccountPickerStep
-                    connections={connections}
-                    onConnect={() => {
-                      window.location.href = "/api/fanvue/connect?next=/content"
-                    }}
-                    onSelect={(connection) => {
-                      setComposerState((current) => ({
-                        ...current,
-                        step: "compose",
-                        connection,
-                      }))
-                    }}
-                  />
+                  <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                    <AccountPickerStep
+                      connections={connections}
+                      onConnect={() => {
+                        window.location.href = "/api/fanvue/connect?next=/content"
+                      }}
+                      onSelect={(connection) => {
+                        setComposerState((current) => ({
+                          ...current,
+                          step: "compose",
+                          connection,
+                        }))
+                      }}
+                    />
+                  </div>
                 ) : composerState.connection ? (
                   <FanvueComposerStep
                     connection={composerState.connection}

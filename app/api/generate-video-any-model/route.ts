@@ -1,6 +1,6 @@
 import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthenticatedRequestContext } from '@/lib/server/request-auth';
 import { checkUserHasCredits, deductUserCreditsUpTo } from '@/lib/credits';
 import { inferStoragePathFromUrl } from '@/lib/assets/library';
 import {
@@ -46,8 +46,10 @@ export async function POST(request: NextRequest) {
   
   try {
     // Get authenticated user
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { supabase, user, error: authError } = await getAuthenticatedRequestContext(
+      request,
+      ['generations:write'],
+    );
     
     if (authError || !user) {
       console.error('[generate-video-test] Authentication failed:', authError?.message || 'No user');
@@ -756,17 +758,25 @@ export async function POST(request: NextRequest) {
           predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
         };
 
-        const { error: saveError } = await supabase.from('generations').insert(generationData);
+        const { data: savedData, error: saveError } = await supabase
+          .from('generations')
+          .insert(generationData)
+          .select('id')
+          .single();
 
         if (saveError) {
           console.error('[generate-video-test] Error saving generation to database:', saveError);
+          return null;
         }
+
+        return savedData ?? null;
       } catch (e) {
         console.error('[generate-video-test] Exception saving generation to database:', e);
       }
+      return null;
     };
 
-    await saveGenerationToDatabase();
+    const savedGeneration = await saveGenerationToDatabase();
 
     // Deduct credits after successful upload (aligned with image route: charge only when we have a durable asset).
     const chargedCredits = await deductUserCreditsUpTo(user.id, quotedCredits, supabase);
@@ -782,6 +792,7 @@ export async function POST(request: NextRequest) {
       },
       videoUrl: finalVideoUrl,
       model: normalizedModel,
+      generationId: savedGeneration?.id ?? null,
       creditsQuoted: quotedCredits,
       creditsUsed: chargedCredits,
     });

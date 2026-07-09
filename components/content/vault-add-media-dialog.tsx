@@ -28,7 +28,7 @@ type VaultAddMediaDialogProps = {
   onAdded: () => Promise<void> | void
 }
 
-import { isFanvueMediaReadyStatus } from "@/lib/fanvue/media"
+import { isFanvueMediaBrowsable } from "@/lib/fanvue/media"
 
 export function VaultAddMediaDialog({
   open,
@@ -86,7 +86,7 @@ export function VaultAddMediaDialog({
   const availableItems = React.useMemo(() => {
     const query = search.trim().toLowerCase()
     return items.filter((item) => {
-      if (!isFanvueMediaReadyStatus(item.status)) return false
+      if (!isFanvueMediaBrowsable(item)) return false
       if (existingMediaUuids.has(item.uuid)) return false
       if (!query) return true
       const haystack = `${item.name ?? ""} ${item.filename ?? ""}`.toLowerCase()

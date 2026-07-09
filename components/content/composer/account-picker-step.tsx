@@ -17,11 +17,6 @@ type AccountPickerStepProps = {
 export function AccountPickerStep({ connections, onSelect, onConnect }: AccountPickerStepProps) {
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <h3 className="text-lg font-semibold text-foreground">Where should this post go?</h3>
-        <p className="text-sm text-muted-foreground">Pick the Fanvue account for this post.</p>
-      </div>
-
       {connections.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border/70 bg-muted/10 px-6 py-10 text-center">
           <p className="text-sm font-medium text-foreground">No Fanvue accounts connected</p>
