@@ -8,6 +8,7 @@ import { ArrowLeftIcon, EnvelopeSimpleIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
 import { createClient } from "@/lib/supabase/client"
+import { isMcpOAuthContinuationPath } from "@/lib/mcp/oauth-login-state"
 import { currentProduct } from "@/lib/product/current"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -85,13 +86,13 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
     }
 
     const url = new URL("/auth/callback", window.location.origin)
-    if (nextPath !== "/") {
+    if (nextPath !== "/" && !isMcpOAuthContinuationPath(nextPath)) {
       url.searchParams.set("next", nextPath)
     }
     return url.toString()
   }, [nextPath])
   const isMcpOAuthContinuation = React.useMemo(
-    () => nextPath === "/oauth/resume" || nextPath.startsWith("/oauth/resume?"),
+    () => isMcpOAuthContinuationPath(nextPath),
     [nextPath],
   )
 
