@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
-import { ArrowsOutSimple, Copy, DownloadSimple, Check, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple, ShieldCheck, Eraser, Sparkle, ImageSquare } from "@phosphor-icons/react"
+import { ArrowsOutSimple, Copy, DownloadSimple, Check, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple, ShieldCheck, Eraser, Sparkle, ImageSquare, PaperPlaneTilt, Vault } from "@phosphor-icons/react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,6 +79,10 @@ interface ImageGridProps {
   initialColumnCount?: number
   /** Hide column count slider (e.g. embedded chat tool cards). */
   showColumnSlider?: boolean
+  fanvueActions?: {
+    onSendToVault: (imageUrl: string, index: number) => void
+    onCreatePost: (imageUrl: string, index: number) => void
+  }
 }
 
 // Normalize model names by removing prefix before slash, replacing dashes with spaces, and capitalizing
@@ -127,6 +131,7 @@ export function ImageGrid({
   onColumnCountChange,
   initialColumnCount = 2,
   showColumnSlider = true,
+  fanvueActions,
 }: ImageGridProps) {
   const router = useRouter()
   const isAgentMode = actionStrategy === "agent"
@@ -246,10 +251,36 @@ export function ImageGrid({
             }}
             className="cursor-pointer"
           >
-            <Sparkle className="mr-2 size-4" weight="duotone" />
+            <Sparkle className="mr-2 size-4" weight="regular" />
             Save Example
           </DropdownMenuItem>
         )}
+
+        {fanvueActions ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={(event) => {
+                event.stopPropagation()
+                fanvueActions.onSendToVault(data.url, index)
+              }}
+              className="cursor-pointer"
+            >
+              <Vault className="mr-2 size-4" />
+              Send to Fanvue Vault
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(event) => {
+                event.stopPropagation()
+                fanvueActions.onCreatePost(data.url, index)
+              }}
+              className="cursor-pointer"
+            >
+              <PaperPlaneTilt className="mr-2 size-4" />
+              Create Fanvue Post
+            </DropdownMenuItem>
+          </>
+        ) : null}
 
         <DropdownMenuSeparator />
 
@@ -816,7 +847,7 @@ export function ImageGrid({
                           onSaveExample(item.data.url, index)
                         }}
                       >
-                        <Sparkle className="mr-1 size-3" weight="duotone" />
+                        <Sparkle className="mr-1 size-3" weight="regular" />
                         Save Example
                       </Button>
                     ) : null}
@@ -996,7 +1027,7 @@ export function ImageGrid({
               actions.push({
                 id: "save-example",
                 label: "Save Example",
-                icon: <Sparkle className="size-4" weight="duotone" />,
+                icon: <Sparkle className="size-4" weight="regular" />,
                 onClick: () => onSaveExample(url, imageIndexByUrl),
               })
             }
@@ -1081,6 +1112,21 @@ export function ImageGrid({
                 label: isAgentMode ? "Save to Assets" : "Create Asset",
                 icon: <Plus className="size-4" />,
                 onClick: () => onCreateAsset(url, imageIndexByUrl),
+              })
+            }
+
+            if (fanvueActions && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "fanvue-vault",
+                label: "Send to Fanvue Vault",
+                icon: <Vault className="size-4" />,
+                onClick: () => fanvueActions.onSendToVault(url, imageIndexByUrl),
+              })
+              actions.push({
+                id: "fanvue-post",
+                label: "Create Fanvue Post",
+                icon: <PaperPlaneTilt className="size-4" />,
+                onClick: () => fanvueActions.onCreatePost(url, imageIndexByUrl),
               })
             }
 

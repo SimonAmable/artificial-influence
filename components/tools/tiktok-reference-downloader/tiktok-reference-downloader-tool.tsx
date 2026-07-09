@@ -449,7 +449,7 @@ export function TikTokReferenceDownloaderTool() {
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="max-w-3xl space-y-3">
             <Badge variant="secondary" className="w-fit gap-1.5">
-              <FilmStrip className="size-3.5" weight="duotone" />
+              <FilmStrip className="size-3.5" weight="regular" />
               TikTok {"&"} Instagram
             </Badge>
             <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">

@@ -768,7 +768,7 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
                   "text-zinc-300 border-white/15 hover:border-white/25 hover:bg-white/5"
                 )}
               >
-                <Upload size={16} weight="duotone" className="shrink-0" />
+                <Upload size={16} weight="regular" className="shrink-0" />
                 <span className="text-xs">Upload reference</span>
               </Button>
               <Button

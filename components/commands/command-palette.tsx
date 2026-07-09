@@ -35,7 +35,7 @@ function BrandPaletteIcon({ previewUrl }: { previewUrl?: string | null }) {
   return (
     <PreviewOrIcon
       src={previewUrl}
-      fallback={<Palette className="mt-0.5 size-9 shrink-0 text-foreground" weight="duotone" aria-hidden />}
+      fallback={<Palette className="mt-0.5 size-9 shrink-0 text-foreground" weight="regular" aria-hidden />}
     />
   )
 }
@@ -49,11 +49,11 @@ function AssetPaletteIcon({
   const t = row.item.assetType
   const glyph =
     t === "video" ? (
-      <VideoCamera className="mt-0.5 size-9 shrink-0 text-zinc-400" weight="duotone" aria-hidden />
+      <VideoCamera className="mt-0.5 size-9 shrink-0 text-zinc-400" weight="regular" aria-hidden />
     ) : t === "audio" ? (
-      <Waveform className="mt-0.5 size-9 shrink-0 text-zinc-400" weight="duotone" aria-hidden />
+      <Waveform className="mt-0.5 size-9 shrink-0 text-zinc-400" weight="regular" aria-hidden />
     ) : (
-      <Image className="mt-0.5 size-9 shrink-0 text-zinc-400" weight="duotone" aria-hidden />
+      <Image className="mt-0.5 size-9 shrink-0 text-zinc-400" weight="regular" aria-hidden />
     )
   return <PreviewOrIcon src={preview} fallback={glyph} />
 }

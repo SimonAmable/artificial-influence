@@ -875,7 +875,7 @@ export function AssetSelectionModal({
                           <div className="absolute inset-0 flex items-center justify-center rounded-md bg-muted">
                             <SpeakerHigh
                               className="h-12 w-12 text-muted-foreground"
-                              weight="duotone"
+                              weight="regular"
                               aria-hidden
                             />
                           </div>

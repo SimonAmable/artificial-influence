@@ -98,7 +98,7 @@ export function FeatureButtonGrid() {
                   className="flex min-w-0 items-center gap-3 rounded-[24px] px-4 py-3 outline-none transition-shadow duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[24px] bg-muted text-foreground shadow-sm">
-                    <Icon size={22} weight="duotone" className="shrink-0" />
+                    <Icon size={22} weight="regular" className="shrink-0" />
                   </div>
                   <span className="min-w-0 flex-1 text-center text-sm font-semibold text-foreground">
                     {tool.label}

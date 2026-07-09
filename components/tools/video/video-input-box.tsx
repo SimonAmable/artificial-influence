@@ -801,7 +801,7 @@ export function VideoInputBox({
                     className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
                   >
                     <span className="flex items-center text-sm font-medium">
-                      <Waveform className="mr-2 size-4 shrink-0" weight="duotone" />
+                      <Waveform className="mr-2 size-4 shrink-0" weight="regular" />
                       {referenceAudioConfig?.title ?? "Optional audio"}
                     </span>
                     <span className="text-muted-foreground pl-6 text-[10px] leading-snug">

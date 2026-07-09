@@ -1,15 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { FanvueApiError, fanvueApiRequest, fanvueApiUploadPart } from "@/lib/fanvue/client"
+import { fanvueApiRequest, fanvueApiRequestText, fanvueApiUploadPart } from "@/lib/fanvue/client"
+
+export type FanvueMediaSource = "presence" | "fanvue"
 
 export type FanvueMediaListItem = {
   uuid: string
   name?: string | null
   filename?: string | null
+  caption?: string | null
   mediaType?: string | null
   status?: string | null
   thumbnailUrl?: string | null
   createdAt?: string | null
+  mediaSource?: FanvueMediaSource | null
+  recommendedPrice?: number | null
 }
 
 type UploadSessionResponse = {
@@ -18,10 +23,6 @@ type UploadSessionResponse = {
   partSize: number
   maxParts: number
   totalParts: number | null
-}
-
-type SignedPartResponse = {
-  url: string
 }
 
 type CompleteUploadPart = {
@@ -38,10 +39,12 @@ type MediaDetailResponse = {
   uuid?: string
   name?: string | null
   filename?: string | null
+  caption?: string | null
   mediaType?: string | null
   status?: string | null
   thumbnailUrl?: string | null
   createdAt?: string | null
+  recommendedPrice?: number | null
   variants?: MediaVariant[]
 }
 
@@ -60,6 +63,29 @@ type MediaListResponse = {
 }
 
 const FANVUE_MEDIA_VARIANTS = "thumbnail,thumbnail_gallery,main"
+const FANVUE_BULK_MEDIA_BATCH_SIZE = 20
+const FANVUE_MEDIA_MAX_PAGES = 20
+
+export function isFanvueMediaReadyStatus(status: string | null | undefined): boolean {
+  const normalized = (status ?? "").toLowerCase()
+  return (
+    normalized === "ready" ||
+    normalized === "completed" ||
+    normalized === "active" ||
+    normalized === "finalised" ||
+    normalized === "finalized"
+  )
+}
+
+export function isFanvueMediaFailedStatus(status: string | null | undefined): boolean {
+  const normalized = (status ?? "").toLowerCase()
+  return normalized === "failed" || normalized === "error"
+}
+
+export function isFanvueMediaProcessingStatus(status: string | null | undefined): boolean {
+  const normalized = (status ?? "").toLowerCase()
+  return normalized === "processing" || normalized === "created" || normalized === "uploading"
+}
 
 function resolveFanvuePageParams(params?: { cursor?: string; limit?: number }) {
   const parsedPage = Number(params?.cursor)
@@ -98,10 +124,64 @@ function normalizeMediaItem(item: MediaDetailResponse): FanvueMediaListItem | nu
     uuid: item.uuid,
     name: item.name ?? null,
     filename: item.filename ?? null,
+    caption: item.caption ?? null,
     mediaType: item.mediaType ?? null,
     status: item.status ?? null,
     thumbnailUrl: pickThumbnailUrl(item),
     createdAt: item.createdAt ?? null,
+    recommendedPrice: item.recommendedPrice ?? null,
+  }
+}
+
+function mergeFanvueMediaItem(
+  base: FanvueMediaListItem,
+  patch: FanvueMediaListItem | null | undefined
+): FanvueMediaListItem {
+  if (!patch) return base
+  return {
+    ...base,
+    name: patch.name ?? base.name,
+    filename: patch.filename ?? base.filename,
+    caption: patch.caption ?? base.caption,
+    mediaType: patch.mediaType ?? base.mediaType,
+    status: patch.status ?? base.status,
+    thumbnailUrl: patch.thumbnailUrl ?? base.thumbnailUrl,
+    createdAt: patch.createdAt ?? base.createdAt,
+    recommendedPrice: patch.recommendedPrice ?? base.recommendedPrice,
+    mediaSource: base.mediaSource ?? patch.mediaSource,
+  }
+}
+
+function mediaItemNeedsHydration(item: FanvueMediaListItem): boolean {
+  if (!item.thumbnailUrl) return true
+  if (!item.name && !item.filename) return true
+  if (isFanvueMediaProcessingStatus(item.status)) return true
+  return false
+}
+
+type FanvueMediaUploadPaths = {
+  createSessionPath: string
+  completeSessionPath: (uploadId: string) => string
+  partUploadPath: (uploadId: string, partNumber: number) => string
+}
+
+function resolveFanvueMediaUploadPaths(creatorUserUuid?: string): FanvueMediaUploadPaths {
+  const creator = creatorUserUuid?.trim()
+  if (creator) {
+    return {
+      createSessionPath: `/creators/${encodeURIComponent(creator)}/media/uploads`,
+      completeSessionPath: (uploadId: string) =>
+        `/creators/${encodeURIComponent(creator)}/media/uploads/${encodeURIComponent(uploadId)}`,
+      partUploadPath: (uploadId: string, partNumber: number) =>
+        `/creators/${encodeURIComponent(creator)}/media/uploads/${encodeURIComponent(uploadId)}/parts/${partNumber}/url`,
+    }
+  }
+
+  return {
+    createSessionPath: "/media/uploads",
+    completeSessionPath: (uploadId: string) => `/media/uploads/${encodeURIComponent(uploadId)}`,
+    partUploadPath: (uploadId: string, partNumber: number) =>
+      `/media/uploads/${encodeURIComponent(uploadId)}/parts/${partNumber}/url`,
   }
 }
 
@@ -111,33 +191,220 @@ async function resolveSignedPartUploadUrl(params: {
   partNumber: number
   creatorUserUuid?: string
 }): Promise<string> {
-  try {
-    const response = await fanvueApiRequest<SignedPartResponse | string>({
+  const creator = params.creatorUserUuid?.trim()
+  if (creator) {
+    const url = await fanvueApiRequestText({
       accessToken: params.accessToken,
-      path: `/media/uploads/${encodeURIComponent(params.uploadId)}/parts/${params.partNumber}/url`,
+      path: resolveFanvueMediaUploadPaths(creator).partUploadPath(params.uploadId, params.partNumber),
     })
-    const url = typeof response === "string" ? response : response.url
-    if (url?.trim()) return url
-  } catch (error) {
-    if (!(error instanceof FanvueApiError) || error.status !== 404) {
-      throw error
+    if (!url) {
+      throw new Error(`Fanvue did not return an upload URL for part ${params.partNumber}.`)
+    }
+    return url
+  }
+
+  const selfPath = `/media/uploads/${encodeURIComponent(params.uploadId)}/parts/${params.partNumber}/url`
+  const url = await fanvueApiRequestText({
+    accessToken: params.accessToken,
+    path: selfPath,
+  })
+  if (!url) {
+    throw new Error(`Fanvue did not return an upload URL for part ${params.partNumber}.`)
+  }
+  return url
+}
+
+export async function getFanvueBulkMedia(
+  accessToken: string,
+  mediaUuids: string[]
+): Promise<FanvueMediaListItem[]> {
+  const uniqueUuids = Array.from(new Set(mediaUuids.map((uuid) => uuid.trim()).filter(Boolean)))
+  if (uniqueUuids.length === 0) return []
+
+  const response = await fanvueApiRequest<MediaListResponse>({
+    accessToken,
+    path: "/media/bulk",
+    searchParams: {
+      mediaUuids: uniqueUuids.join(","),
+      variants: FANVUE_MEDIA_VARIANTS,
+    },
+  })
+
+  const raw = response.data ?? response.items ?? []
+  return raw.map(normalizeMediaItem).filter((item): item is FanvueMediaListItem => item !== null)
+}
+
+export async function enrichFanvueMediaList(
+  accessToken: string,
+  items: FanvueMediaListItem[],
+  options?: { forceHydrateUuids?: ReadonlySet<string> }
+): Promise<FanvueMediaListItem[]> {
+  const uuidsToHydrate = items
+    .filter(
+      (item) => mediaItemNeedsHydration(item) || options?.forceHydrateUuids?.has(item.uuid)
+    )
+    .map((item) => item.uuid)
+  if (uuidsToHydrate.length === 0) return items
+
+  const hydratedByUuid = new Map<string, FanvueMediaListItem>()
+  for (let index = 0; index < uuidsToHydrate.length; index += FANVUE_BULK_MEDIA_BATCH_SIZE) {
+    const batch = uuidsToHydrate.slice(index, index + FANVUE_BULK_MEDIA_BATCH_SIZE)
+    const batchItems = await getFanvueBulkMedia(accessToken, batch)
+    for (const item of batchItems) {
+      hydratedByUuid.set(item.uuid, item)
     }
   }
 
-  if (!params.creatorUserUuid) {
-    throw new Error("Fanvue upload URL endpoint not available for this account.")
+  return items.map((item) => mergeFanvueMediaItem(item, hydratedByUuid.get(item.uuid)))
+}
+
+async function listAllFanvueMediaPages(
+  loader: (cursor?: string) => Promise<{ items: FanvueMediaListItem[]; nextCursor: string | null }>,
+  options?: { cursor?: string; singlePage?: boolean }
+): Promise<{ items: FanvueMediaListItem[]; nextCursor: string | null }> {
+  if (options?.singlePage) {
+    return loader(options.cursor)
   }
 
-  const creatorResponse = await fanvueApiRequest<SignedPartResponse | string>({
-    accessToken: params.accessToken,
-    path: `/creators/${encodeURIComponent(params.creatorUserUuid)}/media/uploads/${encodeURIComponent(params.uploadId)}/parts/${params.partNumber}/url`,
+  const merged: FanvueMediaListItem[] = []
+  let cursor = options?.cursor
+  let nextCursor: string | null = null
+
+  for (let page = 0; page < FANVUE_MEDIA_MAX_PAGES; page += 1) {
+    const result = await loader(cursor)
+    merged.push(...result.items)
+    nextCursor = result.nextCursor
+    if (!result.nextCursor) break
+    cursor = result.nextCursor
+  }
+
+  return { items: merged, nextCursor }
+}
+
+export async function listAllFanvueMedia(
+  accessToken: string,
+  params?: { cursor?: string; limit?: number; singlePage?: boolean }
+): Promise<{ items: FanvueMediaListItem[]; nextCursor: string | null }> {
+  return listAllFanvueMediaPages(
+    (cursor) => listFanvueMedia(accessToken, { cursor, limit: params?.limit }),
+    { cursor: params?.cursor, singlePage: params?.singlePage }
+  )
+}
+
+export async function listAllFanvueVaultFolderMedia(
+  accessToken: string,
+  folderName: string,
+  params?: { cursor?: string; limit?: number; singlePage?: boolean }
+): Promise<{ items: FanvueMediaListItem[]; nextCursor: string | null }> {
+  return listAllFanvueMediaPages(
+    (cursor) => listFanvueVaultFolderMedia(accessToken, folderName, { cursor, limit: params?.limit }),
+    { cursor: params?.cursor, singlePage: params?.singlePage }
+  )
+}
+
+type FanvueMediaCacheRow = {
+  fanvue_media_uuid: string
+  name: string | null
+  filename: string | null
+  thumbnail_url: string | null
+  status: string | null
+}
+
+export async function listFanvueMediaCacheRows(
+  supabase: SupabaseClient,
+  params: { userId: string; socialConnectionId: string }
+): Promise<Map<string, FanvueMediaCacheRow>> {
+  const { data, error } = await supabase
+    .from("fanvue_media_cache")
+    .select("fanvue_media_uuid, name, filename, thumbnail_url, status")
+    .eq("user_id", params.userId)
+    .eq("social_connection_id", params.socialConnectionId)
+
+  if (error) {
+    console.error("[fanvue/media] cache rows lookup failed:", error)
+    return new Map()
+  }
+
+  return new Map(
+    (data ?? [])
+      .filter((row) => row.fanvue_media_uuid)
+      .map((row) => [row.fanvue_media_uuid as string, row as FanvueMediaCacheRow])
+  )
+}
+
+export function mergeFanvueMediaWithCache(
+  items: FanvueMediaListItem[],
+  cacheRows: Map<string, FanvueMediaCacheRow>
+): FanvueMediaListItem[] {
+  return items.map((item) => {
+    const cached = cacheRows.get(item.uuid)
+    if (!cached) return item
+
+    return mergeFanvueMediaItem(
+      {
+        uuid: item.uuid,
+        name: cached.name,
+        filename: cached.filename,
+        thumbnailUrl: cached.thumbnail_url,
+        status: cached.status,
+      },
+      item
+    )
+  })
+}
+
+export async function loadHydratedFanvueMedia(params: {
+  supabase: SupabaseClient
+  accessToken: string
+  userId: string
+  socialConnectionId: string
+  folderName?: string
+  cursor?: string
+  limit?: number
+  singlePage?: boolean
+}): Promise<{ items: FanvueMediaListItem[]; nextCursor: string | null }> {
+  const listed = params.folderName
+    ? await listAllFanvueVaultFolderMedia(params.accessToken, params.folderName, {
+        cursor: params.cursor,
+        limit: params.limit,
+        singlePage: params.singlePage,
+      })
+    : await listAllFanvueMedia(params.accessToken, {
+        cursor: params.cursor,
+        limit: params.limit,
+        singlePage: params.singlePage,
+      })
+
+  const presenceUuids = await listPresenceUploadedMediaUuids(params.supabase, {
+    userId: params.userId,
+    socialConnectionId: params.socialConnectionId,
   })
 
-  const creatorUrl = typeof creatorResponse === "string" ? creatorResponse : creatorResponse.url
-  if (!creatorUrl?.trim()) {
-    throw new Error(`Fanvue did not return an upload URL for part ${params.partNumber}.`)
+  const enriched = await enrichFanvueMediaList(params.accessToken, listed.items, {
+    forceHydrateUuids: presenceUuids,
+  })
+  const cacheRows = await listFanvueMediaCacheRows(params.supabase, {
+    userId: params.userId,
+    socialConnectionId: params.socialConnectionId,
+  })
+  const merged = mergeFanvueMediaWithCache(enriched, cacheRows)
+
+  await Promise.all(
+    merged
+      .filter((item) => presenceUuids.has(item.uuid) && item.thumbnailUrl)
+      .map((item) =>
+        upsertFanvueMediaCache(params.supabase, {
+          userId: params.userId,
+          socialConnectionId: params.socialConnectionId,
+          media: item,
+        })
+      )
+  )
+
+  return {
+    items: annotateFanvueMediaSources(merged, presenceUuids),
+    nextCursor: listed.nextCursor,
   }
-  return creatorUrl
 }
 
 export async function listFanvueMedia(
@@ -174,6 +441,72 @@ export async function getFanvueMedia(accessToken: string, mediaUuid: string): Pr
   return normalizeMediaItem(response)
 }
 
+type UpdateFanvueMediaInput = {
+  name?: string | null
+  caption?: string | null
+  recommendedPrice?: number | null
+}
+
+export async function updateFanvueMedia(
+  accessToken: string,
+  mediaUuid: string,
+  input: UpdateFanvueMediaInput
+): Promise<FanvueMediaListItem> {
+  const body: UpdateFanvueMediaInput = {}
+  if ("name" in input) body.name = input.name
+  if ("caption" in input) body.caption = input.caption
+  if ("recommendedPrice" in input) body.recommendedPrice = input.recommendedPrice
+
+  if (!("name" in body) && !("caption" in body) && !("recommendedPrice" in body)) {
+    throw new Error("At least one field must be provided to update media.")
+  }
+
+  const response = await fanvueApiRequest<{
+    uuid?: string
+    name?: string | null
+    caption?: string | null
+    recommendedPrice?: number | null
+  }>({
+    accessToken,
+    method: "PATCH",
+    path: `/media/${encodeURIComponent(mediaUuid)}`,
+    body,
+  })
+
+  const media = await getFanvueMedia(accessToken, response.uuid ?? mediaUuid)
+  if (!media) {
+    throw new Error("Updated media could not be loaded.")
+  }
+  return media
+}
+
+type UpdateFanvueVaultFolderMediaInput = {
+  name?: string | null
+  recommendedPrice?: number | null
+}
+
+export async function updateFanvueVaultFolderMedia(
+  accessToken: string,
+  folderName: string,
+  mediaUuid: string,
+  input: UpdateFanvueVaultFolderMediaInput
+): Promise<void> {
+  const body: UpdateFanvueVaultFolderMediaInput = {}
+  if ("name" in input) body.name = input.name
+  if ("recommendedPrice" in input) body.recommendedPrice = input.recommendedPrice
+
+  if (!("name" in body) && !("recommendedPrice" in body)) {
+    throw new Error("At least one field must be provided to update folder media.")
+  }
+
+  await fanvueApiRequest({
+    accessToken,
+    method: "PATCH",
+    path: `/vault/folders/${encodeURIComponent(folderName)}/media/${encodeURIComponent(mediaUuid)}`,
+    body,
+  })
+}
+
 export async function waitForFanvueMediaReady(
   accessToken: string,
   mediaUuid: string,
@@ -186,10 +519,10 @@ export async function waitForFanvueMediaReady(
   while (Date.now() - started < timeoutMs) {
     const media = await getFanvueMedia(accessToken, mediaUuid)
     const status = (media?.status ?? "").toLowerCase()
-    if (media && (status === "ready" || status === "completed" || status === "active")) {
+    if (media && isFanvueMediaReadyStatus(status)) {
       return media
     }
-    if (status === "failed" || status === "error") {
+    if (isFanvueMediaFailedStatus(status)) {
       throw new Error("Fanvue media processing failed.")
     }
     await new Promise((resolve) => setTimeout(resolve, intervalMs))
@@ -207,9 +540,10 @@ export async function uploadFanvueMediaBuffer(params: {
   creatorUserUuid?: string
 }): Promise<FanvueMediaListItem> {
   const mediaType = inferFanvueMediaType(params.mimeType)
+  const uploadPaths = resolveFanvueMediaUploadPaths(params.creatorUserUuid)
   const session = await fanvueApiRequest<UploadSessionResponse>({
     accessToken: params.accessToken,
-    path: "/media/uploads",
+    path: uploadPaths.createSessionPath,
     body: {
       name: params.displayName?.trim() || params.filename,
       filename: params.filename,
@@ -235,19 +569,24 @@ export async function uploadFanvueMediaBuffer(params: {
       creatorUserUuid: params.creatorUserUuid,
     })
 
-    const etag = await fanvueApiUploadPart(signedUrl, chunk, params.mimeType)
+    const etag = await fanvueApiUploadPart(signedUrl, chunk)
     completedParts.push({
       PartNumber: partNumber,
-      ...(etag ? { ETag: etag } : {}),
+      ETag: etag,
     })
   }
 
-  await fanvueApiRequest({
+  const completion = await fanvueApiRequest<{ status?: string }>({
     accessToken: params.accessToken,
     method: "PATCH",
-    path: `/media/uploads/${encodeURIComponent(session.uploadId)}`,
+    path: uploadPaths.completeSessionPath(session.uploadId),
     body: { parts: completedParts },
   })
+
+  const completionStatus = (completion.status ?? "").toLowerCase()
+  if (completionStatus === "error" || completionStatus === "failed") {
+    throw new Error("Fanvue rejected the completed media upload.")
+  }
 
   return waitForFanvueMediaReady(params.accessToken, session.mediaUuid)
 }
@@ -270,7 +609,7 @@ export async function upsertFanvueMediaCache(
       media_type: row.media.mediaType,
       status: row.media.status ?? "processing",
       thumbnail_url: row.media.thumbnailUrl,
-      metadata: {},
+      metadata: { source: "presence" },
       updated_at: new Date().toISOString(),
     },
     { onConflict: "social_connection_id,fanvue_media_uuid" }
@@ -327,4 +666,95 @@ export async function listFanvueVaultFolderMedia(
     items,
     nextCursor: resolveNextPageCursor(response.pagination) ?? response.nextCursor ?? response.cursor ?? null,
   }
+}
+
+export async function createFanvueVaultFolder(accessToken: string, name: string): Promise<FanvueVaultFolder> {
+  const response = await fanvueApiRequest<{ name?: string; mediaCount?: number }>({
+    accessToken,
+    method: "POST",
+    path: "/vault/folders",
+    body: { name: name.trim() },
+  })
+  return {
+    name: response.name?.trim() || name.trim(),
+    mediaCount: response.mediaCount ?? 0,
+  }
+}
+
+export async function renameFanvueVaultFolder(
+  accessToken: string,
+  folderName: string,
+  nextName: string
+): Promise<FanvueVaultFolder> {
+  const response = await fanvueApiRequest<{ name?: string; mediaCount?: number }>({
+    accessToken,
+    method: "PATCH",
+    path: `/vault/folders/${encodeURIComponent(folderName)}`,
+    body: { name: nextName.trim() },
+  })
+  return {
+    name: response.name?.trim() || nextName.trim(),
+    mediaCount: response.mediaCount ?? null,
+  }
+}
+
+export async function deleteFanvueVaultFolder(accessToken: string, folderName: string): Promise<void> {
+  await fanvueApiRequest({
+    accessToken,
+    method: "DELETE",
+    path: `/vault/folders/${encodeURIComponent(folderName)}`,
+  })
+}
+
+export async function addMediaToFanvueVaultFolder(
+  accessToken: string,
+  folderName: string,
+  mediaUuids: string[]
+): Promise<void> {
+  await fanvueApiRequest({
+    accessToken,
+    method: "POST",
+    path: `/vault/folders/${encodeURIComponent(folderName)}/media`,
+    body: { mediaUuids },
+  })
+}
+
+export async function removeMediaFromFanvueVaultFolder(
+  accessToken: string,
+  folderName: string,
+  mediaUuid: string
+): Promise<void> {
+  await fanvueApiRequest({
+    accessToken,
+    method: "DELETE",
+    path: `/vault/folders/${encodeURIComponent(folderName)}/media/${encodeURIComponent(mediaUuid)}`,
+  })
+}
+
+export async function listPresenceUploadedMediaUuids(
+  supabase: SupabaseClient,
+  params: { userId: string; socialConnectionId: string }
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("fanvue_media_cache")
+    .select("fanvue_media_uuid")
+    .eq("user_id", params.userId)
+    .eq("social_connection_id", params.socialConnectionId)
+
+  if (error) {
+    console.error("[fanvue/media] cache lookup failed:", error)
+    return new Set()
+  }
+
+  return new Set((data ?? []).map((row) => row.fanvue_media_uuid).filter(Boolean))
+}
+
+export function annotateFanvueMediaSources(
+  items: FanvueMediaListItem[],
+  presenceUuids: Set<string>
+): FanvueMediaListItem[] {
+  return items.map((item) => ({
+    ...item,
+    mediaSource: presenceUuids.has(item.uuid) ? "presence" : "fanvue",
+  }))
 }

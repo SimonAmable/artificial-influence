@@ -8,12 +8,13 @@ import {
   endOfWeek,
   format,
   isSameMonth,
+  isBefore,
   isToday,
   startOfDay,
   startOfMonth,
   startOfWeek,
 } from "date-fns"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 
 import type { AutopostJobRow } from "@/components/autopost/autopost-page"
 import { Button } from "@/components/ui/button"
@@ -51,7 +52,7 @@ export function getJobCalendarAnchor(job: AutopostJobRow): Date | null {
 
 function providerIconSrc(provider: string | null | undefined) {
   if (provider === "tiktok") return "/brand_icons/tiktok-icon.svg"
-  if (provider === "fanvue") return "/brand_icons/fanvue-icon.svg"
+  if (provider === "fanvue") return "/brand_icons/fanvue_logo.png"
   return "/brand_icons/instagram-icon.svg"
 }
 
@@ -60,6 +61,7 @@ export type AutopostPostsCalendarProps = {
   month: Date
   onMonthChange: (nextMonth: Date) => void
   onPostClick: (job: AutopostJobRow) => void
+  onDayClick?: (day: Date) => void
   getJobMediaPreview: (job: AutopostJobRow) => { url: string; kind: "image" | "video" } | null
   className?: string
 }
@@ -69,6 +71,7 @@ export function AutopostPostsCalendar({
   month,
   onMonthChange,
   onPostClick,
+  onDayClick,
   getJobMediaPreview,
   className,
 }: AutopostPostsCalendarProps) {
@@ -114,6 +117,7 @@ export function AutopostPostsCalendar({
   }, [month])
 
   const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  const todayStart = startOfDay(new Date())
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
@@ -161,12 +165,34 @@ export function AutopostPostsCalendar({
           const expanded = expandedDayKeys.has(dayKey)
           const visibleCap = expanded ? dayJobs.length : VISIBLE_PILLS_PER_DAY
 
+          const isPastDay = isBefore(startOfDay(day), todayStart)
+          const canCreateOnDay = Boolean(onDayClick && inMonth && !isPastDay)
+
           return (
             <div
               key={day.toISOString()}
+              role={canCreateOnDay ? "button" : undefined}
+              tabIndex={canCreateOnDay ? 0 : undefined}
+              aria-label={
+                canCreateOnDay ? `Create post for ${format(day, "MMMM d, yyyy")}` : undefined
+              }
+              onClick={canCreateOnDay ? () => onDayClick?.(day) : undefined}
+              onKeyDown={
+                canCreateOnDay
+                  ? (event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault()
+                        onDayClick?.(day)
+                      }
+                    }
+                  : undefined
+              }
               className={cn(
-                "flex min-h-[104px] flex-col gap-1 bg-background p-1.5 sm:min-h-[120px] sm:p-2",
+                "group/day relative flex min-h-[104px] flex-col gap-1 bg-background p-1.5 sm:min-h-[120px] sm:p-2",
                 !inMonth && "bg-muted/20",
+                isPastDay && inMonth && "bg-muted/10",
+                canCreateOnDay &&
+                  "cursor-pointer transition-colors hover:bg-muted/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40",
               )}
             >
               <div className="flex justify-end">
@@ -183,13 +209,33 @@ export function AutopostPostsCalendar({
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
+                {dayJobs.length === 0 && canCreateOnDay ? (
+                  <div
+                    className={cn(
+                      "flex w-full min-w-0 items-center gap-1.5 rounded-full border border-dashed border-border/60 bg-muted/15 px-1.5 py-1 opacity-0 transition-all",
+                      "group-hover/day:border-primary/40 group-hover/day:bg-muted/30 group-hover/day:opacity-100",
+                      "group-focus-visible/day:border-primary/40 group-focus-visible/day:bg-muted/30 group-focus-visible/day:opacity-100",
+                    )}
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-colors group-hover/day:bg-muted/70 group-hover/day:text-foreground">
+                      <Plus className="h-3.5 w-3.5" aria-hidden />
+                    </span>
+                    <span className="truncate text-[10px] font-medium text-muted-foreground transition-colors group-hover/day:text-foreground">
+                      Create post
+                    </span>
+                  </div>
+                ) : null}
+
                 {dayJobs.slice(0, visibleCap).map(({ job, at }) => {
                   const preview = getJobMediaPreview(job)
                   return (
                     <button
                       key={job.id}
                       type="button"
-                      onClick={() => onPostClick(job)}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onPostClick(job)
+                      }}
                       className={cn(
                         "flex w-full min-w-0 items-center gap-1.5 rounded-full border border-border/60 bg-muted/25 px-1 py-0.5 text-left transition-colors",
                         "hover:border-primary/40 hover:bg-muted/40",
@@ -228,7 +274,7 @@ export function AutopostPostsCalendar({
                         aria-hidden
                         className={cn(
                           "shrink-0 opacity-90",
-                          job.provider !== "tiktok" && "dark:invert",
+                          job.provider === "instagram" && "dark:invert",
                         )}
                         height={14}
                         src={providerIconSrc(job.provider)}
@@ -250,7 +296,10 @@ export function AutopostPostsCalendar({
                         ? "Collapse extra posts for this day"
                         : `Show ${dayJobs.length - VISIBLE_PILLS_PER_DAY} more posts for this day`
                     }
-                    onClick={() => toggleDayExpanded(dayKey)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      toggleDayExpanded(dayKey)
+                    }}
                   >
                     {expanded
                       ? "Show less"

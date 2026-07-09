@@ -177,7 +177,7 @@ export function OnboardingLearnScreen({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
-                      <PlayCircle className="size-5 text-primary" weight="duotone" />
+                      <PlayCircle className="size-5 text-primary" weight="regular" />
                       Preview transcript
                     </CardTitle>
                     <CardDescription className="mt-2 max-w-2xl leading-6">

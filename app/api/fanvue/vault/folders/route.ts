@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { listFanvueVaultFolders } from "@/lib/fanvue/media"
+import { createFanvueVaultFolder, listFanvueVaultFolders } from "@/lib/fanvue/media"
 import { getValidFanvueAccessToken } from "@/lib/fanvue/token-service"
 import { requirePresenceProductResponse } from "@/lib/product/require-presence"
 import { createClient } from "@/lib/supabase/server"
@@ -37,6 +37,48 @@ export async function GET(request: Request) {
     console.error("[fanvue/vault/folders] GET exception:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to load Fanvue vault folders." },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: Request) {
+  const blocked = requirePresenceProductResponse()
+  if (blocked) return blocked
+
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 })
+    }
+
+    const body = (await request.json()) as { connectionId?: string; name?: string }
+    const connectionId = body.connectionId?.trim() ?? ""
+    const name = body.name?.trim() ?? ""
+
+    if (!connectionId) {
+      return NextResponse.json({ error: "connectionId is required." }, { status: 400 })
+    }
+    if (!name) {
+      return NextResponse.json({ error: "name is required." }, { status: 400 })
+    }
+
+    const token = await getValidFanvueAccessToken(supabase, {
+      connectionId,
+      userId: user.id,
+    })
+
+    const folder = await createFanvueVaultFolder(token.accessToken, name)
+    return NextResponse.json({ folder })
+  } catch (error) {
+    console.error("[fanvue/vault/folders] POST exception:", error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to create vault folder." },
       { status: 500 }
     )
   }

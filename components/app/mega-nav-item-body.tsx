@@ -111,7 +111,7 @@ export function MegaNavItemBody({ item }: { item: MegaNavItem }) {
           )}
         >
           {PhosphorIcon ? (
-            <PhosphorIcon className="h-[18px] w-[18px] text-foreground" weight="duotone" />
+            <PhosphorIcon className="h-[18px] w-[18px] text-foreground" weight="regular" />
           ) : item.iconSrc ? (
             <Image
               src={item.iconSrc}

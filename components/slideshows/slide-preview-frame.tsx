@@ -52,7 +52,7 @@ export function SlidePreviewFrame({
           {slide.status === "resolving" ? (
             <CircleNotch className="h-6 w-6 animate-spin" />
           ) : (
-            <ImageIcon className="h-6 w-6" weight="duotone" />
+            <ImageIcon className="h-6 w-6" weight="regular" />
           )}
           <span>{slide.status}</span>
         </div>

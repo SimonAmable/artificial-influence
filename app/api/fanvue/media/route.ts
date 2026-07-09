@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { listFanvueMedia } from "@/lib/fanvue/media"
+import { loadHydratedFanvueMedia } from "@/lib/fanvue/media"
 import { getValidFanvueAccessToken } from "@/lib/fanvue/token-service"
 import { requirePresenceProductResponse } from "@/lib/product/require-presence"
 import { createClient } from "@/lib/supabase/server"
@@ -25,6 +25,7 @@ export async function GET(request: Request) {
     const cursor = requestUrl.searchParams.get("cursor")?.trim() || undefined
     const query = requestUrl.searchParams.get("q")?.trim().toLowerCase() ?? ""
     const mediaType = requestUrl.searchParams.get("mediaType")?.trim() || undefined
+    const mediaSource = requestUrl.searchParams.get("mediaSource")?.trim() || undefined
 
     if (!connectionId) {
       return NextResponse.json({ error: "connectionId is required." }, { status: 400 })
@@ -35,10 +36,20 @@ export async function GET(request: Request) {
       userId: user.id,
     })
 
-    const { items, nextCursor } = await listFanvueMedia(token.accessToken, { cursor, limit: 50 })
+    const { items, nextCursor } = await loadHydratedFanvueMedia({
+      supabase,
+      accessToken: token.accessToken,
+      userId: user.id,
+      socialConnectionId: connectionId,
+      cursor,
+      limit: 50,
+      singlePage: Boolean(cursor),
+    })
 
     const filtered = items.filter((item) => {
       if (mediaType && item.mediaType !== mediaType) return false
+      if (mediaSource === "presence" && item.mediaSource !== "presence") return false
+      if (mediaSource === "fanvue" && item.mediaSource !== "fanvue") return false
       if (!query) return true
       const haystack = `${item.name ?? ""} ${item.filename ?? ""}`.toLowerCase()
       return haystack.includes(query)

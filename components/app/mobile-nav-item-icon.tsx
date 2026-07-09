@@ -45,7 +45,7 @@ export function MobileNavItemIcon({ item, className }: { item: MegaNavItem; clas
   const PhosphorIcon = item.iconPhosphor ? MEGA_NAV_PHOSPHOR[item.iconPhosphor] : null
 
   if (PhosphorIcon) {
-    return <PhosphorIcon className={cn("size-4 shrink-0", className)} weight="duotone" aria-hidden />
+    return <PhosphorIcon className={cn("size-4 shrink-0", className)} weight="regular" aria-hidden />
   }
 
   if (item.iconSrc) {

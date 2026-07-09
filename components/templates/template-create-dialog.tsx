@@ -67,7 +67,7 @@ export function TemplateCreateDialog({ currentUserId }: TemplateCreateDialogProp
                 : `/login?next=${encodeURIComponent(createTemplateNextPath)}`
             }
           >
-            <FilePlus className="h-4 w-4" weight="duotone" />
+            <FilePlus className="h-4 w-4" weight="regular" />
             Create manually
           </Link>
         </Button>
@@ -75,13 +75,13 @@ export function TemplateCreateDialog({ currentUserId }: TemplateCreateDialogProp
 
         {isSignedIn ? (
           <Button className="rounded-full px-5" onClick={() => handleRequestDialogOpenChange(true)}>
-            <Sparkle className="h-4 w-4" weight="duotone" />
+            <Sparkle className="h-4 w-4" weight="regular" />
             Request template
           </Button>
         ) : (
           <Button asChild className="rounded-full px-5">
             <Link href={`/login?next=${encodeURIComponent(requestTemplateNextPath)}`}>
-              <Sparkle className="h-4 w-4" weight="duotone" />
+              <Sparkle className="h-4 w-4" weight="regular" />
               Request template
             </Link>
           </Button>

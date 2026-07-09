@@ -14,6 +14,10 @@ import {
 import { MegaNavItemBody, MenuBadge } from "@/components/app/mega-nav-item-body"
 import { MobileAppSidebar } from "@/components/app/mobile-app-sidebar"
 import { cn } from "@/lib/utils"
+import {
+  HeaderIconButton,
+  HeaderPillButton,
+} from "@/components/app/header-controls"
 import { Button } from "@/components/ui/button"
 import { SettingsDropdown } from "@/components/app/settings-dropdown"
 import { GlobalSearchCommand } from "@/components/app/global-search-command"
@@ -36,13 +40,6 @@ import {
   type SettingsTab,
 } from "@/components/profile/profile-settings-modal"
 import { useNotificationsRead } from "@/lib/notifications/use-notifications-read"
-
-/** Matches signed-in header pills (credits, search) and icon controls for one surface style. */
-const signedInHeaderPillClassName =
-  "h-auto min-h-9 rounded-full border border-border/70 bg-secondary/40 px-3 py-1.5 text-sm font-semibold text-foreground shadow-sm backdrop-blur-md transition-colors hover:bg-secondary/70 hover:text-foreground aria-expanded:bg-secondary/50"
-
-const signedInHeaderIconButtonClassName =
-  "border-border/70 bg-background/70 shadow-md backdrop-blur-md hover:bg-background/90 aria-expanded:bg-background/90"
 
 function isGroupActive(pathname: string, group: MegaNavGroup) {
   if (group.path && pathname === group.path) return true
@@ -349,15 +346,14 @@ export function Header() {
           <div className="xl:hidden">
             <React.Suspense
               fallback={
-                <Button
-                  variant="outline"
-                  className={cn("justify-between gap-2", signedInHeaderIconButtonClassName)}
+                <HeaderPillButton
+                  className="justify-between gap-2"
                   disabled
                   type="button"
                 >
                   <span className="min-w-16 select-none text-muted-foreground">Menu</span>
                   <CaretDownIcon className="h-4 w-4 opacity-50" />
-                </Button>
+                </HeaderPillButton>
               }
             >
               <MobileAppSidebar
@@ -371,12 +367,9 @@ export function Header() {
           <GlobalSearchCommand />
           {loading ? null : user ? (
             <>
-              <button
+              <HeaderPillButton
                 type="button"
-                className={cn(
-                  "hidden sm:inline-flex shrink-0 items-center gap-1.5 tabular-nums",
-                  signedInHeaderPillClassName
-                )}
+                className="hidden shrink-0 items-center gap-1.5 tabular-nums sm:inline-flex"
                 aria-label={
                   credits !== null
                     ? `${credits.toLocaleString()} credits — open plans and buy more`
@@ -389,7 +382,7 @@ export function Header() {
               >
                 <Coin
                   className="h-4 w-4 shrink-0 text-muted-foreground"
-                  weight="duotone"
+                  weight="regular"
                 />
                 {credits !== null ? (
                   <span>{credits.toLocaleString()}</span>
@@ -399,25 +392,22 @@ export function Header() {
                     aria-hidden
                   />
                 )}
-              </button>
-              <Button
-                variant="outline"
-                size="icon"
+              </HeaderPillButton>
+              <HeaderIconButton
                 asChild
-                className={cn(
-                  signedInHeaderIconButtonClassName,
-                  (pathname === "/history" || pathname === "/assets") && "bg-secondary/70"
-                )}
+                className={
+                  pathname === "/history" || pathname === "/assets"
+                    ? "bg-secondary/70"
+                    : undefined
+                }
               >
                 <Link href="/assets?tab=history" aria-label="Open library history">
                   <FolderSimple className="h-[1.2rem] w-[1.2rem]" />
                 </Link>
-              </Button>
-              <Button
+              </HeaderIconButton>
+              <HeaderIconButton
                 type="button"
-                variant="outline"
-                size="icon"
-                className={cn("relative", signedInHeaderIconButtonClassName)}
+                className="relative"
                 aria-label={
                   notificationsUnread
                     ? "Open account settings (unread notifications)"
@@ -435,7 +425,7 @@ export function Header() {
                     aria-hidden
                   />
                 ) : null}
-              </Button>
+              </HeaderIconButton>
             </>
           ) : (
             <>

@@ -1,3 +1,7 @@
+import { currentProduct } from "@/lib/product/current"
+import { presenceStudioProduct } from "@/lib/product/products/presence-studio"
+import type { ProductId } from "@/lib/product/types"
+
 export type ProductUpdateTag = "feature" | "improvement" | "fix"
 
 export type ProductUpdate = {
@@ -19,7 +23,7 @@ export const DEFAULT_PRODUCT_UPDATE_FALLBACK_IMAGE = "/notificaitons/notificatio
 const NOTIFICATION_IMAGE = DEFAULT_PRODUCT_UPDATE_FALLBACK_IMAGE
 const TEMPLATE_IMAGE = "/notificaitons/templates.png" as const
 
-export const PRODUCT_UPDATES: ProductUpdate[] = [
+const UNICAN_PRODUCT_UPDATES: ProductUpdate[] = [
   {
     id: "templates-gallery-2026-05-27",
     title: "Templates",
@@ -43,6 +47,28 @@ export const PRODUCT_UPDATES: ProductUpdate[] = [
     tag: "feature",
   },
 ]
+
+const PRESENCE_STUDIO_PRODUCT_UPDATES: ProductUpdate[] = [
+  {
+    id: "presence-beta-launch-2026-07-08",
+    title: "Beta launch",
+    description:
+      "Welcome to the Presence Studio beta. Create AI influencers, generate character-led content, and build your posting pipeline from one focused studio.",
+    publishedAt: "2026-07-08T12:00:00.000Z",
+    imageSrc: presenceStudioProduct.logo,
+    fallbackImageSrc: presenceStudioProduct.logo,
+    ctaLabel: "Open dashboard",
+    ctaHref: "/dashboard",
+    tag: "feature",
+  },
+]
+
+const PRODUCT_UPDATES_BY_ID: Record<ProductId, ProductUpdate[]> = {
+  unican: UNICAN_PRODUCT_UPDATES,
+  "presence-studio": PRESENCE_STUDIO_PRODUCT_UPDATES,
+}
+
+export const PRODUCT_UPDATES = PRODUCT_UPDATES_BY_ID[currentProduct.id]
 
 function sortByPublishedAtDesc(updates: ProductUpdate[]): ProductUpdate[] {
   return [...updates].sort(

@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import type { UIMessage } from "ai"
@@ -254,7 +254,7 @@ export function ChatBrandPills({
             {ref.previewUrl ? (
               <img src={ref.previewUrl} alt="" className="h-full w-full object-cover" />
             ) : (
-              <Palette className="size-3 text-primary" weight="duotone" aria-hidden />
+              <Palette className="size-3 text-primary" weight="regular" aria-hidden />
             )}
           </span>
           <span className="truncate font-medium">{ref.label}</span>
@@ -293,7 +293,7 @@ export function PinnedSkillPills({
           className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-muted/30 px-2 py-1 text-xs text-foreground"
           title={skill.description}
         >
-          <Books className="size-3.5 shrink-0 text-muted-foreground" weight="duotone" />
+          <Books className="size-3.5 shrink-0 text-muted-foreground" weight="regular" />
           <span className="truncate font-medium">{skill.title?.trim() || skill.slug}</span>
           {onRemove ? (
             <button

@@ -389,10 +389,10 @@ export function DashboardHeroSection({ className }: { className?: string }) {
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center gap-5 py-8 sm:py-12">
         <div className="space-y-3 text-center">
           <h1 className="text-balance text-2xl font-sans font-extrabold normal-case tracking-tight text-foreground sm:text-4xl md:text-5xl">
-            <span>Create at the Speed of Thought</span>
+            <span>Create Anything, Anytime, Anywhere</span>
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Ask Unican for any of image or video, in plain English, and we find the best model and prompt for the job.
+            Ask Unican for any kind of image or video, in plain English, and we find the best model and prompt for the job.
           </p>
         </div>
 

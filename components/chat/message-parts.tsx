@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import Link from "next/link"
@@ -1535,7 +1535,7 @@ export function MessageParts({
                               />
                             ) : asset.assetType === "audio" ? (
                               <div className="flex h-full flex-col items-center justify-center gap-2 bg-muted/80 p-2">
-                                <SpeakerHigh className="size-9 shrink-0 text-muted-foreground" weight="duotone" aria-hidden />
+                                <SpeakerHigh className="size-9 shrink-0 text-muted-foreground" weight="regular" aria-hidden />
                                 {asset.url.trim() ? (
                                   <audio src={asset.url} controls className="h-8 w-full min-w-0 max-w-[200px]" />
                                 ) : (

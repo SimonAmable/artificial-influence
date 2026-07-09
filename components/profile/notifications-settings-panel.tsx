@@ -67,7 +67,7 @@ function NotificationUpdateImage({
         className="flex aspect-[16/10] w-full items-center justify-center rounded-xl border border-border/60 bg-muted/40"
         aria-hidden
       >
-        <Sparkle className="size-8 text-primary/60" weight="duotone" />
+        <Sparkle className="size-8 text-primary/60" weight="regular" />
       </div>
     )
   }

@@ -29,7 +29,7 @@ export function CanvasGroupHeader({
       className="nopan nodrag"
     >
       <div className="rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur-md shadow-xl px-3 py-2 flex items-center gap-2">
-        <Folder className="w-4 h-4 text-zinc-500" weight="duotone" />
+        <Folder className="w-4 h-4 text-zinc-500" weight="regular" />
         <span className="text-xs text-zinc-400 font-medium">
           {groupName}
         </span>

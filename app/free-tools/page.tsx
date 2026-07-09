@@ -58,7 +58,7 @@ export default function FreeToolsPage() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <div className="max-w-3xl">
           <Badge variant="secondary" className="mb-3 w-fit gap-1.5">
-            <ShieldCheck className="size-3.5" weight="duotone" />
+            <ShieldCheck className="size-3.5" weight="regular" />
             Free tools
           </Badge>
           <h1 className="text-3xl font-bold leading-tight sm:text-5xl">

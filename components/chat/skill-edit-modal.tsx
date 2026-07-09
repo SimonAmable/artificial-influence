@@ -144,7 +144,7 @@ export function SkillEditModal({
       <DialogContent className="flex max-h-[min(92dvh,52rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="border-b border-border/60 px-4 py-4 text-left sm:px-6">
           <DialogTitle className="flex items-center gap-2">
-            <PencilSimple className="size-5 shrink-0 opacity-80" weight="duotone" />
+            <PencilSimple className="size-5 shrink-0 opacity-80" weight="regular" />
             Edit skill
           </DialogTitle>
           <DialogDescription>Update the catalog metadata and the SKILL.md instructions.</DialogDescription>

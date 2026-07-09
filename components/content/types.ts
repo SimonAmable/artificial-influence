@@ -37,13 +37,27 @@ export type FanvueMediaItem = {
   uuid: string
   name?: string | null
   filename?: string | null
+  caption?: string | null
   mediaType?: string | null
   status?: string | null
   thumbnailUrl?: string | null
   createdAt?: string | null
+  mediaSource?: "presence" | "fanvue" | null
+  recommendedPrice?: number | null
 }
 
 export type FanvueVaultFolder = {
   name: string
   mediaCount?: number | null
+}
+
+/** Sentinel value for the unified vault view that lists all media. */
+export const VAULT_ALL_FOLDERS = "__all_folders__"
+
+export const VAULT_ALL_FOLDERS_LABEL = "ALL FOLDERS"
+
+export function isVaultAllFoldersSelection(
+  folder: string | null | undefined
+): folder is typeof VAULT_ALL_FOLDERS {
+  return folder === VAULT_ALL_FOLDERS
 }

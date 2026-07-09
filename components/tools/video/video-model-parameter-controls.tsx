@@ -207,7 +207,7 @@ export function VideoModelParameterControls({
             disabled={disabled}
           />
           {isAudioToggle ? (
-            <SpeakerHigh className="size-3.5 shrink-0 text-muted-foreground" weight="duotone" />
+            <SpeakerHigh className="size-3.5 shrink-0 text-muted-foreground" weight="regular" />
           ) : null}
           <Label htmlFor={param.name} className="text-xs cursor-pointer whitespace-nowrap leading-none">
             {isAudioToggle ? "Audio" : param.label}

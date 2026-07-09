@@ -67,7 +67,7 @@ export function CharacterAssetPicker({
         </div>
       ) : (
         <Button type="button" variant="outline" className="w-full gap-2" onClick={() => setOpen(true)}>
-          <User className="h-4 w-4" weight="duotone" />
+          <User className="h-4 w-4" weight="regular" />
           Select character
         </Button>
       )}

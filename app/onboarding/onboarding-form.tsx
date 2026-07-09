@@ -103,21 +103,21 @@ const TEAM_OPTIONS: {
   label: string
   icon: React.ReactNode
 }[] = [
-  { id: "solo", label: "Solo", icon: <User className="size-7" weight="duotone" /> },
+  { id: "solo", label: "Solo", icon: <User className="size-7" weight="regular" /> },
   {
     id: "2-20",
     label: "2 – 20",
-    icon: <Users className="size-7" weight="duotone" />,
+    icon: <Users className="size-7" weight="regular" />,
   },
   {
     id: "21-200",
     label: "21 – 200",
-    icon: <UsersThree className="size-7" weight="duotone" />,
+    icon: <UsersThree className="size-7" weight="regular" />,
   },
   {
     id: "200+",
     label: "200+",
-    icon: <Globe className="size-7" weight="duotone" />,
+    icon: <Globe className="size-7" weight="regular" />,
   },
 ]
 
@@ -129,12 +129,12 @@ const ROLE_OPTIONS: {
   {
     id: "ai_influencer",
     label: "AI influencer",
-    icon: <Sparkle className="size-5" weight="duotone" />,
+    icon: <Sparkle className="size-5" weight="regular" />,
   },
   {
     id: "ai_agency",
     label: "AI agency",
-    icon: <UsersThree className="size-5" weight="duotone" />,
+    icon: <UsersThree className="size-5" weight="regular" />,
   },
   { id: "founder", label: "Founder / owner", icon: <Buildings className="size-5" /> },
   {
@@ -145,7 +145,7 @@ const ROLE_OPTIONS: {
   {
     id: "creator",
     label: "Content creator",
-    icon: <VideoCamera className="size-5" weight="duotone" />,
+    icon: <VideoCamera className="size-5" weight="regular" />,
   },
   { id: "other", label: "Other", icon: <DotsThree className="size-5" weight="bold" /> },
 ]
@@ -172,25 +172,25 @@ const AI_EXPERIENCE_OPTIONS: {
     id: "beginner",
     label: "Beginner",
     description: "Just getting started",
-    icon: <Baby className="size-6" weight="duotone" />,
+    icon: <Baby className="size-6" weight="regular" />,
   },
   {
     id: "intermediate",
     label: "Intermediate",
     description: "Used some AI tools",
-    icon: <Stack className="size-6" weight="duotone" />,
+    icon: <Stack className="size-6" weight="regular" />,
   },
   {
     id: "advanced",
     label: "Advanced",
     description: "Regular AI user",
-    icon: <Lightning className="size-6" weight="duotone" />,
+    icon: <Lightning className="size-6" weight="regular" />,
   },
   {
     id: "expert",
     label: "Expert",
     description: "AI professional",
-    icon: <Crown className="size-6" weight="duotone" />,
+    icon: <Crown className="size-6" weight="regular" />,
   },
 ]
 
@@ -199,25 +199,25 @@ const REFERRAL_OPTIONS: {
   label: string
   icon: React.ReactNode
 }[] = [
-  { id: "tiktok", label: "TikTok", icon: <VideoCamera className="size-6" weight="duotone" /> },
-  { id: "youtube", label: "YouTube", icon: <VideoCamera className="size-6" weight="duotone" /> },
+  { id: "tiktok", label: "TikTok", icon: <VideoCamera className="size-6" weight="regular" /> },
+  { id: "youtube", label: "YouTube", icon: <VideoCamera className="size-6" weight="regular" /> },
   {
     id: "instagram",
     label: "Instagram",
-    icon: <InstagramLogo className="size-6" weight="duotone" />,
+    icon: <InstagramLogo className="size-6" weight="regular" />,
   },
-  { id: "twitter", label: "Twitter / X", icon: <TwitterLogo className="size-6" weight="duotone" /> },
+  { id: "twitter", label: "Twitter / X", icon: <TwitterLogo className="size-6" weight="regular" /> },
   {
     id: "google",
     label: "Google Search",
-    icon: <MagnifyingGlass className="size-6" weight="duotone" />,
+    icon: <MagnifyingGlass className="size-6" weight="regular" />,
   },
   {
     id: "friend",
     label: "Friend / Word of mouth",
-    icon: <Users className="size-6" weight="duotone" />,
+    icon: <Users className="size-6" weight="regular" />,
   },
-  { id: "reddit", label: "Reddit", icon: <Globe className="size-6" weight="duotone" /> },
+  { id: "reddit", label: "Reddit", icon: <Globe className="size-6" weight="regular" /> },
   { id: "other", label: "Other", icon: <DotsThree className="size-6" weight="bold" /> },
 ]
 
@@ -231,25 +231,25 @@ const ONBOARDING_PRIORITY_OPTIONS: {
     id: "video_quality",
     label: "Output quality",
     description: "Sharp visuals, motion, and detail",
-    icon: <Diamond className="size-6" weight="duotone" />,
+    icon: <Diamond className="size-6" weight="regular" />,
   },
   {
     id: "generation_speed",
     label: "Speed",
     description: "Get ideas out fast with short waits",
-    icon: <Gauge className="size-6" weight="duotone" />,
+    icon: <Gauge className="size-6" weight="regular" />,
   },
   {
     id: "ease_of_use",
     label: "Simplicity",
     description: "Clear flows without a steep learning curve",
-    icon: <Hand className="size-6" weight="duotone" />,
+    icon: <Hand className="size-6" weight="regular" />,
   },
   {
     id: "creative_control",
     label: "Creative control",
     description: "Fine-grained steering over style and edits",
-    icon: <Sliders className="size-6" weight="duotone" />,
+    icon: <Sliders className="size-6" weight="regular" />,
   },
 ]
 
@@ -1995,7 +1995,7 @@ export function OnboardingForm({
                       onSelect={influencerOpenCreate}
                       title="Create new"
                       description="Pick a curated starter face from presets"
-                      icon={<Sparkle className="size-7" weight="duotone" />}
+                      icon={<Sparkle className="size-7" weight="regular" />}
                       layoutId={choiceGlowLayoutId(INFLUENCER_ONBOARDING_STEP, "-mode")}
                     />
                     <InfluencerPickCard
@@ -2003,7 +2003,7 @@ export function OnboardingForm({
                       onSelect={influencerOpenUpload}
                       title="Onboard existing"
                       description="Upload reference photos or short clips we save to Characters"
-                      icon={<UploadSimple className="size-7" weight="duotone" />}
+                      icon={<UploadSimple className="size-7" weight="regular" />}
                       layoutId={choiceGlowLayoutId(INFLUENCER_ONBOARDING_STEP, "-mode")}
                     />
                   </div>
@@ -2069,7 +2069,7 @@ export function OnboardingForm({
                       onChange={handleInfluencerFileInputChange}
                     />
                     <div className="flex size-12 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 text-primary">
-                      <UploadSimple className="size-6" weight="duotone" />
+                      <UploadSimple className="size-6" weight="regular" />
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-foreground">Drag and drop, or browse files</p>
@@ -2148,7 +2148,7 @@ export function OnboardingForm({
                       characterUploadBusy && "pointer-events-none opacity-60",
                     )}
                   >
-                    <UploadSimple className="size-10 text-primary" weight="duotone" />
+                    <UploadSimple className="size-10 text-primary" weight="regular" />
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-foreground">Drag and drop, or browse files</p>
                       <p className="text-xs text-muted-foreground">

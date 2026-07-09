@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:presence": "node scripts/run-presence-dev.mjs",
+    "dev:presence:portless": "node scripts/run-presence-dev.mjs --portless",
     "build": "next build",
     "dev:webpack": "next dev --webpack",
     "build:webpack": "next build --webpack",

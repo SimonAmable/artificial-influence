@@ -2066,7 +2066,7 @@ export function CreativeAgentChat({
                               }
                               onClick={() => setSkillLoadModalOpen(true)}
                             >
-                              <Books className="size-4" weight="duotone" />
+                              <Books className="size-4" weight="regular" />
                               <Badge
                                 variant="secondary"
                                 className="h-5 min-w-5 rounded-full px-1.5 text-[10px] font-medium tabular-nums"
@@ -2105,9 +2105,9 @@ export function CreativeAgentChat({
                               }
                             >
                               {generationApprovalMode === "ask" ? (
-                                <HandPalm className="size-4 shrink-0" weight="duotone" />
+                                <HandPalm className="size-4 shrink-0" weight="regular" />
                               ) : (
-                                <Lightning className="size-4 shrink-0" weight="duotone" />
+                                <Lightning className="size-4 shrink-0" weight="regular" />
                               )}
                               <span className="hidden truncate md:inline">
                                 {generationApprovalMode === "ask"
@@ -2124,7 +2124,7 @@ export function CreativeAgentChat({
                               onClick={() => updateGenerationApprovalMode("auto")}
                               className="gap-3"
                             >
-                              <Lightning className="size-4 text-muted-foreground" weight="duotone" />
+                              <Lightning className="size-4 text-muted-foreground" weight="regular" />
                               <span className="min-w-0 flex-1">Auto-run without asking</span>
                               {generationApprovalMode === "auto" ? <Check className="size-4" /> : null}
                             </DropdownMenuItem>
@@ -2132,7 +2132,7 @@ export function CreativeAgentChat({
                               onClick={() => updateGenerationApprovalMode("ask")}
                               className="gap-3"
                             >
-                              <HandPalm className="size-4 text-muted-foreground" weight="duotone" />
+                              <HandPalm className="size-4 text-muted-foreground" weight="regular" />
                               <span className="min-w-0 flex-1">Confirm before running</span>
                               {generationApprovalMode === "ask" ? <Check className="size-4" /> : null}
                             </DropdownMenuItem>

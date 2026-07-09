@@ -248,7 +248,7 @@ export function ImageCompressorTool() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-3xl">
             <Badge variant="secondary" className="mb-3 w-fit gap-1.5">
-              <ImageSquare className="size-3.5" weight="duotone" />
+              <ImageSquare className="size-3.5" weight="regular" />
               Free local tool
             </Badge>
             <h1 className="text-3xl font-bold leading-tight sm:text-5xl">
@@ -341,7 +341,7 @@ export function ImageCompressorTool() {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <span className="flex size-16 items-center justify-center rounded-full border bg-muted text-foreground">
-                    <UploadSimple className="size-7" weight="duotone" />
+                    <UploadSimple className="size-7" weight="regular" />
                   </span>
                   <span className="max-w-md">
                     <span className="block text-lg font-semibold text-foreground">
@@ -434,7 +434,7 @@ export function ImageCompressorTool() {
 
                 <div className="flex flex-col gap-2">
                   <Button onClick={handleCompress} disabled={!selectedImage || isProcessing}>
-                    <ImageSquare className="mr-2 size-4" weight="duotone" />
+                    <ImageSquare className="mr-2 size-4" weight="regular" />
                     {isProcessing ? "Compressing..." : compressedImage ? "Compress again" : "Compress image"}
                   </Button>
                   <Button variant="outline" onClick={handleDownload} disabled={!compressedImage}>

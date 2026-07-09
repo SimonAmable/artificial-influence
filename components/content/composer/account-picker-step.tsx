@@ -56,7 +56,7 @@ export function AccountPickerStep({ connections, onSelect, onConnect }: AccountP
                   </p>
                   <p className="truncate text-xs text-muted-foreground">{label}</p>
                 </div>
-                <Image alt="" aria-hidden src="/brand_icons/fanvue-icon.svg" width={20} height={20} className="ml-auto" />
+                <Image alt="" aria-hidden src="/brand_icons/fanvue_logo.png" width={20} height={20} className="ml-auto" />
               </button>
             )
           })}

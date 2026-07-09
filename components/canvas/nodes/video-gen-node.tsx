@@ -1627,7 +1627,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         >
           <span className="flex items-center text-sm font-medium">
             {isSeedance2Node && !isLipsyncModel ? (
-              <Waveform size={14} className="mr-2 shrink-0" weight="duotone" />
+              <Waveform size={14} className="mr-2 shrink-0" weight="regular" />
             ) : (
               <VideoCamera size={14} className="mr-2 shrink-0" />
             )}

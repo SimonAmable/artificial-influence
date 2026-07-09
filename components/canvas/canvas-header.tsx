@@ -187,7 +187,7 @@ export function CanvasHeader({
               size="icon"
               className="bg-zinc-900/80 backdrop-blur-md border border-white/10 shadow-lg hover:bg-zinc-800/80"
             >
-              <GearSix size={20} weight="duotone" className="text-zinc-300" />
+              <GearSix size={20} weight="regular" className="text-zinc-300" />
               <span className="sr-only">Settings</span>
             </Button>
           </DropdownMenuTrigger>

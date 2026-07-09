@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 
-import { uploadFanvueMediaBuffer, upsertFanvueMediaCache } from "@/lib/fanvue/media"
+import {
+  addMediaToFanvueVaultFolder,
+  uploadFanvueMediaBuffer,
+  upsertFanvueMediaCache,
+} from "@/lib/fanvue/media"
 import { getValidFanvueAccessToken } from "@/lib/fanvue/token-service"
 import { requirePresenceProductResponse } from "@/lib/product/require-presence"
 import { createClient } from "@/lib/supabase/server"
@@ -24,6 +28,7 @@ export async function POST(request: Request) {
 
     const formData = await request.formData()
     const connectionId = String(formData.get("connectionId") ?? "").trim()
+    const folderName = String(formData.get("folderName") ?? "").trim() || null
     const file = formData.get("file")
 
     if (!connectionId) {
@@ -48,6 +53,10 @@ export async function POST(request: Request) {
       displayName: file.name,
       creatorUserUuid: token.connection.provider_account_id,
     })
+
+    if (folderName) {
+      await addMediaToFanvueVaultFolder(token.accessToken, folderName, [media.uuid])
+    }
 
     await upsertFanvueMediaCache(supabase, {
       userId: user.id,

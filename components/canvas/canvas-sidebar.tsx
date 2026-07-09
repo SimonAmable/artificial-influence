@@ -481,7 +481,7 @@ export function CanvasSidebar({
                           <video src={asset.url} className="w-full h-full object-cover" preload="metadata" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-zinc-400">
-                            <SpeakerHigh size={24} weight="duotone" />
+                            <SpeakerHigh size={24} weight="regular" />
                           </div>
                         )}
                       </div>

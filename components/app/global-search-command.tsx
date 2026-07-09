@@ -12,7 +12,7 @@ import {
 } from "@phosphor-icons/react"
 
 import { MegaNavItemBody } from "@/components/app/mega-nav-item-body"
-import { Button } from "@/components/ui/button"
+import { HeaderIconButton, HeaderPillButton } from "@/components/app/header-controls"
 import {
   CommandDialog,
   CommandEmpty,
@@ -46,13 +46,13 @@ function pageToMegaNavItem(item: PageSearchItem): MegaNavItem {
 function TemplatePreview({ template }: { template: Template }) {
   const fallback =
     template.thumbnail_kind === "video" || template.output_kind === "video" ? (
-      <Video className="h-[18px] w-[18px]" weight="duotone" />
+      <Video className="h-[18px] w-[18px]" weight="regular" />
     ) : template.output_kind === "slideshow" ? (
-      <Images className="h-[18px] w-[18px]" weight="duotone" />
+      <Images className="h-[18px] w-[18px]" weight="regular" />
     ) : template.category === "photo" ? (
-      <Sparkle className="h-[18px] w-[18px]" weight="duotone" />
+      <Sparkle className="h-[18px] w-[18px]" weight="regular" />
     ) : (
-      <FlowArrow className="h-[18px] w-[18px]" weight="duotone" />
+      <FlowArrow className="h-[18px] w-[18px]" weight="regular" />
     )
 
   return (
@@ -204,10 +204,9 @@ export function GlobalSearchCommand() {
 
   return (
     <>
-      <Button
+      <HeaderPillButton
         type="button"
-        variant="outline"
-        className="hidden h-9 min-w-0 gap-2 rounded-full border-border/70 bg-secondary/40 px-3 text-muted-foreground shadow-sm backdrop-blur-md hover:bg-secondary/70 hover:text-foreground md:inline-flex"
+        className="hidden min-w-0 gap-2 text-muted-foreground md:inline-flex"
         onClick={() => setOpen(true)}
       >
         <MagnifyingGlass className="h-4 w-4" />
@@ -215,17 +214,15 @@ export function GlobalSearchCommand() {
         <kbd className="hidden rounded-md border border-border/70 bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground lg:inline">
           Ctrl K
         </kbd>
-      </Button>
-      <Button
+      </HeaderPillButton>
+      <HeaderIconButton
         type="button"
-        variant="outline"
-        size="icon"
-        className="size-9 rounded-full border-border/70 bg-secondary/40 shadow-sm backdrop-blur-md md:hidden"
+        className="md:hidden"
         aria-label="Search tools and templates"
         onClick={() => setOpen(true)}
       >
         <MagnifyingGlass className="h-4 w-4" />
-      </Button>
+      </HeaderIconButton>
 
       <CommandDialog
         open={open}

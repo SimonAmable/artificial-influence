@@ -47,7 +47,7 @@ export function SlideTypeIcon({
   className?: string
 }) {
   const Icon = KIND_ICONS[kind]
-  return <Icon className={cn("h-4 w-4", className)} weight="duotone" />
+  return <Icon className={cn("h-4 w-4", className)} weight="regular" />
 }
 
 export function SlideTypePicker({

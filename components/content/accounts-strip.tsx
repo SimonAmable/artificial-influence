@@ -9,12 +9,17 @@ import type { FanvueConnectionItem } from "@/components/content/types"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+const FANVUE_GREEN_BUTTON_CLASS =
+  "bg-[#C6FF00] text-black hover:bg-[#b8f000] dark:bg-[#C6FF00] dark:text-black dark:hover:bg-[#b8f000]"
+
 type AccountsStripProps = {
   connections: FanvueConnectionItem[]
   selectedConnectionId: string | null
   onSelectConnection: (connectionId: string) => void
   isLoading?: boolean
   onRefresh: () => void
+  hideActions?: boolean
+  variant?: "card" | "dialog"
 }
 
 export function ContentAccountsStrip({
@@ -23,6 +28,8 @@ export function ContentAccountsStrip({
   onSelectConnection,
   isLoading,
   onRefresh,
+  hideActions = false,
+  variant = "card",
 }: AccountsStripProps) {
   const [isDisconnecting, setIsDisconnecting] = React.useState(false)
 
@@ -51,26 +58,51 @@ export function ContentAccountsStrip({
     }
   }
 
-  return (
-    <section className="space-y-3 rounded-[28px] border border-border/70 bg-muted/10 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <h2 className="text-sm font-semibold text-foreground">Accounts</h2>
-          <p className="text-sm text-muted-foreground">
-            {connections.length > 0
-              ? "Choose which Fanvue account your library and posts use."
-              : "Connect Fanvue to upload media, organize your vault, and schedule posts."}
-          </p>
+  const content = (
+    <>
+      {variant === "card" ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1">
+            <h2 className="text-sm font-semibold text-foreground">Accounts</h2>
+            <p className="text-sm text-muted-foreground">
+              {connections.length > 0
+                ? "Choose which Fanvue account your library and posts use."
+                : "Connect Fanvue to upload media, organize your vault, and schedule posts."}
+            </p>
+          </div>
+          {!hideActions ? (
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={onRefresh}>
+                Refresh
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className={cn("rounded-full", FANVUE_GREEN_BUTTON_CLASS)}
+                onClick={handleConnect}
+              >
+                <Image alt="" aria-hidden src="/brand_icons/fanvue_logo.png" width={16} height={16} className="rounded-sm" />
+                Connect Fanvue
+              </Button>
+            </div>
+          ) : null}
         </div>
-        <div className="flex items-center gap-2">
+      ) : !hideActions ? (
+        <div className="flex items-center justify-end gap-2">
           <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={onRefresh}>
             Refresh
           </Button>
-          <Button type="button" size="sm" className="rounded-full" onClick={handleConnect}>
+          <Button
+            type="button"
+            size="sm"
+            className={cn("rounded-full", FANVUE_GREEN_BUTTON_CLASS)}
+            onClick={handleConnect}
+          >
+            <Image alt="" aria-hidden src="/brand_icons/fanvue_logo.png" width={16} height={16} className="rounded-sm" />
             Connect Fanvue
           </Button>
         </div>
-      </div>
+      ) : null}
 
       {isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -87,7 +119,7 @@ export function ContentAccountsStrip({
             <p className="text-sm font-semibold text-foreground">Connect Fanvue</p>
             <p className="text-xs text-muted-foreground">Add your creator account to get started.</p>
           </div>
-          <Image alt="" aria-hidden src="/brand_icons/fanvue-icon.svg" width={28} height={28} />
+          <Image alt="" aria-hidden src="/brand_icons/fanvue_logo.png" width={28} height={28} className="rounded-md" />
         </button>
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-1">
@@ -147,6 +179,16 @@ export function ContentAccountsStrip({
           })}
         </div>
       )}
+    </>
+  )
+
+  if (variant === "dialog") {
+    return <div className="space-y-3">{content}</div>
+  }
+
+  return (
+    <section className="space-y-3 rounded-[28px] border border-border/70 bg-muted/10 p-4">
+      {content}
     </section>
   )
 }

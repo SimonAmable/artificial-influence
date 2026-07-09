@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import {
   Bell,
   ChatCircleDots,
@@ -13,6 +14,7 @@ import {
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { AffiliateSettingsPanel } from "@/components/profile/affiliate-settings-panel"
+import { AccountsSettingsPanel } from "@/components/profile/accounts-settings-panel"
 import { CreditsSettingsPanel } from "@/components/profile/credits-settings-panel"
 import { FeedbackSettingsPanel } from "@/components/profile/feedback-settings-panel"
 import { NotificationsSettingsPanel } from "@/components/profile/notifications-settings-panel"
@@ -28,11 +30,13 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
+import { isPresenceProduct } from "@/lib/product/require-presence"
 import { cn } from "@/lib/utils"
 
 export type SettingsTab =
   | "profile"
   | "notifications"
+  | "accounts"
   | "credits"
   | "affiliate"
   | "feedback"
@@ -53,8 +57,15 @@ const SETTINGS_TABS: {
   id: SettingsTab
   label: string
   icon: Icon
+  iconSrc?: string
 }[] = [
   { id: "profile", label: "Profile", icon: User },
+  {
+    id: "accounts",
+    label: "Accounts",
+    icon: User,
+    ...(isPresenceProduct() ? { iconSrc: "/brand_icons/fanvue_logo.png" } : {}),
+  },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "credits", label: "Credits", icon: Coin },
   { id: "affiliate", label: "Affiliate", icon: HandCoins },
@@ -145,6 +156,7 @@ type NavTabButtonProps = {
   tab: SettingsTab
   activeTab: SettingsTab
   icon: Icon
+  iconSrc?: string
   label: string
   onSelect: (tab: SettingsTab) => void
   className?: string
@@ -155,6 +167,7 @@ function NavTabButton({
   tab,
   activeTab,
   icon: Icon,
+  iconSrc,
   label,
   onSelect,
   className,
@@ -174,7 +187,18 @@ function NavTabButton({
         className
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" weight="regular" />
+      {iconSrc ? (
+        <Image
+          src={iconSrc}
+          alt=""
+          aria-hidden
+          width={16}
+          height={16}
+          className="size-4 shrink-0 rounded-sm object-contain"
+        />
+      ) : (
+        <Icon className="h-4 w-4 shrink-0" weight="regular" />
+      )}
       <span className="whitespace-nowrap">{label}</span>
       {showUnreadDot ? (
         <span
@@ -205,13 +229,14 @@ function SettingsTabNav({
           "flex gap-1 overflow-x-auto overscroll-x-contain px-4 pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       )}
     >
-      {SETTINGS_TABS.map(({ id, label, icon }) => (
+      {SETTINGS_TABS.map(({ id, label, icon, iconSrc }) => (
         <NavTabButton
           key={id}
           tab={id}
           activeTab={activeTab}
           onSelect={onSelect}
           icon={icon}
+          iconSrc={iconSrc}
           label={label}
           className={variant === "sidebar" ? "w-full" : undefined}
           showUnreadDot={id === "notifications" && notificationsUnread}
@@ -326,6 +351,8 @@ export function ProfileSettingsModal({
         ) : null
       case "notifications":
         return <NotificationsSettingsPanel variant="modal" onViewed={markNotificationsSeen} />
+      case "accounts":
+        return <AccountsSettingsPanel />
       case "affiliate":
         return <AffiliateSettingsPanel variant="modal" onCloseModal={closeModal} />
       case "feedback":

@@ -23,7 +23,16 @@ function readConfiguredFanvueRedirectUri(): string | undefined {
     process.env.FANVUE_OAUTH_REDIRECT_URI?.trim() ||
     process.env.FANVUE_OAUTH_REDIRECT_URL?.trim()
 
-  return configured || undefined
+  if (configured) {
+    return configured
+  }
+
+  const localPresenceEnabled = process.env.PRESENCE_LOCAL_DEV?.trim() === "1"
+  if (localPresenceEnabled) {
+    return "https://presence.localhost/api/fanvue/callback"
+  }
+
+  return undefined
 }
 
 export function resolveFanvueOAuthRedirectUri(requestUrl: URL): string {

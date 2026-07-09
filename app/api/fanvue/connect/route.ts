@@ -13,12 +13,26 @@ import {
 } from "@/lib/social/oauth-return"
 import { createClient } from "@/lib/supabase/server"
 
+function resolvePublicRequestOrigin(request: Request, requestUrl: URL): string {
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim()
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim()
+  const host = forwardedHost || request.headers.get("host")?.split(",")[0]?.trim()
+
+  if (!host) {
+    return requestUrl.origin
+  }
+
+  const protocol = forwardedProto || requestUrl.protocol.replace(":", "")
+  return `${protocol}://${host}`
+}
+
 export async function GET(request: Request) {
   const blocked = requirePresenceProductResponse()
   if (blocked) return blocked
 
   try {
     const requestUrl = new URL(request.url)
+    const publicRequestOrigin = resolvePublicRequestOrigin(request, requestUrl)
     const supabase = await createClient()
     const {
       data: { user },
@@ -31,7 +45,7 @@ export async function GET(request: Request) {
 
     const redirectUri = resolveFanvueOAuthRedirectUri(requestUrl)
     const oauthOrigin = resolveFanvueOAuthOrigin(requestUrl)
-    if (oauthOrigin !== requestUrl.origin) {
+    if (oauthOrigin !== publicRequestOrigin) {
       const canonicalConnect = new URL(`${requestUrl.pathname}${requestUrl.search}`, oauthOrigin)
       return NextResponse.redirect(canonicalConnect.toString(), 302)
     }

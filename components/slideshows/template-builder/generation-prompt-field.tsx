@@ -241,7 +241,7 @@ export function GenerationPromptField({
                 </>
               ) : (
                 <>
-                  <User className="h-3.5 w-3.5" weight="duotone" />
+                  <User className="h-3.5 w-3.5" weight="regular" />
                   Select character
                 </>
               )}

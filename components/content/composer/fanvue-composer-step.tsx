@@ -6,6 +6,7 @@ import { CalendarIcon, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import type { FanvueConnectionItem, FanvueMediaItem } from "@/components/content/types"
+import { FanvueAccountSelect } from "@/components/content/composer/fanvue-account-select"
 import { VaultMediaPicker } from "@/components/content/composer/vault-media-picker"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -26,25 +27,69 @@ import { cn } from "@/lib/utils"
 
 type FanvueComposerStepProps = {
   connection: FanvueConnectionItem
-  onBack: () => void
+  connections: FanvueConnectionItem[]
+  onConnectionChange: (connection: FanvueConnectionItem) => void
   onSuccess: () => void
   onGoToMediaTab: () => void
+  initialScheduleDate?: Date
+  defaultComposerTab?: "now" | "schedule"
+  preselectedMediaUuid?: string | null
 }
 
-export function FanvueComposerStep({ connection, onBack, onSuccess, onGoToMediaTab }: FanvueComposerStepProps) {
+export function FanvueComposerStep({
+  connection,
+  connections,
+  onConnectionChange,
+  onSuccess,
+  onGoToMediaTab,
+  initialScheduleDate,
+  defaultComposerTab = "now",
+  preselectedMediaUuid = null,
+}: FanvueComposerStepProps) {
   const [caption, setCaption] = React.useState("")
   const [audience, setAudience] = React.useState<"subscribers" | "followers-and-subscribers">("subscribers")
   const [selectedMedia, setSelectedMedia] = React.useState<FanvueMediaItem | null>(null)
   const [previewMedia, setPreviewMedia] = React.useState<FanvueMediaItem | null>(null)
   const [isPaid, setIsPaid] = React.useState(false)
   const [priceDollars, setPriceDollars] = React.useState("5")
-  const [composerTab, setComposerTab] = React.useState<"now" | "schedule">("now")
-  const [scheduleDate, setScheduleDate] = React.useState<Date>(() => new Date(Date.now() + 60 * 60 * 1000))
-  const [scheduleHour, setScheduleHour] = React.useState(String(new Date(Date.now() + 60 * 60 * 1000).getHours()))
+  const [composerTab, setComposerTab] = React.useState<"now" | "schedule">(defaultComposerTab)
+  const [scheduleDate, setScheduleDate] = React.useState<Date>(
+    () => initialScheduleDate ?? new Date(Date.now() + 60 * 60 * 1000)
+  )
+  const [scheduleHour, setScheduleHour] = React.useState(
+    String((initialScheduleDate ?? new Date(Date.now() + 60 * 60 * 1000)).getHours())
+  )
   const [scheduleMinute, setScheduleMinute] = React.useState(
-    String(new Date(Date.now() + 60 * 60 * 1000).getMinutes())
+    String((initialScheduleDate ?? new Date(Date.now() + 60 * 60 * 1000)).getMinutes())
   )
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!preselectedMediaUuid || selectedMedia) return
+
+    let cancelled = false
+    void fetch(`/api/fanvue/media?connectionId=${encodeURIComponent(connection.id)}`, { cache: "no-store" })
+      .then(async (response) => {
+        const data = (await response.json()) as { items?: FanvueMediaItem[] }
+        if (!response.ok || cancelled) return
+        const match = (data.items ?? []).find((item) => item.uuid === preselectedMediaUuid)
+        if (match) {
+          setSelectedMedia(match)
+        }
+      })
+      .catch(() => undefined)
+
+    return () => {
+      cancelled = true
+    }
+  }, [connection.id, preselectedMediaUuid, selectedMedia])
+
+  const handleConnectionChange = (next: FanvueConnectionItem) => {
+    if (next.id === connection.id) return
+    setSelectedMedia(null)
+    setPreviewMedia(null)
+    onConnectionChange(next)
+  }
 
   const priceCents = React.useMemo(() => {
     const parsed = Number.parseFloat(priceDollars)
@@ -109,31 +154,27 @@ export function FanvueComposerStep({ connection, onBack, onSuccess, onGoToMediaT
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="text-lg font-semibold text-foreground">Create Fanvue post</h3>
-          <p className="text-sm text-muted-foreground">
-            Posting to {connection.displayName || connection.username || "your Fanvue account"}
-          </p>
-        </div>
-        <Button type="button" variant="ghost" size="sm" className="rounded-full" onClick={onBack}>
-          Change account
-        </Button>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-muted-foreground">Posting as</Label>
+        <FanvueAccountSelect
+          connections={connections}
+          value={connection.id}
+          onValueChange={handleConnectionChange}
+        />
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <Label className="text-base font-semibold">Vault media</Label>
-          <Button type="button" variant="link" className="h-auto px-0" onClick={onGoToMediaTab}>
-            Upload in Media tab
-          </Button>
-        </div>
+        <Label className="text-base font-semibold">Vault media</Label>
         <VaultMediaPicker
           connectionId={connection.id}
           selectedMediaUuid={selectedMedia?.uuid ?? null}
           previewMediaUuid={previewMedia?.uuid ?? null}
           onSelectMedia={setSelectedMedia}
+          onUploaded={setSelectedMedia}
         />
+        <Button type="button" variant="link" className="h-auto px-0 text-xs text-muted-foreground" onClick={onGoToMediaTab}>
+          Browse full media library
+        </Button>
       </div>
 
       <div className="space-y-2">
@@ -189,6 +230,7 @@ export function FanvueComposerStep({ connection, onBack, onSuccess, onGoToMediaT
                 previewMediaUuid={previewMedia?.uuid ?? null}
                 previewMode
                 onSelectPreview={setPreviewMedia}
+                onUploaded={setPreviewMedia}
               />
             </div>
           </div>

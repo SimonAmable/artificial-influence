@@ -49,6 +49,11 @@ import { useAIChatDockInsetRight } from "@/components/ai-chat"
 import { SavedExamplesGallery } from "@/components/image/saved-examples-gallery"
 import type { SavedExample } from "@/lib/examples/types"
 import {
+  FanvueImageActionDialog,
+  type FanvueImageActionMode,
+} from "@/components/content/fanvue-image-action-dialog"
+import { currentProduct } from "@/lib/product/current"
+import {
   getParameterDefault,
   parseModelParameters,
   type Model,
@@ -323,6 +328,10 @@ function ImagePageContent() {
   const [saveExampleDialogOpen, setSaveExampleDialogOpen] = React.useState(false)
   const [saveExampleSnapshot, setSaveExampleSnapshot] = React.useState<SaveExampleSnapshot | null>(null)
   const [imageEditorOpen, setImageEditorOpen] = React.useState(false)
+  const [fanvueActionOpen, setFanvueActionOpen] = React.useState(false)
+  const [fanvueActionMode, setFanvueActionMode] = React.useState<FanvueImageActionMode>("vault")
+  const [fanvueActionImageUrl, setFanvueActionImageUrl] = React.useState<string | null>(null)
+  const showFanvueContentActions = currentProduct.id === "presence-studio"
   const [imageEditorUrl, setImageEditorUrl] = React.useState<string | null>(null)
 
   // Upscale: which image is currently upscaling (by URL)
@@ -1201,6 +1210,23 @@ function ImagePageContent() {
     return [...generating, ...completed]
   }, [historyImages, pendingRequests])
 
+  const openFanvueAction = React.useCallback((mode: FanvueImageActionMode, imageUrl: string) => {
+    setFanvueActionMode(mode)
+    setFanvueActionImageUrl(imageUrl)
+    setFanvueActionOpen(true)
+  }, [])
+
+  const fanvueActions = React.useMemo(
+    () =>
+      showFanvueContentActions
+        ? {
+            onSendToVault: (imageUrl: string) => openFanvueAction("vault", imageUrl),
+            onCreatePost: (imageUrl: string) => openFanvueAction("post", imageUrl),
+          }
+        : undefined,
+    [openFanvueAction, showFanvueContentActions]
+  )
+
   const renderHistoryGrid = () => {
     const hasImages = historyImages.length > 0
     const hasItems = gridItems.length > 0
@@ -1229,6 +1255,7 @@ function ImagePageContent() {
           removingMetadataImageUrl={removingMetadataImageUrl}
           showColumnSlider={false}
           columnCount={libraryColumnCount}
+          fanvueActions={fanvueActions}
         />
       )
     }
@@ -1523,6 +1550,15 @@ function ImagePageContent() {
           })()
         }}
       />
+
+      {showFanvueContentActions ? (
+        <FanvueImageActionDialog
+          open={fanvueActionOpen}
+          onOpenChange={setFanvueActionOpen}
+          mode={fanvueActionMode}
+          imageUrl={fanvueActionImageUrl}
+        />
+      ) : null}
     </div>
   )
 }

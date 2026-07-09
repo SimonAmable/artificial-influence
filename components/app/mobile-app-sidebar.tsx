@@ -24,7 +24,7 @@ import {
 } from "@phosphor-icons/react"
 
 import { MenuBadge } from "@/components/app/mega-nav-item-body"
-import { Button } from "@/components/ui/button"
+import { HeaderPillButton } from "@/components/app/header-controls"
 import {
   Sheet,
   SheetContent,
@@ -43,11 +43,13 @@ import {
   SidebarProvider,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { isAiMonochromeIconPath } from "@/lib/constants/ai-vendor-icons"
 import {
   getMobileNavTriggerLabel,
   isPageInMegaNavigation,
   megaNavPathMatches,
 } from "@/lib/navigation/mobile-sidebar"
+import { cn } from "@/lib/utils"
 import { currentProduct } from "@/lib/product/current"
 import type { ProductId } from "@/lib/product/types"
 import { isRouteVisibleForProduct, isVisibleByProductMetadata } from "@/lib/product/visibility"
@@ -59,7 +61,8 @@ type NavBadge = "new" | "beta"
 interface FlatNavItem {
   path: string
   label: string
-  icon: React.ElementType
+  icon?: React.ElementType
+  iconSrc?: string
   badge?: NavBadge
   products?: ProductId[]
   hiddenFor?: ProductId[]
@@ -70,7 +73,7 @@ const FLAT_NAV_ITEMS: FlatNavItem[] = [
   { path: "/automations",   label: "Automations",   icon: RobotIcon,       badge: "beta" },
   { path: "/templates",     label: "Templates",     icon: FlowArrow,       badge: "new"  },
   { path: "/slideshows",    label: "Slideshows",    icon: SquaresFour,     badge: "new"  },
-  { path: "/content",       label: "Content",       icon: Palette,         badge: "new", products: ["presence-studio"] },
+  { path: "/content",       label: "Content",       iconSrc: "/brand_icons/fanvue_logo.png", badge: "new", products: ["presence-studio"] },
   { path: "/autopost",      label: "Autopost",      icon: PaperPlaneTilt,  badge: "new", hiddenFor: ["presence-studio"] },
   { path: "/ai-influencer", label: "AI Influencer", icon: RobotIcon,       badge: "new"  },
   { path: "/explore",       label: "Explore",       icon: MagnifyingGlass, badge: "new"  },
@@ -91,6 +94,44 @@ function getMobileFlatNavItems(product = currentProduct): FlatNavItem[] {
   )
 }
 
+// ─── Icon rendering ───────────────────────────────────────────────────────────
+
+function FlatNavItemIcon({
+  item,
+  className,
+  fallback: Fallback = SquaresFour,
+}: {
+  item: Pick<FlatNavItem, "icon" | "iconSrc" | "path">
+  className?: string
+  fallback?: React.ElementType
+}) {
+  const Icon = item.icon
+
+  if (item.iconSrc) {
+    return (
+      <Image
+        src={item.iconSrc}
+        alt=""
+        width={16}
+        height={16}
+        className={cn(
+          "size-4 shrink-0 object-contain",
+          isAiMonochromeIconPath(item.iconSrc) && "brightness-0 dark:invert",
+          item.path === "/brand" && "invert",
+          className,
+        )}
+        aria-hidden
+      />
+    )
+  }
+
+  if (Icon) {
+    return <Icon className={cn("size-4 shrink-0", className)} weight="regular" aria-hidden />
+  }
+
+  return <Fallback className={cn("size-4 shrink-0", className)} weight="regular" aria-hidden />
+}
+
 // ─── Single nav item ──────────────────────────────────────────────────────────
 
 function FlatNavLink({
@@ -105,13 +146,12 @@ function FlatNavLink({
   onNavigate: () => void
 }) {
   const active = megaNavPathMatches(pathname, search, item.path)
-  const Icon = item.icon
 
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={active}>
         <Link href={item.path} onClick={onNavigate}>
-          <Icon className="size-4 shrink-0" weight="duotone" aria-hidden />
+          <FlatNavItemIcon item={item} />
           <span className="truncate font-bold">{item.label}</span>
           {item.badge ? (
             <span className="ml-auto shrink-0">
@@ -208,7 +248,7 @@ function MobileNavSheetBody({
                   onOpenProfileModal?.()
                 }}
               >
-                <User className="size-4 shrink-0" weight="duotone" aria-hidden />
+                <User className="size-4 shrink-0" weight="regular" aria-hidden />
                 <span className="font-bold">Profile &amp; settings</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -233,19 +273,29 @@ function MobileNavTriggerButton({
 
   const triggerLabel = getMobileNavTriggerLabel(pathname, search, authenticated)
   const isKnown = isPageInMegaNavigation(pathname, search, authenticated)
+  const triggerItem = getMobileFlatNavItems().find((item) =>
+    megaNavPathMatches(pathname, search, item.path),
+  )
 
   return (
-    <Button
+    <HeaderPillButton
       type="button"
-      variant="outline"
-      className="justify-between gap-2 border-border/70 bg-background/70 shadow-md backdrop-blur-md hover:bg-background/90"
+      data-icon="inline-start"
+      className="justify-between gap-2"
       aria-expanded={openMobile}
       aria-controls="mobile-app-sidebar"
       onClick={() => setOpenMobile(true)}
     >
-      <span>{isKnown ? triggerLabel : "Tools"}</span>
+      <span className="inline-flex min-w-0 items-center gap-2">
+        {triggerItem ? (
+          <FlatNavItemIcon item={triggerItem} className="opacity-70" />
+        ) : (
+          <SquaresFour className="h-4 w-4 shrink-0 opacity-70" weight="regular" aria-hidden />
+        )}
+        <span className="truncate">{isKnown ? triggerLabel : "Tools"}</span>
+      </span>
       <CaretDownIcon className="h-4 w-4 opacity-50" />
-    </Button>
+    </HeaderPillButton>
   )
 }
 

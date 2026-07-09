@@ -108,7 +108,7 @@ export function TemplatePreviewModal({
           <div className="flex flex-col p-6">
             <div className="mb-5">
               <div className="flex items-center gap-2">
-                <Sparkle className="h-5 w-5 text-primary" weight="duotone" />
+                <Sparkle className="h-5 w-5 text-primary" weight="regular" />
                 <h2 className="text-xl font-semibold">{template.name}</h2>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -176,7 +176,7 @@ export function TemplatePreviewModal({
             </div>
 
             <Button className="mt-auto w-full" onClick={() => onUseTemplate(template)}>
-              <Sparkle className="mr-2 h-4 w-4" weight="duotone" />
+              <Sparkle className="mr-2 h-4 w-4" weight="regular" />
               Use template
             </Button>
           </div>

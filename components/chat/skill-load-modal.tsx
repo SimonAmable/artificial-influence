@@ -633,7 +633,7 @@ export function SkillLoadModal({
           <DialogHeader className="gap-3 border-b border-border/60 px-4 py-4 text-left sm:flex-row sm:items-start sm:justify-between sm:px-6">
             <div className="flex min-w-0 flex-col gap-1.5 pr-8 sm:pr-0">
               <DialogTitle className="flex items-center gap-2">
-                <Books className="size-5 shrink-0 opacity-80" weight="duotone" />
+                <Books className="size-5 shrink-0 opacity-80" weight="regular" />
                 {headerTitle}
               </DialogTitle>
               <DialogDescription>{headerDescription}</DialogDescription>

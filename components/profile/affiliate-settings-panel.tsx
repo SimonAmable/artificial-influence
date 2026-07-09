@@ -55,7 +55,7 @@ export function AffiliateSettingsPanel({
         )}
       >
         <div className="mb-3 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <HandCoins className="size-5" weight="duotone" />
+          <HandCoins className="size-5" weight="regular" />
         </div>
         <h3 className="text-lg font-semibold tracking-tight text-foreground">
           Earn 20% for 12 months
