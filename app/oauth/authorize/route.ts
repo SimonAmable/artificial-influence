@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { hashToken, normalizeScopes, randomToken, validateClientRedirect } from "@/lib/mcp/auth"
+import { MCP_OAUTH_RETURN_COOKIE } from "@/lib/mcp/oauth-login-state"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 
@@ -33,10 +34,15 @@ export async function GET(request: Request) {
 
   if (!user) {
     const next = `${requestUrl.pathname}${requestUrl.search}`
-    return NextResponse.redirect(
-      `${requestUrl.origin}/login?next=${encodeURIComponent(next)}`,
-      302,
-    )
+    const response = NextResponse.redirect(`${requestUrl.origin}/login?next=/oauth/resume`, 302)
+    response.cookies.set(MCP_OAUTH_RETURN_COOKIE, next, {
+      path: "/",
+      maxAge: 10 * 60,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+    })
+    return response
   }
 
   const serviceRole = createServiceRoleClient()
@@ -66,7 +72,9 @@ export async function GET(request: Request) {
   const redirect = new URL(redirectUri)
   redirect.searchParams.set("code", code)
   if (state) redirect.searchParams.set("state", state)
-  return NextResponse.redirect(redirect.toString(), 302)
+  const response = NextResponse.redirect(redirect.toString(), 302)
+  response.cookies.delete(MCP_OAUTH_RETURN_COOKIE)
+  return response
 }
 
 function oauthError(redirectUri: string, state: string | null, error: string) {

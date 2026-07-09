@@ -4,6 +4,7 @@ import {
   clearTermsVersionCookieOnResponse,
   getCurrentTermsDocument,
 } from "@/lib/legal/terms-acceptance"
+import { isMcpOAuthContinuationPath } from "@/lib/mcp/oauth-login-state"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
 import { NextResponse } from "next/server"
 
@@ -49,7 +50,8 @@ export async function GET(request: Request) {
         .maybeSingle()
 
       const needsOnboarding = !profile?.onboarding_completed_at
-      const destination = needsOnboarding ? "/onboarding" : next
+      const isMcpOAuthContinuation = isMcpOAuthContinuationPath(next)
+      const destination = isMcpOAuthContinuation ? next : needsOnboarding ? "/onboarding" : next
 
       const forwardedHost = request.headers.get("x-forwarded-host") // original origin before load balancer
       const isLocalEnv = process.env.NODE_ENV === "development"
