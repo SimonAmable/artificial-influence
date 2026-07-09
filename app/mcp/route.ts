@@ -16,6 +16,14 @@ import {
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://chatgpt.com",
+  "https://chat.openai.com",
+  "https://platform.openai.com",
+  "http://localhost:6274",
+  "http://127.0.0.1:6274",
+]
+
 type JsonRpcRequest = {
   id?: string | number | null
   jsonrpc?: string
@@ -224,12 +232,14 @@ function isAllowedOrigin(request: Request, requestUrl: URL) {
   const origin = request.headers.get("origin")
   if (!origin) return true
 
-  const allowed = new Set(
+  const allowed = new Set([
+    ...DEFAULT_ALLOWED_ORIGINS,
+    ...
     (process.env.MCP_ALLOWED_ORIGINS || "")
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean),
-  )
+  ])
   allowed.add(requestUrl.origin)
 
   return allowed.has(origin)
