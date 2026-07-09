@@ -310,7 +310,7 @@ const WIDGET_HTML = String.raw`
           return;
         }
 
-        appendBadges([data.total ? `${data.total} models` : `${models.length} models`, data.defaultImageModel ? `Default: ${data.defaultImageModel}` : ""]);
+        appendBadges([data.total ? String(data.total) + " models" : String(models.length) + " models", data.defaultImageModel ? "Default: " + data.defaultImageModel : ""]);
         const list = document.createElement("section");
         list.className = "models";
 
@@ -320,7 +320,7 @@ const WIDGET_HTML = String.raw`
 
           const title = document.createElement("div");
           title.className = "model-title";
-          title.innerHTML = `<span>${escapeHtml(model.label || model.name || model.identifier || model.id || "Model")}</span><span>${escapeHtml(model.kind || model.type || "")}</span>`;
+          title.innerHTML = "<span>" + escapeHtml(model.label || model.name || model.identifier || model.id || "Model") + "</span><span>" + escapeHtml(model.kind || model.type || "") + "</span>";
           row.appendChild(title);
 
           const id = document.createElement("div");
@@ -353,7 +353,7 @@ const WIDGET_HTML = String.raw`
           settings.model || data?.model || items.find((item) => item.model)?.model,
           settings.aspectRatio || settings.aspect_ratio,
           settings.quality || settings.resolution,
-          settings.count ? `${settings.count} item${settings.count === 1 ? "" : "s"}` : items.length ? `${items.length} item${items.length === 1 ? "" : "s"}` : "",
+          settings.count ? String(settings.count) + " item" + (settings.count === 1 ? "" : "s") : items.length ? String(items.length) + " item" + (items.length === 1 ? "" : "s") : "",
           data?.status,
         ]);
 
@@ -399,7 +399,7 @@ const WIDGET_HTML = String.raw`
           }
         } else {
           const placeholder = document.createElement("div");
-          placeholder.className = `placeholder ${kind === "video" || kind === "audio" ? kind : ""}`;
+          placeholder.className = "placeholder " + (kind === "video" || kind === "audio" ? kind : "");
           placeholder.textContent = item.error ? "Failed" : statusLabel(item.status || "generating");
           card.appendChild(placeholder);
         }
