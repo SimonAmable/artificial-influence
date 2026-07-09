@@ -40,13 +40,17 @@ export function getMcpServerSlug(productName: string) {
   return productName.toLowerCase().replace(/\s+/g, "-")
 }
 
-export function buildMcpEndpointUrl(siteUrl: string) {
-  return `${siteUrl.replace(/\/$/, "")}/mcp`
+export function buildMcpEndpointUrl(mcpBaseUrl: string) {
+  return `${mcpBaseUrl.replace(/\/$/, "")}/mcp`
 }
 
-export function buildCliCommand(siteUrl: string, productName: string, platform: McpConnectPlatform) {
+export function buildCliCommand(
+  mcpBaseUrl: string,
+  productName: string,
+  platform: McpConnectPlatform,
+) {
   const slug = getMcpServerSlug(productName)
-  const endpoint = buildMcpEndpointUrl(siteUrl)
+  const endpoint = buildMcpEndpointUrl(mcpBaseUrl)
 
   if (platform === "cursor") {
     return JSON.stringify(
@@ -69,14 +73,14 @@ export function getMcpConnectSteps(options: {
   mode: McpConnectMode
   platform: McpConnectPlatform
   productName: string
-  siteUrl: string
+  mcpBaseUrl: string
 }): McpConnectStep[] {
-  const { mode, platform, productName, siteUrl } = options
-  const endpoint = buildMcpEndpointUrl(siteUrl)
+  const { mode, platform, productName, mcpBaseUrl } = options
+  const endpoint = buildMcpEndpointUrl(mcpBaseUrl)
   const slug = getMcpServerSlug(productName)
 
   if (mode === "cli") {
-    const cliValue = buildCliCommand(siteUrl, productName, platform)
+    const cliValue = buildCliCommand(mcpBaseUrl, productName, platform)
     const agentLabel =
       MCP_PLATFORMS.find((item) => item.id === platform)?.cliAgentLabel ?? "your coding agent"
 

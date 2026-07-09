@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 
 import { McpConnectPage } from "@/components/mcp/mcp-connect-page"
+import { getMcpConnectBaseUrl } from "@/lib/mcp/auth"
 import { currentProduct, getCurrentProductSiteUrl } from "@/lib/product/current"
 
 export const metadata: Metadata = {
@@ -9,10 +10,12 @@ export const metadata: Metadata = {
 }
 
 export default function McpPage() {
+  const siteUrl = getCurrentProductSiteUrl()
+
   return (
     <McpConnectPage
       productName={currentProduct.name}
-      siteUrl={getCurrentProductSiteUrl()}
+      mcpBaseUrl={getMcpConnectBaseUrl(currentProduct.mcpSiteUrl ?? siteUrl)}
       logoSrc={currentProduct.logo}
     />
   )

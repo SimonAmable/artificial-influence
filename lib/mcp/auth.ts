@@ -39,6 +39,10 @@ export function getMcpBaseUrl(requestUrl: URL) {
   return process.env.MCP_BASE_URL?.replace(/\/$/, "") || requestUrl.origin
 }
 
+export function getMcpConnectBaseUrl(fallbackSiteUrl: string) {
+  return getMcpBaseUrl(new URL(fallbackSiteUrl.replace(/\/$/, "") || "http://localhost"))
+}
+
 export function getMcpEndpointUrl(requestUrl: URL) {
   return `${getMcpBaseUrl(requestUrl)}/mcp`
 }

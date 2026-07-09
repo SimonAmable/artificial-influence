@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils"
 
 type McpConnectPageProps = {
   productName: string
-  siteUrl: string
+  mcpBaseUrl: string
   logoSrc: string
 }
 
@@ -85,7 +85,7 @@ function StepCard({
   )
 }
 
-export function McpConnectPage({ productName, siteUrl, logoSrc }: McpConnectPageProps) {
+export function McpConnectPage({ productName, mcpBaseUrl, logoSrc }: McpConnectPageProps) {
   const [mode, setMode] = React.useState<McpConnectMode>("mcp")
   const [platform, setPlatform] = React.useState<McpConnectPlatform>("claude")
 
@@ -97,8 +97,8 @@ export function McpConnectPage({ productName, siteUrl, logoSrc }: McpConnectPage
     }
   }, [mode, platform, platformsForMode])
 
-  const steps = getMcpConnectSteps({ mode, platform, productName, siteUrl })
-  const mcpEndpoint = buildMcpEndpointUrl(siteUrl)
+  const steps = getMcpConnectSteps({ mode, platform, productName, mcpBaseUrl })
+  const mcpEndpoint = buildMcpEndpointUrl(mcpBaseUrl)
 
   return (
     <div className="min-h-screen bg-background text-foreground">

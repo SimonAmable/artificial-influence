@@ -4,6 +4,7 @@ export const unicanProduct: ProductConfig = {
   id: "unican",
   name: "UniCan",
   siteUrl: "https://unican.ai",
+  mcpSiteUrl: "https://mcp.unican.ai",
   logo: "/logo.svg",
   favicon: "/favicon.ico",
   themeClass: "theme-unican",

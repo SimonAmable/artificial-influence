@@ -23,6 +23,8 @@ export interface ProductConfig {
   id: ProductId
   name: string
   siteUrl: string
+  /** MCP OAuth/API host when it differs from the marketing site (e.g. mcp.unican.ai). */
+  mcpSiteUrl?: string
   logo: string
   /** Header logo display size in px (fits inside the 44px circle on the 52px bar). */
   logoSizePx?: number
