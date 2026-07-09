@@ -1,7 +1,11 @@
 export const MCP_OAUTH_RETURN_COOKIE = "mcp_oauth_return"
 
 export function isMcpOAuthContinuationPath(path: string) {
-  return path === "/oauth/resume" || path.startsWith("/oauth/authorize")
+  return (
+    path === "/oauth/resume" ||
+    path.startsWith("/oauth/resume?") ||
+    path.startsWith("/oauth/authorize")
+  )
 }
 
 export function isSafeMcpOAuthReturnPath(path: string | null | undefined) {
@@ -17,7 +21,8 @@ export function getMcpOAuthCookieDomain(requestHost?: string | null) {
   if (!host || host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host)) return undefined
 
   const parts = host.split(".").filter(Boolean)
-  if (parts.length < 3) return undefined
+  if (parts.length === 2) return `.${host}`
+  if (parts.length < 2) return undefined
   return `.${parts.slice(-2).join(".")}`
 }
 

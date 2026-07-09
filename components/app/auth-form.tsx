@@ -90,6 +90,10 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
     }
     return url.toString()
   }, [nextPath])
+  const isMcpOAuthContinuation = React.useMemo(
+    () => nextPath === "/oauth/resume" || nextPath.startsWith("/oauth/resume?"),
+    [nextPath],
+  )
 
   React.useEffect(() => {
     setMode(defaultMode)
@@ -154,6 +158,11 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
 
         toast.dismiss(loadingToast)
         toast.success("Logged in successfully.")
+        if (isMcpOAuthContinuation) {
+          window.location.assign(nextPath)
+          return
+        }
+
         router.push(nextPath)
         router.refresh()
       }

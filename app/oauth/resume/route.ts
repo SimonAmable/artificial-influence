@@ -17,7 +17,9 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.redirect(`${requestUrl.origin}/login?next=/oauth/resume`, 302)
+    const loginUrl = new URL("/login", requestUrl.origin)
+    loginUrl.searchParams.set("next", "/oauth/resume")
+    return NextResponse.redirect(loginUrl, 302)
   }
 
   const cookieStore = await cookies()

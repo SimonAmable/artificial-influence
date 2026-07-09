@@ -34,7 +34,9 @@ export async function GET(request: Request) {
 
   if (!user) {
     const next = `${requestUrl.pathname}${requestUrl.search}`
-    const response = NextResponse.redirect(`${requestUrl.origin}/login?next=/oauth/resume`, 302)
+    const loginUrl = new URL("/login", requestUrl.origin)
+    loginUrl.searchParams.set("next", "/oauth/resume")
+    const response = NextResponse.redirect(loginUrl, 302)
     response.cookies.set(MCP_OAUTH_RETURN_COOKIE, next, {
       path: "/",
       maxAge: 10 * 60,
