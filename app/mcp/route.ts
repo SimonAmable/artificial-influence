@@ -232,14 +232,11 @@ function isAllowedOrigin(request: Request, requestUrl: URL) {
   const origin = request.headers.get("origin")
   if (!origin) return true
 
-  const allowed = new Set([
-    ...DEFAULT_ALLOWED_ORIGINS,
-    ...
-    (process.env.MCP_ALLOWED_ORIGINS || "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean),
-  ])
+  const configuredOrigins = (process.env.MCP_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+  const allowed = new Set([...DEFAULT_ALLOWED_ORIGINS, ...configuredOrigins])
   allowed.add(requestUrl.origin)
 
   return allowed.has(origin)
