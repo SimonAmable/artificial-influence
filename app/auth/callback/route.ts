@@ -4,8 +4,13 @@ import {
   clearTermsVersionCookieOnResponse,
   getCurrentTermsDocument,
 } from "@/lib/legal/terms-acceptance"
-import { isMcpOAuthContinuationPath } from "@/lib/mcp/oauth-login-state"
+import {
+  isMcpOAuthContinuationPath,
+  isSafeMcpOAuthReturnPath,
+  MCP_OAUTH_RETURN_COOKIE,
+} from "@/lib/mcp/oauth-login-state"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
+import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
 export async function GET(request: Request) {
@@ -41,6 +46,8 @@ export async function GET(request: Request) {
     }
 
     if (data.session) {
+      const cookieStore = await cookies()
+      const pendingMcpAuthorizePath = cookieStore.get(MCP_OAUTH_RETURN_COOKIE)?.value
       const userId = data.session.user.id
       const currentTerms = getCurrentTermsDocument()
       const { data: profile } = await supabase
@@ -50,8 +57,9 @@ export async function GET(request: Request) {
         .maybeSingle()
 
       const needsOnboarding = !profile?.onboarding_completed_at
-      const isMcpOAuthContinuation = isMcpOAuthContinuationPath(next)
-      const destination = isMcpOAuthContinuation ? next : needsOnboarding ? "/onboarding" : next
+      const isMcpOAuthContinuation =
+        isMcpOAuthContinuationPath(next) || isSafeMcpOAuthReturnPath(pendingMcpAuthorizePath)
+      const destination = isMcpOAuthContinuation ? "/oauth/resume" : needsOnboarding ? "/onboarding" : next
 
       const forwardedHost = request.headers.get("x-forwarded-host") // original origin before load balancer
       const isLocalEnv = process.env.NODE_ENV === "development"

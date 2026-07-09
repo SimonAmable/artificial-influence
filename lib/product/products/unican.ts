@@ -46,6 +46,7 @@ export const unicanProduct: ProductConfig = {
     "/resources",
     "/free-tools",
     "/pricing",
+    "/mcp",
     "/dashboard",
     "/onboarding",
     "/upscale",

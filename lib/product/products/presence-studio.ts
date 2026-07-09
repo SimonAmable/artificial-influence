@@ -43,6 +43,7 @@ export const presenceStudioProduct: ProductConfig = {
     "/dashboard",
     "/onboarding",
     "/pricing",
+    "/mcp",
   ],
   defaultSignedInRoute: "/dashboard",
   assistantName: "Presence Agent",

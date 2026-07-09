@@ -89,12 +89,7 @@ export async function callMcpTool(options: {
 }) {
   switch (options.name) {
     case "get_account":
-      return {
-        account: {
-          id: options.auth.user.id,
-          email: options.auth.user.email || null,
-        },
-      }
+      return getAccount(options.auth)
     case "list_models":
       return listModels(options.args)
     case "list_generations":
@@ -111,6 +106,24 @@ export async function callMcpTool(options: {
       return generateAudio(options)
     default:
       throw new Error(`Unknown MCP tool: ${options.name}`)
+  }
+}
+
+async function getAccount(auth: McpAuthContext) {
+  const supabase = requireServiceRole()
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("credits, is_pro")
+    .eq("id", auth.user.id)
+    .maybeSingle()
+
+  return {
+    account: {
+      id: auth.user.id,
+      email: auth.user.email || null,
+      credits: typeof profile?.credits === "number" ? profile.credits : null,
+      isPro: Boolean(profile?.is_pro),
+    },
   }
 }
 
@@ -264,7 +277,11 @@ async function generateImage(options: {
     body: form,
   })
 
-  return normalizeGenerationResponse(await safeJson(response), response.status)
+  return normalizeGenerationResponse(await safeJson(response), response.status, {
+    type: "image",
+    model: stringOrNull(options.args.model),
+    prompt: stringOrNull(options.args.prompt),
+  })
 }
 
 async function generateVideo(options: {
@@ -300,7 +317,11 @@ async function generateVideo(options: {
     body: JSON.stringify(body),
   })
 
-  return normalizeGenerationResponse(await safeJson(response), response.status)
+  return normalizeGenerationResponse(await safeJson(response), response.status, {
+    type: "video",
+    model: stringOrNull(options.args.model),
+    prompt: stringOrNull(options.args.prompt),
+  })
 }
 
 async function generateAudio(options: {
@@ -327,7 +348,11 @@ async function generateAudio(options: {
     body: JSON.stringify(body),
   })
 
-  return normalizeGenerationResponse(await safeJson(response), response.status)
+  return normalizeGenerationResponse(await safeJson(response), response.status, {
+    type: "audio",
+    model: stringOrNull(options.args.model),
+    prompt: stringOrNull(options.args.text),
+  })
 }
 
 async function resolveGenerationUrl(userId: string, generationId: string) {
@@ -366,9 +391,20 @@ function mapGeneration(row: Record<string, unknown>) {
   }
 }
 
-function normalizeGenerationResponse(body: unknown, statusCode: number) {
+function normalizeGenerationResponse(
+  body: unknown,
+  statusCode: number,
+  fallback: { type?: string | null; model?: string | null; prompt?: string | null } = {},
+) {
   if (!isPlainObject(body)) {
-    return { statusCode, raw: body }
+    return {
+      statusCode,
+      status: statusCode >= 400 ? "failed" : "completed",
+      type: fallback.type ?? null,
+      model: fallback.model ?? null,
+      prompt: fallback.prompt ?? null,
+      raw: body,
+    }
   }
 
   const generationId =
@@ -387,10 +423,10 @@ function normalizeGenerationResponse(body: unknown, statusCode: number) {
     statusCode,
     generationId,
     generationIds: Array.isArray(body.generationIds) ? body.generationIds : generationId ? [generationId] : [],
-    status: stringOrNull(body.status) || (statusCode === 202 ? "pending" : "completed"),
-    type: inferResponseType(body),
-    model: stringOrNull(body.model) || (isPlainObject(body.usage) ? stringOrNull(body.usage.modelId) : null),
-    prompt: stringOrNull(body.prompt),
+    status: stringOrNull(body.status) || (statusCode >= 400 ? "failed" : statusCode === 202 ? "pending" : "completed"),
+    type: inferResponseType(body) || fallback.type || null,
+    model: stringOrNull(body.model) || (isPlainObject(body.usage) ? stringOrNull(body.usage.modelId) : null) || fallback.model || null,
+    prompt: stringOrNull(body.prompt) || fallback.prompt || null,
     url,
     createdAt: stringOrNull(body.createdAt),
     error: stringOrNull(body.error) || stringOrNull(body.message),

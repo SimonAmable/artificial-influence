@@ -2,7 +2,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
 import {
-  isMcpOAuthContinuationPath,
+  isSafeMcpOAuthReturnPath,
   MCP_OAUTH_RETURN_COOKIE,
 } from "@/lib/mcp/oauth-login-state"
 import { createClient } from "@/lib/supabase/server"
@@ -25,8 +25,7 @@ export async function GET(request: Request) {
 
   if (
     !pendingAuthorizePath ||
-    !pendingAuthorizePath.startsWith("/") ||
-    !isMcpOAuthContinuationPath(pendingAuthorizePath)
+    !isSafeMcpOAuthReturnPath(pendingAuthorizePath)
   ) {
     return NextResponse.json(
       { error: "No pending MCP authorization request was found. Start the connector flow again." },

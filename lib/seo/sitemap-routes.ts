@@ -28,6 +28,7 @@ export function getSitemapEntries(): SitemapEntry[] {
     { path: "/inpaint", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
     { path: "/ai-influencer", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
     { path: "/pricing", lastModified: DEFAULT_LAST, changeFrequency: "monthly", priority: 0.8 },
+    { path: "/mcp", lastModified: DEFAULT_LAST, changeFrequency: "monthly", priority: 0.85 },
     { path: "/content", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
     { path: "/autopost", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.85 },
     { path: "/free-tools", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },

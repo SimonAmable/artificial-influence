@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { hashToken, normalizeScopes, randomToken, validateClientRedirect } from "@/lib/mcp/auth"
-import { MCP_OAUTH_RETURN_COOKIE } from "@/lib/mcp/oauth-login-state"
+import { getMcpOAuthCookieDomain, MCP_OAUTH_RETURN_COOKIE } from "@/lib/mcp/oauth-login-state"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 
@@ -41,6 +41,7 @@ export async function GET(request: Request) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
+      domain: getMcpOAuthCookieDomain(requestUrl.hostname),
     })
     return response
   }
@@ -73,7 +74,11 @@ export async function GET(request: Request) {
   redirect.searchParams.set("code", code)
   if (state) redirect.searchParams.set("state", state)
   const response = NextResponse.redirect(redirect.toString(), 302)
-  response.cookies.delete(MCP_OAUTH_RETURN_COOKIE)
+  response.cookies.set(MCP_OAUTH_RETURN_COOKIE, "", {
+    path: "/",
+    maxAge: 0,
+    domain: getMcpOAuthCookieDomain(requestUrl.hostname),
+  })
   return response
 }
 

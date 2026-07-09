@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
       ? costPerImage * imageCount
       : Math.max(1, imageCount);
 
-    const hasCredits = await checkUserHasCredits(user.id, requiredCredits);
+    const hasCredits = await checkUserHasCredits(user.id, requiredCredits, supabase);
     if (!hasCredits) {
       return NextResponse.json(
         {
