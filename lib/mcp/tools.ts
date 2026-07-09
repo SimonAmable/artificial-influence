@@ -548,7 +548,7 @@ function normalizeGenerationResponse(
     }
     return {
       ...base,
-      settings: buildSettings(fallback.model, fallback.prompt, null, 1),
+      settings: buildSettings(fallback.model ?? null, fallback.prompt ?? null, null, 1),
       items: [generationToMediaItem(base)],
     }
   }

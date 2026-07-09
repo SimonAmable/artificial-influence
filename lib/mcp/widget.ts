@@ -12,13 +12,31 @@ const WIDGET_HTML = String.raw`
     <style>
       :root {
         color-scheme: light dark;
-        --bg: light-dark(#ffffff, #101010);
-        --panel: light-dark(#f6f6f6, #181818);
-        --panel-2: light-dark(#eeeeee, #202020);
-        --border: light-dark(#dedede, #303030);
-        --text: light-dark(#111111, #f5f5f5);
-        --muted: light-dark(#666666, #a0a0a0);
-        --muted-2: light-dark(#8a8a8a, #777777);
+        --bg: #ffffff;
+        --panel: #f6f6f6;
+        --panel-2: #eeeeee;
+        --border: #dedede;
+        --overlay: rgba(255,255,255,.88);
+        --overlay-border: rgba(0,0,0,.12);
+        --shine: rgba(255,255,255,.75);
+        --text: #111111;
+        --muted: #666666;
+        --muted-2: #8a8a8a;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #101010;
+          --panel: #181818;
+          --panel-2: #202020;
+          --border: #303030;
+          --overlay: rgba(0,0,0,.58);
+          --overlay-border: rgba(255,255,255,.18);
+          --shine: rgba(255,255,255,.08);
+          --text: #f5f5f5;
+          --muted: #a0a0a0;
+          --muted-2: #777777;
+        }
       }
 
       * { box-sizing: border-box; }
@@ -119,7 +137,7 @@ const WIDGET_HTML = String.raw`
         width: 100%;
         aspect-ratio: 1 / 1;
         background:
-          linear-gradient(100deg, transparent 20%, light-dark(rgba(255,255,255,.75), rgba(255,255,255,.08)) 35%, transparent 50%),
+          linear-gradient(100deg, transparent 20%, var(--shine) 35%, transparent 50%),
           var(--panel-2);
         background-size: 220% 100%;
         animation: load 1.2s ease-in-out infinite;
@@ -145,9 +163,9 @@ const WIDGET_HTML = String.raw`
         place-items: center;
         width: 30px;
         height: 30px;
-        border: 1px solid light-dark(rgba(0,0,0,.12), rgba(255,255,255,.18));
+        border: 1px solid var(--overlay-border);
         border-radius: 999px;
-        background: light-dark(rgba(255,255,255,.88), rgba(0,0,0,.58));
+        background: var(--overlay);
         cursor: pointer;
         backdrop-filter: blur(10px);
       }
@@ -220,6 +238,8 @@ const WIDGET_HTML = String.raw`
     <main id="app" class="wrap"></main>
     <script>
       const app = document.getElementById("app");
+      let pollTimer = null;
+      let pollAttempts = 0;
 
       function text(value) {
         return value == null ? "" : String(value);
@@ -462,6 +482,10 @@ const WIDGET_HTML = String.raw`
       }
 
       function render(data) {
+        if (pollTimer) {
+          clearTimeout(pollTimer);
+          pollTimer = null;
+        }
         app.replaceChildren();
         if (!data || typeof data !== "object") {
           renderEmpty("No output returned.");
@@ -472,24 +496,68 @@ const WIDGET_HTML = String.raw`
           renderModels(data);
         } else {
           renderMedia(data);
+          schedulePoll(data);
         }
         requestAnimationFrame(notifyHeight);
       }
 
-      render(window.openai?.toolOutput);
+      function findStructuredContent(value) {
+        if (!value || typeof value !== "object") return null;
+        if (value.structuredContent && typeof value.structuredContent === "object") return value.structuredContent;
+        if (value.mcp_tool_result?.structuredContent && typeof value.mcp_tool_result.structuredContent === "object") return value.mcp_tool_result.structuredContent;
+        if (value.call_tool_result?.structuredContent && typeof value.call_tool_result.structuredContent === "object") return value.call_tool_result.structuredContent;
+        return null;
+      }
+
+      function getInitialOutput() {
+        return window.openai?.toolOutput
+          || findStructuredContent(window.openai?.toolResponseMetadata)
+          || findStructuredContent(window.openai?.toolResponseMetadata?.mcp_tool_result)
+          || findStructuredContent(window.openai?.toolResponseMetadata?.call_tool_result)
+          || null;
+      }
+
+      async function pollGeneration(generationId) {
+        if (!generationId || !window.openai?.callTool) return;
+        try {
+          const response = await window.openai.callTool("get_generation", { generationId });
+          const next = response?.structuredContent || findStructuredContent(response);
+          if (next) render(next);
+        } catch {
+          pollTimer = null;
+        }
+      }
+
+      function schedulePoll(data) {
+        const item = pickItems(data).find((entry) => isWorking(entry.status) && entry.generationId);
+        if (!item || !window.openai?.callTool || pollAttempts > 18) return;
+        pollAttempts += 1;
+        const delay = Math.min(10000, 1600 + pollAttempts * 800);
+        pollTimer = setTimeout(() => pollGeneration(item.generationId), delay);
+      }
+
+      try {
+        render(getInitialOutput());
+      } catch (error) {
+        app.replaceChildren();
+        renderEmpty("Unable to render output.");
+        requestAnimationFrame(notifyHeight);
+      }
 
       window.addEventListener("message", (event) => {
         if (event.source !== window.parent) return;
         const message = event.data;
         if (!message || message.jsonrpc !== "2.0") return;
         if (message.method === "ui/notifications/tool-result") {
-          render(message.params?.structuredContent);
+          pollAttempts = 0;
+          render(message.params?.structuredContent || findStructuredContent(message.params));
         }
       }, { passive: true });
 
       window.addEventListener("openai:set_globals", (event) => {
-        const data = event.detail?.globals?.toolOutput ?? window.openai?.toolOutput;
-        render(data);
+        const globals = event.detail?.globals;
+        const data = globals?.toolOutput || findStructuredContent(globals?.toolResponseMetadata) || getInitialOutput();
+        if (data) render(data);
       }, { passive: true });
     </script>
   </body>
