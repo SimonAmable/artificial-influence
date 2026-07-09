@@ -11,7 +11,13 @@ import {
   callMcpTool,
   getToolDefinition,
   MCP_TOOLS,
+  serializeToolDefinition,
 } from "@/lib/mcp/tools"
+import {
+  getUnicanMediaWidgetResource,
+  UNICAN_MEDIA_WIDGET_MIME_TYPE,
+  UNICAN_MEDIA_WIDGET_URI,
+} from "@/lib/mcp/widget"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -105,6 +111,7 @@ async function handleRpcRequest(
       return jsonRpcResult(id, {
         protocolVersion: "2025-06-18",
         capabilities: {
+          resources: {},
           tools: {},
         },
         serverInfo: {
@@ -122,11 +129,34 @@ async function handleRpcRequest(
     if (method === "tools/list") {
       await requireMcpAuth(request.headers)
       return jsonRpcResult(id, {
-        tools: MCP_TOOLS.map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema,
-        })),
+        tools: MCP_TOOLS.map((tool) => serializeToolDefinition(tool)),
+      })
+    }
+
+    if (method === "resources/list") {
+      await requireMcpAuth(request.headers)
+      return jsonRpcResult(id, {
+        resources: [
+          {
+            uri: UNICAN_MEDIA_WIDGET_URI,
+            name: "unican-media-output",
+            title: "UniCan media output",
+            description: "Minimal media and model output UI for UniCan MCP tools.",
+            mimeType: UNICAN_MEDIA_WIDGET_MIME_TYPE,
+          },
+        ],
+      })
+    }
+
+    if (method === "resources/read") {
+      await requireMcpAuth(request.headers)
+      const uri = typeof rpc.params?.uri === "string" ? rpc.params.uri : ""
+      if (uri !== UNICAN_MEDIA_WIDGET_URI) {
+        return jsonRpcError(id, -32602, `Unknown resource: ${uri}`)
+      }
+
+      return jsonRpcResult(id, {
+        contents: [getUnicanMediaWidgetResource()],
       })
     }
 
@@ -158,12 +188,7 @@ async function handleRpcRequest(
           generationId: extractGenerationId(result),
         })
         return jsonRpcResult(id, {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
+          content: formatToolContent(name, result),
           structuredContent: result,
         })
       } catch (error) {
@@ -226,6 +251,45 @@ function extractGenerationId(result: unknown) {
   if (!result || typeof result !== "object") return null
   const value = (result as { generationId?: unknown }).generationId
   return typeof value === "string" ? value : null
+}
+
+function formatToolContent(toolName: string, result: unknown) {
+  const summary = summarizeToolResult(toolName, result)
+  return [
+    {
+      type: "text",
+      text: summary,
+    },
+  ]
+}
+
+function summarizeToolResult(toolName: string, result: unknown) {
+  if (!result || typeof result !== "object") return `${toolName} completed.`
+  const value = result as Record<string, unknown>
+
+  if (Array.isArray(value.models)) {
+    return `Listed ${value.models.length} active UniCan model${value.models.length === 1 ? "" : "s"}.`
+  }
+
+  if (Array.isArray(value.generations)) {
+    return `Loaded ${value.generations.length} generation${value.generations.length === 1 ? "" : "s"}.`
+  }
+
+  if (value.generation && typeof value.generation === "object") {
+    const generationId = (value.generation as Record<string, unknown>).generationId
+    return `Loaded generation ${typeof generationId === "string" ? generationId : ""}.`.trim()
+  }
+
+  if (Array.isArray(value.items)) {
+    const status = typeof value.status === "string" ? value.status : "ready"
+    return `${toolName} ${status}; ${value.items.length} media item${value.items.length === 1 ? "" : "s"} returned.`
+  }
+
+  if (value.account && typeof value.account === "object") {
+    return "Connected UniCan account loaded."
+  }
+
+  return `${toolName} completed.`
 }
 
 function isAllowedOrigin(request: Request, requestUrl: URL) {

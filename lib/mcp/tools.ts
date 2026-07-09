@@ -3,49 +3,91 @@ import "server-only"
 import { filterPublicCatalogModels } from "@/lib/server/model-catalog-visibility"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import type { McpAuthContext } from "@/lib/mcp/auth"
+import { UNICAN_MEDIA_WIDGET_URI } from "@/lib/mcp/widget"
 
 type JsonObject = Record<string, unknown>
+type ToolMeta = {
+  ui?: {
+    resourceUri?: string
+    visibility?: string[]
+  }
+  [key: string]: unknown
+}
 
 type ToolDefinition = {
   name: string
+  title: string
   description: string
   inputSchema: JsonObject
+  outputSchema: JsonObject
   scopes: string[]
+  annotations?: JsonObject
+  _meta?: ToolMeta
 }
+
+const BEARER_SECURITY_SCHEMES = [{ type: "http", scheme: "bearer" }]
+const MEDIA_TOOL_META = {
+  ui: { resourceUri: UNICAN_MEDIA_WIDGET_URI },
+  "openai/outputTemplate": UNICAN_MEDIA_WIDGET_URI,
+  "openai/toolInvocation/invoking": "Working...",
+  "openai/toolInvocation/invoked": "Ready",
+} satisfies ToolMeta
 
 export const MCP_TOOLS: ToolDefinition[] = [
   {
     name: "get_account",
+    title: "Get account",
     description: "Return the connected Unican account id and email.",
     scopes: ["account:read"],
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    outputSchema: accountOutputSchema(),
+    annotations: readOnlyAnnotations(),
   },
   {
     name: "list_models",
-    description: "List active Unican generation models, optionally filtered by media type.",
+    title: "List models",
+    description: "List every active Unican generation model at once. This tool accepts no input; group or choose models from the returned model metadata.",
     scopes: ["models:read"],
-    inputSchema: {
-      type: "object",
-      properties: {
-        type: { type: "string", enum: ["image", "video", "audio"] },
-      },
-      additionalProperties: false,
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    outputSchema: modelsOutputSchema(),
+    annotations: readOnlyAnnotations(),
+    _meta: {
+      ...MEDIA_TOOL_META,
+      "openai/toolInvocation/invoking": "Listing models...",
+      "openai/toolInvocation/invoked": "Models ready",
     },
   },
   {
     name: "list_generations",
+    title: "List generations",
     description: "List recent generation history for the connected user.",
     scopes: ["generations:read"],
     inputSchema: generationListSchema(),
+    outputSchema: generationListOutputSchema(),
+    annotations: readOnlyAnnotations(),
+    _meta: {
+      ...MEDIA_TOOL_META,
+      "openai/toolInvocation/invoking": "Loading generations...",
+      "openai/toolInvocation/invoked": "Generations ready",
+    },
   },
   {
     name: "search_generations",
+    title: "Search generations",
     description: "Search generation history by prompt, model, type, status, or tool.",
     scopes: ["generations:read"],
     inputSchema: generationListSchema({ includeSearch: true }),
+    outputSchema: generationListOutputSchema(),
+    annotations: readOnlyAnnotations(),
+    _meta: {
+      ...MEDIA_TOOL_META,
+      "openai/toolInvocation/invoking": "Searching generations...",
+      "openai/toolInvocation/invoked": "Generations ready",
+    },
   },
   {
     name: "get_generation",
+    title: "Get generation",
     description: "Fetch one generation by id, including output URL when available.",
     scopes: ["generations:read"],
     inputSchema: {
@@ -56,26 +98,73 @@ export const MCP_TOOLS: ToolDefinition[] = [
       required: ["generationId"],
       additionalProperties: false,
     },
+    outputSchema: generationOutputSchema(),
+    annotations: readOnlyAnnotations(),
+    _meta: {
+      ...MEDIA_TOOL_META,
+      "openai/toolInvocation/invoking": "Loading generation...",
+      "openai/toolInvocation/invoked": "Generation ready",
+    },
   },
   {
     name: "generate_image",
+    title: "Generate image",
     description: "Create an image using an active Unican image model.",
     scopes: ["generations:write"],
     inputSchema: generateImageSchema(),
+    outputSchema: generatedMediaOutputSchema(),
+    annotations: writeAnnotations(),
+    _meta: {
+      ...MEDIA_TOOL_META,
+      "openai/toolInvocation/invoking": "Generating image...",
+      "openai/toolInvocation/invoked": "Image ready",
+    },
   },
   {
     name: "generate_video",
+    title: "Generate video",
     description: "Create a video using an active Unican video model.",
     scopes: ["generations:write"],
     inputSchema: generateVideoSchema(),
+    outputSchema: generatedMediaOutputSchema(),
+    annotations: writeAnnotations(),
+    _meta: {
+      ...MEDIA_TOOL_META,
+      "openai/toolInvocation/invoking": "Generating video...",
+      "openai/toolInvocation/invoked": "Video ready",
+    },
   },
   {
     name: "generate_audio",
+    title: "Generate audio",
     description: "Create text-to-speech audio using an active Unican audio provider.",
     scopes: ["generations:write"],
     inputSchema: generateAudioSchema(),
+    outputSchema: generatedMediaOutputSchema(),
+    annotations: writeAnnotations(),
+    _meta: {
+      ...MEDIA_TOOL_META,
+      "openai/toolInvocation/invoking": "Generating audio...",
+      "openai/toolInvocation/invoked": "Audio ready",
+    },
   },
 ]
+
+export function serializeToolDefinition(tool: ToolDefinition) {
+  return {
+    name: tool.name,
+    title: tool.title,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+    outputSchema: tool.outputSchema,
+    annotations: tool.annotations,
+    securitySchemes: BEARER_SECURITY_SCHEMES,
+    _meta: {
+      securitySchemes: BEARER_SECURITY_SCHEMES,
+      ...tool._meta,
+    },
+  }
+}
 
 export function getToolDefinition(name: string) {
   return MCP_TOOLS.find((tool) => tool.name === name) || null
@@ -154,29 +243,36 @@ export async function auditMcpToolCall(input: {
 
 async function listModels(args: JsonObject) {
   const supabase = requireServiceRole()
-  const type = typeof args.type === "string" ? args.type : null
+  void args
 
-  let query = supabase
+  const query = supabase
     .from("models")
     .select("*")
     .eq("is_active", true)
     .order("name", { ascending: true })
 
-  if (type && ["image", "video", "audio"].includes(type)) {
-    query = query.eq("type", type)
-  }
-
   const { data, error } = await query
   if (error) throw new Error(error.message)
 
-  return {
-    models: filterPublicCatalogModels(data || []).map((model) => ({
+  const models = filterPublicCatalogModels(data || []).map((model) => {
+    const aspectRatios = stringArray(model.aspect_ratios)
+    const type = typeof model.type === "string" ? model.type : "model"
+    const provider = typeof model.provider === "string" ? model.provider : null
+    return {
       id: model.id,
       identifier: model.identifier,
+      label: model.name,
       name: model.name,
       description: model.description,
-      type: model.type,
-      provider: model.provider,
+      kind: type,
+      type,
+      provider,
+      badges: [
+        type,
+        provider,
+        aspectRatios.length > 0 ? aspectRatios.join(", ") : null,
+        model.max_images && Number(model.max_images) > 1 ? `up to ${model.max_images}` : null,
+      ].filter(Boolean),
       modelCost: model.model_cost,
       modelCostPerSecond: model.model_cost_per_second ?? null,
       supportsReferenceImage: Boolean(model.supports_reference_image),
@@ -184,10 +280,21 @@ async function listModels(args: JsonObject) {
       supportsReferenceAudio: Boolean(model.supports_reference_audio),
       supportsFirstFrame: Boolean(model.supports_first_frame),
       supportsLastFrame: Boolean(model.supports_last_frame),
+      aspectRatios,
+      defaultAspectRatio: typeof model.default_aspect_ratio === "string" ? model.default_aspect_ratio : null,
       durationOptions: model.duration_options ?? null,
       maxImages: model.max_images ?? null,
       parameters: model.parameters ?? null,
-    })),
+      defaultSettings: {
+        aspectRatio: typeof model.default_aspect_ratio === "string" ? model.default_aspect_ratio : null,
+      },
+    }
+  })
+
+  return {
+    models,
+    total: models.length,
+    groups: groupCounts(models.map((model) => model.type)),
   }
 }
 
@@ -222,9 +329,12 @@ async function listGenerations(userId: string, args: JsonObject) {
 
   const { data, error } = await query
   if (error) throw new Error(error.message)
+  const generations = (data || []).map((row) => mapGeneration(row))
+  const items = generations.map(generationToMediaItem)
 
   return {
-    generations: (data || []).map((row) => mapGeneration(row)),
+    generations,
+    items,
     pagination: {
       limit,
       offset,
@@ -246,7 +356,14 @@ async function getGeneration(userId: string, generationId: string) {
 
   if (error) throw new Error(error.message)
   if (!data) throw new Error("Generation not found")
-  return { generation: mapGeneration(data) }
+  const generation = mapGeneration(data)
+  return {
+    generation,
+    items: [generationToMediaItem(generation)],
+    prompt: stringOrNull(generation.prompt),
+    model: stringOrNull(generation.model),
+    status: stringOrNull(generation.status),
+  }
 }
 
 async function generateImage(options: {
@@ -391,19 +508,48 @@ function mapGeneration(row: Record<string, unknown>) {
   }
 }
 
+function generationToMediaItem(generation: Record<string, unknown>) {
+  const kind = typeof generation.type === "string" ? generation.type : "image"
+  const url = stringOrNull(generation.url)
+  const status = stringOrNull(generation.status) || (url ? "completed" : "pending")
+  return {
+    id: stringOrNull(generation.generationId) || stringOrNull(generation.id),
+    generationId: stringOrNull(generation.generationId) || stringOrNull(generation.id),
+    status,
+    kind,
+    type: kind,
+    mediaUrl: url,
+    thumbnailUrl: url,
+    downloadUrl: url,
+    mimeType: mimeTypeForKind(kind),
+    model: stringOrNull(generation.model),
+    prompt: stringOrNull(generation.prompt),
+    error: stringOrNull(generation.error),
+    createdAt: stringOrNull(generation.createdAt),
+  }
+}
+
 function normalizeGenerationResponse(
   body: unknown,
   statusCode: number,
   fallback: { type?: string | null; model?: string | null; prompt?: string | null } = {},
 ) {
   if (!isPlainObject(body)) {
-    return {
+    const status = statusCode >= 400 ? "failed" : "completed"
+    const base = {
+      generationId: null,
       statusCode,
-      status: statusCode >= 400 ? "failed" : "completed",
+      status,
       type: fallback.type ?? null,
       model: fallback.model ?? null,
       prompt: fallback.prompt ?? null,
+      url: null,
       raw: body,
+    }
+    return {
+      ...base,
+      settings: buildSettings(fallback.model, fallback.prompt, null, 1),
+      items: [generationToMediaItem(base)],
     }
   }
 
@@ -419,20 +565,127 @@ function normalizeGenerationResponse(
     (isPlainObject(body.audio) ? stringOrNull(body.audio.url) : null) ||
     (Array.isArray(body.images) && isPlainObject(body.images[0]) ? stringOrNull(body.images[0].url) : null)
 
+  const status = stringOrNull(body.status) || (statusCode >= 400 ? "failed" : statusCode === 202 ? "pending" : "completed")
+  const type = inferResponseType(body) || fallback.type || null
+  const model = stringOrNull(body.model) || (isPlainObject(body.usage) ? stringOrNull(body.usage.modelId) : null) || fallback.model || null
+  const prompt = stringOrNull(body.prompt) || fallback.prompt || null
+  const generationIds = Array.isArray(body.generationIds) ? body.generationIds : generationId ? [generationId] : []
+  const mediaItems = extractMediaItems(body, {
+    generationId,
+    generationIds,
+    status,
+    type,
+    model,
+    prompt,
+    url,
+    error: stringOrNull(body.error) || stringOrNull(body.message),
+  })
+
   return {
     statusCode,
     generationId,
-    generationIds: Array.isArray(body.generationIds) ? body.generationIds : generationId ? [generationId] : [],
-    status: stringOrNull(body.status) || (statusCode >= 400 ? "failed" : statusCode === 202 ? "pending" : "completed"),
-    type: inferResponseType(body) || fallback.type || null,
-    model: stringOrNull(body.model) || (isPlainObject(body.usage) ? stringOrNull(body.usage.modelId) : null) || fallback.model || null,
-    prompt: stringOrNull(body.prompt) || fallback.prompt || null,
+    generationIds,
+    status,
+    type,
+    model,
+    prompt,
     url,
     createdAt: stringOrNull(body.createdAt),
     error: stringOrNull(body.error) || stringOrNull(body.message),
+    settings: buildSettings(model, prompt, optionsFromBody(body), mediaItems.length || 1),
+    items: mediaItems,
     result: body,
     nextAction: statusCode === 202 ? "Call get_generation with generationId to check completion." : null,
   }
+}
+
+function extractMediaItems(
+  body: JsonObject,
+  fallback: {
+    generationId: string | null
+    generationIds: unknown[]
+    status: string
+    type: string | null
+    model: string | null
+    prompt: string | null
+    url: string | null
+    error: string | null
+  },
+) {
+  const items: JsonObject[] = []
+  const images = Array.isArray(body.images) ? body.images : []
+  images.forEach((image, index) => {
+    const imageUrl = isPlainObject(image) ? stringOrNull(image.url) : stringOrNull(image)
+    items.push(buildMediaItem({
+      id: stringOrNull(fallback.generationIds[index]) || fallback.generationId,
+      status: fallback.status,
+      type: "image",
+      url: imageUrl,
+      model: fallback.model,
+      prompt: fallback.prompt,
+      error: fallback.error,
+      createdAt: stringOrNull(body.createdAt),
+    }))
+  })
+
+  if (items.length === 0) {
+    items.push(buildMediaItem({
+      id: fallback.generationId,
+      status: fallback.status,
+      type: fallback.type,
+      url: fallback.url,
+      model: fallback.model,
+      prompt: fallback.prompt,
+      error: fallback.error,
+      createdAt: stringOrNull(body.createdAt),
+    }))
+  }
+
+  return items
+}
+
+function buildMediaItem(input: {
+  id: string | null
+  status: string
+  type: string | null
+  url: string | null
+  model: string | null
+  prompt: string | null
+  error: string | null
+  createdAt: string | null
+}) {
+  const kind = input.type || "image"
+  return {
+    id: input.id,
+    generationId: input.id,
+    status: input.status,
+    kind,
+    type: kind,
+    mediaUrl: input.url,
+    thumbnailUrl: input.url,
+    downloadUrl: input.url,
+    mimeType: mimeTypeForKind(kind),
+    model: input.model,
+    prompt: input.prompt,
+    error: input.error,
+    createdAt: input.createdAt,
+  }
+}
+
+function buildSettings(model: string | null, prompt: string | null, options: JsonObject | null, count: number) {
+  void prompt
+  return {
+    model,
+    aspectRatio: stringOrNull(options?.aspect_ratio) || stringOrNull(options?.aspectRatio),
+    quality: stringOrNull(options?.quality) || stringOrNull(options?.resolution),
+    count,
+  }
+}
+
+function optionsFromBody(body: JsonObject) {
+  if (isPlainObject(body.options)) return body.options
+  if (isPlainObject(body.input)) return body.input
+  return body
 }
 
 async function safeJson(response: Response) {
@@ -517,6 +770,280 @@ function generateAudioSchema() {
   }
 }
 
+function accountOutputSchema() {
+  return {
+    type: "object",
+    properties: {
+      account: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          email: { type: ["string", "null"] },
+          credits: { type: ["number", "null"] },
+          isPro: { type: "boolean" },
+        },
+        required: ["id", "email", "credits", "isPro"],
+        additionalProperties: false,
+      },
+    },
+    required: ["account"],
+    additionalProperties: false,
+  }
+}
+
+function modelsOutputSchema() {
+  return {
+    type: "object",
+    properties: {
+      total: { type: "integer" },
+      groups: {
+        type: "object",
+        additionalProperties: { type: "integer" },
+      },
+      models: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: {},
+            identifier: { type: "string" },
+            label: { type: "string" },
+            name: { type: "string" },
+            description: { type: ["string", "null"] },
+            kind: { type: "string" },
+            type: { type: "string" },
+            provider: { type: ["string", "null"] },
+            badges: { type: "array", items: { type: "string" } },
+            modelCost: { type: ["number", "null"] },
+            modelCostPerSecond: { type: ["number", "null"] },
+            supportsReferenceImage: { type: "boolean" },
+            supportsReferenceVideo: { type: "boolean" },
+            supportsReferenceAudio: { type: "boolean" },
+            supportsFirstFrame: { type: "boolean" },
+            supportsLastFrame: { type: "boolean" },
+            aspectRatios: { type: "array", items: { type: "string" } },
+            defaultAspectRatio: { type: ["string", "null"] },
+            durationOptions: {},
+            maxImages: {},
+            parameters: {},
+            defaultSettings: {
+              type: "object",
+              properties: {
+                aspectRatio: { type: ["string", "null"] },
+              },
+              required: ["aspectRatio"],
+              additionalProperties: false,
+            },
+          },
+          required: [
+            "id",
+            "identifier",
+            "label",
+            "name",
+            "description",
+            "kind",
+            "type",
+            "provider",
+            "badges",
+            "modelCost",
+            "modelCostPerSecond",
+            "supportsReferenceImage",
+            "supportsReferenceVideo",
+            "supportsReferenceAudio",
+            "supportsFirstFrame",
+            "supportsLastFrame",
+            "aspectRatios",
+            "defaultAspectRatio",
+            "durationOptions",
+            "maxImages",
+            "parameters",
+            "defaultSettings",
+          ],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["models", "total", "groups"],
+    additionalProperties: false,
+  }
+}
+
+function generationListOutputSchema() {
+  return {
+    type: "object",
+    properties: {
+      generations: {
+        type: "array",
+        items: generationSchema(),
+      },
+      items: {
+        type: "array",
+        items: mediaItemSchema(),
+      },
+      pagination: {
+        type: "object",
+        properties: {
+          limit: { type: "integer" },
+          offset: { type: "integer" },
+          returned: { type: "integer" },
+          hasMore: { type: "boolean" },
+        },
+        required: ["limit", "offset", "returned", "hasMore"],
+        additionalProperties: false,
+      },
+    },
+    required: ["generations", "items", "pagination"],
+    additionalProperties: false,
+  }
+}
+
+function generationOutputSchema() {
+  return {
+    type: "object",
+    properties: {
+      generation: generationSchema(),
+      items: { type: "array", items: mediaItemSchema() },
+      prompt: { type: ["string", "null"] },
+      model: { type: ["string", "null"] },
+      status: { type: ["string", "null"] },
+    },
+    required: ["generation", "items", "prompt", "model", "status"],
+    additionalProperties: false,
+  }
+}
+
+function generatedMediaOutputSchema() {
+  return {
+    type: "object",
+    properties: {
+      statusCode: { type: "integer" },
+      generationId: { type: ["string", "null"] },
+      generationIds: { type: "array" },
+      status: { type: "string" },
+      type: { type: ["string", "null"] },
+      model: { type: ["string", "null"] },
+      prompt: { type: ["string", "null"] },
+      url: { type: ["string", "null"] },
+      createdAt: { type: ["string", "null"] },
+      error: { type: ["string", "null"] },
+      settings: settingsSchema(),
+      items: { type: "array", items: mediaItemSchema() },
+      result: {},
+      raw: {},
+      nextAction: { type: ["string", "null"] },
+    },
+    required: ["statusCode", "status", "type", "model", "prompt", "items", "settings"],
+    additionalProperties: true,
+  }
+}
+
+function generationSchema() {
+  return {
+    type: "object",
+    properties: {
+      generationId: {},
+      status: {},
+      type: {},
+      model: {},
+      prompt: {},
+      url: { type: ["string", "null"] },
+      storagePath: { type: ["string", "null"] },
+      tool: {},
+      createdAt: {},
+      finishedAt: {},
+      error: {},
+      referenceImageStoragePaths: {},
+      referenceVideoStoragePaths: {},
+      predictionId: {},
+    },
+    required: [
+      "generationId",
+      "status",
+      "type",
+      "model",
+      "prompt",
+      "url",
+      "storagePath",
+      "tool",
+      "createdAt",
+      "finishedAt",
+      "error",
+      "referenceImageStoragePaths",
+      "referenceVideoStoragePaths",
+      "predictionId",
+    ],
+    additionalProperties: false,
+  }
+}
+
+function mediaItemSchema() {
+  return {
+    type: "object",
+    properties: {
+      id: { type: ["string", "null"] },
+      generationId: { type: ["string", "null"] },
+      status: { type: "string" },
+      kind: { type: "string" },
+      type: { type: "string" },
+      mediaUrl: { type: ["string", "null"] },
+      thumbnailUrl: { type: ["string", "null"] },
+      downloadUrl: { type: ["string", "null"] },
+      mimeType: { type: ["string", "null"] },
+      model: { type: ["string", "null"] },
+      prompt: { type: ["string", "null"] },
+      error: { type: ["string", "null"] },
+      createdAt: { type: ["string", "null"] },
+    },
+    required: [
+      "id",
+      "generationId",
+      "status",
+      "kind",
+      "type",
+      "mediaUrl",
+      "thumbnailUrl",
+      "downloadUrl",
+      "mimeType",
+      "model",
+      "prompt",
+      "error",
+      "createdAt",
+    ],
+    additionalProperties: false,
+  }
+}
+
+function settingsSchema() {
+  return {
+    type: "object",
+    properties: {
+      model: { type: ["string", "null"] },
+      aspectRatio: { type: ["string", "null"] },
+      quality: { type: ["string", "null"] },
+      count: { type: "integer" },
+    },
+    required: ["model", "aspectRatio", "quality", "count"],
+    additionalProperties: false,
+  }
+}
+
+function readOnlyAnnotations() {
+  return {
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: false,
+  }
+}
+
+function writeAnnotations() {
+  return {
+    readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: false,
+    idempotentHint: false,
+  }
+}
+
 function clampInt(value: unknown, min: number, max: number, fallback: number) {
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return fallback
@@ -559,6 +1086,25 @@ function copyString(source: JsonObject, target: JsonObject, key: string) {
 function collectStringArray(value: unknown) {
   if (!Array.isArray(value)) return []
   return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+}
+
+function stringArray(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+}
+
+function groupCounts(values: string[]) {
+  return values.reduce<Record<string, number>>((groups, value) => {
+    groups[value] = (groups[value] || 0) + 1
+    return groups
+  }, {})
+}
+
+function mimeTypeForKind(kind: string) {
+  if (kind === "video") return "video/mp4"
+  if (kind === "audio") return "audio/mpeg"
+  if (kind === "image") return "image/png"
+  return null
 }
 
 function inferResponseType(body: JsonObject) {
