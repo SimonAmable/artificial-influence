@@ -103,7 +103,12 @@ function PresenceLandingPage() {
       </div>
       <PlatformSurfacesSection />
       <ModelsBentoSection />
-      <FounderTestimonialSection />
+      <PricingSection embedded />
+      <div id="faq">
+        <FAQSection />
+      </div>
+      <FinalCTASection />
+      <Footer />
     </>
   )
 }
