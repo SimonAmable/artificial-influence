@@ -5,7 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react"
 
-import { platformSurfaceCards } from "@/lib/constants/landing-content"
+import { getPlatformSurfaceCards } from "@/lib/constants/landing-content"
 import type { LandingPlatformSurfaceCard } from "@/lib/types/landing"
 import { AutomationLogoConnection } from "@/components/landing/automation-logo-connection"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -81,6 +81,7 @@ function renderActivePanel(card: LandingPlatformSurfaceCard) {
 
 export function PlatformSurfacesSection() {
   const sectionRef = React.useRef<HTMLElement>(null)
+  const platformSurfaceCards = React.useMemo(() => getPlatformSurfaceCards(), [])
   const defaultTab = platformSurfaceCards[0]?.id ?? "generator"
   const [tab, setTab] = React.useState(defaultTab)
   const [hasInteracted, setHasInteracted] = React.useState(false)

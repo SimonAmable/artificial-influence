@@ -22,7 +22,7 @@ const HOME_AUTH_TIMEOUT_MS = 2500
 const HOME_PROFILE_TIMEOUT_MS = 2500
 const landingPageVariants = {
   default: DefaultLandingPage,
-  presence: DefaultLandingPage,
+  presence: PresenceLandingPage,
 }
 
 async function withTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs: number): Promise<T> {
@@ -88,6 +88,24 @@ export default async function Page() {
     landingPageVariants.default
 
   return <LandingPage />
+}
+
+function PresenceLandingPage() {
+  return (
+    <>
+      <div className="flex min-h-dvh bg-background">
+        <main className="min-w-0 flex-1">
+          <TempHero />
+        </main>
+      </div>
+      <div id="platform-surfaces">
+        <ProofSection />
+      </div>
+      <PlatformSurfacesSection />
+      <ModelsBentoSection />
+      <FounderTestimonialSection />
+    </>
+  )
 }
 
 function DefaultLandingPage() {

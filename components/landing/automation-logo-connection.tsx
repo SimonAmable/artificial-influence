@@ -4,7 +4,10 @@ import { Instagram } from "lucide-react"
 
 import { currentProduct } from "@/lib/product/current"
 import { productLogo } from "@/lib/product/branding"
+import { isPresenceProduct } from "@/lib/product/require-presence"
 import { cn } from "@/lib/utils"
+
+const FANVUE_LOGO_SRC = "/brand_icons/fanvue_logo.png"
 
 type AutomationLogoConnectionProps = {
   className?: string
@@ -13,12 +16,15 @@ type AutomationLogoConnectionProps = {
 }
 
 /**
- * Animated link between the UniCan mark and the standard Instagram mark (automation / social posting).
+ * Animated link between the product mark and a publishing destination (Instagram or Fanvue).
  */
 export function AutomationLogoConnection({
   className,
   fillContainer = false,
 }: AutomationLogoConnectionProps) {
+  const isPresence = isPresenceProduct()
+  const destinationLabel = isPresence ? "Fanvue" : "Instagram"
+
   return (
     <div
       className={cn(
@@ -62,13 +68,20 @@ export function AutomationLogoConnection({
       </div>
 
       <div className="relative z-1 flex shrink-0 flex-col items-center gap-2">
-        <div
-          className="rounded-2xl bg-linear-to-br from-[#f09433] via-[#e6683c] to-[#bc1888] p-3 shadow-lg ring-1 ring-white/25"
-          aria-hidden
-        >
-          <Instagram className="h-12 w-12 text-white" strokeWidth={1.75} />
-        </div>
-        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">Instagram</span>
+        {isPresence ? (
+          <div className="overflow-hidden rounded-2xl shadow-lg ring-1 ring-white/25">
+            {/* eslint-disable-next-line @next/next/no-img-element -- brand mark */}
+            <img src={FANVUE_LOGO_SRC} alt="" width={48} height={48} className="h-12 w-12" />
+          </div>
+        ) : (
+          <div
+            className="rounded-2xl bg-linear-to-br from-[#f09433] via-[#e6683c] to-[#bc1888] p-3 shadow-lg ring-1 ring-white/25"
+            aria-hidden
+          >
+            <Instagram className="h-12 w-12 text-white" strokeWidth={1.75} />
+          </div>
+        )}
+        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">{destinationLabel}</span>
       </div>
     </div>
   )

@@ -48,7 +48,7 @@ export const presenceStudioProduct: ProductConfig = {
   defaultSignedInRoute: "/dashboard",
   assistantName: "Presence Agent",
   pageOverrides: {
-    landing: "default",
+    landing: "presence",
     onboarding: "default",
     dashboard: "default",
     pricing: "default",

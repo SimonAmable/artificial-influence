@@ -12,6 +12,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { CreditPackGrid } from '@/components/credits/credit-pack-grid';
 import { cn } from '@/lib/utils';
+import { isPresenceProduct } from '@/lib/product/require-presence';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { FOUNDER_NOTE_PHOTO_SRC } from '@/lib/onboarding/founder-note';
@@ -71,6 +72,8 @@ const cardFade = {
 };
 
 function PersonalSupportPopoverBody() {
+  const isPresence = isPresenceProduct()
+
   return (
     <div className="space-y-3 text-sm leading-relaxed">
       <div className="flex gap-3">
@@ -95,24 +98,26 @@ function PersonalSupportPopoverBody() {
         you want a feature and you&apos;re not sure it&apos;s worth asking, please just tell me. I
         usually ship fixes and requests within 24 hours.&rdquo;
       </blockquote>
-      <div className="flex flex-col gap-2 border-t border-border/60 pt-2">
-        <Link
-          href={FOUNDER_X_PROFILE_HREF}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-medium text-primary underline underline-offset-4 transition-opacity hover:opacity-80"
-        >
-          Follow me on X
-        </Link>
-        <Link
-          href={FOUNDER_X_PROOF_POST_HREF}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs font-medium text-primary underline underline-offset-4 transition-opacity hover:opacity-80"
-        >
-          See the proof on X
-        </Link>
-      </div>
+      {!isPresence ? (
+        <div className="flex flex-col gap-2 border-t border-border/60 pt-2">
+          <Link
+            href={FOUNDER_X_PROFILE_HREF}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-primary underline underline-offset-4 transition-opacity hover:opacity-80"
+          >
+            Follow me on X
+          </Link>
+          <Link
+            href={FOUNDER_X_PROOF_POST_HREF}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-medium text-primary underline underline-offset-4 transition-opacity hover:opacity-80"
+          >
+            See the proof on X
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }

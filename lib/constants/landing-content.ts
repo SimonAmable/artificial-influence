@@ -5,6 +5,8 @@ import type {
   LandingProcessStep,
   LandingWorkflowItem,
 } from "@/lib/types/landing"
+import type { ProductId } from "@/lib/product/types"
+import { currentProduct } from "@/lib/product/current"
 
 export const landingHero = {
   eyebrow: "For creators",
@@ -143,6 +145,26 @@ export const platformSurfaceCards: LandingPlatformSurfaceCard[] = [
     layoutClass: "lg:col-span-6 lg:min-h-[280px]",
   },
 ]
+
+export function getPlatformSurfaceCards(
+  productId: ProductId = currentProduct.id,
+): LandingPlatformSurfaceCard[] {
+  if (productId !== "presence-studio") {
+    return platformSurfaceCards
+  }
+
+  return platformSurfaceCards.map((card) =>
+    card.id === "automation"
+      ? {
+          ...card,
+          sectionBlurb: "Connect Fanvue and publish on your schedule.",
+          description: "Connect Fanvue and publish on your schedule.",
+          href: "/content",
+          safariUrl: "presencestudio.ai/content",
+        }
+      : card,
+  )
+}
 
 export const modelCards: LandingModelCard[] = [
   {

@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { isPresenceProduct } from "@/lib/product/require-presence"
 
 const CONTACT_EMAIL =
   process.env.NEXT_PUBLIC_ENTERPRISE_CONTACT_EMAIL ?? "support@synthetichumanlabs.com"
@@ -15,6 +16,7 @@ function XLogo() {
 
 export function FinalCTASection() {
   const contactHref = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Contact: teams and small business support")}`
+  const isPresence = isPresenceProduct()
 
   return (
     <section className="w-full bg-background py-16 sm:py-20">
@@ -37,12 +39,14 @@ export function FinalCTASection() {
               View Pricing
             </Button>
           </Link>
-          <Button variant="outline" size="lg" asChild>
-            <a href={X_PROFILE_HREF} target="_blank" rel="noreferrer">
-              <XLogo />
-              Follow on X
-            </a>
-          </Button>
+          {!isPresence ? (
+            <Button variant="outline" size="lg" asChild>
+              <a href={X_PROFILE_HREF} target="_blank" rel="noreferrer">
+                <XLogo />
+                Follow on X
+              </a>
+            </Button>
+          ) : null}
           <Button variant="outline" size="lg" asChild>
             <a href={contactHref}>Contact us</a>
           </Button>

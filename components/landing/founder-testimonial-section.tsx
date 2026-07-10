@@ -4,6 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useMemo, useRef } from "react"
 import { motion, useInView, useReducedMotion } from "motion/react"
+import { isPresenceProduct } from "@/lib/product/require-presence"
 const chartData = [
   { day: 1, label: "Day 1", views: 1500 },
   { day: 2, label: "Day 2", views: 4000 },
@@ -33,6 +34,7 @@ function formatViews(value: number) {
 
 export function FounderTestimonialSection() {
   const sectionRef = useRef<HTMLElement>(null)
+  const isPresence = isPresenceProduct()
   const isInView = useInView(sectionRef, { once: true, margin: "0px 0px -15% 0px" })
   const reduceMotion = useReducedMotion()
   const revealed = isInView || reduceMotion
@@ -89,14 +91,16 @@ export function FounderTestimonialSection() {
             250,000 organic views in 7 days.&quot;
           </p>
 
-          <Link
-            href="https://x.com/Simoncodingshit/status/2051864111655330245?s=20"
-            target="_blank"
-            rel="noreferrer"
-            className="mt-4 inline-flex items-center text-sm font-medium text-primary underline underline-offset-4 transition-opacity hover:opacity-80"
-          >
-            See the proof on X
-          </Link>
+          {!isPresence ? (
+            <Link
+              href="https://x.com/Simoncodingshit/status/2051864111655330245?s=20"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex items-center text-sm font-medium text-primary underline underline-offset-4 transition-opacity hover:opacity-80"
+            >
+              See the proof on X
+            </Link>
+          ) : null}
         </div>
 
         <motion.div
