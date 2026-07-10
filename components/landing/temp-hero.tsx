@@ -6,7 +6,7 @@ import Link from "next/link"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { HERO_SHOWCASE_DURATION_MS, getHeroShowcaseMedia } from "@/lib/constants/hero-showcase-media"
+import { HERO_SHOWCASE_IMAGE_DURATION_MS, getHeroShowcaseMedia } from "@/lib/constants/hero-showcase-media"
 import { currentProduct } from "@/lib/product/current"
 
 const heroEase = [0.22, 1, 0.36, 1] as const
@@ -30,7 +30,7 @@ export function TempHero() {
       return
     }
 
-    const timeout = window.setTimeout(showNextMedia, HERO_SHOWCASE_DURATION_MS)
+    const timeout = window.setTimeout(showNextMedia, HERO_SHOWCASE_IMAGE_DURATION_MS)
     return () => {
       window.clearTimeout(timeout)
     }

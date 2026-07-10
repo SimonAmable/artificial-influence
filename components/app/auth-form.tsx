@@ -8,7 +8,11 @@ import { ArrowLeftIcon, EnvelopeSimpleIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
 import { createClient } from "@/lib/supabase/client"
-import { HERO_SHOWCASE_DURATION_MS, getHeroShowcaseMedia } from "@/lib/constants/hero-showcase-media"
+import {
+  HERO_SHOWCASE_IMAGE_DURATION_MS,
+  HERO_SHOWCASE_VIDEO_FALLBACK_DURATION_MS,
+  getHeroShowcaseMedia,
+} from "@/lib/constants/hero-showcase-media"
 import { isMcpOAuthContinuationPath } from "@/lib/mcp/oauth-login-state"
 import { currentProduct } from "@/lib/product/current"
 import { cn } from "@/lib/utils"
@@ -53,7 +57,9 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
   const supabase = createClient()
   const activeItem = showcaseItems[activeShowcase]
   const activeDurationMs =
-    activeItem.media.type === "video" ? showcaseDurationsMs[activeItem.id] ?? HERO_SHOWCASE_DURATION_MS : HERO_SHOWCASE_DURATION_MS
+    activeItem.media.type === "video"
+      ? showcaseDurationsMs[activeItem.id] ?? HERO_SHOWCASE_VIDEO_FALLBACK_DURATION_MS
+      : HERO_SHOWCASE_IMAGE_DURATION_MS
   const nextPath = React.useMemo(() => {
     const requestedNext = searchParams.get("next")
     return requestedNext && requestedNext.startsWith("/") ? requestedNext : "/"
@@ -429,7 +435,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                         key={`progress-${index}-${activeShowcase}`}
                         className="absolute inset-y-0 left-0 rounded-full bg-primary"
                         style={{
-                          animation: `showcase-progress ${HERO_SHOWCASE_DURATION_MS}ms linear forwards`,
+                          animation: `showcase-progress ${HERO_SHOWCASE_IMAGE_DURATION_MS}ms linear forwards`,
                           animationDuration: `${activeDurationMs}ms`,
                         }}
                       />

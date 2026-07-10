@@ -1,6 +1,8 @@
 import type { ProductId } from "@/lib/product/types"
 
-export const HERO_SHOWCASE_DURATION_MS = 7000
+export const HERO_SHOWCASE_IMAGE_DURATION_MS = 2000
+/** Fallback progress duration before video metadata is available (auth carousel). */
+export const HERO_SHOWCASE_VIDEO_FALLBACK_DURATION_MS = 7000
 
 export type HeroShowcaseMediaItem = {
   id: string
