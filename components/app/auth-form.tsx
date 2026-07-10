@@ -8,6 +8,7 @@ import { ArrowLeftIcon, EnvelopeSimpleIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
 import { createClient } from "@/lib/supabase/client"
+import { HERO_SHOWCASE_DURATION_MS, getHeroShowcaseMedia } from "@/lib/constants/hero-showcase-media"
 import { isMcpOAuthContinuationPath } from "@/lib/mcp/oauth-login-state"
 import { currentProduct } from "@/lib/product/current"
 import { cn } from "@/lib/utils"
@@ -24,38 +25,15 @@ type ShowcaseItem = {
   }
 }
 
-const SHOWCASE_DURATION_MS = 7000
-
-const showcaseItems: ShowcaseItem[] = [
-  {
-    id: "demo-hero-1",
+function toShowcaseItems(): ShowcaseItem[] {
+  return getHeroShowcaseMedia(currentProduct.id).map((item) => ({
+    id: item.id,
     media: {
-      type: "video",
-      src: "/hero_showcase_images/demo_hero_vids/compressed/d1.webm",
+      type: item.kind,
+      src: item.src,
     },
-  },
-  {
-    id: "demo-hero-2",
-    media: {
-      type: "video",
-      src: "/hero_showcase_images/demo_hero_vids/compressed/d2.webm",
-    },
-  },
-  {
-    id: "demo-hero-3",
-    media: {
-      type: "video",
-      src: "/hero_showcase_images/demo_hero_vids/compressed/d3.webm",
-    },
-  },
-  {
-    id: "demo-hero-4",
-    media: {
-      type: "video",
-      src: "/hero_showcase_images/demo_hero_vids/compressed/d4.webm",
-    },
-  },
-]
+  }))
+}
 
 export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) {
   const [mode, setMode] = React.useState<AuthMode>(defaultMode)
@@ -68,13 +46,14 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
   const [showcaseDurationsMs, setShowcaseDurationsMs] = React.useState<Record<string, number>>({})
   const [error, setError] = React.useState<string | null>(null)
   const [message, setMessage] = React.useState<string | null>(null)
+  const showcaseItems = React.useMemo(() => toShowcaseItems(), [])
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const supabase = createClient()
   const activeItem = showcaseItems[activeShowcase]
   const activeDurationMs =
-    activeItem.media.type === "video" ? showcaseDurationsMs[activeItem.id] ?? SHOWCASE_DURATION_MS : SHOWCASE_DURATION_MS
+    activeItem.media.type === "video" ? showcaseDurationsMs[activeItem.id] ?? HERO_SHOWCASE_DURATION_MS : HERO_SHOWCASE_DURATION_MS
   const nextPath = React.useMemo(() => {
     const requestedNext = searchParams.get("next")
     return requestedNext && requestedNext.startsWith("/") ? requestedNext : "/"
@@ -450,7 +429,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                         key={`progress-${index}-${activeShowcase}`}
                         className="absolute inset-y-0 left-0 rounded-full bg-primary"
                         style={{
-                          animation: `showcase-progress ${SHOWCASE_DURATION_MS}ms linear forwards`,
+                          animation: `showcase-progress ${HERO_SHOWCASE_DURATION_MS}ms linear forwards`,
                           animationDuration: `${activeDurationMs}ms`,
                         }}
                       />

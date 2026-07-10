@@ -6,18 +6,16 @@ import Link from "next/link"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { HERO_SHOWCASE_DURATION_MS, getHeroShowcaseMedia } from "@/lib/constants/hero-showcase-media"
 import { currentProduct } from "@/lib/product/current"
-
-const heroBackgroundMedia = [
-  { kind: "video" as const, src: "/hero_showcase_images/demo_hero_vids/compressed/d1.webm" },
-  { kind: "video" as const, src: "/hero_showcase_images/demo_hero_vids/compressed/d2.webm" },
-  { kind: "video" as const, src: "/hero_showcase_images/demo_hero_vids/compressed/d3.webm" },
-  { kind: "video" as const, src: "/hero_showcase_images/demo_hero_vids/compressed/d4.webm" },
-]
 
 const heroEase = [0.22, 1, 0.36, 1] as const
 
 export function TempHero() {
+  const heroBackgroundMedia = React.useMemo(
+    () => getHeroShowcaseMedia(currentProduct.id),
+    [],
+  )
   const [activeMediaIndex, setActiveMediaIndex] = React.useState(0)
   const activeMedia = heroBackgroundMedia[activeMediaIndex]
   const prefersReducedMotion = useReducedMotion()
@@ -25,7 +23,18 @@ export function TempHero() {
 
   const showNextMedia = React.useCallback(() => {
     setActiveMediaIndex((currentIndex) => (currentIndex + 1) % heroBackgroundMedia.length)
-  }, [])
+  }, [heroBackgroundMedia.length])
+
+  React.useEffect(() => {
+    if (activeMedia.kind !== "image") {
+      return
+    }
+
+    const timeout = window.setTimeout(showNextMedia, HERO_SHOWCASE_DURATION_MS)
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [activeMedia.kind, activeMediaIndex, showNextMedia])
 
   const fadeUp = React.useCallback(
     (delay: number) => ({
@@ -61,16 +70,26 @@ export function TempHero() {
               transition={{ duration: prefersReducedMotion ? 0.01 : 0.45, ease: heroEase }}
               className="absolute inset-0"
             >
-              <video
-                autoPlay
-                muted
-                playsInline
-                preload="auto"
-                onEnded={showNextMedia}
-                className="absolute inset-0 h-full w-full object-cover object-center"
-              >
-                <source src={activeMedia.src} type="video/webm" />
-              </video>
+              {activeMedia.kind === "image" ? (
+                <Image
+                  src={activeMedia.src}
+                  alt=""
+                  fill
+                  priority
+                  className="object-cover object-center"
+                />
+              ) : (
+                <video
+                  autoPlay
+                  muted
+                  playsInline
+                  preload="auto"
+                  onEnded={showNextMedia}
+                  className="absolute inset-0 h-full w-full object-cover object-center"
+                >
+                  <source src={activeMedia.src} type="video/webm" />
+                </video>
+              )}
             </motion.div>
           </AnimatePresence>
           <motion.div
