@@ -191,54 +191,26 @@ function mediaItemNeedsHydration(item: FanvueMediaListItem): boolean {
   return false
 }
 
-type FanvueMediaUploadPaths = {
-  createSessionPath: string
-  completeSessionPath: (uploadId: string) => string
-  partUploadPath: (uploadId: string, partNumber: number) => string
-}
-
-function resolveFanvueMediaUploadPaths(creatorUserUuid?: string): FanvueMediaUploadPaths {
-  const creator = creatorUserUuid?.trim()
-  if (creator) {
-    return {
-      createSessionPath: `/creators/${encodeURIComponent(creator)}/media/uploads`,
-      completeSessionPath: (uploadId: string) =>
-        `/creators/${encodeURIComponent(creator)}/media/uploads/${encodeURIComponent(uploadId)}`,
-      partUploadPath: (uploadId: string, partNumber: number) =>
-        `/creators/${encodeURIComponent(creator)}/media/uploads/${encodeURIComponent(uploadId)}/parts/${partNumber}/url`,
-    }
-  }
-
-  return {
-    createSessionPath: "/media/uploads",
-    completeSessionPath: (uploadId: string) => `/media/uploads/${encodeURIComponent(uploadId)}`,
-    partUploadPath: (uploadId: string, partNumber: number) =>
-      `/media/uploads/${encodeURIComponent(uploadId)}/parts/${partNumber}/url`,
-  }
-}
+/**
+ * Creator OAuth uploads use the authenticated-user media endpoints from Fanvue's
+ * multipart tutorial (`POST/GET/PATCH /media/uploads`), not the agency
+ * `/creators/{uuid}/media/uploads` routes.
+ */
+const FANVUE_SELF_MEDIA_UPLOAD_PATHS = {
+  createSessionPath: "/media/uploads",
+  completeSessionPath: (uploadId: string) => `/media/uploads/${encodeURIComponent(uploadId)}`,
+  partUploadPath: (uploadId: string, partNumber: number) =>
+    `/media/uploads/${encodeURIComponent(uploadId)}/parts/${partNumber}/url`,
+} as const
 
 async function resolveSignedPartUploadUrl(params: {
   accessToken: string
   uploadId: string
   partNumber: number
-  creatorUserUuid?: string
 }): Promise<string> {
-  const creator = params.creatorUserUuid?.trim()
-  if (creator) {
-    const url = await fanvueApiRequestText({
-      accessToken: params.accessToken,
-      path: resolveFanvueMediaUploadPaths(creator).partUploadPath(params.uploadId, params.partNumber),
-    })
-    if (!url) {
-      throw new Error(`Fanvue did not return an upload URL for part ${params.partNumber}.`)
-    }
-    return url
-  }
-
-  const selfPath = `/media/uploads/${encodeURIComponent(params.uploadId)}/parts/${params.partNumber}/url`
   const url = await fanvueApiRequestText({
     accessToken: params.accessToken,
-    path: selfPath,
+    path: FANVUE_SELF_MEDIA_UPLOAD_PATHS.partUploadPath(params.uploadId, params.partNumber),
   })
   if (!url) {
     throw new Error(`Fanvue did not return an upload URL for part ${params.partNumber}.`)
@@ -569,13 +541,11 @@ export async function uploadFanvueMediaBuffer(params: {
   mimeType: string
   buffer: Buffer
   displayName?: string
-  creatorUserUuid?: string
 }): Promise<FanvueMediaListItem> {
   const mediaType = inferFanvueMediaType(params.mimeType)
-  const uploadPaths = resolveFanvueMediaUploadPaths(params.creatorUserUuid)
   const session = await fanvueApiRequest<UploadSessionResponse>({
     accessToken: params.accessToken,
-    path: uploadPaths.createSessionPath,
+    path: FANVUE_SELF_MEDIA_UPLOAD_PATHS.createSessionPath,
     body: {
       name: params.displayName?.trim() || params.filename,
       filename: params.filename,
@@ -598,7 +568,6 @@ export async function uploadFanvueMediaBuffer(params: {
       accessToken: params.accessToken,
       uploadId: session.uploadId,
       partNumber,
-      creatorUserUuid: params.creatorUserUuid,
     })
 
     const etag = await fanvueApiUploadPart(signedUrl, chunk)
@@ -611,7 +580,7 @@ export async function uploadFanvueMediaBuffer(params: {
   const completion = await fanvueApiRequest<{ status?: string }>({
     accessToken: params.accessToken,
     method: "PATCH",
-    path: uploadPaths.completeSessionPath(session.uploadId),
+    path: FANVUE_SELF_MEDIA_UPLOAD_PATHS.completeSessionPath(session.uploadId),
     body: { parts: completedParts },
   })
 

@@ -25,8 +25,9 @@ function inferFilenameFromUrl(url: string): string {
 }
 
 function inferMimeType(filename: string, contentType: string | null): string {
-  if (contentType?.startsWith("image/") || contentType?.startsWith("video/")) {
-    return contentType
+  const normalizedContentType = contentType?.split(";")[0]?.trim().toLowerCase() ?? null
+  if (normalizedContentType?.startsWith("image/") || normalizedContentType?.startsWith("video/")) {
+    return normalizedContentType
   }
   const lower = filename.toLowerCase()
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg"
@@ -90,7 +91,6 @@ export async function POST(request: Request) {
       mimeType,
       buffer,
       displayName: body.displayName?.trim() || filename,
-      creatorUserUuid: token.connection.provider_account_id,
     })
 
     if (folderName) {

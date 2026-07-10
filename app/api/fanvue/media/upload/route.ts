@@ -45,13 +45,26 @@ export async function POST(request: Request) {
     })
 
     const buffer = Buffer.from(await file.arrayBuffer())
+    const filename = file.name || `presence-upload-${Date.now()}.png`
+    const mimeType = (() => {
+      const declared = file.type?.split(";")[0]?.trim().toLowerCase() ?? ""
+      if (declared.startsWith("image/") || declared.startsWith("video/")) return declared
+      const lower = filename.toLowerCase()
+      if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg"
+      if (lower.endsWith(".webp")) return "image/webp"
+      if (lower.endsWith(".gif")) return "image/gif"
+      if (lower.endsWith(".png")) return "image/png"
+      if (lower.endsWith(".mp4")) return "video/mp4"
+      if (lower.endsWith(".mov")) return "video/quicktime"
+      return declared || "image/png"
+    })()
+
     const media = await uploadFanvueMediaBuffer({
       accessToken: token.accessToken,
-      filename: file.name,
-      mimeType: file.type || "application/octet-stream",
+      filename,
+      mimeType,
       buffer,
-      displayName: file.name,
-      creatorUserUuid: token.connection.provider_account_id,
+      displayName: filename,
     })
 
     if (folderName) {
