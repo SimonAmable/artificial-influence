@@ -6,6 +6,7 @@ export const unicanProduct: ProductConfig = {
   siteUrl: "https://unican.ai",
   mcpSiteUrl: "https://mcp.unican.ai",
   logo: "/logo.svg",
+  logoSizePx: 28,
   favicon: "/favicon.ico",
   themeClass: "theme-unican",
   metadata: {

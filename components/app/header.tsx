@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils"
 import {
   HeaderIconButton,
   HeaderPillButton,
+  headerControlSurfaceClassName,
 } from "@/components/app/header-controls"
 import { Button } from "@/components/ui/button"
 import { SettingsDropdown } from "@/components/app/settings-dropdown"
@@ -217,7 +218,10 @@ export function Header() {
           >
             <span
               aria-hidden
-              className="pointer-events-none absolute left-1/2 top-1/2 h-11 w-11 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/5 shadow-lg dark:bg-white/6"
+              className={cn(
+                "pointer-events-none absolute left-1/2 top-1/2 h-11 w-11 -translate-x-1/2 -translate-y-1/2",
+                headerControlSurfaceClassName,
+              )}
             />
             <Image
               src={currentProduct.logo}
