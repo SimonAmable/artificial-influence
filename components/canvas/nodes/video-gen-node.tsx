@@ -75,6 +75,7 @@ import { toast } from "sonner"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
 import { useNodeErrorToast } from "@/hooks/use-node-error-toast"
+import { toUserFacingGenerationError } from "@/lib/content-moderation-toast"
 import { generateVideoAndWait } from "@/lib/generate-video-client"
 
 export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodeProps) => {
@@ -1099,7 +1100,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     } catch (err) {
       nodeData.onDataChange?.(id, {
         isGenerating: false,
-        error: err instanceof Error ? err.message : "Generation failed",
+        error: toUserFacingGenerationError(
+          err instanceof Error ? err.message : "Generation failed",
+        ),
       })
     }
   }

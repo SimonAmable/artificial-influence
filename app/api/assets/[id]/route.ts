@@ -2,31 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { ASSET_CATEGORIES, inferStoragePathFromUrl, normalizeTags } from "@/lib/assets/library"
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
+import { mapAssetRowWithFreshUrl } from "@/lib/assets/map-asset-row"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { resolveStoredObjectUrl } from "@/lib/uploads/server"
-import { normalizeSameOriginAssetUrl } from "@/lib/assets/normalize-same-origin-asset-url"
-
-function mapAssetRow(row: Record<string, unknown>, siteOrigin: string) {
-  const rawUrl = row.asset_url as string
-  const rawThumb = (row.thumbnail_url as string | null) || null
-  return {
-    id: row.id as string,
-    userId: row.user_id as string,
-    uploadId: (row.upload_id as string | null) || null,
-    title: (row.title as string) || "Untitled Asset",
-    description: (row.description as string | null) || null,
-    assetType: row.asset_type as AssetType,
-    category: row.category as AssetCategory,
-    visibility: row.visibility as AssetVisibility,
-    tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
-    url: normalizeSameOriginAssetUrl(rawUrl, siteOrigin),
-    thumbnailUrl: rawThumb ? normalizeSameOriginAssetUrl(rawThumb, siteOrigin) : null,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
-    sourceNodeType: (row.source_node_type as string | null) || null,
-    sourceGenerationId: (row.source_generation_id as string | null) || null,
-  }
-}
 
 export async function PATCH(
   request: NextRequest,
@@ -65,6 +43,7 @@ export async function PATCH(
     }
 
     const siteOrigin = request.nextUrl.origin
+    const storageClient = createServiceRoleClient() ?? supabase
 
     const tags = normalizeTags(Array.isArray(body.tags) ? (body.tags as string[]) : [])
     let assetUrl = url
@@ -89,16 +68,15 @@ export async function PATCH(
       uploadId = uploadRow.id as string
       supabaseStoragePath = uploadRow.storage_path as string
       assetUrl = await resolveStoredObjectUrl(
-        createServiceRoleClient() ?? supabase,
+        storageClient,
         uploadRow.bucket as string,
         uploadRow.storage_path as string,
       )
     }
 
-    assetUrl = normalizeSameOriginAssetUrl(assetUrl, siteOrigin)
     const thumbnailUrl =
       typeof body.thumbnailUrl === "string" && body.thumbnailUrl.trim().length > 0
-        ? normalizeSameOriginAssetUrl(body.thumbnailUrl.trim(), siteOrigin)
+        ? body.thumbnailUrl.trim()
         : null
 
     const updateData: Record<string, unknown> = {
@@ -138,7 +116,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Failed to update asset", message: error?.message }, { status: 500 })
     }
 
-    return NextResponse.json({ asset: mapAssetRow(data as Record<string, unknown>, siteOrigin) })
+    return NextResponse.json({
+      asset: await mapAssetRowWithFreshUrl(storageClient, data as Record<string, unknown>, {
+        siteOrigin,
+      }),
+    })
   } catch (error) {
     console.error("[assets] PATCH exception:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

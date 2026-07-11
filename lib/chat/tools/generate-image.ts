@@ -5,6 +5,12 @@ import { tool } from "ai"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { inferStoragePathFromUrl } from "@/lib/assets/library"
+import {
+  absolutizeAssetUrl,
+  resolveAssetAccessUrl,
+} from "@/lib/assets/resolve-asset-access-url"
+import { extractStorageObjectRef } from "@/lib/uploads/storage-ref"
+import { DEFAULT_UPLOAD_BUCKET, type UploadBucket } from "@/lib/uploads/shared"
 import { checkUserHasCredits } from "@/lib/credits"
 import { enhancePrompt, enhancePromptForJSONModels } from "@/lib/prompt-enhancement"
 import {
@@ -62,6 +68,7 @@ interface CreateGenerateImageToolOptions {
 interface StoredAsset {
   mimeType: string
   storagePath: string | null
+  bucket: UploadBucket | null
   url: string
 }
 
@@ -182,6 +189,7 @@ async function uploadBufferToStorage({
   return {
     mimeType,
     storagePath,
+    bucket: DEFAULT_UPLOAD_BUCKET,
     url: urlData.publicUrl,
   }
 }
@@ -199,9 +207,11 @@ async function uploadReferenceImage(
       maxContentLengthBytes: MAX_FILE_SIZE_BYTES,
     })
 
+    const ref = extractStorageObjectRef(safeUrl)
     return {
       mimeType: reference.mediaType ?? "image/png",
-      storagePath: inferStoragePathFromUrl(safeUrl),
+      storagePath: ref?.storagePath ?? inferStoragePathFromUrl(safeUrl),
+      bucket: ref?.bucket ?? null,
       url: safeUrl,
     }
   }
@@ -228,24 +238,29 @@ async function storedAssetToFile(
   supabase: SupabaseClient,
 ): Promise<File> {
   if (reference.storagePath) {
-    const { data, error } = await supabase.storage
-      .from("public-bucket")
-      .download(reference.storagePath)
+    const bucketsToTry: UploadBucket[] = reference.bucket
+      ? [reference.bucket]
+      : [DEFAULT_UPLOAD_BUCKET, "private-bucket"]
 
-    if (error || !data) {
-      throw new Error(`Failed to download reference image: ${error?.message ?? "Unknown error"}`)
+    let lastError: string | null = null
+    for (const bucket of bucketsToTry) {
+      const { data, error } = await supabase.storage.from(bucket).download(reference.storagePath)
+      if (!error && data) {
+        const mimeType = data.type || reference.mimeType || "image/png"
+        return new File(
+          [data],
+          buildReferenceFilename({
+            fallbackStem: `reference-${index + 1}`,
+            mimeType,
+            source: reference.storagePath,
+          }),
+          { type: mimeType },
+        )
+      }
+      lastError = error?.message ?? "Unknown error"
     }
 
-    const mimeType = data.type || reference.mimeType || "image/png"
-    return new File(
-      [data],
-      buildReferenceFilename({
-        fallbackStem: `reference-${index + 1}`,
-        mimeType,
-        source: reference.storagePath,
-      }),
-      { type: mimeType },
-    )
+    throw new Error(`Failed to download reference image: ${lastError ?? "Unknown error"}`)
   }
 
   const safeUrl = await validateExternalReferenceUrl({
@@ -281,7 +296,7 @@ async function loadAssetReferences(
 
   const { data, error } = await supabase
     .from("assets")
-    .select("id, user_id, asset_type, asset_url, visibility")
+    .select("id, user_id, asset_type, asset_url, visibility, upload_id, supabase_storage_path")
     .in("id", assetIds)
 
   if (error) {
@@ -303,11 +318,29 @@ async function loadAssetReferences(
     throw new Error("One or more saved assets could not be accessed.")
   }
 
-  return assets.map((asset) => ({
-    mimeType: "image/png",
-    storagePath: inferStoragePathFromUrl(String(asset.asset_url)),
-    url: String(asset.asset_url),
-  }))
+  return Promise.all(
+    assets.map(async (asset) => {
+      const freshUrl = await resolveAssetAccessUrl(supabase, {
+        asset_url: asset.asset_url,
+        upload_id: asset.upload_id,
+        supabase_storage_path: asset.supabase_storage_path,
+        visibility: asset.visibility,
+      })
+      const absolute = absolutizeAssetUrl(freshUrl)
+      const ref = extractStorageObjectRef(absolute)
+      const storagePath =
+        (typeof asset.supabase_storage_path === "string" && asset.supabase_storage_path.trim()) ||
+        ref?.storagePath ||
+        inferStoragePathFromUrl(absolute)
+
+      return {
+        mimeType: "image/png",
+        storagePath,
+        bucket: ref?.bucket ?? null,
+        url: absolute,
+      }
+    }),
+  )
 }
 
 async function maybeEnhancePrompt({

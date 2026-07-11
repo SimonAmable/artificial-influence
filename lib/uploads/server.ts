@@ -2,9 +2,9 @@ import { createHash } from "crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
+import { resolveStoredObjectUrl } from "@/lib/uploads/resolve-stored-object-url"
 import {
   DEFAULT_UPLOAD_BUCKET,
-  PRIVATE_UPLOAD_BUCKET,
   type FinalizeUploadRequest,
   type RegisterUploadRequest,
   type RegisterUploadResponse,
@@ -12,6 +12,8 @@ import {
   type UploadFileType,
   type UploadResponsePayload,
 } from "@/lib/uploads/shared"
+
+export { resolveStoredObjectUrl } from "@/lib/uploads/resolve-stored-object-url"
 
 type UploadRow = {
   id: string
@@ -71,22 +73,6 @@ async function storageObjectExists(
   const { data, error } = await supabase.storage.from(bucket).exists(storagePath)
   if (error) return false
   return Boolean(data)
-}
-
-export async function resolveStoredObjectUrl(
-  supabase: SupabaseClient,
-  bucket: UploadBucket,
-  storagePath: string,
-) {
-  if (bucket !== PRIVATE_UPLOAD_BUCKET) {
-    return supabase.storage.from(bucket).getPublicUrl(storagePath).data.publicUrl
-  }
-
-  const signed = await supabase.storage.from(bucket).createSignedUrl(storagePath, 60 * 60)
-  if (signed.error || !signed.data?.signedUrl) {
-    throw new Error(signed.error?.message || "Failed to create signed URL")
-  }
-  return signed.data.signedUrl
 }
 
 function mapUploadRowToResponse(row: UploadRow, url: string, deduped: boolean): UploadResponsePayload {

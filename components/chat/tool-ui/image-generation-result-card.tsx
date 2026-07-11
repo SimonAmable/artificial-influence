@@ -11,6 +11,7 @@ import type {
   UniversalGenerateImageToolPart,
 } from "@/lib/chat/agent-tool-part-types"
 import { useImageGenerationPoll } from "@/hooks/use-generation-status"
+import { toUserFacingGenerationError } from "@/lib/content-moderation-toast"
 import { CreditCostBadge, PromptLengthBadge, shouldHideGenerateImageToolMessage } from "./badges"
 
 export function ImageGenerationResultCard({
@@ -168,7 +169,7 @@ export function ImageGenerationResultCard({
       <Card key={messageId} className="border-destructive/30 bg-destructive/5">
         <CardContent className="space-y-2 p-4 text-sm text-destructive">
           <p className="font-medium">{title} failed</p>
-          <p>{part.errorText || "Unknown tool error."}</p>
+          <p>{toUserFacingGenerationError(part.errorText || "Unknown tool error.")}</p>
         </CardContent>
       </Card>
     )
@@ -187,7 +188,11 @@ export function ImageGenerationResultCard({
         <Card key={messageId} className="border-destructive/30 bg-destructive/5">
           <CardContent className="space-y-2 p-4 text-sm text-destructive">
             <p className="font-medium">{title} failed</p>
-            <p>{polledState?.error || part.errorText || "Unknown tool error."}</p>
+            <p>
+              {toUserFacingGenerationError(
+                polledState?.error || part.errorText || "Unknown tool error.",
+              )}
+            </p>
           </CardContent>
         </Card>
       )

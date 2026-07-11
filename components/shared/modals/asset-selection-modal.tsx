@@ -169,8 +169,12 @@ function mergeUniqueById<TItem extends { id: string }>(existing: TItem[], incomi
   return merged
 }
 
+export type AssetSelectionSource = "asset" | "history" | "upload"
+
 export type AssetSelectionPick = {
   id?: string
+  /** Which library tab the pick came from — used for durable server-side media proxy. */
+  source?: AssetSelectionSource
   previewUrl?: string | null
   title?: string
   url: string
@@ -843,6 +847,7 @@ export function AssetSelectionModal({
                         onClick={() =>
                           handleSelect({
                             id: asset.id,
+                            source: "asset",
                             previewUrl: asset.thumbnailUrl || asset.url,
                             title: asset.title,
                             url: asset.url,
@@ -959,6 +964,7 @@ export function AssetSelectionModal({
                         onClick={() =>
                           handleSelect({
                             id: generation.id,
+                            source: "history",
                             previewUrl: generation.url,
                             title: generation.prompt || "Generated media",
                             url: generation.url,
@@ -1076,6 +1082,7 @@ export function AssetSelectionModal({
                         onClick={() =>
                           handleSelect({
                             id: upload.id,
+                            source: "upload",
                             previewUrl: upload.url,
                             title: upload.title,
                             url: upload.url,

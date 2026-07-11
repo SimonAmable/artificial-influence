@@ -71,6 +71,7 @@ import {
   hasVideoOrAudioAssetRefs,
 } from "@/lib/commands/ref-image-pipeline"
 import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
+import { toUserFacingGenerationError } from "@/lib/content-moderation-toast"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 
 // Helper function to get dimensions for aspect ratio
@@ -801,7 +802,9 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         error: null,
       })
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Generation failed"
+      const message = toUserFacingGenerationError(
+        err instanceof Error ? err.message : "Generation failed",
+      )
       const remainingPendingGenerationCount = Math.max(0, getLatestPendingGenerationCount() - 1)
       nodeData.onDataChange?.(id, {
         pendingGenerationCount: remainingPendingGenerationCount,

@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { tryShowContentModerationToast, toUserFacingGenerationError } from "@/lib/content-moderation-toast"
 import {
   AUDIO_MODEL_OPTIONS,
   DEFAULT_AUDIO_PROVIDER,
@@ -954,8 +955,12 @@ export function AudioStudioPage() {
       toast.success("Voice change video generated")
     } catch (generationError) {
       const message = generationError instanceof Error ? generationError.message : "Generation failed"
-      setError(message)
-      toast.error(message)
+      if (tryShowContentModerationToast(message, generationError, { toastId: "audio-moderation-error" })) {
+        setError(toUserFacingGenerationError(message))
+      } else {
+        setError(message)
+        toast.error(message)
+      }
     } finally {
       setIsGenerating(false)
       setStatusMessage(null)

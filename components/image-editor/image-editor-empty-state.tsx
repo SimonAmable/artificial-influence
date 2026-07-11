@@ -10,6 +10,7 @@ import {
 } from "@/components/shared/modals/asset-selection-modal"
 import { toast } from "sonner"
 import { useImageEditor } from "./image-editor-provider"
+import { fetchLibraryPickAsFile } from "@/lib/client/fetch-library-pick"
 
 interface ImageEditorEmptyStateProps {
   className?: string
@@ -78,21 +79,28 @@ export function ImageEditorEmptyState({ className }: ImageEditorEmptyStateProps)
     }
   }
 
-  const handleAssetSelect = async ({ url, assetType }: AssetSelectionPick) => {
-    if (assetType !== "image") {
+  const handleAssetSelect = async (pick: AssetSelectionPick) => {
+    if (pick.assetType !== "image") {
       toast.error("Selected item must be an image")
       return
     }
     try {
-      const response = await fetch(url)
-      if (!response.ok) throw new Error("Failed to fetch")
-      const blob = await response.blob()
-      if (!blob.type.startsWith("image/")) {
-        toast.error("Selected item must be an image")
-        return
+      // Prefer durable library URL (freshly signed from assets API); fall back to proxy blob.
+      try {
+        await loadImage(pick.url)
+      } catch {
+        const file = await fetchLibraryPickAsFile(pick)
+        if (!file.type.startsWith("image/")) {
+          toast.error("Selected item must be an image")
+          return
+        }
+        const objectUrl = URL.createObjectURL(file)
+        try {
+          await loadImage(objectUrl)
+        } finally {
+          URL.revokeObjectURL(objectUrl)
+        }
       }
-      // Use the canonical URL for canvas + state so currentImage stays valid for export/generate (same as /image references).
-      await loadImage(url)
       setAssetModalOpen(false)
     } catch {
       toast.error("Could not load image from library")

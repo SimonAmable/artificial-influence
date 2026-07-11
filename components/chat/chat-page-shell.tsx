@@ -19,19 +19,22 @@ export async function ChatPageShell({
   const threads = user ? await listUserChatThreads(user.id) : []
 
   return (
-    <div className="flex h-dvh min-h-0 bg-background pt-16 md:pt-[60px]">
-      {user ? <ChatSidebar currentThreadId={currentThreadId} threads={threads} /> : null}
+    <div className="flex h-dvh min-h-0 flex-col bg-background pt-16 md:pt-[60px]">
+      {/* Shared pad so sidebar bottom and prompt box bottom share one edge */}
+      <div className="flex min-h-0 flex-1 items-stretch gap-3 px-3 pb-5 pt-3">
+        {user ? <ChatSidebar currentThreadId={currentThreadId} threads={threads} /> : null}
 
-      <main className="min-w-0 flex-1">
-        <CreativeAgentChat
-          compact
-          enablePersistence
-          initialMessages={initialMessages}
-          initialThreadId={currentThreadId}
-          mobileThreads={user ? threads : undefined}
-          syncUrlOnThreadCreate
-        />
-      </main>
+        <main className="min-h-0 min-w-0 flex-1">
+          <CreativeAgentChat
+            compact
+            enablePersistence
+            initialMessages={initialMessages}
+            initialThreadId={currentThreadId}
+            mobileThreads={user ? threads : undefined}
+            syncUrlOnThreadCreate
+          />
+        </main>
+      </div>
     </div>
   )
 }

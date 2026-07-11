@@ -49,6 +49,40 @@ export function attachedRefFromDroppedMediaUrl(
   }
 }
 
+export function attachedRefFromAssetPick(pick: {
+  id?: string
+  source?: "asset" | "history" | "upload"
+  title?: string
+  url: string
+  assetType: "image" | "video" | "audio"
+  previewUrl?: string | null
+}): AttachedRef {
+  const chipId =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  const label =
+    pick.title?.trim() ||
+    (pick.assetType === "image"
+      ? "Reference image"
+      : pick.assetType === "video"
+        ? "Reference video"
+        : "Reference audio")
+  // Only real library assets get `asset:{uuid}` — history/upload ids are different tables.
+  const id = pick.source === "asset" && pick.id ? `asset:${pick.id}` : chipId
+  return {
+    id,
+    label,
+    category: "asset",
+    assetType: pick.assetType,
+    assetUrl: pick.url,
+    previewUrl: pick.previewUrl ?? pick.url,
+    serialized: `Reference (${pick.assetType}) "${label}": ${pick.url}`,
+    chipId,
+    mentionToken: "",
+  }
+}
+
 export function inferMediaTypeFromFile(file: File): MediaValueType {
   if (file.type.startsWith("image/")) return "image"
   if (file.type.startsWith("video/")) return "video"

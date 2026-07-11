@@ -24,11 +24,13 @@ import { SaveExampleDialog, type SaveExampleSnapshot } from "@/components/image/
 import { ImageEditorDialog } from "@/components/image-editor"
 import {
   type GenerateImageAcceptedPayload,
-  isContentModerationError,
-  isContentModerationMessage,
   isInsufficientCreditsError,
   isInsufficientCreditsMessage,
 } from "@/lib/generate-image-client"
+import {
+  toUserFacingGenerationError,
+  tryShowContentModerationToast,
+} from "@/lib/content-moderation-toast"
 import { toast } from "sonner"
 import {
   getDefaultAspectRatioForModel,
@@ -169,29 +171,8 @@ function mergeRemoteHistoryWithLocal(
   return out
 }
 
-function normalizeModerationFailureMessage(message: string) {
-  const trimmed = message.trim()
-  if (!trimmed) {
-    return "The AI model flagged this request. Try adjusting your prompt or reference images."
-  }
-
-  if (/try\s+/i.test(trimmed)) {
-    return trimmed
-  }
-
-  return `${trimmed} Try adjusting your prompt or reference images.`
-}
-
-function showImageModerationToast(message: string) {
-  toast.error("Generation blocked by moderation", {
-    id: "image-moderation-error",
-    description: `${normalizeModerationFailureMessage(message)} You were not charged, and if any credits were temporarily held they'll be refunded automatically.`,
-  })
-}
-
 function showImageGenerationErrorToast(message: string, err: unknown) {
-  if (isContentModerationError(err) || isContentModerationMessage(message)) {
-    showImageModerationToast(message)
+  if (tryShowContentModerationToast(message, err, { toastId: "image-moderation-error" })) {
     return
   }
 
@@ -800,7 +781,6 @@ function ImagePageContent() {
       const message = err instanceof Error ? err.message : 'Failed to generate image'
       const isCredits =
         isInsufficientCreditsError(err) || isInsufficientCreditsMessage(message)
-      const isModeration = isContentModerationError(err)
       if (!isCredits) {
         console.error('Error generating image:', err)
       }
@@ -816,11 +796,8 @@ function ImagePageContent() {
           description: `${message} Wait for one to finish, then try again.`,
         })
       } else {
-        const normalizedMessage = isModeration
-          ? normalizeModerationFailureMessage(message)
-          : message
         showImageGenerationErrorToast(message, err)
-        setError(normalizedMessage)
+        setError(toUserFacingGenerationError(message))
       }
       void fetchImageHistory(20, { silent: true, replace: false })
     }

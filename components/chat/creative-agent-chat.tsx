@@ -41,6 +41,7 @@ import { SkillLoadModal } from "@/components/chat/skill-load-modal"
 import { MessageParts } from "@/components/chat/message-parts"
 import {
   attachedRefFromDroppedMediaUrl,
+  attachedRefFromAssetPick,
   brandReferencesOnly,
   ChatBrandPills,
   composerDropTypesAccept,
@@ -955,7 +956,7 @@ export function CreativeAgentChat({
   }, [authReady, getLoginHref, router, userId])
 
   const handleAssetLibrarySelect = React.useCallback((pick: AssetSelectionPick) => {
-    setAttachedRefs((prev) => [...prev, attachedRefFromDroppedMediaUrl(pick.url, pick.assetType)])
+    setAttachedRefs((prev) => [...prev, attachedRefFromAssetPick(pick)])
     setAssetModalOpen(false)
   }, [])
 
@@ -1848,7 +1849,13 @@ export function CreativeAgentChat({
           <ConversationScrollButton />
         </Conversation>
 
-        <div className="z-10 shrink-0 bg-transparent px-0 pb-5 pt-3 sm:px-4">
+        <div
+          className={cn(
+            "z-10 shrink-0 bg-transparent px-0 pt-3 sm:px-4",
+            // Compact `/chat` shell owns bottom pad so sidebar + prompt share one bottom edge
+            compact ? "pb-0" : "pb-5",
+          )}
+        >
           <div className="mx-auto w-full max-w-4xl space-y-3">
             {composerAttachments.length > 0 || attachedRefs.some((ref) => ref.category === "brand") ? (
               <div className="flex flex-wrap items-start gap-2">
@@ -1903,7 +1910,9 @@ export function CreativeAgentChat({
             <>
               <div
                 className={cn(
-                  "rounded-[26px] p-1 transition-[box-shadow,ring-color] sm:p-2",
+                  "rounded-[26px] transition-[box-shadow,ring-color]",
+                  // No bottom pad in compact so prompt shadow bottom = sidebar panel bottom
+                  compact ? "px-1 pt-1 sm:px-2 sm:pt-2" : "p-1 sm:p-2",
                   composerDropActive && "ring-2 ring-primary/50 ring-offset-2 ring-offset-transparent",
                 )}
                 onDragEnter={handleComposerDragEnter}

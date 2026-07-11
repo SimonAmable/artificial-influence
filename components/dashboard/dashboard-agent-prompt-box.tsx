@@ -3,7 +3,7 @@
 import * as React from "react"
 import { ArrowUp, CircleNotch, FolderOpen, Plus, X } from "@phosphor-icons/react"
 import { CommandTextarea } from "@/components/commands/command-textarea"
-import { attachedRefFromDroppedMediaUrl } from "@/components/chat/composer/attachments"
+import { attachedRefFromAssetPick } from "@/components/chat/composer/attachments"
 import {
   AssetSelectionModal,
   type AssetSelectionPick,
@@ -62,7 +62,7 @@ export function DashboardAgentPromptBox({
   const handleAssetSelect = React.useCallback((pick: AssetSelectionPick) => {
     onAttachedRefsChange([
       ...attachedRefs,
-      attachedRefFromDroppedMediaUrl(pick.url, pick.assetType),
+      attachedRefFromAssetPick(pick),
     ])
     setAssetModalOpen(false)
   }, [attachedRefs, onAttachedRefsChange])

@@ -45,7 +45,9 @@ import {
   isInsufficientCreditsError,
   isInsufficientCreditsMessage,
 } from "@/lib/generate-image-client"
+import { tryShowContentModerationToast } from "@/lib/content-moderation-toast"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
+import { fetchLibraryPickAsFile } from "@/lib/client/fetch-library-pick"
 
 type CanvasWithMaskStore = FabricCanvas & {
   __maskWorkCanvas?: FabricCanvas
@@ -382,6 +384,8 @@ export function ImageEditorPromptBar({
           description: "Upgrade your plan to continue generating images",
           toastId: "image-editor-credits-upsell",
         })
+      } else {
+        tryShowContentModerationToast(message, error, { toastId: "image-editor-moderation-error" })
       }
     } finally {
       setIsGenerating(false)
@@ -415,21 +419,17 @@ export function ImageEditorPromptBar({
     }
   }, [])
 
-  const handleAssetSelect = React.useCallback(async ({ url, assetType }: AssetSelectionPick) => {
-    if (assetType !== "image") {
+  const handleAssetSelect = React.useCallback(async (pick: AssetSelectionPick) => {
+    if (pick.assetType !== "image") {
       toast.error("Selected item must be an image")
       return
     }
     try {
-      const response = await fetch(url)
-      if (!response.ok) throw new Error("Failed to fetch")
-      const blob = await response.blob()
-      if (!blob.type.startsWith("image/")) {
+      const file = await fetchLibraryPickAsFile(pick)
+      if (!file.type.startsWith("image/")) {
         toast.error("Selected item must be an image")
         return
       }
-      const ext = blob.type.split("/")[1] || "png"
-      const file = new File([blob], `reference-asset.${ext}`, { type: blob.type })
       setReferenceFiles((prev) => [...prev, file])
       setAssetModalOpen(false)
     } catch {

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { downloadBlob } from "@/lib/images/strip-metadata"
+import { tryShowContentModerationToast } from "@/lib/content-moderation-toast"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 import {
   SEEDVR2_MODEL_IDENTIFIER,
@@ -373,7 +374,7 @@ export function UpscaleTool() {
             description: "Get more credits to continue",
             toastId: "upscale-credits-upsell",
           })
-        } else {
+        } else if (!tryShowContentModerationToast(msg, undefined, { toastId: "upscale-moderation-error" })) {
           toast.error(msg)
         }
         setPhase("preview")
@@ -391,8 +392,11 @@ export function UpscaleTool() {
       setPhase("result")
       toast.success("Upscale complete")
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Upscale failed"
       console.error("Upscale error:", err)
-      toast.error(err instanceof Error ? err.message : "Upscale failed")
+      if (!tryShowContentModerationToast(message, err, { toastId: "upscale-moderation-error" })) {
+        toast.error(message)
+      }
       setPhase("preview")
     }
   }, [selectedImage, settings])

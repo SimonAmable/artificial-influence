@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { isInsufficientCreditsMessage } from "@/lib/generate-image-client"
+import { tryShowContentModerationToast } from "@/lib/content-moderation-toast"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 
 /** Show `nodeData.error` as a Sonner toast (in addition to inline UI in the prompt toolbar). */
@@ -25,7 +26,7 @@ export function useNodeErrorToast(nodeId: string, error: string | null | undefin
           id: toastId,
           description: `${normalized} Wait for one to finish, then try again.`,
         })
-      } else {
+      } else if (!tryShowContentModerationToast(normalized, undefined, { toastId })) {
         toast.error(normalized, { id: toastId })
       }
     } else if (!normalized && prevRef.current) {

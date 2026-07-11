@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type { GenerateVideoToolPart } from "@/lib/chat/agent-tool-part-types"
 import { useVideoGenerationPoll } from "@/hooks/use-generation-status"
+import { toUserFacingGenerationError } from "@/lib/content-moderation-toast"
 import { cn } from "@/lib/utils"
 function VideoToolPromptPopover({
   label,
@@ -273,7 +274,7 @@ export function VideoGenerationResultCard({
         <CardContent className="space-y-4 p-4 text-sm text-destructive">
           <div className="space-y-2">
             <p className="font-medium">Video generation failed</p>
-            <p>{part.errorText || "Unknown tool error."}</p>
+            <p>{toUserFacingGenerationError(part.errorText || "Unknown tool error.")}</p>
           </div>
           {part.input ? (
             <div className="flex flex-wrap gap-2 border-t border-destructive/20 pt-3 text-foreground">
@@ -303,7 +304,11 @@ export function VideoGenerationResultCard({
             </div>
             <div className="space-y-2 text-sm text-destructive">
               <p className="font-medium">Video generation failed</p>
-              <p>{polledState?.error || part.errorText || "Unknown tool error."}</p>
+              <p>
+                {toUserFacingGenerationError(
+                  polledState?.error || part.errorText || "Unknown tool error.",
+                )}
+              </p>
             </div>
           </CardContent>
         </Card>

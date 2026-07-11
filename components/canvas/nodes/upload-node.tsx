@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button"
 import { extractFirstFrame, extractLastFrame } from "@/lib/canvas/frame-extraction"
 import { createUploadNodeData } from "@/lib/canvas/types"
 import { uploadBlobToSupabase, uploadFileToSupabase, type UploadResult } from "@/lib/canvas/upload-helpers"
+import { fetchLibraryPickAsFile } from "@/lib/client/fetch-library-pick"
 import { toast } from "sonner"
 import {
   Dialog,
@@ -442,68 +443,78 @@ export const UploadNodeComponent = React.memo(({ id, data, selected, width: prop
     }
   }
 
-  const handleAssetSelectFromModal = async ({ url: assetUrl }: AssetSelectionPick) => {
+  const handleAssetSelectFromModal = async (pick: AssetSelectionPick) => {
     try {
-      const response = await fetch(assetUrl)
-      if (!response.ok) throw new Error("Failed to fetch")
-      const blob = await response.blob()
+      const file = await fetchLibraryPickAsFile(pick)
       let fileType: "image" | "video" | "audio" | null = null
-      if (blob.type.startsWith("image/")) fileType = "image"
-      else if (blob.type.startsWith("video/")) fileType = "video"
-      else if (blob.type.startsWith("audio/")) fileType = "audio"
+      if (file.type.startsWith("image/")) fileType = "image"
+      else if (file.type.startsWith("video/")) fileType = "video"
+      else if (file.type.startsWith("audio/")) fileType = "audio"
 
       if (!fileType) {
         toast.error("This file type is not supported on upload nodes")
         return
       }
 
-      const fileName =
-        decodeURIComponent(
-          assetUrl.split("/").pop()?.split("?")[0] || ""
-        ) || "asset"
+      // Re-upload like a PC file so the node stores a fresh durable URL.
+      nodeData.onBackgroundUploadStart?.()
+      try {
+        setIsUploading(true)
+        const uploadResult = await uploadFileToSupabase(file, "uploads")
+        if (!uploadResult) {
+          toast.error("Could not load asset")
+          return
+        }
 
-      if (fileType === "image") {
-        const img = new Image()
-        img.onload = () => {
-          const constrained = getConstrainedSize({
-            width: img.naturalWidth,
-            height: img.naturalHeight,
-          })
+        const assetUrl = uploadResult.url
+        const fileName = uploadResult.fileName || file.name || "asset"
+
+        if (fileType === "image") {
+          const img = new Image()
+          img.onload = () => {
+            const constrained = getConstrainedSize({
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+            })
+            reactFlow.updateNodeData(id, {
+              fileUrl: assetUrl,
+              fileType,
+              fileName,
+            })
+            applyNodeSize(constrained.width, constrained.height)
+            toast.success("Asset loaded")
+          }
+          img.onerror = () => toast.error("Could not load image")
+          img.src = assetUrl
+        } else if (fileType === "video") {
+          const video = document.createElement("video")
+          video.onloadedmetadata = () => {
+            const constrained = getConstrainedSize({
+              width: video.videoWidth,
+              height: video.videoHeight,
+            })
+            reactFlow.updateNodeData(id, {
+              fileUrl: assetUrl,
+              fileType,
+              fileName,
+            })
+            applyNodeSize(constrained.width, constrained.height)
+            toast.success("Asset loaded")
+          }
+          video.onerror = () => toast.error("Could not load video")
+          video.src = assetUrl
+        } else {
           reactFlow.updateNodeData(id, {
             fileUrl: assetUrl,
             fileType,
             fileName,
           })
-          applyNodeSize(constrained.width, constrained.height)
+          applyNodeSize(280, 280)
           toast.success("Asset loaded")
         }
-        img.onerror = () => toast.error("Could not load image")
-        img.src = assetUrl
-      } else if (fileType === "video") {
-        const video = document.createElement("video")
-        video.onloadedmetadata = () => {
-          const constrained = getConstrainedSize({
-            width: video.videoWidth,
-            height: video.videoHeight,
-          })
-          reactFlow.updateNodeData(id, {
-            fileUrl: assetUrl,
-            fileType,
-            fileName,
-          })
-          applyNodeSize(constrained.width, constrained.height)
-          toast.success("Asset loaded")
-        }
-        video.onerror = () => toast.error("Could not load video")
-        video.src = assetUrl
-      } else {
-        reactFlow.updateNodeData(id, {
-          fileUrl: assetUrl,
-          fileType,
-          fileName,
-        })
-        applyNodeSize(280, 280)
-        toast.success("Asset loaded")
+      } finally {
+        setIsUploading(false)
+        nodeData.onBackgroundUploadEnd?.()
       }
     } catch {
       toast.error("Could not load asset")

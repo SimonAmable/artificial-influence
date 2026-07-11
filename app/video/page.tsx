@@ -26,6 +26,10 @@ import { validateVideoAttachedRefs } from "@/lib/commands/validate-video-refs"
 import { getVideoChipSlotInfo } from "@/lib/commands/video-chip-slots"
 import { generateVideoAndWait } from "@/lib/generate-video-client"
 import { isInsufficientCreditsMessage } from "@/lib/generate-image-client"
+import {
+  toUserFacingGenerationError,
+  tryShowContentModerationToast,
+} from "@/lib/content-moderation-toast"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 import { resolveVideoPricingQuote } from "@/lib/video-pricing"
 import {
@@ -1097,6 +1101,10 @@ function VideoPageContent() {
           toast.error("Too many active generations", {
             description: `${message} Wait for one to finish, then try again.`,
           })
+        } else if (
+          tryShowContentModerationToast(message, err, { toastId: "video-moderation-error" })
+        ) {
+          setError(toUserFacingGenerationError(message))
         } else {
           setError(message)
         }

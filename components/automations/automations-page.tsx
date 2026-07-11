@@ -330,7 +330,7 @@ function buildPersistSnapshot(input: {
 }
 
 function attachedRefFromAssetPick(pick: AssetSelectionPick): AttachedRef {
-  const { assetType, id, previewUrl, title, url } = pick
+  const { assetType, id, previewUrl, source, title, url } = pick
   const chipId =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
@@ -339,7 +339,7 @@ function attachedRefFromAssetPick(pick: AssetSelectionPick): AttachedRef {
     title?.trim() ||
     (assetType === "image" ? "Reference image" : assetType === "video" ? "Reference video" : "Reference audio")
   return {
-    id: id ? `asset:${id}` : chipId,
+    id: source === "asset" && id ? `asset:${id}` : chipId,
     label,
     category: "asset",
     assetType,

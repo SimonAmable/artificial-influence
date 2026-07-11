@@ -35,6 +35,7 @@ import { generateImageAndWait, isInsufficientCreditsError, isInsufficientCredits
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { downloadMediaFile, normalizeMediaModelName } from "@/components/shared/display/media-viewer-utils"
 import { toast } from "sonner"
+import { tryShowContentModerationToast } from "@/lib/content-moderation-toast"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 
 interface ImageHistoryItem {
@@ -745,7 +746,7 @@ export default function AIInfluencerPage() {
           description: "Upgrade your plan to get more credits for character generation",
           toastId: "influencer-credits-upsell"
         })
-      } else {
+      } else if (!tryShowContentModerationToast(msg, err, { toastId: "influencer-toast" })) {
         toast.error(msg, { id: "influencer-toast" })
       }
     } finally {

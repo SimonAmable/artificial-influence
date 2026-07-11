@@ -1,7 +1,12 @@
 import { inferStoragePathFromUrl } from "@/lib/assets/library"
+import { absolutizeAssetUrl } from "@/lib/assets/resolve-asset-access-url"
 import { validateStoredReferenceImageUrl } from "@/lib/image/stored-reference-url"
 import { isReplicateGptImage2Model } from "@/lib/server/replicate-gpt-image"
 import { validateExternalReferenceUrl } from "@/lib/server/external-reference-url"
+import { extractStorageObjectRef } from "@/lib/uploads/storage-ref"
+import { resolveStoredObjectUrl } from "@/lib/uploads/server"
+import { createServiceRoleClient } from "@/lib/supabase/service-role"
+import { createClient } from "@/lib/supabase/server"
 
 const MAX_REFERENCE_SIZE_BYTES = 10 * 1024 * 1024
 
@@ -20,6 +25,24 @@ export function parseReferenceImageUrlsFromForm(formData: FormData): string[] {
   return urls
 }
 
+async function refreshStoredReferenceUrlIfNeeded(url: string): Promise<string> {
+  if (url.startsWith("data:")) return url
+
+  const absolute = absolutizeAssetUrl(url)
+  const ref = extractStorageObjectRef(absolute)
+  if (!ref) return absolute
+
+  // Public bucket URLs are durable; signed/private need a fresh URL.
+  if (absolute.includes("/object/public/")) return absolute
+
+  try {
+    const supabase = createServiceRoleClient() ?? (await createClient())
+    return await resolveStoredObjectUrl(supabase, ref.bucket, ref.storagePath)
+  } catch {
+    return absolute
+  }
+}
+
 export async function resolveFormReferenceImageUrl(
   url: string,
   options: {
@@ -27,12 +50,15 @@ export async function resolveFormReferenceImageUrl(
     replicateGptImage2ReferenceImages: File[]
   },
 ): Promise<{ url: string; storagePath: string | null }> {
-  validateStoredReferenceImageUrl(url)
+  const absoluteUrl = absolutizeAssetUrl(url)
+  validateStoredReferenceImageUrl(absoluteUrl)
 
-  const safeUrl = url.startsWith("data:")
-    ? url
+  const refreshed = await refreshStoredReferenceUrlIfNeeded(absoluteUrl)
+
+  const safeUrl = refreshed.startsWith("data:")
+    ? refreshed
     : await validateExternalReferenceUrl({
-        url,
+        url: refreshed,
         expectedKind: "image",
         maxContentLengthBytes: MAX_REFERENCE_SIZE_BYTES,
       })

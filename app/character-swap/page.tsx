@@ -15,6 +15,10 @@ import {
   isInsufficientCreditsMessage,
 } from "@/lib/generate-image-client"
 import { toast } from "sonner"
+import {
+  toUserFacingGenerationError,
+  tryShowContentModerationToast,
+} from "@/lib/content-moderation-toast"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 
 const CHARACTER_SWAP_PROMPT =
@@ -196,6 +200,10 @@ export default function CharacterSwapPage() {
         toast.error("Too many active generations", {
           description: `${message} Wait for one to finish, then try again.`,
         })
+      } else if (
+        tryShowContentModerationToast(message, err, { toastId: "character-swap-moderation-error" })
+      ) {
+        setError(toUserFacingGenerationError(message))
       } else {
         setError(message)
       }

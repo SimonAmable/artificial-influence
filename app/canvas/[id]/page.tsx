@@ -61,6 +61,7 @@ import type { Workflow } from "@/lib/workflows/database-server"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { toUserFacingGenerationError } from "@/lib/content-moderation-toast"
 import {
   selectFlowSelectedNodesWithKey,
   equalFlowSelectionKey,
@@ -1419,10 +1420,11 @@ function CanvasContent() {
   }, [setNodes])
 
   const handleNodeExecutionError = React.useCallback((nodeId: string, error: string) => {
+    const displayError = toUserFacingGenerationError(error)
     setNodes((nds) =>
       nds.map((n) =>
         n.id === nodeId
-          ? { ...n, data: { ...n.data, isGenerating: false, error } }
+          ? { ...n, data: { ...n.data, isGenerating: false, error: displayError } }
           : n
       )
     )

@@ -27,6 +27,7 @@ import { Sparkles } from "lucide-react"
 import { toast } from "sonner"
 
 import type { AudioNodeData, TextNodeData } from "@/lib/canvas/types"
+import { toUserFacingGenerationError } from "@/lib/content-moderation-toast"
 import { cn } from "@/lib/utils"
 import {
   Select,
@@ -298,7 +299,9 @@ export const AudioNodeComponent = React.memo(({ id, data, selected }: NodeProps)
     } catch (err) {
       nodeData.onDataChange?.(id, {
         isGenerating: false,
-        error: err instanceof Error ? err.message : "Generation failed",
+        error: toUserFacingGenerationError(
+          err instanceof Error ? err.message : "Generation failed",
+        ),
       })
     }
   }
