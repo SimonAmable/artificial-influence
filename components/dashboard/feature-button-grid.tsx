@@ -19,6 +19,7 @@ import {
   ChatCircleDots,
   Robot,
   ShieldCheck,
+  User,
   Users,
 } from "@phosphor-icons/react"
 
@@ -31,6 +32,7 @@ const toolIconMap: Record<DashboardToolIcon, typeof ImageIcon> = {
   "paint-brush": PaintBrushIcon,
   "arrows-left-right": ArrowsLeftRight,
   users: Users,
+  user: User,
   "pencil-simple": PencilSimpleIcon,
   "squares-four": SquaresFour,
   "chat-circle-dots": ChatCircleDots,

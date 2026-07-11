@@ -34,6 +34,7 @@ export type MegaNavPhosphorIcon =
   | "microphone"
   | "chat-circle-dots"
   | "robot"
+  | "user"
   | "paper-plane-tilt"
   | "shield-check"
   | "magnifying-glass"
@@ -84,6 +85,7 @@ export type DashboardToolIcon =
   | "squares-four"
   | "chat-circle-dots"
   | "robot"
+  | "user"
   | "shield-check"
 
 export interface DashboardToolNavItem {
@@ -231,7 +233,7 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             label: "AI Influencer",
             description: "Create and build custom AI characters",
             badge: "new",
-            iconPhosphor: "robot",
+            iconPhosphor: "user",
           },
           {
             path: "/inpaint",
@@ -734,7 +736,7 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
   {
     label: "AI Influencer",
     href: "/ai-influencer",
-    icon: "robot",
+    icon: "user",
     hint: "Create custom AI characters and influencers.",
   },
   {
