@@ -5,11 +5,10 @@ import {
 } from "@/lib/generate-image-client"
 
 export const CONTENT_MODERATION_USER_MESSAGE =
-  "The provider blocked this generation. No credits were used."
+  "Blocked by model safety filters. No credits were used. Try adjusting your prompt."
 
-const TOAST_TITLE = "Blocked by moderation"
-const TOAST_DESCRIPTION =
-  "The model provider rejected this request. No credits were used."
+const TOAST_TITLE = "Blocked by safety filters"
+const TOAST_DESCRIPTION = "No credits were used. Try adjusting your prompt."
 
 type ContentModerationToastOptions = {
   toastId?: string

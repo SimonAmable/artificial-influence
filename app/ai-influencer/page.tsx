@@ -514,6 +514,21 @@ export default function AIInfluencerPage() {
     return "Build from Traits (Mode 3)"
   }
 
+  const getUploadGuidance = () => {
+    if (uploadedFiles.length === 1) {
+      return "Save this photo as your character, or add another to blend faces."
+    }
+    if (uploadedFiles.length === 2) {
+      return "Create to merge these faces, or add one more to refine the blend."
+    }
+    if (uploadedFiles.length >= 3) {
+      return "Ready to blend these faces into one consistent character."
+    }
+    return null
+  }
+
+  const uploadGuidance = getUploadGuidance()
+
   // Shuffle/randomize options
   const handleShuffle = () => {
     const newTraits: { [key: string]: string } = {}
@@ -1121,11 +1136,17 @@ export default function AIInfluencerPage() {
                     {uploadedFiles.length === 0 ? (
                       <div className="text-center flex flex-col items-center max-w-sm">
                         <h4 className="text-sm font-bold text-foreground mb-1 font-display uppercase tracking-wider">Add reference photos</h4>
-                        <p className="text-xs text-muted-foreground leading-normal mt-1 max-w-[280px] space-y-1">
-                          <span className="block">Save characters instantly with 1 photo.</span>
-                          <span className="block">Blend 2-3 photos into one new face.</span>
-                          <span className="block">Or build a new character with the builder.</span>
-                        </p>
+                        <div className="mt-1 max-w-[280px] space-y-1 text-center">
+                          <span className="shimmer block text-xs leading-normal text-muted-foreground">
+                            Save characters instantly with 1 photo.
+                          </span>
+                          <span className="shimmer block text-xs leading-normal text-muted-foreground">
+                            Blend 2-3 photos into one new face.
+                          </span>
+                          <span className="shimmer block text-xs leading-normal text-muted-foreground">
+                            Or build a new character with the builder.
+                          </span>
+                        </div>
                         <Button 
                           variant="secondary" 
                           size="sm" 
@@ -1136,33 +1157,46 @@ export default function AIInfluencerPage() {
                         </Button>
                       </div>
                     ) : (
-                      // Multi-file Thumbnails Preview
-                      <div className="w-full grid grid-cols-3 gap-3">
-                        {uploadedFiles.map((item, idx) => (
-                          <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-border/40 bg-black group/thumb">
-                            <img
-                              src={item.url}
-                              alt="preview"
-                              className="w-full h-full object-cover"
-                            />
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                removeUploadedFile(idx)
-                              }}
-                              className="absolute top-1 right-1 p-1 bg-black/80 hover:bg-destructive rounded-full transition-colors"
-                              aria-label="Remove photo"
-                            >
-                              <X className="size-3 text-white" />
-                            </button>
-                          </div>
-                        ))}
-                        {uploadedFiles.length < 3 && (
-                          <div className="border border-dashed border-border/40 hover:border-primary/40 flex flex-col justify-center items-center rounded-lg aspect-[3/4] transition-colors">
-                            <Plus className="size-5 text-muted-foreground" />
-                            <span className="text-[10px] font-medium text-muted-foreground mt-1">Add</span>
-                          </div>
+                      <div className="w-full flex flex-col items-center gap-5">
+                        {uploadGuidance && (
+                          <p className="shimmer text-center text-xs leading-relaxed text-muted-foreground max-w-[260px]">
+                            {uploadGuidance}
+                          </p>
                         )}
+                        <div
+                          className={cn(
+                            "w-full grid gap-3",
+                            uploadedFiles.length === 1
+                              ? "grid-cols-2 max-w-[240px]"
+                              : "grid-cols-3"
+                          )}
+                        >
+                          {uploadedFiles.map((item, idx) => (
+                            <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-border/40 bg-black group/thumb">
+                              <img
+                                src={item.url}
+                                alt="preview"
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  removeUploadedFile(idx)
+                                }}
+                                className="absolute top-1 right-1 p-1 bg-black/80 hover:bg-destructive rounded-full transition-colors"
+                                aria-label="Remove photo"
+                              >
+                                <X className="size-3 text-white" />
+                              </button>
+                            </div>
+                          ))}
+                          {uploadedFiles.length < 3 && (
+                            <div className="border border-dashed border-border/40 hover:border-primary/40 flex flex-col justify-center items-center rounded-lg aspect-[3/4] transition-colors">
+                              <Plus className="size-5 text-muted-foreground" />
+                              <span className="text-[10px] font-medium text-muted-foreground mt-1">Add</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
