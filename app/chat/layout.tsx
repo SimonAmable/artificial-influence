@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import { redirect } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
+import { isOnboardingEnabled } from "@/lib/product/onboarding"
 
 /**
  * Server-side gate for all /chat routes: one DB read verifies onboarding completion.
@@ -27,7 +28,7 @@ export default async function ChatLayout({ children }: { children: ReactNode }) 
 
   if (profileError) {
     console.error("[chat/layout] profile read failed:", profileError.message)
-  } else if (!profile?.onboarding_completed_at) {
+  } else if (isOnboardingEnabled() && !profile?.onboarding_completed_at) {
     redirect("/onboarding")
   }
 

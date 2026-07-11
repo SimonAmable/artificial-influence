@@ -39,6 +39,8 @@ export interface ProductConfig {
   visibleRoutes: string[]
   defaultSignedInRoute: string
   assistantName: string
+  /** When false, signed-in users skip onboarding redirects and /onboarding is unavailable. */
+  onboardingEnabled: boolean
   pageOverrides?: {
     landing?: PageVariant
     onboarding?: PageVariant

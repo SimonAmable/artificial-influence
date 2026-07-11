@@ -10,6 +10,7 @@ import {
   MCP_OAUTH_RETURN_COOKIE,
 } from "@/lib/mcp/oauth-login-state"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
+import { isOnboardingEnabled } from "@/lib/product/onboarding"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
@@ -56,7 +57,7 @@ export async function GET(request: Request) {
         .eq("id", userId)
         .maybeSingle()
 
-      const needsOnboarding = !profile?.onboarding_completed_at
+      const needsOnboarding = isOnboardingEnabled() && !profile?.onboarding_completed_at
       const isMcpOAuthContinuation =
         isMcpOAuthContinuationPath(next) || isSafeMcpOAuthReturnPath(pendingMcpAuthorizePath)
       const destination = isMcpOAuthContinuation ? "/oauth/resume" : needsOnboarding ? "/onboarding" : next

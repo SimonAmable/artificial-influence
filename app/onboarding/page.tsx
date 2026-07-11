@@ -5,6 +5,7 @@ import { OnboardingForm } from "@/app/onboarding/onboarding-form"
 import { parseStoredOnboardingPrefill } from "@/lib/onboarding/prefill"
 import type { CompleteOnboardingPayload } from "@/lib/onboarding/payload-schema"
 import { currentProduct } from "@/lib/product/current"
+import { isOnboardingEnabled } from "@/lib/product/onboarding"
 
 const onboardingPageVariants = {
   default: OnboardingForm,
@@ -19,6 +20,10 @@ export default async function OnboardingPage() {
 
   if (!user) {
     redirect("/login")
+  }
+
+  if (!isOnboardingEnabled()) {
+    redirect(currentProduct.defaultSignedInRoute)
   }
 
   const { data: profile } = await supabase

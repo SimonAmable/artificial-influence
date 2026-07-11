@@ -556,7 +556,7 @@ function EnterprisePlanCard({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'relative mx-auto flex h-full w-full max-w-3xl flex-col rounded-lg border-2 border-border bg-card p-8 shadow-lg transition-shadow hover:shadow-xl',
+        'relative mx-auto flex h-full w-full max-w-3xl flex-col rounded-lg border-2 border-border bg-card p-8 shadow-md transition-shadow hover:shadow-lg',
         className
       )}
     >
@@ -842,7 +842,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                       variants={cardFade}
                       transition={motionTransition}
                       className={cn(
-                        'relative flex h-full min-h-[460px] flex-col rounded-[22px] border border-border/70 bg-card/90 p-6 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset] transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-lg',
+                        'relative flex h-full min-h-[460px] flex-col rounded-[22px] border border-border/70 bg-card/90 p-6 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-lg',
                         'max-sm:snap-center max-sm:shrink-0 max-sm:w-[85vw] max-sm:max-w-md sm:w-auto sm:max-w-none',
                         plan.popular ? 'bg-card/95' : ''
                       )}

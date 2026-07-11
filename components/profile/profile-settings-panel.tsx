@@ -11,6 +11,7 @@ import { ThemeToggleGroup } from "@/components/settings/theme-toggle-group"
 import { LayoutMode } from "@/components/shared/layout/layout-toggle"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { isOnboardingEnabled } from "@/lib/product/onboarding"
 
 export type ProfileSettingsPanelProps = {
   displayName: string
@@ -96,7 +97,7 @@ export function ProfileSettingsPanel({
         <Button asChild variant="outline" className={isModal ? "rounded-full" : undefined}>
           <Link href="/assets?tab=history">View history</Link>
         </Button>
-        {hasCompletedOnboarding ? (
+        {isOnboardingEnabled() && hasCompletedOnboarding ? (
           <RestartOnboardingButton userId={userId} />
         ) : null}
         <ProfileLogoutButton

@@ -17,6 +17,7 @@ import { FinalCTASection } from "@/components/landing/final-cta-section"
 import { Footer } from "@/components/landing/footer"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
 import { currentProduct } from "@/lib/product/current"
+import { isOnboardingEnabled } from "@/lib/product/onboarding"
 
 const HOME_AUTH_TIMEOUT_MS = 2500
 const HOME_PROFILE_TIMEOUT_MS = 2500
@@ -60,7 +61,7 @@ export default async function Page() {
     try {
       const onboardingCookieUserId = cookieStore.get(ONBOARDING_DONE_COOKIE)?.value
 
-      if (onboardingCookieUserId !== user.id) {
+      if (isOnboardingEnabled() && onboardingCookieUserId !== user.id) {
         const { data: profile } = await withTimeout(
           supabase
             .from("profiles")

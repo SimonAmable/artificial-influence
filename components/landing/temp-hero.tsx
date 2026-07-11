@@ -6,10 +6,12 @@ import Link from "next/link"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { WebGLShader } from "@/components/ui/web-gl-shader"
 import { HERO_SHOWCASE_IMAGE_DURATION_MS, getHeroShowcaseMedia } from "@/lib/constants/hero-showcase-media"
 import { currentProduct } from "@/lib/product/current"
 
 const heroEase = [0.22, 1, 0.36, 1] as const
+const DESKTOP_HERO_MEDIA_QUERY = "(min-width: 768px)"
 
 export function TempHero() {
   const heroBackgroundMedia = React.useMemo(
@@ -17,9 +19,23 @@ export function TempHero() {
     [],
   )
   const [activeMediaIndex, setActiveMediaIndex] = React.useState(0)
+  const [showDesktopShader, setShowDesktopShader] = React.useState(false)
   const activeMedia = heroBackgroundMedia[activeMediaIndex]
   const prefersReducedMotion = useReducedMotion()
   const landing = currentProduct.landing
+
+  React.useEffect(() => {
+    const mediaQuery = window.matchMedia(DESKTOP_HERO_MEDIA_QUERY)
+    const syncDesktopShader = () => {
+      setShowDesktopShader(mediaQuery.matches)
+    }
+
+    syncDesktopShader()
+    mediaQuery.addEventListener("change", syncDesktopShader)
+    return () => {
+      mediaQuery.removeEventListener("change", syncDesktopShader)
+    }
+  }, [])
 
   const showNextMedia = React.useCallback(() => {
     setActiveMediaIndex((currentIndex) => (currentIndex + 1) % heroBackgroundMedia.length)
@@ -54,7 +70,17 @@ export function TempHero() {
 
   return (
     <section className="relative isolate overflow-visible bg-background px-0 pb-[10rem] pt-0 text-foreground md:px-6 md:pb-[24rem] md:pt-[60px]">
-      <div className="relative mx-auto flex min-h-[100svh] w-full flex-col items-center overflow-hidden rounded-none border-0 bg-background shadow-none md:h-[calc(100svh-7.5rem)] md:min-h-0 md:w-[min(calc((100svh-7.5rem)*0.62),42rem)] md:rounded-[2.5rem] md:border md:border-border/60 md:shadow-[0_28px_90px_rgba(15,23,42,0.12)] dark:md:shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
+      {showDesktopShader && !prefersReducedMotion ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 hidden overflow-hidden md:block"
+        >
+          <WebGLShader className="absolute inset-0 h-full w-full" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_42%,var(--background)_100%)] opacity-50" />
+        </div>
+      ) : null}
+
+      <div className="relative z-10 mx-auto flex min-h-[100svh] w-full flex-col items-center overflow-hidden rounded-none border-0 bg-background shadow-none md:h-[calc(100svh-7.5rem)] md:min-h-0 md:w-[min(calc((100svh-7.5rem)*0.62),42rem)] md:rounded-[2.5rem] md:border md:border-border/60 md:shadow-[0_28px_90px_rgba(15,23,42,0.12)] dark:md:shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
         <motion.div
           className="absolute inset-0"
           initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 1.02 }}
@@ -187,6 +213,11 @@ export function TempHero() {
           </div>
         </div>
       </motion.div>
+
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-5 bg-gradient-to-b from-transparent to-background"
+      />
     </section>
   )
 }

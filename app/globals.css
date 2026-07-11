@@ -447,6 +447,27 @@ body::-webkit-scrollbar-button:horizontal,
   .shadow-2xl {
     box-shadow: var(--shadow-l) !important;
   }
+
+  /* Hover variants need !important too, or rest-state overrides win */
+  .hover\:shadow-sm:hover {
+    box-shadow: var(--shadow-s) !important;
+  }
+
+  .hover\:shadow-md:hover {
+    box-shadow: var(--shadow-m) !important;
+  }
+
+  .hover\:shadow-lg:hover {
+    box-shadow: var(--shadow-l) !important;
+  }
+
+  .hover\:shadow-xl:hover {
+    box-shadow: var(--shadow-l) !important;
+  }
+
+  .hover\:shadow-2xl:hover {
+    box-shadow: var(--shadow-l) !important;
+  }
 }
 
 /* Chat composer: rest = medium depth, focus = large (beats !important shadow-md on same node) */

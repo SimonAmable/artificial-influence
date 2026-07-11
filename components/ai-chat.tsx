@@ -509,7 +509,7 @@ function AIChatLauncher() {
         >
           <Button
             onClick={() => setSidebarOpen(true)}
-            className="h-14 w-14 rounded-full shadow-depth-l"
+            className="h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-depth-l hover:bg-primary/80 dark:bg-primary dark:hover:bg-primary/80"
             size="icon"
           >
             <ProductLogo size={22} alt="" />

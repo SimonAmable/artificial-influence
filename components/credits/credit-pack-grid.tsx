@@ -91,7 +91,7 @@ export function CreditPackGrid({ className, redirectPath = '/pricing' }: CreditP
           <article
             key={pack.amountDollars}
             className={cn(
-              'flex min-h-[250px] flex-col justify-between rounded-[22px] border border-border/70 bg-card/90 p-5 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset] transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-lg'
+              'flex min-h-[250px] flex-col justify-between rounded-[22px] border border-border/70 bg-card/90 p-5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-lg'
             )}
           >
             <div>
@@ -121,7 +121,7 @@ export function CreditPackGrid({ className, redirectPath = '/pricing' }: CreditP
 
         <article
           className={cn(
-            'flex min-h-[250px] flex-col justify-between rounded-[22px] border border-border/70 bg-card/90 p-5 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset] transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-lg'
+            'flex min-h-[250px] flex-col justify-between rounded-[22px] border border-border/70 bg-card/90 p-5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-lg'
           )}
         >
           <div>

@@ -231,6 +231,10 @@ export function TemplateRunForm({
       })
 
       const data = await response.json().catch(() => ({}))
+      if (response.status === 401) {
+        router.push(`/login?next=${encodeURIComponent(`/templates/${template.slug}`)}`)
+        return
+      }
       if (!response.ok) {
         throw new Error(data.error ?? "Failed to run template")
       }

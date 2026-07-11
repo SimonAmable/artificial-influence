@@ -5,7 +5,6 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { toast } from "sonner"
 
-import { LegalMarkdown } from "@/components/legal/legal-markdown"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -149,23 +148,23 @@ export function TermsAcceptanceGate() {
   return (
     <Dialog open={open}>
       <DialogContent
-        className="!flex h-[min(92vh,920px)] w-[min(96vw,72rem)] max-w-none flex-col overflow-hidden rounded-3xl p-0"
+        className="w-[min(96vw,28rem)] gap-0 overflow-hidden rounded-3xl p-0 sm:max-w-md"
         onEscapeKeyDown={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
       >
-        <DialogHeader className="shrink-0 border-b border-border px-6 pt-6 text-left">
+        <DialogHeader className="space-y-2 px-6 pt-6 text-left">
           <DialogTitle>
             {status?.reason === "outdated" ? "We updated our Terms" : "Accept the current Terms"}
           </DialogTitle>
           <DialogDescription className="leading-6">
             {status?.reason === "outdated"
-              ? "Before you continue using UniCan, please review and accept the latest Terms of Use."
-              : "Please review the full Terms of Use below and confirm acceptance to continue."}
+              ? "Review the latest Terms of Use and Privacy Policy, then confirm to continue."
+              : "Review our Terms of Use and Privacy Policy, then confirm to continue."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-6 py-5">
-          <div className="shrink-0 rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+        <div className="space-y-4 px-6 py-5">
+          <div className="text-sm text-muted-foreground">
             <p className="font-medium text-foreground">
               {status?.currentTerms.title ?? "Terms of Use"} v{status?.currentTerms.version}
             </p>
@@ -174,54 +173,57 @@ export function TermsAcceptanceGate() {
                 Last updated {status.currentTerms.lastUpdated}
               </p>
             ) : null}
-            <p className="mt-3 leading-6">Read the full Terms below before accepting.</p>
+            <p className="mt-3 leading-6">
+              Open the{" "}
+              <Link
+                href="/terms"
+                target="_blank"
+                className="font-medium text-foreground underline underline-offset-2"
+              >
+                Terms of Use
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/privacy"
+                target="_blank"
+                className="font-medium text-foreground underline underline-offset-2"
+              >
+                Privacy Policy
+              </Link>{" "}
+              to review the full documents.
+            </p>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card/70">
-            <div className="shrink-0 border-b border-border px-4 py-3 text-sm font-medium text-foreground">
-              Read the full Terms of Use
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 pb-10">
-              <LegalMarkdown content={status?.currentTerms.content ?? ""} />
-            </div>
-          </div>
-
-          <div className="shrink-0 rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-            Confirm the checkbox below once you have reviewed the Terms.
-          </div>
-
-          <div className="shrink-0 rounded-2xl border border-border bg-card/70 p-4">
-            <label htmlFor="terms-modal-accept" className="flex items-start gap-3 text-sm">
-              <Checkbox
-                id="terms-modal-accept"
-                checked={checked}
-                onCheckedChange={(value) => setChecked(value === true)}
-                className="mt-0.5"
-              />
-              <span className="leading-6 text-muted-foreground">
-                I have read the Terms of Use above, I agree to the current{" "}
-                <Link
-                  href="/terms"
-                  target="_blank"
-                  className="font-medium text-foreground underline underline-offset-2"
-                >
-                  Terms of Use
-                </Link>{" "}
-                and acknowledge the{" "}
-                <Link
-                  href="/privacy"
-                  target="_blank"
-                  className="font-medium text-foreground underline underline-offset-2"
-                >
-                  Privacy Policy
-                </Link>
-                . I confirm that I am at least 18 years old.
-              </span>
-            </label>
-          </div>
+          <label htmlFor="terms-modal-accept" className="flex items-start gap-3 text-sm">
+            <Checkbox
+              id="terms-modal-accept"
+              checked={checked}
+              onCheckedChange={(value) => setChecked(value === true)}
+              className="mt-0.5"
+            />
+            <span className="leading-6 text-muted-foreground">
+              I have read and agree to the{" "}
+              <Link
+                href="/terms"
+                target="_blank"
+                className="font-medium text-foreground underline underline-offset-2"
+              >
+                Terms of Use
+              </Link>{" "}
+              and acknowledge the{" "}
+              <Link
+                href="/privacy"
+                target="_blank"
+                className="font-medium text-foreground underline underline-offset-2"
+              >
+                Privacy Policy
+              </Link>
+              . I confirm that I am at least 18 years old.
+            </span>
+          </label>
         </div>
 
-        <DialogFooter className="shrink-0 border-t border-border bg-background px-6 py-4 sm:justify-between">
+        <DialogFooter className="border-t border-border bg-background px-6 py-4 sm:justify-between">
           <Button type="button" variant="outline" onClick={handleSignOut}>
             Sign out
           </Button>

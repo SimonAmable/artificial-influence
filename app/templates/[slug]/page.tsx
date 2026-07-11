@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { notFound, redirect } from "next/navigation"
+import { notFound } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 import { TemplateRunForm } from "@/components/templates/template-run-form"
 import { Button } from "@/components/ui/button"
@@ -20,10 +20,6 @@ export default async function TemplateRunPage({ params }: TemplateRunPageProps) 
   const template = await getTemplateBySlugForUser(slug, user?.id ?? null)
   if (!template) {
     notFound()
-  }
-
-  if (!user) {
-    redirect(`/login?next=${encodeURIComponent(`/templates/${slug}`)}`)
   }
 
   return (
