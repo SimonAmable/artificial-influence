@@ -1,6 +1,13 @@
 import Replicate from "replicate"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getAutoStripImageMetadata } from "@/lib/server/auto-strip-image-metadata"
+import {
+  type StoredGeneratedImage,
+  uploadPreparedGeneratedImage,
+} from "@/lib/server/store-generated-image"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
+
+export type { StoredGeneratedImage } from "@/lib/server/store-generated-image"
 
 export class InsufficientCreditsError extends Error {
   requiredCredits: number
@@ -10,12 +17,6 @@ export class InsufficientCreditsError extends Error {
     this.name = "InsufficientCreditsError"
     this.requiredCredits = requiredCredits
   }
-}
-
-export interface StoredGeneratedImage {
-  mimeType: string
-  storagePath: string
-  url: string
 }
 
 interface FinalizeGeneratedImagesOptions {
@@ -41,19 +42,6 @@ interface RunReplicatePollingImageGenerationOptions {
   supabase: SupabaseClient
   tool?: string | null
   userId: string
-}
-
-function getFileExtension(mimeType: string, fallback = "png") {
-  const normalized = mimeType.toLowerCase()
-
-  if (normalized === "image/jpeg") return "jpg"
-  if (normalized === "image/png") return "png"
-  if (normalized === "image/webp") return "webp"
-  if (normalized === "image/gif") return "gif"
-  if (normalized === "image/avif") return "avif"
-  if (normalized === "image/svg+xml") return "svg"
-
-  return fallback
 }
 
 function extractOutputUrls(output: unknown): string[] {
@@ -84,87 +72,56 @@ function extractOutputUrls(output: unknown): string[] {
 }
 
 async function storeGeneratedImageFromUrl({
+  autoStrip,
   index,
+  modelIdentifier,
   remoteUrl,
   supabase,
   userId,
 }: {
+  autoStrip: boolean
   index: number
+  modelIdentifier: string
   remoteUrl: string
   supabase: SupabaseClient
   userId: string
 }): Promise<StoredGeneratedImage> {
-  const response = await fetch(remoteUrl)
-
-  if (!response.ok) {
-    throw new Error(`Failed to download generated image (${response.status}).`)
-  }
-
-  const mimeType = response.headers.get("content-type") || "image/png"
-  const arrayBuffer = await response.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
-  const timestamp = Date.now()
-  const randomStr = Math.random().toString(36).slice(2, 10)
-  const extension = getFileExtension(mimeType)
-  const storagePath = `${userId}/image-generations/${timestamp}-${randomStr}-${index + 1}.${extension}`
-
-  const { error: uploadError } = await supabase.storage
-    .from("public-bucket")
-    .upload(storagePath, buffer, {
-      contentType: mimeType,
-      upsert: false,
-    })
-
-  if (uploadError) {
-    throw new Error(`Failed to upload generated image: ${uploadError.message}`)
-  }
-
-  const { data: urlData } = supabase.storage.from("public-bucket").getPublicUrl(storagePath)
-
-  return {
-    mimeType,
-    storagePath,
-    url: urlData.publicUrl,
-  }
+  return uploadPreparedGeneratedImage({
+    autoStrip,
+    index,
+    modelIdentifier,
+    remoteUrl,
+    supabase,
+    userId,
+  })
 }
 
 async function storeGeneratedImageFromBase64({
+  autoStrip,
   base64,
   index,
   mimeType = "image/png",
+  modelIdentifier,
   supabase,
   userId,
 }: {
+  autoStrip: boolean
   base64: string
   index: number
   mimeType?: string
+  modelIdentifier: string
   supabase: SupabaseClient
   userId: string
 }): Promise<StoredGeneratedImage> {
-  const buffer = Buffer.from(base64, "base64")
-  const timestamp = Date.now()
-  const randomStr = Math.random().toString(36).slice(2, 10)
-  const extension = getFileExtension(mimeType)
-  const storagePath = `${userId}/image-generations/${timestamp}-${randomStr}-${index + 1}.${extension}`
-
-  const { error: uploadError } = await supabase.storage
-    .from("public-bucket")
-    .upload(storagePath, buffer, {
-      contentType: mimeType,
-      upsert: false,
-    })
-
-  if (uploadError) {
-    throw new Error(`Failed to upload generated image: ${uploadError.message}`)
-  }
-
-  const { data: urlData } = supabase.storage.from("public-bucket").getPublicUrl(storagePath)
-
-  return {
+  return uploadPreparedGeneratedImage({
+    autoStrip,
+    base64,
+    index,
     mimeType,
-    storagePath,
-    url: urlData.publicUrl,
-  }
+    modelIdentifier,
+    supabase,
+    userId,
+  })
 }
 
 async function saveCompletedGenerations({
@@ -279,12 +236,15 @@ export async function persistGeneratedBase64Images({
   creditsUsed: number
   images: StoredGeneratedImage[]
 }> {
+  const autoStrip = await getAutoStripImageMetadata(supabase, userId)
   const storedImages = await Promise.all(
     base64Images.map((base64, index) =>
       storeGeneratedImageFromBase64({
+        autoStrip,
         base64,
         index,
         mimeType,
+        modelIdentifier,
         supabase,
         userId,
       }),
@@ -345,10 +305,13 @@ export async function runReplicatePollingImageGeneration({
     throw new Error("Replicate returned no output URLs")
   }
 
+  const autoStrip = await getAutoStripImageMetadata(supabase, userId)
   const storedImages = await Promise.all(
     outputUrls.map((remoteUrl, index) =>
       storeGeneratedImageFromUrl({
+        autoStrip,
         index,
+        modelIdentifier,
         remoteUrl,
         supabase,
         userId,

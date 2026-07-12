@@ -28,6 +28,8 @@ import {
   isReplicateGptImage2Model,
 } from '@/lib/server/replicate-gpt-image';
 import { applyMinimalReplicateImageModeration } from '@/lib/server/minimal-moderation';
+import { getAutoStripImageMetadata } from '@/lib/server/auto-strip-image-metadata';
+import { uploadPreparedGeneratedImage } from '@/lib/server/store-generated-image';
 import { isContentModerationMessage } from '@/lib/generate-image-client';
 import {
   parseReferenceImageUrlsFromForm,
@@ -1003,45 +1005,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Helper function to upload image to storage and get URL and path
+    const autoStrip = await getAutoStripImageMetadata(supabase, user.id);
     const uploadImageToStorage = async (base64Image: string, index?: number): Promise<{ url: string; storagePath: string }> => {
       const uploadStartTime = Date.now();
       console.log(`[generate-image] Uploading generated image ${index !== undefined ? `#${index + 1}` : ''} to storage...`);
-      
-      const imageBuffer = Buffer.from(base64Image, 'base64');
-      const timestamp = Date.now();
-      const randomStr = Math.random().toString(36).substring(7);
-      const filename = index !== undefined 
-        ? `${timestamp}-${randomStr}-${index}.png`
-        : `${timestamp}-${randomStr}.png`;
-      const storagePath = `${user.id}/image-generations/${filename}`;
 
-      console.log(`[generate-image] Generated image details:`, {
-        index: index !== undefined ? index + 1 : 1,
-        bufferSize: imageBuffer.length,
-        storagePath,
+      const stored = await uploadPreparedGeneratedImage({
+        autoStrip,
+        base64: base64Image,
+        index: index ?? 0,
+        mimeType: 'image/png',
+        modelIdentifier,
+        supabase,
+        userId: user.id,
       });
-
-      const { error: uploadError } = await supabase.storage
-        .from('public-bucket')
-        .upload(storagePath, imageBuffer, {
-          contentType: 'image/png',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        console.error(`[generate-image] Error uploading generated image ${index !== undefined ? `#${index + 1}` : ''}:`, uploadError);
-        throw new Error(`Failed to upload generated image: ${uploadError.message}`);
-      }
 
       const uploadTime = Date.now() - uploadStartTime;
       console.log(`[generate-image] ✓ Generated image ${index !== undefined ? `#${index + 1}` : ''} uploaded in`, uploadTime, 'ms');
-
-      const { data: urlData } = supabase.storage
-        .from('public-bucket')
-        .getPublicUrl(storagePath);
-
-      console.log(`[generate-image] ✓ Generated image ${index !== undefined ? `#${index + 1}` : ''} URL:`, urlData.publicUrl);
-      return { url: urlData.publicUrl, storagePath };
+      console.log(`[generate-image] ✓ Generated image ${index !== undefined ? `#${index + 1}` : ''} URL:`, stored.url);
+      return { url: stored.url, storagePath: stored.storagePath };
     };
 
     // Helper function to save generation data to database

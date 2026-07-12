@@ -50,6 +50,7 @@ type ProfileData = {
   memberSince: string
   hasSubscription: boolean
   hasCompletedOnboarding: boolean
+  autoStripImageMetadata: boolean
   userId: string
 }
 
@@ -106,7 +107,7 @@ async function fetchProfileData(): Promise<ProfileData | null> {
   const [{ data: profile }, { data: subscription }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, email, credits, created_at, onboarding_completed_at")
+      .select("full_name, email, credits, created_at, onboarding_completed_at, auto_strip_image_metadata")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -148,6 +149,7 @@ async function fetchProfileData(): Promise<ProfileData | null> {
     memberSince,
     hasSubscription,
     hasCompletedOnboarding: Boolean(profile?.onboarding_completed_at),
+    autoStripImageMetadata: profile?.auto_strip_image_metadata === true,
     userId: user.id,
   }
 }
@@ -330,6 +332,10 @@ export function ProfileSettingsModal({
             hasCompletedOnboarding={data.hasCompletedOnboarding}
             userId={data.userId}
             credits={data.credits}
+            autoStripImageMetadata={data.autoStripImageMetadata}
+            onAutoStripImageMetadataChange={(enabled) =>
+              setData((prev) => (prev ? { ...prev, autoStripImageMetadata: enabled } : prev))
+            }
             onDisplayNameChange={(name) =>
               setData((prev) => (prev ? { ...prev, displayName: name } : prev))
             }

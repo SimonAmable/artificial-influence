@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js"
 import { deductUserCredits, deductUserCreditsUpTo } from "@/lib/credits"
 import { runGenerationFollowUpResume } from "@/lib/chat/generation-follow-up-resume"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
+import { getAutoStripImageMetadata } from "@/lib/server/auto-strip-image-metadata"
+import { prepareGeneratedImageForStorage } from "@/lib/server/prepare-generated-image-for-storage"
 
 /** Agent follow-up resume can run a full tool loop after upload (same budget as /api/chat). */
 export const maxDuration = 300
@@ -103,6 +105,7 @@ async function cancelPendingGenerationFollowUps(generationId: string) {
 async function uploadReplicateOutput(
   generation: PendingGenerationRow,
   outputUrl: string,
+  autoStrip: boolean,
   index?: number,
 ): Promise<{ storagePath: string; url: string }> {
   const response = await fetch(outputUrl)
@@ -110,9 +113,25 @@ async function uploadReplicateOutput(
     throw new Error(`Failed to download Replicate output (${response.status})`)
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer())
-  const contentType =
+  const downloadedMimeType =
     response.headers.get("content-type")?.split(";")[0]?.trim() || getDefaultMimeTypeForGeneration(generation.type)
+  const downloadedBuffer = Buffer.from(await response.arrayBuffer())
+
+  const prepared =
+    generation.type === "image"
+      ? await prepareGeneratedImageForStorage({
+          autoStrip,
+          buffer: downloadedBuffer,
+          mimeType: downloadedMimeType,
+          modelIdentifier: generation.model,
+          remoteUrl: outputUrl,
+        })
+      : {
+          buffer: downloadedBuffer,
+          mimeType: downloadedMimeType,
+        }
+
+  const contentType = prepared.mimeType
   const extension = getExtensionForMimeType(
     contentType,
     generation.type === "video" ? "mp4" : "png",
@@ -123,7 +142,7 @@ async function uploadReplicateOutput(
       : `${Date.now()}-${Math.random().toString(36).slice(7)}.${extension}`
   const storagePath = `${generation.user_id}/${getGenerationFolder(generation.type)}/${filename}`
 
-  const { error: uploadError } = await supabaseAdmin.storage.from("public-bucket").upload(storagePath, buffer, {
+  const { error: uploadError } = await supabaseAdmin.storage.from("public-bucket").upload(storagePath, prepared.buffer, {
     contentType,
     upsert: false,
   })
@@ -211,11 +230,17 @@ export async function POST(request: NextRequest) {
         ? outputUrls.slice(0, 1)
         : outputUrls
 
+    const autoStrip =
+      pendingGeneration.type === "image"
+        ? await getAutoStripImageMetadata(supabaseAdmin, pendingGeneration.user_id)
+        : false
+
     const persistedOutputs = await Promise.all(
       urlsToPersist.map((url, index) =>
         uploadReplicateOutput(
           pendingGeneration,
           url,
+          autoStrip,
           pendingGeneration.type === "image" && urlsToPersist.length > 1 ? index : undefined,
         ),
       ),

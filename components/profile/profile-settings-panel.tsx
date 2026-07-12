@@ -1,8 +1,11 @@
 "use client"
 
 import Link from "next/link"
+import * as React from "react"
 import { Coin } from "@phosphor-icons/react"
+import { toast } from "sonner"
 
+import { updateAutoStripImageMetadata } from "@/app/profile/actions"
 import { EditableDisplayName } from "@/components/profile/editable-display-name"
 import { ProfileLogoutButton } from "@/components/profile/profile-logout-button"
 import { RestartOnboardingButton } from "@/components/profile/restart-onboarding-button"
@@ -11,6 +14,7 @@ import { ThemeToggleGroup } from "@/components/settings/theme-toggle-group"
 import { LayoutMode } from "@/components/shared/layout/layout-toggle"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { isOnboardingEnabled } from "@/lib/product/onboarding"
 
 export type ProfileSettingsPanelProps = {
@@ -20,6 +24,8 @@ export type ProfileSettingsPanelProps = {
   hasCompletedOnboarding: boolean
   userId: string
   credits?: number
+  autoStripImageMetadata?: boolean
+  onAutoStripImageMetadataChange?: (enabled: boolean) => void
   variant?: "page" | "modal"
   onDisplayNameChange?: (name: string) => void
   onLogout?: () => void
@@ -34,6 +40,8 @@ export function ProfileSettingsPanel({
   hasCompletedOnboarding,
   userId,
   credits,
+  autoStripImageMetadata = false,
+  onAutoStripImageMetadataChange,
   variant = "page",
   onDisplayNameChange,
   onLogout,
@@ -43,6 +51,34 @@ export function ProfileSettingsPanel({
   const isModal = variant === "modal"
   const nameSize = isModal ? "compact" : "page"
   const showLayout = layoutMode !== undefined && onLayoutModeChange !== undefined
+  const [stripMetadata, setStripMetadata] = React.useState(autoStripImageMetadata)
+  const [stripMetadataPending, startStripMetadataTransition] = React.useTransition()
+  const stripMetadataSwitchId = React.useId()
+
+  React.useEffect(() => {
+    setStripMetadata(autoStripImageMetadata)
+  }, [autoStripImageMetadata])
+
+  const stripMetadataDescription = stripMetadata
+    ? "On — removes hidden file data and AI watermarks like Synth ID before images are saved to your library."
+    : "Off — images save as generated, including hidden file data and AI watermarks like Synth ID."
+
+  function handleStripMetadataChange(checked: boolean) {
+    const previous = stripMetadata
+    setStripMetadata(checked)
+    onAutoStripImageMetadataChange?.(checked)
+
+    startStripMetadataTransition(() => {
+      void (async () => {
+        const result = await updateAutoStripImageMetadata(checked)
+        if (!result.ok) {
+          setStripMetadata(previous)
+          onAutoStripImageMetadataChange?.(previous)
+          toast.error(result.error)
+        }
+      })()
+    })
+  }
 
   return (
     <div className={isModal ? "w-full min-w-0 space-y-6" : "space-y-6"}>
@@ -91,6 +127,26 @@ export function ProfileSettingsPanel({
             />
           </div>
         ) : null}
+        <div className="space-y-0 border-t border-border/60 pt-4">
+          <label
+            htmlFor={stripMetadataSwitchId}
+            className="flex min-h-[52px] cursor-pointer items-center justify-between gap-4 border-b border-border/60 py-3 last:border-b-0"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-foreground">Strip image metadata</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {stripMetadataDescription}
+              </p>
+            </div>
+            <Switch
+              id={stripMetadataSwitchId}
+              checked={stripMetadata}
+              onCheckedChange={handleStripMetadataChange}
+              disabled={stripMetadataPending}
+              aria-label="Strip image metadata"
+            />
+          </label>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">

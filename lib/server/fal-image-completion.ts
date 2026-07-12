@@ -3,6 +3,8 @@ import { fal } from "@fal-ai/client"
 import { createClient } from "@supabase/supabase-js"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
+import { getAutoStripImageMetadata } from "@/lib/server/auto-strip-image-metadata"
+import { prepareGeneratedImageForStorage } from "@/lib/server/prepare-generated-image-for-storage"
 import { configureFal } from "./fal-image"
 import { formatFalClientError } from "./fal-client-error"
 
@@ -155,6 +157,7 @@ export async function completeFalPendingImageAdmin(
   }
 
   const persistedOutputs: { storagePath: string; url: string }[] = []
+  const autoStrip = await getAutoStripImageMetadata(supabaseAdmin, row.user_id)
 
   for (let index = 0; index < urls.length; index++) {
     const outputUrl = urls[index]
@@ -171,9 +174,17 @@ export async function completeFalPendingImageAdmin(
       await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
       return { status: "failed", error: "Download failed" }
     }
-    const buffer = Buffer.from(await response.arrayBuffer())
-    const contentType =
+    const downloadedMimeType =
       response.headers.get("content-type")?.split(";")[0]?.trim() || "image/png"
+    const downloadedBuffer = Buffer.from(await response.arrayBuffer())
+    const prepared = await prepareGeneratedImageForStorage({
+      autoStrip,
+      buffer: downloadedBuffer,
+      mimeType: downloadedMimeType,
+      modelIdentifier: row.model,
+      remoteUrl: outputUrl,
+    })
+    const contentType = prepared.mimeType
     const extension = getExtensionForMimeType(contentType, "png")
     const filename =
       urls.length > 1
@@ -181,7 +192,7 @@ export async function completeFalPendingImageAdmin(
         : `${Date.now()}-${Math.random().toString(36).slice(7)}.${extension}`
     const storagePath = `${row.user_id}/image-generations/${filename}`
 
-    const { error: uploadError } = await supabaseAdmin.storage.from("public-bucket").upload(storagePath, buffer, {
+    const { error: uploadError } = await supabaseAdmin.storage.from("public-bucket").upload(storagePath, prepared.buffer, {
       contentType,
       upsert: false,
     })

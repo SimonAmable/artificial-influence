@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -502,28 +503,33 @@ export function InputPromptBox({
         </div>
       </CardContent>
 
-      {/* Full Screen Image Preview */}
-      {isFullScreenPreviewOpen && referenceImage?.url && (
-        <div
-          className="fixed inset-0 z-100 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={handleCloseFullScreenPreview}
-        >
-          <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={referenceImage.url}
-              alt="Reference image full screen"
-              className="max-w-full max-h-[90vh] object-contain rounded-lg"
-            />
-            <button
-              onClick={handleCloseFullScreenPreview}
-              className="absolute top-4 right-4 bg-background/80 hover:bg-background text-foreground rounded-full p-2 shadow-lg border border-border"
-              aria-label="Close full screen preview"
-            >
-              <X className="size-5" weight="bold" />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Full Screen Image Preview — portal so fixed isn't trapped by prompt card backdrop-filter */}
+      {typeof document !== "undefined" &&
+        isFullScreenPreviewOpen &&
+        referenceImage?.url &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-100 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={handleCloseFullScreenPreview}
+          >
+            <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+              <img
+                src={referenceImage.url}
+                alt="Reference image full screen"
+                className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              />
+              <button
+                type="button"
+                onClick={handleCloseFullScreenPreview}
+                className="absolute top-4 right-4 bg-background/80 hover:bg-background text-foreground rounded-full p-2 shadow-lg border border-border"
+                aria-label="Close full screen preview"
+              >
+                <X className="size-5" weight="bold" />
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
     </Card>
   )
 }
