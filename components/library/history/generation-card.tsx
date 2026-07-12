@@ -55,33 +55,6 @@ export function GenerationCard({
 }: GenerationCardProps) {
   const supportsFanvue = generation.type === "image" || generation.type === "video"
   const source = generation.source === "upload" ? "upload" : "generation"
-  const dropdownProps = {
-    canEditImage: actionVariant === "library" && generation.type === "image",
-    canSaveExample: actionVariant === "library" && generation.type === "image",
-    canAnimate: actionVariant === "library" && generation.type === "image",
-    onEditImage: onEditImage ? () => onEditImage(generation.url) : undefined,
-    onSaveExample: onSaveExample ? () => onSaveExample(generation) : undefined,
-    onAnimate: onAnimate ? () => onAnimate(generation) : undefined,
-    onCopy: () => onCopy(generation.url, generation.type),
-    onDownload: () => onDownload(generation.url, generation.type, generation.type),
-    onDelete: () => onDelete(generation),
-  }
-
-  const handleSave = () => {
-    if (!onSave || !getDefaultCategoryByMediaType) return
-    onSave({
-      url: generation.url,
-      assetType: generation.type,
-      title: `${generation.type} ${generation.id.slice(0, 8)}`,
-      category: getDefaultCategoryByMediaType(generation.type),
-      visibility: "private",
-      uploadId: source === "upload" ? generation.uploadId ?? generation.id : undefined,
-      supabaseStoragePath: generation.supabase_storage_path,
-      sourceGenerationId: source === "upload" ? undefined : generation.id,
-      sourceNodeType: source === "upload" ? "upload" : "generation-history",
-      description: generation.prompt ?? undefined,
-    })
-  }
 
   if (actionVariant === "select") {
     return (
@@ -145,6 +118,34 @@ export function GenerationCard({
         </div>
       </article>
     )
+  }
+
+  const dropdownProps = {
+    canEditImage: actionVariant === "library" && generation.type === "image",
+    canSaveExample: actionVariant === "library" && generation.type === "image",
+    canAnimate: actionVariant === "library" && generation.type === "image",
+    onEditImage: onEditImage ? () => onEditImage(generation.url) : undefined,
+    onSaveExample: onSaveExample ? () => onSaveExample(generation) : undefined,
+    onAnimate: onAnimate ? () => onAnimate(generation) : undefined,
+    onCopy: () => onCopy(generation.url, generation.type),
+    onDownload: () => onDownload(generation.url, generation.type, generation.type),
+    onDelete: () => onDelete(generation),
+  }
+
+  const handleSave = () => {
+    if (!onSave || !getDefaultCategoryByMediaType) return
+    onSave({
+      url: generation.url,
+      assetType: generation.type,
+      title: `${generation.type} ${generation.id.slice(0, 8)}`,
+      category: getDefaultCategoryByMediaType(generation.type),
+      visibility: "private",
+      uploadId: source === "upload" ? generation.uploadId ?? generation.id : undefined,
+      supabaseStoragePath: generation.supabase_storage_path,
+      sourceGenerationId: source === "upload" ? undefined : generation.id,
+      sourceNodeType: source === "upload" ? "upload" : "generation-history",
+      description: generation.prompt ?? undefined,
+    })
   }
 
   return (
