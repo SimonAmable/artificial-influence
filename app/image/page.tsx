@@ -178,7 +178,7 @@ function showImageGenerationErrorToast(message: string, err: unknown) {
 
   toast.error("Image generation failed", {
     id: "image-generation-error",
-    description: message,
+    description: toUserFacingGenerationError(message, "Please try again."),
   })
 }
 
@@ -1094,7 +1094,8 @@ function ImagePageContent() {
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        const msg = data.error ?? data.message ?? 'Remove background failed'
+        const raw = String(data.error ?? data.message ?? '')
+        const msg = toUserFacingGenerationError(raw, 'Remove background failed. Please try again.')
         if (response.status === 402) {
           showCreditsUpsellToast({
             message: msg,
@@ -1109,7 +1110,7 @@ function ImagePageContent() {
 
       const outputUrl = data.imageUrl as string | undefined
       if (!outputUrl) {
-        toast.error('Remove background failed')
+        toast.error('Remove background failed. Please try again.')
         return
       }
 
@@ -1132,7 +1133,12 @@ function ImagePageContent() {
       })
     } catch (err) {
       console.error('Remove background error:', err)
-      toast.error(err instanceof Error ? err.message : 'Remove background failed')
+      toast.error(
+        toUserFacingGenerationError(
+          err instanceof Error ? err.message : '',
+          'Remove background failed. Please try again.',
+        ),
+      )
     } finally {
       setRemovingBackgroundImageUrl(null)
     }

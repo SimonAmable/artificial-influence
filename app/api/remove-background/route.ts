@@ -3,22 +3,40 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 
-const REMOVE_BG_MODEL_ID =
-  'fottoai/remove-bg-2';
+/** Model slug stored on generations / shown in history. */
+const REMOVE_BG_MODEL_ID = 'fottoai/remove-bg-2';
+/**
+ * Pin a version — `replicate.run("owner/name")` hits `/v1/models/.../predictions`,
+ * which 404s for this model. Versioned runs use `/v1/predictions` and work.
+ */
+const REMOVE_BG_MODEL_VERSION =
+  'fottoai/remove-bg-2:d748bcc6882e5567ffe1468356323e6345736494dd9b827ff2871a68fca79be5';
 const CREDITS_COST = 1;
+const USER_FACING_FAILURE = 'Remove background failed. Please try again.';
+
+function coerceUrl(value: unknown): string | null {
+  if (typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://'))) {
+    return value;
+  }
+  if (value instanceof URL) {
+    return value.href;
+  }
+  return null;
+}
 
 function extractOutputUrl(output: unknown): string | null {
-  if (typeof output === 'string' && (output.startsWith('http://') || output.startsWith('https://'))) {
-    return output;
-  }
+  const asUrl = coerceUrl(output);
+  if (asUrl) return asUrl;
+
   if (output && typeof output === 'object') {
-    const obj = output as { url?: string | (() => string) };
-    if (typeof obj.url === 'function') return obj.url();
-    if (typeof obj.url === 'string') return obj.url;
+    const obj = output as { url?: unknown };
+    if (typeof obj.url === 'function') {
+      return coerceUrl(obj.url());
+    }
+    return coerceUrl(obj.url);
   }
   if (Array.isArray(output) && output.length > 0) {
-    const first = output[0];
-    return typeof first === 'string' ? first : extractOutputUrl(first);
+    return extractOutputUrl(output[0]);
   }
   return null;
 }
@@ -26,10 +44,8 @@ function extractOutputUrl(output: unknown): string | null {
 export async function POST(request: NextRequest) {
   try {
     if (!process.env.REPLICATE_API_TOKEN) {
-      return NextResponse.json(
-        { error: 'REPLICATE_API_TOKEN environment variable is not set' },
-        { status: 500 }
-      );
+      console.error('[remove-background] REPLICATE_API_TOKEN is not set');
+      return NextResponse.json({ error: USER_FACING_FAILURE }, { status: 500 });
     }
 
     const supabase = await createClient();
@@ -37,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'Unauthorized. Please log in to remove background.' },
+        { error: 'Please log in to remove background.' },
         { status: 401 }
       );
     }
@@ -61,7 +77,7 @@ export async function POST(request: NextRequest) {
       imageUrl = (body.imageUrl ?? body.image ?? body.media ?? '')?.trim() ?? '';
       if (!imageUrl) {
         return NextResponse.json(
-          { error: 'Missing "imageUrl", "image", or "media" in JSON body.' },
+          { error: 'Please provide an image to remove the background from.' },
           { status: 400 }
         );
       }
@@ -70,7 +86,7 @@ export async function POST(request: NextRequest) {
       const imageFile = formData.get('image') as File | null;
       if (!imageFile || !(imageFile instanceof File)) {
         return NextResponse.json(
-          { error: 'Missing or invalid "image" file in FormData.' },
+          { error: 'Please provide an image to remove the background from.' },
           { status: 400 }
         );
       }
@@ -89,37 +105,32 @@ export async function POST(request: NextRequest) {
         });
 
       if (uploadError) {
-        return NextResponse.json(
-          { error: 'Failed to upload image.', message: uploadError.message },
-          { status: 500 }
-        );
+        console.error('[remove-background] Upload failed:', uploadError.message);
+        return NextResponse.json({ error: USER_FACING_FAILURE }, { status: 500 });
       }
       const { data: urlData } = supabase.storage.from('public-bucket').getPublicUrl(storagePath);
       imageUrl = urlData.publicUrl;
     } else {
       return NextResponse.json(
-        { error: 'Content-Type must be application/json or multipart/form-data.' },
+        { error: 'Please provide an image to remove the background from.' },
         { status: 400 }
       );
     }
 
     const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
-    const output = await replicate.run(REMOVE_BG_MODEL_ID as `${string}/${string}`, {
-      input: {
-        image: imageUrl,
-        format: 'png',
-        reverse: false,
-        threshold: 0,
-        background_type: 'rgba',
+    const output = await replicate.run(
+      REMOVE_BG_MODEL_VERSION as `${string}/${string}:${string}`,
+      {
+        input: {
+          image_url: imageUrl,
+        },
       },
-    });
+    );
 
     const outputUrl = extractOutputUrl(output);
     if (!outputUrl) {
-      return NextResponse.json(
-        { error: 'Unexpected output from background remover.' },
-        { status: 500 }
-      );
+      console.error('[remove-background] Unexpected output shape:', output);
+      return NextResponse.json({ error: USER_FACING_FAILURE }, { status: 500 });
     }
 
     // Save result to storage so URL is permanent (Replicate URLs can expire)
@@ -176,9 +187,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error('[remove-background] Error:', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Remove background failed' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: USER_FACING_FAILURE }, { status: 500 });
   }
 }

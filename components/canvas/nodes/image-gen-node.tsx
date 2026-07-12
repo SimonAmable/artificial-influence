@@ -556,7 +556,8 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const msg = data.error ?? data.message ?? 'Remove background failed'
+        const raw = String(data.error ?? data.message ?? '')
+        const msg = toUserFacingGenerationError(raw, 'Remove background failed. Please try again.')
         if (res.status === 402) {
           showCreditsUpsellToast({
             message: msg,
@@ -582,7 +583,12 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       }
     } catch (err) {
       console.error('Remove background error:', err)
-      toast.error(err instanceof Error ? err.message : 'Remove background failed')
+      toast.error(
+        toUserFacingGenerationError(
+          err instanceof Error ? err.message : '',
+          'Remove background failed. Please try again.',
+        ),
+      )
     } finally {
       setIsRemovingBg(false)
     }
