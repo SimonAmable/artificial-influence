@@ -7,24 +7,17 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import {
-  ArrowsOutSimple,
   ClockCounterClockwise,
   Copy,
-  DotsThreeVertical,
   DownloadSimple,
   FolderSimple,
-  Image as ImageIcon,
-  Images,
   MagnifyingGlass,
-  MusicNote,
   PencilSimple,
-  Plus,
   Play,
+  Plus,
   SlidersHorizontal,
   Sparkle,
-  Trash,
   UploadSimple,
-  Video,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
@@ -33,15 +26,15 @@ import { BrandKitNewFlowDialog } from "@/components/brand-kit/brand-kit-new-flow
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { CreateCollectionDialog } from "@/components/collections/create-collection-dialog"
 import { SaveExampleDialog, type SaveExampleSnapshot } from "@/components/image/save-example-dialog"
+import { AssetFilterOptions } from "@/components/library/assets/asset-filters"
+import { AssetsPanel } from "@/components/library/assets/assets-panel"
+import { ASSET_PAGE_LIMIT, COLUMN_COUNT_STORAGE_KEY } from "@/components/library/assets/constants"
 import { HistoryFilterOptions } from "@/components/library/history/history-filters"
 import { HistoryPanel } from "@/components/library/history/history-panel"
 import { EmptyState, LoadingGrid, RetryState } from "@/components/library/history/history-states"
-import { MediaTypeIcon } from "@/components/library/history/media-preview"
 import {
   HISTORY_PAGE_LIMIT,
-  HISTORY_TOOLS,
   HISTORY_TYPES,
-  emptyHistoryMessages,
 } from "@/components/library/history/constants"
 import type {
   Generation,
@@ -69,23 +62,13 @@ import {
 import { copyMediaToClipboard, downloadMediaFile } from "@/components/shared/display/media-viewer-utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Slider } from "@/components/ui/slider"
 import type { AssetCategory, AssetRecord, AssetType, AssetVisibility } from "@/lib/assets/types"
-import {
-  ASSET_CATEGORIES,
-  ASSET_CATEGORY_LABELS,
-  deleteAsset,
-} from "@/lib/assets/library"
+import { deleteAsset } from "@/lib/assets/library"
 import type { BrandKit } from "@/lib/brand-kit/types"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import type { SlideshowCollection } from "@/lib/slideshow/types"
@@ -124,7 +107,6 @@ type ViewerItem = {
   actions: FullscreenMediaViewerAction[]
 }
 
-const ASSET_PAGE_LIMIT = 200
 const ALL_LIBRARY_TABS: LibraryTab[] = ["history", "assets", "brands", "collections"]
 
 function getLibraryTabs(): LibraryTab[] {
@@ -156,16 +138,6 @@ function mediaMatchesSearch(value: string, fields: Array<string | null | undefin
   if (!query) return true
   return fields.some((field) => field?.toLowerCase().includes(query))
 }
-
-const ASSET_SOURCES = [
-  { value: "all", label: "All Sources" },
-  { value: "upload", label: "Direct Upload" },
-  { value: "image-gen", label: "Image Studio" },
-  { value: "video-gen", label: "Video Studio" },
-  { value: "audio", label: "Audio Studio" },
-  { value: "ai_influencer", label: "AI Influencer" },
-  { value: "generation-history", label: "Saved History" },
-]
 
 function FilterOptionsContent({
   activeTab,
@@ -220,85 +192,17 @@ function FilterOptionsContent({
 
   if (activeTab === "assets") {
     return (
-      <div className="space-y-4 p-4 text-foreground bg-card rounded-2xl">
-        <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Visibility</label>
-          <div className="flex gap-1.5">
-            <Button
-              variant={assetVisibility === "all" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAssetVisibility("all")}
-              className="rounded-full text-xs px-3 py-1 h-8"
-            >
-              All
-            </Button>
-            <Button
-              variant={assetVisibility === "private" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAssetVisibility("private")}
-              className="rounded-full text-xs px-3 py-1 h-8"
-            >
-              Private
-            </Button>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Category</label>
-          <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto pr-1">
-            <Button
-              variant={assetCategory === "all" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setCategory("all")}
-              className="rounded-full text-xs px-3 py-1 h-8"
-            >
-              All categories
-            </Button>
-            {ASSET_CATEGORIES.map((cat) => (
-              <Button
-                key={cat}
-                variant={assetCategory === cat ? "default" : "outline"}
-                size="sm"
-                onClick={() => setCategory(cat)}
-                className="rounded-full text-xs px-3 py-1 h-8"
-              >
-                {ASSET_CATEGORY_LABELS[cat]}
-              </Button>
-            ))}
-          </div>
-        </div>
-        <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Source Tool</label>
-          <div className="flex flex-wrap gap-1.5 max-h-[140px] overflow-y-auto pr-1">
-            {ASSET_SOURCES.map((src) => (
-              <Button
-                key={src.value}
-                variant={assetSource === src.value ? "default" : "outline"}
-                size="sm"
-                onClick={() => setAssetSource(src.value)}
-                className="rounded-full text-xs px-3 py-1 h-8"
-              >
-                {src.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-        {isMobile && (
-          <div className="space-y-2 pt-3 border-t border-border/50">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Grid Columns</span>
-              <span className="text-sm font-medium text-primary">{columnCount}</span>
-            </div>
-            <Slider
-              value={[columnCount]}
-              onValueChange={(val) => onColumnCountChange(val[0])}
-              min={2}
-              max={6}
-              step={1}
-              className="py-2"
-            />
-          </div>
-        )}
-      </div>
+      <AssetFilterOptions
+        assetVisibility={assetVisibility}
+        onAssetVisibilityChange={setAssetVisibility}
+        assetCategory={assetCategory}
+        onAssetCategoryChange={setCategory}
+        assetSource={assetSource}
+        onAssetSourceChange={setAssetSource}
+        columnCount={columnCount}
+        onColumnCountChange={onColumnCountChange}
+        showColumnSlider={isMobile}
+      />
     )
   }
 
@@ -332,7 +236,7 @@ function LibraryPageContent() {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false)
 
   React.useEffect(() => {
-    const saved = window.localStorage.getItem("unican-assets-column-count")
+    const saved = window.localStorage.getItem(COLUMN_COUNT_STORAGE_KEY)
     if (saved) {
       const parsed = parseInt(saved, 10)
       if (!isNaN(parsed) && parsed >= 2 && parsed <= 6) {
@@ -343,7 +247,7 @@ function LibraryPageContent() {
 
   const handleColumnCountChange = React.useCallback((value: number) => {
     setColumnCount(value)
-    window.localStorage.setItem("unican-assets-column-count", String(value))
+    window.localStorage.setItem(COLUMN_COUNT_STORAGE_KEY, String(value))
   }, [])
 
   const [historyType, setHistoryType] = React.useState<GenerationType>("all")
@@ -1302,9 +1206,7 @@ function LibraryPageContent() {
           <TabsContent value="assets" className="mt-0 w-full pt-3">
             <AssetsPanel
               visibility={assetVisibility}
-              setVisibility={setAssetVisibility}
               category={assetCategory}
-              setCategory={setAssetCategory}
               state={assetsState}
               onRefresh={() => void refreshAssets()}
               onUpload={() => fileInputRef.current?.click()}
@@ -1418,423 +1320,6 @@ function LibraryPageContent() {
         onCreated={(collection) => setCollections((prev) => [collection, ...prev])}
       />
     </div>
-  )
-}
-
-function AssetsPanel({
-  visibility,
-  setVisibility,
-  category,
-  setCategory,
-  state,
-  onRefresh,
-  onUpload,
-  currentUserId,
-  onOpen,
-  onSaveExample,
-  onAnimate,
-  onCopy,
-  onReference,
-  onDownload,
-  onEdit,
-  onDelete,
-  onEditImage,
-  columnCount,
-  onColumnCountChange,
-}: {
-  visibility: AssetVisibility | "all"
-  setVisibility: (visibility: AssetVisibility | "all") => void
-  category: AssetCategory | "all"
-  setCategory: (category: AssetCategory | "all") => void
-  state: PaginatedState<AssetRecord>
-  onRefresh: () => void
-  onUpload: () => void
-  currentUserId: string | null
-  onOpen: (asset: AssetRecord) => void
-  onSaveExample: (asset: AssetRecord) => void
-  onAnimate: (asset: AssetRecord) => void
-  onCopy: (url: string, type: AssetType) => void
-  onReference: (url: string) => void
-  onDownload: (url: string, type: AssetType, title?: string) => void
-  onEdit: (asset: AssetRecord) => void
-  onDelete: (asset: AssetRecord) => void
-  onEditImage: (url: string) => void
-  columnCount: number
-  onColumnCountChange: (value: number) => void
-}) {
-  const emptyTitle =
-    category !== "all"
-      ? `No ${ASSET_CATEGORY_LABELS[category]} yet`
-      : visibility === "private"
-        ? "No private assets yet"
-        : "Nothing here yet"
-
-  const gridColsClass = {
-    2: "grid-cols-2",
-    3: "grid-cols-2 sm:grid-cols-3",
-    4: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
-    5: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
-    6: "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6",
-  }[columnCount] || "grid-cols-2"
-
-  return (
-    <section className="w-full space-y-3">
-      {state.initialLoading ? (
-        <LoadingGrid label="Loading assets..." />
-      ) : state.error ? (
-        <RetryState centered message={state.error} onRetry={onRefresh} />
-      ) : state.items.length === 0 ? (
-        <EmptyState
-          centered
-          icon={<Images className="h-7 w-7" />}
-          title={emptyTitle}
-          description="Drop a file anywhere on this page, or use Upload."
-          action={<Button onClick={onUpload}>Create asset</Button>}
-        />
-      ) : (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
-            <div>
-              Showing {state.items.length} of {state.pagination.total}
-            </div>
-            {/* Mobile only columns slider */}
-            <div className="flex items-center gap-2 lg:hidden">
-              <span className="text-xs">Cols: <span className="text-primary font-medium">{columnCount}</span></span>
-              <Slider
-                value={[columnCount]}
-                onValueChange={(val) => onColumnCountChange(val[0])}
-                min={2}
-                max={6}
-                step={1}
-                className="w-20"
-              />
-            </div>
-          </div>
-          <div className={cn("grid gap-2 sm:gap-3", gridColsClass)}>
-            {state.items.map((asset) => (
-                <AssetCard
-                  key={asset.id}
-                  asset={asset}
-                  isOwner={currentUserId !== null && asset.userId === currentUserId}
-                  onOpen={onOpen}
-                  onSaveExample={onSaveExample}
-                  onAnimate={onAnimate}
-                  onCopy={onCopy}
-                  onReference={onReference}
-                  onDownload={onDownload}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                onEditImage={onEditImage}
-                columnCount={columnCount}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </section>
-  )
-}
-
-function AssetCard({
-  asset,
-  isOwner,
-  onOpen,
-  onSaveExample,
-  onAnimate,
-  onCopy,
-  onReference,
-  onDownload,
-  onEdit,
-  onDelete,
-  onEditImage,
-  columnCount,
-}: {
-  asset: AssetRecord
-  isOwner: boolean
-  onOpen: (asset: AssetRecord) => void
-  onSaveExample: (asset: AssetRecord) => void
-  onAnimate: (asset: AssetRecord) => void
-  onCopy: (url: string, type: AssetType) => void
-  onReference: (url: string) => void
-  onDownload: (url: string, type: AssetType, title?: string) => void
-  onEdit: (asset: AssetRecord) => void
-  onDelete: (asset: AssetRecord) => void
-  onEditImage: (url: string) => void
-  columnCount: number
-}) {
-  return (
-    <article className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card/45 aspect-square shadow-sm transition-all hover:border-foreground/20 hover:shadow-md">
-      <MediaPreview
-        type={asset.assetType}
-        url={asset.thumbnailUrl || asset.url}
-        playableUrl={asset.url}
-        alt={asset.title}
-        onOpen={asset.assetType === "audio" ? undefined : () => onOpen(asset)}
-      />
-
-      {/* Desktop Hover Overlay */}
-      <div className="absolute inset-0 bg-black/50 opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 z-10 flex flex-col justify-between p-3 pointer-events-none">
-        <div className="flex items-center justify-between pointer-events-auto">
-          <Badge variant="secondary" className="gap-1 bg-black/60 text-white border-none rounded-full capitalize text-[10px] py-0.5 px-2">
-            <MediaTypeIcon type={asset.assetType} className="h-2.5 w-2.5" />
-            {asset.assetType}
-          </Badge>
-          <span className="text-[10px] text-white/80 font-medium drop-shadow-sm">{formatDate(asset.createdAt)}</span>
-        </div>
-
-        <div className="text-left pr-6 select-none">
-          <p className="truncate text-xs font-semibold text-white drop-shadow-sm">{asset.title}</p>
-          <p className="mt-0.5 text-[10px] text-white/85 font-medium drop-shadow-sm">
-            {ASSET_CATEGORY_LABELS[asset.category]}
-          </p>
-        </div>
-
-        <div className="flex items-center justify-between gap-1 pointer-events-auto">
-          {asset.assetType !== "audio" ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-7 w-7 rounded-full p-0 bg-white/15 hover:bg-white/25 border-none text-white transition-colors"
-              onClick={() => onOpen(asset)}
-              title="Fullscreen"
-            >
-              <ArrowsOutSimple className="h-3.5 w-3.5" />
-            </Button>
-          ) : (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-7 w-7 rounded-full p-0 bg-white/15 hover:bg-white/25 border-none text-white transition-colors"
-              onClick={() => onCopy(asset.url, asset.assetType)}
-              title="Copy"
-            >
-              <Copy className="h-3.5 w-3.5" />
-            </Button>
-          )}
-
-          <div className="flex items-center gap-1.5">
-            {isOwner ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-7 px-2.5 rounded-full bg-white text-black hover:bg-white/90 border-none text-[10px] font-semibold transition-colors"
-                onClick={() => onEdit(asset)}
-              >
-                Edit
-              </Button>
-            ) : (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-7 px-2.5 rounded-full bg-white text-black hover:bg-white/90 border-none text-[10px] font-semibold transition-colors"
-                onClick={() => onReference(asset.url)}
-              >
-                Reference
-              </Button>
-            )}
-            <DropdownActions
-              canEditImage={asset.assetType === "image"}
-              canEditAsset={isOwner}
-              canDelete={isOwner}
-              canSaveExample={asset.assetType === "image"}
-              canAnimate={asset.assetType === "image"}
-              onEditAsset={() => onEdit(asset)}
-              onEditImage={() => onEditImage(asset.url)}
-              onSaveExample={() => onSaveExample(asset)}
-              onAnimate={() => onAnimate(asset)}
-              onCopy={() => onCopy(asset.url, asset.assetType)}
-              onDownload={() => onDownload(asset.url, asset.assetType, asset.title)}
-              onDelete={() => onDelete(asset)}
-              className="h-7 w-7 rounded-full bg-white/15 hover:bg-white/25 border-none text-white transition-colors"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Floating Action Button (No Hover) */}
-      <div className="absolute right-2 bottom-2 z-10 sm:hidden">
-        <DropdownActions
-          canEditImage={asset.assetType === "image"}
-          canEditAsset={isOwner}
-          canDelete={isOwner}
-          canSaveExample={asset.assetType === "image"}
-          canAnimate={asset.assetType === "image"}
-          onEditAsset={() => onEdit(asset)}
-          onEditImage={() => onEditImage(asset.url)}
-          onSaveExample={() => onSaveExample(asset)}
-          onAnimate={() => onAnimate(asset)}
-          onCopy={() => onCopy(asset.url, asset.assetType)}
-          onDownload={() => onDownload(asset.url, asset.assetType, asset.title)}
-          onDelete={() => onDelete(asset)}
-          className="h-8 w-8 rounded-full bg-black/60 backdrop-blur border border-white/10 text-white hover:bg-black/85"
-        />
-      </div>
-    </article>
-  )
-}
-
-function MediaPreview({
-  type,
-  url,
-  playableUrl,
-  alt,
-  onOpen,
-}: {
-  type: AssetType
-  url: string
-  playableUrl?: string
-  alt: string
-  onOpen?: () => void
-}) {
-  const src = playableUrl || url
-  const audioRef = React.useRef<HTMLAudioElement | null>(null)
-  const [isPlaying, setIsPlaying] = React.useState(false)
-
-  const togglePlay = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!audioRef.current) return
-    if (isPlaying) {
-      audioRef.current.pause()
-    } else {
-      void audioRef.current.play()
-    }
-  }
-
-  React.useEffect(() => {
-    const audio = audioRef.current
-    if (!audio) return
-    const handlePlay = () => setIsPlaying(true)
-    const handlePause = () => setIsPlaying(false)
-    audio.addEventListener("play", handlePlay)
-    audio.addEventListener("pause", handlePause)
-    return () => {
-      audio.removeEventListener("play", handlePlay)
-      audio.removeEventListener("pause", handlePause)
-    }
-  }, [])
-
-  if (type === "image") {
-    return (
-      <button type="button" className="relative block h-full w-full overflow-hidden bg-muted text-left" onClick={onOpen}>
-        <Image src={url} alt={alt} fill className="object-cover transition-transform duration-300 group-hover:scale-105" />
-      </button>
-    )
-  }
-
-  if (type === "video") {
-    return (
-      <div className="relative h-full w-full overflow-hidden bg-black">
-        <video src={src} className="h-full w-full object-cover" preload="metadata" muted playsInline />
-        {onOpen ? (
-          <button type="button" className="absolute inset-0" onClick={onOpen} aria-label="Open video fullscreen" />
-        ) : null}
-      </div>
-    )
-  }
-
-  return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center bg-muted/40 p-4 text-center select-none overflow-hidden rounded-2xl">
-      <audio ref={audioRef} src={src} preload="metadata" />
-      <button
-        type="button"
-        onClick={togglePlay}
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95 z-20 pointer-events-auto"
-      >
-        {isPlaying ? (
-          <span className="flex gap-0.5 items-end h-4">
-            <span className="w-1 bg-current animate-[pulse_0.8s_infinite] h-4" />
-            <span className="w-1 bg-current animate-[pulse_0.8s_infinite_0.2s] h-3" />
-            <span className="w-1 bg-current animate-[pulse_0.8s_infinite_0.4s] h-4" />
-          </span>
-        ) : (
-          <Play className="h-5 w-5 text-current fill-current ml-0.5" />
-        )}
-      </button>
-      <span className="mt-2 text-xs text-muted-foreground font-medium truncate max-w-full px-2 drop-shadow-sm select-none">
-        {alt || "Audio track"}
-      </span>
-    </div>
-  )
-}
-
-function DropdownActions({
-  canEditAsset = false,
-  canEditImage = false,
-  canDelete = true,
-  canSaveExample = false,
-  canAnimate = false,
-  onEditAsset,
-  onEditImage,
-  onSaveExample,
-  onAnimate,
-  onCopy,
-  onDownload,
-  onDelete,
-  className,
-}: {
-  canEditAsset?: boolean
-  canEditImage?: boolean
-  canDelete?: boolean
-  canSaveExample?: boolean
-  canAnimate?: boolean
-  onEditAsset?: () => void
-  onEditImage?: () => void
-  onSaveExample?: () => void
-  onAnimate?: () => void
-  onCopy: () => void
-  onDownload: () => void
-  onDelete: () => void
-  className?: string
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className={cn("h-8 w-8", className)}>
-          <DotsThreeVertical className="h-4 w-4" />
-          <span className="sr-only">Open menu</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {canEditAsset && onEditAsset ? (
-          <DropdownMenuItem onClick={onEditAsset}>
-            <PencilSimple className="mr-2 h-4 w-4" />
-            Edit asset
-          </DropdownMenuItem>
-        ) : null}
-        {canEditImage && onEditImage ? (
-          <DropdownMenuItem onClick={onEditImage}>
-            <PencilSimple className="mr-2 h-4 w-4" />
-            Edit image
-          </DropdownMenuItem>
-        ) : null}
-        {canSaveExample && onSaveExample ? (
-          <DropdownMenuItem onClick={onSaveExample}>
-            <Sparkle className="mr-2 h-4 w-4" weight="regular" />
-            Save Example
-          </DropdownMenuItem>
-        ) : null}
-        {canAnimate && onAnimate ? (
-          <DropdownMenuItem onClick={onAnimate}>
-            <Play className="mr-2 h-4 w-4" weight="fill" />
-            Animate
-          </DropdownMenuItem>
-        ) : null}
-        <DropdownMenuItem onClick={onCopy}>
-          <Copy className="mr-2 h-4 w-4" />
-          Copy
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onDownload}>
-          <DownloadSimple className="mr-2 h-4 w-4" />
-          Download
-        </DropdownMenuItem>
-        {canDelete ? (
-          <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
-            <Trash className="mr-2 h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }
 

@@ -83,6 +83,70 @@ export function GenerationCard({
     })
   }
 
+  if (actionVariant === "select") {
+    return (
+      <article className="group relative aspect-square overflow-hidden rounded-2xl border border-border/70 bg-card/45 shadow-sm transition-all hover:border-primary/50 hover:shadow-md">
+        <MediaPreview
+          type={generation.type}
+          url={generation.url}
+          alt={generation.prompt || "Generated media"}
+          onOpen={generation.type === "audio" ? undefined : () => onOpen(generation)}
+        />
+
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between bg-black/50 p-3 opacity-0 transition-opacity duration-200 sm:group-hover:opacity-100">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <Badge
+              variant="secondary"
+              className="gap-1 rounded-full border-none bg-black/60 px-2 py-0.5 text-[10px] capitalize text-white"
+            >
+              <MediaTypeIcon type={generation.type} className="h-2.5 w-2.5" />
+              {generation.type}
+            </Badge>
+            <Badge
+              variant="secondary"
+              className="rounded-full border-none bg-black/60 px-2 py-0.5 text-[10px] text-white"
+            >
+              {sourceLabel(source)}
+            </Badge>
+            <span className="text-[10px] font-medium text-white/80 drop-shadow-sm">
+              {formatRelativeDate(generation.created_at)}
+            </span>
+          </div>
+
+          {generation.prompt ? (
+            <p className="line-clamp-2 select-none text-left text-[10px] font-medium leading-tight text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              {generation.prompt}
+            </p>
+          ) : (
+            <span />
+          )}
+
+          <div className="pointer-events-auto flex justify-end">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 rounded-full border-none bg-white px-3 text-[10px] font-semibold text-black hover:bg-white/90"
+              onClick={() => onOpen(generation)}
+            >
+              Select
+            </Button>
+          </div>
+        </div>
+
+        <div className="absolute inset-x-2 bottom-2 z-10 sm:hidden">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 w-full rounded-full border-none bg-black/70 text-xs font-semibold text-white backdrop-blur"
+            onClick={() => onOpen(generation)}
+          >
+            Select
+          </Button>
+        </div>
+      </article>
+    )
+  }
+
   return (
     <article className="group relative aspect-square overflow-hidden rounded-2xl border border-border/70 bg-card/45 shadow-sm transition-all hover:border-foreground/20 hover:shadow-md">
       <MediaPreview

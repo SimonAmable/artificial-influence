@@ -60,7 +60,7 @@ export type SaveAssetDraft = {
   description?: string
 }
 
-export type GenerationCardActionVariant = "library" | "fanvue"
+export type GenerationCardActionVariant = "library" | "fanvue" | "select"
 
 export type FanvueGenerationActions = {
   onSendToVault: (generation: Generation) => void
