@@ -1,13 +1,15 @@
 "use client"
 
-import { HISTORY_TOOLS, HISTORY_TYPES } from "@/components/library/history/constants"
-import type { GenerationType } from "@/components/library/history/types"
+import { HISTORY_SOURCES, HISTORY_TOOLS, HISTORY_TYPES } from "@/components/library/history/constants"
+import type { GenerationType, HistorySource } from "@/components/library/history/types"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 
 type HistoryFilterOptionsProps = {
   historyType: GenerationType
   onHistoryTypeChange: (type: GenerationType) => void
+  historySource: HistorySource
+  onHistorySourceChange: (source: HistorySource) => void
   historyTool: string
   onHistoryToolChange: (tool: string) => void
   columnCount: number
@@ -18,6 +20,8 @@ type HistoryFilterOptionsProps = {
 export function HistoryFilterOptions({
   historyType,
   onHistoryTypeChange,
+  historySource,
+  onHistorySourceChange,
   historyTool,
   onHistoryToolChange,
   columnCount,
@@ -40,6 +44,25 @@ export function HistoryFilterOptions({
               className="h-8 rounded-full px-3 py-1 text-xs capitalize"
             >
               {type}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Source
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {HISTORY_SOURCES.map((source) => (
+            <Button
+              key={source.value}
+              variant={historySource === source.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => onHistorySourceChange(source.value)}
+              className="h-8 rounded-full px-3 py-1 text-xs"
+            >
+              {source.label}
             </Button>
           ))}
         </div>

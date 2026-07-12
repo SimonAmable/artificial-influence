@@ -15,6 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
@@ -168,12 +175,17 @@ export function VaultAddMediaDialog({
               Loading library...
             </div>
           ) : availableItems.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border/70 bg-muted/10 px-4 py-10 text-center">
-              <p className="text-sm font-medium text-foreground">No media available to add</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Upload on the Media tab first, or everything here is already in this folder.
-              </p>
-            </div>
+            <Empty className="p-8">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <ImageIcon />
+                </EmptyMedia>
+                <EmptyTitle>No media available to add</EmptyTitle>
+                <EmptyDescription>
+                  Upload on the Media tab first, or everything here is already in this folder.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {availableItems.map((item) => {

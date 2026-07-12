@@ -80,7 +80,7 @@ const FLAT_NAV_ITEMS: FlatNavItem[] = [
   { path: "/image",         label: "Image",         icon: ImageIcon                      },
   { path: "/video",         label: "Video",         icon: VideoIcon                      },
   { path: "/audio",         label: "Audio",         icon: MicrophoneIcon                 },
-  { path: "/assets",        label: "Assets",        icon: FolderSimple,    badge: "new"  },
+  { path: "/assets?tab=history", label: "Assets",   icon: FolderSimple,    badge: "new"  },
   { path: "/canvases",      label: "Canvas",        icon: PencilSimple                   },
   { path: "/free-tools",    label: "Free Tools",    icon: ShieldCheck                   },
   { path: "/pricing",       label: "Pricing",       icon: CurrencyDollar                },

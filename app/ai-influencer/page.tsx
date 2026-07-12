@@ -18,7 +18,8 @@ import {
   Eye,
   User,
   Shuffle,
-  FileImage,
+  Image as ImageIcon,
+  VideoCamera,
   DownloadSimple
 } from "@phosphor-icons/react"
 import { Card } from "@/components/ui/card"
@@ -300,7 +301,7 @@ function LiquidGlassCard({
   return (
     <div
       className={cn(
-        "relative isolate overflow-hidden rounded-[20px] border border-white/12 bg-white/[0.06] p-[1px] shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-3xl",
+        "relative isolate overflow-hidden rounded-[20px] border border-border/60 bg-card/80 p-[1px] shadow-lg backdrop-blur-3xl",
         className
       )}
     >
@@ -313,12 +314,11 @@ function LiquidGlassCard({
           }}
         />
       ) : null}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.2),transparent_34%),radial-gradient(circle_at_85%_0%,rgba(56,189,248,0.18),transparent_26%),radial-gradient(circle_at_50%_120%,rgba(168,85,247,0.12),transparent_32%)] opacity-90" />
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.18),transparent_28%,rgba(255,255,255,0.03)_48%,transparent_68%,rgba(255,255,255,0.08))] opacity-70 mix-blend-screen" />
-      <div className="absolute inset-0 bg-black/20" />
-      <div className="absolute -left-24 top-6 h-40 w-40 rounded-full bg-cyan-400/20 blur-3xl" />
-      <div className="absolute -right-20 bottom-0 h-44 w-44 rounded-full bg-fuchsia-500/15 blur-3xl" />
-      <div className="relative rounded-[19px] border border-white/10 bg-[rgba(10,10,10,0.45)] backdrop-blur-[18px]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,color-mix(in_oklab,var(--foreground)_12%,transparent),transparent_34%),radial-gradient(circle_at_85%_0%,color-mix(in_oklab,var(--primary)_22%,transparent),transparent_26%)] opacity-90" />
+      <div className="absolute inset-0 bg-background/40" />
+      <div className="absolute -left-24 top-6 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
+      <div className="absolute -right-20 bottom-0 h-44 w-44 rounded-full bg-primary/10 blur-3xl" />
+      <div className="relative rounded-[19px] border border-border/50 bg-card/70 backdrop-blur-[18px]">
         {children}
       </div>
     </div>
@@ -497,12 +497,19 @@ export default function AIInfluencerPage() {
     (target: "image" | "video") => {
       if (!selectedCharacter?.url) return
 
-      const referenceImageUrl = new URL(selectedCharacter.url, window.location.origin).toString()
-      const params = new URLSearchParams({
-        referenceImageUrl,
-      })
+      const characterUrl = new URL(selectedCharacter.url, window.location.origin).toString()
 
-      router.push(`/${target}?${params.toString()}`)
+      if (target === "video") {
+        // Video studio loads the primary frame via startFrame (input image),
+        // matching Animate from Assets / image grid — not referenceImageUrl.
+        router.push(`/video?startFrame=${encodeURIComponent(characterUrl)}`)
+        return
+      }
+
+      const params = new URLSearchParams({
+        referenceImageUrl: characterUrl,
+      })
+      router.push(`/image?${params.toString()}`)
     },
     [router, selectedCharacter?.url]
   )
@@ -844,6 +851,9 @@ export default function AIInfluencerPage() {
                     {/* Render standard options */}
                     {category.options.map(option => {
                       const isSelected = selectedVal === option
+                      const optionArtwork =
+                        traitArtwork?.options[option as keyof typeof traitArtwork.options]
+                      const hasArtwork = Boolean(optionArtwork)
                       
                       // Render visually rich card builders
                       return (
@@ -855,16 +865,16 @@ export default function AIInfluencerPage() {
                             isSelected && "border-primary ring-1 ring-primary/20 opacity-90"
                           )}
                         >
-                          {traitArtwork?.options[option as keyof typeof traitArtwork.options] ? (
+                          {optionArtwork ? (
                             <>
                               <Image
-                                src={traitArtwork.options[option as keyof typeof traitArtwork.options]}
+                                src={optionArtwork}
                                 alt=""
                                 fill
                                 className="object-cover transition-transform duration-500 group-hover:scale-105"
                                 sizes="(max-width: 1024px) 33vw, 180px"
                               />
-                              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.14),transparent_38%),linear-gradient(180deg,rgba(0,0,0,0.1),rgba(0,0,0,0.62))]" />
+                              <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
                             </>
                           ) : null}
 
@@ -873,7 +883,7 @@ export default function AIInfluencerPage() {
                             <div className="absolute inset-0 z-10 flex items-center justify-center px-3">
                               <div 
                                 style={{ background: EYE_COLORS[option] }}
-                                className="size-8 rounded-full border border-white/20 shadow-inner flex items-center justify-center group-hover:scale-110 transition-transform"
+                                className="size-8 rounded-full border border-border/50 shadow-inner flex items-center justify-center group-hover:scale-110 transition-transform"
                               >
                                 <div className="size-1.5 rounded-full bg-black" />
                               </div>
@@ -885,7 +895,7 @@ export default function AIInfluencerPage() {
                             <div className="absolute inset-0 z-10 flex items-center justify-center px-3">
                               <div 
                                 style={{ backgroundColor: SKIN_TONES[option] }}
-                                className="h-8 w-8 rounded-full border border-white/10 shadow-sm group-hover:scale-105 transition-transform"
+                                className="h-8 w-8 rounded-full border border-border/40 shadow-sm group-hover:scale-105 transition-transform"
                               />
                             </div>
                           )}
@@ -895,12 +905,19 @@ export default function AIInfluencerPage() {
                             <div className="absolute inset-0 z-10 flex items-center justify-center px-3">
                               <div 
                                 style={{ backgroundColor: HAIR_COLORS[option] }}
-                                className="size-8 rounded-full border border-white/15 shadow-sm group-hover:scale-110 transition-transform"
+                                className="size-8 rounded-full border border-border/40 shadow-sm group-hover:scale-110 transition-transform"
                               />
                             </div>
                           )}
-                          <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-2 pb-2 pt-8">
-                            <span className="block text-[10px] font-bold font-display tracking-tight text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+                          <div
+                            className={cn(
+                              "absolute inset-x-0 bottom-0 z-20 px-2 pb-2 pt-8",
+                              hasArtwork
+                                ? "bg-gradient-to-t from-background/95 via-background/50 to-transparent"
+                                : "bg-gradient-to-t from-background/90 via-background/40 to-transparent"
+                            )}
+                          >
+                            <span className="block text-[10px] font-bold font-display tracking-tight text-foreground">
                               {option}
                             </span>
                           </div>
@@ -913,7 +930,7 @@ export default function AIInfluencerPage() {
                       onClick={() => openCustomTraitEditor(key)}
                       className={cn(
                         "flex flex-col items-stretch justify-center rounded-lg border border-dashed border-border/40 hover:border-primary/40 hover:bg-primary/5 transition-all text-center aspect-square relative overflow-hidden group",
-                        selectedVal === customTraitValue && "border-primary ring-1 ring-primary/20 opacity-90"
+                        selectedVal === customTraitValue && customTraitValue && "border-primary ring-1 ring-primary/20 opacity-90"
                       )}
                     >
                       <Image
@@ -923,12 +940,12 @@ export default function AIInfluencerPage() {
                         className="object-cover"
                         sizes="(max-width: 1024px) 33vw, 180px"
                       />
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.14),transparent_38%),linear-gradient(180deg,rgba(0,0,0,0.1),rgba(0,0,0,0.62))]" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-background/85 via-background/25 to-transparent" />
                       <div className="absolute inset-0 z-10 flex items-center justify-center px-3">
-                        <Plus className="size-5 text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]" />
+                        <Plus className="size-5 text-foreground" />
                       </div>
-                      <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-2 pb-2 pt-8">
-                        <span className="block text-[10px] font-bold font-display tracking-tight text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+                      <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-background/95 via-background/50 to-transparent px-2 pb-2 pt-8">
+                        <span className="block text-[10px] font-bold font-display tracking-tight text-foreground">
                           {customTraitValue || `+ Custom`}
                         </span>
                       </div>
@@ -953,7 +970,7 @@ export default function AIInfluencerPage() {
           onClick={handleReset}
           className={cn(
             "flex shrink-0 flex-col items-center justify-center p-3 rounded-xl border border-dashed border-border/40 bg-secondary/15 hover:bg-secondary/30 hover:border-primary/50 transition-all aspect-square w-[96px] sm:w-[108px] lg:w-full",
-            !selectedCharacter && "border-primary/45 bg-primary/5 shadow-[0_0_12px_rgba(168,85,247,0.06)]"
+            !selectedCharacter && "border-primary/45 bg-primary/5 shadow-[0_0_12px_color-mix(in_oklab,var(--primary)_12%,transparent)]"
           )}
         >
           <Plus className="size-4 text-primary mb-1" weight="bold" />
@@ -1002,11 +1019,11 @@ export default function AIInfluencerPage() {
   }
 
   return (
-    <div className="h-auto lg:h-[100dvh] min-h-0 overflow-y-auto lg:overflow-hidden bg-black text-foreground flex flex-col pt-[52px]">
+    <div className="h-auto lg:h-[100dvh] min-h-0 overflow-y-auto lg:overflow-hidden bg-background text-foreground flex flex-col pt-[52px]">
       <div className="flex-1 min-h-0 w-full max-w-full flex flex-col lg:flex-row overflow-visible lg:overflow-hidden min-w-0">
         
         {/* Left Column: Characters History (Narrow, Clean sidebar look) */}
-        <div className="w-full lg:w-[180px] shrink-0 min-w-0 border-b lg:border-b-0 lg:border-r border-border/40 bg-muted/5 flex flex-col h-auto lg:h-full min-h-0">
+        <div className="w-full lg:w-[180px] shrink-0 min-w-0 border-b lg:border-b-0 lg:border-r border-border/40 bg-muted/20 flex flex-col h-auto lg:h-full min-h-0">
           <div className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-display">Characters</h2>
@@ -1039,7 +1056,7 @@ export default function AIInfluencerPage() {
         </div>
 
         {/* Middle Column: Preview & Action Canvas (Spacious, Centered card) */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-between items-center p-4 lg:px-8 lg:pt-0 lg:pb-8 bg-black relative overflow-visible lg:overflow-hidden h-auto lg:h-full">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-between items-center p-4 lg:px-8 lg:pt-0 lg:pb-8 bg-background relative overflow-visible lg:overflow-hidden h-auto lg:h-full">
           <div className="w-full max-w-lg flex-1 flex flex-col justify-start py-4 lg:py-0">
             
             {/* Main Preview Card with big round borders */}
@@ -1088,7 +1105,7 @@ export default function AIInfluencerPage() {
                           onClick={() => openCharacterInStudio("image")}
                           className="h-11 rounded-full border border-white/10 bg-white/10 text-[11px] font-bold uppercase tracking-wider text-white shadow-lg backdrop-blur-md hover:bg-white/15"
                         >
-                          <FileImage className="mr-2 size-4" />
+                          <ImageIcon className="mr-2 size-4" />
                           Use in Image
                         </Button>
                         <Button
@@ -1096,7 +1113,7 @@ export default function AIInfluencerPage() {
                           onClick={() => openCharacterInStudio("video")}
                           className="h-11 rounded-full border border-white/10 bg-white/10 text-[11px] font-bold uppercase tracking-wider text-white shadow-lg backdrop-blur-md hover:bg-white/15"
                         >
-                          <Sparkle className="mr-2 size-4" />
+                          <VideoCamera className="mr-2 size-4" />
                           Use in Video
                         </Button>
                       </div>
@@ -1104,14 +1121,14 @@ export default function AIInfluencerPage() {
                   </div>
                 </div>
               ) : isGenerating ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.09),transparent_45%),linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.78))] px-6">
-                  <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_0%,rgba(255,255,255,0.08)_50%,transparent_100%)] opacity-70 animate-pulse" />
+                <div className="absolute inset-0 flex items-center justify-center bg-muted/40 px-6">
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 opacity-70 animate-pulse" />
                   <div className="relative flex w-full max-w-[320px] justify-center">
                     <GenerationLoadingSlots
                       count={6}
                       maxVisible={6}
                       className="flex-wrap justify-center gap-2"
-                      tileClassName="h-12 w-12 rounded-2xl border-white/10 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
+                      tileClassName="h-12 w-12 rounded-2xl border-border/40 bg-secondary/30"
                     />
                   </div>
                 </div>
@@ -1172,7 +1189,7 @@ export default function AIInfluencerPage() {
                           )}
                         >
                           {uploadedFiles.map((item, idx) => (
-                            <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-border/40 bg-black group/thumb">
+                            <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-border/40 bg-muted group/thumb">
                               <img
                                 src={item.url}
                                 alt="preview"
@@ -1183,10 +1200,10 @@ export default function AIInfluencerPage() {
                                   e.stopPropagation()
                                   removeUploadedFile(idx)
                                 }}
-                                className="absolute top-1 right-1 p-1 bg-black/80 hover:bg-destructive rounded-full transition-colors"
+                                className="absolute top-1 right-1 p-1 bg-background/80 text-foreground hover:bg-destructive hover:text-destructive-foreground rounded-full transition-colors"
                                 aria-label="Remove photo"
                               >
-                                <X className="size-3 text-white" />
+                                <X className="size-3" />
                               </button>
                             </div>
                           ))}
@@ -1203,7 +1220,7 @@ export default function AIInfluencerPage() {
 
                   {/* Dynamic Traits Tags container attached to bottom of preview */}
                   {Object.keys(selectedTraits).length > 0 && (
-                    <div className="w-full px-4 pb-4 pt-3 border-t border-border/20 bg-black/10">
+                    <div className="w-full px-4 pb-4 pt-3 border-t border-border/20 bg-muted/30">
                       <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto pr-1">
                         <AnimatePresence initial={false} mode="popLayout">
                           {Object.entries(selectedTraits).map(([key, val]) => (
@@ -1290,154 +1307,14 @@ export default function AIInfluencerPage() {
         </div>
 
         {/* Right Column: Visual Prompt Builder (Wider layout with custom grids) */}
-        <div className="hidden lg:flex w-full lg:w-[420px] shrink-0 border-t lg:border-t-0 lg:border-l border-border/40 bg-muted/5 flex-col h-1/4 lg:h-full min-h-0 overflow-hidden">
-          <div className="p-4 border-b border-border/40 flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-display">Builder</h2>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleReset}
-              className="text-xs font-semibold text-muted-foreground hover:text-foreground h-7 px-2.5"
-            >
-              Reset
-            </Button>
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto p-4">
-            <Accordion type="multiple" defaultValue={Object.keys(TRAITS)} className="space-y-2.5 pb-8">
-              
-              {Object.entries(TRAITS).map(([key, category]) => {
-                const CategoryIcon = category.icon
-                const selectedVal = selectedTraits[key]
-                const traitArtwork = TRAIT_ARTWORK[key as keyof typeof TRAIT_ARTWORK]
-                const customTraitValue = customTraits[key] || ""
-                
-                return (
-                  <AccordionItem 
-                    key={key} 
-                    value={key}
-                    className="border-none rounded-lg overflow-hidden bg-secondary/5 mb-2.5"
-                  >
-                    <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-secondary/10 transition-colors [&[data-state=open]>div>svg]:rotate-180">
-                      <div className="flex items-center gap-2">
-                        <CategoryIcon className="size-3.5 text-muted-foreground" />
-                        <span className="text-xs font-bold text-foreground font-display tracking-wider uppercase">{category.label}</span>
-                        {selectedVal && (
-                          <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[9px] font-bold px-2 py-0.5 ml-2.5">
-                            {selectedVal}
-                          </Badge>
-                        )}
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4 pt-1 border-t border-border/10">
-                      <div className={cn("grid gap-2 mt-2", category.columns)}>
-                        
-                        {/* Render standard options */}
-                        {category.options.map(option => {
-                          const isSelected = selectedVal === option
-                          
-                          // Render visually rich card builders
-                          return (
-                            <button
-                              key={option}
-                              onClick={() => setSelectedTraits(prev => ({ ...prev, [key]: option }))}
-                              className={cn(
-                                "flex flex-col items-stretch justify-center rounded-lg border border-border/40 bg-secondary/15 hover:bg-secondary/30 transition-all text-center aspect-square relative overflow-hidden group",
-                                isSelected && "border-primary ring-1 ring-primary/20 opacity-90"
-                              )}
-                            >
-                              {traitArtwork?.options[option as keyof typeof traitArtwork.options] ? (
-                                <>
-                                  <Image
-                                    src={traitArtwork.options[option as keyof typeof traitArtwork.options]}
-                                    alt=""
-                                    fill
-                                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                                    sizes="(max-width: 1024px) 33vw, 180px"
-                                  />
-                                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.14),transparent_38%),linear-gradient(180deg,rgba(0,0,0,0.1),rgba(0,0,0,0.62))]" />
-                                </>
-                              ) : null}
-
-                              {/* Visual iris preview for Eye Colour */}
-                              {key === "eyeColour" && EYE_COLORS[option] && (
-                                <div className="absolute inset-0 z-10 flex items-center justify-center px-3">
-                                  <div 
-                                    style={{ background: EYE_COLORS[option] }}
-                                    className="size-8 rounded-full border border-white/20 shadow-inner flex items-center justify-center group-hover:scale-110 transition-transform"
-                                  >
-                                    <div className="size-1.5 rounded-full bg-black" />
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Visual color swatch for Skin Tone */}
-                              {key === "skinTone" && SKIN_TONES[option] && (
-                                <div className="absolute inset-0 z-10 flex items-center justify-center px-3">
-                                  <div 
-                                    style={{ backgroundColor: SKIN_TONES[option] }}
-                                    className="h-8 w-8 rounded-full border border-white/10 shadow-sm group-hover:scale-105 transition-transform"
-                                  />
-                                </div>
-                              )}
-
-                              {/* Visual color swatch for Hair Colour */}
-                              {key === "hairColour" && HAIR_COLORS[option] && (
-                                <div className="absolute inset-0 z-10 flex items-center justify-center px-3">
-                                  <div 
-                                    style={{ backgroundColor: HAIR_COLORS[option] }}
-                                    className="size-8 rounded-full border border-white/15 shadow-sm group-hover:scale-110 transition-transform"
-                                  />
-                                </div>
-                              )}
-                              <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-2 pb-2 pt-8">
-                                <span className="block text-[10px] font-bold font-display tracking-tight text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
-                                  {option}
-                                </span>
-                              </div>
-                            </button>
-                          )
-                        })}
-
-                        {/* Custom Trait Card */}
-                        <button
-                          onClick={() => openCustomTraitEditor(key)}
-                          className={cn(
-                            "flex flex-col items-stretch justify-center rounded-lg border border-dashed border-border/40 hover:border-primary/40 hover:bg-primary/5 transition-all text-center aspect-square relative overflow-hidden group",
-                            selectedVal === customTraitValue && "border-primary ring-1 ring-primary/20 opacity-90"
-                          )}
-                        >
-                          <Image
-                            src={CUSTOM_TRAIT_IMAGE}
-                            alt=""
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 1024px) 33vw, 180px"
-                          />
-                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.14),transparent_38%),linear-gradient(180deg,rgba(0,0,0,0.1),rgba(0,0,0,0.62))]" />
-                          <div className="absolute inset-0 z-10 flex items-center justify-center px-3">
-                            <Plus className="size-5 text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]" />
-                          </div>
-                          <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-2 pb-2 pt-8">
-                            <span className="block text-[10px] font-bold font-display tracking-tight text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
-                              {customTraitValue || `+ Custom`}
-                            </span>
-                          </div>
-                        </button>
-
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                )
-              })}
-
-            </Accordion>
-          </div>
+        <div className="hidden lg:flex w-full lg:w-[420px] shrink-0 border-t lg:border-t-0 lg:border-l border-border/40 bg-muted/20 flex-col h-1/4 lg:h-full min-h-0 overflow-hidden">
+          {builderPanel()}
         </div>
 
         </div>
 
         <Sheet open={isBuilderSheetOpen} onOpenChange={setIsBuilderSheetOpen}>
-          <SheetContent side="right" className="w-[92vw] max-w-[420px] p-0 overflow-hidden bg-muted/5">
+          <SheetContent side="right" className="w-[92vw] max-w-[420px] p-0 overflow-hidden bg-background">
             <SheetHeader className="sr-only">
               <SheetTitle>Builder</SheetTitle>
             </SheetHeader>
@@ -1547,9 +1424,9 @@ export default function AIInfluencerPage() {
             className="w-full"
             backgroundSrc="/ai_influencer/learn_influencer_faceless.jpg"
           >
-            <div className="p-7 flex flex-col bg-black/10">
+            <div className="p-7 flex flex-col bg-background/20">
               <DialogHeader>
-                <DialogTitle className="text-center text-xl font-bold font-display uppercase tracking-wider text-white">
+                <DialogTitle className="text-center text-xl font-bold font-display uppercase tracking-wider text-foreground">
                   AI Influencer Builder
                 </DialogTitle>
                 <DialogDescription className="text-center text-xs text-muted-foreground mt-1.5 max-w-sm mx-auto leading-normal">
@@ -1559,9 +1436,9 @@ export default function AIInfluencerPage() {
 
               <div className="space-y-4 my-5">
                 <div className="flex gap-3">
-                  <div className="size-6 rounded-full bg-white/10 text-primary flex items-center justify-center text-xs font-extrabold shrink-0 mt-0.5">1</div>
+                  <div className="size-6 rounded-full bg-secondary text-primary flex items-center justify-center text-xs font-extrabold shrink-0 mt-0.5">1</div>
                   <div>
-                    <h4 className="text-xs font-bold text-white font-display uppercase tracking-wider">Direct Save Mode</h4>
+                    <h4 className="text-xs font-bold text-foreground font-display uppercase tracking-wider">Direct Save Mode</h4>
                     <p className="text-[11px] text-muted-foreground mt-0.5 leading-normal">
                       Upload exactly one photo of a character you already have, name them, and save them directly to your library.
                     </p>
@@ -1569,9 +1446,9 @@ export default function AIInfluencerPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <div className="size-6 rounded-full bg-white/10 text-primary flex items-center justify-center text-xs font-extrabold shrink-0 mt-0.5">2</div>
+                  <div className="size-6 rounded-full bg-secondary text-primary flex items-center justify-center text-xs font-extrabold shrink-0 mt-0.5">2</div>
                   <div>
-                    <h4 className="text-xs font-bold text-white font-display uppercase tracking-wider">Merge References Mode</h4>
+                    <h4 className="text-xs font-bold text-foreground font-display uppercase tracking-wider">Merge References Mode</h4>
                     <p className="text-[11px] text-muted-foreground mt-0.5 leading-normal">
                       Upload 2 or 3 closeups of different faces. We will blend and merge their facial structures into one consistent face.
                     </p>
@@ -1579,9 +1456,9 @@ export default function AIInfluencerPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <div className="size-6 rounded-full bg-white/10 text-primary flex items-center justify-center text-xs font-extrabold shrink-0 mt-0.5">3</div>
+                  <div className="size-6 rounded-full bg-secondary text-primary flex items-center justify-center text-xs font-extrabold shrink-0 mt-0.5">3</div>
                   <div>
-                    <h4 className="text-xs font-bold text-white font-display uppercase tracking-wider">Build from Traits Mode</h4>
+                    <h4 className="text-xs font-bold text-foreground font-display uppercase tracking-wider">Build from Traits Mode</h4>
                     <p className="text-[11px] text-muted-foreground mt-0.5 leading-normal">
                       No reference photos? Select a combination of gender, race, eye color, hair, and style on the right. We will build a new character prompt.
                     </p>
@@ -1597,7 +1474,7 @@ export default function AIInfluencerPage() {
                   Get Started
                 </Button>
                 <DialogClose asChild>
-                  <Button variant="ghost" className="w-full text-xs text-muted-foreground h-9 font-semibold hover:text-white uppercase tracking-wider rounded-full hover:bg-white/5">
+                  <Button variant="ghost" className="w-full text-xs text-muted-foreground h-9 font-semibold hover:text-foreground uppercase tracking-wider rounded-full hover:bg-secondary/40">
                     Close Guide
                   </Button>
                 </DialogClose>

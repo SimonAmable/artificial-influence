@@ -39,6 +39,14 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -2535,7 +2543,7 @@ export function AutomationsPage() {
 
   return (
     <div className="mx-auto min-h-dvh w-full max-w-[1180px] px-4 pb-12 pt-20">
-      <div className="flex flex-col gap-5 border-b border-border/40 pb-6 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-5 pb-6 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1 space-y-1.5">
           <h1 className="text-2xl font-semibold tracking-tight">{pageTitle}</h1>
           <p className="text-sm leading-6 text-muted-foreground">{pageDescription}</p>
@@ -2565,37 +2573,41 @@ export function AutomationsPage() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : automations.length === 0 ? (
-          <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/10 px-6 py-12 text-center">
-            <div className="flex max-w-md flex-col items-center">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-border/60 bg-background">
-                <CalendarClock className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <h2 className="text-lg font-semibold tracking-tight">
-                {isCommunityScope ? "No community automations yet" : "No automations yet"}
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {isCommunityScope
-                  ? "Shared workflows will appear here once creators publish reusable automations."
-                  : "Create your first scheduled workflow, or browse community automations for a useful starting point."}
-              </p>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-                {isCommunityScope ? (
-                  <Button variant="outline" size="sm" onClick={goToMine}>
-                    <ArrowLeft className="h-4 w-4" />
-                    View Mine
+          <div className="flex min-h-[360px] w-full items-center justify-center">
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <CalendarClock />
+                </EmptyMedia>
+                <EmptyTitle>
+                  {isCommunityScope ? "No community automations yet" : "No automations yet"}
+                </EmptyTitle>
+                <EmptyDescription>
+                  {isCommunityScope
+                    ? "Shared workflows will appear here once creators publish reusable automations."
+                    : "Create your first scheduled workflow, or browse community automations for a useful starting point."}
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {isCommunityScope ? (
+                    <Button variant="outline" size="sm" onClick={goToMine}>
+                      <ArrowLeft className="h-4 w-4" />
+                      View Mine
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={goToCommunity}>
+                      <Globe className="h-4 w-4" />
+                      View Community
+                    </Button>
+                  )}
+                  <Button size="sm" onClick={openCreateAutomation}>
+                    <Plus className="h-4 w-4" />
+                    Create
                   </Button>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={goToCommunity}>
-                    <Globe className="h-4 w-4" />
-                    View Community
-                  </Button>
-                )}
-                <Button size="sm" onClick={openCreateAutomation}>
-                  <Plus className="h-4 w-4" />
-                  Create
-                </Button>
-              </div>
-            </div>
+                </div>
+              </EmptyContent>
+            </Empty>
           </div>
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

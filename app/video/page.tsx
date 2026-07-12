@@ -247,6 +247,8 @@ function VideoPageContent() {
     }
     if (!/^https?:\/\//i.test(resolvedReferenceImageUrl)) return
 
+    // Primary frame for most I2V models; also keep in reference gallery for omni/multimodal.
+    setInputImage({ url: resolvedReferenceImageUrl })
     setReferenceImages([{ url: resolvedReferenceImageUrl }])
     lastLoadedReferenceImageUrlRef.current = referenceImageUrl
   }, [searchParams])

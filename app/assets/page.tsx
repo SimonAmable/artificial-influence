@@ -47,6 +47,7 @@ import type {
   Generation,
   GenerationType,
   HistoryResponse,
+  HistorySource,
   MediaGenerationType,
   PaginatedState,
   PaginationState,
@@ -56,6 +57,7 @@ import {
   createEmptyPaginatedState,
   createHistoryUrl,
   formatRelativeDate as formatDate,
+  historyItemDeleteUrl,
   mergeUniqueById,
   normalizePagination,
 } from "@/components/library/history/utils"
@@ -169,6 +171,8 @@ function FilterOptionsContent({
   activeTab,
   historyType,
   setHistoryType,
+  historySource,
+  setHistorySource,
   historyTool,
   setHistoryTool,
   assetVisibility,
@@ -184,6 +188,8 @@ function FilterOptionsContent({
   activeTab: LibraryTab
   historyType: GenerationType
   setHistoryType: (type: GenerationType) => void
+  historySource: HistorySource
+  setHistorySource: (source: HistorySource) => void
   historyTool: string
   setHistoryTool: (tool: string) => void
   assetVisibility: AssetVisibility | "all"
@@ -201,6 +207,8 @@ function FilterOptionsContent({
       <HistoryFilterOptions
         historyType={historyType}
         onHistoryTypeChange={setHistoryType}
+        historySource={historySource}
+        onHistorySourceChange={setHistorySource}
         historyTool={historyTool}
         onHistoryToolChange={setHistoryTool}
         columnCount={columnCount}
@@ -339,6 +347,7 @@ function LibraryPageContent() {
   }, [])
 
   const [historyType, setHistoryType] = React.useState<GenerationType>("all")
+  const [historySource, setHistorySource] = React.useState<HistorySource>("all")
   const [historyTool, setHistoryTool] = React.useState<string>("all")
   const [assetVisibility, setAssetVisibility] = React.useState<AssetVisibility | "all">("all")
   const [assetCategory, setAssetCategory] = React.useState<AssetCategory | "all">("all")
@@ -621,8 +630,10 @@ function LibraryPageContent() {
       }
 
       const offset = append && currentState.query === searchQuery ? currentState.nextOffset : 0
-      const response = await fetch(createHistoryUrl(type, HISTORY_PAGE_LIMIT, offset, searchQuery, historyTool))
-      if (!response.ok) throw new Error("Failed to fetch generations")
+      const response = await fetch(
+        createHistoryUrl(type, HISTORY_PAGE_LIMIT, offset, searchQuery, historyTool, historySource)
+      )
+      if (!response.ok) throw new Error("Failed to fetch history")
 
       const data = (await response.json()) as HistoryResponse
       if (requestId !== historyRequestIdRef.current) return
@@ -663,7 +674,7 @@ function LibraryPageContent() {
         },
       }))
     }
-  }, [debouncedSearch, historyTool])
+  }, [debouncedSearch, historySource, historyTool])
 
   const refreshBrands = React.useCallback(async () => {
     setBrandsLoading(true)
@@ -712,7 +723,7 @@ function LibraryPageContent() {
       video: createEmptyPaginatedState<Generation>(HISTORY_PAGE_LIMIT),
       audio: createEmptyPaginatedState<Generation>(HISTORY_PAGE_LIMIT),
     })
-  }, [historyTool])
+  }, [historyTool, historySource])
 
   React.useEffect(() => {
     const state = historyStates[historyType]
@@ -863,12 +874,12 @@ function LibraryPageContent() {
   }, [])
 
   const handleDeleteGeneration = React.useCallback(async (generation: Generation) => {
-    if (!confirm("Delete this generation?")) return
+    if (!confirm(generation.source === "upload" ? "Delete this upload?" : "Delete this generation?")) return
     try {
-      const response = await fetch(`/api/generations/${generation.id}`, {
+      const response = await fetch(historyItemDeleteUrl(generation), {
         method: "DELETE",
       })
-      if (!response.ok) throw new Error("Failed to delete generation")
+      if (!response.ok) throw new Error("Failed to delete media")
 
       setHistoryStates((prev) => {
         const next = { ...prev }
@@ -886,9 +897,9 @@ function LibraryPageContent() {
         }
         return next
       })
-      toast.success("Generation deleted")
+      toast.success(generation.source === "upload" ? "Upload deleted" : "Generation deleted")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete generation")
+      toast.error(error instanceof Error ? error.message : "Failed to delete media")
     }
   }, [])
 
@@ -1195,6 +1206,8 @@ function LibraryPageContent() {
                           activeTab={activeTab}
                           historyType={historyType}
                           setHistoryType={setHistoryType}
+                          historySource={historySource}
+                          setHistorySource={setHistorySource}
                           historyTool={historyTool}
                           setHistoryTool={setHistoryTool}
                           assetVisibility={assetVisibility}
@@ -1226,6 +1239,8 @@ function LibraryPageContent() {
                           activeTab={activeTab}
                           historyType={historyType}
                           setHistoryType={setHistoryType}
+                          historySource={historySource}
+                          setHistorySource={setHistorySource}
                           historyTool={historyTool}
                           setHistoryTool={setHistoryTool}
                           assetVisibility={assetVisibility}

@@ -3,6 +3,14 @@
 import * as React from "react"
 
 import { Button } from "@/components/ui/button"
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { cn } from "@/lib/utils"
 
 export function LoadingGrid({ label }: { label: string }) {
@@ -29,12 +37,16 @@ export function RetryState({
 }) {
   return (
     <div className={cn("flex w-full justify-center", centered && "min-h-[calc(100dvh-15rem)] items-center")}>
-      <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-2xl border border-dashed border-border/70 bg-muted/20 px-6 py-14 text-center">
-        <p className="text-sm text-muted-foreground">{message}</p>
-        <Button variant="outline" onClick={onRetry}>
-          Retry
-        </Button>
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyDescription>{message}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button variant="outline" onClick={onRetry}>
+            Retry
+          </Button>
+        </EmptyContent>
+      </Empty>
     </div>
   )
 }
@@ -54,14 +66,14 @@ export function EmptyState({
 }) {
   return (
     <div className={cn("flex w-full justify-center", centered && "min-h-[calc(100dvh-15rem)] items-center")}>
-      <div className="flex w-full max-w-md flex-col items-center rounded-2xl border border-dashed border-border/70 bg-muted/20 px-6 py-14 text-center">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm">
-          {icon}
-        </div>
-        <h3 className="text-lg font-semibold tracking-tight text-foreground">{title}</h3>
-        {description ? <p className="mt-2 text-sm text-muted-foreground">{description}</p> : null}
-        {action ? <div className="mt-6">{action}</div> : null}
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">{icon}</EmptyMedia>
+          <EmptyTitle>{title}</EmptyTitle>
+          {description ? <EmptyDescription>{description}</EmptyDescription> : null}
+        </EmptyHeader>
+        {action ? <EmptyContent>{action}</EmptyContent> : null}
+      </Empty>
     </div>
   )
 }

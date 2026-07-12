@@ -11,9 +11,10 @@ import {
 } from "@/components/content/fanvue-image-action-dialog"
 import { HistoryPanel } from "@/components/library/history/history-panel"
 import { HistorySearchToolbar } from "@/components/library/history/history-search-toolbar"
-import type { Generation, GenerationType, SaveAssetDraft } from "@/components/library/history/types"
+import type { Generation, GenerationType, HistorySource, SaveAssetDraft } from "@/components/library/history/types"
 import { useDebouncedValue } from "@/components/library/history/use-debounced-value"
 import { useGenerationHistory } from "@/components/library/history/use-generation-history"
+import { historyItemDeleteUrl } from "@/components/library/history/utils"
 import {
   FullscreenMediaViewer,
   type FullscreenMediaViewerAction,
@@ -54,6 +55,7 @@ export function GenerationHistoryView({
   const [search, setSearch] = React.useState("")
   const debouncedSearch = useDebouncedValue(search.trim(), 250)
   const [historyType, setHistoryType] = React.useState<GenerationType>("all")
+  const [historySource, setHistorySource] = React.useState<HistorySource>("all")
   const [historyTool, setHistoryTool] = React.useState("all")
   const [columnCount, setColumnCount] = React.useState(2)
   const [viewerGeneration, setViewerGeneration] = React.useState<Generation | null>(null)
@@ -79,6 +81,7 @@ export function GenerationHistoryView({
   const { state, loadMoreSentinelRef, refresh, loadMore } = useGenerationHistory({
     enabled,
     historyType,
+    historySource,
     historyTool,
     searchQuery: debouncedSearch,
   })
@@ -154,15 +157,15 @@ export function GenerationHistoryView({
       }
 
       try {
-        const response = await fetch(`/api/generations/${generation.id}`, { method: "DELETE" })
+        const response = await fetch(historyItemDeleteUrl(generation), { method: "DELETE" })
         const data = (await response.json()) as { error?: string }
         if (!response.ok) {
-          throw new Error(data.error || "Failed to delete generation.")
+          throw new Error(data.error || "Failed to delete media.")
         }
-        toast.success("Generation deleted.")
+        toast.success(generation.source === "upload" ? "Upload deleted." : "Generation deleted.")
         refresh()
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to delete generation.")
+        toast.error(error instanceof Error ? error.message : "Failed to delete media.")
       }
     },
     [onDelete, refresh]
@@ -211,6 +214,8 @@ export function GenerationHistoryView({
           onSearchChange={setSearch}
           historyType={historyType}
           onHistoryTypeChange={setHistoryType}
+          historySource={historySource}
+          onHistorySourceChange={setHistorySource}
           historyTool={historyTool}
           onHistoryToolChange={setHistoryTool}
           columnCount={columnCount}

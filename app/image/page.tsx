@@ -400,8 +400,10 @@ function ImagePageContent() {
     }
     if (!/^https?:\/\//i.test(resolvedReferenceImageUrl)) return
 
-    setReferenceImage({ url: resolvedReferenceImageUrl })
-    setReferenceImages([])
+    // Prefer referenceImages — InfluencerInputBox only displays that list when
+    // onReferenceImagesChange is provided (singular referenceImage is ignored in the UI).
+    setReferenceImages([{ url: resolvedReferenceImageUrl }])
+    setReferenceImage(null)
     lastLoadedReferenceImageUrlRef.current = referenceImageUrl
   }, [searchParams])
 

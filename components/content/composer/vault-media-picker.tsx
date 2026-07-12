@@ -11,6 +11,14 @@ import {
 } from "@/components/content/fanvue-media-preview"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { isFanvueMediaBrowsable } from "@/lib/fanvue/media"
@@ -127,21 +135,29 @@ export function VaultMediaPicker({
 
     if (items.length === 0) {
       return (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border/70 bg-muted/10 px-4 py-8 text-center">
-          <p className="text-sm text-muted-foreground">No vault media yet. Upload to get started.</p>
+        <Empty className="p-6">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Upload />
+            </EmptyMedia>
+            <EmptyTitle>No vault media yet</EmptyTitle>
+            <EmptyDescription>Upload to get started.</EmptyDescription>
+          </EmptyHeader>
           {allowUpload ? (
-            <Button
-              type="button"
-              size="sm"
-              className="rounded-full"
-              disabled={disabled || isUploading}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-              Upload media
-            </Button>
+            <EmptyContent>
+              <Button
+                type="button"
+                size="sm"
+                className="rounded-full"
+                disabled={disabled || isUploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                Upload media
+              </Button>
+            </EmptyContent>
           ) : null}
-        </div>
+        </Empty>
       )
     }
 

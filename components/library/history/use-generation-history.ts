@@ -3,7 +3,13 @@
 import * as React from "react"
 
 import { HISTORY_PAGE_LIMIT } from "@/components/library/history/constants"
-import type { Generation, GenerationType, HistoryResponse, PaginatedState } from "@/components/library/history/types"
+import type {
+  Generation,
+  GenerationType,
+  HistoryResponse,
+  HistorySource,
+  PaginatedState,
+} from "@/components/library/history/types"
 import {
   createEmptyPaginatedState,
   createHistoryUrl,
@@ -15,6 +21,7 @@ import { createClient } from "@/lib/supabase/client"
 type UseGenerationHistoryOptions = {
   enabled?: boolean
   historyType: GenerationType
+  historySource: HistorySource
   historyTool: string
   searchQuery: string
 }
@@ -22,6 +29,7 @@ type UseGenerationHistoryOptions = {
 export function useGenerationHistory({
   enabled = true,
   historyType,
+  historySource,
   historyTool,
   searchQuery,
 }: UseGenerationHistoryOptions) {
@@ -46,7 +54,7 @@ export function useGenerationHistory({
       video: createEmptyPaginatedState<Generation>(HISTORY_PAGE_LIMIT),
       audio: createEmptyPaginatedState<Generation>(HISTORY_PAGE_LIMIT),
     })
-  }, [historyTool])
+  }, [historyTool, historySource])
 
   const fetchGenerations = React.useCallback(
     async (type: GenerationType, append: boolean) => {
@@ -89,9 +97,9 @@ export function useGenerationHistory({
         const offset =
           append && currentState.query === searchQuery ? currentState.nextOffset : 0
         const response = await fetch(
-          createHistoryUrl(type, HISTORY_PAGE_LIMIT, offset, searchQuery, historyTool)
+          createHistoryUrl(type, HISTORY_PAGE_LIMIT, offset, searchQuery, historyTool, historySource)
         )
-        if (!response.ok) throw new Error("Failed to fetch generations")
+        if (!response.ok) throw new Error("Failed to fetch history")
 
         const data = (await response.json()) as HistoryResponse
         if (requestId !== requestIdRef.current) return
@@ -131,12 +139,12 @@ export function useGenerationHistory({
             hasLoaded: true,
             initialLoading: false,
             loadingMore: false,
-            error: error instanceof Error ? error.message : "Failed to fetch generations",
+            error: error instanceof Error ? error.message : "Failed to fetch history",
           },
         }))
       }
     },
-    [historyTool, searchQuery]
+    [historySource, historyTool, searchQuery]
   )
 
   const refresh = React.useCallback(() => {

@@ -1,15 +1,10 @@
 "use client"
 
 import * as React from "react"
-import {
-  ArrowsOutSimple,
-  Copy,
-  MagnifyingGlass,
-  SlidersHorizontal,
-} from "@phosphor-icons/react"
+import { MagnifyingGlass, SlidersHorizontal } from "@phosphor-icons/react"
 
 import { HistoryFilterOptions } from "@/components/library/history/history-filters"
-import type { GenerationType } from "@/components/library/history/types"
+import type { GenerationType, HistorySource } from "@/components/library/history/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -21,6 +16,8 @@ type HistorySearchToolbarProps = {
   onSearchChange: (value: string) => void
   historyType: GenerationType
   onHistoryTypeChange: (type: GenerationType) => void
+  historySource: HistorySource
+  onHistorySourceChange: (source: HistorySource) => void
   historyTool: string
   onHistoryToolChange: (tool: string) => void
   columnCount: number
@@ -32,6 +29,8 @@ export function HistorySearchToolbar({
   onSearchChange,
   historyType,
   onHistoryTypeChange,
+  historySource,
+  onHistorySourceChange,
   historyTool,
   onHistoryToolChange,
   columnCount,
@@ -43,6 +42,8 @@ export function HistorySearchToolbar({
   const filterProps = {
     historyType,
     onHistoryTypeChange,
+    historySource,
+    onHistorySourceChange,
     historyTool,
     onHistoryToolChange,
     columnCount,

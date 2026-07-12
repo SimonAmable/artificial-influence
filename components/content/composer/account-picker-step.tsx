@@ -6,7 +6,13 @@ import { UserRound } from "lucide-react"
 
 import type { FanvueConnectionItem } from "@/components/content/types"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import {
+  Empty,
+  EmptyContent,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 
 type AccountPickerStepProps = {
   connections: FanvueConnectionItem[]
@@ -16,14 +22,21 @@ type AccountPickerStepProps = {
 
 export function AccountPickerStep({ connections, onSelect, onConnect }: AccountPickerStepProps) {
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {connections.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border/70 bg-muted/10 px-6 py-10 text-center">
-          <p className="text-sm font-medium text-foreground">No Fanvue accounts connected</p>
-          <Button type="button" className="mt-4 rounded-full" onClick={onConnect}>
-            Connect Fanvue
-          </Button>
-        </div>
+        <Empty className="p-8">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <UserRound />
+            </EmptyMedia>
+            <EmptyTitle>No Fanvue accounts connected</EmptyTitle>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button type="button" className="rounded-full" onClick={onConnect}>
+              Connect Fanvue
+            </Button>
+          </EmptyContent>
+        </Empty>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {connections.map((connection) => {

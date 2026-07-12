@@ -1,4 +1,4 @@
-import type { GenerationType, PaginationState } from "@/components/library/history/types"
+import type { GenerationType, HistorySource, PaginationState } from "@/components/library/history/types"
 import { cn } from "@/lib/utils"
 
 export function createEmptyPagination(limit: number): PaginationState {
@@ -48,13 +48,14 @@ export function normalizePagination(
   }
 }
 
-export function mergeUniqueById<T extends { id: string }>(existing: T[], incoming: T[]) {
-  const seen = new Set(existing.map((item) => item.id))
+export function mergeUniqueById<T extends { id: string; source?: string }>(existing: T[], incoming: T[]) {
+  const seen = new Set(existing.map((item) => `${item.source ?? "generation"}:${item.id}`))
   const merged = [...existing]
 
   for (const item of incoming) {
-    if (seen.has(item.id)) continue
-    seen.add(item.id)
+    const key = `${item.source ?? "generation"}:${item.id}`
+    if (seen.has(key)) continue
+    seen.add(key)
     merged.push(item)
   }
 
@@ -66,7 +67,8 @@ export function createHistoryUrl(
   limit: number,
   offset: number,
   search: string,
-  tool: string
+  tool: string,
+  source: HistorySource = "all"
 ) {
   const params = new URLSearchParams({
     limit: String(limit),
@@ -85,7 +87,18 @@ export function createHistoryUrl(
     params.set("tool", tool)
   }
 
-  return `/api/generations?${params.toString()}`
+  if (source && source !== "all") {
+    params.set("source", source)
+  }
+
+  return `/api/history?${params.toString()}`
+}
+
+export function historyItemDeleteUrl(item: { id: string; source?: "generation" | "upload" }) {
+  if (item.source === "upload") {
+    return `/api/uploads/${item.id}`
+  }
+  return `/api/generations/${item.id}`
 }
 
 export function formatRelativeDate(dateString: string): string {

@@ -1,6 +1,11 @@
 "use client"
 
-import { ArrowsOutSimple, Copy, PaperPlaneTilt, Vault } from "@phosphor-icons/react"
+import {
+  DownloadSimple,
+  Heart,
+  PaperPlaneTilt,
+  Vault,
+} from "@phosphor-icons/react"
 
 import { CardDropdownActions } from "@/components/library/history/card-dropdown-actions"
 import { MediaPreview, MediaTypeIcon } from "@/components/library/history/media-preview"
@@ -30,6 +35,10 @@ type GenerationCardProps = {
   getDefaultCategoryByMediaType?: (type: AssetType) => import("@/lib/assets/types").AssetCategory
 }
 
+function sourceLabel(source: Generation["source"]) {
+  return source === "upload" ? "Upload" : "Generation"
+}
+
 export function GenerationCard({
   generation,
   actionVariant,
@@ -45,6 +54,7 @@ export function GenerationCard({
   getDefaultCategoryByMediaType,
 }: GenerationCardProps) {
   const supportsFanvue = generation.type === "image" || generation.type === "video"
+  const source = generation.source === "upload" ? "upload" : "generation"
   const dropdownProps = {
     canEditImage: actionVariant === "library" && generation.type === "image",
     canSaveExample: actionVariant === "library" && generation.type === "image",
@@ -57,6 +67,22 @@ export function GenerationCard({
     onDelete: () => onDelete(generation),
   }
 
+  const handleSave = () => {
+    if (!onSave || !getDefaultCategoryByMediaType) return
+    onSave({
+      url: generation.url,
+      assetType: generation.type,
+      title: `${generation.type} ${generation.id.slice(0, 8)}`,
+      category: getDefaultCategoryByMediaType(generation.type),
+      visibility: "private",
+      uploadId: source === "upload" ? generation.uploadId ?? generation.id : undefined,
+      supabaseStoragePath: generation.supabase_storage_path,
+      sourceGenerationId: source === "upload" ? undefined : generation.id,
+      sourceNodeType: source === "upload" ? "upload" : "generation-history",
+      description: generation.prompt ?? undefined,
+    })
+  }
+
   return (
     <article className="group relative aspect-square overflow-hidden rounded-2xl border border-border/70 bg-card/45 shadow-sm transition-all hover:border-foreground/20 hover:shadow-md">
       <MediaPreview
@@ -67,49 +93,27 @@ export function GenerationCard({
       />
 
       <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between bg-black/50 p-3 opacity-0 transition-opacity duration-200 sm:group-hover:opacity-100">
-        <div className="pointer-events-auto flex items-center justify-between">
-          <Badge
-            variant="secondary"
-            className="gap-1 rounded-full border-none bg-black/60 px-2 py-0.5 text-[10px] capitalize text-white"
-          >
-            <MediaTypeIcon type={generation.type} className="h-2.5 w-2.5" />
-            {generation.type}
-          </Badge>
-          <span className="text-[10px] font-medium text-white/80 drop-shadow-sm">
-            {formatRelativeDate(generation.created_at)}
-          </span>
-        </div>
-
-        {generation.prompt ? (
-          <p className="line-clamp-2 select-none pr-6 text-left text-[10px] font-medium leading-tight text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-            {generation.prompt}
-          </p>
-        ) : null}
-
-        <div className="pointer-events-auto flex items-center justify-between gap-1">
-          {generation.type !== "audio" ? (
-            <Button
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <Badge
               variant="secondary"
-              size="sm"
-              className="h-7 w-7 rounded-full border-none bg-white/15 p-0 text-white transition-colors hover:bg-white/25"
-              onClick={() => onOpen(generation)}
-              title="Fullscreen"
+              className="gap-1 rounded-full border-none bg-black/60 px-2 py-0.5 text-[10px] capitalize text-white"
             >
-              <ArrowsOutSimple className="h-3.5 w-3.5" />
-            </Button>
-          ) : (
-            <Button
+              <MediaTypeIcon type={generation.type} className="h-2.5 w-2.5" />
+              {generation.type}
+            </Badge>
+            <Badge
               variant="secondary"
-              size="sm"
-              className="h-7 w-7 rounded-full border-none bg-white/15 p-0 text-white transition-colors hover:bg-white/25"
-              onClick={() => onCopy(generation.url, generation.type)}
-              title="Copy"
+              className="rounded-full border-none bg-black/60 px-2 py-0.5 text-[10px] text-white"
             >
-              <Copy className="h-3.5 w-3.5" />
-            </Button>
-          )}
+              {sourceLabel(source)}
+            </Badge>
+            <span className="text-[10px] font-medium text-white/80 drop-shadow-sm">
+              {formatRelativeDate(generation.created_at)}
+            </span>
+          </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="pointer-events-auto flex shrink-0 flex-col items-end gap-1.5">
             {actionVariant === "fanvue" && fanvueActions && supportsFanvue ? (
               <>
                 <Button
@@ -134,26 +138,37 @@ export function GenerationCard({
             ) : null}
 
             {actionVariant === "library" && onSave && getDefaultCategoryByMediaType ? (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 rounded-full border-none bg-white px-2.5 text-[10px] font-semibold text-black transition-colors hover:bg-white/90"
+                  onClick={handleSave}
+                >
+                  <Heart className="mr-1 h-3.5 w-3.5" weight="fill" />
+                  Save
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 w-7 rounded-full border-none bg-white/15 p-0 text-white transition-colors hover:bg-white/25"
+                  onClick={() => onDownload(generation.url, generation.type, generation.type)}
+                  title="Download"
+                >
+                  <DownloadSimple className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
               <Button
                 variant="secondary"
                 size="sm"
-                className="h-7 rounded-full border-none bg-white px-2.5 text-[10px] font-semibold text-black transition-colors hover:bg-white/90"
-                onClick={() =>
-                  onSave({
-                    url: generation.url,
-                    assetType: generation.type,
-                    title: `${generation.type} ${generation.id.slice(0, 8)}`,
-                    category: getDefaultCategoryByMediaType(generation.type),
-                    visibility: "private",
-                    sourceGenerationId: generation.id,
-                    sourceNodeType: "generation-history",
-                    description: generation.prompt ?? undefined,
-                  })
-                }
+                className="h-7 w-7 rounded-full border-none bg-white/15 p-0 text-white transition-colors hover:bg-white/25"
+                onClick={() => onDownload(generation.url, generation.type, generation.type)}
+                title="Download"
               >
-                Save
+                <DownloadSimple className="h-3.5 w-3.5" />
               </Button>
-            ) : null}
+            )}
 
             <CardDropdownActions
               {...dropdownProps}
@@ -161,6 +176,12 @@ export function GenerationCard({
             />
           </div>
         </div>
+
+        {generation.prompt ? (
+          <p className="line-clamp-1 select-none text-left text-[10px] font-medium leading-tight text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+            {generation.prompt}
+          </p>
+        ) : null}
       </div>
 
       <div className="absolute bottom-2 right-2 z-10 sm:hidden">

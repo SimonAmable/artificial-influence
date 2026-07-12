@@ -41,6 +41,14 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -341,10 +349,15 @@ export function VaultTab({ connectionId }: VaultTabProps) {
 
   if (!connectionId) {
     return (
-      <div className="rounded-2xl border border-dashed border-border/70 bg-muted/10 px-6 py-10 text-center">
-        <p className="text-sm font-medium text-foreground">Connect Fanvue to browse your vault</p>
-        <p className="mt-1 text-sm text-muted-foreground">Folders help you organize content before posting.</p>
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <FolderOpen />
+          </EmptyMedia>
+          <EmptyTitle>Connect Fanvue to browse your vault</EmptyTitle>
+          <EmptyDescription>Folders help you organize content before posting.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     )
   }
 
@@ -595,49 +608,56 @@ export function VaultTab({ connectionId }: VaultTabProps) {
               {isAllFoldersView ? "Loading vault media..." : "Loading folder media..."}
             </div>
           ) : folderMedia.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border/70 bg-muted/10 px-6 py-12 text-center">
-              <p className="text-sm font-medium text-foreground">
-                {isAllFoldersView ? "No vault media yet" : "This folder is empty"}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {isAllFoldersView
-                  ? "Upload media to your vault or add assets from your library."
-                  : "Upload directly here or add an asset from your library."}
-              </p>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Upload />
+                </EmptyMedia>
+                <EmptyTitle>
+                  {isAllFoldersView ? "No vault media yet" : "This folder is empty"}
+                </EmptyTitle>
+                <EmptyDescription>
+                  {isAllFoldersView
+                    ? "Upload media to your vault or add assets from your library."
+                    : "Upload directly here or add an asset from your library."}
+                </EmptyDescription>
+              </EmptyHeader>
               {selectedFolder ? (
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                  {isRealFolder ? (
+                <EmptyContent>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {isRealFolder ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={isAddingAsset}
+                        onClick={() => setAssetModalOpen(true)}
+                      >
+                        {isAddingAsset ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <FolderOpen className="mr-2 h-4 w-4" />
+                        )}
+                        Add asset
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
                       size="sm"
-                      disabled={isAddingAsset}
-                      onClick={() => setAssetModalOpen(true)}
+                      variant={isRealFolder ? "outline" : "default"}
+                      disabled={isUploading}
+                      onClick={() => fileInputRef.current?.click()}
                     >
-                      {isAddingAsset ? (
+                      {isUploading ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
-                        <FolderOpen className="mr-2 h-4 w-4" />
+                        <Upload className="mr-2 h-4 w-4" />
                       )}
-                      Add asset
+                      Upload
                     </Button>
-                  ) : null}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={isRealFolder ? "outline" : "default"}
-                    disabled={isUploading}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    {isUploading ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Upload className="mr-2 h-4 w-4" />
-                    )}
-                    Upload
-                  </Button>
-                </div>
+                  </div>
+                </EmptyContent>
               ) : null}
-            </div>
+            </Empty>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {folderMedia.map((item) => (
