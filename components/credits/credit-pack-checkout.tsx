@@ -122,12 +122,7 @@ export function CreditPackCheckout({
   };
 
   return (
-    <section
-      className={cn(
-        'mx-auto max-w-3xl rounded-lg border-2 border-border bg-card p-6 shadow-lg transition-shadow hover:shadow-xl sm:p-8',
-        className
-      )}
-    >
+    <section className={cn('w-full', className)}>
       <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-xl">
           <div className="mb-3 flex items-center gap-2">

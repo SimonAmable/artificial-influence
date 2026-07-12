@@ -158,10 +158,7 @@ export function CreditPackGrid({ className, redirectPath = '/pricing' }: CreditP
             </DialogDescription>
           </DialogHeader>
 
-          <CreditPackCheckout
-            redirectPath={redirectPath}
-            className="!mx-0 !w-full !max-w-none !border-0 !bg-transparent !p-0 !shadow-none"
-          />
+          <CreditPackCheckout redirectPath={redirectPath} />
         </DialogContent>
       </Dialog>
     </section>
