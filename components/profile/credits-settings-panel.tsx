@@ -95,8 +95,10 @@ export function CreditsSettingsPanel({
             Upgrade plan
           </Button>
         )}
-        <Button type="button" variant="outline" className={pillBtn} onClick={handleUpgrade}>
-          View all plans
+        <Button asChild variant="outline" className={pillBtn}>
+          <Link href="/pricing" onClick={() => onCloseModal?.()}>
+            View all plans
+          </Link>
         </Button>
         <Button asChild variant="outline" className={pillBtn}>
           <Link href="/dashboard/subscription" onClick={() => onCloseModal?.()}>
