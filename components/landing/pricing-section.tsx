@@ -7,12 +7,23 @@ import Link from 'next/link';
 import { getStoredAffiliateRef } from '@/hooks/use-affiliate-ref';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Info } from '@phosphor-icons/react';
+import { CaretDown, Info } from '@phosphor-icons/react';
 import { motion, useReducedMotion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { CreditPackGrid } from '@/components/credits/credit-pack-grid';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { isPresenceProduct } from '@/lib/product/require-presence';
+import {
+  getFeaturedPlanEstimates,
+  getModelEstimateLines,
+} from '@/lib/pricing-output-estimates';
+import { getPlanCtaState } from '@/lib/pricing-plan-cta';
+import type { PlanCtaKind } from '@/lib/pricing-plan-cta';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { FOUNDER_NOTE_PHOTO_SRC } from '@/lib/onboarding/founder-note';
@@ -43,7 +54,6 @@ type PricingPlan = {
   ctaLabel?: string;
   ctaHref?: string;
   creditsLabel?: string;
-  creditSummary?: string;
 };
 
 type PricingTab = 'monthly' | 'yearly' | 'one-time' | 'enterprise';
@@ -139,7 +149,6 @@ const freePlan: PricingPlan = {
   ctaLabel: 'Start free',
   ctaHref: '/login?mode=signup',
   creditsLabel: '10 credits',
-  creditSummary: 'Enough for 2 Nano Banana images',
   features: [
     {
       name: 'Limited access to image tools',
@@ -548,6 +557,275 @@ function getSubscriptionCardBullets(plan: PricingPlan) {
   }
 }
 
+function PlanCreditEstimates({
+  credits,
+  creditsLabel,
+}: {
+  credits: number;
+  creditsLabel?: string;
+}) {
+  const featured = getFeaturedPlanEstimates(credits);
+  const modelLines = getModelEstimateLines(credits);
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-foreground/90">
+          {creditsLabel ?? `${credits} credits / month`}
+        </p>
+        <InfoPopover label="See what you can create with these credits">
+          <div className="space-y-3">
+            <p className="font-medium text-foreground">With these credits you can create about</p>
+            <ul className="space-y-1.5 text-muted-foreground">
+              {modelLines.map((line) => (
+                <li key={line.id}>{line.label}</li>
+              ))}
+            </ul>
+            <p className="border-t border-border/60 pt-2 text-xs text-muted-foreground">
+              Estimates use typical defaults. Exact use depends on model settings and length.
+            </p>
+          </div>
+        </InfoPopover>
+      </div>
+      <div className="mt-2 space-y-0.5">
+        <p className="text-xs leading-relaxed text-muted-foreground">{featured.imageLine}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{featured.videoLine}</p>
+      </div>
+    </div>
+  );
+}
+
+function PricingSpinner() {
+  return (
+    <svg
+      className="h-5 w-5 animate-spin"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
+}
+
+function PlanCardCta({
+  cta,
+  loading,
+  pending,
+  onCheckout,
+  onPortal,
+  signupHref,
+  popular,
+}: {
+  cta: { kind: PlanCtaKind; label: string } | null;
+  loading: boolean;
+  pending: boolean;
+  onCheckout: () => void;
+  onPortal: () => void;
+  signupHref: string;
+  popular: boolean;
+}) {
+  if (pending || !cta) {
+    return (
+      <div
+        className="h-[50px] w-full animate-pulse rounded-2xl bg-muted/50"
+        aria-hidden
+      />
+    );
+  }
+
+  if (cta.kind === 'current' || cta.kind === 'inactive') {
+    return (
+      <button
+        type="button"
+        disabled
+        className={cn(
+          'w-full cursor-default rounded-2xl px-6 py-3 font-semibold',
+          cta.kind === 'current'
+            ? 'border border-primary/25 bg-primary/5 text-primary'
+            : 'border border-border/60 bg-muted/30 text-muted-foreground'
+        )}
+      >
+        {cta.label}
+      </button>
+    );
+  }
+
+  if (cta.kind === 'signup') {
+    return (
+      <Link
+        href={signupHref}
+        className={cn(
+          'inline-flex w-full items-center justify-center rounded-2xl px-6 py-3 text-center font-semibold shadow-sm shadow-black/10 transition-all hover:shadow-md',
+          'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+        )}
+      >
+        {cta.label}
+      </Link>
+    );
+  }
+
+  const isPortal = cta.kind === 'portal';
+  const handleClick = isPortal ? onPortal : onCheckout;
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={loading}
+      className={cn(
+        'w-full rounded-2xl px-6 py-3 font-semibold shadow-sm shadow-black/10 transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50',
+        popular && !isPortal
+          ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+          : isPortal
+            ? 'border border-border bg-background text-foreground hover:bg-muted/60'
+            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+      )}
+    >
+      {loading ? (
+        <span className="flex items-center justify-center gap-2">
+          <PricingSpinner />
+          Processing...
+        </span>
+      ) : (
+        cta.label
+      )}
+    </button>
+  );
+}
+
+type ComparisonCell = string;
+
+type ComparisonRow = {
+  feature: string;
+  free: ComparisonCell;
+  starter: ComparisonCell;
+  plus: ComparisonCell;
+};
+
+function getPlanComparisonRows(): ComparisonRow[] {
+  const free = getFeaturedPlanEstimates(freePlan.credits);
+  const starter = getFeaturedPlanEstimates(400);
+  const plus = getFeaturedPlanEstimates(1000);
+
+  return [
+    {
+      feature: 'Monthly credits',
+      free: String(freePlan.credits),
+      starter: '400',
+      plus: '1,000',
+    },
+    {
+      feature: 'NB2 images',
+      free: `Up to ${free.nanoBanana2LiteImages}`,
+      starter: `Up to ${starter.nanoBanana2LiteImages}`,
+      plus: `Up to ${plus.nanoBanana2LiteImages}`,
+    },
+    {
+      feature: 'Veo 3.1 Fast',
+      free: `Up to ${free.veoSeconds}s`,
+      starter: `Up to ${starter.veoSeconds}s`,
+      plus: `Up to ${plus.veoSeconds}s`,
+    },
+    {
+      feature: 'Commercial license',
+      free: 'Personal use',
+      starter: 'Yes',
+      plus: 'Yes',
+    },
+    {
+      feature: 'Support',
+      free: 'Community',
+      starter: 'Personal',
+      plus: 'Priority',
+    },
+    {
+      feature: 'Concurrent generations',
+      free: 'Standard',
+      starter: 'Standard',
+      plus: 'Expanded',
+    },
+    {
+      feature: 'Instagram & TikTok',
+      free: '—',
+      starter: 'Unlimited',
+      plus: 'Unlimited',
+    },
+    {
+      feature: 'Automations',
+      free: '—',
+      starter: 'Unlimited',
+      plus: 'Unlimited',
+    },
+  ];
+}
+
+function PlanComparisonDetails() {
+  const [open, setOpen] = useState(false);
+  const rows = getPlanComparisonRows();
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="mt-10">
+      <div className="flex justify-center">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            Compare plan details
+            <CaretDown
+              className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')}
+              weight="bold"
+            />
+          </button>
+        </CollapsibleTrigger>
+      </div>
+      <CollapsibleContent className="mt-6 data-[state=closed]:animate-out data-[state=open]:animate-in">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[32rem] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="py-3 pr-4 font-medium text-muted-foreground">Feature</th>
+                <th className="px-3 py-3 font-medium text-foreground">Free</th>
+                <th className="px-3 py-3 font-medium text-foreground">Starter</th>
+                <th className="px-3 py-3 font-medium text-foreground">Plus</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.feature} className="border-b border-border/60">
+                  <th scope="row" className="py-3 pr-4 font-normal text-foreground/90">
+                    {row.feature}
+                  </th>
+                  <td className="px-3 py-3 text-muted-foreground">{row.free}</td>
+                  <td className="px-3 py-3 text-muted-foreground">{row.starter}</td>
+                  <td className="px-3 py-3 text-muted-foreground">{row.plus}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-center text-xs text-muted-foreground">
+          Output estimates use typical defaults and may vary with model settings.
+        </p>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 function scrollCardIntoView(el: HTMLElement | null) {
   el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 }
@@ -591,9 +869,16 @@ type PricingSectionProps = {
   compact?: boolean;
 };
 
+type SubscriptionUiState =
+  | { status: 'pending' }
+  | { status: 'ready'; isLoggedIn: boolean; activePriceId: string | null };
+
 export function PricingSection({ embedded = false, compact = false }: PricingSectionProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [activePricingTab, setActivePricingTab] = useState<PricingTab>('monthly');
+  const [subscriptionState, setSubscriptionState] = useState<SubscriptionUiState>({
+    status: 'pending',
+  });
   const reduceMotion = useReducedMotion();
   const router = useRouter();
   const supabase = createClient();
@@ -631,6 +916,103 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
   const motionTransition = reduceMotion
     ? { duration: 0 }
     : { duration: 0.24, ease: [0.22, 1, 0.36, 1] as const };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSubscription() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (cancelled) return;
+
+        let activePriceId: string | null = null;
+        if (user) {
+          const { data } = await supabase
+            .from('subscriptions')
+            .select('price_id')
+            .eq('user_id', user.id)
+            .in('status', ['active', 'trialing'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          activePriceId = data?.price_id ?? null;
+        }
+
+        if (!cancelled) {
+          setSubscriptionState({
+            status: 'ready',
+            isLoggedIn: Boolean(user),
+            activePriceId,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load subscription for pricing:', error);
+        if (!cancelled) {
+          setSubscriptionState({
+            status: 'ready',
+            isLoggedIn: false,
+            activePriceId: null,
+          });
+        }
+      }
+    }
+
+    void loadSubscription();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
+  const planStateReady = subscriptionState.status === 'ready';
+  const activePriceId =
+    subscriptionState.status === 'ready' ? subscriptionState.activePriceId : null;
+  const isLoggedIn = subscriptionState.status === 'ready' ? subscriptionState.isLoggedIn : false;
+
+  const handleManageBilling = async (planId: string) => {
+    setLoading(planId);
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push('/login?redirect=/pricing');
+        return;
+      }
+
+      const response = await fetch('/api/customer-portal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          returnUrl: window.location.href,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to open billing portal');
+      }
+
+      if (data.url) {
+        window.location.assign(data.url);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to open billing portal. Please try again.');
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const handleSubscribe = async (priceId: string, planId: string) => {
     setLoading(planId);
 
@@ -827,6 +1209,17 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                   const annualMonthly = plan.price / 12;
                   const hasYearlyDiscount =
                     plan.interval === 'year' && listMonthly != null && annualMonthly < listMonthly;
+                  const cta = planStateReady
+                    ? getPlanCtaState({
+                        planName: plan.name,
+                        planInterval: plan.interval,
+                        planPriceId: plan.priceId,
+                        activePriceId,
+                        isLoggedIn,
+                      })
+                    : null;
+                  const isCurrentPlan = planStateReady && cta?.kind === 'current';
+
                   return (
                     <motion.div
                       key={plan.id}
@@ -842,12 +1235,21 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                       variants={cardFade}
                       transition={motionTransition}
                       className={cn(
-                        'relative flex h-full min-h-[460px] flex-col rounded-[22px] border border-border/70 bg-card/90 p-6 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-lg',
+                        'relative flex h-full min-h-[460px] flex-col rounded-[22px] border bg-card/90 p-6 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
                         'max-sm:snap-center max-sm:shrink-0 max-sm:w-[85vw] max-sm:max-w-md sm:w-auto sm:max-w-none',
-                        plan.popular ? 'bg-card/95' : ''
+                        isCurrentPlan
+                          ? 'border-primary/40 ring-1 ring-primary/20'
+                          : 'border-border/70 hover:border-border',
+                        plan.popular && !isCurrentPlan ? 'bg-card/95' : ''
                       )}
                     >
-                      {plan.popular ? (
+                      {isCurrentPlan ? (
+                        <div className="pointer-events-none absolute right-4 top-4 z-20">
+                          <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary backdrop-blur-sm">
+                            Your plan
+                          </span>
+                        </div>
+                      ) : plan.popular ? (
                         <div className="pointer-events-none absolute right-4 top-4 z-20">
                           <span className="inline-flex rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground backdrop-blur-sm">
                             Most Popular
@@ -856,9 +1258,21 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                       ) : null}
 
                       <div className="space-y-4">
-                        <div className="space-y-1 pr-20">
+                        <div
+                          className={cn(
+                            'space-y-1',
+                            (isCurrentPlan || plan.popular) && 'pr-20'
+                          )}
+                        >
                           <h2 className="text-2xl font-semibold tracking-tight">{plan.name}</h2>
-                          <p className="text-sm text-muted-foreground">{plan.description}</p>
+                          <p
+                            className={cn(
+                              'text-sm text-muted-foreground',
+                              plan.name === 'Free' && 'whitespace-nowrap'
+                            )}
+                          >
+                            {plan.description}
+                          </p>
                         </div>
 
                         <div className="space-y-1.5">
@@ -915,17 +1329,12 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                       </div>
 
                       <div className="mt-5 space-y-3.5">
-                        <div className="space-y-1.5">
-                          <p className="text-sm font-medium text-foreground/90">
-                            {plan.creditsLabel ?? `${plan.credits} credits / month`}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {plan.creditSummary ??
-                              `~${Math.floor(plan.credits / 4)}-${Math.floor(plan.credits / 2)} Nano Banana images`}
-                          </p>
-                        </div>
+                        <PlanCreditEstimates
+                          credits={plan.credits}
+                          creditsLabel={plan.creditsLabel}
+                        />
 
-                        <ul className="space-y-2.5">
+                        <ul className="space-y-2">
                           {getSubscriptionCardBullets(plan).map((bullet) => (
                             <li key={bullet} className="flex items-start gap-2 text-sm text-foreground/90">
                               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/70" />
@@ -933,65 +1342,24 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                             </li>
                           ))}
                         </ul>
-
                       </div>
 
                       <div className="mt-auto pt-5">
-                        {plan.price === 0 ? (
-                          <Link
-                            href={plan.ctaHref ?? '/login?mode=signup'}
-                            className={cn(
-                              'inline-flex w-full items-center justify-center rounded-2xl px-6 py-3 text-center font-semibold shadow-sm shadow-black/10 transition-all hover:shadow-md',
-                              'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                            )}
-                          >
-                            {plan.ctaLabel ?? 'Start free'}
-                          </Link>
-                        ) : (
-                          <button
-                            onClick={() => handleSubscribe(plan.priceId!, plan.id)}
-                            disabled={loading === plan.id}
-                            className={cn(
-                              'w-full rounded-2xl px-6 py-3 font-semibold shadow-sm shadow-black/10 transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50',
-                              plan.popular
-                                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                            )}
-                          >
-                            {loading === plan.id ? (
-                              <span className="flex items-center justify-center gap-2">
-                                <svg
-                                  className="h-5 w-5 animate-spin"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <circle
-                                    className="opacity-25"
-                                    cx="12"
-                                    cy="12"
-                                    r="10"
-                                    stroke="currentColor"
-                                    strokeWidth="4"
-                                  ></circle>
-                                  <path
-                                    className="opacity-75"
-                                    fill="currentColor"
-                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                  ></path>
-                                </svg>
-                                Processing...
-                              </span>
-                            ) : (
-                              `Get ${plan.name}`
-                            )}
-                          </button>
-                        )}
+                        <PlanCardCta
+                          cta={cta}
+                          pending={!planStateReady}
+                          loading={loading === plan.id}
+                          popular={Boolean(plan.popular)}
+                          signupHref={plan.ctaHref ?? '/login?mode=signup'}
+                          onCheckout={() => handleSubscribe(plan.priceId!, plan.id)}
+                          onPortal={() => handleManageBilling(plan.id)}
+                        />
                       </div>
                     </motion.div>
                   );
                 })}
               </motion.div>
+              <PlanComparisonDetails />
             </motion.div>
           ) : activePricingTab === 'one-time' ? (
             <motion.div
