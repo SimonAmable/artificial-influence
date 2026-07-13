@@ -1,6 +1,6 @@
 import "server-only"
 
-export const UNICAN_MEDIA_WIDGET_URI = "ui://widget/unican-media-output.html"
+export const UNICAN_MEDIA_WIDGET_URI = "ui://unican/media-output.html"
 export const UNICAN_MEDIA_WIDGET_MIME_TYPE = "text/html;profile=mcp-app"
 
 const WIDGET_HTML = String.raw`
@@ -10,555 +10,65 @@ const WIDGET_HTML = String.raw`
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      :root {
-        color-scheme: light dark;
-        --bg: #ffffff;
-        --panel: #f6f6f6;
-        --panel-2: #eeeeee;
-        --border: #dedede;
-        --overlay: rgba(255,255,255,.88);
-        --overlay-border: rgba(0,0,0,.12);
-        --shine: rgba(255,255,255,.75);
-        --text: #111111;
-        --muted: #666666;
-        --muted-2: #8a8a8a;
-      }
-
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #101010;
-          --panel: #181818;
-          --panel-2: #202020;
-          --border: #303030;
-          --overlay: rgba(0,0,0,.58);
-          --overlay-border: rgba(255,255,255,.18);
-          --shine: rgba(255,255,255,.08);
-          --text: #f5f5f5;
-          --muted: #a0a0a0;
-          --muted-2: #777777;
-        }
-      }
-
-      * { box-sizing: border-box; }
-
-      body {
-        margin: 0;
-        background: var(--bg);
-        color: var(--text);
-        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-
-      button {
-        color: inherit;
-        font: inherit;
-      }
-
-      .wrap {
-        display: grid;
-        gap: 10px;
-        padding: 12px;
-      }
-
-      .prompt {
-        color: var(--text);
-        font-size: 13px;
-        line-height: 1.45;
-        overflow: hidden;
-      }
-
-      .prompt.collapsed {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-      }
-
-      .show-more {
-        width: fit-content;
-        border: 0;
-        background: transparent;
-        color: var(--muted);
-        cursor: pointer;
-        font-size: 12px;
-        padding: 0;
-      }
-
-      .badges {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-      }
-
-      .badge {
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        background: var(--panel);
-        color: var(--muted);
-        font-size: 11px;
-        line-height: 1;
-        padding: 6px 8px;
-        white-space: nowrap;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 8px;
-      }
-
-      .grid.multi {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .card {
-        position: relative;
-        overflow: hidden;
-        min-height: 160px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--panel);
-      }
-
-      .media {
-        display: block;
-        width: 100%;
-        aspect-ratio: 1 / 1;
-        object-fit: cover;
-        background: var(--panel-2);
-      }
-
-      .media.video,
-      .media.audio {
-        aspect-ratio: 16 / 9;
-      }
-
-      .placeholder {
-        display: grid;
-        place-items: center;
-        width: 100%;
-        aspect-ratio: 1 / 1;
-        background:
-          linear-gradient(100deg, transparent 20%, var(--shine) 35%, transparent 50%),
-          var(--panel-2);
-        background-size: 220% 100%;
-        animation: load 1.2s ease-in-out infinite;
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .placeholder.video,
-      .placeholder.audio {
-        aspect-ratio: 16 / 9;
-      }
-
-      @keyframes load {
-        from { background-position: 160% 0; }
-        to { background-position: -60% 0; }
-      }
-
-      .download {
-        position: absolute;
-        right: 8px;
-        top: 8px;
-        display: grid;
-        place-items: center;
-        width: 30px;
-        height: 30px;
-        border: 1px solid var(--overlay-border);
-        border-radius: 999px;
-        background: var(--overlay);
-        cursor: pointer;
-        backdrop-filter: blur(10px);
-      }
-
-      .download svg {
-        width: 15px;
-        height: 15px;
-      }
-
-      .caption {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        padding: 8px;
-        color: var(--muted);
-        font-size: 11px;
-      }
-
-      .caption span {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .models {
-        display: grid;
-        gap: 8px;
-      }
-
-      .model-row {
-        display: grid;
-        gap: 6px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--panel);
-        padding: 10px;
-      }
-
-      .model-title {
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        font-size: 13px;
-        font-weight: 600;
-      }
-
-      .model-id {
-        color: var(--muted-2);
-        font-size: 11px;
-        overflow-wrap: anywhere;
-      }
-
-      .empty {
-        border: 1px dashed var(--border);
-        border-radius: 8px;
-        color: var(--muted);
-        font-size: 12px;
-        padding: 16px;
-        text-align: center;
-      }
-
-      @media (max-width: 520px) {
-        .grid.multi { grid-template-columns: 1fr; }
-      }
+      :root { color-scheme: light dark; --color-background-primary: #101010; --color-background-secondary: #191919; --color-text-primary: #f5f5f5; --color-text-secondary: #a0a0a0; --color-border-primary: #343434; --color-border-secondary: #292929; --border-radius-lg: 14px; --font-sans: ui-sans-serif, system-ui, sans-serif; }
+      @media (prefers-color-scheme: light) { :root { --color-background-primary: #fff; --color-background-secondary: #f6f6f6; --color-text-primary: #171717; --color-text-secondary: #666; --color-border-primary: #dedede; --color-border-secondary: #eee; } }
+      * { box-sizing: border-box; } body { margin: 0; background: var(--color-background-primary); color: var(--color-text-primary); font-family: var(--font-sans); } button, a { font: inherit; } #app { display: grid; gap: 12px; padding: 12px; } .empty, .card, .model { border: 1px solid var(--color-border-primary); border-radius: var(--border-radius-lg); background: var(--color-background-secondary); } .empty { color: var(--color-text-secondary); padding: 16px; text-align: center; } .meta { display: flex; flex-wrap: wrap; gap: 6px; } .badge { border: 1px solid var(--color-border-primary); border-radius: 999px; color: var(--color-text-secondary); font-size: 12px; padding: 5px 8px; } .models { display: grid; gap: 8px; } .model { display: grid; gap: 4px; padding: 11px; } .model strong { font-size: 14px; } .model span { color: var(--color-text-secondary); font-size: 12px; overflow-wrap: anywhere; } .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); } .card { overflow: hidden; } .media, .placeholder { aspect-ratio: 1 / 1; background: var(--color-border-secondary); display: block; object-fit: cover; width: 100%; } video.media, audio.media { aspect-ratio: 16 / 9; } .placeholder { align-items: center; color: var(--color-text-secondary); display: grid; font-size: 13px; justify-content: center; padding: 12px; text-align: center; } .caption { display: grid; gap: 5px; padding: 10px; } .caption strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .caption span { color: var(--color-text-secondary); font-size: 12px; } .open { background: transparent; border: 0; color: inherit; cursor: pointer; padding: 0; text-align: left; text-decoration: underline; }
     </style>
   </head>
   <body>
-    <main id="app" class="wrap"></main>
+    <main id="app"><div class="empty">Waiting for UniCan output…</div></main>
     <script>
       const app = document.getElementById("app");
-      let pollTimer = null;
-      let pollAttempts = 0;
+      let nextId = 1;
 
-      function text(value) {
-        return value == null ? "" : String(value);
-      }
+      function post(message) { window.parent.postMessage(message, "*"); }
+      function request(method, params) { const id = nextId++; post({ jsonrpc: "2.0", id, method, params }); return id; }
+      function notify(method, params) { post({ jsonrpc: "2.0", method, params }); }
+      function text(value) { return value == null ? "" : String(value); }
+      function object(value) { return value && typeof value === "object" && !Array.isArray(value) ? value : null; }
 
-      function compact(value) {
-        return text(value).replace(/\s+/g, " ").trim();
-      }
+      function resize() { requestAnimationFrame(() => notify("ui/notifications/size-changed", { height: document.documentElement.scrollHeight })); }
+      function clear() { app.replaceChildren(); }
+      function empty(message) { const el = document.createElement("div"); el.className = "empty"; el.textContent = message; app.appendChild(el); resize(); }
+      function badge(value) { if (!value) return null; const el = document.createElement("span"); el.className = "badge"; el.textContent = text(value); return el; }
+      function open(url) { request("ui/open-link", { url }); }
 
-      function statusLabel(value) {
-        const status = compact(value || "ready").toLowerCase();
-        return status.replace(/_/g, " ");
-      }
-
-      function isWorking(status) {
-        const value = compact(status).toLowerCase();
-        return value === "queued" || value === "pending" || value === "processing" || value === "generating" || value === "starting";
-      }
-
-      function createBadge(label) {
-        if (!compact(label)) return null;
-        const el = document.createElement("span");
-        el.className = "badge";
-        el.textContent = compact(label);
-        return el;
-      }
-
-      function appendBadges(labels) {
-        const clean = labels.map(compact).filter(Boolean);
-        if (!clean.length) return;
-        const wrap = document.createElement("div");
-        wrap.className = "badges";
-        clean.forEach((label) => wrap.appendChild(createBadge(label)));
-        app.appendChild(wrap);
-      }
-
-      function pickItems(data) {
-        if (Array.isArray(data?.items)) return data.items;
-        if (Array.isArray(data?.generations)) return data.generations.map(toMediaItem);
-        if (data?.generation) return [toMediaItem(data.generation)];
-        if (data?.generationId || data?.url) return [toMediaItem(data)];
-        return [];
-      }
-
-      function toMediaItem(item) {
-        if (!item || typeof item !== "object") return {};
-        const url = item.mediaUrl || item.url || item.downloadUrl || item.thumbnailUrl;
-        return {
-          id: item.id || item.generationId,
-          status: item.status,
-          kind: item.kind || item.type,
-          mediaUrl: item.mediaUrl || item.url || null,
-          thumbnailUrl: item.thumbnailUrl || url || null,
-          downloadUrl: item.downloadUrl || item.url || null,
-          mimeType: item.mimeType || null,
-          model: item.model || null,
-          prompt: item.prompt || null,
-          error: item.error || null,
-          createdAt: item.createdAt || null,
-        };
-      }
-
-      function renderPrompt(prompt) {
-        const clean = compact(prompt);
-        if (!clean) return;
-        const promptEl = document.createElement("div");
-        promptEl.className = "prompt collapsed";
-        promptEl.textContent = clean;
-        app.appendChild(promptEl);
-
-        if (clean.length < 150) return;
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "show-more";
-        button.textContent = "Show more...";
-        button.onclick = () => {
-          const collapsed = promptEl.classList.toggle("collapsed");
-          button.textContent = collapsed ? "Show more..." : "Show less";
-          notifyHeight();
-        };
-        app.appendChild(button);
+      function mediaItem(value) {
+        const item = object(value) || {};
+        return { id: item.id || item.generationId, type: item.type || item.kind || "image", status: item.status || "ready", url: item.mediaUrl || item.url || item.downloadUrl || item.thumbnailUrl, model: item.model, prompt: item.prompt, error: item.error };
       }
 
       function renderModels(data) {
-        const models = Array.isArray(data?.models) ? data.models : [];
-        if (!models.length) {
-          renderEmpty("No models returned.");
-          return;
-        }
-
-        appendBadges([data.total ? String(data.total) + " models" : String(models.length) + " models", data.defaultImageModel ? "Default: " + data.defaultImageModel : ""]);
-        const list = document.createElement("section");
-        list.className = "models";
-
-        models.forEach((model) => {
-          const row = document.createElement("article");
-          row.className = "model-row";
-
-          const title = document.createElement("div");
-          title.className = "model-title";
-          title.innerHTML = "<span>" + escapeHtml(model.label || model.name || model.identifier || model.id || "Model") + "</span><span>" + escapeHtml(model.kind || model.type || "") + "</span>";
-          row.appendChild(title);
-
-          const id = document.createElement("div");
-          id.className = "model-id";
-          id.textContent = model.identifier || model.id || "";
-          row.appendChild(id);
-
-          const badges = document.createElement("div");
-          badges.className = "badges";
-          const labels = Array.isArray(model.badges) ? model.badges : [];
-          labels.forEach((label) => {
-            const badge = createBadge(label);
-            if (badge) badges.appendChild(badge);
-          });
-          if (badges.childNodes.length) row.appendChild(badges);
-
-          list.appendChild(row);
-        });
-
-        app.appendChild(list);
+        const models = Array.isArray(data.models) ? data.models : [];
+        if (!models.length) return empty("No models returned.");
+        const meta = document.createElement("div"); meta.className = "meta"; meta.appendChild(badge(data.total ? data.total + " models" : models.length + " models")); app.appendChild(meta);
+        const list = document.createElement("section"); list.className = "models";
+        models.forEach((model) => { const row = document.createElement("article"); row.className = "model"; const title = document.createElement("strong"); title.textContent = text(model.label || model.name || model.identifier || "Model"); const details = document.createElement("span"); details.textContent = [model.identifier, model.type || model.kind, model.provider].filter(Boolean).join(" · "); row.append(title, details); list.appendChild(row); });
+        app.appendChild(list); resize();
       }
 
       function renderMedia(data) {
-        const items = pickItems(data);
-        const prompt = data?.prompt || items.find((item) => item.prompt)?.prompt;
-        renderPrompt(prompt);
-
-        const settings = data?.settings || {};
-        appendBadges([
-          settings.model || data?.model || items.find((item) => item.model)?.model,
-          settings.aspectRatio || settings.aspect_ratio,
-          settings.quality || settings.resolution,
-          settings.count ? String(settings.count) + " item" + (settings.count === 1 ? "" : "s") : items.length ? String(items.length) + " item" + (items.length === 1 ? "" : "s") : "",
-          data?.status,
-        ]);
-
-        if (!items.length) {
-          renderEmpty("No media returned.");
-          return;
-        }
-
-        const grid = document.createElement("section");
-        grid.className = items.length > 1 ? "grid multi" : "grid";
-        items.forEach((item) => grid.appendChild(renderCard(item)));
-        app.appendChild(grid);
+        const raw = Array.isArray(data.items) ? data.items : Array.isArray(data.generations) ? data.generations : data.generation ? [data.generation] : [data];
+        const items = raw.map(mediaItem).filter((item) => item.id || item.url || item.error || item.status);
+        const meta = document.createElement("div"); meta.className = "meta"; [data.model, data.status, items.length ? items.length + " item" + (items.length === 1 ? "" : "s") : null].forEach((value) => { const el = badge(value); if (el) meta.appendChild(el); }); if (meta.childNodes.length) app.appendChild(meta);
+        if (!items.length) return empty("No media returned.");
+        const grid = document.createElement("section"); grid.className = "grid";
+        items.forEach((item) => { const card = document.createElement("article"); card.className = "card"; if (item.url && item.status !== "failed") { let el; if (item.type === "video") { el = document.createElement("video"); el.controls = true; el.playsInline = true; } else if (item.type === "audio") { el = document.createElement("audio"); el.controls = true; } else { el = document.createElement("img"); el.alt = text(item.prompt || "Generated media"); } el.className = "media"; el.src = item.url; card.appendChild(el); } else { const placeholder = document.createElement("div"); placeholder.className = "placeholder"; placeholder.textContent = text(item.error || item.status || "Generating"); card.appendChild(placeholder); } const caption = document.createElement("div"); caption.className = "caption"; const title = document.createElement("strong"); title.textContent = text(item.model || item.type || "Media"); const state = document.createElement("span"); state.textContent = text(item.error || item.status || "ready"); caption.append(title, state); if (item.url) { const button = document.createElement("button"); button.className = "open"; button.type = "button"; button.textContent = "Open media"; button.onclick = () => open(item.url); caption.appendChild(button); } card.appendChild(caption); grid.appendChild(card); });
+        app.appendChild(grid); resize();
       }
 
-      function renderCard(item) {
-        const card = document.createElement("article");
-        card.className = "card";
-        const kind = compact(item.kind || "image").toLowerCase();
-        const mediaUrl = item.mediaUrl || item.thumbnailUrl;
-
-        if (mediaUrl && !isWorking(item.status)) {
-          if (kind === "video") {
-            const video = document.createElement("video");
-            video.className = "media video";
-            video.src = mediaUrl;
-            video.controls = true;
-            video.playsInline = true;
-            card.appendChild(video);
-          } else if (kind === "audio") {
-            const audioWrap = document.createElement("div");
-            audioWrap.className = "placeholder audio";
-            const audio = document.createElement("audio");
-            audio.src = mediaUrl;
-            audio.controls = true;
-            audioWrap.appendChild(audio);
-            card.appendChild(audioWrap);
-          } else {
-            const img = document.createElement("img");
-            img.className = "media";
-            img.src = mediaUrl;
-            img.alt = compact(item.prompt) || "Generated media";
-            card.appendChild(img);
-          }
-        } else {
-          const placeholder = document.createElement("div");
-          placeholder.className = "placeholder " + (kind === "video" || kind === "audio" ? kind : "");
-          placeholder.textContent = item.error ? "Failed" : statusLabel(item.status || "generating");
-          card.appendChild(placeholder);
-        }
-
-        if (item.downloadUrl && !isWorking(item.status)) {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "download";
-          button.title = "Download";
-          button.setAttribute("aria-label", "Download");
-          button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
-          button.onclick = () => openDownload(item.downloadUrl);
-          card.appendChild(button);
-        }
-
-        const caption = document.createElement("div");
-        caption.className = "caption";
-        const left = document.createElement("span");
-        left.textContent = item.error || item.model || item.id || kind;
-        const right = document.createElement("span");
-        right.textContent = statusLabel(item.status || (item.mediaUrl ? "completed" : "pending"));
-        caption.append(left, right);
-        card.appendChild(caption);
-
-        return card;
-      }
-
-      function renderEmpty(message) {
-        const empty = document.createElement("div");
-        empty.className = "empty";
-        empty.textContent = message;
-        app.appendChild(empty);
-      }
-
-      function openDownload(url) {
-        if (window.openai?.openExternal) {
-          window.openai.openExternal({ href: url, redirectUrl: false });
-          return;
-        }
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "";
-        a.target = "_blank";
-        a.rel = "noreferrer";
-        a.click();
-      }
-
-      function notifyHeight() {
-        window.openai?.notifyIntrinsicHeight?.(document.documentElement.scrollHeight);
-      }
-
-      function escapeHtml(value) {
-        return text(value).replace(/[&<>"']/g, (char) => ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#039;",
-        })[char]);
-      }
-
-      function render(data) {
-        if (pollTimer) {
-          clearTimeout(pollTimer);
-          pollTimer = null;
-        }
-        app.replaceChildren();
-        if (!data || typeof data !== "object") {
-          renderEmpty("No output returned.");
-          notifyHeight();
-          return;
-        }
-        if (Array.isArray(data.models)) {
-          renderModels(data);
-        } else {
-          renderMedia(data);
-          schedulePoll(data);
-        }
-        requestAnimationFrame(notifyHeight);
-      }
-
-      function findStructuredContent(value) {
-        if (!value || typeof value !== "object") return null;
-        if (value.structuredContent && typeof value.structuredContent === "object") return value.structuredContent;
-        if (value.mcp_tool_result?.structuredContent && typeof value.mcp_tool_result.structuredContent === "object") return value.mcp_tool_result.structuredContent;
-        if (value.call_tool_result?.structuredContent && typeof value.call_tool_result.structuredContent === "object") return value.call_tool_result.structuredContent;
-        return null;
-      }
-
-      function getInitialOutput() {
-        return window.openai?.toolOutput
-          || findStructuredContent(window.openai?.toolResponseMetadata)
-          || findStructuredContent(window.openai?.toolResponseMetadata?.mcp_tool_result)
-          || findStructuredContent(window.openai?.toolResponseMetadata?.call_tool_result)
-          || null;
-      }
-
-      async function pollGeneration(generationId) {
-        if (!generationId || !window.openai?.callTool) return;
-        try {
-          const response = await window.openai.callTool("get_generation", { generationId });
-          const next = response?.structuredContent || findStructuredContent(response);
-          if (next) render(next);
-        } catch {
-          pollTimer = null;
-        }
-      }
-
-      function schedulePoll(data) {
-        const item = pickItems(data).find((entry) => isWorking(entry.status) && entry.generationId);
-        if (!item || !window.openai?.callTool || pollAttempts > 18) return;
-        pollAttempts += 1;
-        const delay = Math.min(10000, 1600 + pollAttempts * 800);
-        pollTimer = setTimeout(() => pollGeneration(item.generationId), delay);
-      }
-
-      try {
-        render(getInitialOutput());
-      } catch (error) {
-        app.replaceChildren();
-        renderEmpty("Unable to render output.");
-        requestAnimationFrame(notifyHeight);
-      }
+      function render(result) { clear(); const data = object(result); if (!data) return empty("No output returned."); if (Array.isArray(data.models)) renderModels(data); else renderMedia(data); }
+      function applyHostContext(result) { const context = result && result.hostContext; const variables = context && context.styles && context.styles.variables; if (variables && typeof variables === "object") Object.entries(variables).forEach(([key, value]) => document.documentElement.style.setProperty(key, String(value))); if (context && context.theme) document.documentElement.style.colorScheme = context.theme; }
 
       window.addEventListener("message", (event) => {
-        if (event.source !== window.parent) return;
         const message = event.data;
         if (!message || message.jsonrpc !== "2.0") return;
-        if (message.method === "ui/notifications/tool-result") {
-          pollAttempts = 0;
-          render(message.params?.structuredContent || findStructuredContent(message.params));
-        }
+        if (message.id === 1 && message.result) { applyHostContext(message.result); notify("ui/notifications/initialized", {}); resize(); }
+        if (message.method === "ui/notifications/tool-result") render(message.params && message.params.structuredContent);
+        if (message.method === "ui/notifications/host-context-changed") applyHostContext({ hostContext: message.params });
       }, { passive: true });
 
-      window.addEventListener("openai:set_globals", (event) => {
-        const globals = event.detail?.globals;
-        const data = globals?.toolOutput || findStructuredContent(globals?.toolResponseMetadata) || getInitialOutput();
-        if (data) render(data);
-      }, { passive: true });
+      request("ui/initialize", { appInfo: { name: "unican-media-output", version: "1.0.0" }, appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] }, protocolVersion: "2026-01-26" });
     </script>
   </body>
 </html>
@@ -574,28 +84,8 @@ export function getUnicanMediaWidgetResource() {
         prefersBorder: true,
         csp: {
           connectDomains: [],
-          resourceDomains: [
-            "https://*.supabase.co",
-            "https://replicate.delivery",
-            "https://fal.media",
-          ],
+          resourceDomains: ["https://*.supabase.co", "https://replicate.delivery", "https://fal.media"],
         },
-      },
-      "openai/widgetDescription":
-        "Minimal UniCan media output with prompt, settings badges, generated media, status states, and download controls.",
-      "openai/widgetPrefersBorder": true,
-      "openai/widgetCSP": {
-        connect_domains: [],
-        resource_domains: [
-          "https://*.supabase.co",
-          "https://replicate.delivery",
-          "https://fal.media",
-        ],
-        redirect_domains: [
-          "https://*.supabase.co",
-          "https://replicate.delivery",
-          "https://fal.media",
-        ],
       },
     },
   }

@@ -9,7 +9,7 @@ type JsonObject = Record<string, unknown>
 type ToolMeta = {
   ui?: {
     resourceUri?: string
-    visibility?: string[]
+    visibility?: Array<"model" | "app">
   }
   [key: string]: unknown
 }
@@ -27,10 +27,10 @@ type ToolDefinition = {
 
 const BEARER_SECURITY_SCHEMES = [{ type: "http", scheme: "bearer" }]
 const MEDIA_TOOL_META = {
-  ui: { resourceUri: UNICAN_MEDIA_WIDGET_URI },
-  "openai/outputTemplate": UNICAN_MEDIA_WIDGET_URI,
-  "openai/toolInvocation/invoking": "Working...",
-  "openai/toolInvocation/invoked": "Ready",
+  ui: {
+    resourceUri: UNICAN_MEDIA_WIDGET_URI,
+    visibility: ["model", "app"],
+  },
 } satisfies ToolMeta
 
 export const MCP_TOOLS: ToolDefinition[] = [
@@ -51,11 +51,7 @@ export const MCP_TOOLS: ToolDefinition[] = [
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     outputSchema: modelsOutputSchema(),
     annotations: readOnlyAnnotations(),
-    _meta: {
-      ...MEDIA_TOOL_META,
-      "openai/toolInvocation/invoking": "Listing models...",
-      "openai/toolInvocation/invoked": "Models ready",
-    },
+    _meta: MEDIA_TOOL_META,
   },
   {
     name: "list_generations",
@@ -65,11 +61,7 @@ export const MCP_TOOLS: ToolDefinition[] = [
     inputSchema: generationListSchema(),
     outputSchema: generationListOutputSchema(),
     annotations: readOnlyAnnotations(),
-    _meta: {
-      ...MEDIA_TOOL_META,
-      "openai/toolInvocation/invoking": "Loading generations...",
-      "openai/toolInvocation/invoked": "Generations ready",
-    },
+    _meta: MEDIA_TOOL_META,
   },
   {
     name: "search_generations",
@@ -79,11 +71,7 @@ export const MCP_TOOLS: ToolDefinition[] = [
     inputSchema: generationListSchema({ includeSearch: true }),
     outputSchema: generationListOutputSchema(),
     annotations: readOnlyAnnotations(),
-    _meta: {
-      ...MEDIA_TOOL_META,
-      "openai/toolInvocation/invoking": "Searching generations...",
-      "openai/toolInvocation/invoked": "Generations ready",
-    },
+    _meta: MEDIA_TOOL_META,
   },
   {
     name: "get_generation",
@@ -100,11 +88,7 @@ export const MCP_TOOLS: ToolDefinition[] = [
     },
     outputSchema: generationOutputSchema(),
     annotations: readOnlyAnnotations(),
-    _meta: {
-      ...MEDIA_TOOL_META,
-      "openai/toolInvocation/invoking": "Loading generation...",
-      "openai/toolInvocation/invoked": "Generation ready",
-    },
+    _meta: MEDIA_TOOL_META,
   },
   {
     name: "generate_image",
@@ -114,11 +98,7 @@ export const MCP_TOOLS: ToolDefinition[] = [
     inputSchema: generateImageSchema(),
     outputSchema: generatedMediaOutputSchema(),
     annotations: writeAnnotations(),
-    _meta: {
-      ...MEDIA_TOOL_META,
-      "openai/toolInvocation/invoking": "Generating image...",
-      "openai/toolInvocation/invoked": "Image ready",
-    },
+    _meta: MEDIA_TOOL_META,
   },
   {
     name: "generate_video",
@@ -128,11 +108,7 @@ export const MCP_TOOLS: ToolDefinition[] = [
     inputSchema: generateVideoSchema(),
     outputSchema: generatedMediaOutputSchema(),
     annotations: writeAnnotations(),
-    _meta: {
-      ...MEDIA_TOOL_META,
-      "openai/toolInvocation/invoking": "Generating video...",
-      "openai/toolInvocation/invoked": "Video ready",
-    },
+    _meta: MEDIA_TOOL_META,
   },
   {
     name: "generate_audio",
@@ -142,11 +118,7 @@ export const MCP_TOOLS: ToolDefinition[] = [
     inputSchema: generateAudioSchema(),
     outputSchema: generatedMediaOutputSchema(),
     annotations: writeAnnotations(),
-    _meta: {
-      ...MEDIA_TOOL_META,
-      "openai/toolInvocation/invoking": "Generating audio...",
-      "openai/toolInvocation/invoked": "Audio ready",
-    },
+    _meta: MEDIA_TOOL_META,
   },
 ]
 

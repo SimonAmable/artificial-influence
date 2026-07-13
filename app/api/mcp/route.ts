@@ -109,10 +109,15 @@ async function handleRpcRequest(
     if (method === "initialize") {
       await requireMcpAuth(request.headers)
       return jsonRpcResult(id, {
-        protocolVersion: "2025-06-18",
+        protocolVersion: "2025-11-25",
         capabilities: {
           resources: {},
           tools: {},
+          extensions: {
+            "io.modelcontextprotocol/ui": {
+              mimeTypes: [UNICAN_MEDIA_WIDGET_MIME_TYPE],
+            },
+          },
         },
         serverInfo: {
           name: "unican-mcp",
@@ -141,7 +146,7 @@ async function handleRpcRequest(
             uri: UNICAN_MEDIA_WIDGET_URI,
             name: "unican-media-output",
             title: "UniCan media output",
-            description: "Minimal media and model output UI for UniCan MCP tools.",
+            description: "Interactive output for UniCan media and model tools.",
             mimeType: UNICAN_MEDIA_WIDGET_MIME_TYPE,
           },
         ],
@@ -258,7 +263,7 @@ function formatToolContent(toolName: string, result: unknown) {
   return [
     {
       type: "text",
-      text: summary,
+      text: `${summary}\n\n${JSON.stringify(result, null, 2)}`,
     },
   ]
 }
