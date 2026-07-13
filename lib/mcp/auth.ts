@@ -11,6 +11,7 @@ export const MCP_REFRESH_TOKEN_PREFIX = "unican_mcp_refresh_"
 export const MCP_SCOPES = [
   "account:read",
   "models:read",
+  "assets:read",
   "generations:read",
   "generations:write",
 ] as const

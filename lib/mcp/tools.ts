@@ -4,6 +4,7 @@ import { filterPublicCatalogModels } from "@/lib/server/model-catalog-visibility
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import type { McpAuthContext } from "@/lib/mcp/auth"
 import { UNICAN_MEDIA_WIDGET_URI } from "@/lib/mcp/widget"
+import { resolveAssetAccessUrl, type AssetAccessRow } from "@/lib/assets/resolve-asset-access-url"
 
 type JsonObject = Record<string, unknown>
 type ToolMeta = {
@@ -33,6 +34,18 @@ const GENERATION_TOOL_META = {
   },
 } satisfies ToolMeta
 
+type MediaKind = "image" | "video" | "audio"
+type MediaReferenceRole = "reference_image" | "first_frame" | "last_frame" | "reference_video" | "reference_audio"
+type ResolvedMedia = {
+  mediaId: string
+  source: "asset" | "generation"
+  sourceId: string
+  type: MediaKind
+  status: string
+  title: string
+  url: string | null
+}
+
 export const MCP_TOOLS: ToolDefinition[] = [
   {
     name: "get_account",
@@ -59,6 +72,15 @@ export const MCP_TOOLS: ToolDefinition[] = [
     scopes: ["generations:read"],
     inputSchema: generationListSchema(),
     outputSchema: generationListOutputSchema(),
+    annotations: readOnlyAnnotations(),
+  },
+  {
+    name: "search_media",
+    title: "Search media",
+    description: "Find the connected user's reusable library assets and completed generations. Returns stable media IDs for use as generation references.",
+    scopes: ["assets:read", "generations:read"],
+    inputSchema: mediaSearchSchema(),
+    outputSchema: mediaSearchOutputSchema(),
     annotations: readOnlyAnnotations(),
   },
   {
@@ -152,6 +174,8 @@ export async function callMcpTool(options: {
       return listModels(options.args)
     case "list_generations":
       return listGenerations(options.auth.user.id, options.args)
+    case "search_media":
+      return searchMedia(options.auth.user.id, options.args)
     case "search_generations":
       return listGenerations(options.auth.user.id, options.args)
     case "get_generation":
@@ -313,6 +337,84 @@ async function listGenerations(userId: string, args: JsonObject) {
   }
 }
 
+async function searchMedia(userId: string, args: JsonObject) {
+  const supabase = requireServiceRole()
+  const limit = clampInt(args.limit, 1, 40, 12)
+  const search = typeof args.search === "string" ? args.search.trim().slice(0, 120) : ""
+  const requestedType = isMediaType(args.type) ? args.type : null
+  const source = args.source === "asset" || args.source === "generation" ? args.source : null
+  const queryLimit = source ? limit : Math.max(1, Math.ceil(limit / 2))
+  const media: JsonObject[] = []
+
+  if (source !== "generation") {
+    let query = supabase
+      .from("assets")
+      .select("id, asset_type, title, description, tags, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(queryLimit)
+
+    if (requestedType) query = query.eq("asset_type", requestedType)
+    if (search) {
+      const pattern = `%${escapeLike(search)}%`
+      query = query.or(`title.ilike.${pattern},description.ilike.${pattern}`)
+    }
+
+    const { data, error } = await query
+    if (error) throw new Error(error.message)
+    for (const row of data || []) {
+      const id = String(row.id)
+      const type = isMediaType(row.asset_type) ? row.asset_type : "image"
+      media.push({
+        mediaId: mediaIdFor("asset", id),
+        source: "asset",
+        type,
+        status: "ready",
+        title: typeof row.title === "string" ? row.title : "Untitled asset",
+        description: typeof row.description === "string" ? row.description : null,
+        tags: Array.isArray(row.tags) ? row.tags : [],
+        createdAt: typeof row.created_at === "string" ? row.created_at : null,
+      })
+    }
+  }
+
+  if (source !== "asset") {
+    let query = supabase
+      .from("generations")
+      .select("id, type, status, prompt, model, created_at")
+      .eq("user_id", userId)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(queryLimit)
+
+    if (requestedType) query = query.eq("type", requestedType)
+    if (search) {
+      const pattern = `%${escapeLike(search)}%`
+      query = query.or(`prompt.ilike.${pattern},model.ilike.${pattern}`)
+    }
+
+    const { data, error } = await query
+    if (error) throw new Error(error.message)
+    for (const row of data || []) {
+      const id = String(row.id)
+      const type = isMediaType(row.type) ? row.type : "image"
+      const prompt = typeof row.prompt === "string" ? row.prompt : null
+      media.push({
+        mediaId: mediaIdFor("generation", id),
+        source: "generation",
+        type,
+        status: typeof row.status === "string" ? row.status : "completed",
+        title: prompt || (typeof row.model === "string" ? row.model : "Generated media"),
+        description: prompt,
+        tags: [],
+        createdAt: typeof row.created_at === "string" ? row.created_at : null,
+      })
+    }
+  }
+
+  return { media: media.slice(0, limit) }
+}
+
 async function getGeneration(userId: string, generationId: string) {
   if (!generationId) throw new Error("generationId is required")
   const supabase = requireServiceRole()
@@ -346,6 +448,17 @@ async function generateImage(options: {
   form.set("tool", "mcp")
 
   const referenceUrls = collectStringArray(options.args.referenceImageUrls)
+  const references = await resolveMediaReferences(options.auth.user.id, options.args.referenceMedia)
+  for (const reference of references) {
+    if (reference.role !== "reference_image") {
+      throw new Error("Image generation only accepts reference_image media references")
+    }
+    if (reference.media.type !== "image") {
+      throw new Error("Image generation references must be images")
+    }
+    if (!reference.media.url) throw new Error(`Media ${reference.media.mediaId} is not ready to use`)
+    referenceUrls.push(reference.media.url)
+  }
   if (typeof options.args.sourceGenerationId === "string") {
     const source = await resolveGenerationUrl(options.auth.user.id, options.args.sourceGenerationId)
     if (source?.url) referenceUrls.push(source.url)
@@ -383,8 +496,34 @@ async function generateVideo(options: {
   copyString(options.args, body, "model")
   copyString(options.args, body, "image")
   copyString(options.args, body, "first_frame_image")
+  copyString(options.args, body, "last_frame_image")
   copyString(options.args, body, "video")
   copyString(options.args, body, "reference_video")
+
+  const references = await resolveMediaReferences(options.auth.user.id, options.args.referenceMedia)
+  for (const reference of references) {
+    if (!reference.media.url) throw new Error(`Media ${reference.media.mediaId} is not ready to use`)
+    switch (reference.role) {
+      case "reference_image":
+        if (reference.media.type !== "image") throw new Error("reference_image must use an image")
+        assignReferenceUrl(body, "image", reference.media.url)
+        break
+      case "first_frame":
+        if (reference.media.type !== "image") throw new Error("first_frame must use an image")
+        assignReferenceUrl(body, "first_frame_image", reference.media.url)
+        break
+      case "last_frame":
+        if (reference.media.type !== "image") throw new Error("last_frame must use an image")
+        assignReferenceUrl(body, "last_frame_image", reference.media.url)
+        break
+      case "reference_video":
+        if (reference.media.type !== "video") throw new Error("reference_video must use a video")
+        assignReferenceUrl(body, "reference_video", reference.media.url)
+        break
+      default:
+        throw new Error(`${reference.role} is not supported for video generation`)
+    }
+  }
 
   if (typeof options.args.sourceGenerationId === "string" && !body.image && !body.first_frame_image) {
     const source = await resolveGenerationUrl(options.auth.user.id, options.args.sourceGenerationId)
@@ -415,6 +554,9 @@ async function generateAudio(options: {
   args: JsonObject
   origin: string
 }) {
+  if (Array.isArray(options.args.referenceMedia) && options.args.referenceMedia.length > 0) {
+    throw new Error("Audio generation does not support media references yet")
+  }
   const body: JsonObject = {
     ...(isPlainObject(options.args.options) ? options.args.options : {}),
   }
@@ -452,6 +594,82 @@ async function resolveGenerationUrl(userId: string, generationId: string) {
   }
 }
 
+async function resolveMediaReferences(userId: string, value: unknown) {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) throw new Error("referenceMedia must be an array")
+  const references: Array<{ role: MediaReferenceRole; media: ResolvedMedia }> = []
+  const roles = new Set<MediaReferenceRole>()
+
+  for (const entry of value) {
+    if (!isPlainObject(entry)) throw new Error("Each media reference must be an object")
+    const mediaId = stringOrNull(entry.mediaId)
+    const role = stringOrNull(entry.role) as MediaReferenceRole | null
+    if (!mediaId || !role || !isMediaReferenceRole(role)) {
+      throw new Error("Each media reference needs a valid mediaId and role")
+    }
+    if (role !== "reference_image" && roles.has(role)) {
+      throw new Error(`Only one ${role} media reference is allowed`)
+    }
+    roles.add(role)
+    references.push({ role, media: await resolveMediaId(userId, mediaId) })
+  }
+
+  return references
+}
+
+async function resolveMediaId(userId: string, mediaId: string): Promise<ResolvedMedia> {
+  const parsed = parseMediaId(mediaId)
+  if (!parsed) throw new Error("Invalid mediaId. Use an ID returned by search_media or a generation result")
+  const supabase = requireServiceRole()
+
+  if (parsed.source === "asset") {
+    const { data, error } = await supabase
+      .from("assets")
+      .select("id, user_id, asset_type, title, asset_url, thumbnail_url, upload_id, supabase_storage_path, visibility")
+      .eq("id", parsed.id)
+      .eq("user_id", userId)
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!data) throw new Error("Media not found or not available to this account")
+    const asset = data as AssetAccessRow & { id: string; asset_type: unknown; title: unknown }
+    const type = isMediaType(asset.asset_type) ? asset.asset_type : null
+    if (!type) throw new Error("Media has an unsupported type")
+    return {
+      mediaId: mediaIdFor("asset", asset.id),
+      source: "asset",
+      sourceId: asset.id,
+      type,
+      status: "ready",
+      title: typeof asset.title === "string" ? asset.title : "Untitled asset",
+      url: await resolveAssetAccessUrl(supabase, asset),
+    }
+  }
+
+  const { generation } = await getGeneration(userId, parsed.id)
+  const type = generation && typeof generation === "object" && isMediaType((generation as Record<string, unknown>).type)
+    ? (generation as Record<string, unknown>).type
+    : null
+  const status = generation && typeof generation === "object" ? stringOrNull((generation as Record<string, unknown>).status) : null
+  const url = generation && typeof generation === "object" ? stringOrNull((generation as Record<string, unknown>).url) : null
+  if (!type || status !== "completed" || !url) throw new Error("Generated media is not ready to use as a reference")
+  return {
+    mediaId: mediaIdFor("generation", parsed.id),
+    source: "generation",
+    sourceId: parsed.id,
+    type,
+    status,
+    title: stringOrNull((generation as Record<string, unknown>).prompt) || "Generated media",
+    url,
+  }
+}
+
+function assignReferenceUrl(body: JsonObject, key: string, url: string) {
+  if (typeof body[key] === "string" && body[key] !== url) {
+    throw new Error(`Use either ${key} or referenceMedia for that reference, not both`)
+  }
+  body[key] = url
+}
+
 function mapGeneration(row: Record<string, unknown>) {
   const storagePath = typeof row.supabase_storage_path === "string" ? row.supabase_storage_path : null
   const supabase = requireServiceRole()
@@ -461,6 +679,7 @@ function mapGeneration(row: Record<string, unknown>) {
 
   return {
     generationId: row.id,
+    mediaId: mediaIdFor("generation", String(row.id)),
     status: row.status || "completed",
     type: row.type,
     model: row.model,
@@ -481,9 +700,11 @@ function generationToMediaItem(generation: Record<string, unknown>) {
   const kind = typeof generation.type === "string" ? generation.type : "image"
   const url = stringOrNull(generation.url)
   const status = stringOrNull(generation.status) || (url ? "completed" : "pending")
+  const generationId = stringOrNull(generation.generationId) || stringOrNull(generation.id)
   return {
-    id: stringOrNull(generation.generationId) || stringOrNull(generation.id),
-    generationId: stringOrNull(generation.generationId) || stringOrNull(generation.id),
+    id: generationId,
+    generationId,
+    mediaId: stringOrNull(generation.mediaId) || (generationId ? mediaIdFor("generation", generationId) : null),
     status,
     kind,
     type: kind,
@@ -553,6 +774,7 @@ function normalizeGenerationResponse(
   return {
     statusCode,
     generationId,
+    mediaId: generationId ? mediaIdFor("generation", generationId) : null,
     generationIds,
     status,
     type,
@@ -626,6 +848,7 @@ function buildMediaItem(input: {
   return {
     id: input.id,
     generationId: input.id,
+    mediaId: input.id ? mediaIdFor("generation", input.id) : null,
     status: input.status,
     kind,
     type: kind,
@@ -688,6 +911,19 @@ function generationListSchema(options: { includeSearch?: boolean } = {}) {
   }
 }
 
+function mediaSearchSchema() {
+  return {
+    type: "object",
+    properties: {
+      search: { type: "string", description: "Words from an asset title, description, generation prompt, or model." },
+      type: { type: "string", enum: ["image", "video", "audio"] },
+      source: { type: "string", enum: ["asset", "generation"] },
+      limit: { type: "integer", minimum: 1, maximum: 40 },
+    },
+    additionalProperties: false,
+  }
+}
+
 function generateImageSchema() {
   return {
     type: "object",
@@ -696,6 +932,7 @@ function generateImageSchema() {
       model: { type: "string" },
       referenceImageUrls: { type: "array", items: { type: "string" } },
       sourceGenerationId: { type: "string" },
+      referenceMedia: mediaReferenceSchema(),
       options: { type: "object", additionalProperties: true },
     },
     required: ["prompt"],
@@ -711,9 +948,11 @@ function generateVideoSchema() {
       model: { type: "string" },
       image: { type: "string" },
       first_frame_image: { type: "string" },
+      last_frame_image: { type: "string" },
       video: { type: "string" },
       reference_video: { type: "string" },
       sourceGenerationId: { type: "string" },
+      referenceMedia: mediaReferenceSchema(),
       options: { type: "object", additionalProperties: true },
     },
     required: ["model"],
@@ -731,6 +970,7 @@ function generateAudioSchema() {
       voice: { type: "string" },
       stylePrompt: { type: "string" },
       languageCode: { type: "string" },
+      referenceMedia: mediaReferenceSchema(),
       options: { type: "object", additionalProperties: true },
     },
     required: ["text"],
@@ -865,6 +1105,34 @@ function generationListOutputSchema() {
   }
 }
 
+function mediaSearchOutputSchema() {
+  return {
+    type: "object",
+    properties: {
+      media: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            mediaId: { type: "string" },
+            source: { type: "string", enum: ["asset", "generation"] },
+            type: { type: "string", enum: ["image", "video", "audio"] },
+            status: { type: "string" },
+            title: { type: "string" },
+            description: { type: ["string", "null"] },
+            tags: { type: "array" },
+            createdAt: { type: ["string", "null"] },
+          },
+          required: ["mediaId", "source", "type", "status", "title", "description", "tags", "createdAt"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["media"],
+    additionalProperties: false,
+  }
+}
+
 function generationOutputSchema() {
   return {
     type: "object",
@@ -886,6 +1154,7 @@ function generatedMediaOutputSchema() {
     properties: {
       statusCode: { type: "integer" },
       generationId: { type: ["string", "null"] },
+      mediaId: { type: ["string", "null"] },
       generationIds: { type: "array" },
       status: { type: "string" },
       type: { type: ["string", "null"] },
@@ -925,6 +1194,7 @@ function generationSchema() {
     },
     required: [
       "generationId",
+      "mediaId",
       "status",
       "type",
       "model",
@@ -949,6 +1219,7 @@ function mediaItemSchema() {
     properties: {
       id: { type: ["string", "null"] },
       generationId: { type: ["string", "null"] },
+      mediaId: { type: ["string", "null"] },
       status: { type: "string" },
       kind: { type: "string" },
       type: { type: "string" },
@@ -964,6 +1235,7 @@ function mediaItemSchema() {
     required: [
       "id",
       "generationId",
+      "mediaId",
       "status",
       "kind",
       "type",
@@ -994,6 +1266,21 @@ function settingsSchema() {
   }
 }
 
+function mediaReferenceSchema() {
+  return {
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        mediaId: { type: "string", description: "Stable media ID returned by search_media or a generation result." },
+        role: { type: "string", enum: ["reference_image", "first_frame", "last_frame", "reference_video", "reference_audio"] },
+      },
+      required: ["mediaId", "role"],
+      additionalProperties: false,
+    },
+  }
+}
+
 function readOnlyAnnotations() {
   return {
     readOnlyHint: true,
@@ -1019,6 +1306,24 @@ function clampInt(value: unknown, min: number, max: number, fallback: number) {
 
 function isMediaType(value: unknown): value is "image" | "video" | "audio" {
   return value === "image" || value === "video" || value === "audio"
+}
+
+function isMediaReferenceRole(value: string): value is MediaReferenceRole {
+  return ["reference_image", "first_frame", "last_frame", "reference_video", "reference_audio"].includes(value)
+}
+
+function mediaIdFor(source: "asset" | "generation", id: string) {
+  return `med_${source}_${id}`
+}
+
+function parseMediaId(value: string): { source: "asset" | "generation"; id: string } | null {
+  const match = /^med_(asset|generation)_([a-zA-Z0-9-]+)$/.exec(value)
+  if (!match) return null
+  return { source: match[1] as "asset" | "generation", id: match[2] }
+}
+
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, (match) => `\\${match}`).replace(/[,()]/g, " ")
 }
 
 function isPlainObject(value: unknown): value is JsonObject {

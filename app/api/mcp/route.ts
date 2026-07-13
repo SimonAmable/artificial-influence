@@ -272,7 +272,11 @@ function summarizeToolResult(toolName: string, result: unknown) {
   const value = result as Record<string, unknown>
 
   if (Array.isArray(value.models)) {
-    return `Listed ${value.models.length} active UniCan model${value.models.length === 1 ? "" : "s"}.`
+    return formatModelCatalog(value.models)
+  }
+
+  if (Array.isArray(value.media)) {
+    return formatMediaSearch(value.media)
   }
 
   if (Array.isArray(value.generations)) {
@@ -311,6 +315,89 @@ function summarizeToolResult(toolName: string, result: unknown) {
   }
 
   return `${toolName} completed.`
+}
+
+function formatModelCatalog(models: unknown[]) {
+  if (models.length === 0) return "No active UniCan models are available."
+
+  const rows = models.map((model) => {
+    const value = model && typeof model === "object" ? model as Record<string, unknown> : {}
+    const label = textValue(value.label) || textValue(value.name) || textValue(value.identifier) || "Unnamed model"
+    const identifier = textValue(value.identifier) || "unknown"
+    const details = [
+      textValue(value.type) || textValue(value.kind),
+      textValue(value.provider),
+      textValue(value.description),
+      formatModelCapabilities(value),
+      formatModelSettings(value),
+      formatModelCost(value),
+    ].filter(Boolean)
+    return `- ${label}\n  id: ${identifier}${details.length ? `\n  ${details.join("\n  ")}` : ""}`
+  })
+
+  return `Active UniCan models (${models.length}):\n${rows.join("\n")}`
+}
+
+function formatModelCapabilities(model: Record<string, unknown>) {
+  const capabilities = [
+    model.supportsReferenceImage === true ? "reference images" : null,
+    model.supportsReferenceVideo === true ? "reference videos" : null,
+    model.supportsReferenceAudio === true ? "reference audio" : null,
+    model.supportsFirstFrame === true ? "first frame" : null,
+    model.supportsLastFrame === true ? "last frame" : null,
+  ].filter(Boolean)
+  return capabilities.length ? `supports: ${capabilities.join(", ")}` : null
+}
+
+function formatModelSettings(model: Record<string, unknown>) {
+  const settings = [
+    arrayValues(model.aspectRatios).length ? `aspect ratios: ${arrayValues(model.aspectRatios).join(", ")}` : null,
+    textValue(model.defaultAspectRatio) ? `default aspect ratio: ${textValue(model.defaultAspectRatio)}` : null,
+    valueText(model.durationOptions) ? `durations: ${valueText(model.durationOptions)}` : null,
+    typeof model.maxImages === "number" ? `max images: ${model.maxImages}` : null,
+    valueText(model.parameters) ? `parameters: ${valueText(model.parameters)}` : null,
+  ].filter(Boolean)
+  return settings.length ? settings.join(" | ") : null
+}
+
+function formatModelCost(model: Record<string, unknown>) {
+  const values = [
+    typeof model.modelCost === "number" ? `cost: ${model.modelCost} credits` : null,
+    typeof model.modelCostPerSecond === "number" ? `cost: ${model.modelCostPerSecond} credits/sec` : null,
+  ].filter(Boolean)
+  return values.length ? values.join(" | ") : null
+}
+
+function formatMediaSearch(media: unknown[]) {
+  if (media.length === 0) return "No matching media was found."
+  const rows = media.map((entry) => {
+    const value = entry && typeof entry === "object" ? entry as Record<string, unknown> : {}
+    const mediaId = textValue(value.mediaId) || "unknown"
+    const title = textValue(value.title) || "Untitled media"
+    const details = [textValue(value.type), textValue(value.source), textValue(value.status), textValue(value.description)].filter(Boolean)
+    const tags = arrayValues(value.tags)
+    return `- ${title}\n  mediaId: ${mediaId}${details.length ? `\n  ${details.join(" | ")}` : ""}${tags.length ? `\n  tags: ${tags.join(", ")}` : ""}`
+  })
+  return `Matching UniCan media (${media.length}):\n${rows.join("\n")}`
+}
+
+function textValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null
+}
+
+function arrayValues(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim()) : []
+}
+
+function valueText(value: unknown) {
+  if (value === null || value === undefined) return null
+  if (typeof value === "string") return value.trim() || null
+  try {
+    const serialized = JSON.stringify(value)
+    return serialized.length > 700 ? `${serialized.slice(0, 697)}...` : serialized
+  } catch {
+    return null
+  }
 }
 
 function isAllowedOrigin(request: Request, requestUrl: URL) {
