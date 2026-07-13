@@ -7,6 +7,7 @@ import {
   ChatCircleDots,
   Coin,
   HandCoins,
+  PawPrint,
   User,
   X,
   type Icon,
@@ -19,6 +20,7 @@ import { CreditsSettingsPanel } from "@/components/profile/credits-settings-pane
 import { FeedbackSettingsPanel } from "@/components/profile/feedback-settings-panel"
 import { NotificationsSettingsPanel } from "@/components/profile/notifications-settings-panel"
 import { ProfileSettingsPanel } from "@/components/profile/profile-settings-panel"
+import { PetsSettingsPanel } from "@/components/profile/pets-settings-panel"
 import { useNotificationsRead } from "@/lib/notifications/use-notifications-read"
 import { LayoutMode } from "@/components/shared/layout/layout-toggle"
 import {
@@ -40,6 +42,7 @@ export type SettingsTab =
   | "credits"
   | "affiliate"
   | "feedback"
+  | "pets"
 
 type ProfileData = {
   displayName: string
@@ -71,6 +74,7 @@ const SETTINGS_TABS: {
   { id: "credits", label: "Credits", icon: Coin },
   { id: "affiliate", label: "Affiliate", icon: HandCoins },
   { id: "feedback", label: "Feedback", icon: ChatCircleDots },
+  { id: "pets", label: "Pets", icon: PawPrint },
 ]
 
 const TAB_LABELS = Object.fromEntries(
@@ -363,6 +367,8 @@ export function ProfileSettingsModal({
         return <AffiliateSettingsPanel variant="modal" onCloseModal={closeModal} />
       case "feedback":
         return <FeedbackSettingsPanel variant="modal" />
+      case "pets":
+        return <PetsSettingsPanel />
       default:
         return null
     }

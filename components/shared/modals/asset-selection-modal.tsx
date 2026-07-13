@@ -589,7 +589,7 @@ export function AssetSelectionModal({
       >
         <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
           <div className="container mx-auto flex min-h-0 flex-1 flex-col px-4 pb-6 pt-4">
-            <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+            <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
               <DialogHeader className="min-w-0 gap-1 p-0 text-left">
                 <DialogTitle className="text-left text-3xl font-bold tracking-tight">
                   Library
@@ -602,7 +602,7 @@ export function AssetSelectionModal({
                 </p>
               </DialogHeader>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 pt-1 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1">
                 <input
                   ref={createAssetFileInputRef}
                   type="file"
@@ -627,7 +627,8 @@ export function AssetSelectionModal({
                     variant="outline"
                     size="icon"
                     onClick={() => void refreshHistory()}
-                    title="Refresh history"
+                      title="Refresh history"
+                      className="h-9 w-9 rounded-full transition-transform hover:rotate-[-20deg]"
                   >
                     <ClockCounterClockwise className="h-4 w-4" />
                   </Button>
@@ -640,11 +641,12 @@ export function AssetSelectionModal({
                       size="icon"
                       onClick={() => void refreshAssets()}
                       title="Refresh assets"
+                      className="h-9 w-9 rounded-full transition-transform hover:rotate-[-20deg]"
                     >
                       <ClockCounterClockwise className="h-4 w-4" />
                     </Button>
                     <Button
-                      className="gap-2"
+                      className="gap-2 rounded-full transition-transform hover:-translate-y-0.5"
                       disabled={createAssetUploading}
                       onClick={() => createAssetFileInputRef.current?.click()}
                     >
@@ -656,7 +658,7 @@ export function AssetSelectionModal({
 
                 {activeTab === "uploads" ? (
                   <Button
-                    className="gap-2"
+                    className="gap-2 rounded-full transition-transform hover:-translate-y-0.5"
                     disabled={uploadReferenceUploading}
                     onClick={() => uploadReferenceInputRef.current?.click()}
                   >
@@ -669,7 +671,7 @@ export function AssetSelectionModal({
                   variant="ghost"
                   size="icon"
                   onClick={() => onOpenChange(false)}
-                  className="h-9 w-9 rounded-full"
+                  className="h-9 w-9 rounded-full transition-transform hover:rotate-90"
                   aria-label="Close"
                 >
                   <X className="h-4 w-4" weight="bold" />

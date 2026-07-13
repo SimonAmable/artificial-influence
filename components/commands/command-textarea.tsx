@@ -278,7 +278,7 @@ export function CommandTextarea({
           placeholder={placeholder}
           spellCheck={false}
           className={cn(
-            "relative z-10 box-border m-0 w-full border-none p-0 outline-none resize-none bg-transparent text-sm leading-snug text-foreground caret-foreground",
+            "relative z-10 box-border m-0 w-full border-none p-0 outline-none resize-none bg-transparent text-base sm:text-sm leading-snug text-foreground caret-foreground",
             "overflow-y-auto whitespace-pre-wrap break-words",
             "selection:bg-primary/25",
             "placeholder:text-muted-foreground placeholder:opacity-100",

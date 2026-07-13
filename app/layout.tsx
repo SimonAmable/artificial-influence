@@ -12,6 +12,8 @@ import { SitewideJsonLd } from "@/components/seo/sitewide-jsonld"
 import { getSiteBaseUrl } from "@/lib/seo/site-url"
 import { PricingUpsellController } from "@/components/pricing/pricing-upsell-controller"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { GenerationTasksProvider } from "@/components/generation-companion/generation-tasks-provider"
+import { BloopCompanion } from "@/components/generation-companion/bloop-companion"
 import { fontBrand } from "@/lib/fonts/brand"
 import { currentProduct } from "@/lib/product/current"
 
@@ -62,6 +64,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <TooltipProvider>
+            <GenerationTasksProvider>
             <AIChatProvider>
               <LayoutModeProviderWrapper>
                 <AffiliateRefCapture />
@@ -73,8 +76,10 @@ export default function RootLayout({
               </LayoutModeProviderWrapper>
               <Toaster />
               <PricingUpsellController />
-              <TermsAcceptanceGate />
+               <TermsAcceptanceGate />
+               <BloopCompanion />
             </AIChatProvider>
+            </GenerationTasksProvider>
           </TooltipProvider>
         </ThemeProvider>
         <Analytics />

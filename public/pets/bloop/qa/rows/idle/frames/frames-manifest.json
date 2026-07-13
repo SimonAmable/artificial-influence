@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "chroma_key": {
+    "hex": "#FF7F00",
+    "rgb": [
+      255,
+      127,
+      0
+    ],
+    "threshold": 96.0
+  },
+  "rows": [
+    {
+      "state": "idle",
+      "frames": [
+        "C:\\Users\\simon\\Desktop\\MYCOOLESTSHIT\\001_testing_style\\artificial-influece\\pet-runs\\bloop\\qa\\rows\\idle\\frames\\idle\\00.png",
+        "C:\\Users\\simon\\Desktop\\MYCOOLESTSHIT\\001_testing_style\\artificial-influece\\pet-runs\\bloop\\qa\\rows\\idle\\frames\\idle\\01.png",
+        "C:\\Users\\simon\\Desktop\\MYCOOLESTSHIT\\001_testing_style\\artificial-influece\\pet-runs\\bloop\\qa\\rows\\idle\\frames\\idle\\02.png",
+        "C:\\Users\\simon\\Desktop\\MYCOOLESTSHIT\\001_testing_style\\artificial-influece\\pet-runs\\bloop\\qa\\rows\\idle\\frames\\idle\\03.png",
+        "C:\\Users\\simon\\Desktop\\MYCOOLESTSHIT\\001_testing_style\\artificial-influece\\pet-runs\\bloop\\qa\\rows\\idle\\frames\\idle\\04.png",
+        "C:\\Users\\simon\\Desktop\\MYCOOLESTSHIT\\001_testing_style\\artificial-influece\\pet-runs\\bloop\\qa\\rows\\idle\\frames\\idle\\05.png"
+      ],
+      "method": "components"
+    }
+  ]
+}

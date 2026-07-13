@@ -55,7 +55,7 @@ export function ImagePromptFields({
         : placeholder
 
   const textareaClassName = cn(
-    "w-full border-none outline-none resize-none bg-transparent text-sm overflow-y-auto",
+    "w-full border-none outline-none resize-none bg-transparent text-base sm:text-sm overflow-y-auto",
     variant === "toolbar" && "min-h-[50px] max-h-[120px] text-zinc-200 placeholder:text-zinc-600",
     variant === "page" && "min-h-[60px] max-h-[120px]",
     isNode && "min-h-[60px] max-h-[120px] text-zinc-200 placeholder:text-zinc-500"

@@ -87,7 +87,7 @@ export function GenerationCard({
           </div>
 
           {generation.prompt ? (
-            <p className="line-clamp-2 select-none text-left text-[10px] font-medium leading-tight text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+            <p className="truncate select-none text-left text-[10px] font-medium leading-tight text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
               {generation.prompt}
             </p>
           ) : (
@@ -243,7 +243,7 @@ export function GenerationCard({
         </div>
 
         {generation.prompt ? (
-          <p className="line-clamp-1 select-none text-left text-[10px] font-medium leading-tight text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+          <p className="truncate select-none text-left text-[10px] font-medium leading-tight text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
             {generation.prompt}
           </p>
         ) : null}

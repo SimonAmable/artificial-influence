@@ -5,7 +5,8 @@ import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
 import { InfluencerInputBox, InfluencerShowcaseCard } from "@/components/tools/influencer"
 import { CharacterSwapInputBox } from "@/components/tools/character-swap"
 import type { CharacterSwapMode } from "@/components/tools/character-swap/character-swap-input-box"
-import { ImageGrid } from "@/components/shared/display/image-grid"
+import { ImageGrid, type GridItem } from "@/components/shared/display/image-grid"
+import { useGenerationTasks } from "@/components/generation-companion/generation-tasks-provider"
 // import { GenerationHistoryColumn } from "@/components/shared/display/generation-history-column" // Temporarily disabled
 import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
 import { ImageUpload } from "@/components/shared/upload/photo-upload"
@@ -236,6 +237,7 @@ function ImagePageContent() {
   
   const { layoutMode } = layoutModeContext
   const chatDockInsetRight = useAIChatDockInsetRight()
+  const { tasks: persistedTasks } = useGenerationTasks()
   const fixedPromptPanelStyle = React.useMemo(
     () => ({ right: chatDockInsetRight }),
     [chatDockInsetRight],
@@ -251,6 +253,7 @@ function ImagePageContent() {
   const [characterSwapMode, setCharacterSwapMode] = React.useState<CharacterSwapMode>("full_character")
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
   const [savedExamples, setSavedExamples] = React.useState<SavedExample[]>([])
+  const [examplesViewerId, setExamplesViewerId] = React.useState<string | null>(null)
   const [pendingRequests, setPendingRequests] = React.useState<PendingImageRequest[]>([])
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
   const [isExamplesLoading, setIsExamplesLoading] = React.useState(false)
@@ -308,6 +311,7 @@ function ImagePageContent() {
   const [selectedImageForAsset, setSelectedImageForAsset] = React.useState<{ url: string; index: number } | null>(null)
   const [saveExampleDialogOpen, setSaveExampleDialogOpen] = React.useState(false)
   const [saveExampleSnapshot, setSaveExampleSnapshot] = React.useState<SaveExampleSnapshot | null>(null)
+  const [editingExample, setEditingExample] = React.useState<SavedExample | null>(null)
   const [imageEditorOpen, setImageEditorOpen] = React.useState(false)
   const [fanvueActionOpen, setFanvueActionOpen] = React.useState(false)
   const [fanvueActionMode, setFanvueActionMode] = React.useState<FanvueImageActionMode>("vault")
@@ -549,6 +553,7 @@ function ImagePageContent() {
 
       const data = await response.json().catch(() => ({}))
       setSavedExamples(Array.isArray(data.examples) ? data.examples : [])
+      setExamplesViewerId(typeof data.viewerId === "string" ? data.viewerId : null)
     } catch (error) {
       if (!signal?.aborted) {
         console.error("Error fetching saved examples:", error)
@@ -1024,6 +1029,22 @@ function ImagePageContent() {
     setSaveExampleDialogOpen(true)
   }, [historyImages])
 
+  const handleEditSavedExample = React.useCallback((example: SavedExample) => {
+    setEditingExample(example)
+    setSaveExampleSnapshot({
+      prompt: example.prompt,
+      referenceImageUrls: example.prompt_attachments.map((attachment) => attachment.url),
+      coverUrl: example.cover_url ?? "",
+      selectedModel: typeof example.default_settings.model === "string" ? example.default_settings.model : "",
+      selectedAspectRatio: typeof example.default_settings.aspect_ratio === "string" ? example.default_settings.aspect_ratio : "",
+      selectedNumImages: typeof example.default_settings.num_images === "number" ? example.default_settings.num_images : 1,
+      selectedModelParameters: (example.default_settings.model_parameters as ModelInputValues) ?? {},
+      enhancePrompt: example.default_settings.enhance_prompt === true,
+      sourceGenerationId: example.source_generation_id,
+    })
+    setSaveExampleDialogOpen(true)
+  }, [])
+
   const handleCreateAsset = React.useCallback((imageUrl: string, index: number) => {
     setSelectedImageForAsset({ url: imageUrl, index })
     setCreateAssetDialogOpen(true)
@@ -1180,20 +1201,28 @@ function ImagePageContent() {
 
   // Grid order: generating (at front) → filled (newest) → older
   // Grid order: pending requests (newest first) followed by completed history.
-  const gridItems = React.useMemo(() => {
+  const gridItems = React.useMemo((): GridItem[] => {
     const toImageData = (img: ImageHistoryItem) => ({
       ...img,
       referenceImageUrls: img.reference_image_urls ?? (img as { referenceImageUrls?: string[] }).referenceImageUrls ?? [],
     })
     const generating = pendingRequests.flatMap((request) =>
       Array.from({ length: request.numImages }, (_, i) => ({
-        type: "generating" as const,
-        id: `slot-${request.clientRequestId}-${i}`,
+        createdAt: request.startedAt,
+        item: { type: "generating" as const, id: `slot-${request.clientRequestId}-${i}`, model: request.model, prompt: request.prompt },
       }))
     )
-    const completed = historyImages.map((img) => ({ type: "image" as const, data: toImageData(img) }))
-    return [...generating, ...completed]
-  }, [historyImages, pendingRequests])
+    const persisted = persistedTasks
+      .filter((task) => task.type === "image" && task.status !== "completed")
+      .filter((task) => !pendingRequests.some((request) => request.generationId === task.id))
+      .map((task) => ({ createdAt: task.createdAt, item: task.status === "failed"
+        ? { type: "failed" as const, id: task.id, model: task.model, prompt: task.prompt, error: task.errorMessage }
+        : { type: "generating" as const, id: task.id, model: task.model, prompt: task.prompt } }))
+    const completed = historyImages.map((img) => ({ createdAt: img.createdAt, item: { type: "image" as const, data: toImageData(img) } }))
+    return [...generating, ...persisted, ...completed]
+      .sort((a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? ""))
+      .map((entry) => entry.item)
+  }, [historyImages, pendingRequests, persistedTasks])
 
   const openFanvueAction = React.useCallback((mode: FanvueImageActionMode, imageUrl: string) => {
     setFanvueActionMode(mode)
@@ -1288,6 +1317,7 @@ function ImagePageContent() {
           isLoading={isExamplesLoading}
           columnCount={libraryColumnCount}
           onUseExample={handleUseSavedExample}
+          onEditExample={examplesViewerId ? (example) => example.creator_id === examplesViewerId && handleEditSavedExample(example) : undefined}
         />
       </div>
     )
@@ -1480,9 +1510,11 @@ function ImagePageContent() {
           setSaveExampleDialogOpen(open)
           if (!open) {
             setSaveExampleSnapshot(null)
+            setEditingExample(null)
           }
         }}
         snapshot={saveExampleSnapshot}
+        existingExample={editingExample}
         onSaved={() => {
           void fetchSavedExamples()
         }}

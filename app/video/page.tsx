@@ -7,6 +7,7 @@ import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
 import { VideoInputBox } from "@/components/tools/video/video-input-box"
 import { VideoShowcaseCard } from "@/components/tools/video/video-showcase-card"
 import { VideoGrid } from "@/components/shared/display/video-grid"
+import { useGenerationTasks } from "@/components/generation-companion/generation-tasks-provider"
 import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -121,6 +122,7 @@ const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
 
 function VideoPageContent() {
   const layoutModeContext = useLayoutMode()
+  const { tasks: persistedTasks } = useGenerationTasks()
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -585,14 +587,22 @@ function VideoPageContent() {
 
   const gridItems = React.useMemo((): VideoGridItem[] => {
     const generating = pendingRequests.map((request) => ({
-      type: "generating" as const,
-      id: `slot-${request.clientRequestId}`,
+      createdAt: request.startedAt,
+      item: { type: "generating" as const, id: `slot-${request.clientRequestId}`, model: request.modelDisplayName || request.model, prompt: request.prompt },
     }))
+    const persisted = persistedTasks
+      .filter((task) => task.type === "video" && task.status !== "completed")
+      .filter((task) => !pendingRequests.some((request) => request.generationId === task.id))
+      .map((task) => ({ createdAt: task.createdAt, item: task.status === "failed"
+        ? { type: "failed" as const, id: task.id, model: task.model, prompt: task.prompt, error: task.errorMessage }
+        : { type: "generating" as const, id: task.id, model: task.model, prompt: task.prompt } }))
     const completed = historyVideos
       .filter((v) => v.url)
-      .map((v) => ({ type: "video" as const, data: v }))
-    return [...generating, ...completed]
-  }, [historyVideos, pendingRequests])
+      .map((v) => ({ createdAt: v.createdAt, item: { type: "video" as const, data: v } }))
+    return [...generating, ...persisted, ...completed]
+      .sort((a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? ""))
+      .map((entry) => entry.item)
+  }, [historyVideos, pendingRequests, persistedTasks])
 
   // Handle generation
   const handleGenerate = async () => {

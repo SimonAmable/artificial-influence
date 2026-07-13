@@ -44,7 +44,8 @@ interface ImageData {
 
 export type GridItem =
   | { type: "image"; data: ImageData }
-  | { type: "generating"; id: string }
+  | { type: "generating"; id: string; model?: string | null; prompt?: string | null }
+  | { type: "failed"; id: string; model?: string | null; prompt?: string | null; error?: string | null }
 
 interface ImageGridProps {
   /** Unified list of items (images + generating slots). When provided, takes precedence over images/isGenerating/generatingCount. */
@@ -624,7 +625,7 @@ export function ImageGrid({
           {/* Unified items: generating slots and image cards in order */}
           {!isLoadingSkeleton &&
             items.map((item, index) =>
-              item.type === "generating" ? (
+              item.type === "generating" || item.type === "failed" ? (
                 <div
                   key={item.id}
                   className={cn(
@@ -632,19 +633,12 @@ export function ImageGrid({
                     isOneColumn ? "min-h-[50vh]" : "aspect-square min-h-0"
                   )}
                 >
-                  {/* White fading line animation - 20 second infinite duration */}
-                  <div
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-zinc-800 to-zinc-700"
-                    style={{
-                      width: "0%",
-                      animation: "fillProgress 20s linear infinite",
-                      boxShadow: "2px 0 8px 0 rgba(255, 255, 255, 0.4)",
-                    }}
-                  />
+                  {item.type === "generating" ? <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-zinc-800 to-zinc-700" style={{ width: "0%", animation: "fillProgress 20s linear infinite", boxShadow: "2px 0 8px 0 rgba(255, 255, 255, 0.4)" }} /> : null}
                   {/* Overlay gradient for depth */}
                   <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30 pointer-events-none" />
-                  <div className="absolute bottom-2 left-2 z-10 rounded-md bg-black/50 px-2 py-1 text-[10px] font-medium text-white/90">
-                    Generating...
+                  <div className="absolute inset-x-2 bottom-2 z-10 text-left text-[10px] text-white/90 drop-shadow-md">
+                    <p className="truncate font-semibold">{item.type === "failed" ? "Generation failed · Credit refunded" : item.model ?? "Generating..."}</p>
+                    <p className="truncate text-white/60">{item.type === "failed" ? item.error ?? "Try again from the generator." : item.prompt ?? "Generating..."}</p>
                   </div>
                 </div>
               ) : (
@@ -810,7 +804,7 @@ export function ImageGrid({
                   {item.data.prompt && (
                     <button
                       type="button"
-                      className="line-clamp-2 w-full text-left text-[10px] leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-white/95"
+                      className="truncate w-full text-left text-[10px] leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-white/95"
                       onClick={(event) => {
                         event.stopPropagation()
                         void handleCopyPrompt(item.data.prompt ?? "", `${item.data.url}-text`)

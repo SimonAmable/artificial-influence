@@ -43,9 +43,7 @@ const SidebarCreativeAgentChat = dynamic(
 )
 
 const DESKTOP_CHAT_PANEL_WIDTH_PX = 384
-const DESKTOP_CHAT_DOCK_PADDING_PX = 12
-const DESKTOP_CHAT_SLOT_WIDTH_PX =
-  DESKTOP_CHAT_PANEL_WIDTH_PX + DESKTOP_CHAT_DOCK_PADDING_PX * 2
+const DESKTOP_CHAT_SLOT_WIDTH_PX = DESKTOP_CHAT_PANEL_WIDTH_PX
 const CHAT_DOCK_TRANSITION = {
   duration: 0.28,
   ease: [0.32, 0.72, 0, 1] as const,
@@ -61,7 +59,7 @@ function AIChatPanelShell({
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl bg-background shadow-depth-m",
+        "flex h-full min-h-0 w-full flex-col overflow-hidden rounded-none rounded-tl-2xl border border-border/60 bg-background shadow-none",
         className,
       )}
     >
@@ -472,7 +470,7 @@ export function AIChatDesktopDock() {
   return (
     <motion.aside
       aria-label={`${UNICAN_ASSISTANT_NAME} chat`}
-      className="sticky top-[52px] box-border flex h-[calc(100dvh-52px)] min-w-0 shrink-0 flex-col overflow-hidden p-3"
+      className="sticky top-[52px] box-border flex h-[calc(100dvh-52px)] min-w-0 shrink-0 flex-col overflow-hidden p-0"
       style={{ width: dockWidthMotion }}
     >
       <motion.div
@@ -532,7 +530,7 @@ function AIChatMobileSheet() {
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="flex h-full w-full max-w-none flex-col overflow-visible border-0 bg-transparent p-3 shadow-none duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-[side=right]:w-full sm:max-w-none"
+        className="flex h-full w-full max-w-none flex-col overflow-visible border-0 bg-transparent p-0 shadow-none duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-[side=right]:w-full sm:max-w-none"
       >
         <AIChatPanelShell>{panelBody}</AIChatPanelShell>
       </SheetContent>

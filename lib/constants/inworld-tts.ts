@@ -6,27 +6,6 @@ export const INWORLD_TTS_MODEL_OPTIONS = [
     group: "Current",
     deprecated: false,
   },
-  {
-    id: "inworld-tts-1.5-mini",
-    label: "Inworld 1.5 Mini",
-    description: "Lowest latency and most cost-efficient option",
-    group: "Current",
-    deprecated: false,
-  },
-  {
-    id: "inworld-tts-1-max",
-    label: "Inworld 1 Max",
-    description: "Previous generation high-quality model with basic timestamps",
-    group: "Legacy",
-    deprecated: true,
-  },
-  {
-    id: "inworld-tts-1",
-    label: "Inworld 1",
-    description: "Previous generation fast model with basic timestamps",
-    group: "Legacy",
-    deprecated: true,
-  },
 ] as const
 
 export type InworldTtsModelId =

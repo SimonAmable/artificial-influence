@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
-import { createSavedExample, listSavedExamplesForGallery } from "@/lib/examples/database-server"
+import { createSavedExample, listSavedExamplesForGallery, updateSavedExample } from "@/lib/examples/database-server"
 import type { TemplateInput } from "@/lib/templates/types"
 
 const exampleRequestSchema = z.object({
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     const examples = await listSavedExamplesForGallery(user?.id ?? null, surface, search)
 
-    return NextResponse.json({ examples })
+    return NextResponse.json({ examples, viewerId: user?.id ?? null })
   } catch (error) {
     console.error("[examples] GET error:", error)
     return NextResponse.json(
@@ -107,5 +107,31 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 },
     )
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const body = await request.json().catch(() => ({}))
+    const exampleId = typeof body.id === "string" ? body.id : ""
+    const parsed = exampleRequestSchema.safeParse(body)
+    if (!exampleId || !parsed.success) {
+      return NextResponse.json({ error: parsed.success ? "Invalid example id" : parsed.error.flatten().fieldErrors }, { status: 400 })
+    }
+    const title = parsed.data.title?.trim() || buildFallbackTitle(parsed.data.prompt)
+    const example = await updateSavedExample(exampleId, user.id, {
+      surface: parsed.data.surface, title, description: parsed.data.description ?? "", prompt: parsed.data.prompt,
+      prompt_attachments: parsed.data.prompt_attachments ?? [], inputs: (parsed.data.inputs ?? []) as TemplateInput[],
+      default_settings: parsed.data.default_settings ?? {}, source_generation_id: parsed.data.source_generation_id ?? null,
+      cover_url: parsed.data.cover_url ?? null, cover_kind: parsed.data.cover_kind, visibility: parsed.data.visibility,
+    })
+    return NextResponse.json({ example })
+  } catch (error) {
+    console.error("[examples] PATCH error:", error)
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to update example" }, { status: 500 })
   }
 }

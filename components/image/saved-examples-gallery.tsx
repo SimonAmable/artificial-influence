@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { createPortal } from "react-dom"
-import { PencilSimple, Sparkle, UploadSimple, X } from "@phosphor-icons/react"
+import { Images, PencilSimple, Sparkle, UploadSimple, X } from "@phosphor-icons/react"
 
 import type { SavedExample } from "@/lib/examples/types"
 import { Badge } from "@/components/ui/badge"
@@ -24,17 +24,11 @@ interface SavedExamplesGalleryProps {
     promptOverride: string,
     mediaInputs: Record<string, { file?: File; url: string }>
   ) => void
+  onEditExample?: (example: SavedExample) => void
 }
 
 function getExampleCover(example: SavedExample) {
   return example.cover_url || "/hero_showcase_images/image_generation.png"
-}
-
-function formatSettingLabel(value: unknown) {
-  if (value === null || value === undefined) return null
-  if (typeof value === "boolean") return value ? "On" : "Off"
-  if (typeof value === "string" || typeof value === "number") return String(value)
-  return null
 }
 
 function promptPreview(prompt: string) {
@@ -50,6 +44,7 @@ export function SavedExamplesGallery({
   className,
   columnCount = 2,
   onUseExample,
+  onEditExample,
 }: SavedExamplesGalleryProps) {
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => {
@@ -190,8 +185,7 @@ export function SavedExamplesGallery({
                       {/* Dark overlay showing only on hover */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/0 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
 
-                      {/* Badges overlaying at top */}
-                      <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                       <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                         <Badge variant="secondary" className="bg-background/90 text-[10px] uppercase tracking-wide text-foreground backdrop-blur-sm">
                           {example.surface}
                         </Badge>
@@ -205,7 +199,23 @@ export function SavedExamplesGallery({
                             {defaultModel.replace(/^.*\//, "")}
                           </Badge>
                         )}
-                      </div>
+                       </div>
+
+                       {onEditExample ? (
+                         <Button
+                           type="button"
+                           variant="secondary"
+                           size="icon"
+                           className="absolute right-2.5 top-2.5 size-8 rounded-full opacity-0 transition-all group-hover:opacity-100"
+                           aria-label="Edit example"
+                           onClick={(event) => {
+                             event.stopPropagation()
+                             onEditExample(example)
+                           }}
+                         >
+                           <PencilSimple className="size-3.5" weight="bold" />
+                         </Button>
+                       ) : null}
 
                       {/* Center Glass Button */}
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100">
@@ -277,32 +287,28 @@ export function SavedExamplesGallery({
                         alt="Active example preview"
                         className="max-h-[40vh] min-h-[180px] w-auto h-auto object-contain"
                       />
-                      {/* Badges overlaying at the top */}
-                      <div className="absolute left-3 top-3 flex flex-wrap gap-1 z-10">
-                        <Badge variant="secondary" className="bg-background/90 text-[10px] uppercase tracking-wide text-foreground backdrop-blur-sm">
-                          {activeExample.surface}
-                        </Badge>
-                        <Badge variant="outline" className="border-white/20 bg-black/45 text-[10px] uppercase tracking-wide text-white backdrop-blur-sm">
-                          {activeExample.cover_kind}
-                        </Badge>
-                        {Object.entries(activeExample.default_settings)
-                          .filter(([key]) => key !== "model_parameters")
-                          .map(([key, value]) => {
-                            const label = formatSettingLabel(value)
-                            if (!label) return null
-                            return (
-                              <Badge key={key} variant="outline" className="border-white/20 bg-black/45 text-[10px] uppercase tracking-wide text-white backdrop-blur-sm">
-                                {key}: {label}
-                              </Badge>
-                            )
-                          })}
-                      </div>
-                      {/* Prompt overlaying at bottom */}
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-4 text-white z-10">
-                        <p className="line-clamp-3 text-xs leading-relaxed text-white/90 text-left">
-                          {draftPrompt || "No prompt description"}
-                        </p>
-                      </div>
+                       <div className="absolute inset-x-0 bottom-0 z-10 flex flex-wrap items-center gap-1.5 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3 pt-8">
+                         {typeof activeExample.default_settings.model === "string" ? (
+                           <Badge variant="outline" className="border-white/20 bg-black/45 text-[10px] text-white backdrop-blur-sm">
+                             {activeExample.default_settings.model.replace(/^.*\//, "")}
+                           </Badge>
+                         ) : null}
+                         {typeof activeExample.default_settings.aspect_ratio === "string" ? (
+                           <Badge variant="outline" className="border-white/20 bg-black/45 text-[10px] text-white backdrop-blur-sm">
+                             {activeExample.default_settings.aspect_ratio}
+                           </Badge>
+                         ) : null}
+                         {typeof activeExample.default_settings.num_images === "number" ? (
+                           <Badge variant="outline" className="border-white/20 bg-black/45 text-[10px] text-white backdrop-blur-sm">
+                             <Images className="mr-1 size-3" />{activeExample.default_settings.num_images}
+                           </Badge>
+                         ) : null}
+                         {activeExample.inputs.length > 0 ? (
+                           <Badge variant="outline" className="border-white/20 bg-black/45 text-[10px] text-white backdrop-blur-sm">
+                             {activeExample.inputs.length} inputs
+                           </Badge>
+                         ) : null}
+                       </div>
                     </div>
                   </section>
 
@@ -412,7 +418,7 @@ export function SavedExamplesGallery({
 
                   {/* Element 3: PROMPT BOX CARD (Replica style editor) */}
                   <section className="space-y-3">
-                    <Card className="w-full relative transition-colors bg-background/95 backdrop-blur-sm overflow-visible border border-border/70 rounded-[30px]">
+                      <Card className="w-full relative overflow-visible border-0 bg-transparent shadow-none">
                       <CardContent className="p-2 flex flex-col gap-1.5">
                         
                         {/* Text editor and action buttons side-by-side */}
@@ -437,7 +443,7 @@ export function SavedExamplesGallery({
                                 )}
                               </div>
                               {!isEditingPrompt ? (
-                                <div className="min-h-[110px] w-full rounded-[24px] border border-border/70 bg-muted/15 p-3.5 text-sm leading-6 text-foreground/90 text-left select-none cursor-default flex flex-col justify-start">
+                                <div className="min-h-[110px] w-full p-3.5 text-sm leading-6 text-foreground/90 text-left select-none cursor-default flex flex-col justify-start">
                                   <p className="line-clamp-3 break-words whitespace-pre-wrap">
                                     {draftPrompt || "No prompt description"}
                                   </p>
@@ -447,7 +453,7 @@ export function SavedExamplesGallery({
                                   <Textarea
                                     value={draftPrompt}
                                     onChange={(e) => setDraftPrompt(e.target.value)}
-                                    className="min-h-[110px] w-full rounded-[24px] border border-border/70 bg-background p-3.5 text-sm leading-6 outline-none resize-none"
+                                    className="min-h-[110px] w-full border-0 bg-transparent p-3.5 text-base leading-6 outline-none resize-none sm:text-sm"
                                     placeholder="Edit the prompt before recreating the example"
                                     autoFocus
                                   />
@@ -496,4 +502,3 @@ export function SavedExamplesGallery({
     </>
   )
 }
-

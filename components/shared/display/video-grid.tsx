@@ -34,7 +34,8 @@ export interface VideoHistoryItem {
 }
 
 export type VideoGridItem =
-  | { type: "generating"; id: string }
+  | { type: "generating"; id: string; model?: string | null; prompt?: string | null }
+  | { type: "failed"; id: string; model?: string | null; prompt?: string | null; error?: string | null }
   | { type: "video"; data: VideoHistoryItem }
 
 /** Legacy shape for backward compatibility. */
@@ -192,20 +193,21 @@ function VideoHistoryTile({
   )
 }
 
-function GeneratingCell() {
+function GeneratingCell({ item }: { item: Extract<VideoGridItem, { type: "generating" | "failed" }> }) {
   return (
     <div className="relative isolate aspect-square w-full min-h-0 min-w-0 overflow-hidden rounded-lg border border-white/10 bg-zinc-900">
-      <div
+      {item.type === "generating" ? <div
         className="absolute inset-y-0 left-0 bg-gradient-to-r from-zinc-800 to-zinc-700"
         style={{
           width: "0%",
           animation: "fillProgress 120s linear infinite",
           boxShadow: "2px 0 8px 0 rgba(255, 255, 255, 0.4)",
         }}
-      />
+      /> : null}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30" />
-      <div className="absolute bottom-2 left-2 z-10 rounded-md bg-black/50 px-2 py-1 text-[10px] font-medium text-white/90">
-        Generating...
+      <div className="absolute inset-x-2 bottom-2 z-10 text-left text-[10px] text-white/90 drop-shadow-md">
+        <p className="truncate font-semibold">{item.type === "failed" ? "Generation failed · Credit refunded" : item.model ?? "Generating..."}</p>
+        <p className="truncate text-white/60">{item.type === "failed" ? item.error ?? "Try again from the generator." : item.prompt ?? "Generating..."}</p>
       </div>
     </div>
   )
@@ -370,9 +372,9 @@ export function VideoGrid({
 
           {!showSkeletonOnly &&
             items.map((item, index) =>
-              item.type === "generating" ? (
+              item.type === "generating" || item.type === "failed" ? (
                 <div key={item.id} className="min-w-0 shrink-0">
-                  <GeneratingCell />
+                  <GeneratingCell item={item} />
                 </div>
               ) : (
                 <div

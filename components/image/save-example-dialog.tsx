@@ -3,7 +3,7 @@
 import * as React from "react"
 import { createPortal } from "react-dom"
 import { toast } from "sonner"
-import { Sparkle, Plus, X, Trash, FolderOpen } from "@phosphor-icons/react"
+import { Sparkle, Plus, X, Trash, FolderOpen, Images } from "@phosphor-icons/react"
 
 import { useModels } from "@/hooks/use-models"
 import { cn } from "@/lib/utils"
@@ -16,6 +16,7 @@ import {
   placeholderToken,
 } from "@/lib/templates/input-utils"
 import type { TemplatePromptAttachment } from "@/lib/templates/types"
+import type { SavedExample } from "@/lib/examples/types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -49,6 +50,7 @@ interface SaveExampleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   snapshot: SaveExampleSnapshot | null
+  existingExample?: SavedExample | null
   onSaved?: () => void | Promise<void>
 }
 
@@ -182,6 +184,7 @@ export function SaveExampleDialog({
   open,
   onOpenChange,
   snapshot,
+  existingExample = null,
   onSaved,
 }: SaveExampleDialogProps) {
   const [mounted, setMounted] = React.useState(false)
@@ -447,9 +450,10 @@ export function SaveExampleDialog({
 
       const title = buildExampleTitle(finalPrompt)
       const response = await fetch("/api/examples", {
-        method: "POST",
+        method: existingExample ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...(existingExample ? { id: existingExample.id } : {}),
           surface: "image",
           title,
           description: "",
@@ -478,7 +482,7 @@ export function SaveExampleDialog({
         )
       }
 
-      toast.success("Example saved")
+      toast.success(existingExample ? "Example updated" : "Example saved")
       onOpenChange(false)
       await onSaved?.()
     } catch (error) {
@@ -489,6 +493,7 @@ export function SaveExampleDialog({
   }, [
     draftInputs,
     enhancePrompt,
+    existingExample,
     onOpenChange,
     onSaved,
     prompt,
@@ -593,8 +598,7 @@ export function SaveExampleDialog({
                     </div>
                   )}
 
-                  {/* Badges overlaying at the top */}
-                  <div className="absolute left-3 top-3 flex flex-wrap gap-1 z-10">
+                  <div className="absolute inset-x-0 bottom-0 z-10 flex flex-wrap items-center gap-1.5 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3 pt-8">
                     {selectedModel && (
                       <Badge variant="secondary" className="bg-background/90 text-[10px] uppercase tracking-wide text-foreground backdrop-blur-sm">
                         {selectedModel.replace(/^.*\//, "")}
@@ -606,7 +610,7 @@ export function SaveExampleDialog({
                       </Badge>
                     )}
                     <Badge variant="outline" className="border-white/20 bg-black/45 text-[10px] uppercase tracking-wide text-white backdrop-blur-sm">
-                      {selectedNumImages} {selectedNumImages === 1 ? "image" : "images"}
+                      <Images className="mr-1 size-3" />{selectedNumImages}
                     </Badge>
                     {enhancePrompt && (
                       <Badge variant="outline" className="border-white/20 bg-black/45 text-[10px] uppercase tracking-wide text-white backdrop-blur-sm">
@@ -618,13 +622,6 @@ export function SaveExampleDialog({
                         {draftInputs.length} variable{draftInputs.length === 1 ? "" : "s"}
                       </Badge>
                     )}
-                  </div>
-
-                  {/* Prompt overlaying at bottom */}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-4 text-white z-10">
-                    <p className="line-clamp-3 text-xs leading-relaxed text-white/90">
-                      {prompt || "Describe your generation..."}
-                    </p>
                   </div>
                 </div>
               </section>
@@ -746,7 +743,7 @@ export function SaveExampleDialog({
               {/* Element 3: PROMPT BOX CARD (Replica of InfluencerInputBox) */}
               <section className="space-y-3">
                 <div ref={promptBoxRef} className="relative">
-                  <Card className="w-full relative transition-colors bg-background/95 backdrop-blur-sm overflow-visible border border-border/70 rounded-[30px]">
+                  <Card className="w-full relative overflow-visible border-0 bg-transparent shadow-none">
                     <CardContent className="p-2 flex flex-col gap-1.5">
                       
                       {/* Image attachments list: displays thumbnails styled like InfluencerInputBox reference images */}
@@ -797,14 +794,14 @@ export function SaveExampleDialog({
                             </div>
                           )}
 
-                          <div className="rounded-[24px] border border-border/70 bg-background p-3.5 min-h-[120px] relative">
+                          <div className="min-h-[120px] p-3.5 relative">
                             <div
                               ref={promptEditorRef}
                               contentEditable
                               suppressContentEditableWarning
                               spellCheck
                               className={cn(
-                                "min-h-[100px] w-full whitespace-pre-wrap break-words px-1 py-1 text-sm leading-6 outline-none",
+                                "min-h-[100px] w-full whitespace-pre-wrap break-words px-1 py-1 text-base leading-6 outline-none sm:text-sm",
                                 "selection:bg-primary/25",
                               )}
                               onInput={handlePromptInput}
@@ -958,4 +955,3 @@ export function SaveExampleDialog({
   if (!mounted || typeof document === "undefined") return null
   return createPortal(modalContent, document.body)
 }
-
