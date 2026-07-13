@@ -121,7 +121,7 @@ async function handleRpcRequest(
         },
         serverInfo: {
           name: "unican-mcp",
-          version: "0.1.0",
+          version: "0.2.0",
         },
       })
     }
