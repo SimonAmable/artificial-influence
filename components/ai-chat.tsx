@@ -36,6 +36,7 @@ import {
 } from "@/lib/chat/client-storage"
 import { UNICAN_ASSISTANT_NAME } from "@/lib/constants/system-prompts"
 import { createClient as createSupabaseClient } from "@/lib/supabase/client"
+import { GenerationSidebarCard } from "@/components/generation-companion/generation-sidebar-card"
 
 const SidebarCreativeAgentChat = dynamic(
   () => import("@/components/chat/creative-agent-chat").then((mod) => mod.CreativeAgentChat),
@@ -373,7 +374,7 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
 
   const panelBody = (
     <AIChatPanelBody>
-      <AIChatPanelHeader
+       <AIChatPanelHeader
         authReady={authReady}
         userId={userId}
         onClose={() => setSidebarOpen(false)}
@@ -381,8 +382,9 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
         onOpenFullChat={handleOpenFullChat}
         onOpenHistory={handleOpenHistory}
         useSheetPrimitives={isMobile}
-      />
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+       />
+       <GenerationSidebarCard />
+       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {!authReady || isHydratingThread ? (
           <div className="flex h-full items-center justify-center gap-2 px-4 text-sm text-muted-foreground">
             <CircleNotch className="h-4 w-4 animate-spin" />

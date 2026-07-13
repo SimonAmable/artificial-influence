@@ -9,12 +9,12 @@ const PREFERENCES_KEY = "unican-bloop-preferences"
 const POSITION_KEY = "unican-bloop-position"
 
 type Preferences = { enabled: boolean; size: "small" | "medium" | "large" }
-const defaults: Preferences = { enabled: true, size: "medium" }
+const defaults: Preferences = { enabled: false, size: "medium" }
 
 function readPreferences(): Preferences {
   try {
     const saved = JSON.parse(window.localStorage.getItem(PREFERENCES_KEY) ?? "{}") as Partial<Preferences>
-    return { enabled: saved.enabled !== false, size: saved.size === "small" || saved.size === "large" ? saved.size : "medium" }
+    return { enabled: saved.enabled === true, size: saved.size === "small" || saved.size === "large" ? saved.size : "medium" }
   } catch { return defaults }
 }
 

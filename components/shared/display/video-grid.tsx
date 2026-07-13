@@ -207,7 +207,7 @@ function GeneratingCell({ item }: { item: Extract<VideoGridItem, { type: "genera
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30" />
       <div className="absolute inset-x-2 bottom-2 z-10 text-left text-[10px] text-white/90 drop-shadow-md">
         <p className="truncate font-semibold">{item.type === "failed" ? "Generation failed · Credit refunded" : item.model ?? "Generating..."}</p>
-        <p className="truncate text-white/60">{item.type === "failed" ? item.error ?? "Try again from the generator." : item.prompt ?? "Generating..."}</p>
+        <p className="truncate text-white/60">{item.type === "failed" ? "Sorry for the issue. We refunded your credits so you can try again." : item.prompt ?? "Generating..."}</p>
       </div>
     </div>
   )

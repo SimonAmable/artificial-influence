@@ -22,8 +22,19 @@ export const DEFAULT_PRODUCT_UPDATE_FALLBACK_IMAGE = "/notificaitons/notificatio
 
 const NOTIFICATION_IMAGE = DEFAULT_PRODUCT_UPDATE_FALLBACK_IMAGE
 const TEMPLATE_IMAGE = "/notificaitons/templates.png" as const
+const BLOOP_IMAGE = "/notificaitons/bloop_notification.png" as const
 
 const UNICAN_PRODUCT_UPDATES: ProductUpdate[] = [
+  {
+    id: "bloop-pet-2026-07-13",
+    title: "Meet Bloop",
+    description:
+      "Turn on Bloop in Settings → Pets for a quiet, movable companion that keeps an eye on your media generations.",
+    publishedAt: "2026-07-13T12:00:00.000Z",
+    imageSrc: BLOOP_IMAGE,
+    fallbackImageSrc: NOTIFICATION_IMAGE,
+    tag: "feature",
+  },
   {
     id: "templates-gallery-2026-05-27",
     title: "Templates",

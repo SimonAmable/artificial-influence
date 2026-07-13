@@ -59,12 +59,13 @@ export function BloopCompanion() {
   const router = useRouter()
   const { tasks } = useGenerationTasks()
   const [position, setPosition] = React.useState<Position>({ x: 20, y: 20 })
-  const [preferences, setPreferences] = React.useState<Preferences>({ enabled: true, size: "medium" })
+  const [preferences, setPreferences] = React.useState<Preferences>({ enabled: false, size: "medium" })
   const [dismissed, setDismissed] = React.useState<Set<string>>(() => new Set())
   const [collapsed, setCollapsed] = React.useState(false)
   const [notificationsHydrated, setNotificationsHydrated] = React.useState(false)
   const [dragState, setDragState] = React.useState<BloopState | null>(null)
   const dragging = React.useRef<{ x: number; y: number } | null>(null)
+  const wasDragged = React.useRef(false)
 
   React.useEffect(() => {
     const load = () => {
@@ -72,8 +73,8 @@ export function BloopCompanion() {
       if (stored) { try { setPosition(JSON.parse(stored) as Position) } catch { /* use default */ } } else { setPosition({ x: 20, y: 20 }) }
       try {
         const saved = JSON.parse(window.localStorage.getItem(PREFERENCES_KEY) ?? "{}") as Partial<Preferences>
-        setPreferences({ enabled: saved.enabled !== false, size: saved.size === "small" || saved.size === "large" ? saved.size : "medium" })
-      } catch { setPreferences({ enabled: true, size: "medium" }) }
+        setPreferences({ enabled: saved.enabled === true, size: saved.size === "small" || saved.size === "large" ? saved.size : "medium" })
+      } catch { setPreferences({ enabled: false, size: "medium" }) }
       try {
         const saved = JSON.parse(window.localStorage.getItem(NOTIFICATION_STATE_KEY) ?? "{}") as Partial<NotificationState>
         setDismissed(new Set(Array.isArray(saved.dismissedIds) ? saved.dismissedIds : []))
@@ -132,7 +133,7 @@ export function BloopCompanion() {
         {visibleTasks.map((task) => (
           <div key={task.id} className="group relative rounded-2xl border border-white/10 bg-zinc-900/95 px-3 py-2 text-left shadow-xl backdrop-blur transition-colors hover:bg-zinc-800">
             <button type="button" onClick={() => goToTask(task)} className="block w-full pr-5 text-left"><div className="flex items-center gap-2 text-xs font-semibold text-zinc-100"><span className="min-w-0 flex-1 truncate">{taskLabel(task)}</span><StatusIcon status={task.status} /></div>
-            <p className="mt-0.5 truncate text-xs text-zinc-400">{task.status === "failed" ? task.errorMessage ?? "Generation failed" : task.prompt ?? "Generating media"}</p>
+            <p className="mt-0.5 truncate text-xs text-zinc-400">{task.status === "failed" ? "Sorry for the issue. We refunded your credits so you can try again." : task.prompt ?? "Generating media"}</p>
             </button><button type="button" aria-label="Dismiss notification" onClick={() => dismissNotification(task.id)} className="absolute right-2 top-2 hidden rounded p-0.5 text-zinc-500 hover:bg-white/10 hover:text-zinc-200 group-hover:block focus:block"><X className="size-3" /></button>
           </div>
         ))}
@@ -143,10 +144,12 @@ export function BloopCompanion() {
         className="ml-3 cursor-grab active:cursor-grabbing"
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId)
+          wasDragged.current = false
           dragging.current = { x: event.clientX - position.x, y: window.innerHeight - event.clientY - position.y }
         }}
         onPointerMove={(event) => {
           if (!dragging.current) return
+          wasDragged.current = true
           setDragState(event.movementX < 0 ? "running-left" : "running-right")
           setPosition({ x: Math.max(8, event.clientX - dragging.current.x), y: Math.max(8, window.innerHeight - event.clientY - dragging.current.y) })
         }}
@@ -155,10 +158,17 @@ export function BloopCompanion() {
           setPosition((next) => { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); return next })
           window.setTimeout(() => setDragState(null), 240)
         }}
+        onClick={() => {
+          if (wasDragged.current) {
+            wasDragged.current = false
+            return
+          }
+          window.dispatchEvent(new CustomEvent("chat-open"))
+        }}
       >
         <div className={cn("relative", preferences.size === "small" ? "scale-75 origin-bottom-left" : preferences.size === "large" ? "scale-125 origin-bottom-left" : undefined)}><BloopSprite state={state} /><DotsSixVertical className="absolute bottom-0 left-0 size-4 text-muted-foreground/80" weight="bold" /></div>
       </button>
-      {notificationCount > 0 ? <button type="button" aria-label={collapsed ? "Show notifications" : "Collapse notifications"} onClick={toggleNotifications} className="ml-8 mt-0.5 flex min-w-5 items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-300 shadow-sm hover:bg-zinc-800">
+      {notificationCount > 0 ? <button type="button" aria-label={collapsed ? "Show notifications" : "Collapse notifications"} onClick={toggleNotifications} className="absolute bottom-0 left-[30px] flex min-w-5 items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-300 shadow-sm hover:bg-zinc-800">
         {collapsed ? `${Math.min(notificationCount, 9)}${notificationCount > 9 ? "+" : ""}` : <CaretDown className="size-3" weight="bold" />}
       </button> : null}
     </div>
