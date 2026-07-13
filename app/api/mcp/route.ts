@@ -259,11 +259,10 @@ function extractGenerationId(result: unknown) {
 }
 
 function formatToolContent(toolName: string, result: unknown) {
-  const summary = summarizeToolResult(toolName, result)
   return [
     {
       type: "text",
-      text: `${summary}\n\n${JSON.stringify(result, null, 2)}`,
+      text: summarizeToolResult(toolName, result),
     },
   ]
 }
@@ -281,13 +280,30 @@ function summarizeToolResult(toolName: string, result: unknown) {
   }
 
   if (value.generation && typeof value.generation === "object") {
-    const generationId = (value.generation as Record<string, unknown>).generationId
-    return `Loaded generation ${typeof generationId === "string" ? generationId : ""}.`.trim()
+    const generation = value.generation as Record<string, unknown>
+    const status = typeof generation.status === "string" ? generation.status : "ready"
+    const type = typeof generation.type === "string" ? generation.type : "generation"
+    const url = typeof generation.url === "string" ? generation.url : null
+    if (status === "completed" && url) return `Your ${type} is ready: ${url}`
+    if (status === "failed") return `This ${type} could not be completed.`
+    return `Your ${type} is still being created.`
   }
 
   if (Array.isArray(value.items)) {
     const status = typeof value.status === "string" ? value.status : "ready"
-    return `${toolName} ${status}; ${value.items.length} media item${value.items.length === 1 ? "" : "s"} returned.`
+    const type = typeof value.type === "string" ? value.type : "media"
+    const firstItem = value.items[0]
+    const firstUrl = firstItem && typeof firstItem === "object"
+      ? (firstItem as Record<string, unknown>).mediaUrl || (firstItem as Record<string, unknown>).url
+      : null
+    if (status === "completed" && typeof firstUrl === "string") {
+      return `Your ${type} is ready: ${firstUrl}`
+    }
+    if (status === "failed") return `This ${type} could not be completed.`
+    if (["pending", "queued", "processing", "starting", "in_progress"].includes(status)) {
+      return `Your ${type} is being created.`
+    }
+    return `${toolName} completed.`
   }
 
   if (value.account && typeof value.account === "object") {

@@ -26,7 +26,7 @@ type ToolDefinition = {
 }
 
 const BEARER_SECURITY_SCHEMES = [{ type: "http", scheme: "bearer" }]
-const MEDIA_TOOL_META = {
+const GENERATION_TOOL_META = {
   ui: {
     resourceUri: UNICAN_MEDIA_WIDGET_URI,
     visibility: ["model", "app"],
@@ -51,7 +51,6 @@ export const MCP_TOOLS: ToolDefinition[] = [
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     outputSchema: modelsOutputSchema(),
     annotations: readOnlyAnnotations(),
-    _meta: MEDIA_TOOL_META,
   },
   {
     name: "list_generations",
@@ -61,7 +60,6 @@ export const MCP_TOOLS: ToolDefinition[] = [
     inputSchema: generationListSchema(),
     outputSchema: generationListOutputSchema(),
     annotations: readOnlyAnnotations(),
-    _meta: MEDIA_TOOL_META,
   },
   {
     name: "search_generations",
@@ -71,12 +69,11 @@ export const MCP_TOOLS: ToolDefinition[] = [
     inputSchema: generationListSchema({ includeSearch: true }),
     outputSchema: generationListOutputSchema(),
     annotations: readOnlyAnnotations(),
-    _meta: MEDIA_TOOL_META,
   },
   {
     name: "get_generation",
     title: "Get generation",
-    description: "Fetch one generation by id, including output URL when available.",
+    description: "Refresh the status and output of an existing UniCan generation. Used by the generation card after a creation has started.",
     scopes: ["generations:read"],
     inputSchema: {
       type: "object",
@@ -88,7 +85,7 @@ export const MCP_TOOLS: ToolDefinition[] = [
     },
     outputSchema: generationOutputSchema(),
     annotations: readOnlyAnnotations(),
-    _meta: MEDIA_TOOL_META,
+    _meta: { ui: { visibility: ["app"] } },
   },
   {
     name: "generate_image",
@@ -97,8 +94,8 @@ export const MCP_TOOLS: ToolDefinition[] = [
     scopes: ["generations:write"],
     inputSchema: generateImageSchema(),
     outputSchema: generatedMediaOutputSchema(),
-    annotations: writeAnnotations(),
-    _meta: MEDIA_TOOL_META,
+    annotations: billableGenerationAnnotations(),
+    _meta: GENERATION_TOOL_META,
   },
   {
     name: "generate_video",
@@ -107,8 +104,8 @@ export const MCP_TOOLS: ToolDefinition[] = [
     scopes: ["generations:write"],
     inputSchema: generateVideoSchema(),
     outputSchema: generatedMediaOutputSchema(),
-    annotations: writeAnnotations(),
-    _meta: MEDIA_TOOL_META,
+    annotations: billableGenerationAnnotations(),
+    _meta: GENERATION_TOOL_META,
   },
   {
     name: "generate_audio",
@@ -117,8 +114,8 @@ export const MCP_TOOLS: ToolDefinition[] = [
     scopes: ["generations:write"],
     inputSchema: generateAudioSchema(),
     outputSchema: generatedMediaOutputSchema(),
-    annotations: writeAnnotations(),
-    _meta: MEDIA_TOOL_META,
+    annotations: billableGenerationAnnotations(),
+    _meta: GENERATION_TOOL_META,
   },
 ]
 
@@ -567,7 +564,6 @@ function normalizeGenerationResponse(
     settings: buildSettings(model, prompt, optionsFromBody(body), mediaItems.length || 1),
     items: mediaItems,
     result: body,
-    nextAction: statusCode === 202 ? "Call get_generation with generationId to check completion." : null,
   }
 }
 
@@ -902,7 +898,6 @@ function generatedMediaOutputSchema() {
       items: { type: "array", items: mediaItemSchema() },
       result: {},
       raw: {},
-      nextAction: { type: ["string", "null"] },
     },
     required: ["statusCode", "status", "type", "model", "prompt", "items", "settings"],
     additionalProperties: true,
@@ -1007,10 +1002,10 @@ function readOnlyAnnotations() {
   }
 }
 
-function writeAnnotations() {
+function billableGenerationAnnotations() {
   return {
     readOnlyHint: false,
-    destructiveHint: false,
+    destructiveHint: true,
     openWorldHint: false,
     idempotentHint: false,
   }
