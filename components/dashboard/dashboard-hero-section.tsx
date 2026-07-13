@@ -11,6 +11,7 @@ import type { AudioUploadValue } from "@/components/shared/upload/audio-upload"
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { VideoInputBox } from "@/components/tools/video/video-input-box"
 import type { MultiShotItem } from "@/components/tools/video/multi-shot-editor"
+import { useDefaultEnhancePrompt } from "@/hooks/use-default-enhance-prompt"
 import { useModels } from "@/hooks/use-models"
 import { DEFAULT_CHAT_GATEWAY_MODEL } from "@/lib/constants/chat-llm-models"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
@@ -104,7 +105,17 @@ export function DashboardHeroSection({ className }: { className?: string }) {
   const [referenceImage, setReferenceImage] = React.useState<ImageUpload | null>(null)
   const [referenceImages, setReferenceImages] = React.useState<ImageUpload[]>([])
   const [enhancePrompt, setEnhancePrompt] = React.useState(false)
+  const { defaultEnhancePrompt, isReady: defaultEnhancePromptReady } =
+    useDefaultEnhancePrompt()
+  const enhancePromptSeededRef = React.useRef(false)
   const [selectedImageModel, setSelectedImageModel] = React.useState("")
+
+  React.useEffect(() => {
+    if (!defaultEnhancePromptReady || enhancePromptSeededRef.current) return
+    enhancePromptSeededRef.current = true
+    setEnhancePrompt(defaultEnhancePrompt)
+  }, [defaultEnhancePrompt, defaultEnhancePromptReady])
+
   const [selectedAspectRatio, setSelectedAspectRatio] = React.useState("match_input_image")
   const [selectedNumImages, setSelectedNumImages] = React.useState(1)
   const [isImageHandoffPending, setIsImageHandoffPending] = React.useState(false)

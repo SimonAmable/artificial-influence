@@ -54,6 +54,7 @@ type ProfileData = {
   hasSubscription: boolean
   hasCompletedOnboarding: boolean
   autoStripImageMetadata: boolean
+  defaultEnhancePrompt: boolean
   userId: string
 }
 
@@ -111,7 +112,7 @@ async function fetchProfileData(): Promise<ProfileData | null> {
   const [{ data: profile }, { data: subscription }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, email, credits, created_at, onboarding_completed_at, auto_strip_image_metadata")
+      .select("full_name, email, credits, created_at, onboarding_completed_at, auto_strip_image_metadata, default_enhance_prompt")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -154,6 +155,7 @@ async function fetchProfileData(): Promise<ProfileData | null> {
     hasSubscription,
     hasCompletedOnboarding: Boolean(profile?.onboarding_completed_at),
     autoStripImageMetadata: profile?.auto_strip_image_metadata === true,
+    defaultEnhancePrompt: profile?.default_enhance_prompt === true,
     userId: user.id,
   }
 }
@@ -339,6 +341,10 @@ export function ProfileSettingsModal({
             autoStripImageMetadata={data.autoStripImageMetadata}
             onAutoStripImageMetadataChange={(enabled) =>
               setData((prev) => (prev ? { ...prev, autoStripImageMetadata: enabled } : prev))
+            }
+            defaultEnhancePrompt={data.defaultEnhancePrompt}
+            onDefaultEnhancePromptChange={(enabled) =>
+              setData((prev) => (prev ? { ...prev, defaultEnhancePrompt: enabled } : prev))
             }
             onDisplayNameChange={(name) =>
               setData((prev) => (prev ? { ...prev, displayName: name } : prev))

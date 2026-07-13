@@ -5,7 +5,10 @@ import * as React from "react"
 import { Coin } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
-import { updateAutoStripImageMetadata } from "@/app/profile/actions"
+import {
+  updateAutoStripImageMetadata,
+  updateDefaultEnhancePrompt,
+} from "@/app/profile/actions"
 import { EditableDisplayName } from "@/components/profile/editable-display-name"
 import { ProfileLogoutButton } from "@/components/profile/profile-logout-button"
 import { RestartOnboardingButton } from "@/components/profile/restart-onboarding-button"
@@ -26,6 +29,8 @@ export type ProfileSettingsPanelProps = {
   credits?: number
   autoStripImageMetadata?: boolean
   onAutoStripImageMetadataChange?: (enabled: boolean) => void
+  defaultEnhancePrompt?: boolean
+  onDefaultEnhancePromptChange?: (enabled: boolean) => void
   variant?: "page" | "modal"
   onDisplayNameChange?: (name: string) => void
   onLogout?: () => void
@@ -42,6 +47,8 @@ export function ProfileSettingsPanel({
   credits,
   autoStripImageMetadata = false,
   onAutoStripImageMetadataChange,
+  defaultEnhancePrompt = false,
+  onDefaultEnhancePromptChange,
   variant = "page",
   onDisplayNameChange,
   onLogout,
@@ -54,14 +61,25 @@ export function ProfileSettingsPanel({
   const [stripMetadata, setStripMetadata] = React.useState(autoStripImageMetadata)
   const [stripMetadataPending, startStripMetadataTransition] = React.useTransition()
   const stripMetadataSwitchId = React.useId()
+  const [enhanceByDefault, setEnhanceByDefault] = React.useState(defaultEnhancePrompt)
+  const [enhanceByDefaultPending, startEnhanceByDefaultTransition] = React.useTransition()
+  const enhanceByDefaultSwitchId = React.useId()
 
   React.useEffect(() => {
     setStripMetadata(autoStripImageMetadata)
   }, [autoStripImageMetadata])
 
+  React.useEffect(() => {
+    setEnhanceByDefault(defaultEnhancePrompt)
+  }, [defaultEnhancePrompt])
+
   const stripMetadataDescription = stripMetadata
     ? "On — removes hidden file data and AI watermarks like Synth ID before images are saved to your library."
     : "Off — images save as generated, including hidden file data and AI watermarks like Synth ID."
+
+  const enhanceByDefaultDescription = enhanceByDefault
+    ? "On — Enhance Prompt starts enabled on image tools so your ideas get polished before you generate."
+    : "Off — you turn on Enhance Prompt only when you want it."
 
   function handleStripMetadataChange(checked: boolean) {
     const previous = stripMetadata
@@ -74,6 +92,23 @@ export function ProfileSettingsPanel({
         if (!result.ok) {
           setStripMetadata(previous)
           onAutoStripImageMetadataChange?.(previous)
+          toast.error(result.error)
+        }
+      })()
+    })
+  }
+
+  function handleEnhanceByDefaultChange(checked: boolean) {
+    const previous = enhanceByDefault
+    setEnhanceByDefault(checked)
+    onDefaultEnhancePromptChange?.(checked)
+
+    startEnhanceByDefaultTransition(() => {
+      void (async () => {
+        const result = await updateDefaultEnhancePrompt(checked)
+        if (!result.ok) {
+          setEnhanceByDefault(previous)
+          onDefaultEnhancePromptChange?.(previous)
           toast.error(result.error)
         }
       })()
@@ -128,6 +163,24 @@ export function ProfileSettingsPanel({
           </div>
         ) : null}
         <div className="space-y-0 border-t border-border/60 pt-4">
+          <label
+            htmlFor={enhanceByDefaultSwitchId}
+            className="flex min-h-[52px] cursor-pointer items-center justify-between gap-4 border-b border-border/60 py-3 last:border-b-0"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-foreground">Enhance prompts by default</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {enhanceByDefaultDescription}
+              </p>
+            </div>
+            <Switch
+              id={enhanceByDefaultSwitchId}
+              checked={enhanceByDefault}
+              onCheckedChange={handleEnhanceByDefaultChange}
+              disabled={enhanceByDefaultPending}
+              aria-label="Enhance prompts by default"
+            />
+          </label>
           <label
             htmlFor={stripMetadataSwitchId}
             className="flex min-h-[52px] cursor-pointer items-center justify-between gap-4 border-b border-border/60 py-3 last:border-b-0"

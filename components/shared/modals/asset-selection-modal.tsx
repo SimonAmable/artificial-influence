@@ -589,20 +589,15 @@ export function AssetSelectionModal({
       >
         <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
           <div className="container mx-auto flex min-h-0 flex-1 flex-col px-4 pb-6 pt-4">
-            <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-              <DialogHeader className="min-w-0 gap-1 p-0 text-left">
-                <DialogTitle className="text-left text-3xl font-bold tracking-tight">
-                  Library
-                </DialogTitle>
-                <p
-                  id="asset-selection-description"
-                  className="text-left text-sm text-muted-foreground"
-                >
-                  Pick from your assets, history, or uploads
-                </p>
-              </DialogHeader>
+            <div className="mb-2">
+              <div className="flex items-center justify-between gap-2">
+                <DialogHeader className="min-w-0 flex-1 gap-0 p-0 text-left">
+                  <DialogTitle className="text-left text-3xl font-bold tracking-tight">
+                    Library
+                  </DialogTitle>
+                </DialogHeader>
 
-              <div className="flex flex-wrap items-center gap-2 pt-1 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1">
+                <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1">
                 <input
                   ref={createAssetFileInputRef}
                   type="file"
@@ -627,10 +622,10 @@ export function AssetSelectionModal({
                     variant="outline"
                     size="icon"
                     onClick={() => void refreshHistory()}
-                      title="Refresh history"
-                      className="h-9 w-9 rounded-full transition-transform hover:rotate-[-20deg]"
+                    title="Refresh history"
+                    className="h-8 w-8 rounded-full transition-transform hover:rotate-[-20deg] sm:h-9 sm:w-9"
                   >
-                    <ClockCounterClockwise className="h-4 w-4" />
+                    <ClockCounterClockwise className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 ) : null}
 
@@ -641,16 +636,17 @@ export function AssetSelectionModal({
                       size="icon"
                       onClick={() => void refreshAssets()}
                       title="Refresh assets"
-                      className="h-9 w-9 rounded-full transition-transform hover:rotate-[-20deg]"
+                      className="h-8 w-8 rounded-full transition-transform hover:rotate-[-20deg] sm:h-9 sm:w-9"
                     >
-                      <ClockCounterClockwise className="h-4 w-4" />
+                      <ClockCounterClockwise className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>
                     <Button
-                      className="gap-2 rounded-full transition-transform hover:-translate-y-0.5"
+                      size="sm"
+                      className="gap-1.5 rounded-full px-2.5 transition-transform hover:-translate-y-0.5 sm:h-9 sm:gap-2 sm:px-3"
                       disabled={createAssetUploading}
                       onClick={() => createAssetFileInputRef.current?.click()}
                     >
-                      <UploadSimple className="h-4 w-4" />
+                      <UploadSimple className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       Upload
                     </Button>
                   </>
@@ -658,11 +654,12 @@ export function AssetSelectionModal({
 
                 {activeTab === "uploads" ? (
                   <Button
-                    className="gap-2 rounded-full transition-transform hover:-translate-y-0.5"
+                    size="sm"
+                    className="gap-1.5 rounded-full px-2.5 transition-transform hover:-translate-y-0.5 sm:h-9 sm:gap-2 sm:px-3"
                     disabled={uploadReferenceUploading}
                     onClick={() => uploadReferenceInputRef.current?.click()}
                   >
-                    <UploadSimple className="h-4 w-4" />
+                    <UploadSimple className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     Upload image
                   </Button>
                 ) : null}
@@ -671,12 +668,19 @@ export function AssetSelectionModal({
                   variant="ghost"
                   size="icon"
                   onClick={() => onOpenChange(false)}
-                  className="h-9 w-9 rounded-full transition-transform hover:rotate-90"
+                  className="h-8 w-8 rounded-full transition-transform hover:rotate-90 sm:h-9 sm:w-9"
                   aria-label="Close"
                 >
-                  <X className="h-4 w-4" weight="bold" />
+                  <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" weight="bold" />
                 </Button>
+                </div>
               </div>
+              <p
+                id="asset-selection-description"
+                className="mt-1 text-left text-sm text-muted-foreground"
+              >
+                Pick from your assets, history, or uploads
+              </p>
             </div>
 
             <div className="sticky top-0 z-30 -mx-4 mb-2 border-b border-border/20 bg-background/90 px-4 pt-0.5 pb-2 backdrop-blur supports-backdrop-filter:bg-background/70">

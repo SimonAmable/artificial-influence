@@ -32,6 +32,7 @@ import {
 } from "@/components/shared/modals/asset-selection-modal"
 import { useImageEditor } from "./image-editor-provider"
 import { MODEL_IDENTIFIERS } from "@/lib/constants/models"
+import { useDefaultEnhancePrompt } from "@/hooks/use-default-enhance-prompt"
 import { useModels } from "@/hooks/use-models"
 import { AspectRatioSelector } from "@/components/shared/selectors/aspect-ratio-selector"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
@@ -132,9 +133,18 @@ export function ImageEditorPromptBar({
   const [selectedAspectRatio, setSelectedAspectRatio] =
     React.useState<string>("match_input_image")
   const [enhancePrompt, setEnhancePrompt] = React.useState(false)
+  const { defaultEnhancePrompt, isReady: defaultEnhancePromptReady } =
+    useDefaultEnhancePrompt()
+  const enhancePromptSeededRef = React.useRef(false)
   const [assetModalOpen, setAssetModalOpen] = React.useState(false)
   const editorInstruction = "apply the edit instructions from the image."
   const referenceInputRef = React.useRef<HTMLInputElement>(null)
+
+  React.useEffect(() => {
+    if (!defaultEnhancePromptReady || enhancePromptSeededRef.current) return
+    enhancePromptSeededRef.current = true
+    setEnhancePrompt(defaultEnhancePrompt)
+  }, [defaultEnhancePrompt, defaultEnhancePromptReady])
 
   React.useEffect(() => {
     if (isInpaint) {

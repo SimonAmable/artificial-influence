@@ -18,7 +18,7 @@ export default async function ProfilePage() {
   const [{ data: profile }, subscription] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, email, credits, created_at, onboarding_completed_at, auto_strip_image_metadata")
+      .select("full_name, email, credits, created_at, onboarding_completed_at, auto_strip_image_metadata, default_enhance_prompt")
       .eq("id", user.id)
       .maybeSingle(),
     getUserSubscription(user.id),
@@ -41,6 +41,7 @@ export default async function ProfilePage() {
     : "Not subscribed"
   const hasCompletedOnboarding = Boolean(profile?.onboarding_completed_at)
   const autoStripImageMetadata = profile?.auto_strip_image_metadata === true
+  const defaultEnhancePrompt = profile?.default_enhance_prompt === true
 
   return (
     <main className="min-h-screen bg-background px-4 py-20 sm:px-6">
@@ -54,6 +55,7 @@ export default async function ProfilePage() {
             hasCompletedOnboarding={hasCompletedOnboarding}
             userId={user.id}
             autoStripImageMetadata={autoStripImageMetadata}
+            defaultEnhancePrompt={defaultEnhancePrompt}
           />
         </section>
         <section className="p-1">

@@ -81,6 +81,37 @@ export async function updateAutoStripImageMetadata(
   return { ok: true }
 }
 
+export type UpdateDefaultEnhancePromptResult =
+  | { ok: true }
+  | { ok: false; error: string }
+
+export async function updateDefaultEnhancePrompt(
+  enabled: boolean,
+): Promise<UpdateDefaultEnhancePromptResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { ok: false, error: "Not signed in" }
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ default_enhance_prompt: enabled })
+    .eq("id", user.id)
+
+  if (error) {
+    console.error("[profile] updateDefaultEnhancePrompt", error)
+    return { ok: false, error: error.message }
+  }
+
+  revalidatePath("/profile")
+  revalidatePath("/", "layout")
+  return { ok: true }
+}
+
 export type RestartOnboardingResult =
   | { ok: true }
   | { ok: false; error: string }

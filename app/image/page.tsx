@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+import { useDefaultEnhancePrompt } from "@/hooks/use-default-enhance-prompt"
 import { useModels } from "@/hooks/use-models"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -267,6 +268,9 @@ function ImagePageContent() {
   const [historyError, setHistoryError] = React.useState<string | null>(null)
   const [examplesError, setExamplesError] = React.useState<string | null>(null)
   const [enhancePrompt, setEnhancePrompt] = React.useState(false)
+  const { defaultEnhancePrompt, isReady: defaultEnhancePromptReady } =
+    useDefaultEnhancePrompt()
+  const enhancePromptSeededRef = React.useRef(false)
   const historyAbortRef = React.useRef<AbortController | null>(null)
   const historyRequestIdRef = React.useRef(0)
   const isGenerating = pendingRequests.length > 0
@@ -386,12 +390,23 @@ function ImagePageContent() {
     setReferenceImages(intent.referenceImageUrls.map((url) => ({ url })))
     setReferenceImage(null)
     setEnhancePrompt(intent.enhancePrompt)
+    enhancePromptSeededRef.current = true
     setSelectedModel(intent.model)
     setSelectedAspectRatio(intent.aspectRatio)
     setSelectedNumImages(intent.numImages)
     pendingAutoGenerateModelRef.current = intent.model
     setShouldAutoGenerate(true)
   }, [effectiveImageModels.length, router, searchParams])
+
+  // Seed Enhance Prompt from account preference once (skip if a generate handoff set it).
+  React.useEffect(() => {
+    if (!defaultEnhancePromptReady || enhancePromptSeededRef.current) return
+    if (searchParams.get("generate") === "1" && !autoGenerateHandoffConsumedRef.current) {
+      return
+    }
+    enhancePromptSeededRef.current = true
+    setEnhancePrompt(defaultEnhancePrompt)
+  }, [defaultEnhancePrompt, defaultEnhancePromptReady, searchParams])
 
   React.useEffect(() => {
     const referenceImageUrl = searchParams.get("referenceImageUrl")
