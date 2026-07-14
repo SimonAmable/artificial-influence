@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         status: 'completed',
         generationId: completedGenerations[0].id,
+        generationIds: completedGenerations.map((generation) => generation.id),
         image: images[0],
         images,
       });

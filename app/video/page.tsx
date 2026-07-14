@@ -122,7 +122,7 @@ const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
 
 function VideoPageContent() {
   const layoutModeContext = useLayoutMode()
-  const { tasks: persistedTasks } = useGenerationTasks()
+  const { tasks: persistedTasks, refresh: refreshGenerationTasks, markCompleted } = useGenerationTasks()
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -586,6 +586,16 @@ function VideoPageContent() {
   }, [fetchVideoHistory])
 
   const gridItems = React.useMemo((): VideoGridItem[] => {
+    const historyIds = new Set(
+      historyVideos
+        .map((video) => video.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    )
+    const historyUrls = new Set(
+      historyVideos
+        .map((video) => video.url)
+        .filter((url): url is string => typeof url === "string" && url.length > 0),
+    )
     const generating = pendingRequests.map((request) => ({
       createdAt: request.startedAt,
       item: { type: "generating" as const, id: `slot-${request.clientRequestId}`, model: request.modelDisplayName || request.model, prompt: request.prompt },
@@ -593,6 +603,8 @@ function VideoPageContent() {
     const persisted = persistedTasks
       .filter((task) => task.type === "video" && task.status !== "completed")
       .filter((task) => !pendingRequests.some((request) => request.generationId === task.id))
+      .filter((task) => !historyIds.has(task.id))
+      .filter((task) => !(task.url != null && historyUrls.has(task.url)))
       .map((task) => ({ createdAt: task.createdAt, item: task.status === "failed"
         ? { type: "failed" as const, id: task.id, model: task.model, prompt: task.prompt, error: task.errorMessage }
         : { type: "generating" as const, id: task.id, model: task.model, prompt: task.prompt } }))
@@ -1044,6 +1056,7 @@ function VideoPageContent() {
 
       const endpoint = isLipsync ? '/api/generate-lipsync' : '/api/generate-video-any-model'
 
+      let resolvedGenerationId: string | undefined
       const data = isLipsync
         ? await (async () => {
             const response = await fetch(endpoint, {
@@ -1063,6 +1076,7 @@ function VideoPageContent() {
           })()
         : await generateVideoAndWait(endpoint, requestBody, {
             onAccepted: ({ generationId, predictionId }) => {
+              resolvedGenerationId = generationId
               setPendingRequests((prev) =>
                 prev.map((request) =>
                   request.clientRequestId === clientRequestId
@@ -1084,6 +1098,7 @@ function VideoPageContent() {
 
       if (resultVideoUrl) {
         const newItem: VideoHistoryItem = {
+          id: resolvedGenerationId,
           url: resultVideoUrl,
           model: selectedModel.name,
           prompt: mergedPrompt || null,
@@ -1092,8 +1107,12 @@ function VideoPageContent() {
           timestamp: Date.now(),
           parameters: { ...parameters, prompt: mergedPrompt },
         }
+        if (resolvedGenerationId) {
+          markCompleted([resolvedGenerationId])
+        }
         setPendingRequests((current) => removeSlotByClientId(current, clientRequestId))
         setHistoryVideos((current) => prependUniqueHistoryItems(current, [newItem]))
+        void refreshGenerationTasks()
         void fetchVideoHistory(20, { silent: true, replace: false })
       } else {
         setPendingRequests((current) => removeSlotByClientId(current, clientRequestId))

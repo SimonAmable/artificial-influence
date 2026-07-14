@@ -238,7 +238,7 @@ function ImagePageContent() {
   
   const { layoutMode } = layoutModeContext
   const chatDockInsetRight = useAIChatDockInsetRight()
-  const { tasks: persistedTasks } = useGenerationTasks()
+  const { tasks: persistedTasks, refresh: refreshGenerationTasks, markCompleted } = useGenerationTasks()
   const fixedPromptPanelStyle = React.useMemo(
     () => ({ right: chatDockInsetRight }),
     [chatDockInsetRight],
@@ -768,10 +768,12 @@ function ImagePageContent() {
       console.log('Sending request with reference images:', totalRefImages, 'numImages:', selectedNumImages)
       
       const { generateImageAndWait } = await import('@/lib/generate-image-client')
+      let acceptedGenerationId: string | undefined
       const result = await generateImageAndWait(
         formData,
         undefined,
         ({ generationId, predictionId }: GenerateImageAcceptedPayload) => {
+          acceptedGenerationId = generationId
           setPendingRequests((prev) =>
             prev.map((request) =>
               request.clientRequestId === clientRequestId
@@ -786,18 +788,40 @@ function ImagePageContent() {
         }
       )
 
+      const completedAt = new Date().toISOString()
+      const generationIds =
+        result.generationIds && result.generationIds.length > 0
+          ? result.generationIds
+          : acceptedGenerationId
+            ? [acceptedGenerationId]
+            : []
       const newItems: ImageHistoryItem[] = result.image
-        ? [{ url: result.image.url, model: capturedModel, prompt: capturedPrompt || null, tool: capturedTool, aspectRatio: capturedAspectRatio, reference_image_urls: capturedRefUrls }]
-        : (result.images ?? []).map((img) => ({
+        ? [{
+            id: generationIds[0],
+            url: result.image.url,
+            model: capturedModel,
+            prompt: capturedPrompt || null,
+            tool: capturedTool,
+            aspectRatio: capturedAspectRatio,
+            reference_image_urls: capturedRefUrls,
+            createdAt: completedAt,
+          }]
+        : (result.images ?? []).map((img, index) => ({
+            id: generationIds[index],
             url: img.url,
             model: capturedModel,
             prompt: capturedPrompt || null,
             tool: capturedTool,
             aspectRatio: capturedAspectRatio,
             reference_image_urls: capturedRefUrls,
+            createdAt: completedAt,
           }))
+      if (generationIds.length > 0) {
+        markCompleted(generationIds)
+      }
       setPendingRequests((currentRequests) => removeSlotByClientId(currentRequests, clientRequestId))
       setHistoryImages((currentImages) => prependUniqueHistoryItems(currentImages, newItems))
+      void refreshGenerationTasks()
       void fetchImageHistory(20, { silent: true, replace: false })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate image'
@@ -1221,6 +1245,12 @@ function ImagePageContent() {
       ...img,
       referenceImageUrls: img.reference_image_urls ?? (img as { referenceImageUrls?: string[] }).referenceImageUrls ?? [],
     })
+    const historyIds = new Set(
+      historyImages
+        .map((img) => img.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    )
+    const historyUrls = new Set(historyImages.map((img) => img.url))
     const generating = pendingRequests.flatMap((request) =>
       Array.from({ length: request.numImages }, (_, i) => ({
         createdAt: request.startedAt,
@@ -1230,6 +1260,9 @@ function ImagePageContent() {
     const persisted = persistedTasks
       .filter((task) => task.type === "image" && task.status !== "completed")
       .filter((task) => !pendingRequests.some((request) => request.generationId === task.id))
+      // Drop companion "pending" ghosts once the finished image is already in history.
+      .filter((task) => !historyIds.has(task.id))
+      .filter((task) => !(task.url != null && historyUrls.has(task.url)))
       .map((task) => ({ createdAt: task.createdAt, item: task.status === "failed"
         ? { type: "failed" as const, id: task.id, model: task.model, prompt: task.prompt, error: task.errorMessage }
         : { type: "generating" as const, id: task.id, model: task.model, prompt: task.prompt } }))

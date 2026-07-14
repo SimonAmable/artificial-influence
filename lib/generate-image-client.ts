@@ -123,8 +123,8 @@ export function isContentModerationError(err: unknown): boolean {
 }
 
 export type GenerateImageResult =
-  | { image: { url: string; mimeType?: string }; images?: undefined }
-  | { images: { url: string; mimeType?: string }[]; image?: undefined };
+  | { image: { url: string; mimeType?: string }; images?: undefined; generationIds?: string[] }
+  | { images: { url: string; mimeType?: string }[]; image?: undefined; generationIds?: string[] };
 
 export interface GenerateImageAcceptedPayload {
   generationId?: string;
@@ -203,7 +203,7 @@ export async function generateImageAndWait(
     onProgress?.('Generation started, waiting for result...');
 
     const pollResult = await waitForGenerationStatus<
-      | { ok: true; result: GenerateImageResult }
+      | { ok: true; result: GenerateImageResult; generationIds: string[] }
       | { ok: false; error: Error }
     >({
       predictionId,
@@ -214,9 +214,19 @@ export async function generateImageAndWait(
         if (statusData.status !== 'completed') {
           return null;
         }
+
+        const generationIds = Array.isArray(statusData.generationIds)
+          ? statusData.generationIds.filter(
+              (id): id is string => typeof id === 'string' && id.length > 0,
+            )
+          : typeof statusData.generationId === 'string' && statusData.generationId.length > 0
+            ? [statusData.generationId]
+            : [];
+
         if (Array.isArray(statusData.images) && statusData.images.length > 0) {
           return {
             ok: true,
+            generationIds,
             result: {
               images: (statusData.images as Array<{ url: string; mimeType?: string }>).map((img) => ({
                 url: img.url,
@@ -229,6 +239,7 @@ export async function generateImageAndWait(
         if (image?.url) {
           return {
             ok: true,
+            generationIds,
             result: {
               image: { url: image.url, mimeType: image.mimeType || 'image/png' },
             },
@@ -256,7 +267,10 @@ export async function generateImageAndWait(
       throw pollResult.error;
     }
 
-    return pollResult.result;
+    return {
+      ...pollResult.result,
+      generationIds: pollResult.generationIds,
+    };
   }
 
   const image = data.image as { url?: string; mimeType?: string } | undefined;

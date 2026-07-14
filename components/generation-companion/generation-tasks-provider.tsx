@@ -19,6 +19,8 @@ export type GenerationTask = {
 type GenerationTasksContextValue = {
   tasks: GenerationTask[]
   refresh: () => Promise<void>
+  /** Optimistically clear generating tiles when the active page already has the result. */
+  markCompleted: (ids: string[]) => void
 }
 
 const GenerationTasksContext = React.createContext<GenerationTasksContextValue | null>(null)
@@ -61,13 +63,34 @@ export function GenerationTasksProvider({ children }: { children: React.ReactNod
     }
   }, [])
 
+  const markCompleted = React.useCallback((ids: string[]) => {
+    if (ids.length === 0) return
+    const completedIds = new Set(ids)
+    setTasks((current) =>
+      current.map((task) =>
+        completedIds.has(task.id)
+          ? {
+              ...task,
+              status: "completed",
+              isRecentCompletion: true,
+            }
+          : task,
+      ),
+    )
+  }, [])
+
   React.useEffect(() => {
     void refresh()
     const timer = window.setInterval(() => void refresh(), 10_000)
     return () => window.clearInterval(timer)
   }, [refresh])
 
-  return <GenerationTasksContext.Provider value={{ tasks, refresh }}>{children}</GenerationTasksContext.Provider>
+  const value = React.useMemo(
+    () => ({ tasks, refresh, markCompleted }),
+    [tasks, refresh, markCompleted],
+  )
+
+  return <GenerationTasksContext.Provider value={value}>{children}</GenerationTasksContext.Provider>
 }
 
 export function useGenerationTasks() {
