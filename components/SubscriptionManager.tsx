@@ -2,20 +2,37 @@
 
 import { useState } from 'react';
 import { Subscription, getSubscriptionStatusDisplay } from '@/lib/subscription';
+import { getFanvueAppStoreListingUrl } from '@/lib/fanvue/app-store';
+
+type BillingProvider = 'stripe' | 'fanvue';
 
 interface SubscriptionManagerProps {
   subscription: Subscription | null;
+  billingProvider?: BillingProvider;
+  planName?: string | null;
 }
 
 export default function SubscriptionManager({
   subscription,
+  billingProvider = 'stripe',
+  planName = null,
 }: SubscriptionManagerProps) {
   const [loading, setLoading] = useState(false);
+  const isFanvue = billingProvider === 'fanvue';
 
   const handleManageSubscription = async () => {
     setLoading(true);
 
     try {
+      if (isFanvue) {
+        const listingUrl = getFanvueAppStoreListingUrl();
+        if (!listingUrl) {
+          throw new Error('Fanvue billing is not configured yet.');
+        }
+        window.location.href = listingUrl;
+        return;
+      }
+
       const response = await fetch('/api/customer-portal', {
         method: 'POST',
         headers: {
@@ -32,13 +49,16 @@ export default function SubscriptionManager({
         throw new Error(data.error || 'Failed to create portal session');
       }
 
-      // Redirect to Stripe Customer Portal
       if (data.url) {
         window.location.href = data.url;
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Failed to open billing portal. Please try again.');
+      alert(
+        isFanvue
+          ? 'Failed to open Fanvue billing. Please try again.'
+          : 'Failed to open billing portal. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -59,9 +79,13 @@ export default function SubscriptionManager({
           >
             <path d="M20 12H4M12 4v16"></path>
           </svg>
-          <h2 className="text-2xl font-bold mb-2">No Active Subscription</h2>
+          <h2 className="text-2xl font-bold mb-2">
+            {isFanvue ? 'Free Plan' : 'No Active Subscription'}
+          </h2>
           <p className="text-muted-foreground mb-6">
-            You don&apos;t have an active subscription. Choose a plan to get started.
+            {isFanvue
+              ? 'You are on the free plan. Upgrade anytime for more monthly credits.'
+              : "You don't have an active subscription. Choose a plan to get started."}
           </p>
           <a
             href="/pricing"
@@ -77,10 +101,10 @@ export default function SubscriptionManager({
   const statusInfo = getSubscriptionStatusDisplay(subscription.status);
   const currentPeriodEnd = new Date(subscription.current_period_end);
   const isActive = subscription.status === 'active' || subscription.status === 'trialing';
+  const displayPlanName = planName ?? (isFanvue ? 'Paid' : null);
 
   return (
     <div className="space-y-6">
-      {/* Subscription Status Card */}
       <div className="bg-card border border-border rounded-lg p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -105,14 +129,24 @@ export default function SubscriptionManager({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Price ID</p>
-            <p className="font-mono text-sm">{subscription.price_id}</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Quantity</p>
-            <p className="font-semibold">{subscription.quantity}</p>
-          </div>
+          {displayPlanName ? (
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Plan</p>
+              <p className="font-semibold">{displayPlanName}</p>
+            </div>
+          ) : null}
+          {!isFanvue ? (
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Price ID</p>
+              <p className="font-mono text-sm">{subscription.price_id}</p>
+            </div>
+          ) : null}
+          {!isFanvue ? (
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Quantity</p>
+              <p className="font-semibold">{subscription.quantity}</p>
+            </div>
+          ) : null}
           <div>
             <p className="text-sm text-muted-foreground mb-1">
               {isActive ? 'Next Billing Date' : 'Period End'}
@@ -166,26 +200,33 @@ export default function SubscriptionManager({
               </svg>
               Loading...
             </span>
+          ) : isFanvue ? (
+            'Manage on Fanvue'
           ) : (
             'Manage Subscription'
           )}
         </button>
       </div>
 
-      {/* Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-card border border-border rounded-lg p-6">
-          <h3 className="font-semibold mb-2">Billing Portal</h3>
+          <h3 className="font-semibold mb-2">
+            {isFanvue ? 'Fanvue App Store' : 'Billing Portal'}
+          </h3>
           <p className="text-sm text-muted-foreground">
-            Use the Stripe Customer Portal to update your payment method, view invoices,
-            and manage your subscription.
+            {isFanvue
+              ? 'Manage your subscription, payment method, and invoices through the Fanvue App Store listing.'
+              : 'Use the Stripe Customer Portal to update your payment method, view invoices, and manage your subscription.'}
           </p>
         </div>
         <div className="bg-card border border-border rounded-lg p-6">
           <h3 className="font-semibold mb-2">Need Help?</h3>
           <p className="text-sm text-muted-foreground">
-            Contact our support team if you have any questions about your subscription
-            or billing.
+            Contact our support team at{' '}
+            <a href="mailto:support@synthetichumanlabs.com" className="underline">
+              support@synthetichumanlabs.com
+            </a>{' '}
+            if you have questions about your subscription or billing.
           </p>
         </div>
       </div>

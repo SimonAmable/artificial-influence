@@ -23,6 +23,8 @@ import {
   getFanvueCheckoutUrl,
   mapInternalPlanToFanvue,
 } from '@/lib/fanvue/app-store';
+import { getFanvuePlanCtaState } from '@/lib/fanvue/plan-cta';
+import { FANVUE_PLAN_PRICES_USD, FANVUE_MONTHLY_CREDITS } from '@/lib/fanvue/billing-config';
 import {
   getFeaturedPlanEstimates,
   getModelEstimateLines,
@@ -288,7 +290,30 @@ const monthlyPlans: PricingPlan[] = [
   //       info: 'Create as many autopost and workflow automations as you need, no caps on scheduled jobs',
   //     },
   //   ],
-  // },
+  //   },
+];
+
+const presenceMonthlyPlans: PricingPlan[] = [
+  freePlan,
+  {
+    ...monthlyPlans[1],
+    id: 'starter-monthly',
+    name: 'Starter',
+    price: FANVUE_PLAN_PRICES_USD.starter,
+    priceId: undefined,
+    credits: FANVUE_MONTHLY_CREDITS.starter,
+    creditsLabel: `${FANVUE_MONTHLY_CREDITS.starter} credits / month`,
+  },
+  {
+    ...monthlyPlans[2],
+    id: 'pro-monthly',
+    name: 'Pro',
+    price: FANVUE_PLAN_PRICES_USD.pro,
+    priceId: undefined,
+    credits: FANVUE_MONTHLY_CREDITS.pro,
+    creditsLabel: `${FANVUE_MONTHLY_CREDITS.pro} credits / month`,
+    popular: true,
+  },
 ];
 
 const yearlyPlans: PricingPlan[] = [
@@ -721,17 +746,17 @@ type ComparisonRow = {
   plus: ComparisonCell;
 };
 
-function getPlanComparisonRows(): ComparisonRow[] {
+function getPlanComparisonRows(starterCredits: number, paidCredits: number): ComparisonRow[] {
   const free = getFeaturedPlanEstimates(freePlan.credits);
-  const starter = getFeaturedPlanEstimates(400);
-  const plus = getFeaturedPlanEstimates(1000);
+  const starter = getFeaturedPlanEstimates(starterCredits);
+  const plus = getFeaturedPlanEstimates(paidCredits);
 
   return [
     {
       feature: 'Monthly credits',
       free: String(freePlan.credits),
-      starter: '400',
-      plus: '1,000',
+      starter: starterCredits.toLocaleString(),
+      plus: paidCredits.toLocaleString(),
     },
     {
       feature: 'NB2 images',
@@ -778,9 +803,13 @@ function getPlanComparisonRows(): ComparisonRow[] {
   ];
 }
 
-function PlanComparisonDetails() {
+function PlanComparisonDetails({ proLabel = 'Plus' }: { proLabel?: string }) {
   const [open, setOpen] = useState(false);
-  const rows = getPlanComparisonRows();
+  const isPresence = isPresenceProduct();
+  const rows = getPlanComparisonRows(
+    isPresence ? FANVUE_MONTHLY_CREDITS.starter : 400,
+    isPresence ? FANVUE_MONTHLY_CREDITS.pro : 1000
+  );
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="mt-10">
@@ -806,7 +835,7 @@ function PlanComparisonDetails() {
                 <th className="py-3 pr-4 font-medium text-muted-foreground">Feature</th>
                 <th className="px-3 py-3 font-medium text-foreground">Free</th>
                 <th className="px-3 py-3 font-medium text-foreground">Starter</th>
-                <th className="px-3 py-3 font-medium text-foreground">Plus</th>
+                <th className="px-3 py-3 font-medium text-foreground">{proLabel}</th>
               </tr>
             </thead>
             <tbody>
@@ -876,9 +905,16 @@ type PricingSectionProps = {
 
 type SubscriptionUiState =
   | { status: 'pending' }
-  | { status: 'ready'; isLoggedIn: boolean; activePriceId: string | null };
+  | {
+      status: 'ready';
+      isLoggedIn: boolean;
+      activePriceId: string | null;
+      activePlanUuid: string | null;
+      activePlanName: string | null;
+    };
 
 export function PricingSection({ embedded = false, compact = false }: PricingSectionProps) {
+  const isPresence = isPresenceProduct();
   const [loading, setLoading] = useState<string | null>(null);
   const [activePricingTab, setActivePricingTab] = useState<PricingTab>('monthly');
   const [subscriptionState, setSubscriptionState] = useState<SubscriptionUiState>({
@@ -893,8 +929,12 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
   const plusCardRef = useRef<HTMLDivElement>(null);
   const maxCardRef = useRef<HTMLDivElement>(null);
 
-  const isSubscriptionTab = activePricingTab === 'monthly' || activePricingTab === 'yearly';
-  const pricingPlans = activePricingTab === 'yearly' ? yearlyPlans : monthlyPlans;
+  const isSubscriptionTab = activePricingTab === 'monthly' || (!isPresence && activePricingTab === 'yearly');
+  const pricingPlans = isPresence
+    ? presenceMonthlyPlans
+    : activePricingTab === 'yearly'
+      ? yearlyPlans
+      : monthlyPlans;
   const staticHeaderCopy = {
     title: 'Pick Your Plan',
     description: 'Simple affordable pricing',
@@ -933,6 +973,38 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
 
         if (cancelled) return;
 
+        if (isPresence) {
+          if (!user) {
+            if (!cancelled) {
+              setSubscriptionState({
+                status: 'ready',
+                isLoggedIn: false,
+                activePriceId: null,
+                activePlanUuid: null,
+                activePlanName: null,
+              });
+            }
+            return;
+          }
+
+          const response = await fetch('/api/billing/subscription');
+          const data = (await response.json()) as {
+            activePlanUuid?: string | null;
+            activePlanName?: string | null;
+          };
+
+          if (!cancelled) {
+            setSubscriptionState({
+              status: 'ready',
+              isLoggedIn: true,
+              activePriceId: null,
+              activePlanUuid: data.activePlanUuid ?? null,
+              activePlanName: data.activePlanName ?? null,
+            });
+          }
+          return;
+        }
+
         let activePriceId: string | null = null;
         if (user) {
           const { data } = await supabase
@@ -952,6 +1024,8 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
             status: 'ready',
             isLoggedIn: Boolean(user),
             activePriceId,
+            activePlanUuid: null,
+            activePlanName: null,
           });
         }
       } catch (error) {
@@ -961,6 +1035,8 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
             status: 'ready',
             isLoggedIn: false,
             activePriceId: null,
+            activePlanUuid: null,
+            activePlanName: null,
           });
         }
       }
@@ -971,11 +1047,15 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [supabase, isPresence]);
 
   const planStateReady = subscriptionState.status === 'ready';
   const activePriceId =
     subscriptionState.status === 'ready' ? subscriptionState.activePriceId : null;
+  const activePlanUuid =
+    subscriptionState.status === 'ready' ? subscriptionState.activePlanUuid : null;
+  const activePlanName =
+    subscriptionState.status === 'ready' ? subscriptionState.activePlanName : null;
   const isLoggedIn = subscriptionState.status === 'ready' ? subscriptionState.isLoggedIn : false;
 
   const handleManageBilling = async (planId: string) => {
@@ -1126,7 +1206,8 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
             <TabsList
               variant="default"
               className={cn(
-                '!mx-auto grid !h-auto min-h-10 w-full max-w-xl grid-cols-4 gap-0.5 rounded-4xl p-0.5',
+                '!mx-auto grid !h-auto min-h-10 w-full max-w-xl gap-0.5 rounded-4xl p-0.5',
+                isPresence ? 'grid-cols-2' : 'grid-cols-4',
                 'border border-border/65 bg-muted/95',
                 'shadow-[inset_0_2px_6px_rgba(0,0,0,0.10),inset_0_1px_2px_rgba(0,0,0,0.06),inset_0_-1px_1px_rgba(255,255,255,0.35)]',
                 'dark:border-border/45 dark:bg-muted/55',
@@ -1139,24 +1220,28 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
               >
                 Monthly
               </TabsTrigger>
-              <TabsTrigger
-                value="yearly"
-                className="flex min-h-8 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-1.5 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
-              >
-                <span>Yearly</span>
-              </TabsTrigger>
+              {!isPresence ? (
+                <TabsTrigger
+                  value="yearly"
+                  className="flex min-h-8 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-1.5 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
+                >
+                  <span>Yearly</span>
+                </TabsTrigger>
+              ) : null}
               <TabsTrigger
                 value="one-time"
                 className="flex min-h-8 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-1.5 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
               >
                 Credits
               </TabsTrigger>
-              <TabsTrigger
-                value="enterprise"
-                className="flex min-h-8 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-1.5 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
-              >
-                Enterprise
-              </TabsTrigger>
+              {!isPresence ? (
+                <TabsTrigger
+                  value="enterprise"
+                  className="flex min-h-8 w-full min-w-0 shrink-0 items-center justify-center rounded-2xl border border-transparent px-1.5 py-1.5 text-center text-xs font-medium text-muted-foreground transition-[color,box-shadow,border-color,background-color] hover:text-foreground data-active:border-border/80 data-active:bg-background data-active:text-foreground data-active:shadow-sm dark:data-active:border-border/60 dark:data-active:bg-card/90 sm:px-3 sm:text-sm"
+                >
+                  Enterprise
+                </TabsTrigger>
+              ) : null}
             </TabsList>
           </Tabs>
         </motion.div>
@@ -1203,7 +1288,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                       className="rounded-full"
                       onClick={() => scrollCardIntoView(plusCardRef.current)}
                     >
-                      Plus
+                      {isPresence ? 'Pro' : 'Plus'}
                     </Button>
                     {/* Max jump-to button hidden for conversion test — re-enable to restore */}
                     {/* <Button
@@ -1238,13 +1323,20 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                   const hasYearlyDiscount =
                     plan.interval === 'year' && listMonthly != null && annualMonthly < listMonthly;
                   const cta = planStateReady
-                    ? getPlanCtaState({
-                        planName: plan.name,
-                        planInterval: plan.interval,
-                        planPriceId: plan.priceId,
-                        activePriceId,
-                        isLoggedIn,
-                      })
+                    ? isPresence
+                      ? getFanvuePlanCtaState({
+                          planName: plan.name,
+                          activePlanUuid,
+                          activePlanName,
+                          isLoggedIn,
+                        })
+                      : getPlanCtaState({
+                          planName: plan.name,
+                          planInterval: plan.interval,
+                          planPriceId: plan.priceId,
+                          activePriceId,
+                          isLoggedIn,
+                        })
                     : null;
                   const isCurrentPlan = planStateReady && cta?.kind === 'current';
 
@@ -1256,7 +1348,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                           ? freeCardRef
                           : plan.name === 'Starter'
                             ? starterCardRef
-                            : plan.name === 'Plus'
+                            : plan.name === 'Plus' || plan.name === 'Pro'
                               ? plusCardRef
                               : maxCardRef
                       }
@@ -1379,7 +1471,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                           loading={loading === plan.id}
                           popular={Boolean(plan.popular)}
                           signupHref={plan.ctaHref ?? '/login?mode=signup'}
-                          onCheckout={() => handleSubscribe(plan.priceId!, plan.id)}
+                          onCheckout={() => handleSubscribe(plan.priceId ?? '', plan.id)}
                           onPortal={() => handleManageBilling(plan.id)}
                         />
                       </div>
@@ -1387,7 +1479,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
                   );
                 })}
               </motion.div>
-              <PlanComparisonDetails />
+              <PlanComparisonDetails proLabel={isPresence ? 'Pro' : 'Plus'} />
             </motion.div>
           ) : activePricingTab === 'one-time' ? (
             <motion.div

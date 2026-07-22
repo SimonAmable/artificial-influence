@@ -12,10 +12,12 @@ import {
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
 import { CREDIT_PACK_CENTS_PER_CREDIT } from '@/lib/credit-packs';
+import { FANVUE_CREDIT_PACK_PRICES_USD } from '@/lib/fanvue/billing-config';
 import {
   getFanvueAppStoreListingUrl,
   getFanvueCreditCheckoutUrl,
   mapCreditsToFanvueItem,
+  type FanvueCreditItemKey,
 } from '@/lib/fanvue/app-store';
 import { isPresenceProduct } from '@/lib/product/require-presence';
 import { cn } from '@/lib/utils';
@@ -26,27 +28,46 @@ type CreditPackGridProps = {
   redirectPath?: string;
 };
 
-const PACK_AMOUNTS = [10, 25, 50, 100] as const;
+const STRIPE_PACK_AMOUNTS = [10, 25, 50, 100] as const;
 
-function toCredits(amountDollars: number) {
+const PRESENCE_PACKS: Array<{ credits: FanvueCreditItemKey; price: number }> = [
+  { credits: '200', price: FANVUE_CREDIT_PACK_PRICES_USD['200'] },
+  { credits: '500', price: FANVUE_CREDIT_PACK_PRICES_USD['500'] },
+  { credits: '1000', price: FANVUE_CREDIT_PACK_PRICES_USD['1000'] },
+  { credits: '2000', price: FANVUE_CREDIT_PACK_PRICES_USD['2000'] },
+];
+
+function toStripeCredits(amountDollars: number) {
   return (amountDollars * 100) / CREDIT_PACK_CENTS_PER_CREDIT;
 }
 
+function formatPackPrice(price: number) {
+  return Number.isInteger(price) ? `$${price}` : `$${price.toFixed(2)}`;
+}
+
 export function CreditPackGrid({ className, redirectPath = '/pricing' }: CreditPackGridProps) {
+  const isPresence = isPresenceProduct();
   const [activeCredits, setActiveCredits] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [customOpen, setCustomOpen] = useState(false);
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
-  const fixedPacks = PACK_AMOUNTS.map((amountDollars) => {
-    const credits = toCredits(amountDollars);
+  const stripePacks = STRIPE_PACK_AMOUNTS.map((amountDollars) => {
+    const credits = toStripeCredits(amountDollars);
     return {
       amountDollars,
       credits,
       imageEstimate: credits / 2,
     };
   });
+
+  const presencePacks = PRESENCE_PACKS.map((pack) => ({
+    credits: Number(pack.credits),
+    price: pack.price,
+    imageEstimate: Number(pack.credits) / 2,
+    itemKey: pack.credits,
+  }));
 
   const startCheckout = async (credits: number) => {
     setError(null);
@@ -62,7 +83,7 @@ export function CreditPackGrid({ className, redirectPath = '/pricing' }: CreditP
         return;
       }
 
-      if (isPresenceProduct()) {
+      if (isPresence) {
         const itemKey = mapCreditsToFanvueItem(credits);
         const checkoutUrl = itemKey
           ? getFanvueCreditCheckoutUrl(itemKey, { action: 'checkout' })
@@ -104,21 +125,89 @@ export function CreditPackGrid({ className, redirectPath = '/pricing' }: CreditP
 
   return (
     <section className={cn('mx-auto w-full max-w-7xl', className)}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {fixedPacks.map((pack) => (
+      <div
+        className={cn(
+          'grid grid-cols-1 gap-4 sm:grid-cols-2',
+          isPresence ? 'xl:grid-cols-4' : 'xl:grid-cols-5'
+        )}
+      >
+        {isPresence
+          ? presencePacks.map((pack) => (
+              <article
+                key={pack.credits}
+                className={cn(
+                  'flex min-h-[250px] flex-col justify-between rounded-[22px] border border-border/70 bg-card/90 p-5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-lg'
+                )}
+              >
+                <div>
+                  <p className="text-4xl font-semibold tracking-tight">
+                    {formatPackPrice(pack.price)}
+                  </p>
+                  <p className="mt-7 text-lg font-medium text-foreground">
+                    {pack.credits.toLocaleString()} credits
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    ~ {pack.imageEstimate.toLocaleString()} Nano Banana images
+                  </p>
+                </div>
+
+                <div className="mt-8">
+                  <Button
+                    type="button"
+                    className="h-12 w-full rounded-2xl bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                    onClick={() => void startCheckout(pack.credits)}
+                    disabled={activeCredits != null}
+                  >
+                    {activeCredits === pack.credits
+                      ? 'Opening checkout...'
+                      : `Buy ${pack.credits.toLocaleString()} credits`}
+                  </Button>
+                </div>
+              </article>
+            ))
+          : stripePacks.map((pack) => (
+              <article
+                key={pack.amountDollars}
+                className={cn(
+                  'flex min-h-[250px] flex-col justify-between rounded-[22px] border border-border/70 bg-card/90 p-5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-lg'
+                )}
+              >
+                <div>
+                  <p className="text-4xl font-semibold tracking-tight">${pack.amountDollars}</p>
+                  <p className="mt-7 text-lg font-medium text-foreground">
+                    {pack.credits.toLocaleString()} credits
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    ~ {pack.imageEstimate.toLocaleString()} Nano Banana images
+                  </p>
+                </div>
+
+                <div className="mt-8">
+                  <Button
+                    type="button"
+                    className="h-12 w-full rounded-2xl bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                    onClick={() => void startCheckout(pack.credits)}
+                    disabled={activeCredits != null}
+                  >
+                    {activeCredits === pack.credits
+                      ? 'Opening checkout...'
+                      : `Buy ${pack.credits.toLocaleString()} credits`}
+                  </Button>
+                </div>
+              </article>
+            ))}
+
+        {!isPresence ? (
           <article
-            key={pack.amountDollars}
             className={cn(
               'flex min-h-[250px] flex-col justify-between rounded-[22px] border border-border/70 bg-card/90 p-5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-lg'
             )}
           >
             <div>
-              <p className="text-4xl font-semibold tracking-tight">${pack.amountDollars}</p>
-              <p className="mt-7 text-lg font-medium text-foreground">
-                {pack.credits.toLocaleString()} credits
-              </p>
+              <p className="text-4xl font-semibold tracking-tight">Custom</p>
+              <p className="mt-7 text-lg font-medium text-foreground">Any amount</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                ~ {pack.imageEstimate.toLocaleString()} Nano Banana images
+                Choose the exact credit total you want before checkout.
               </p>
             </div>
 
@@ -126,59 +215,34 @@ export function CreditPackGrid({ className, redirectPath = '/pricing' }: CreditP
               <Button
                 type="button"
                 className="h-12 w-full rounded-2xl bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                onClick={() => void startCheckout(pack.credits)}
+                onClick={() => setCustomOpen(true)}
                 disabled={activeCredits != null}
               >
-                {activeCredits === pack.credits
-                  ? 'Opening checkout...'
-                  : `Buy ${pack.credits.toLocaleString()} credits`}
+                Choose amount
               </Button>
             </div>
           </article>
-        ))}
-
-        <article
-          className={cn(
-            'flex min-h-[250px] flex-col justify-between rounded-[22px] border border-border/70 bg-card/90 p-5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-lg'
-          )}
-        >
-          <div>
-            <p className="text-4xl font-semibold tracking-tight">Custom</p>
-            <p className="mt-7 text-lg font-medium text-foreground">Any amount</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Choose the exact credit total you want before checkout.
-            </p>
-          </div>
-
-          <div className="mt-8">
-            <Button
-              type="button"
-              className="h-12 w-full rounded-2xl bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              onClick={() => setCustomOpen(true)}
-              disabled={activeCredits != null}
-            >
-              Choose amount
-            </Button>
-          </div>
-        </article>
+        ) : null}
       </div>
 
       {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
 
-      <Dialog open={customOpen} onOpenChange={setCustomOpen}>
-        <DialogContent className="!max-w-none max-h-[90vh] w-[min(100vw-1.5rem,72rem)] overflow-y-auto rounded-[28px] border-border/70 bg-background/95 p-4 shadow-2xl sm:p-6">
-          <DialogHeader className="px-1 pt-1">
-            <DialogTitle className="text-2xl font-semibold tracking-tight">
-              Custom credit pack
-            </DialogTitle>
-            <DialogDescription>
-              Use the slider to choose the amount that fits your run.
-            </DialogDescription>
-          </DialogHeader>
+      {!isPresence ? (
+        <Dialog open={customOpen} onOpenChange={setCustomOpen}>
+          <DialogContent className="!max-w-none max-h-[90vh] w-[min(100vw-1.5rem,72rem)] overflow-y-auto rounded-[28px] border-border/70 bg-background/95 p-4 shadow-2xl sm:p-6">
+            <DialogHeader className="px-1 pt-1">
+              <DialogTitle className="text-2xl font-semibold tracking-tight">
+                Custom credit pack
+              </DialogTitle>
+              <DialogDescription>
+                Use the slider to choose the amount that fits your run.
+              </DialogDescription>
+            </DialogHeader>
 
-          <CreditPackCheckout redirectPath={redirectPath} />
-        </DialogContent>
-      </Dialog>
+            <CreditPackCheckout redirectPath={redirectPath} />
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </section>
   );
 }
