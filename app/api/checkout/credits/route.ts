@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rejectStripeBillingRoute } from '@/lib/billing/require-stripe-billing';
 import { validateCreditPackCredits, CREDIT_PACK_CURRENCY } from '@/lib/credit-packs';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
@@ -19,6 +20,11 @@ function isMissingStripeCustomer(error: unknown) {
 
 export async function POST(request: NextRequest) {
   try {
+    const stripeBlocked = rejectStripeBillingRoute();
+    if (stripeBlocked) {
+      return stripeBlocked;
+    }
+
     let body: unknown;
     try {
       body = await request.json();

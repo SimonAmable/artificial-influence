@@ -614,10 +614,13 @@ export default function AIInfluencerPage() {
     setIsGenerating(true)
     try {
       const mode = getDetectedMode()
+      // Sonner merges updates by id and keeps a prior description unless cleared
+      // (e.g. content-moderation's "No credits were used..." stuck on the next loading toast).
+      const influencerToast = { id: "influencer-toast", description: "" } as const
 
       if (uploadedFiles.length === 1) {
         // Mode 1: Upload and save directly
-        toast.loading("Saving your character upload...", { id: "influencer-toast" })
+        toast.loading("Saving your character upload...", influencerToast)
         const uploadResult = await uploadFileToSupabase(uploadedFiles[0].file, "ai-influencer")
         if (!uploadResult) throw new Error("Failed to upload character photo")
 
@@ -669,7 +672,7 @@ export default function AIInfluencerPage() {
           console.error("[ai-influencer] saveCharacterAsset(upload)", assetError)
         }
 
-        toast.success("Character saved successfully!", { id: "influencer-toast" })
+        toast.success("Character saved successfully!", influencerToast)
         handleReset()
         setSelectedCharacter(createdCharacter)
         const refreshedHistory = await fetchHistory()
@@ -687,7 +690,10 @@ export default function AIInfluencerPage() {
         }
       } else {
         // Mode 2 & 3: Run model generation with GPT Image 2
-        toast.loading("Generating your AI Influencer (this may take a few seconds)...", { id: "influencer-toast" })
+        toast.loading(
+          "Generating your AI Influencer (this may take a few seconds)...",
+          influencerToast,
+        )
 
         const prompt = buildCharacterGenerationPrompt(name, selectedTraits, uploadedFiles.length >= 2)
 
@@ -742,7 +748,7 @@ export default function AIInfluencerPage() {
         } catch (assetError) {
           console.error("[ai-influencer] saveCharacterAsset(generated)", assetError)
         }
-        toast.success("AI Influencer created successfully!", { id: "influencer-toast" })
+        toast.success("AI Influencer created successfully!", influencerToast)
         handleReset()
         setSelectedCharacter(createdCharacter)
         const refreshedHistory = await fetchHistory()
@@ -763,13 +769,14 @@ export default function AIInfluencerPage() {
       console.error(err)
       const msg = err instanceof Error ? err.message : "Failed to create character"
       if (isInsufficientCreditsError(err) || isInsufficientCreditsMessage(msg)) {
+        toast.dismiss("influencer-toast")
         showCreditsUpsellToast({
           message: msg,
           description: "Upgrade your plan to get more credits for character generation",
           toastId: "influencer-credits-upsell"
         })
       } else if (!tryShowContentModerationToast(msg, err, { toastId: "influencer-toast" })) {
-        toast.error(msg, { id: "influencer-toast" })
+        toast.error(msg, { id: "influencer-toast", description: "" })
       }
     } finally {
       setIsGenerating(false)

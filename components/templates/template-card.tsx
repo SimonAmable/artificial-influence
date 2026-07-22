@@ -9,6 +9,7 @@ import {
   Video,
 } from "@phosphor-icons/react"
 import type { Template } from "@/lib/templates/types"
+import { ReportContentButton } from "@/components/app/report-content-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -115,6 +116,17 @@ export function TemplateCard({
               {outputLabel}
             </Badge>
           </div>
+          {template.visibility === "public" && !isOwner ? (
+            <div className="absolute right-2 top-2">
+              <ReportContentButton
+                contentType="template"
+                contentId={template.id}
+                contentSlug={template.slug}
+                contentUrl={`/templates/${template.slug}`}
+                className="bg-background/85 text-foreground backdrop-blur-sm hover:bg-background"
+              />
+            </div>
+          ) : null}
         </div>
       </Link>
 

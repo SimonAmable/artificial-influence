@@ -10,6 +10,7 @@ import {
   type AssetSelectionPick,
 } from "@/components/shared/modals/asset-selection-modal"
 import { TemplateRunForm } from "@/components/templates/template-run-form"
+import { ReportContentButton } from "@/components/app/report-content-button"
 import {
   TemplateInputField,
   type TemplateFieldValue,
@@ -326,26 +327,43 @@ function ExploreCard({
   onOpen: (item: ExploreItem) => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(item)}
-      className="group mb-4 block w-full break-inside-avoid overflow-hidden rounded-lg bg-muted text-left outline-none ring-offset-background transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-    >
-      <div
-        className="relative w-full overflow-hidden bg-muted"
-        style={{ aspectRatio: String(aspectRatio) }}
-      >
-        <ExploreMedia item={item} onAspectRatio={(ratio) => onAspectRatio(item, ratio)} />
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/55 px-4 text-center opacity-0 backdrop-blur-[1px] transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
-          <p className="line-clamp-2 text-sm font-semibold leading-tight text-white">
-            {item.title}
-          </p>
-          <span className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-black shadow-sm">
-            {item.kind === "template" ? "Use Template" : "Use Example"}
-          </span>
+    <div className="group mb-4 block w-full break-inside-avoid">
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => onOpen(item)}
+          className="block w-full overflow-hidden rounded-lg bg-muted text-left outline-none ring-offset-background transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <div
+            className="relative w-full overflow-hidden bg-muted"
+            style={{ aspectRatio: String(aspectRatio) }}
+          >
+            <ExploreMedia item={item} onAspectRatio={(ratio) => onAspectRatio(item, ratio)} />
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/55 px-4 text-center opacity-0 backdrop-blur-[1px] transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
+              <p className="line-clamp-2 text-sm font-semibold leading-tight text-white">
+                {item.title}
+              </p>
+              <span className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-black shadow-sm">
+                {item.kind === "template" ? "Use Template" : "Use Example"}
+              </span>
+            </div>
+          </div>
+        </button>
+        <div className="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover:opacity-100">
+          <ReportContentButton
+            contentType={item.kind === "template" ? "template" : "saved_example"}
+            contentId={item.id}
+            contentSlug={item.kind === "template" ? item.template.slug : undefined}
+            contentUrl={
+              item.kind === "template"
+                ? `/templates/${item.template.slug}`
+                : `/explore`
+            }
+            className="bg-background/90 text-foreground backdrop-blur hover:bg-background"
+          />
         </div>
       </div>
-    </button>
+    </div>
   )
 }
 

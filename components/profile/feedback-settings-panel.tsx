@@ -22,6 +22,7 @@ export type FeedbackType =
   | "feature"
   | "improvement"
   | "template_request"
+  | "abuse"
 
 export type FeedbackSettingsPanelProps = {
   variant?: "dialog" | "modal"
@@ -30,6 +31,7 @@ export type FeedbackSettingsPanelProps = {
   open?: boolean
   initialFeedbackType?: FeedbackType
   hideFeedbackType?: boolean
+  initialMessage?: string
 }
 
 const DEFAULT_FEEDBACK_TYPE: FeedbackType = "general"
@@ -68,6 +70,11 @@ const FEEDBACK_COPY: Record<
     messagePlaceholder:
       "Describe the hook, format, or visual style you want.",
   },
+  abuse: {
+    description: "Report content that violates our policies or applicable law.",
+    messageLabel: "Report details",
+    messagePlaceholder: "Describe what is wrong and include any relevant context.",
+  },
 }
 
 export function FeedbackSettingsPanel({
@@ -77,6 +84,7 @@ export function FeedbackSettingsPanel({
   open,
   initialFeedbackType = DEFAULT_FEEDBACK_TYPE,
   hideFeedbackType = false,
+  initialMessage = "",
 }: FeedbackSettingsPanelProps) {
   const [feedbackType, setFeedbackType] = React.useState<FeedbackType>(initialFeedbackType)
   const [message, setMessage] = React.useState("")
@@ -92,9 +100,9 @@ export function FeedbackSettingsPanel({
   React.useEffect(() => {
     if (!open) return
     setFeedbackType(initialFeedbackType)
-    setMessage("")
+    setMessage(initialMessage)
     setTiktokLinks("")
-  }, [initialFeedbackType, open])
+  }, [initialFeedbackType, initialMessage, open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -154,6 +162,7 @@ export function FeedbackSettingsPanel({
                 <SelectItem value="feature">Feature Request</SelectItem>
                 <SelectItem value="improvement">Improvement Suggestion</SelectItem>
                 <SelectItem value="template_request">Template Request</SelectItem>
+                <SelectItem value="abuse">Report Abuse</SelectItem>
               </SelectContent>
             </Select>
           </div>

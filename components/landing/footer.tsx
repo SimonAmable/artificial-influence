@@ -4,8 +4,11 @@ import {
   getFooterMegaNavColumns,
   type FooterMegaNavLink,
 } from "@/lib/constants/navigation"
+import { getFanvueAppStoreListingUrl } from "@/lib/fanvue/app-store"
 import { currentProduct } from "@/lib/product/current"
 import { cn } from "@/lib/utils"
+
+const SUPPORT_EMAIL = "support@synthetichumanlabs.com"
 
 function FooterLinkList({
   links,
@@ -34,6 +37,8 @@ function FooterLinkList({
 export function Footer() {
   const { imageTools, videoTools, otherTools, imageModels, videoModels, freeTools } =
     getFooterMegaNavColumns()
+  const fanvueListingUrl =
+    currentProduct.billingProvider === "fanvue" ? getFanvueAppStoreListingUrl() : null
 
   return (
     <footer className="relative w-full overflow-hidden bg-background py-12">
@@ -125,6 +130,26 @@ export function Footer() {
                   Delete account
                 </Link>
               </li>
+              <li>
+                <a
+                  href={`mailto:${SUPPORT_EMAIL}`}
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Support
+                </a>
+              </li>
+              {fanvueListingUrl ? (
+                <li>
+                  <a
+                    href={fanvueListingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Fanvue App Store
+                  </a>
+                </li>
+              ) : null}
             </ul>
           </div>
         </div>

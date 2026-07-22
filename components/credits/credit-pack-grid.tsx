@@ -12,6 +12,12 @@ import {
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
 import { CREDIT_PACK_CENTS_PER_CREDIT } from '@/lib/credit-packs';
+import {
+  getFanvueAppStoreListingUrl,
+  getFanvueCreditCheckoutUrl,
+  mapCreditsToFanvueItem,
+} from '@/lib/fanvue/app-store';
+import { isPresenceProduct } from '@/lib/product/require-presence';
 import { cn } from '@/lib/utils';
 import { CreditPackCheckout } from '@/components/credits/credit-pack-checkout';
 
@@ -53,6 +59,18 @@ export function CreditPackGrid({ className, redirectPath = '/pricing' }: CreditP
 
       if (!user) {
         router.push(`/login?redirect=${encodeURIComponent(redirectPath)}`);
+        return;
+      }
+
+      if (isPresenceProduct()) {
+        const itemKey = mapCreditsToFanvueItem(credits);
+        const checkoutUrl = itemKey
+          ? getFanvueCreditCheckoutUrl(itemKey, { action: 'checkout' })
+          : getFanvueAppStoreListingUrl();
+        if (!checkoutUrl) {
+          throw new Error('Fanvue billing is not configured yet.');
+        }
+        window.location.href = checkoutUrl;
         return;
       }
 

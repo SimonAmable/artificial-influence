@@ -19,6 +19,11 @@ import {
 import { cn } from '@/lib/utils';
 import { isPresenceProduct } from '@/lib/product/require-presence';
 import {
+  getFanvueAppStoreListingUrl,
+  getFanvueCheckoutUrl,
+  mapInternalPlanToFanvue,
+} from '@/lib/fanvue/app-store';
+import {
   getFeaturedPlanEstimates,
   getModelEstimateLines,
 } from '@/lib/pricing-output-estimates';
@@ -986,6 +991,16 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
         return;
       }
 
+      if (isPresenceProduct()) {
+        const listingUrl = getFanvueAppStoreListingUrl();
+        if (!listingUrl) {
+          alert('Fanvue billing is not configured yet.');
+          return;
+        }
+        window.location.assign(listingUrl);
+        return;
+      }
+
       const response = await fetch('/api/customer-portal', {
         method: 'POST',
         headers: {
@@ -1023,6 +1038,19 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
 
       if (!user) {
         router.push('/login?redirect=/pricing');
+        return;
+      }
+
+      if (isPresenceProduct()) {
+        const fanvuePlan = mapInternalPlanToFanvue(planId);
+        const checkoutUrl = fanvuePlan
+          ? getFanvueCheckoutUrl(fanvuePlan, { action: 'checkout' })
+          : getFanvueAppStoreListingUrl();
+        if (!checkoutUrl) {
+          alert('Fanvue billing is not configured yet.');
+          return;
+        }
+        window.location.assign(checkoutUrl);
         return;
       }
 

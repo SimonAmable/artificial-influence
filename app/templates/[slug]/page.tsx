@@ -2,6 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 import { TemplateRunForm } from "@/components/templates/template-run-form"
+import { ReportContentButton } from "@/components/app/report-content-button"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/server"
 import { getTemplateBySlugForUser } from "@/lib/templates/database-server"
@@ -21,6 +22,9 @@ export default async function TemplateRunPage({ params }: TemplateRunPageProps) 
   if (!template) {
     notFound()
   }
+
+  const isOwner = Boolean(user?.id && template.creator_id === user.id)
+  const showReport = template.visibility === "public" && !isOwner
 
   return (
     <main className="min-h-screen bg-background">
@@ -66,9 +70,19 @@ export default async function TemplateRunPage({ params }: TemplateRunPageProps) 
               </Button>
 
               <div className="min-w-0 flex-1">
-                <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">
-                  {template.title}
-                </h1>
+                <div className="flex items-start justify-between gap-3">
+                  <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">
+                    {template.title}
+                  </h1>
+                  {showReport ? (
+                    <ReportContentButton
+                      contentType="template"
+                      contentId={template.id}
+                      contentSlug={template.slug}
+                      contentUrl={`/templates/${template.slug}`}
+                    />
+                  ) : null}
+                </div>
                 {template.description ? (
                   <p className="mt-2 text-sm text-muted-foreground lg:max-w-2xl lg:text-base">
                     {template.description}

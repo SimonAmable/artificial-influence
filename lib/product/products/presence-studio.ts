@@ -3,7 +3,7 @@ import type { ProductConfig } from "@/lib/product/types"
 export const presenceStudioProduct: ProductConfig = {
   id: "presence-studio",
   name: "Presence Studio",
-  siteUrl: "https://presencestudio.ai",
+  siteUrl: "https://artificialinfluence.tech",
   logo: "/presence_studio_logo.png",
   logoSizePx: 36,
   logoClassName: "relative z-10",
@@ -47,6 +47,7 @@ export const presenceStudioProduct: ProductConfig = {
   defaultSignedInRoute: "/dashboard",
   assistantName: "Presence Agent",
   onboardingEnabled: false,
+  billingProvider: "fanvue",
   pageOverrides: {
     landing: "presence",
     dashboard: "default",

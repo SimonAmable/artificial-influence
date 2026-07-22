@@ -5,6 +5,7 @@ import { createPortal } from "react-dom"
 import { Images, PencilSimple, Sparkle, UploadSimple, X } from "@phosphor-icons/react"
 
 import type { SavedExample } from "@/lib/examples/types"
+import { ReportContentButton } from "@/components/app/report-content-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
@@ -215,6 +216,15 @@ export function SavedExamplesGallery({
                          >
                            <PencilSimple className="size-3.5" weight="bold" />
                          </Button>
+                       ) : example.visibility === "public" ? (
+                         <div className="absolute right-2.5 top-2.5 opacity-0 transition-all group-hover:opacity-100">
+                           <ReportContentButton
+                             contentType="saved_example"
+                             contentId={example.id}
+                             contentUrl={typeof window !== "undefined" ? window.location.href : undefined}
+                             className="size-8 rounded-full bg-background/90 text-foreground backdrop-blur hover:bg-background"
+                           />
+                         </div>
                        ) : null}
 
                       {/* Center Glass Button */}

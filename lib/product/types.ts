@@ -2,6 +2,9 @@ export type ProductId = "unican" | "presence-studio"
 
 export type PageVariant = "default" | "presence"
 
+/** How this product collects money. Presence uses Fanvue App Store rails; UniCan uses Stripe. */
+export type BillingProvider = "stripe" | "fanvue"
+
 export interface ProductMetadataConfig {
   title: string
   titleTemplate: string
@@ -41,6 +44,7 @@ export interface ProductConfig {
   assistantName: string
   /** When false, signed-in users skip onboarding redirects and /onboarding is unavailable. */
   onboardingEnabled: boolean
+  billingProvider: BillingProvider
   pageOverrides?: {
     landing?: PageVariant
     onboarding?: PageVariant

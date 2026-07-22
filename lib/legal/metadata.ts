@@ -1,12 +1,11 @@
 import type { Metadata } from "next"
 
 import { loadLegalDoc, type LegalSlug } from "@/lib/legal/load-legal-doc"
-
-const SITE_NAME = "UniCan"
+import { currentProduct } from "@/lib/product/current"
 
 export function getLegalMetadata(slug: LegalSlug): Metadata {
   const { data } = loadLegalDoc(slug)
-  const title = `${data.title} | ${SITE_NAME}`
+  const title = `${data.title} | ${currentProduct.name}`
 
   return {
     title,

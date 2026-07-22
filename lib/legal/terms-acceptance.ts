@@ -5,6 +5,7 @@ import type { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
 import { loadLegalDoc } from "@/lib/legal/load-legal-doc"
+import { currentProduct } from "@/lib/product/current"
 
 export const TERMS_VERSION_COOKIE = "terms_version" as const
 
@@ -87,7 +88,7 @@ export function getCurrentTermsDocument(): CurrentTermsDocument {
   const lastUpdated = normalizeFrontmatterString(data.lastUpdated)
 
   if (!version) {
-    throw new Error('content/legal/terms.md is missing required frontmatter field "version".')
+    throw new Error(`content/legal/${currentProduct.id}/terms.md is missing required frontmatter field "version".`)
   }
 
   cachedCurrentTerms = {

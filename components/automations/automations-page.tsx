@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { ReportContentButton } from "@/components/app/report-content-button"
 import {
   AssetSelectionModal,
   type AssetSelectionPick,
@@ -2694,6 +2695,14 @@ export function AutomationsPage() {
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
+                          {a.user_id !== userId ? (
+                            <ReportContentButton
+                              contentType="automation"
+                              contentId={a.id}
+                              contentUrl={`/automations?scope=community`}
+                              className="size-8 rounded-full bg-background/90 text-foreground backdrop-blur hover:bg-background"
+                            />
+                          ) : null}
                         </>
                       ) : (
                         <>

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { Coin } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
@@ -15,9 +16,22 @@ import { RestartOnboardingButton } from "@/components/profile/restart-onboarding
 import { LayoutModeToggleGroup } from "@/components/settings/layout-mode-toggle-group"
 import { ThemeToggleGroup } from "@/components/settings/theme-toggle-group"
 import { LayoutMode } from "@/components/shared/layout/layout-toggle"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
+import { createClient } from "@/lib/supabase/client"
 import { isOnboardingEnabled } from "@/lib/product/onboarding"
 
 export type ProfileSettingsPanelProps = {
@@ -55,6 +69,7 @@ export function ProfileSettingsPanel({
   layoutMode,
   onLayoutModeChange,
 }: ProfileSettingsPanelProps) {
+  const router = useRouter()
   const isModal = variant === "modal"
   const nameSize = isModal ? "compact" : "page"
   const showLayout = layoutMode !== undefined && onLayoutModeChange !== undefined
@@ -64,6 +79,10 @@ export function ProfileSettingsPanel({
   const [enhanceByDefault, setEnhanceByDefault] = React.useState(defaultEnhancePrompt)
   const [enhanceByDefaultPending, startEnhanceByDefaultTransition] = React.useTransition()
   const enhanceByDefaultSwitchId = React.useId()
+  const [exportLoading, setExportLoading] = React.useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+  const [deleteEmailInput, setDeleteEmailInput] = React.useState("")
+  const [deleteLoading, setDeleteLoading] = React.useState(false)
 
   React.useEffect(() => {
     setStripMetadata(autoStripImageMetadata)
@@ -113,6 +132,66 @@ export function ProfileSettingsPanel({
         }
       })()
     })
+  }
+
+  async function handleExportData() {
+    setExportLoading(true)
+    try {
+      const response = await fetch("/api/account/export")
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(data?.error || "Failed to export data.")
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = `data-export-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      toast.success("Your data export has started downloading.")
+    } catch (error) {
+      console.error("[profile-settings] export", error)
+      toast.error(error instanceof Error ? error.message : "Failed to export data.")
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (deleteEmailInput.trim().toLowerCase() !== email.trim().toLowerCase()) {
+      toast.error("Email confirmation does not match your account email.")
+      return
+    }
+
+    setDeleteLoading(true)
+    try {
+      const response = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmationEmail: deleteEmailInput.trim() }),
+      })
+      const data = (await response.json().catch(() => null)) as { error?: string } | null
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to delete account.")
+      }
+
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      toast.success("Your account has been deleted.")
+      setDeleteDialogOpen(false)
+      onLogout?.()
+      router.push("/")
+      router.refresh()
+    } catch (error) {
+      console.error("[profile-settings] delete", error)
+      toast.error(error instanceof Error ? error.message : "Failed to delete account.")
+    } finally {
+      setDeleteLoading(false)
+    }
   }
 
   return (
@@ -214,6 +293,85 @@ export function ProfileSettingsPanel({
           variant={variant}
           onLoggedOut={onLogout}
         />
+      </div>
+
+      <div
+        className={
+          isModal
+            ? "space-y-3 border-t border-border/60 pt-6"
+            : "space-y-3 rounded-2xl border border-destructive/30 bg-background/80 p-4"
+        }
+      >
+        <div>
+          <p className="text-sm font-medium text-foreground">Danger zone</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Export your data or permanently delete your account and all associated content.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <Button
+            type="button"
+            variant="outline"
+            className={isModal ? "rounded-full" : undefined}
+            disabled={exportLoading}
+            onClick={() => void handleExportData()}
+          >
+            {exportLoading ? "Preparing export..." : "Download my data"}
+          </Button>
+          <AlertDialog
+            open={deleteDialogOpen}
+            onOpenChange={(open) => {
+              setDeleteDialogOpen(open)
+              if (!open) setDeleteEmailInput("")
+            }}
+          >
+            <AlertDialogTrigger asChild>
+              <Button
+                type="button"
+                variant="destructive"
+                className={isModal ? "rounded-full" : undefined}
+              >
+                Delete account
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This permanently deletes your account, generated content, uploads, chat history,
+                  automations, and connected integrations. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Type <span className="font-medium text-foreground">{email}</span> to confirm.
+                </p>
+                <Input
+                  value={deleteEmailInput}
+                  onChange={(event) => setDeleteEmailInput(event.target.value)}
+                  placeholder="Your account email"
+                  autoComplete="off"
+                />
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={
+                    deleteLoading ||
+                    deleteEmailInput.trim().toLowerCase() !== email.trim().toLowerCase()
+                  }
+                  onClick={(event) => {
+                    event.preventDefault()
+                    void handleDeleteAccount()
+                  }}
+                >
+                  {deleteLoading ? "Deleting..." : "Delete permanently"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
     </div>
   )

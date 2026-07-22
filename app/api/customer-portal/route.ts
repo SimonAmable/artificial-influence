@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rejectStripeBillingRoute } from '@/lib/billing/require-stripe-billing';
 import { createClient } from '@/lib/supabase/server';
 import { createCustomerPortalSession } from '@/lib/stripe/server';
 
 export async function POST(request: NextRequest) {
   try {
+    const stripeBlocked = rejectStripeBillingRoute();
+    if (stripeBlocked) {
+      return stripeBlocked;
+    }
+
     const { returnUrl } = await request.json();
 
     // Get authenticated user

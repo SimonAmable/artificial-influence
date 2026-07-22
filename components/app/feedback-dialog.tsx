@@ -16,6 +16,7 @@ interface FeedbackDialogProps {
   description?: string
   initialFeedbackType?: FeedbackType
   hideFeedbackType?: boolean
+  initialMessage?: string
 }
 
 export function FeedbackDialog({
@@ -25,6 +26,7 @@ export function FeedbackDialog({
   description = "Share feedback, report bugs, or request features.",
   initialFeedbackType = "general",
   hideFeedbackType = false,
+  initialMessage,
 }: FeedbackDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -40,6 +42,7 @@ export function FeedbackDialog({
           variant="dialog"
           initialFeedbackType={initialFeedbackType}
           hideFeedbackType={hideFeedbackType}
+          initialMessage={initialMessage}
           onSubmitted={() => onOpenChange(false)}
           onCancel={() => onOpenChange(false)}
         />

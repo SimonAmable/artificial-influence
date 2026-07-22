@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rejectStripeBillingRoute } from '@/lib/billing/require-stripe-billing';
 import { createClient } from '@/lib/supabase/server';
 import { createCheckoutSession, createCustomer } from '@/lib/stripe/server';
 
 export async function POST(request: NextRequest) {
   try {
+    const stripeBlocked = rejectStripeBillingRoute();
+    if (stripeBlocked) {
+      return stripeBlocked;
+    }
+
     const { priceId, affiliateCode: affiliateCodeRaw } = await request.json();
 
     if (!priceId) {

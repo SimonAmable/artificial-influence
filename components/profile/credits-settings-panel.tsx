@@ -7,6 +7,8 @@ import { toast } from "sonner"
 import { SettingsRow, SettingsSection } from "@/components/settings/settings-row"
 import { Button } from "@/components/ui/button"
 import { openPricingPlansModal } from "@/lib/pricing-upsell"
+import { isPresenceProduct } from "@/lib/product/require-presence"
+import { getFanvueAppStoreListingUrl } from "@/lib/fanvue/app-store"
 import { cn } from "@/lib/utils"
 
 export type CreditsSettingsPanelProps = {
@@ -32,6 +34,15 @@ export function CreditsSettingsPanel({
   const handleManageBilling = async () => {
     setPortalLoading(true)
     try {
+      if (isPresenceProduct()) {
+        const listingUrl = getFanvueAppStoreListingUrl()
+        if (!listingUrl) {
+          throw new Error("Fanvue billing is not configured yet.")
+        }
+        window.location.href = listingUrl
+        return
+      }
+
       const response = await fetch("/api/customer-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

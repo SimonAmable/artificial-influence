@@ -19,10 +19,11 @@ Review billing (for example Stripe) and in-app flows alongside these steps as ne
 ## How to request deletion
 
 1. **Sign in** to the account you want removed.
-2. **Email support** at [support@synthetichumanlabs.com](mailto:support@synthetichumanlabs.com).
-3. **State clearly** that you want your **account and personal data deleted**, and include the **email address** associated with the account.
+2. Open **Profile settings**.
+3. In the **Danger zone**, choose **Delete account**.
+4. Type your account **email address** to confirm, then confirm deletion.
 
-If in-app self-service deletion is added later, this page should be updated to describe that flow first.
+If self-service deletion is unavailable, email [support@synthetichumanlabs.com](mailto:support@synthetichumanlabs.com) from the address on the account and request deletion.
 
 ## What we delete
 

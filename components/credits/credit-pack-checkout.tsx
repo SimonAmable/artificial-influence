@@ -16,6 +16,12 @@ import {
   MAX_CREDIT_PACK_CREDITS,
   MIN_CREDIT_PACK_CREDITS,
 } from '@/lib/credit-packs';
+import {
+  getFanvueAppStoreListingUrl,
+  getFanvueCreditCheckoutUrl,
+  mapCreditsToFanvueItem,
+} from '@/lib/fanvue/app-store';
+import { isPresenceProduct } from '@/lib/product/require-presence';
 import { cn } from '@/lib/utils';
 
 type CreditPackCheckoutProps = {
@@ -90,6 +96,18 @@ export function CreditPackCheckout({
 
       if (!user) {
         router.push(`/login?redirect=${encodeURIComponent(redirectPath)}`);
+        return;
+      }
+
+      if (isPresenceProduct()) {
+        const itemKey = mapCreditsToFanvueItem(credits);
+        const checkoutUrl = itemKey
+          ? getFanvueCreditCheckoutUrl(itemKey, { action: 'checkout' })
+          : getFanvueAppStoreListingUrl();
+        if (!checkoutUrl) {
+          throw new Error('Fanvue billing is not configured yet.');
+        }
+        window.location.href = checkoutUrl;
         return;
       }
 

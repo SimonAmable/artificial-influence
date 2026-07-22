@@ -9,6 +9,7 @@ import {
   Sparkle,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
+import { ReportContentButton } from "@/components/app/report-content-button"
 import { executeWorkflow } from "@/lib/canvas/execution"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import type { MiniApp } from "@/lib/mini-apps/types"
@@ -216,7 +217,15 @@ function MiniAppShowcaseCard({
 }) {
   return (
     <div className="h-[50vh] md:h-[60vh] pt-0 px-4 flex flex-col gap-3">
-      <div className="space-y-2 text-center">
+      <div className="relative space-y-2 text-center">
+        <div className="absolute right-0 top-0">
+          <ReportContentButton
+            contentType="mini_app"
+            contentId={miniApp.id}
+            contentSlug={miniApp.slug}
+            contentUrl={`/apps/${miniApp.slug}`}
+          />
+        </div>
         <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold leading-tight">
           {miniApp.name}
         </h1>

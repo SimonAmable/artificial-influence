@@ -10,7 +10,7 @@ import { PlatformSurfacesSection } from "@/components/landing/platform-surfaces-
 import { ModelsBentoSection } from "@/components/landing/models-bento-section"
 import { ProofSection } from "@/components/landing/proof-section"
 import { FAQSection } from "@/components/landing/faq-section"
-import { FounderTestimonialSection } from "@/components/landing/founder-testimonial-section"
+// import { FounderTestimonialSection } from "@/components/landing/founder-testimonial-section"
 // import { TestimonialsSection } from "@/components/landing/testimonials-section"
 import { PricingSection } from "@/components/landing/pricing-section"
 import { FinalCTASection } from "@/components/landing/final-cta-section"
@@ -132,7 +132,7 @@ function DefaultLandingPage() {
       {/* <ProcessSection /> */}
       <ModelsBentoSection />
       {/* <TestimonialsSection /> */}
-      <FounderTestimonialSection />
+      {/* <FounderTestimonialSection /> */}
       <PricingSection embedded />
       <div id="faq">
         <FAQSection />

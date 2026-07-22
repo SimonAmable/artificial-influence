@@ -56,4 +56,5 @@ export const unicanProduct: ProductConfig = {
   defaultSignedInRoute: "/dashboard",
   assistantName: "UNI AGENT",
   onboardingEnabled: true,
+  billingProvider: "stripe",
 }
