@@ -1,5 +1,6 @@
 /**
  * Fanvue App Store listing + checkout deeplink helpers.
+ * Billing UUIDs are read from NEXT_PUBLIC_FANVUE_* env vars only.
  * @see https://api.fanvue.com/docs/app-store/deeplinks.md
  */
 
@@ -15,7 +16,11 @@ function trimEnv(value: string | undefined): string | null {
 }
 
 function readEnv(name: string): string | null {
-  return trimEnv(process.env[`NEXT_PUBLIC_${name}`]) ?? trimEnv(process.env[name])
+  return trimEnv(process.env[`NEXT_PUBLIC_${name}`])
+}
+
+function readCreditItemEnv(amount: FanvueCreditItemKey): string | null {
+  return readEnv(`FANVUE_ITEM_CREDITS_${amount}_UUID`)
 }
 
 export function getFanvueAppUuid(): string | null {
@@ -46,13 +51,13 @@ export function getFanvuePlanUuid(plan: FanvuePlanKey): string | null {
 export function getFanvueCreditItemUuid(item: FanvueCreditItemKey): string | null {
   switch (item) {
     case "200":
-      return readEnv("FANVUE_ITEM_CREDITS_200_UUID")
+      return readCreditItemEnv("200")
     case "500":
-      return readEnv("FANVUE_ITEM_CREDITS_500_UUID")
+      return readCreditItemEnv("500")
     case "1000":
-      return readEnv("FANVUE_ITEM_CREDITS_1000_UUID")
+      return readCreditItemEnv("1000")
     case "2000":
-      return readEnv("FANVUE_ITEM_CREDITS_2000_UUID")
+      return readCreditItemEnv("2000")
     default: {
       const _exhaustive: never = item
       return _exhaustive

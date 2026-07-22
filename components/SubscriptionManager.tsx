@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Subscription, getSubscriptionStatusDisplay } from '@/lib/subscription';
-import { getFanvueAppStoreListingUrl } from '@/lib/fanvue/app-store';
+import { fetchFanvueBillingUrl } from '@/lib/fanvue/open-billing-client';
 
 type BillingProvider = 'stripe' | 'fanvue';
 
@@ -25,10 +25,7 @@ export default function SubscriptionManager({
 
     try {
       if (isFanvue) {
-        const listingUrl = getFanvueAppStoreListingUrl();
-        if (!listingUrl) {
-          throw new Error('Fanvue billing is not configured yet.');
-        }
+        const listingUrl = await fetchFanvueBillingUrl({ kind: 'listing' });
         window.location.href = listingUrl;
         return;
       }

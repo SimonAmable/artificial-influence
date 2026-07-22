@@ -18,11 +18,8 @@ import {
 } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { isPresenceProduct } from '@/lib/product/require-presence';
-import {
-  getFanvueAppStoreListingUrl,
-  getFanvueCheckoutUrl,
-  mapInternalPlanToFanvue,
-} from '@/lib/fanvue/app-store';
+import { mapInternalPlanToFanvue } from '@/lib/fanvue/app-store';
+import { fetchFanvueBillingUrl } from '@/lib/fanvue/open-billing-client';
 import { getFanvuePlanCtaState } from '@/lib/fanvue/plan-cta';
 import { FANVUE_PLAN_PRICES_USD, FANVUE_MONTHLY_CREDITS } from '@/lib/fanvue/billing-config';
 import {
@@ -1072,12 +1069,8 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
       }
 
       if (isPresenceProduct()) {
-        const listingUrl = getFanvueAppStoreListingUrl();
-        if (!listingUrl) {
-          alert('Fanvue billing is not configured yet.');
-          return;
-        }
-        window.location.assign(listingUrl);
+        const checkoutUrl = await fetchFanvueBillingUrl({ kind: 'listing' });
+        window.location.assign(checkoutUrl);
         return;
       }
 
@@ -1102,7 +1095,9 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Failed to open billing portal. Please try again.');
+      alert(
+        error instanceof Error ? error.message : 'Failed to open billing portal. Please try again.'
+      );
     } finally {
       setLoading(null);
     }
@@ -1124,12 +1119,8 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
       if (isPresenceProduct()) {
         const fanvuePlan = mapInternalPlanToFanvue(planId);
         const checkoutUrl = fanvuePlan
-          ? getFanvueCheckoutUrl(fanvuePlan, { action: 'checkout' })
-          : getFanvueAppStoreListingUrl();
-        if (!checkoutUrl) {
-          alert('Fanvue billing is not configured yet.');
-          return;
-        }
+          ? await fetchFanvueBillingUrl({ kind: 'plan', plan: fanvuePlan })
+          : await fetchFanvueBillingUrl({ kind: 'listing' });
         window.location.assign(checkoutUrl);
         return;
       }
@@ -1157,7 +1148,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Failed to start checkout. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to start checkout. Please try again.');
     } finally {
       setLoading(null);
     }

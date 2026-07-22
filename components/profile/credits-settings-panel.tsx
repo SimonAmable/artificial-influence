@@ -8,7 +8,7 @@ import { SettingsRow, SettingsSection } from "@/components/settings/settings-row
 import { Button } from "@/components/ui/button"
 import { openPricingPlansModal } from "@/lib/pricing-upsell"
 import { isPresenceProduct } from "@/lib/product/require-presence"
-import { getFanvueAppStoreListingUrl } from "@/lib/fanvue/app-store"
+import { fetchFanvueBillingUrl } from "@/lib/fanvue/open-billing-client"
 import { cn } from "@/lib/utils"
 
 export type CreditsSettingsPanelProps = {
@@ -35,10 +35,7 @@ export function CreditsSettingsPanel({
     setPortalLoading(true)
     try {
       if (isPresenceProduct()) {
-        const listingUrl = getFanvueAppStoreListingUrl()
-        if (!listingUrl) {
-          throw new Error("Fanvue billing is not configured yet.")
-        }
+        const listingUrl = await fetchFanvueBillingUrl({ kind: "listing" })
         window.location.href = listingUrl
         return
       }
