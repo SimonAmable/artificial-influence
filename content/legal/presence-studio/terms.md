@@ -1,15 +1,13 @@
 ---
 title: Terms of Use
 description: Terms governing your use of Presence Studio and related services.
-lastUpdated: July 22, 2026
-version: "2026-07-22"
+lastUpdated: July 23, 2026
+version: "2026-07-23"
 ---
 
 ## Agreement
 
-These Terms of Use ("Terms") govern your access to and use of Presence Studio's website at [artificialinfluence.tech](https://artificialinfluence.tech), applications, APIs, automations, and related services (collectively, the "Services"). By creating an account or otherwise accessing or using the Services, you agree to these Terms. If you do not agree, do not use the Services.
-
-This document is a product-ready starting point, not legal advice. Have qualified counsel review and adapt it before relying on it in production.
+These Terms of Use ("Terms") govern your access to and use of Presence Studio, operated by Synthetic Human Labs, including the website at [artificialinfluence.tech](https://artificialinfluence.tech), applications, APIs, automations, and related services (collectively, the "Services"). By creating an account or otherwise accessing or using the Services, you agree to these Terms. If you do not agree, do not use the Services.
 
 ## Eligibility
 
@@ -71,11 +69,11 @@ To the fullest extent permitted by law, you will defend, indemnify, and hold har
 
 ## Changes to the Terms
 
-We may update these Terms from time to time. When we do, we may update the "last updated" date and version above and require acceptance of the revised Terms before continued use of some or all parts of the Services.
+We may update these Terms from time to time. When we do, we will update the "last updated" date and version above and may require acceptance of the revised Terms before continued use of some or all parts of the Services. Continued use after revised Terms become effective constitutes acceptance where permitted by law and where we do not require an additional affirmative acceptance step.
 
 ## Governing Law
 
-These Terms are governed by the laws of the jurisdiction designated with your counsel, excluding conflict-of-law rules.
+These Terms are governed by the laws of the State of Delaware, United States, excluding conflict-of-law rules. The state and federal courts located in Delaware will have exclusive jurisdiction over disputes arising out of or relating to these Terms or the Services, except where mandatory law requires a different forum.
 
 ## Contact
 

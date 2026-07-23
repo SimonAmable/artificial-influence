@@ -1,12 +1,12 @@
 ---
 title: Privacy Policy
 description: How Presence Studio collects, uses, and protects your information.
-lastUpdated: July 22, 2026
+lastUpdated: July 23, 2026
 ---
 
 ## Introduction
 
-This Privacy Policy describes how Presence Studio (“we,” “us,” or “our”) handles personal information when you use [artificialinfluence.tech](https://artificialinfluence.tech), our applications, and related services (collectively, the “Services”). It is provided for general information and does not constitute legal advice.
+This Privacy Policy describes how Presence Studio, operated by Synthetic Human Labs (“we,” “us,” or “our”), handles personal information when you use [artificialinfluence.tech](https://artificialinfluence.tech), our applications, and related services (collectively, the “Services”).
 
 ## Information we may collect
 

@@ -25,10 +25,21 @@ export function FinalCTASection() {
           Built to make content creation feel easier
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-          I&apos;m building UniCan to make organic marketing and faceless content easier for everyone.
-          I want it to save you time, help you grow, and create more opportunities to make money.
-          If there&apos;s something that would help you reach your goals faster, please reach out.
-          I&apos;m happy to help.
+          {isPresence ? (
+            <>
+              I&apos;m building Presence Studio to make AI influencer creation and publishing easier for
+              creators. I want it to save you time, help you grow, and create more opportunities to make
+              money. If there&apos;s something that would help you reach your goals faster, please reach
+              out. I&apos;m happy to help.
+            </>
+          ) : (
+            <>
+              I&apos;m building UniCan to make organic marketing and faceless content easier for everyone.
+              I want it to save you time, help you grow, and create more opportunities to make money.
+              If there&apos;s something that would help you reach your goals faster, please reach out.
+              I&apos;m happy to help.
+            </>
+          )}
         </p>
         <div className="mt-8 flex flex-row flex-wrap items-center justify-center gap-3">
           <Link href="/login?mode=signup">

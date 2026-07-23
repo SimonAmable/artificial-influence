@@ -6,8 +6,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { isPresenceProduct } from "@/lib/product/require-presence"
 
-const faqData = [
+const unicanFaqData = [
   {
     question: "How does UniCan help me make Instagram content faster?",
     answer:
@@ -30,7 +31,32 @@ const faqData = [
   },
 ]
 
+const presenceFaqData = [
+  {
+    question: "How does Presence Studio help me build AI influencers faster?",
+    answer:
+      "You work with an agent built for character-led content. Describe the look, scene, or post you want, generate images and video with consistent faces, then publish through Fanvue when you are ready.",
+  },
+  {
+    question: "What can I actually make? Is it just one kind of post?",
+    answer:
+      "You can create character stills, short-form video, template-driven shoots, and vault-ready posts. Same day you might build a new influencer, generate a batch of images, and prep content for publishing.",
+  },
+  {
+    question: "Do I need design or video skills?",
+    answer:
+      "No. If you can describe what you want in a sentence or two, you are in good shape. The studio runs the workflow. You can refine results, but you do not need to build everything by hand.",
+  },
+  {
+    question: "Can I start free?",
+    answer:
+      "Yes. Sign up and try the main flows. Plans and limits are on the pricing page.",
+  },
+]
+
 export function FAQSection() {
+  const faqData = isPresenceProduct() ? presenceFaqData : unicanFaqData
+
   return (
     <section id="faq" className="w-full bg-background py-16 sm:py-24">
       <div className="mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-8">

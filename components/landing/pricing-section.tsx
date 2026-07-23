@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { isPresenceProduct } from '@/lib/product/require-presence';
+import { currentProduct } from '@/lib/product/current';
 import { mapInternalPlanToFanvue } from '@/lib/fanvue/app-store';
 import { fetchFanvueBillingUrl } from '@/lib/fanvue/open-billing-client';
 import { getFanvuePlanCtaState } from '@/lib/fanvue/plan-cta';
@@ -87,20 +88,21 @@ const cardFade = {
 
 function PersonalSupportPopoverBody() {
   const isPresence = isPresenceProduct()
+  const productName = isPresence ? "Presence Studio" : "UniCan"
 
   return (
     <div className="space-y-3 text-sm leading-relaxed">
       <div className="flex gap-3">
         <Image
           src={FOUNDER_NOTE_PHOTO_SRC}
-          alt="Simon, founder of UniCan"
+          alt={`Simon, founder of ${productName}`}
           width={48}
           height={48}
           className="h-12 w-12 shrink-0 rounded-full border-2 border-border object-cover"
         />
         <div className="min-w-0 flex-1 space-y-0.5">
           <p className="font-semibold leading-tight text-foreground">Simon</p>
-          <p className="text-xs text-muted-foreground">Founder, UniCan</p>
+          <p className="text-xs text-muted-foreground">Founder, {productName}</p>
         </div>
       </div>
       <p className="text-muted-foreground">
@@ -108,9 +110,19 @@ function PersonalSupportPopoverBody() {
         feature ideas land in my inbox and I aim to reply within 24 hours.
       </p>
       <blockquote className="border-l-2 border-primary/45 pl-3 text-muted-foreground italic">
-        &ldquo;I really do use UniCan every day as my main marketing tool—if something feels off or
-        you want a feature and you&apos;re not sure it&apos;s worth asking, please just tell me. I
-        usually ship fixes and requests within 24 hours.&rdquo;
+        {isPresence ? (
+          <>
+            &ldquo;I use Presence Studio every day for AI influencer workflows—if something feels off or
+            you want a feature and you&apos;re not sure it&apos;s worth asking, please just tell me. I
+            usually ship fixes and requests within 24 hours.&rdquo;
+          </>
+        ) : (
+          <>
+            &ldquo;I really do use UniCan every day as my main marketing tool—if something feels off or
+            you want a feature and you&apos;re not sure it&apos;s worth asking, please just tell me. I
+            usually ship fixes and requests within 24 hours.&rdquo;
+          </>
+        )}
       </blockquote>
       {!isPresence ? (
         <div className="flex flex-col gap-2 border-t border-border/60 pt-2">

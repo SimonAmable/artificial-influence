@@ -160,7 +160,7 @@ export function getPlatformSurfaceCards(
           sectionBlurb: "Connect Fanvue and publish on your schedule.",
           description: "Connect Fanvue and publish on your schedule.",
           href: "/content",
-          safariUrl: "presencestudio.ai/content",
+          safariUrl: "artificialinfluence.tech/content",
         }
       : card,
   )

@@ -403,7 +403,7 @@ export function DashboardHeroSection({ className }: { className?: string }) {
             <span>Create Anything, Anytime, Anywhere</span>
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Ask Unican for any kind of image or video, in plain English, and we find the best model and prompt for the job.
+            Ask for any kind of image or video, in plain English, and we find the best model and prompt for the job.
           </p>
         </div>
 

@@ -32,6 +32,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { GenerationLoadingSlots } from "@/components/shared/display/generation-loading-slots"
 import { cn } from "@/lib/utils"
+import { currentProduct } from "@/lib/product/current"
 import { generateImageAndWait, isInsufficientCreditsError, isInsufficientCreditsMessage } from "@/lib/generate-image-client"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { downloadMediaFile, normalizeMediaModelName } from "@/components/shared/display/media-viewer-utils"
@@ -1437,7 +1438,7 @@ export default function AIInfluencerPage() {
                   AI Influencer Builder
                 </DialogTitle>
                 <DialogDescription className="text-center text-xs text-muted-foreground mt-1.5 max-w-sm mx-auto leading-normal">
-                  UniCan enables you to create and save consistent AI characters and influencers in three modes.
+                  {currentProduct.name} enables you to create and save consistent AI characters and influencers in three modes.
                 </DialogDescription>
               </DialogHeader>
 
