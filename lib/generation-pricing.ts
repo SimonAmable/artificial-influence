@@ -6,8 +6,8 @@ import type {
   PerSecondPricing,
   PricingSnapshot,
   TieredPerOutputPricing,
-} from './types/pricing';
-import { resolvePredictedDurationSeconds } from './video-duration';
+} from './types/pricing.ts';
+import { resolvePredictedDurationSeconds } from './video-duration.ts';
 
 export const PRICING_PARAMETER_NAMES = [
   'quality',

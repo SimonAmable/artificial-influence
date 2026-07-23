@@ -30,6 +30,24 @@ export function formatQualityOptionLabel(paramName: string, option: string): str
   }
 }
 
+export function getQualityOptionDescription(option: string): string {
+  switch (option) {
+    case 'low':
+      return 'Fast · lower detail';
+    case 'medium':
+      return 'Balanced quality';
+    case 'high':
+      return 'Max quality';
+    default:
+      return '';
+  }
+}
+
+export function getImageCountDescription(count: number): string {
+  if (count === 1) return 'Single image';
+  return `${count} variations`;
+}
+
 export function isPricingParameter(param: ParameterDefinition): boolean {
   if (param.affects_pricing) return true;
   return IMAGE_PRICING_PARAMETER_NAMES.has(param.name);

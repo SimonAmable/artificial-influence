@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Plus, X, FilePlus, Sparkle, FolderOpen } from "@phosphor-icons/react"
+import { Plus, X, FilePlus, Sparkle, FolderOpen, Images } from "@phosphor-icons/react"
 import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
@@ -19,11 +19,6 @@ import { ImagePromptFields } from "./image-prompt-fields"
 import { ImageEnhanceSwitch } from "./image-enhance-switch"
 import {
   Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -33,10 +28,11 @@ import {
   type ModelInputValues,
 } from "@/lib/types/models"
 import {
-  formatPricingOptionLabel,
   formatQualityOptionLabel,
   getImagePricingParameters,
+  getQualityOptionDescription,
 } from "@/lib/pricing-parameter-ui"
+import { resolveCreditsForParameterOption } from "@/lib/generation-pricing"
 import { useGenerationCreditEstimate } from "@/hooks/use-generation-credit-estimate"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { AspectRatioSelector } from "@/components/shared/selectors/aspect-ratio-selector"
@@ -54,6 +50,15 @@ import { toast } from "sonner"
 import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
 import { extendMentionRangeEnd } from "@/lib/commands/mention-token"
 import { GenerateShaderButton } from "./generate-shader-button"
+import { AnimatedControlItem, AnimatedSelectLabel, influencerControlIconButtonClassName, influencerControlPillClassName, influencerControlsPresenceProps } from "./animated-control-item"
+import {
+  PromptControlMenuContent,
+  PromptControlMenuGroup,
+  PromptControlMenuItem,
+  PromptControlMenuSeparator,
+  QualityOptionIcon,
+} from "./prompt-control-menu"
+import { AnimatePresence, LayoutGroup } from "framer-motion"
 import { brandRefsOnly, getImageAssetUrlsFromRefChips } from "@/lib/commands/ref-image-pipeline"
 
 interface InfluencerInputBoxProps {
@@ -642,13 +647,14 @@ export function InfluencerInputBox({
         </div>
 
         {/* Controls: Add Reference Image, Model Selector, Enhance Prompt */}
-        <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] [&>*]:shrink-0">
-          <DropdownMenu>
+        <LayoutGroup id="influencer-controls">
+          <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <AnimatedControlItem>
+              <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full bg-muted hover:bg-muted/80"
+                variant="outline"
+                className={influencerControlIconButtonClassName}
                 aria-label="Add reference image"
               >
                 <Plus className="size-3.5" weight="bold" />
@@ -665,130 +671,130 @@ export function InfluencerInputBox({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          
+            </AnimatedControlItem>
+
+          <AnimatePresence {...influencerControlsPresenceProps}>
           {/* Model Selector (if enabled) */}
-          {showModelSelector && (
+            {showModelSelector ? (
+              <AnimatedControlItem key="model-selector" appear>
             <Select
               value={selectedModel || ""}
               onValueChange={(value) => onModelChange?.(value)}
               disabled={!allowOptionsDuringGeneration && isGenerating}
             >
-              <SelectTrigger id="model-select" className="h-7 text-xs w-fit min-w-0 px-2">
+              <SelectTrigger id="model-select" hideChevron className={influencerControlPillClassName}>
                 <SelectValue placeholder="Select model">
                   {selectedModel && (() => {
                     const model = models.find(m => m.identifier === selectedModel)
                     return (
                       <div className="flex items-center gap-2">
                         <ModelIcon identifier={selectedModel} size={16} />
-                        <span>{model ? formatModelName(model.identifier, model.name) : selectedModel}</span>
+                        <AnimatedSelectLabel
+                          value={model ? formatModelName(model.identifier, model.name) : selectedModel}
+                        />
                       </div>
                     )
                   })()}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent position="popper" side="top" sideOffset={4}>
+              <PromptControlMenuContent className="min-w-[14rem]">
                 {showModelGroups ? (
                   <>
-                    <SelectGroup>
-                      <SelectLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Tools
-                      </SelectLabel>
+                    <PromptControlMenuGroup label="Tools">
                       {toolModels.map((model) => (
-                        <SelectItem key={model.identifier} value={model.identifier}>
-                          <div className="flex items-center gap-2">
-                            <ModelIcon identifier={model.identifier} size={16} className="shrink-0" />
-                            <span className="font-semibold text-sm truncate max-w-[70vw] sm:max-w-none">
-                              {formatModelName(model.identifier, model.name)}
-                              {model.description && (
-                                <span className="font-normal text-muted-foreground"> — {model.description}</span>
-                              )}
-                            </span>
-                          </div>
-                        </SelectItem>
+                        <PromptControlMenuItem
+                          key={model.identifier}
+                          value={model.identifier}
+                          icon={<ModelIcon identifier={model.identifier} size={16} />}
+                          label={formatModelName(model.identifier, model.name)}
+                          description={model.description ?? undefined}
+                        />
                       ))}
-                    </SelectGroup>
-                    <SelectSeparator />
-                    <SelectGroup>
-                      <SelectLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Models
-                      </SelectLabel>
+                    </PromptControlMenuGroup>
+                    <PromptControlMenuSeparator />
+                    <PromptControlMenuGroup label="Models">
                       {imageModelsOnly.map((model) => (
-                        <SelectItem key={model.identifier} value={model.identifier}>
-                          <div className="flex items-center gap-2">
-                            <ModelIcon identifier={model.identifier} size={16} className="shrink-0" />
-                            <span className="font-semibold text-sm truncate max-w-[70vw] sm:max-w-none">
-                              {formatModelName(model.identifier, model.name)}
-                              {model.description && (
-                                <span className="font-normal text-muted-foreground"> — {model.description}</span>
-                              )}
-                            </span>
-                          </div>
-                        </SelectItem>
+                        <PromptControlMenuItem
+                          key={model.identifier}
+                          value={model.identifier}
+                          icon={<ModelIcon identifier={model.identifier} size={16} />}
+                          label={formatModelName(model.identifier, model.name)}
+                          description={model.description ?? undefined}
+                        />
                       ))}
-                    </SelectGroup>
+                    </PromptControlMenuGroup>
                   </>
                 ) : (
-                  models.map((model) => (
-                    <SelectItem key={model.identifier} value={model.identifier}>
-                      <div className="flex items-center gap-2">
-                        <ModelIcon identifier={model.identifier} size={16} className="shrink-0" />
-                        <span className="font-semibold text-sm truncate max-w-[70vw] sm:max-w-none">
-                          {formatModelName(model.identifier, model.name)}
-                          {model.description && (
-                            <span className="font-normal text-muted-foreground"> — {model.description}</span>
-                          )}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))
+                  <PromptControlMenuGroup label="Models">
+                    {models.map((model) => (
+                      <PromptControlMenuItem
+                        key={model.identifier}
+                        value={model.identifier}
+                        icon={<ModelIcon identifier={model.identifier} size={16} />}
+                        label={formatModelName(model.identifier, model.name)}
+                        description={model.description ?? undefined}
+                      />
+                    ))}
+                  </PromptControlMenuGroup>
                 )}
-              </SelectContent>
+              </PromptControlMenuContent>
             </Select>
-          )}
+              </AnimatedControlItem>
+            ) : null}
 
           {/* Aspect Ratio Selector (if enabled) */}
-          {showAspectRatioSelector && (
+            {showAspectRatioSelector ? (
+              <AnimatedControlItem key="aspect-ratio-selector" appear>
             <AspectRatioSelector
               model={selectedModelObject}
               value={selectedAspectRatio}
               onValueChange={onAspectRatioChange}
               disabled={!allowOptionsDuringGeneration && isGenerating}
+              hideChevron
             />
-          )}
+              </AnimatedControlItem>
+            ) : null}
 
           {/* Number of Images Selector (when model supports max_images > 1) */}
-          {showNumImagesSelector && selectedModelObject && (selectedModelObject.max_images ?? 1) > 1 && (
+            {showNumImagesSelector && selectedModelObject && (selectedModelObject.max_images ?? 1) > 1 ? (
+              <AnimatedControlItem key="num-images-selector" appear>
             <Select
               value={String(selectedNumImages)}
               onValueChange={(v) => onNumImagesChange?.(parseInt(v, 10))}
               disabled={!allowOptionsDuringGeneration && isGenerating}
             >
-              <SelectTrigger id="num-images-select" className="h-7 text-xs w-fit min-w-[2.25rem] px-2">
-                <SelectValue>{selectedNumImages}</SelectValue>
+              <SelectTrigger id="num-images-select" hideChevron className={influencerControlPillClassName}>
+                <SelectValue>
+                  <div className="flex items-center gap-1.5">
+                    <AnimatedSelectLabel value={selectedNumImages} />
+                    <Images size={12} weight="bold" className="shrink-0" />
+                  </div>
+                </SelectValue>
               </SelectTrigger>
-              <SelectContent position="popper" side="top" sideOffset={4}>
-                {Array.from({ length: selectedModelObject.max_images ?? 1 }, (_, i) => i + 1).map((n) => (
-                  <SelectItem key={n} value={String(n)}>
-                    {n}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <PromptControlMenuContent>
+                <PromptControlMenuGroup label="Images">
+                  {Array.from({ length: selectedModelObject.max_images ?? 1 }, (_, i) => i + 1).map((n) => (
+                    <PromptControlMenuItem
+                      key={n}
+                      value={String(n)}
+                      icon={<Images size={14} weight="bold" />}
+                      iconPosition="end"
+                      label={String(n)}
+                    />
+                  ))}
+                </PromptControlMenuGroup>
+              </PromptControlMenuContent>
             </Select>
-          )}
+              </AnimatedControlItem>
+            ) : null}
 
           {onModelParametersChange && selectedQualityParameters.map((param) => {
             const value = modelParameters?.[param.name] ?? getParameterDefault(param)
 
             if (param.ui_type === "select" && "enum" in param && Array.isArray(param.enum)) {
-              const displayValue = formatPricingOptionLabel(
-                selectedModelObject ?? { model_cost: 0 },
-                param.name,
-                String(value),
-              )
-
               return (
+                <AnimatedControlItem key={`param-${param.name}`} appear>
                 <Select
-                  key={param.name}
                   value={String(value)}
                   onValueChange={(nextValue) =>
                     onModelParametersChange({
@@ -798,23 +804,46 @@ export function InfluencerInputBox({
                   }
                   disabled={!allowOptionsDuringGeneration && isGenerating}
                 >
-                  <SelectTrigger id={param.name} className="h-7 text-xs w-fit min-w-[4.25rem] px-2">
+                  <SelectTrigger id={param.name} hideChevron className={influencerControlPillClassName}>
                     <SelectValue placeholder={param.label}>
-                      {formatQualityOptionLabel(param.name, String(value))}
+                      <AnimatedSelectLabel
+                        value={formatQualityOptionLabel(param.name, String(value))}
+                      />
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent position="popper" side="top" sideOffset={4}>
-                    {param.enum.map((option) => (
-                      <SelectItem key={String(option)} value={String(option)} className="text-xs">
-                        {formatPricingOptionLabel(
+                  <PromptControlMenuContent>
+                    <PromptControlMenuGroup label={param.label}>
+                      {param.enum.map((option) => {
+                        const optionValue = String(option)
+                        const label = formatQualityOptionLabel(param.name, optionValue)
+                        const qualityDescription =
+                          param.name === "quality" ? getQualityOptionDescription(optionValue) : undefined
+                        const credits = resolveCreditsForParameterOption(
                           selectedModelObject ?? { model_cost: 0 },
                           param.name,
-                          String(option),
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                          optionValue,
+                        )
+                        const description =
+                          credits != null ? `${credits} cr` : qualityDescription || undefined
+
+                        return (
+                          <PromptControlMenuItem
+                            key={optionValue}
+                            value={optionValue}
+                            icon={
+                              param.name === "quality" ? (
+                                <QualityOptionIcon label={label} />
+                              ) : undefined
+                            }
+                            label={label}
+                            description={description}
+                          />
+                        )
+                      })}
+                    </PromptControlMenuGroup>
+                  </PromptControlMenuContent>
                 </Select>
+                </AnimatedControlItem>
               )
             }
 
@@ -822,8 +851,9 @@ export function InfluencerInputBox({
           })}
 
           {/* Aspect Ratio 1:1 Checkbox (if enabled) */}
-          {showAspectRatio1to1Checkbox && (
-            <div className="h-7 flex items-center gap-1.5 px-2 rounded-[28px] border border-border bg-muted/30">
+            {showAspectRatio1to1Checkbox ? (
+              <AnimatedControlItem key="aspect-ratio-1to1" appear>
+            <div className={cn(influencerControlPillClassName, "flex items-center gap-1.5")}>
               <Checkbox
                 id="aspect-ratio-1to1"
                 checked={aspectRatio1to1}
@@ -836,18 +866,23 @@ export function InfluencerInputBox({
                 1:1
               </Label>
             </div>
-          )}
-          
+              </AnimatedControlItem>
+            ) : null}
+
           {/* Enhance Prompt */}
-          {!hideEnhancePrompt && onEnhancePromptChange && (
+            {!hideEnhancePrompt && onEnhancePromptChange ? (
+              <AnimatedControlItem key="enhance-prompt" appear>
             <ImageEnhanceSwitch
               checked={enhancePrompt}
               onCheckedChange={onEnhancePromptChange}
               variant="page"
               id="enhance-prompt"
             />
-          )}
-        </div>
+              </AnimatedControlItem>
+            ) : null}
+          </AnimatePresence>
+          </div>
+        </LayoutGroup>
 
         {/* Hidden file input for reference image */}
         <input

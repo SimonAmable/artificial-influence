@@ -1,11 +1,10 @@
 import assert from "node:assert/strict"
 
-async function runPricingTests() {
-  const {
-    buildImagePricingParameters,
-    parsePricingConfig,
-    resolveGenerationPricingQuote,
-  } = await import(new URL("./generation-pricing.ts", import.meta.url).href)
+const {
+  buildImagePricingParameters,
+  parsePricingConfig,
+  resolveGenerationPricingQuote,
+} = await import(new URL("./generation-pricing.ts", import.meta.url).href)
 
 function runTest(name: string, fn: () => void) {
   try {
@@ -125,9 +124,3 @@ runTest("falls back to model_cost when pricing_config is null", () => {
 })
 
 console.log("generation-pricing tests passed")
-}
-
-runPricingTests().catch((error) => {
-  console.error(error)
-  process.exit(1)
-})
