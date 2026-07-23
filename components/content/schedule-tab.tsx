@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { setHours, setMinutes, startOfDay, startOfMonth } from "date-fns"
-import { CalendarIcon, LayoutList, Loader2, Plus } from "lucide-react"
+import { CalendarIcon, Globe, LayoutList, Loader2, Plus } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
@@ -10,11 +10,19 @@ import type { AutopostJobRow } from "@/components/autopost/autopost-page"
 import { AutopostPostsCalendar, getJobCalendarAnchor } from "@/components/autopost/autopost-posts-calendar"
 import { AccountPickerStep } from "@/components/content/composer/account-picker-step"
 import { FanvueComposerStep } from "@/components/content/composer/fanvue-composer-step"
+import { fanvueConnectionLabel } from "@/components/content/fanvue-account-display"
 import type { ContentJobRow, FanvueConnectionItem } from "@/components/content/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 
 type ScheduleTabProps = {
@@ -44,12 +52,27 @@ function buildComposerScheduleDate(day: Date): Date {
   return scheduled
 }
 
+function getJobAccountLabel(job: ContentJobRow, connections: FanvueConnectionItem[]): string | null {
+  const connection = connections.find((item) => item.id === job.social_connection_id)
+  if (connection) {
+    return fanvueConnectionLabel(connection)
+  }
+  if (job.social_username) {
+    return `@${job.social_username}`
+  }
+  if (job.social_display_name) {
+    return job.social_display_name
+  }
+  return null
+}
+
 export function ScheduleTab({ connections, selectedConnectionId, onGoToMediaTab }: ScheduleTabProps) {
   const searchParams = useSearchParams()
   const hasHandledComposeParams = React.useRef(false)
   const [jobs, setJobs] = React.useState<ContentJobRow[]>([])
   const [isLoadingJobs, setIsLoadingJobs] = React.useState(true)
   const [postsViewMode, setPostsViewMode] = React.useState<"calendar" | "list">("calendar")
+  const [postsAccountFilterId, setPostsAccountFilterId] = React.useState<string | null>(null)
   const [calendarMonth, setCalendarMonth] = React.useState(() => startOfMonth(new Date()))
   const [composerOpen, setComposerOpen] = React.useState(false)
   const [composerState, setComposerState] = React.useState<ComposerState>({
@@ -121,6 +144,42 @@ export function ScheduleTab({ connections, selectedConnectionId, onGoToMediaTab 
     void fetchJobs()
   }, [fetchJobs])
 
+  const postsAccountFilterOptions = React.useMemo(
+    () =>
+      connections.map((connection) => ({
+        value: connection.id,
+        label: fanvueConnectionLabel(connection),
+      })),
+    [connections]
+  )
+
+  const displayJobs = React.useMemo(() => {
+    if (!postsAccountFilterId) {
+      return jobs
+    }
+    return jobs.filter((job) => job.social_connection_id === postsAccountFilterId)
+  }, [jobs, postsAccountFilterId])
+
+  React.useEffect(() => {
+    if (postsAccountFilterId === null) {
+      return
+    }
+    if (!postsAccountFilterOptions.some((option) => option.value === postsAccountFilterId)) {
+      setPostsAccountFilterId(null)
+    }
+  }, [postsAccountFilterId, postsAccountFilterOptions])
+
+  const showAccountLabels = connections.length > 1
+  const getJobAccountLabelForCalendar = React.useCallback(
+    (job: AutopostJobRow) => {
+      if (!showAccountLabels) {
+        return null
+      }
+      return getJobAccountLabel(job as ContentJobRow, connections)
+    },
+    [connections, showAccountLabels]
+  )
+
   React.useEffect(() => {
     if (hasHandledComposeParams.current) return
     if (searchParams.get("compose") !== "1") return
@@ -161,12 +220,14 @@ export function ScheduleTab({ connections, selectedConnectionId, onGoToMediaTab 
     }
   }
 
-  const calendarJobs = jobs as unknown as AutopostJobRow[]
+  const calendarJobs = displayJobs as unknown as AutopostJobRow[]
 
   const renderJobList = () => (
     <ScrollArea className="h-[min(640px,calc(100vh-16rem))] pr-3">
       <ul className="flex flex-col gap-3">
-        {jobs.map((job) => (
+        {displayJobs.map((job) => {
+          const accountLabel = getJobAccountLabel(job, connections)
+          return (
           <li
             key={job.id}
             className="rounded-2xl border border-border/80 bg-muted/15 p-3 shadow-sm transition-colors hover:border-border md:p-4"
@@ -175,6 +236,7 @@ export function ScheduleTab({ connections, selectedConnectionId, onGoToMediaTab 
               <div className="min-w-0 space-y-1">
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">{job.status}</Badge>
+                  {accountLabel ? <Badge variant="outline">{accountLabel}</Badge> : null}
                   {job.metadata?.fanvue?.priceCents ? (
                     <Badge variant="outline">${(job.metadata.fanvue.priceCents / 100).toFixed(2)} PPV</Badge>
                   ) : null}
@@ -201,7 +263,8 @@ export function ScheduleTab({ connections, selectedConnectionId, onGoToMediaTab 
               </div>
             </div>
           </li>
-        ))}
+          )
+        })}
       </ul>
     </ScrollArea>
   )
@@ -222,32 +285,53 @@ export function ScheduleTab({ connections, selectedConnectionId, onGoToMediaTab 
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
               {jobs.length > 0 ? (
-                <ToggleGroup
-                  type="single"
-                  value={postsViewMode}
-                  onValueChange={(value) => {
-                    if (value === "list" || value === "calendar") {
-                      setPostsViewMode(value)
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-stretch sm:w-auto"
-                  aria-label="Posts view"
-                >
-                  <ToggleGroupItem
-                    value="calendar"
-                    aria-label="Calendar view"
-                    className="flex-1 gap-1.5 px-3 sm:flex-initial"
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                  <ToggleGroup
+                    type="single"
+                    value={postsViewMode}
+                    onValueChange={(value) => {
+                      if (value === "list" || value === "calendar") {
+                        setPostsViewMode(value)
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-stretch sm:w-auto"
+                    aria-label="Posts view"
                   >
-                    <CalendarIcon className="h-3.5 w-3.5" />
-                    Calendar
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="list" aria-label="List view" className="flex-1 gap-1.5 px-3 sm:flex-initial">
-                    <LayoutList className="h-3.5 w-3.5" />
-                    List
-                  </ToggleGroupItem>
-                </ToggleGroup>
+                    <ToggleGroupItem
+                      value="calendar"
+                      aria-label="Calendar view"
+                      className="flex-1 gap-1.5 px-3 sm:flex-initial"
+                    >
+                      <CalendarIcon className="h-3.5 w-3.5" />
+                      Calendar
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="list" aria-label="List view" className="flex-1 gap-1.5 px-3 sm:flex-initial">
+                      <LayoutList className="h-3.5 w-3.5" />
+                      List
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                  {postsAccountFilterOptions.length > 1 ? (
+                    <Select
+                      value={postsAccountFilterId ?? "all"}
+                      onValueChange={(value) => setPostsAccountFilterId(value === "all" ? null : value)}
+                    >
+                      <SelectTrigger className="h-9 w-full sm:w-[220px]">
+                        <Globe className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <SelectValue placeholder="All accounts" />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        <SelectItem value="all">All accounts</SelectItem>
+                        {postsAccountFilterOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                </div>
               ) : null}
               <Button
                 type="button"
@@ -281,6 +365,18 @@ export function ScheduleTab({ connections, selectedConnectionId, onGoToMediaTab 
                 Create your first post
               </Button>
             </div>
+          ) : displayJobs.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <p className="text-sm text-muted-foreground">No posts for this account.</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                onClick={() => setPostsAccountFilterId(null)}
+              >
+                Show all accounts
+              </Button>
+            </div>
           ) : postsViewMode === "calendar" ? (
             <div className="min-h-0 flex-1 overflow-auto pr-1">
               <AutopostPostsCalendar
@@ -289,6 +385,7 @@ export function ScheduleTab({ connections, selectedConnectionId, onGoToMediaTab 
                 onMonthChange={setCalendarMonth}
                 onDayClick={(day) => openComposer({ day, defaultComposerTab: "schedule" })}
                 onPostClick={() => undefined}
+                getJobAccountLabel={showAccountLabels ? getJobAccountLabelForCalendar : undefined}
                 getJobMediaPreview={(job) => {
                   const url = job.media_url
                   if (!url || url.startsWith("fanvue://")) return null

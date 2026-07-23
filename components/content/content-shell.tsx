@@ -2,10 +2,11 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { UserRound } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
+import { ActiveAccountSwitcher } from "@/components/content/active-account-switcher"
+import { fanvueConnectionLabel } from "@/components/content/fanvue-account-display"
 import { MediaTab } from "@/components/content/media-tab"
 import { ScheduleTab } from "@/components/content/schedule-tab"
 import { VaultTab } from "@/components/content/vault-tab"
@@ -102,11 +103,25 @@ export function ContentShell() {
   }, [fetchConnections, searchParams])
 
   const handleSelectConnection = React.useCallback((connectionId: string) => {
-    setSelectedConnectionId(connectionId)
+    setSelectedConnectionId((current) => {
+      if (current === connectionId) {
+        return current
+      }
+      const connection = connections.find((item) => item.id === connectionId)
+      if (connection) {
+        toast.success(`Switched to ${fanvueConnectionLabel(connection)}`)
+      }
+      return connectionId
+    })
     if (typeof window !== "undefined") {
       localStorage.setItem(CONTENT_CONNECTION_KEY, connectionId)
     }
-  }, [])
+  }, [connections])
+
+  const selectedConnection = React.useMemo(
+    () => connections.find((connection) => connection.id === selectedConnectionId) ?? null,
+    [connections, selectedConnectionId]
+  )
 
   const handleConnectFanvue = React.useCallback(() => {
     window.location.href = "/api/fanvue/connect?next=/content"
@@ -123,20 +138,14 @@ export function ContentShell() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 md:mt-1">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full"
-              onClick={() => setSettingsOpen(true)}
-            >
-              <UserRound data-icon="inline-start" />
-              Accounts
-              {connections.length > 0 ? (
-                <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
-                  {connections.length}
-                </span>
-              ) : null}
-            </Button>
+            <ActiveAccountSwitcher
+              connections={connections}
+              selectedConnectionId={selectedConnectionId}
+              onSelectConnection={handleSelectConnection}
+              onConnect={handleConnectFanvue}
+              onManageAccounts={() => setSettingsOpen(true)}
+              isLoading={isLoadingConnections}
+            />
             <Button
               type="button"
               className="rounded-full bg-primary text-black hover:bg-primary/90 dark:bg-primary dark:text-black dark:hover:bg-primary/90"
@@ -165,10 +174,10 @@ export function ContentShell() {
           </TabsList>
 
           <TabsContent value="media" className="mt-6">
-            <MediaTab connectionId={selectedConnectionId} />
+            <MediaTab connection={selectedConnection} />
           </TabsContent>
           <TabsContent value="vault" className="mt-6">
-            <VaultTab connectionId={selectedConnectionId} />
+            <VaultTab connection={selectedConnection} />
           </TabsContent>
           <TabsContent value="schedule" className="mt-6">
             <ScheduleTab

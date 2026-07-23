@@ -225,11 +225,16 @@ export async function fulfillFanvueCreditPack(params: {
   console.log(`[fanvue/billing] fulfilled ${credits} credit pack for ${params.userId}`)
 }
 
-export async function recordFanvueWebhookEvent(eventId: string, eventType: string): Promise<boolean> {
+export async function recordFanvueWebhookEvent(
+  eventId: string,
+  eventType: string,
+  payload: Record<string, unknown>
+): Promise<boolean> {
   const supabase = getServiceClient()
   const { error } = await supabase.from("fanvue_webhook_events").insert({
     id: eventId,
     event_type: eventType,
+    payload,
   })
 
   if (!error) return true

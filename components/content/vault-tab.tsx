@@ -14,7 +14,8 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import type { FanvueMediaItem, FanvueVaultFolder } from "@/components/content/types"
+import type { FanvueConnectionItem, FanvueMediaItem, FanvueVaultFolder } from "@/components/content/types"
+import { fanvueConnectionLabel } from "@/components/content/fanvue-account-display"
 import {
   FanvueMediaPreview,
   getFanvueMediaDisplayName,
@@ -67,10 +68,11 @@ import {
 import { cn } from "@/lib/utils"
 
 type VaultTabProps = {
-  connectionId: string | null
+  connection: FanvueConnectionItem | null
 }
 
-export function VaultTab({ connectionId }: VaultTabProps) {
+export function VaultTab({ connection }: VaultTabProps) {
+  const connectionId = connection?.id ?? null
   const [folders, setFolders] = React.useState<FanvueVaultFolder[]>([])
   const [selectedFolder, setSelectedFolder] = React.useState<string | null>(VAULT_ALL_FOLDERS)
   const [folderMedia, setFolderMedia] = React.useState<FanvueMediaItem[]>([])
@@ -502,6 +504,12 @@ export function VaultTab({ connectionId }: VaultTabProps) {
         {folderSidebar}
 
         <div className="space-y-3">
+          {connection ? (
+            <p className="text-xs text-muted-foreground">
+              Viewing vault for{" "}
+              <span className="font-medium text-foreground">{fanvueConnectionLabel(connection)}</span>
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-semibold text-foreground">

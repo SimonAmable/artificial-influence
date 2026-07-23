@@ -110,7 +110,7 @@ const ALL_LIBRARY_TABS: LibraryTab[] = ["history", "assets", "brands", "collecti
 
 function getLibraryTabs(): LibraryTab[] {
   if (isPresenceProduct()) {
-    return ALL_LIBRARY_TABS.filter((tab) => tab !== "brands")
+    return ALL_LIBRARY_TABS.filter((tab) => tab !== "brands" && tab !== "collections")
   }
   return ALL_LIBRARY_TABS
 }
@@ -221,7 +221,10 @@ function LibraryPageContent() {
   }, [libraryTabs, requestedTab])
 
   React.useEffect(() => {
-    if (requestedTab === "brands" && !libraryTabs.includes("brands")) {
+    if (
+      (requestedTab === "brands" && !libraryTabs.includes("brands")) ||
+      (requestedTab === "collections" && !libraryTabs.includes("collections"))
+    ) {
       const params = new URLSearchParams(searchParams.toString())
       params.set("tab", "assets")
       router.replace(`/assets?${params.toString()}`, { scroll: false })

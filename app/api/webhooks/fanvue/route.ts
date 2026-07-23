@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing event id or type" }, { status: 400 })
   }
 
-  const isNew = await recordFanvueWebhookEvent(eventId, eventType)
+  const isNew = await recordFanvueWebhookEvent(eventId, eventType, envelope)
   if (!isNew) {
     return NextResponse.json({ received: true, duplicate: true })
   }

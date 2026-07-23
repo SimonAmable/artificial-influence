@@ -72,7 +72,7 @@ const FLAT_NAV_ITEMS: FlatNavItem[] = [
   { path: "/chat",          label: "Agent",         icon: ChatCircleDots,  badge: "beta" },
   { path: "/automations",   label: "Automations",   icon: RobotIcon,       badge: "beta" },
   { path: "/templates",     label: "Templates",     icon: FlowArrow,       badge: "new"  },
-  { path: "/slideshows",    label: "Slideshows",    icon: SquaresFour,     badge: "new"  },
+  { path: "/slideshows",    label: "Slideshows",    icon: SquaresFour,     badge: "new", hiddenFor: ["presence-studio"] },
   { path: "/content",       label: "Content",       iconSrc: "/brand_icons/fanvue_logo.png", badge: "new", products: ["presence-studio"] },
   { path: "/autopost",      label: "Autopost",      icon: PaperPlaneTilt,  badge: "new", hiddenFor: ["presence-studio"] },
   { path: "/ai-influencer", label: "AI Influencer", icon: User,            badge: "new"  },

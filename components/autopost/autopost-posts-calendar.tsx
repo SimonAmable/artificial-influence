@@ -63,6 +63,7 @@ export type AutopostPostsCalendarProps = {
   onPostClick: (job: AutopostJobRow) => void
   onDayClick?: (day: Date) => void
   getJobMediaPreview: (job: AutopostJobRow) => { url: string; kind: "image" | "video" } | null
+  getJobAccountLabel?: (job: AutopostJobRow) => string | null
   className?: string
 }
 
@@ -73,6 +74,7 @@ export function AutopostPostsCalendar({
   onPostClick,
   onDayClick,
   getJobMediaPreview,
+  getJobAccountLabel,
   className,
 }: AutopostPostsCalendarProps) {
   const [expandedDayKeys, setExpandedDayKeys] = React.useState<Set<number>>(() => new Set())
@@ -228,6 +230,7 @@ export function AutopostPostsCalendar({
 
                 {dayJobs.slice(0, visibleCap).map(({ job, at }) => {
                   const preview = getJobMediaPreview(job)
+                  const accountLabel = getJobAccountLabel?.(job) ?? null
                   return (
                     <button
                       key={job.id}
@@ -264,6 +267,11 @@ export function AutopostPostsCalendar({
                           <span className="shrink-0 text-[10px] font-medium tabular-nums text-muted-foreground">
                             {format(at, "h:mm a")}
                           </span>
+                          {accountLabel ? (
+                            <span className="shrink-0 truncate text-[10px] font-medium text-primary/80">
+                              {accountLabel}
+                            </span>
+                          ) : null}
                           <span className="truncate text-[10px] leading-tight text-foreground">
                             {job.caption?.trim() || "No caption"}
                           </span>

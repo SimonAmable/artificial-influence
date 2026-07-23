@@ -2,8 +2,8 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { UserRound } from "lucide-react"
-
+import { FanvueAccountAvatar } from "@/components/content/active-account-switcher"
+import { fanvueConnectionLabel } from "@/components/content/fanvue-account-display"
 import type { FanvueConnectionItem } from "@/components/content/types"
 import {
   Select,
@@ -19,34 +19,6 @@ type FanvueAccountSelectProps = {
   onValueChange: (connection: FanvueConnectionItem) => void
   className?: string
   disabled?: boolean
-}
-
-function connectionLabel(connection: FanvueConnectionItem) {
-  if (connection.username) return `@${connection.username}`
-  return connection.displayName || "Fanvue account"
-}
-
-function FanvueAccountAvatar({
-  connection,
-  size = "md",
-}: {
-  connection: FanvueConnectionItem
-  size?: "sm" | "md"
-}) {
-  const sizeClass = size === "sm" ? "h-7 w-7 rounded-lg" : "h-9 w-9 rounded-xl"
-
-  if (connection.avatarUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img alt="" src={connection.avatarUrl} className={cn(sizeClass, "shrink-0 object-cover")} />
-    )
-  }
-
-  return (
-    <span className={cn("flex shrink-0 items-center justify-center bg-muted", sizeClass)}>
-      <UserRound className={cn("text-muted-foreground", size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4")} />
-    </span>
-  )
 }
 
 export function FanvueAccountSelect({
@@ -76,7 +48,7 @@ export function FanvueAccountSelect({
           <FanvueAccountAvatar connection={selected} />
           <span className="min-w-0 flex-1 text-left">
             <span className="block truncate text-sm font-semibold text-foreground">
-              {selected.displayName || connectionLabel(selected)}
+              {selected.displayName || fanvueConnectionLabel(selected)}
             </span>
             {selected.username ? (
               <span className="block truncate text-xs text-muted-foreground">@{selected.username}</span>
@@ -99,7 +71,7 @@ export function FanvueAccountSelect({
               <FanvueAccountAvatar connection={connection} size="sm" />
               <span className="min-w-0">
                 <span className="block truncate text-sm font-medium">
-                  {connection.displayName || connectionLabel(connection)}
+                  {connection.displayName || fanvueConnectionLabel(connection)}
                 </span>
                 {connection.username ? (
                   <span className="block truncate text-xs text-muted-foreground">@{connection.username}</span>

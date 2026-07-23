@@ -9,6 +9,8 @@ import {
   FanvueImageActionDialog,
   type FanvueImageActionMode,
 } from "@/components/content/fanvue-image-action-dialog"
+import { fanvueConnectionLabel } from "@/components/content/fanvue-account-display"
+import type { FanvueConnectionItem } from "@/components/content/types"
 import { HistoryPanel } from "@/components/library/history/history-panel"
 import { HistorySearchToolbar } from "@/components/library/history/history-search-toolbar"
 import type { Generation, GenerationType, HistorySource, SaveAssetDraft } from "@/components/library/history/types"
@@ -29,6 +31,7 @@ const COLUMN_COUNT_STORAGE_KEY = "unican-content-media-column-count"
 type GenerationHistoryViewProps = {
   actionVariant?: "library" | "fanvue"
   connectionId?: string | null
+  activeConnection?: FanvueConnectionItem | null
   enabled?: boolean
   className?: string
   onSave?: (draft: SaveAssetDraft) => void
@@ -42,6 +45,7 @@ type GenerationHistoryViewProps = {
 export function GenerationHistoryView({
   actionVariant = "library",
   connectionId = null,
+  activeConnection = null,
   enabled = true,
   className,
   onSave,
@@ -229,6 +233,12 @@ export function GenerationHistoryView({
       {!connectionId && actionVariant === "fanvue" ? (
         <div className="rounded-2xl border border-dashed border-border/70 bg-muted/10 px-4 py-3 text-sm text-muted-foreground">
           Connect Fanvue to send studio media to your vault or schedule posts. Your generation history is still shown below.
+        </div>
+      ) : connectionId && actionVariant === "fanvue" && activeConnection ? (
+        <div className="rounded-2xl border border-border/70 bg-muted/10 px-4 py-3 text-sm text-muted-foreground">
+          Fanvue actions will post to{" "}
+          <span className="font-medium text-foreground">{fanvueConnectionLabel(activeConnection)}</span>.
+          Switch accounts from the header menu.
         </div>
       ) : null}
 
