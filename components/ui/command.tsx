@@ -35,7 +35,7 @@ function CommandDialog({
     <Dialog {...props}>
       <DialogContent
         className={cn(
-          "top-[12vh] max-h-[min(720px,78vh)] max-w-[min(46rem,calc(100vw-1.5rem))] translate-y-0 overflow-hidden rounded-[1.75rem] border border-border/70 bg-background/95 p-0 shadow-2xl backdrop-blur-xl sm:top-[14vh]",
+          "top-[12vh] max-h-[min(560px,65vh)] max-w-[min(46rem,calc(100vw-1.5rem))] translate-y-0 overflow-hidden rounded-[1.75rem] border border-border/70 bg-background/95 p-0 shadow-2xl backdrop-blur-xl sm:top-[14vh]",
           className,
         )}
       >
@@ -60,7 +60,7 @@ function CommandInput({
     <div
       data-slot="command-input-wrapper"
       className={cn(
-        "flex h-14 items-center gap-2 border-b border-border/60 px-4",
+        "flex h-12 items-center gap-2 border-b border-border/60 px-4",
         wrapperClassName,
       )}
     >
@@ -81,7 +81,7 @@ function CommandList({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="command-list"
-      className={cn("max-h-[calc(min(720px,78vh)-3.5rem)] overflow-y-auto p-2", className)}
+      className={cn("max-h-[calc(min(560px,65vh)-3rem)] overflow-y-auto p-2", className)}
       {...props}
     />
   )
@@ -130,7 +130,7 @@ function CommandItem({
       data-slot="command-item"
       data-active={active ? "true" : undefined}
       className={cn(
-        "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm outline-none transition-colors hover:bg-muted/80 focus-visible:bg-muted/80 data-[active=true]:bg-muted",
+        "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm outline-none transition-colors hover:bg-muted/80 focus-visible:bg-muted/80 data-[active=true]:bg-muted",
         className,
       )}
       {...props}

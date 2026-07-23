@@ -260,7 +260,11 @@ export async function POST(request: NextRequest) {
     )
     const requiredCredits =
       pendingGeneration.type === "image"
-        ? costPerOutput * persistedOutputs.length
+        ? Math.max(
+            1,
+            Number(pendingGeneration.quoted_credits ?? costPerOutput * persistedOutputs.length) ||
+              costPerOutput * persistedOutputs.length,
+          )
         : Math.max(
             1,
             Number(pendingGeneration.quoted_credits ?? costPerOutput) || costPerOutput,

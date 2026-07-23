@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
 
     const { data: modelData, error: modelError } = await supabase
         .from('models')
-        .select('model_cost, model_cost_per_second, provider')
+        .select('model_cost, model_cost_per_second, provider, pricing_config')
         .eq('identifier', catalogModelIdentifier)
         .eq('type', 'video')
         .eq('is_active', true)
@@ -171,6 +171,7 @@ export async function POST(request: NextRequest) {
       modelIdentifier: catalogModelIdentifier,
       modelCost: modelData.model_cost,
       modelCostPerSecond: modelData.model_cost_per_second,
+      pricingConfig: modelData.pricing_config,
       duration: otherParams.duration,
       resolution: typeof otherParams.resolution === 'string' ? otherParams.resolution : null,
       draft: typeof otherParams.draft === 'boolean' ? otherParams.draft : null,

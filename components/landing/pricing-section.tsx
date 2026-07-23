@@ -584,11 +584,15 @@ function PlanFeatureList({ features, className }: { features: PlanFeature[]; cla
 }
 
 function getSubscriptionCardBullets(plan: PricingPlan) {
+  const isPresence = isPresenceProduct();
+
   switch (plan.name) {
     case 'Free':
       return ['All AI models', 'Personal use license', 'Community support'];
     case 'Starter':
-      return ['All AI models', 'Commercial license', 'Unlimited Instagram & TikTok connections'];
+      return isPresence
+        ? ['All AI models', 'Commercial license', 'Unlimited Fanvue connections']
+        : ['All AI models', 'Commercial license', 'Unlimited Instagram & TikTok connections'];
     case 'Plus':
       return ['Everything in Starter', 'Priority support', 'Faster generations and more concurrency'];
     default:
@@ -609,9 +613,12 @@ function PlanCreditEstimates({
   return (
     <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-foreground/90">
-          {creditsLabel ?? `${credits} credits / month`}
-        </p>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground/90">
+            {creditsLabel ?? `${credits} credits / month`}
+          </p>
+          <p className="text-xs text-muted-foreground">Credits never expire</p>
+        </div>
         <InfoPopover label="See what you can create with these credits">
           <div className="space-y-3">
             <p className="font-medium text-foreground">With these credits you can create about</p>
@@ -946,7 +953,7 @@ export function PricingSection({ embedded = false, compact = false }: PricingSec
       : monthlyPlans;
   const staticHeaderCopy = {
     title: 'Pick Your Plan',
-    description: 'Simple affordable pricing',
+    description: 'Simple affordable pricing. Credits never expire.',
   };
   const headerCopy: Record<PricingTab, { footer: string }> = {
     monthly: {

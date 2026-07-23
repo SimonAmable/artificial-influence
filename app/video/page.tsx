@@ -449,6 +449,7 @@ function VideoPageContent() {
       modelIdentifier: selectedModel.identifier,
       modelCost: selectedModel.model_cost,
       modelCostPerSecond: selectedModel.model_cost_per_second,
+      pricingConfig: selectedModel.pricing_config,
       duration: parameters.duration as number | string | null | undefined,
       resolution: typeof parameters.resolution === "string" ? parameters.resolution : null,
       draft: typeof parameters.draft === "boolean" ? parameters.draft : null,

@@ -9,6 +9,8 @@ export type PricingEstimateModel = {
   id: string;
   name: string;
   creditsPerUnit: number;
+  /** When set, marketing copy uses a from–to range (quality tiers). */
+  creditsPerUnitMax?: number;
   unit: PricingEstimateUnit;
 };
 
@@ -23,31 +25,36 @@ export const PRICING_ESTIMATE_MODELS = [
   {
     id: 'nano-banana-2',
     name: 'Nano Banana 2',
-    creditsPerUnit: 4,
+    creditsPerUnit: 2,
+    creditsPerUnitMax: 8,
     unit: 'image',
   },
   {
     id: 'nano-banana-pro',
     name: 'Nano Banana Pro',
     creditsPerUnit: 4,
+    creditsPerUnitMax: 10,
     unit: 'image',
   },
   {
     id: 'gpt-image-2',
     name: 'GPT Image 2',
-    creditsPerUnit: 4,
+    creditsPerUnit: 2,
+    creditsPerUnitMax: 8,
     unit: 'image',
   },
   {
     id: 'seedream-5',
     name: 'Seedream 5.0',
-    creditsPerUnit: 2,
+    creditsPerUnit: 3,
+    creditsPerUnitMax: 6,
     unit: 'image',
   },
   {
     id: 'veo-3.1-fast',
     name: 'Veo 3.1 Fast',
-    creditsPerUnit: VEO_31_FAST_CREDITS_PER_SECOND,
+    creditsPerUnit: 4,
+    creditsPerUnitMax: VEO_31_FAST_CREDITS_PER_SECOND,
     unit: 'second',
   },
   {
@@ -59,13 +66,15 @@ export const PRICING_ESTIMATE_MODELS = [
   {
     id: 'kling-v2.6',
     name: 'Kling V2.6 Pro',
-    creditsPerUnit: 6,
+    creditsPerUnit: 3,
+    creditsPerUnitMax: 6,
     unit: 'second',
   },
   {
     id: 'happy-horse-1.1',
     name: 'Happy Horse 1.1',
-    creditsPerUnit: 12,
+    creditsPerUnit: 6,
+    creditsPerUnitMax: 12,
     unit: 'second',
   },
 ] as const satisfies readonly PricingEstimateModel[];
@@ -82,6 +91,16 @@ export function formatEstimateAmount(count: number, unit: PricingEstimateUnit): 
   return count === 1 ? '1 second' : `${count} seconds`;
 }
 
+export function formatTieredCreditsLabel(model: PricingEstimateModel): string {
+  if (model.creditsPerUnitMax != null && model.creditsPerUnitMax !== model.creditsPerUnit) {
+    const unit = model.unit === 'image' ? 'image' : 'sec';
+    return `${model.creditsPerUnit}–${model.creditsPerUnitMax} cr/${unit}`;
+  }
+
+  const unit = model.unit === 'image' ? 'image' : 'sec';
+  return `${model.creditsPerUnit} cr/${unit}`;
+}
+
 export function getFeaturedPlanEstimates(credits: number) {
   const nanoBanana2LiteImages = estimateCount(credits, NANO_BANANA_2_LITE_CREDITS_PER_IMAGE);
   const veoSeconds = estimateCount(credits, VEO_31_FAST_CREDITS_PER_SECOND);
@@ -96,10 +115,12 @@ export function getFeaturedPlanEstimates(credits: number) {
 export function getModelEstimateLines(credits: number) {
   return PRICING_ESTIMATE_MODELS.map((model) => {
     const count = estimateCount(credits, model.creditsPerUnit);
+    const tierLabel = formatTieredCreditsLabel(model);
     return {
       ...model,
       count,
-      label: `Up to ${formatEstimateAmount(count, model.unit)} of ${model.name}`,
+      tierLabel,
+      label: `Up to ${formatEstimateAmount(count, model.unit)} of ${model.name} (${tierLabel})`,
     };
   });
 }

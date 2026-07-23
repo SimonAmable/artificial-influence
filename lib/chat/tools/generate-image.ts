@@ -12,6 +12,10 @@ import {
 import { extractStorageObjectRef } from "@/lib/uploads/storage-ref"
 import { DEFAULT_UPLOAD_BUCKET, type UploadBucket } from "@/lib/uploads/shared"
 import { checkUserHasCredits } from "@/lib/credits"
+import {
+  buildImagePricingParameters,
+  resolveGenerationPricingQuote,
+} from "@/lib/generation-pricing"
 import { enhancePrompt, enhancePromptForJSONModels } from "@/lib/prompt-enhancement"
 import {
   persistGeneratedBase64Images,
@@ -499,7 +503,6 @@ export function createGenerateImageTool({
       const modelData = modelResponse.data
       const maxImages = Math.max(1, Number(modelData.max_images ?? 1) || 1)
       const effectiveVariantCount = Math.min(variantCount, maxImages)
-      const costPerImage = Math.max(1, Number(modelData.model_cost ?? 1) || 1)
       const allReferences = [...uploadedReferences, ...assetReferences].slice(0, MAX_REFERENCE_IMAGES)
       const referenceImageUrls = allReferences.map((reference) => reference.url)
       const referenceImageStoragePaths = allReferences
@@ -528,7 +531,30 @@ export function createGenerateImageTool({
             shouldEnhance,
           })
       const provider = String(modelData.provider ?? "").toLowerCase()
-      const requiredCredits = Math.max(1, costPerImage * effectiveVariantCount)
+      const pricingQuote = resolveGenerationPricingQuote({
+        model: {
+          identifier: modelIdentifier,
+          type: "image",
+          model_cost: modelData.model_cost,
+          pricing_config: modelData.pricing_config,
+        },
+        parameters: buildImagePricingParameters({
+          resolution:
+            resolution ??
+            (typeof replicateInputDefaults.resolution === "string"
+              ? replicateInputDefaults.resolution
+              : null),
+          quality:
+            typeof replicateInputDefaults.quality === "string"
+              ? replicateInputDefaults.quality
+              : null,
+          size:
+            typeof replicateInputDefaults.size === "string" ? replicateInputDefaults.size : null,
+        }),
+        outputCount: effectiveVariantCount,
+      })
+      const requiredCredits = pricingQuote.quotedCredits
+      const pricingSnapshot = pricingQuote.pricingSnapshot
 
       if (provider === "xai") {
         const hasCredits = await checkUserHasCredits(userId, requiredCredits, supabase)
@@ -683,6 +709,8 @@ export function createGenerateImageTool({
             status: "pending",
             replicate_prediction_id: requestId,
             fal_endpoint_id: falEndpoint,
+            quoted_credits: requiredCredits,
+            pricing_snapshot: pricingSnapshot,
             ...(threadId ? { chat_thread_id: threadId } : {}),
           })
           .select("id")
@@ -817,6 +845,8 @@ export function createGenerateImageTool({
             tool: "chat-generate-image",
             status: "pending",
             replicate_prediction_id: prediction.id,
+            quoted_credits: requiredCredits,
+            pricing_snapshot: pricingSnapshot,
             ...(threadId ? { chat_thread_id: threadId } : {}),
           })
           .select("id")

@@ -485,7 +485,7 @@ export function createGenerateVideoTool({
 
       const { data: modelData, error: modelError } = await supabase
         .from("models")
-        .select("model_cost, model_cost_per_second")
+        .select("model_cost, model_cost_per_second, pricing_config")
         .eq("identifier", resolvedModel)
         .eq("type", "video")
         .eq("is_active", true)
@@ -499,6 +499,7 @@ export function createGenerateVideoTool({
         modelIdentifier: resolvedModel,
         modelCost: modelData.model_cost,
         modelCostPerSecond: modelData.model_cost_per_second,
+        pricingConfig: modelData.pricing_config,
         duration,
         resolution: resolution ?? null,
         draft: draft ?? null,

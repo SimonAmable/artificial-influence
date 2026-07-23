@@ -2,6 +2,10 @@
  * TypeScript types for the models database schema
  */
 
+import type { ModelPricingConfig } from '@/lib/types/pricing';
+
+export type { ModelPricingConfig } from '@/lib/types/pricing';
+
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
 
@@ -37,6 +41,8 @@ export interface BaseParameterDefinition {
   required?: boolean;
   default?: string | number | boolean | null;
   ui_type: ParameterUIType;
+  /** When true, UI should surface this param with per-option credit labels. */
+  affects_pricing?: boolean;
 }
 
 /**
@@ -125,6 +131,7 @@ export interface Model {
   is_active: boolean;
   model_cost: number;
   model_cost_per_second?: number | null;
+  pricing_config?: ModelPricingConfig | null;
   parameters: ModelParameters;
   created_at: string;
   updated_at: string;

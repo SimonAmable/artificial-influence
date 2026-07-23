@@ -13,6 +13,7 @@ import {
   PaperPlaneTilt,
   Microphone as MicrophoneIcon,
   PaintBrush as PaintBrushIcon,
+  PencilSimple,
   Robot as RobotIcon,
   User as UserIcon,
   ShieldCheck,
@@ -45,6 +46,7 @@ const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
   "download-simple": DownloadSimple,
   "squares-four": SquaresFour,
   "clock-counter-clockwise": ClockCounterClockwise,
+  "pencil-simple": PencilSimple,
 }
 
 function getBadgeClasses(badge: MegaNavBadge) {

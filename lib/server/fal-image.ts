@@ -8,6 +8,7 @@ export const WAN_27_IMAGE_CANONICAL_ID = "fal-ai/wan/v2.7" as const
 export const WAN_27_PRO_IMAGE_CANONICAL_ID = "fal-ai/wan/v2.7/pro" as const
 export const SEEDREAM_4_5_CANONICAL_ID = "bytedance/seedream-4.5" as const
 export const SEEDREAM_5_LITE_CANONICAL_ID = "bytedance/seedream-5-lite" as const
+export const SEEDREAM_5_PRO_CANONICAL_ID = "bytedance/seedream-5-pro" as const
 export const NANO_BANANA_2_LITE_CANONICAL_ID = "google/nano-banana-2-lite" as const
 
 export const FAL_OPENAI_GPT_IMAGE_2_T2I = "openai/gpt-image-2" as const
@@ -22,6 +23,8 @@ export const FAL_SEEDREAM_4_5_T2I = "fal-ai/bytedance/seedream/v4.5/text-to-imag
 export const FAL_SEEDREAM_4_5_EDIT = "fal-ai/bytedance/seedream/v4.5/edit" as const
 export const FAL_SEEDREAM_5_LITE_T2I = "fal-ai/bytedance/seedream/v5/lite/text-to-image" as const
 export const FAL_SEEDREAM_5_LITE_EDIT = "fal-ai/bytedance/seedream/v5/lite/edit" as const
+export const FAL_SEEDREAM_5_PRO_T2I = "bytedance/seedream/v5/pro/text-to-image" as const
+export const FAL_SEEDREAM_5_PRO_EDIT = "bytedance/seedream/v5/pro/edit" as const
 export const FAL_NANO_BANANA_2_LITE_T2I = "google/nano-banana-2-lite" as const
 export const FAL_NANO_BANANA_2_LITE_EDIT = "google/nano-banana-2-lite/edit" as const
 
@@ -32,6 +35,7 @@ export type SupportedFalImageModelIdentifier =
   | typeof WAN_27_PRO_IMAGE_CANONICAL_ID
   | typeof SEEDREAM_4_5_CANONICAL_ID
   | typeof SEEDREAM_5_LITE_CANONICAL_ID
+  | typeof SEEDREAM_5_PRO_CANONICAL_ID
   | typeof NANO_BANANA_2_LITE_CANONICAL_ID
 
 export type FalImageEndpoint =
@@ -47,6 +51,8 @@ export type FalImageEndpoint =
   | typeof FAL_SEEDREAM_4_5_EDIT
   | typeof FAL_SEEDREAM_5_LITE_T2I
   | typeof FAL_SEEDREAM_5_LITE_EDIT
+  | typeof FAL_SEEDREAM_5_PRO_T2I
+  | typeof FAL_SEEDREAM_5_PRO_EDIT
   | typeof FAL_NANO_BANANA_2_LITE_T2I
   | typeof FAL_NANO_BANANA_2_LITE_EDIT
 
@@ -86,6 +92,11 @@ const FAL_IMAGE_MODEL_CONFIG: Record<
   [SEEDREAM_5_LITE_CANONICAL_ID]: {
     textEndpointId: FAL_SEEDREAM_5_LITE_T2I,
     editEndpointId: FAL_SEEDREAM_5_LITE_EDIT,
+    maxReferenceImages: 10,
+  },
+  [SEEDREAM_5_PRO_CANONICAL_ID]: {
+    textEndpointId: FAL_SEEDREAM_5_PRO_T2I,
+    editEndpointId: FAL_SEEDREAM_5_PRO_EDIT,
     maxReferenceImages: 10,
   },
   [NANO_BANANA_2_LITE_CANONICAL_ID]: {
@@ -243,10 +254,14 @@ function aspectRatioToSeedreamImageSize(
 
 function isSeedreamFalImageModel(
   modelIdentifier: SupportedFalImageModelIdentifier,
-): modelIdentifier is typeof SEEDREAM_4_5_CANONICAL_ID | typeof SEEDREAM_5_LITE_CANONICAL_ID {
+): modelIdentifier is
+  | typeof SEEDREAM_4_5_CANONICAL_ID
+  | typeof SEEDREAM_5_LITE_CANONICAL_ID
+  | typeof SEEDREAM_5_PRO_CANONICAL_ID {
   return (
     modelIdentifier === SEEDREAM_4_5_CANONICAL_ID ||
-    modelIdentifier === SEEDREAM_5_LITE_CANONICAL_ID
+    modelIdentifier === SEEDREAM_5_LITE_CANONICAL_ID ||
+    modelIdentifier === SEEDREAM_5_PRO_CANONICAL_ID
   )
 }
 

@@ -7,6 +7,10 @@ import { enhancePrompt, enhancePromptForJSONModels } from '@/lib/prompt-enhancem
 import { getAuthenticatedRequestContext } from '@/lib/server/request-auth';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 import {
+  buildImagePricingParameters,
+  resolveGenerationPricingQuote,
+} from '@/lib/generation-pricing';
+import {
   aspectRatioToDimensions,
   buildReplicateReferenceImageInput,
   modelUsesDimensions,
@@ -233,12 +237,26 @@ export async function POST(request: NextRequest) {
       console.log(`[generate-image] Clamped n from ${n} to ${effectiveN} (model max_images=${maxImages})`);
     }
 
-    // Compute required credits from model cost and image count
+    // Compute required credits from quality-aware pricing and image count
     const imageCount = effectiveN;
-    const costPerImage = Number(modelData.model_cost) ?? 0;
-    const requiredCredits = costPerImage > 0
-      ? costPerImage * imageCount
-      : Math.max(1, imageCount);
+    const pricingQuote = resolveGenerationPricingQuote({
+      model: {
+        identifier: modelIdentifier,
+        type: 'image',
+        model_cost: modelData.model_cost,
+        pricing_config: modelData.pricing_config,
+      },
+      parameters: buildImagePricingParameters({
+        quality,
+        resolution,
+        size,
+        outputQuality: output_quality,
+        resolutionPreset: size || resolution,
+      }),
+      outputCount: imageCount,
+    });
+    const requiredCredits = pricingQuote.quotedCredits;
+    const pricingSnapshot = pricingQuote.pricingSnapshot;
 
     const hasCredits = await checkUserHasCredits(user.id, requiredCredits, supabase);
     if (!hasCredits) {
@@ -517,6 +535,8 @@ export async function POST(request: NextRequest) {
           status: 'pending',
           replicate_prediction_id: requestId,
           fal_endpoint_id: falEndpoint,
+          quoted_credits: requiredCredits,
+          pricing_snapshot: pricingSnapshot,
         })
         .select('id')
         .single();
@@ -875,6 +895,8 @@ export async function POST(request: NextRequest) {
               tool: tool || null,
               status: 'pending',
               replicate_prediction_id: prediction.id,
+              quoted_credits: requiredCredits,
+              pricing_snapshot: pricingSnapshot,
             })
             .select('id')
             .single();
@@ -1043,6 +1065,8 @@ export async function POST(request: NextRequest) {
           type: 'image', // You can customize this based on your needs
           is_public: true, // Default from schema, but explicitly set
           tool: tool || null,
+          quoted_credits: requiredCredits,
+          pricing_snapshot: pricingSnapshot,
         };
 
         const { data: savedData, error: saveError } = await supabase

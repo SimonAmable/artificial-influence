@@ -9,6 +9,8 @@ const {
   FAL_SEEDREAM_4_5_T2I,
   FAL_SEEDREAM_5_LITE_EDIT,
   FAL_SEEDREAM_5_LITE_T2I,
+  FAL_SEEDREAM_5_PRO_EDIT,
+  FAL_SEEDREAM_5_PRO_T2I,
   FAL_NANO_BANANA_2_LITE_EDIT,
   FAL_NANO_BANANA_2_LITE_T2I,
   FAL_WAN_27_PRO_EDIT,
@@ -17,6 +19,7 @@ const {
   OPENAI_GPT_IMAGE_2_CANONICAL_ID,
   SEEDREAM_4_5_CANONICAL_ID,
   SEEDREAM_5_LITE_CANONICAL_ID,
+  SEEDREAM_5_PRO_CANONICAL_ID,
   WAN_27_PRO_IMAGE_CANONICAL_ID,
 } = await import(new URL("./fal-image.ts", import.meta.url).href)
 
@@ -227,6 +230,40 @@ runTest("Seedream 5 Lite routes prompt-only generations to Fal text-to-image", (
 
   assert.equal(result.endpointId, FAL_SEEDREAM_5_LITE_T2I)
   assert.equal(result.input.image_size, "landscape_4_3")
+  assert.equal(result.input.enable_safety_checker, false)
+})
+
+runTest("Seedream 5 Pro routes prompt-only generations to Fal text-to-image with safety checker off", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: "16:9",
+    modelIdentifier: SEEDREAM_5_PRO_CANONICAL_ID,
+    numImages: 2,
+    prompt: "A vintage travel poster for Tokyo with Japanese text reading 'Visit Tokyo'",
+    referenceImageUrls: [],
+    resolutionPreset: "2K",
+  })
+
+  assert.equal(result.endpointId, FAL_SEEDREAM_5_PRO_T2I)
+  assert.equal(result.input.image_size, "auto_2K")
+  assert.equal(result.input.num_images, 2)
+  assert.equal(result.input.enable_safety_checker, false)
+  assert.ok(!("image_urls" in result.input))
+})
+
+runTest("Seedream 5 Pro routes referenced generations to Fal edit", () => {
+  const references = Array.from({ length: 12 }, (_, index) => `https://example.com/ref-${index + 1}.png`)
+  const result = buildFalImageRequest({
+    aspectRatio: null,
+    modelIdentifier: SEEDREAM_5_PRO_CANONICAL_ID,
+    numImages: 1,
+    prompt: "Replace the product in Figure 1 with that in Figure 2",
+    referenceImageUrls: references,
+  })
+
+  assert.equal(result.endpointId, FAL_SEEDREAM_5_PRO_EDIT)
+  assert.equal(result.resolvedAspectRatio, "match_input_image")
+  assert.equal(result.input.image_size, "auto_2K")
+  assert.equal((result.input.image_urls as string[]).length, 10)
   assert.equal(result.input.enable_safety_checker, false)
 })
 

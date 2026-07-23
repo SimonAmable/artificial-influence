@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       normalizeMotionCopyModelIdentifier(requestedModel) || DEFAULT_MOTION_COPY_MODEL_IDENTIFIER;
     const { data: modelData, error: modelError } = await supabase
       .from('models')
-      .select('model_cost, model_cost_per_second')
+      .select('model_cost, model_cost_per_second, pricing_config')
       .eq('identifier', model)
       .eq('type', 'video')
       .eq('is_active', true)
@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
       modelIdentifier: model,
       modelCost: modelData.model_cost,
       modelCostPerSecond: modelData.model_cost_per_second,
+      pricingConfig: modelData.pricing_config,
       mode,
       characterOrientation,
       hasInputVideo: true,

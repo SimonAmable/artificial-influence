@@ -58,11 +58,10 @@ import {
 } from "@/components/content/fanvue-image-action-dialog"
 import { currentProduct } from "@/lib/product/current"
 import {
-  getParameterDefault,
-  parseModelParameters,
   type Model,
   type ModelInputValues,
 } from "@/lib/types/models"
+import { getDefaultImageModelParameters } from "@/lib/pricing-parameter-ui"
 
 interface ImageHistoryItem {
   id?: string
@@ -90,33 +89,9 @@ interface PendingImageRequest {
   predictionId?: string | null
 }
 
-const QUALITY_IMAGE_PARAMETER_NAMES = new Set(["quality", "output_quality"])
-
-function shouldShowImageQualitySelector(modelIdentifier: string | null | undefined) {
-  if (!modelIdentifier) return false
-  const normalized = modelIdentifier.toLowerCase()
-  return normalized.includes("nano-banana") || normalized.includes("gpt-image")
-}
 
 function getQualityModelParameters(model: Model | null): ModelInputValues {
-  if (!model) return {}
-
-  return parseModelParameters(model.parameters).reduce<ModelInputValues>((acc, param) => {
-    if (!QUALITY_IMAGE_PARAMETER_NAMES.has(param.name)) {
-      return acc
-    }
-
-    if (param.name === "output_quality") {
-      acc[param.name] = 100
-      return acc
-    }
-
-    if (param.name === "quality" && shouldShowImageQualitySelector(model.identifier)) {
-      acc[param.name] = getParameterDefault(param)
-    }
-
-    return acc
-  }, {})
+  return getDefaultImageModelParameters(model)
 }
 
 function createClientRequestId() {
@@ -208,6 +183,7 @@ const FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF = new Set([
   "openai/gpt-image-2",
   "bytedance/seedream-4.5",
   "bytedance/seedream-5-lite",
+  "bytedance/seedream-5-pro",
 ])
 const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
   full_character:

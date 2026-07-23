@@ -37,6 +37,7 @@ type PendingFalImageRow = {
   fal_endpoint_id: string | null
   status: string
   type: string
+  quoted_credits?: number | null
 }
 
 type CompleteFalImageOptions = {
@@ -55,7 +56,7 @@ export async function completeFalPendingImageAdmin(
   const { data: generation, error } = await supabaseAdmin
     .from("generations")
     .select(
-      "id, user_id, model, prompt, aspect_ratio, tool, reference_images_supabase_storage_path, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type",
+      "id, user_id, model, prompt, aspect_ratio, tool, reference_images_supabase_storage_path, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type, quoted_credits",
     )
     .eq("replicate_prediction_id", predictionId)
     .eq("type", "image")
@@ -140,7 +141,10 @@ export async function completeFalPendingImageAdmin(
     .single()
 
   const costPerOutput = Math.max(1, Number((modelRow.data as { model_cost?: number } | null)?.model_cost ?? 2) || 2)
-  const requiredCredits = costPerOutput * urls.length
+  const requiredCredits = Math.max(
+    1,
+    Number(row.quoted_credits ?? costPerOutput * urls.length) || costPerOutput * urls.length,
+  )
 
   const hasCredits = await checkUserHasCredits(row.user_id, requiredCredits, supabaseAdmin)
   if (!hasCredits) {

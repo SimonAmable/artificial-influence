@@ -1,6 +1,7 @@
 import {
   megaNavGroups,
   type MegaNavBadge,
+  type MegaNavGroup,
   type MegaNavItem,
   type MegaNavPhosphorIcon,
 } from "@/lib/constants/navigation"
@@ -22,6 +23,47 @@ function isAppPath(path: string) {
   return path === "/apps" || path.startsWith("/apps/")
 }
 
+function pathSearchTerms(path: string) {
+  const terms = [path]
+  const segments = path
+    .split(/[/?#&=]+/)
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+
+  for (const segment of segments) {
+    terms.push(segment)
+    if (segment.endsWith("s") && segment.length > 3) {
+      terms.push(segment.slice(0, -1))
+    }
+  }
+
+  return terms
+}
+
+function buildSearchText(
+  parts: Array<string | string[] | undefined>,
+  path?: string,
+) {
+  const values = parts
+    .flatMap((part) => (Array.isArray(part) ? part : part ? [part] : []))
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  if (path) values.push(...pathSearchTerms(path))
+
+  return [...new Set(values.map((value) => value.toLowerCase()))].join(" ")
+}
+
+function hasMenuItemAtPath(group: MegaNavGroup, path: string) {
+  if (group.simpleItems?.some((item) => item.path === path)) return true
+  return (
+    group.sections?.some(
+      (section) =>
+        section.title === "Features" && section.items.some((item) => item.path === path),
+    ) ?? false
+  )
+}
+
 function itemToSearchItem(item: MegaNavItem, group: string): PageSearchItem | null {
   if (isAppPath(item.path)) return null
 
@@ -35,11 +77,28 @@ function itemToSearchItem(item: MegaNavItem, group: string): PageSearchItem | nu
     iconSrc: item.iconSrc,
     iconText: item.iconText,
     iconPhosphor: item.iconPhosphor,
-    searchText: [item.label, item.description, item.path, group]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase(),
+    searchText: buildSearchText(
+      [item.label, item.description, group, item.searchKeywords],
+      item.path,
+    ),
   }
+}
+
+function getSearchRank(item: PageSearchItem, query: string) {
+  const label = item.label.toLowerCase()
+  const description = item.description.toLowerCase()
+  const path = item.path.toLowerCase()
+  const terms = item.searchText.split(" ").filter(Boolean)
+
+  if (label === query) return 0
+  if (label.startsWith(query)) return 1
+  if (terms.some((term) => term.startsWith(query))) return 2
+  if (label.includes(query)) return 3
+  if (description.startsWith(query)) return 4
+  if (description.includes(query)) return 5
+  if (path.includes(query)) return 6
+  if (item.searchText.includes(query)) return 7
+  return Number.POSITIVE_INFINITY
 }
 
 export function getCorePageSearchItems(): PageSearchItem[] {
@@ -55,7 +114,7 @@ export function getCorePageSearchItems(): PageSearchItem[] {
   }
 
   for (const group of megaNavGroups) {
-    if (group.path && !isAppPath(group.path)) {
+    if (group.path && !isAppPath(group.path) && !hasMenuItemAtPath(group, group.path)) {
       const matchingMenuItem =
         group.simpleItems?.find((item) => item.path === group.path && item.label === group.label) ??
         group.simpleItems?.find((item) => item.path === group.path)
@@ -70,7 +129,7 @@ export function getCorePageSearchItems(): PageSearchItem[] {
               path: group.path,
               group: group.label,
               badge: group.badge,
-              searchText: [group.label, group.path].join(" ").toLowerCase(),
+              searchText: buildSearchText([group.label], group.path),
             },
       )
     }
@@ -96,14 +155,12 @@ export function searchCorePages(query: string, limit = 12): PageSearchItem[] {
   if (!q) return pages.slice(0, limit)
 
   return pages
-    .filter((item) => item.searchText.includes(q))
+    .map((item) => ({ item, rank: getSearchRank(item, q) }))
+    .filter(({ rank }) => Number.isFinite(rank))
     .sort((a, b) => {
-      const aLabel = a.label.toLowerCase()
-      const bLabel = b.label.toLowerCase()
-      const aStarts = aLabel.startsWith(q) ? 0 : 1
-      const bStarts = bLabel.startsWith(q) ? 0 : 1
-      if (aStarts !== bStarts) return aStarts - bStarts
-      return aLabel.localeCompare(bLabel)
+      if (a.rank !== b.rank) return a.rank - b.rank
+      return a.item.label.localeCompare(b.item.label)
     })
+    .map(({ item }) => item)
     .slice(0, limit)
 }

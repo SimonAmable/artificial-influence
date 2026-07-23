@@ -22,6 +22,7 @@ export const MODEL_IDENTIFIERS = {
   OPENAI_GPT_IMAGE_2: 'openai/gpt-image-2',
   BYTEDANCE_SEEDREAM_4_5: 'bytedance/seedream-4.5',
   BYTEDANCE_SEEDREAM_5_LITE: 'bytedance/seedream-5-lite',
+  BYTEDANCE_SEEDREAM_5_PRO: 'bytedance/seedream-5-pro',
   PRUNAAI_Z_IMAGE_TURBO: 'prunaai/z-image-turbo',
   PRUNAAI_FLUX_KONTEXT_FAST: 'prunaai/flux-kontext-fast',
   XAI_GROK_IMAGINE: 'xai/grok-imagine-image',
@@ -1365,6 +1366,50 @@ const Z_IMAGE_TURBO_PARAMS: ParameterDefinition[] = [
   },
 ];
 
+const FAL_SEEDREAM_PRO_IMAGE_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'enable_safety_checker',
+    type: 'boolean',
+    label: 'Safety checker',
+    description: 'Enable content moderation for input and output',
+    required: false,
+    default: false,
+    ui_type: 'switch',
+  },
+  {
+    name: 'size',
+    type: 'string',
+    label: 'Resolution preset',
+    description: 'Fal auto resolution preset (2K)',
+    required: false,
+    default: '2K',
+    enum: ['2K'],
+    ui_type: 'select',
+  },
+  {
+    name: 'num_images',
+    type: 'number',
+    label: 'Number of Images',
+    description: 'Number of separate generations to run',
+    required: false,
+    default: 1,
+    min: 1,
+    max: 6,
+    ui_type: 'number',
+  },
+  {
+    name: 'seed',
+    type: 'number',
+    label: 'Seed',
+    description: 'Random seed for reproducibility',
+    required: false,
+    default: null,
+    min: 0,
+    max: 2147483647,
+    ui_type: 'number',
+  },
+];
+
 const FAL_SEEDREAM_IMAGE_PARAMS: ParameterDefinition[] = [
   {
     name: 'enable_safety_checker',
@@ -2004,15 +2049,35 @@ export const SEEDREAM_4_5_MODEL: Model = {
 export const SEEDREAM_5_LITE_MODEL: Model = {
   id: 'model-seedream-5-lite',
   identifier: MODEL_IDENTIFIERS.BYTEDANCE_SEEDREAM_5_LITE,
-  name: 'Seedream 5.0',
+  name: 'Seedream 5.0 Lite',
   description:
-    'Seedream 5.0 Lite on fal: reasoning-heavy text-to-image and multi-reference editing up to 3K. Safety checker is disabled by default.',
+    'Seedream 5.0 Lite on fal: fast reasoning-heavy text-to-image and multi-reference editing up to 3K. Safety checker is disabled by default.',
   type: 'image',
   provider: 'fal',
   is_active: true,
   model_cost: 4,
   parameters: {
     parameters: FAL_SEEDREAM_IMAGE_PARAMS,
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+/**
+ * Seedream 5.0 Pro - ByteDance flagship image model with multilingual text and precision editing
+ */
+export const SEEDREAM_5_PRO_MODEL: Model = {
+  id: 'model-seedream-5-pro',
+  identifier: MODEL_IDENTIFIERS.BYTEDANCE_SEEDREAM_5_PRO,
+  name: 'Seedream 5.0',
+  description:
+    'Seedream 5.0 Pro on fal: production-grade text-to-image and multi-reference editing with native multilingual text, layer separation, and up to 2K output. Safety checker is disabled by default.',
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 6,
+  parameters: {
+    parameters: FAL_SEEDREAM_PRO_IMAGE_PARAMS,
   },
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
@@ -2070,6 +2135,7 @@ export const IMAGE_MODELS = [
   FAL_WAN_27_PRO_IMAGE_MODEL,
   SEEDREAM_4_5_MODEL,
   SEEDREAM_5_LITE_MODEL,
+  SEEDREAM_5_PRO_MODEL,
   Z_IMAGE_TURBO_MODEL,
   FLUX_KONTEXT_FAST_MODEL,
   GROK_IMAGINE_IMAGE_QUALITY_MODEL,
@@ -2112,6 +2178,7 @@ const IMAGE_MODELS_FIXED = [
   FAL_WAN_27_PRO_IMAGE_MODEL,
   SEEDREAM_4_5_MODEL,
   SEEDREAM_5_LITE_MODEL,
+  SEEDREAM_5_PRO_MODEL,
   Z_IMAGE_TURBO_MODEL,
   FLUX_KONTEXT_FAST_MODEL,
   GROK_IMAGINE_IMAGE_QUALITY_MODEL,

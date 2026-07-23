@@ -29,10 +29,15 @@ import {
 } from "@/components/ui/select"
 import {
   getParameterDefault,
-  parseModelParameters,
   type Model,
   type ModelInputValues,
 } from "@/lib/types/models"
+import {
+  formatPricingOptionLabel,
+  formatQualityOptionLabel,
+  getImagePricingParameters,
+} from "@/lib/pricing-parameter-ui"
+import { useGenerationCreditEstimate } from "@/hooks/use-generation-credit-estimate"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { AspectRatioSelector } from "@/components/shared/selectors/aspect-ratio-selector"
 import { getActiveModelMetadata, type ModelMetadata } from "@/lib/constants/model-metadata"
@@ -48,6 +53,7 @@ import type { AssetType } from "@/lib/assets/types"
 import { toast } from "sonner"
 import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
 import { extendMentionRangeEnd } from "@/lib/commands/mention-token"
+import { GenerateShaderButton } from "./generate-shader-button"
 import { brandRefsOnly, getImageAssetUrlsFromRefChips } from "@/lib/commands/ref-image-pipeline"
 
 interface InfluencerInputBoxProps {
@@ -100,29 +106,6 @@ interface InfluencerInputBoxProps {
   activeGenerationSlotCount?: number
   modelParameters?: ModelInputValues
   onModelParametersChange?: (params: ModelInputValues) => void
-}
-
-const QUALITY_IMAGE_PARAMETER_NAMES = new Set(["quality", "output_quality"])
-
-function shouldShowImageQualitySelector(modelIdentifier: string | null | undefined) {
-  if (!modelIdentifier) return false
-  const normalized = modelIdentifier.toLowerCase()
-  return normalized.includes("nano-banana") || normalized.includes("gpt-image")
-}
-
-function formatQualityOptionLabel(paramName: string, option: string): string {
-  if (paramName !== "quality") return option
-
-  switch (option) {
-    case "low":
-      return "1k"
-    case "medium":
-      return "2k"
-    case "high":
-      return "4k"
-    default:
-      return option
-  }
 }
 
 export function InfluencerInputBox({
@@ -505,20 +488,13 @@ export function InfluencerInputBox({
     return models.find(m => m.identifier === selectedModel) || null
   }, [selectedModel, models])
   const selectedQualityParameters = React.useMemo(() => {
-    if (!selectedModelObject) return []
-
-    return parseModelParameters(selectedModelObject.parameters).filter((param) => {
-      if (!QUALITY_IMAGE_PARAMETER_NAMES.has(param.name)) {
-        return false
-      }
-
-      if (param.name === "output_quality") {
-        return false
-      }
-
-      return param.name === "quality" && shouldShowImageQualitySelector(selectedModelObject.identifier)
-    })
+    return getImagePricingParameters(selectedModelObject)
   }, [selectedModelObject])
+  const estimatedCredits = useGenerationCreditEstimate({
+    model: selectedModelObject,
+    parameters: modelParameters ?? {},
+    outputCount: selectedNumImages,
+  })
 
   // Determine if button is ready (prompt must not be empty)
   const isReady = React.useMemo(() => {
@@ -583,7 +559,7 @@ export function InfluencerInputBox({
       {isPromptDragActive && canAcceptPromptDrop && (
         <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] border-2 border-dashed border-primary bg-primary/20" />
       )}
-      <CardContent className="p-2 flex flex-col gap-1.5">
+      <CardContent className="flex min-w-0 flex-col gap-1.5 p-2">
         {/* Image Preview - Above Text Input */}
         {showReferenceControls && previewRowCount > 0 && (
           <div className="relative w-full flex gap-2 flex-wrap">
@@ -656,40 +632,17 @@ export function InfluencerInputBox({
             />
           </div>
 
-          {/* Generate Button */}
-          <div className="shrink-0">
-            <div
-              className={cn(
-                "relative inline-block transition-all duration-300",
-                isReady && "before:content-[''] before:absolute before:inset-[-12px] before:bg-primary before:rounded-full before:blur-[15px] before:opacity-50 before:-z-10"
-              )}
-            >
-              <Button
-                onClick={onGenerate}
-                disabled={!isReady || (isGenerating && !allowConcurrent)}
-                className={cn(
-                  "bg-primary hover:bg-primary/80 text-primary-foreground font-semibold h-10 min-w-[100px] text-sm px-4 py-6 transition-all duration-300 relative z-0",
-                  !isReady && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                <div className="flex flex-col items-center gap-0.5">
-                    <span className="text-sm font-semibold">Generate</span>
-                    <div className="flex items-center gap-0.5">
-                      <Sparkle size={8} weight="fill" />
-                      <span className="text-[10px]">
-                        {selectedModelObject?.model_cost != null
-                          ? selectedModelObject.model_cost * selectedNumImages
-                          : "-"}
-                      </span>
-                    </div>
-                  </div>
-                </Button>
-            </div>
-          </div>
+          <GenerateShaderButton
+            isReady={isReady}
+            isGenerating={isGenerating}
+            allowConcurrent={allowConcurrent}
+            onGenerate={onGenerate}
+            creditCost={estimatedCredits ?? "-"}
+          />
         </div>
 
         {/* Controls: Add Reference Image, Model Selector, Enhance Prompt */}
-        <div className="flex items-center gap-1 flex-wrap">
+        <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] [&>*]:shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -827,7 +780,11 @@ export function InfluencerInputBox({
             const value = modelParameters?.[param.name] ?? getParameterDefault(param)
 
             if (param.ui_type === "select" && "enum" in param && Array.isArray(param.enum)) {
-              const displayValue = formatQualityOptionLabel(param.name, String(value))
+              const displayValue = formatPricingOptionLabel(
+                selectedModelObject ?? { model_cost: 0 },
+                param.name,
+                String(value),
+              )
 
               return (
                 <Select
@@ -843,13 +800,17 @@ export function InfluencerInputBox({
                 >
                   <SelectTrigger id={param.name} className="h-7 text-xs w-fit min-w-[4.25rem] px-2">
                     <SelectValue placeholder={param.label}>
-                      {displayValue}
+                      {formatQualityOptionLabel(param.name, String(value))}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent position="popper" side="top" sideOffset={4}>
                     {param.enum.map((option) => (
                       <SelectItem key={String(option)} value={String(option)} className="text-xs">
-                        {formatQualityOptionLabel(param.name, String(option))}
+                        {formatPricingOptionLabel(
+                          selectedModelObject ?? { model_cost: 0 },
+                          param.name,
+                          String(option),
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>

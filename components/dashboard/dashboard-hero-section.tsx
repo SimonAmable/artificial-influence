@@ -234,6 +234,7 @@ export function DashboardHeroSection({ className }: { className?: string }) {
       modelIdentifier: selectedVideoModel.identifier,
       modelCost: selectedVideoModel.model_cost,
       modelCostPerSecond: selectedVideoModel.model_cost_per_second,
+      pricingConfig: selectedVideoModel.pricing_config,
       duration: videoParameters.duration as number | string | undefined,
       resolution: typeof videoParameters.resolution === "string" ? videoParameters.resolution : null,
       draft: videoParameters.draft as boolean | undefined,

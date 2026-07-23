@@ -108,7 +108,15 @@ export async function POST(request: NextRequest) {
         : resolveVideoPricingQuote({
             modelIdentifier: 'veed/fabric-1.0',
             modelCost: 10,
-            modelCostPerSecond: null,
+            modelCostPerSecond: 6,
+            pricingConfig: {
+              strategy: 'per_second',
+              defaultCreditsPerSecond: 6,
+              tiers: [
+                { match: { resolution: '480p' }, creditsPerSecond: 4 },
+                { match: { resolution: '720p' }, creditsPerSecond: 6 },
+              ],
+            },
             resolution,
             sourceDurationSeconds,
           });

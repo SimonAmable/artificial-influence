@@ -26,6 +26,7 @@ export const modelsBentoFeaturedIdentifiers = [
   "openai/gpt-image-2",
   "xai/grok-imagine-image",
   "bytedance/seedream-5-lite",
+  "bytedance/seedream-5-pro",
   "google/veo-3.1-fast",
   "bytedance/seedance-2.0",
   "alibaba/happy-horse/v1.1",

@@ -41,6 +41,7 @@ export type MegaNavPhosphorIcon =
   | "download-simple"
   | "squares-four"
   | "clock-counter-clockwise"
+  | "pencil-simple"
 
 export interface MegaNavItem {
   path: string
@@ -51,6 +52,8 @@ export interface MegaNavItem {
   iconText?: string
   /** When set, header renders this Phosphor icon instead of iconSrc */
   iconPhosphor?: MegaNavPhosphorIcon
+  /** Extra terms surfaced in global search (aliases, synonyms, path fragments) */
+  searchKeywords?: string[]
   /** Replicate-style model id, surfaced on menu items as data-model-identifier */
   modelIdentifier?: string
   products?: ProductId[]
@@ -296,9 +299,9 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             iconSrc: "/ai_icons/grok.svg",
           },
           {
-            path: "/image?model=bytedance/seedream-5-lite",
+            path: "/image?model=bytedance/seedream-5-pro",
             label: "Seedream 5.0",
-            description: "ByteDance reasoning, refs, up to 3K",
+            description: "ByteDance flagship, multilingual text, up to 2K",
             iconSrc: "/ai_icons/bytedance-color.svg",
           },
           {
@@ -469,7 +472,19 @@ const baseMegaNavGroups: MegaNavGroup[] = [
     badge: "new",
     hiddenFor: ["presence-studio"],
   },
-  { label: "Canvas", path: "/canvases" },
+  {
+    label: "Canvas",
+    path: "/canvases",
+    simpleItems: [
+      {
+        path: "/canvases",
+        label: "Canvas",
+        description: "Build node-based workflows and visual pipelines",
+        iconPhosphor: "pencil-simple",
+        searchKeywords: ["workflow", "workflows", "pipeline", "pipelines", "node", "nodes", "canvases"],
+      },
+    ],
+  },
   {
     label: "Free Tools",
     path: "/free-tools",

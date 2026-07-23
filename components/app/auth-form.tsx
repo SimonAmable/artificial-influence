@@ -382,7 +382,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
         </section>
 
         <section className="hidden py-3 pr-3 pl-1 lg:flex lg:items-center lg:justify-center">
-          <div className="relative h-[calc(100vh-5rem)] w-full max-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-border bg-muted">
+          <div className="relative h-[calc(100vh-5rem)] w-full max-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-border bg-muted shadow-depth-l">
             {activeItem.media.type === "image" ? (
               <Image
                 src={activeItem.media.src}
@@ -418,7 +418,12 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
               </video>
             )}
 
-            <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-background via-background/70 to-transparent" />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-10 rounded-2xl shadow-lg"
+            />
+
+            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black via-black/50 to-transparent" />
 
             <div className="absolute inset-x-0 bottom-0 p-6">
               <div className="flex items-center gap-2">
@@ -428,15 +433,16 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: AuthMode }) 
                     type="button"
                     onClick={() => setActiveShowcase(index)}
                     aria-label={`Go to slide ${index + 1}`}
-                    className="group relative h-2.5 flex-1 overflow-hidden rounded-full bg-foreground/20 transition hover:bg-foreground/30"
+                    className="group relative h-2.5 flex-1 overflow-hidden rounded-full bg-white/25 transition hover:bg-white/35"
                   >
-                    {index === activeShowcase ? (
+                    {index < activeShowcase ? (
+                      <span className="absolute inset-y-0 left-0 w-full rounded-full bg-primary" />
+                    ) : index === activeShowcase ? (
                       <span
                         key={`progress-${index}-${activeShowcase}`}
                         className="absolute inset-y-0 left-0 rounded-full bg-primary"
                         style={{
-                          animation: `showcase-progress ${HERO_SHOWCASE_IMAGE_DURATION_MS}ms linear forwards`,
-                          animationDuration: `${activeDurationMs}ms`,
+                          animation: `showcase-progress ${activeDurationMs}ms linear forwards`,
                         }}
                       />
                     ) : (

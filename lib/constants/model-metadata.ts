@@ -206,9 +206,9 @@ export const SEEDREAM_4_5_META: ModelMetadata = {
 export const SEEDREAM_5_LITE_META: ModelMetadata = {
   id: 'seedream-5-lite-meta',
   identifier: 'bytedance/seedream-5-lite',
-  name: 'Seedream 5.0',
+  name: 'Seedream 5.0 Lite',
   description:
-    'Seedream 5.0 Lite on fal: reasoning-heavy text-to-image and multi-reference editing up to 3K',
+    'Seedream 5.0 Lite on fal: fast reasoning-heavy text-to-image and multi-reference editing up to 3K',
   type: 'image',
   provider: 'fal',
   is_active: true,
@@ -230,6 +230,30 @@ export const SEEDREAM_5_LITE_META: ModelMetadata = {
       options: ['disabled', 'auto'],
       default: 'disabled',
       description: 'Generate related image sets in one request',
+    },
+  ],
+};
+
+export const SEEDREAM_5_PRO_META: ModelMetadata = {
+  id: 'seedream-5-pro-meta',
+  identifier: 'bytedance/seedream-5-pro',
+  name: 'Seedream 5.0',
+  description:
+    'Seedream 5.0 Pro on fal: production-grade text-to-image and multi-reference editing with native multilingual text up to 2K',
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 6.0,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['match_input_image', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '21:9'],
+  customParameters: [
+    {
+      name: 'size',
+      label: 'Size Preset',
+      options: ['2K'],
+      default: '2K',
+      description: 'Pre-set image resolution',
     },
   ],
 };
@@ -850,6 +874,7 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
   NANO_BANANA_2_LITE_META,
   SEEDREAM_4_5_META,
   SEEDREAM_5_LITE_META,
+  SEEDREAM_5_PRO_META,
   GROK_IMAGINE_IMAGE_QUALITY_META,
   QWEN_IMAGE_EDIT_PLUS_META,
   GROK_IMAGINE_META,
@@ -930,7 +955,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     P_VIDEO_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
-  fal: [WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META],
+  fal: [WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, SEEDREAM_5_PRO_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META],
   xai: [GROK_IMAGINE_META],
 };
 

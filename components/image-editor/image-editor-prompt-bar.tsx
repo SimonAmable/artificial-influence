@@ -38,6 +38,7 @@ import { AspectRatioSelector } from "@/components/shared/selectors/aspect-ratio-
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { getActiveModelMetadata, type ModelMetadata } from "@/lib/constants/model-metadata"
 import type { Model } from "@/lib/types/models"
+import { useGenerationCreditEstimate } from "@/hooks/use-generation-credit-estimate"
 import type { Canvas as FabricCanvas } from "fabric"
 import { toast } from "sonner"
 import { getCanvasExportMultiplier } from "@/lib/image-editor/export-resolution"
@@ -188,6 +189,10 @@ export function ImageEditorPromptBar({
     }
     return selectedModelObject
   }, [isInpaint, models, selectedModelObject])
+  const estimatedCredits = useGenerationCreditEstimate({
+    model: displayModelObject,
+    outputCount: 1,
+  })
 
   const getMaskOverlay = (canvas: FabricCanvas): MaskOverlayObject | null => {
     const overlay = canvas.getObjects().find((obj) => {
@@ -549,9 +554,7 @@ export function ImageEditorPromptBar({
                     <span className="shrink-0 font-semibold">Generate</span>
                     <Sparkle className="size-2.5 shrink-0" weight="fill" aria-hidden />
                     <span className="text-[10px] font-medium leading-none tabular-nums opacity-95">
-                      {displayModelObject?.model_cost != null
-                        ? displayModelObject.model_cost
-                        : "-"}
+                      {estimatedCredits ?? "-"}
                     </span>
                   </>
                 )}

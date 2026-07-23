@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition } from "@/lib/types/models"
 import { isHappyHorseModelIdentifier } from "@/lib/constants/models"
+import { formatVideoPricingOptionLabel } from "@/lib/pricing-parameter-ui"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import {
   AspectRatioIcon,
@@ -162,6 +163,12 @@ export function VideoModelParameterControls({
         )
       }
 
+      const usesPricingLabels =
+        param.affects_pricing === true ||
+        param.name === "resolution" ||
+        param.name === "mode" ||
+        param.name === "draft"
+
       return (
         <Select
           key={param.name}
@@ -179,7 +186,14 @@ export function VideoModelParameterControls({
           <SelectContent side="top">
             {param.enum.map((option) => (
               <SelectItem key={String(option)} value={String(option)} className="text-xs">
-                {String(option)}
+                {usesPricingLabels
+                  ? formatVideoPricingOptionLabel(
+                      selectedModel,
+                      param.name,
+                      String(option),
+                      parameters,
+                    )
+                  : String(option)}
               </SelectItem>
             ))}
           </SelectContent>
