@@ -43,6 +43,7 @@ export const presenceStudioProduct: ProductConfig = {
     "/dashboard",
     "/pricing",
     "/mcp",
+    "/free-tools/metadata-remover",
   ],
   defaultSignedInRoute: "/dashboard",
   assistantName: "Presence Agent",

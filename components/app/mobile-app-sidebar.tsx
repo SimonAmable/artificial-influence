@@ -66,7 +66,8 @@ const FLAT_NAV_ITEMS: FlatNavItem[] = [
   { path: "/audio",         label: "Audio",         icon: "microphone"                      },
   { path: "/assets?tab=history", label: "Assets",   icon: "folder",           badge: "new"  },
   { path: "/canvases",      label: "Canvas",        icon: "tree-structure"                  },
-  { path: "/free-tools",    label: "Free Tools",    icon: "toolbox"                         },
+  { path: "/free-tools/metadata-remover", label: "Metadata Remover", icon: "broom", products: ["presence-studio"] },
+  { path: "/free-tools",    label: "Free Tools",    icon: "toolbox", hiddenFor: ["presence-studio"] },
   { path: "/pricing",       label: "Pricing",       icon: "currency-dollar"                 },
 ]
 

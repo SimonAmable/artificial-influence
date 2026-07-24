@@ -16,6 +16,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { isRouteVisibleForProduct } from "@/lib/product/visibility"
 import { cn } from "@/lib/utils"
 import {
   downloadBlob,
@@ -150,6 +151,8 @@ export function MetadataRemoverTool() {
     toast.success("Clean image downloaded")
   }, [cleanResult])
 
+  const showAllToolsLink = isRouteVisibleForProduct("/free-tools")
+
   return (
     <div className="min-h-screen bg-background px-4 pb-12 pt-24 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
@@ -166,12 +169,14 @@ export function MetadataRemoverTool() {
               Re-encode AI images into clean raster files in your browser. Nothing uploads, and no credits are used.
             </p>
           </div>
-          <Button variant="outline" asChild>
-            <Link href="/free-tools">
-              All tools
-              <ArrowRight className="ml-2 size-4" />
-            </Link>
-          </Button>
+          {showAllToolsLink ? (
+            <Button variant="outline" asChild>
+              <Link href="/free-tools">
+                All tools
+                <ArrowRight className="ml-2 size-4" />
+              </Link>
+            </Button>
+          ) : null}
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">

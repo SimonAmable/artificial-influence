@@ -7,6 +7,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr"
 
 import { Badge } from "@/components/ui/badge"
+import { isRouteVisibleForProduct } from "@/lib/product/visibility"
 
 export const metadata: Metadata = {
   title: "Free Creator Tools",
@@ -53,6 +54,8 @@ const freeTools = [
 ]
 
 export default function FreeToolsPage() {
+  const visibleTools = freeTools.filter((tool) => isRouteVisibleForProduct(tool.href))
+
   return (
     <div className="min-h-screen bg-background px-4 pb-12 pt-24 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
@@ -70,7 +73,7 @@ export default function FreeToolsPage() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {freeTools.map((tool) => (
+          {visibleTools.map((tool) => (
             <Link
               key={tool.href}
               href={tool.href}
