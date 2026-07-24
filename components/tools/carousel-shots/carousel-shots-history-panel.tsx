@@ -37,7 +37,11 @@ export function CarouselShotsHistoryPanel({
   onRegenerate,
   onShotsChange,
 }: CarouselShotsHistoryPanelProps) {
-  const { error, isLoading, items, updateItemShots } = useCarouselShotsHistory(historyRefreshKey)
+  const { error, hasMore, isLoading, isLoadingMore, items, loadMore, updateItemShots } =
+    useCarouselShotsHistory(historyRefreshKey)
+
+  const scrollRootRef = React.useRef<HTMLDivElement | null>(null)
+  const loadMoreSentinelRef = React.useRef<HTMLDivElement | null>(null)
 
   const displayItems = React.useMemo(() => {
     const merged = [...items]
@@ -92,6 +96,26 @@ export function CarouselShotsHistoryPanel({
     return () => window.cancelAnimationFrame(frame)
   }, [displayItems, focusedGenerationId, isLoading])
 
+  React.useEffect(() => {
+    const root = scrollRootRef.current
+    const target = loadMoreSentinelRef.current
+    if (!root || !target || isLoading || isLoadingMore || !hasMore || error) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore()
+        }
+      },
+      { root, rootMargin: "240px 0px" },
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [displayItems.length, error, hasMore, isLoading, isLoadingMore, loadMore])
+
   const hasPendingJobs = pendingJobs.length > 0
 
   if (isLoading && displayItems.length === 0 && !hasPendingJobs) {
@@ -116,7 +140,10 @@ export function CarouselShotsHistoryPanel({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1">
+    <div
+      ref={scrollRootRef}
+      className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1"
+    >
       {pendingJobs.map((job) => (
         <div key={job.id} className="rounded-2xl border bg-card p-4">
           <CarouselShotsGenerationCard
@@ -161,6 +188,15 @@ export function CarouselShotsHistoryPanel({
           />
         </div>
       ))}
+
+      {hasMore ? (
+        <div className="space-y-3 pb-2">
+          <div ref={loadMoreSentinelRef} className="h-px w-full" aria-hidden />
+          {isLoadingMore ? (
+            <div className="h-[min(280px,32vh)] animate-pulse rounded-2xl border bg-muted/20" />
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

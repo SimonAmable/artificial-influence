@@ -31,7 +31,9 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { GenerationLoadingSlots } from "@/components/shared/display/generation-loading-slots"
+import { GenerateShaderButton } from "@/components/tools/influencer/generate-shader-button"
 import { cn } from "@/lib/utils"
+import { GPT_IMAGE_2_META } from "@/lib/constants/model-metadata"
 import { currentProduct } from "@/lib/product/current"
 import { generateImageAndWait, isInsufficientCreditsError, isInsufficientCreditsMessage } from "@/lib/generate-image-client"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
@@ -1295,20 +1297,37 @@ export default function AIInfluencerPage() {
                   >
                     <User className="size-4 text-foreground" />
                   </Button>
-                  <Button
-                    onClick={handleCreateTrigger}
-                    disabled={isGenerating}
-                    className="flex-1 h-11 font-bold text-xs uppercase tracking-wider bg-transparent border border-border/60 rounded-full text-foreground hover:bg-secondary/20 hover:border-foreground transition-all"
-                  >
-                    {isGenerating ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <ArrowsClockwise className="size-3.5 animate-spin" />
-                        Generating...
-                      </span>
-                    ) : (
-                      "Create character"
-                    )}
-                  </Button>
+                  {uploadedFiles.length > 0 ? (
+                    <GenerateShaderButton
+                      layout="bar"
+                      className="flex-1 [&>div]:before:!rounded-full [&_button]:rounded-full"
+                      isReady
+                      isGenerating={isGenerating}
+                      allowConcurrent={false}
+                      onGenerate={handleCreateTrigger}
+                      creditCost={
+                        uploadedFiles.length === 1
+                          ? 0
+                          : GPT_IMAGE_2_META.model_cost
+                      }
+                      label="Create character"
+                    />
+                  ) : (
+                    <Button
+                      onClick={handleCreateTrigger}
+                      disabled={isGenerating}
+                      className="flex-1 h-11 font-bold text-base uppercase tracking-wider rounded-full border-0 bg-black text-white hover:bg-black/90 dark:bg-black dark:text-white dark:hover:bg-black/90 transition-all"
+                    >
+                      {isGenerating ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <ArrowsClockwise className="size-4 animate-spin" />
+                          Generating...
+                        </span>
+                      ) : (
+                        "Create character"
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             )}

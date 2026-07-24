@@ -2,6 +2,9 @@ import type { CarouselShotsModelId } from "@/lib/carousel-shots/types"
 
 export const CAROUSEL_SHOTS_TOOL = "carousel_shots" as const
 
+/** History list page size for infinite scroll. */
+export const CAROUSEL_SHOTS_HISTORY_PAGE_LIMIT = 3
+
 export const DEFAULT_CAROUSEL_SHOTS_MODEL: CarouselShotsModelId = "google/nano-banana-2"
 
 export const CAROUSEL_SHOTS_MODELS: ReadonlyArray<{

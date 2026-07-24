@@ -40,6 +40,8 @@ type SearchRow =
 
 export type GlobalSearchCommandProps = {
   onOpenSettings?: (tab: PageSearchSettingsTab) => void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 function pageToMegaNavItem(item: PageSearchItem): MegaNavItem {
@@ -125,9 +127,22 @@ function TemplatePreview({ template }: { template: Template }) {
   )
 }
 
-export function GlobalSearchCommand({ onOpenSettings }: GlobalSearchCommandProps) {
+export function GlobalSearchCommand({
+  onOpenSettings,
+  open: openProp,
+  onOpenChange,
+}: GlobalSearchCommandProps) {
   const router = useRouter()
-  const [open, setOpen] = React.useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false)
+  const open = openProp ?? uncontrolledOpen
+  const setOpen = React.useCallback(
+    (next: boolean | ((current: boolean) => boolean)) => {
+      const resolved = typeof next === "function" ? next(open) : next
+      if (openProp === undefined) setUncontrolledOpen(resolved)
+      onOpenChange?.(resolved)
+    },
+    [onOpenChange, open, openProp],
+  )
   const [query, setQuery] = React.useState("")
   const [debouncedQuery, setDebouncedQuery] = React.useState("")
   const [templates, setTemplates] = React.useState<Template[]>([])
@@ -144,7 +159,7 @@ export function GlobalSearchCommand({ onOpenSettings }: GlobalSearchCommandProps
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [])
+  }, [setOpen])
 
   React.useEffect(() => {
     if (!open) return

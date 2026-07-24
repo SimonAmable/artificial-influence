@@ -244,8 +244,12 @@ function MobileNavSheetBody({
 
 function MobileNavTriggerButton({
   authenticated,
+  searchOpen = false,
+  onOpenSearch,
 }: {
   authenticated: boolean
+  searchOpen?: boolean
+  onOpenSearch?: () => void
 }) {
   const pathname = usePathname() ?? ""
   const searchParams = useSearchParams()
@@ -258,14 +262,24 @@ function MobileNavTriggerButton({
     megaNavPathMatches(pathname, search, item.path),
   )
 
+  // Temporary: prefer global search over the mobile sidebar sheet.
+  const opensSearch = Boolean(onOpenSearch)
+
   return (
     <HeaderPillButton
       type="button"
       data-icon="inline-start"
       className="justify-between gap-2"
-      aria-expanded={openMobile}
-      aria-controls="mobile-app-sidebar"
-      onClick={() => setOpenMobile(true)}
+      aria-expanded={opensSearch ? searchOpen : openMobile}
+      aria-haspopup={opensSearch ? "dialog" : undefined}
+      aria-controls={opensSearch ? undefined : "mobile-app-sidebar"}
+      onClick={() => {
+        if (onOpenSearch) {
+          onOpenSearch()
+          return
+        }
+        setOpenMobile(true)
+      }}
     >
       <span className="inline-flex min-w-0 items-center gap-2">
         {triggerItem ? (
@@ -331,13 +345,21 @@ function MobileNavSheet({
 export function MobileAppSidebar({
   authenticated = false,
   onOpenProfileModal,
+  searchOpen,
+  onOpenSearch,
 }: {
   authenticated?: boolean
   onOpenProfileModal?: () => void
+  searchOpen?: boolean
+  onOpenSearch?: () => void
 }) {
   return (
     <SidebarProvider defaultOpen={false} className="!min-h-0 !w-auto flex-none">
-      <MobileNavTriggerButton authenticated={authenticated} />
+      <MobileNavTriggerButton
+        authenticated={authenticated}
+        searchOpen={searchOpen}
+        onOpenSearch={onOpenSearch}
+      />
       <MobileNavSheet
         authenticated={authenticated}
         onOpenProfileModal={onOpenProfileModal}

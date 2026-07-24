@@ -99,6 +99,7 @@ export function Header() {
   const [credits, setCredits] = React.useState<number | null>(null)
   const [profileModalOpen, setProfileModalOpen] = React.useState(false)
   const [profileModalTab, setProfileModalTab] = React.useState<SettingsTab>("profile")
+  const [searchOpen, setSearchOpen] = React.useState(false)
   const { hasUnread: notificationsUnread } = useNotificationsRead()
 
   const openSettingsModal = React.useCallback((tab: SettingsTab = "profile") => {
@@ -361,12 +362,16 @@ export function Header() {
               <MobileAppSidebar
                 authenticated={Boolean(user)}
                 onOpenProfileModal={() => openSettingsModal("profile")}
+                searchOpen={searchOpen}
+                onOpenSearch={() => setSearchOpen(true)}
               />
             </React.Suspense>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <GlobalSearchCommand
+            open={searchOpen}
+            onOpenChange={setSearchOpen}
             onOpenSettings={user ? openSettingsModal : undefined}
           />
           {loading ? null : user ? (

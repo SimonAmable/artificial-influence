@@ -77,6 +77,7 @@ function GenerateShaderButtonComponent({
   creditCost,
   activeSlotCount = 0,
   layout = "compact",
+  label = "Generate",
   className,
 }: GenerateShaderButtonProps) {
   const prefersReducedMotion = useReducedMotion()
@@ -110,7 +111,7 @@ function GenerateShaderButtonComponent({
     <PaperPlaneTilt className="size-4 shrink-0" weight="fill" aria-hidden />
   ) : (
     <span className="inline-flex items-center gap-1.5 uppercase">
-      <span>Generate</span>
+      <span>{label}</span>
       {showActiveBadge ? (
         <span className="rounded-full bg-white/15 px-1.5 py-px text-[10px] font-medium leading-4 tracking-wide text-white/90 uppercase">
           {activeSlotCount} active
@@ -129,8 +130,8 @@ function GenerateShaderButtonComponent({
   const ariaLabel = showGeneratingState
     ? "Generating"
     : showActiveBadge
-      ? `Generate (${activeSlotCount} active)`
-      : "Generate"
+      ? `${label} (${activeSlotCount} active)`
+      : label
 
   return (
     <motion.div
@@ -226,6 +227,7 @@ function propsAreEqual(prev: GenerateShaderButtonProps, next: GenerateShaderButt
     prev.creditCost === next.creditCost &&
     prev.activeSlotCount === next.activeSlotCount &&
     prev.layout === next.layout &&
+    prev.label === next.label &&
     prev.className === next.className
   )
 }

@@ -9,6 +9,7 @@ import {
   SETTINGS_TABS,
   type SettingsTab,
 } from "@/lib/profile/settings-tabs"
+import { currentProduct } from "@/lib/product/current"
 
 export type PageSearchSettingsTab = SettingsTab
 
@@ -135,6 +136,24 @@ function getSettingsSearchItems(): PageSearchItem[] {
   }))
 }
 
+const HOME_SEARCH_ITEM_ID = "home:dashboard"
+
+function getHomeSearchItem(): PageSearchItem {
+  const path = currentProduct.defaultSignedInRoute
+  return {
+    id: HOME_SEARCH_ITEM_ID,
+    label: "Home",
+    description: "Go to Home",
+    path,
+    group: "Home",
+    iconPhosphor: "squares-four",
+    searchText: buildSearchText(
+      ["home", "dashboard", "main", "start", "overview"],
+      path,
+    ),
+  }
+}
+
 export function getCorePageSearchItems(options?: {
   includeSettings?: boolean
 }): PageSearchItem[] {
@@ -148,6 +167,9 @@ export function getCorePageSearchItems(options?: {
     seen.add(key)
     items.push(item)
   }
+
+  // Always first: signed-in home / dashboard is not in mega nav groups.
+  push(getHomeSearchItem())
 
   for (const group of megaNavGroups) {
     if (group.path && !isAppPath(group.path) && !hasMenuItemAtPath(group, group.path)) {
@@ -215,6 +237,9 @@ export function searchCorePages(
         .filter(({ rank }) => Number.isFinite(rank))
         .sort((a, b) => {
           if (a.rank !== b.rank) return a.rank - b.rank
+          // Keep Home/dashboard ahead of same-rank peers.
+          if (a.item.id === HOME_SEARCH_ITEM_ID) return -1
+          if (b.item.id === HOME_SEARCH_ITEM_ID) return 1
           return a.item.label.localeCompare(b.item.label)
         })
         .map(({ item }) => item)
