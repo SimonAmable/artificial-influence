@@ -816,8 +816,8 @@ export default function AIInfluencerPage() {
 
   const builderPanel = (mobile = false) => (
     <div className={cn("flex h-full min-h-0 flex-col", mobile && "pt-14")}>
-      <div className={cn("p-4 border-b border-border/40 flex items-center justify-between", mobile && "pr-14")}>
-        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-display">Builder</h2>
+      <div className={cn("p-4 flex items-center justify-between", mobile && "pr-14")}>
+        <h2 className="text-xs font-bold uppercase tracking-wider text-foreground font-display">Builder</h2>
         <Button
           variant="ghost"
           size="sm"
@@ -1028,13 +1028,13 @@ export default function AIInfluencerPage() {
 
   return (
     <div className="h-auto lg:h-[100dvh] min-h-0 overflow-y-auto lg:overflow-hidden bg-background text-foreground flex flex-col pt-[52px]">
-      <div className="flex-1 min-h-0 w-full max-w-full flex flex-col lg:flex-row overflow-visible lg:overflow-hidden min-w-0">
+      <div className="flex-1 min-h-0 w-full max-w-full flex flex-col lg:flex-row overflow-visible lg:overflow-hidden min-w-0 lg:gap-4 lg:p-4">
         
-        {/* Left Column: Characters History (Narrow, Clean sidebar look) */}
-        <div className="w-full lg:w-[180px] shrink-0 min-w-0 border-b lg:border-b-0 lg:border-r border-border/40 bg-muted/20 flex flex-col h-auto lg:h-full min-h-0">
+        {/* Left Column: Characters History (floating panel) */}
+        <div className="w-full lg:w-[180px] shrink-0 min-w-0 flex flex-col h-auto lg:h-full min-h-0 border-b border-border/40 bg-muted/20 lg:border lg:border-border/40 lg:bg-secondary/5 lg:rounded-2xl lg:shadow-2xl lg:overflow-hidden">
           <div className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-display">Characters</h2>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-foreground font-display">Characters</h2>
               <Badge variant="secondary" className="bg-secondary/45 text-muted-foreground border-border/30 text-[9px] font-bold px-1.5 py-0.5">
                 {historyImages.length}
               </Badge>
@@ -1064,7 +1064,7 @@ export default function AIInfluencerPage() {
         </div>
 
         {/* Middle Column: Preview & Action Canvas (Spacious, Centered card) */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-between items-center p-4 lg:px-8 lg:pt-0 lg:pb-8 bg-background relative overflow-visible lg:overflow-hidden h-auto lg:h-full">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-between items-center p-4 lg:px-4 lg:py-0 bg-background relative overflow-visible lg:overflow-hidden h-auto lg:h-full">
           <div className="w-full max-w-lg flex-1 flex flex-col justify-start py-4 lg:py-0">
             
             {/* Main Preview Card with big round borders */}
@@ -1314,8 +1314,8 @@ export default function AIInfluencerPage() {
           </div>
         </div>
 
-        {/* Right Column: Visual Prompt Builder (Wider layout with custom grids) */}
-        <div className="hidden lg:flex w-full lg:w-[420px] shrink-0 border-t lg:border-t-0 lg:border-l border-border/40 bg-muted/20 flex-col h-1/4 lg:h-full min-h-0 overflow-hidden">
+        {/* Right Column: Visual Prompt Builder (floating panel) */}
+        <div className="hidden lg:flex w-full lg:w-[420px] shrink-0 border border-border/40 bg-secondary/5 flex-col h-full min-h-0 overflow-hidden rounded-2xl shadow-2xl">
           {builderPanel()}
         </div>
 
