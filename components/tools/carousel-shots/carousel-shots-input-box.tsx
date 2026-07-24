@@ -14,6 +14,7 @@ import {
 } from "@/components/shared/modals/asset-selection-modal"
 import { PillToggleGroup } from "@/components/shared/controls/pill-toggle-group"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
+import { AspectRatioIcon } from "@/components/shared/selectors/aspect-ratio-selector"
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   AnimatedSelectLabel,
@@ -49,6 +50,10 @@ function getCarouselCreditParameters(model: CarouselShotsModelId): Record<string
       return { quality: "high" }
     case "google/nano-banana-2":
       return { resolution: "4k" }
+    case "bytedance/seedream-4.5":
+      return { resolution: "4K" }
+    case "bytedance/seedream-5-lite":
+      return { resolution: "3K" }
     case "bytedance/seedream-5-pro":
       return { resolution: "2K" }
     default: {
@@ -279,7 +284,12 @@ export function CarouselShotsInputBox({
             }}
             options={CAROUSEL_PANEL_ASPECT_RATIOS.map((ratio) => ({
               value: ratio,
-              label: ratio,
+              label: (
+                <span className="inline-flex items-center gap-1.5">
+                  <AspectRatioIcon ratio={ratio} />
+                  {ratio}
+                </span>
+              ),
             }))}
           />
         </div>

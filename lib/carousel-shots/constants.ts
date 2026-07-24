@@ -13,12 +13,14 @@ export const CAROUSEL_SHOTS_MODELS: ReadonlyArray<{
 }> = [
   { id: "google/nano-banana-2", label: "Nano Banana 2" },
   { id: "openai/gpt-image-2", label: "GPT Image 2" },
+  { id: "bytedance/seedream-4.5", label: "Seedream 4.5" },
+  { id: "bytedance/seedream-5-lite", label: "Seedream 5.0 Lite" },
   { id: "bytedance/seedream-5-pro", label: "Seedream 5.0 Pro" },
 ]
 
 export const CAROUSEL_GRID_SIZES = [4, 9] as const
 
-export const CAROUSEL_PANEL_ASPECT_RATIOS = ["3:4", "4:5", "9:16"] as const
+export const CAROUSEL_PANEL_ASPECT_RATIOS = ["9:16", "4:5", "3:4"] as const
 
 export const CAROUSEL_VARIATION_STRENGTHS = ["subtle", "natural", "creative"] as const
 
@@ -35,7 +37,7 @@ export const CAROUSEL_SHOTS_EXAMPLE = {
   aspectRatioClass: "aspect-[9/16]",
   title: "Carousel Shots",
   description:
-    "Upload one photo to create a full carousel of matching shots for the cost of one image.  Download or upscale any panel.",
+    "Upload one photo to create a full carousel of matching shots for the cost of one image.",
 } as const
 
 export function getCarouselReferencePublicUrl(storagePath: string): string | null {

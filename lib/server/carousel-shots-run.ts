@@ -37,6 +37,24 @@ import { buildReplicateReferenceImageInput } from "@/lib/utils/model-parameters"
 const FAL_POLL_INTERVAL_MS = 2000
 const FAL_MAX_WAIT_MS = 5 * 60 * 1000
 
+/** Highest supported Fal resolution preset for each Seedream carousel shots model. */
+function getSeedreamResolutionPreset(
+  model: Extract<CarouselShotsModelId, `bytedance/${string}`>,
+): "2K" | "3K" | "4K" {
+  switch (model) {
+    case "bytedance/seedream-4.5":
+      return "4K"
+    case "bytedance/seedream-5-lite":
+      return "3K"
+    case "bytedance/seedream-5-pro":
+      return "2K"
+    default: {
+      const _exhaustive: never = model
+      return _exhaustive
+    }
+  }
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
@@ -91,7 +109,11 @@ async function generateContactSheetUrl(options: {
     const qualityParams =
       options.model === "openai/gpt-image-2"
         ? { quality: "high" as const }
-        : { resolutionPreset: "2K" as const }
+        : {
+            resolutionPreset: getSeedreamResolutionPreset(
+              options.model as Extract<CarouselShotsModelId, `bytedance/${string}`>,
+            ),
+          }
 
     const falRequest = buildFalImageRequest({
       aspectRatio: options.aspectRatio,
@@ -221,7 +243,9 @@ export async function runCarouselShotsGeneration(
       ? buildImagePricingParameters({ quality: "high" })
       : input.model === "google/nano-banana-2"
         ? buildImagePricingParameters({ resolution: "4k" })
-        : buildImagePricingParameters({ resolutionPreset: "2K" })
+        : buildImagePricingParameters({
+            resolutionPreset: getSeedreamResolutionPreset(input.model),
+          })
 
   const pricingQuote = resolveGenerationPricingQuote({
     model: {

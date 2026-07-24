@@ -3,9 +3,8 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import type { CommandItem } from "@/lib/commands/types"
-import type { AtPaletteRow, ReferencesScope } from "@/lib/commands/use-command-input"
+import type { AtPaletteRow } from "@/lib/commands/use-command-input"
 import { Badge } from "@/components/ui/badge"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Image, Palette, VideoCamera, Waveform } from "@phosphor-icons/react"
 
 function PreviewOrIcon({
@@ -75,9 +74,6 @@ export interface CommandPaletteProps {
   fixedStyle?: React.CSSProperties | null
   /** Badge for text/preset slash rows (not `uiAction`); action rows use “ACTION” */
   slashCommandsContext?: string | null
-  /** @ palette: show only your assets vs everything you can access */
-  referencesScope?: ReferencesScope
-  onReferencesScopeChange?: (scope: ReferencesScope) => void
 }
 
 function SlashCommandRow({
@@ -141,8 +137,6 @@ export function CommandPalette({
   listRef,
   fixedStyle,
   slashCommandsContext,
-  referencesScope = "all",
-  onReferencesScopeChange,
 }: CommandPaletteProps) {
   const slashRows = React.useMemo(
     () => slashItems.map((item, paletteIndex) => ({ item, paletteIndex })),
@@ -234,75 +228,45 @@ export function CommandPalette({
           </div>
         </>
       ) : (
-        <>
-          <div className="flex items-center justify-between gap-2 border-b border-border/60 px-2 py-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              References
-            </span>
-            {onReferencesScopeChange ? (
-              <div onMouseDown={(e) => e.preventDefault()}>
-                <ToggleGroup
-                  type="single"
-                  value={referencesScope}
-                  onValueChange={(v) => {
-                    if (v === "mine" || v === "all") onReferencesScopeChange(v)
-                  }}
-                  variant="outline"
-                  size="sm"
-                  spacing={0}
-                  className="shrink-0 scale-[0.85] origin-right"
-                  aria-label="Filter references by ownership"
-                >
-                  <ToggleGroupItem value="mine" className="px-2 text-[10px] font-semibold uppercase tracking-wide">
-                    Mine
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="all" className="px-2 text-[10px] font-semibold uppercase tracking-wide">
-                    All
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-            ) : null}
-          </div>
-          <div ref={listRef} className="overflow-y-auto p-1">
-            {assetsLoading && atRows.length === 0 ? (
-              <div className="px-2 py-3 text-sm text-muted-foreground">Loading assets…</div>
-            ) : atRows.length === 0 ? (
-              <div className="px-2 py-3 text-sm text-muted-foreground">
-                {assetsLoading ? "Loading…" : "No brand kits or assets match"}
-              </div>
-            ) : (
-              atRows.map((row, i) => (
-                <button
-                  key={`${row.kind}-${row.item.id}`}
-                  type="button"
-                  data-palette-index={i}
-                  role="option"
-                  aria-selected={i === activeIndex}
-                  className={cn(
-                    "flex w-full items-start gap-2 rounded-lg border border-transparent px-2 py-2 text-left text-sm transition-[background-color,box-shadow,border-color,color]",
-                    i === activeIndex
-                      ? "bg-background text-foreground border-border/70 shadow-[0_0_0_1px_hsl(var(--border)/0.45),0_14px_30px_-18px_hsl(var(--foreground)/0.9)]"
-                      : "hover:bg-muted/80"
-                  )}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => onSelectAt(row)}
-                >
-                  {row.kind === "brand" ? (
-                    <BrandPaletteIcon previewUrl={row.item.previewUrl} />
-                  ) : (
-                    <AssetPaletteIcon row={row} />
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{row.item.label}</span>
-                    {row.item.subtitle ? (
-                      <span className="block truncate text-xs text-muted-foreground">{row.item.subtitle}</span>
-                    ) : null}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        </>
+        <div ref={listRef} className="overflow-y-auto p-1">
+          {assetsLoading && atRows.length === 0 ? (
+            <div className="px-2 py-3 text-sm text-muted-foreground">Loading assets…</div>
+          ) : atRows.length === 0 ? (
+            <div className="px-2 py-3 text-sm text-muted-foreground">
+              {assetsLoading ? "Loading…" : "No matching references"}
+            </div>
+          ) : (
+            atRows.map((row, i) => (
+              <button
+                key={`${row.kind}-${row.item.id}`}
+                type="button"
+                data-palette-index={i}
+                role="option"
+                aria-selected={i === activeIndex}
+                className={cn(
+                  "flex w-full items-start gap-2 rounded-lg border border-transparent px-2 py-2 text-left text-sm transition-[background-color,box-shadow,border-color,color]",
+                  i === activeIndex
+                    ? "bg-background text-foreground border-border/70 shadow-[0_0_0_1px_hsl(var(--border)/0.45),0_14px_30px_-18px_hsl(var(--foreground)/0.9)]"
+                    : "hover:bg-muted/80"
+                )}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => onSelectAt(row)}
+              >
+                {row.kind === "brand" ? (
+                  <BrandPaletteIcon previewUrl={row.item.previewUrl} />
+                ) : (
+                  <AssetPaletteIcon row={row} />
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{row.item.label}</span>
+                  {row.item.subtitle ? (
+                    <span className="block truncate text-xs text-muted-foreground">{row.item.subtitle}</span>
+                  ) : null}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
       )}
     </div>
   )

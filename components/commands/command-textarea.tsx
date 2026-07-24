@@ -7,6 +7,7 @@ import type { AttachedRef, CommandItem, SlashCommandUiAction } from "@/lib/comma
 import type { AssetType } from "@/lib/assets/types"
 import { useCommandInput } from "@/lib/commands/use-command-input"
 import { prefetchBrandKits } from "@/lib/commands/cache"
+import { currentProduct } from "@/lib/product/current"
 import { CommandPalette } from "./command-palette"
 import {
   MentionMirror,
@@ -74,8 +75,6 @@ export function CommandTextarea({
     atRows,
     activeIndex,
     assetsLoading,
-    referencesScope,
-    setReferencesScope,
     handleChange,
     handleSelect,
     handleKeyDown,
@@ -126,6 +125,7 @@ export function CommandTextarea({
   }, [measurePalettePosition, paletteOpen])
 
   React.useEffect(() => {
+    if (currentProduct.id === "presence-studio") return
     prefetchBrandKits()
   }, [])
 
@@ -232,8 +232,6 @@ export function CommandTextarea({
         listRef={listRef}
         fixedStyle={paletteFixedStyle}
         slashCommandsContext={slashCommandsContext}
-        referencesScope={referencesScope}
-        onReferencesScopeChange={setReferencesScope}
       />
     ) : null
 

@@ -7,6 +7,8 @@ export type CarouselVariationStrength = "subtle" | "natural" | "creative"
 export type CarouselShotsModelId =
   | "openai/gpt-image-2"
   | "google/nano-banana-2"
+  | "bytedance/seedream-4.5"
+  | "bytedance/seedream-5-lite"
   | "bytedance/seedream-5-pro"
 
 export type CarouselShotRecord = {
