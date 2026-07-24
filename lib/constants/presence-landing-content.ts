@@ -14,7 +14,7 @@ export type PresenceMonetizeTile = {
 
 export const presenceLandingCopy = {
   hero: {
-    title: "The AI influencer studio for creating, publishing, and earning",
+    title: "The ultimate content creation suite for AI influencers",
     description:
       "Design consistent characters, generate photos and video, publish to Fanvue, and build a content business from one focused studio.",
     primaryCtaLabel: "Start creating free",

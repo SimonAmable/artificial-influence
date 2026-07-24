@@ -81,10 +81,10 @@ export function MegaNavItemBody({ item }: { item: MegaNavItem }) {
             <Image
               src={item.iconSrc}
               alt={`${item.label} icon`}
-              width={36}
-              height={36}
+              width={18}
+              height={18}
               className={cn(
-                "h-full w-full object-cover",
+                "h-[18px] w-[18px] object-contain",
                 isAiMonochromeIconPath(item.iconSrc) && "brightness-0 dark:invert",
                 item.path === "/brand" && "invert"
               )}

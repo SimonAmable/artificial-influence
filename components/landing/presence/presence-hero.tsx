@@ -154,6 +154,13 @@ export function PresenceHero() {
             </motion.div>
           </AnimatePresence>
           <motion.div
+            aria-hidden
+            className="absolute inset-0 bg-black/20"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: prefersReducedMotion ? 0.01 : 0.7, delay: prefersReducedMotion ? 0 : 0.02, ease: heroEase }}
+          />
+          <motion.div
             className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.16),transparent_34%)] dark:bg-[radial-gradient(circle_at_top,rgba(85,145,255,0.26),transparent_34%)]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
