@@ -190,83 +190,86 @@ export function DualReferenceSwapInputBox({
           )}
         </AnimatePresence>
 
-        <div className="px-2 pt-1">
-          <GenerateShaderButton
-            layout="bar"
-            isReady={isReady}
-            isGenerating={isGenerating}
-            allowConcurrent={allowConcurrent}
-            onGenerate={onGenerate}
-            creditCost={selectedModelObject?.model_cost ?? "-"}
-          />
-        </div>
-
         <LayoutGroup id="studio-tool-controls">
-          <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-fade-x no-scrollbar [-webkit-overflow-scrolling:touch]">
-            <AnimatedControlItem>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={influencerControlIconButtonClassName}
-                    aria-label="Upload references"
-                  >
-                    <Plus className="size-3.5" weight="bold" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={() => sourceInputRef.current?.click()}>
-                    <FilePlus className="size-4 mr-2" />
-                    Upload {sourceSlot?.label ?? "Source"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => sceneInputRef.current?.click()}>
-                    <FilePlus className="size-4 mr-2" />
-                    Upload {sceneSlot?.label ?? "Scene"}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </AnimatedControlItem>
+          <div className="flex min-w-0 items-center gap-1">
+            <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-fade-x no-scrollbar [-webkit-overflow-scrolling:touch]">
+              <AnimatedControlItem>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={influencerControlIconButtonClassName}
+                      aria-label="Upload references"
+                    >
+                      <Plus className="size-3.5" weight="bold" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={() => sourceInputRef.current?.click()}>
+                      <FilePlus className="size-4 mr-2" />
+                      Upload {sourceSlot?.label ?? "Source"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => sceneInputRef.current?.click()}>
+                      <FilePlus className="size-4 mr-2" />
+                      Upload {sceneSlot?.label ?? "Scene"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </AnimatedControlItem>
 
-            <AnimatePresence {...influencerControlsPresenceProps}>
-              {showModelSelector ? (
-                <AnimatedControlItem key="model-selector" appear>
-                  <Select
-                    value={selectedModel || ""}
-                    onValueChange={(value) => onModelChange?.(value)}
-                    disabled={!allowOptionsDuringGeneration && isGenerating}
-                  >
-                    <SelectTrigger id="model-select-studio-tool" hideChevron className={influencerControlPillClassName}>
-                      <SelectValue placeholder="Select model">
-                        {selectedModel && (() => {
-                          const model = models.find((m) => m.identifier === selectedModel)
-                          return (
-                            <div className="flex items-center gap-2">
-                              <ModelIcon identifier={selectedModel} size={16} />
-                              <AnimatedSelectLabel
-                                value={model ? formatModelName(model.identifier, model.name) : selectedModel}
-                              />
-                            </div>
-                          )
-                        })()}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <PromptControlMenuContent className="min-w-[14rem]">
-                      {showModelGroups ? (
-                        <>
-                          <PromptControlMenuGroup label="Tools">
-                            {toolModels.map((model) => (
-                              <PromptControlMenuItem
-                                key={model.identifier}
-                                value={model.identifier}
-                                icon={<ModelIcon identifier={model.identifier} size={16} />}
-                                label={formatModelName(model.identifier, model.name)}
-                                description={model.description ?? undefined}
-                              />
-                            ))}
-                          </PromptControlMenuGroup>
-                          <PromptControlMenuSeparator />
+              <AnimatePresence {...influencerControlsPresenceProps}>
+                {showModelSelector ? (
+                  <AnimatedControlItem key="model-selector" appear>
+                    <Select
+                      value={selectedModel || ""}
+                      onValueChange={(value) => onModelChange?.(value)}
+                      disabled={!allowOptionsDuringGeneration && isGenerating}
+                    >
+                      <SelectTrigger id="model-select-studio-tool" hideChevron className={influencerControlPillClassName}>
+                        <SelectValue placeholder="Select model">
+                          {selectedModel && (() => {
+                            const model = models.find((m) => m.identifier === selectedModel)
+                            return (
+                              <div className="flex items-center gap-2">
+                                <ModelIcon identifier={selectedModel} size={16} />
+                                <AnimatedSelectLabel
+                                  value={model ? formatModelName(model.identifier, model.name) : selectedModel}
+                                />
+                              </div>
+                            )
+                          })()}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <PromptControlMenuContent className="min-w-[14rem]">
+                        {showModelGroups ? (
+                          <>
+                            <PromptControlMenuGroup label="Tools">
+                              {toolModels.map((model) => (
+                                <PromptControlMenuItem
+                                  key={model.identifier}
+                                  value={model.identifier}
+                                  icon={<ModelIcon identifier={model.identifier} size={16} />}
+                                  label={formatModelName(model.identifier, model.name)}
+                                  description={model.description ?? undefined}
+                                />
+                              ))}
+                            </PromptControlMenuGroup>
+                            <PromptControlMenuSeparator />
+                            <PromptControlMenuGroup label="Models">
+                              {imageModelsOnly.map((model) => (
+                                <PromptControlMenuItem
+                                  key={model.identifier}
+                                  value={model.identifier}
+                                  icon={<ModelIcon identifier={model.identifier} size={16} />}
+                                  label={formatModelName(model.identifier, model.name)}
+                                  description={model.description ?? undefined}
+                                />
+                              ))}
+                            </PromptControlMenuGroup>
+                          </>
+                        ) : (
                           <PromptControlMenuGroup label="Models">
-                            {imageModelsOnly.map((model) => (
+                            {models.map((model) => (
                               <PromptControlMenuItem
                                 key={model.identifier}
                                 value={model.identifier}
@@ -276,25 +279,23 @@ export function DualReferenceSwapInputBox({
                               />
                             ))}
                           </PromptControlMenuGroup>
-                        </>
-                      ) : (
-                        <PromptControlMenuGroup label="Models">
-                          {models.map((model) => (
-                            <PromptControlMenuItem
-                              key={model.identifier}
-                              value={model.identifier}
-                              icon={<ModelIcon identifier={model.identifier} size={16} />}
-                              label={formatModelName(model.identifier, model.name)}
-                              description={model.description ?? undefined}
-                            />
-                          ))}
-                        </PromptControlMenuGroup>
-                      )}
-                    </PromptControlMenuContent>
-                  </Select>
-                </AnimatedControlItem>
-              ) : null}
-            </AnimatePresence>
+                        )}
+                      </PromptControlMenuContent>
+                    </Select>
+                  </AnimatedControlItem>
+                ) : null}
+              </AnimatePresence>
+            </div>
+            <div className="ml-auto shrink-0">
+              <GenerateShaderButton
+                layout="icon"
+                isReady={isReady}
+                isGenerating={isGenerating}
+                allowConcurrent={allowConcurrent}
+                onGenerate={onGenerate}
+                creditCost={selectedModelObject?.model_cost ?? "-"}
+              />
+            </div>
           </div>
         </LayoutGroup>
 

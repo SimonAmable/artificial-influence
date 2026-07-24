@@ -762,7 +762,7 @@ export function SaveExampleDialog({
                   ) : null}
 
                   <InfluencerInputBox
-                    className="max-w-none w-full"
+                    className="w-full max-w-none sm:max-w-none lg:max-w-none"
                     referenceImages={referenceImages}
                     referenceImageActionLabel="Make Slot"
                     onReferenceImageAction={handleReferenceImageAction}

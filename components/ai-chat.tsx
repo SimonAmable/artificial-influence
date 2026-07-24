@@ -505,14 +505,14 @@ function AIChatLauncher() {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9, y: 8 }}
           transition={{ duration: 0.22, ease: CHAT_DOCK_TRANSITION.ease }}
-          className="fixed right-6 bottom-6 z-60"
+          className="fixed right-0 bottom-0 z-60 sm:right-6 sm:bottom-6"
         >
           <Button
             onClick={() => setSidebarOpen(true)}
-            className="h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-depth-l hover:bg-primary/80 dark:bg-primary dark:hover:bg-primary/80"
+            className="size-8 rounded-full bg-primary text-primary-foreground shadow-depth-l hover:bg-primary/80 sm:size-14 dark:bg-primary dark:hover:bg-primary/80"
             size="icon"
           >
-            <ProductLogo size={22} alt="" />
+            <ProductLogo size={14} className="sm:size-[22px]" alt="" />
           </Button>
         </motion.div>
       ) : null}
