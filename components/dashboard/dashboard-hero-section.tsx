@@ -63,6 +63,16 @@ const HERO_TAB_INDEX: Record<DashboardHeroMode, number> = {
   video: 2,
 }
 
+const HERO_TITLES = [
+  "What will you create?",
+  "Got an idea?",
+  "Tell us what you want",
+  "Your turn to make something",
+  "Ready when you are",
+] as const
+
+const HERO_TITLE_ROTATE_MS = 3200
+
 function GlowContainer({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div
@@ -96,6 +106,15 @@ export function DashboardHeroSection({ className }: { className?: string }) {
   const prefersReducedMotion = useReducedMotion()
   const [activeTab, setActiveTab] = React.useState<DashboardHeroMode>("agent")
   const [tabDirection, setTabDirection] = React.useState(1)
+  const [titleIndex, setTitleIndex] = React.useState(0)
+
+  React.useEffect(() => {
+    if (prefersReducedMotion) return
+    const id = window.setInterval(() => {
+      setTitleIndex((prev) => (prev + 1) % HERO_TITLES.length)
+    }, HERO_TITLE_ROTATE_MS)
+    return () => window.clearInterval(id)
+  }, [prefersReducedMotion])
 
   const { models: imageModels, isLoading: imageModelsLoading } = useModels("image")
   const { models: videoModels, isLoading: videoModelsLoading } = useModels("video")
@@ -399,13 +418,21 @@ export function DashboardHeroSection({ className }: { className?: string }) {
       style={{ minHeight: "calc(100vh + 40px)" }}
     >
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center gap-5 py-8 sm:py-12">
-        <div className="space-y-3 text-center">
-          <h1 className="text-balance text-2xl font-sans font-extrabold normal-case tracking-tight text-foreground sm:text-4xl md:text-5xl">
-            <span>Create Anything, Anytime, Anywhere</span>
+        <div className="text-center">
+          <h1 className="relative mx-auto flex min-h-[1.2em] w-full max-w-3xl items-center justify-center text-balance text-2xl font-sans font-extrabold normal-case tracking-tight text-foreground sm:text-4xl md:text-5xl">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={HERO_TITLES[titleIndex]}
+                initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: "blur(4px)" }}
+                animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -10, filter: "blur(4px)" }}
+                transition={{ duration: prefersReducedMotion ? 0.12 : 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="block"
+              >
+                {HERO_TITLES[titleIndex]}
+              </motion.span>
+            </AnimatePresence>
           </h1>
-          <p className="text-sm text-muted-foreground sm:text-base">
-            Ask for any kind of image or video, in plain English, and we find the best model and prompt for the job.
-          </p>
         </div>
 
         <div
