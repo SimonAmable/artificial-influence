@@ -31,6 +31,7 @@ import {
   CAROUSEL_PANEL_ASPECT_RATIOS,
   CAROUSEL_SHOTS_MODELS,
   CAROUSEL_VARIATION_STRENGTHS,
+  DEFAULT_CAROUSEL_SHOTS_MODEL,
 } from "@/lib/carousel-shots/constants"
 import type {
   CarouselGridSize,
@@ -138,12 +139,18 @@ export function CarouselShotsInputBox({
     }
 
     const isCurrentModelAvailable = carouselModels.some((model) => model.identifier === form.model)
-    if (!isCurrentModelAvailable) {
-      onChange({
-        ...form,
-        model: carouselModels[0]!.identifier as CarouselShotsModelId,
-      })
+    if (isCurrentModelAvailable) {
+      return
     }
+
+    const preferred =
+      carouselModels.find((model) => model.identifier === DEFAULT_CAROUSEL_SHOTS_MODEL) ??
+      carouselModels[0]!
+
+    onChange({
+      ...form,
+      model: preferred.identifier as CarouselShotsModelId,
+    })
   }, [carouselModels, form, onChange])
 
   const handleFileUpload = React.useCallback(

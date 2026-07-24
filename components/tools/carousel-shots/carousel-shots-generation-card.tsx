@@ -114,18 +114,6 @@ export function CarouselShotsGenerationCard({
             <p className="truncate text-xs text-muted-foreground">{formatCreatedAt(createdAt)}</p>
           ) : null}
         </div>
-        <Button
-          type="button"
-          variant={selectMode ? "default" : "outline"}
-          size="sm"
-          disabled={shots.length === 0 || isGenerating}
-          onClick={() => {
-            setSelectMode((current) => !current)
-            setSelectedShotIds(new Set())
-          }}
-        >
-          {selectMode ? "Done" : "Select"}
-        </Button>
         {selectMode ? (
           <Button
             type="button"
@@ -137,6 +125,24 @@ export function CarouselShotsGenerationCard({
             {allSelected ? "Clear all" : "Select all"}
           </Button>
         ) : null}
+        <button
+          type="button"
+          disabled={shots.length === 0 || isGenerating}
+          aria-pressed={selectMode}
+          aria-label={selectMode ? "Exit selection mode" : "Enter selection mode"}
+          onClick={() => {
+            setSelectMode((current) => !current)
+            setSelectedShotIds(new Set())
+          }}
+          className={cn(
+            "size-6 shrink-0 rounded-[5px] border-2 transition-colors",
+            "outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            "disabled:pointer-events-none disabled:opacity-50",
+            selectMode
+              ? "border-primary bg-primary"
+              : "border-muted-foreground/55 bg-transparent hover:border-foreground/70",
+          )}
+        />
         <Button
           type="button"
           variant="outline"
@@ -173,75 +179,82 @@ export function CarouselShotsGenerationCard({
         </p>
       ) : null}
 
-      <div
-        className={cn(
-          "grid w-full min-h-0 gap-2 sm:gap-3",
-          gridCols,
-          gridSize === 9 ? "grid-rows-3" : "grid-rows-2",
-          "h-[min(560px,calc(100dvh-220px))] max-h-[70dvh]",
-        )}
-      >
-        {isGenerating
-          ? Array.from({ length: gridSize }).map((_, index) => (
-              <div
-                key={`skeleton-${index}`}
-                className="h-full min-h-0 animate-pulse rounded-xl border bg-muted/30"
-              />
-            ))
-          : shots.map((shot, index) => (
-              <CarouselShotsShotCard
-                key={shot.id}
-                shot={shot}
-                selectMode={selectMode}
-                isSelected={selectedShotIds.has(shot.id)}
-                isUpscaling={actions.isUpscalingShot(shot.id)}
-                onSelectChange={(selected) => toggleSelected(shot.id, selected)}
-                onOpen={() => setActiveIndex(index)}
-                onDownload={() => void actions.downloadShot(shot)}
-                onUpscale={() => void actions.upscaleOne(shot)}
-                onUpscaleAndDownload={() => void actions.upscaleAndDownloadShot(shot)}
-              />
-            ))}
-      </div>
-
-      {selectMode && selectedShots.length > 0 ? (
+      <div className="relative min-h-0">
         <div
           className={cn(
-            "z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur",
-            isCardLayout ? "relative" : "absolute inset-x-0 bottom-0",
+            "grid w-full min-h-0 gap-2 sm:gap-3",
+            gridCols,
+            gridSize === 9 ? "grid-rows-3" : "grid-rows-2",
+            "h-[min(560px,calc(100dvh-220px))] max-h-[70dvh]",
+            selectMode && "pb-16",
           )}
         >
-          <p className="text-sm font-medium">
-            {selectedShots.length} selected
-            {actions.batchProgress ? ` · ${actions.batchProgress}` : ""}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void actions.downloadShots(selectedShots)}
-            >
-              Download
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void actions.upscaleShots(selectedShots)}
-            >
-              Upscale
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => void actions.upscaleAndDownloadShots(selectedShots)}
-            >
-              Upscale & Download
-            </Button>
-          </div>
+          {isGenerating
+            ? Array.from({ length: gridSize }).map((_, index) => (
+                <div
+                  key={`skeleton-${index}`}
+                  className="h-full min-h-0 animate-pulse rounded-xl border bg-muted/30"
+                />
+              ))
+            : shots.map((shot, index) => (
+                <CarouselShotsShotCard
+                  key={shot.id}
+                  shot={shot}
+                  selectMode={selectMode}
+                  isSelected={selectedShotIds.has(shot.id)}
+                  isUpscaling={actions.isUpscalingShot(shot.id)}
+                  onSelectChange={(selected) => toggleSelected(shot.id, selected)}
+                  onOpen={() => setActiveIndex(index)}
+                  onDownload={() => void actions.downloadShot(shot)}
+                  onUpscale={() => void actions.upscaleOne(shot)}
+                  onUpscaleAndDownload={() => void actions.upscaleAndDownloadShot(shot)}
+                />
+              ))}
         </div>
-      ) : null}
+
+        {selectMode ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center px-2 pb-2">
+            <div
+              className={cn(
+                "pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-2 rounded-2xl border border-border/80",
+                "bg-background/95 px-3 py-2 shadow-xl ring-1 ring-black/5 backdrop-blur-md",
+                "dark:ring-white/10",
+              )}
+            >
+              <p className="px-1 text-sm font-medium tabular-nums">
+                {selectedShots.length} selected
+                {actions.batchProgress ? ` · ${actions.batchProgress}` : ""}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={selectedShots.length === 0}
+                onClick={() => void actions.downloadShots(selectedShots)}
+              >
+                Download
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={selectedShots.length === 0}
+                onClick={() => void actions.upscaleShots(selectedShots)}
+              >
+                Upscale
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={selectedShots.length === 0}
+                onClick={() => void actions.upscaleAndDownloadShots(selectedShots)}
+              >
+                Upscale & Download
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       <CarouselShotsLightbox
         activeIndex={activeIndex}

@@ -15,8 +15,12 @@ import {
   isInsufficientCreditsError,
   isInsufficientCreditsMessage,
 } from "@/lib/generate-image-client"
-import { tryShowContentModerationToast } from "@/lib/content-moderation-toast"
+import {
+  toUserFacingGenerationError,
+  tryShowContentModerationToast,
+} from "@/lib/content-moderation-toast"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
+import { DEFAULT_CAROUSEL_SHOTS_MODEL } from "@/lib/carousel-shots/constants"
 import type {
   CarouselGridSize,
   CarouselPanelAspectRatio,
@@ -29,7 +33,7 @@ const DEFAULT_FORM: CarouselShotsFormState = {
   gridSize: 9,
   aspectRatio: "4:5",
   variationStrength: "natural",
-  model: "google/nano-banana-2",
+  model: DEFAULT_CAROUSEL_SHOTS_MODEL,
 }
 
 type PendingJob = {
@@ -50,7 +54,6 @@ export function CarouselShotsTool() {
   const [rightView, setRightView] = React.useState<CarouselShotsRightView>("example")
   const [historyRefreshKey, setHistoryRefreshKey] = React.useState(0)
   const [regeneratingId, setRegeneratingId] = React.useState<string | null>(null)
-  const [error, setError] = React.useState<string | null>(null)
 
   const activeSlotCount = pendingJobs.length
   const isGenerating = activeSlotCount > 0
@@ -70,18 +73,16 @@ export function CarouselShotsTool() {
         toastId: "carousel-shots-moderation-error",
       })
     ) {
-      setError(message)
       return
     }
 
-    setError(message)
-    toast.error(message)
+    toast.error(toUserFacingGenerationError(message, "Generation failed. Please try again."))
   }, [])
 
   const runGenerate = React.useCallback(async () => {
     const reference = form.referenceImage
     if (!reference?.file && !reference?.url) {
-      setError("Please upload a reference image")
+      toast.error("Please upload a reference image")
       return
     }
 
@@ -101,7 +102,6 @@ export function CarouselShotsTool() {
     }
 
     setPendingJobs((current) => [jobSnapshot, ...current])
-    setError(null)
     setRightView("history")
 
     try {
@@ -165,9 +165,12 @@ export function CarouselShotsTool() {
           description: "Upgrade your plan to continue generating",
           toastId: "carousel-shots-credits-upsell",
         })
-      } else {
-        setError(message)
-        toast.error(message)
+      } else if (
+        !tryShowContentModerationToast(message, err, {
+          toastId: "carousel-shots-moderation-error",
+        })
+      ) {
+        toast.error(toUserFacingGenerationError(message, "Generation failed. Please try again."))
       }
     } finally {
       setPendingJobs((current) => current.filter((job) => job.id !== jobId))
@@ -177,7 +180,6 @@ export function CarouselShotsTool() {
   const runRegenerate = React.useCallback(
     async (generationId: string) => {
       setRegeneratingId(generationId)
-      setError(null)
       setRightView("history")
 
       try {
@@ -217,9 +219,14 @@ export function CarouselShotsTool() {
             description: "Upgrade your plan to continue generating",
             toastId: "carousel-shots-credits-upsell",
           })
-        } else {
-          setError(message)
-          toast.error(message)
+        } else if (
+          !tryShowContentModerationToast(message, err, {
+            toastId: "carousel-shots-moderation-error",
+          })
+        ) {
+          toast.error(
+            toUserFacingGenerationError(message, "Regeneration failed. Please try again."),
+          )
         }
       } finally {
         setRegeneratingId(null)
@@ -258,7 +265,6 @@ export function CarouselShotsTool() {
             onChange={setForm}
             onGenerate={() => void runGenerate()}
           />
-          {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
         </div>
 
         <div className="relative flex min-h-[70dvh] min-w-0 flex-1 flex-col lg:min-h-0 lg:overflow-hidden">
