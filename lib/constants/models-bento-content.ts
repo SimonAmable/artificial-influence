@@ -7,6 +7,19 @@ function showcase(file: string): string {
   return `${AI_MATERIALS_SHOWCASES_DIR}/${file}`
 }
 
+/** Max model names listed per vendor family card on the homepage bento grid. */
+export const HOMEPAGE_BENTO_VENDOR_MODEL_NAME_LIMIT = 12
+
+/** Curated vendor families shown as bento cards (order preserved on the homepage). */
+export const modelsBentoFeaturedVendorSlugs = [
+  "google",
+  "openai",
+  "xai",
+  "bytedance",
+  "kwaivgi",
+  "alibaba",
+] as const
+
 /** Marketing copy for the models bento block (homepage). */
 export const modelsBentoCopy = {
   eyebrow: "One plan · full stack",
@@ -18,20 +31,6 @@ export const modelsBentoCopy = {
   secondaryCtaLabel: "View pricing",
   secondaryCtaHref: "/#pricing",
 } as const
-
-/** Curated homepage cards so the landing page shows actual supported model names, not backend/provider buckets. */
-export const modelsBentoFeaturedIdentifiers = [
-  "google/nano-banana-2-lite",
-  "google/nano-banana-2",
-  "openai/gpt-image-2",
-  "xai/grok-imagine-image",
-  "bytedance/seedream-5-lite",
-  "bytedance/seedream-5-pro",
-  "google/veo-3.1-fast",
-  "bytedance/seedance-2.0",
-  "alibaba/happy-horse/v1.1",
-  "kwaivgi/kling-v3-motion-control",
-] as const
 
 /**
  * One background per vendor slug (identifier prefix before `/`).

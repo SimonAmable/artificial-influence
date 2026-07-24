@@ -1,8 +1,9 @@
-import type { ModelMetadata } from "@/lib/constants/model-metadata"
+import { getActiveModelMetadata, type ModelMetadata } from "@/lib/constants/model-metadata"
 import type { ModelType } from "@/lib/types/models"
 import type { LandingBentoCardMedia } from "@/lib/types/landing"
 import {
   modelsBentoFallbackMedia,
+  modelsBentoFeaturedVendorSlugs,
   modelsBentoShowcaseByVendorSlug,
   modelsBentoVendorMediaOverrides,
 } from "@/lib/constants/models-bento-content"
@@ -81,6 +82,27 @@ export function groupModelsByVendor(models: ModelMetadata[]): VendorModelGroup[]
   })
 
   return groups
+}
+
+const featuredVendorOrder = new Map(
+  modelsBentoFeaturedVendorSlugs.map((slug, index) => [slug, index] as const),
+)
+
+/** Homepage bento: fixed vendor family cards, each listing all active models in that family. */
+export function getHomepageBentoVendorGroups(): VendorModelGroup[] {
+  const featuredSlugs = new Set<string>(modelsBentoFeaturedVendorSlugs)
+  const activeModels = getActiveModelMetadata().filter((model) => !model.deprecated)
+  const familyModels = activeModels.filter((model) => {
+    const slug = vendorSlugFromIdentifier(model.identifier)
+    return slug !== null && featuredSlugs.has(slug)
+  })
+
+  const groups = groupModelsByVendor(familyModels)
+  return groups.sort(
+    (a, b) =>
+      (featuredVendorOrder.get(a.vendorSlug) ?? Number.MAX_SAFE_INTEGER) -
+      (featuredVendorOrder.get(b.vendorSlug) ?? Number.MAX_SAFE_INTEGER),
+  )
 }
 
 /** Short list of model names for Magic UI BentoCard description line. */

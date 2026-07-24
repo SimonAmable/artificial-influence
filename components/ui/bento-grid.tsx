@@ -20,8 +20,8 @@ interface BentoCardProps extends ComponentPropsWithoutRef<"div"> {
   logoSrc?: string
   logoAlt?: string
   description: string
-  href: string
-  cta: string
+  href?: string
+  cta?: string
   /** Override bottom text scrim gradient (defaults to dark fade to transparent). */
   textScrimStyle?: CSSProperties
 }
@@ -38,7 +38,10 @@ const BentoCard = ({
   cta,
   textScrimStyle,
   ...props
-}: BentoCardProps) => (
+}: BentoCardProps) => {
+  const showCta = Boolean(cta && href)
+
+  return (
   <div
     className={cn(
       "group relative col-span-3 flex min-h-[280px] flex-col overflow-hidden rounded-3xl border border-white/10",
@@ -67,7 +70,12 @@ const BentoCard = ({
     />
 
     <div className="relative z-10 mt-auto flex flex-col justify-end p-5">
-      <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 text-white transition-all duration-300 lg:group-hover:-translate-y-10">
+      <div
+        className={cn(
+          "pointer-events-none z-10 flex transform-gpu flex-col gap-1 text-white transition-all duration-300",
+          showCta && "lg:group-hover:-translate-y-10",
+        )}
+      >
         {logoSrc ? (
           // eslint-disable-next-line @next/next/no-img-element -- public SVG/PNG brand marks
           <img
@@ -85,9 +93,28 @@ const BentoCard = ({
         <p className="max-w-lg text-sm text-white/80 drop-shadow-sm">{description}</p>
       </div>
 
+      {showCta ? (
+        <>
+          <div
+            className={cn(
+              "pointer-events-none flex w-full translate-y-0 transform-gpu flex-row items-center pt-3 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 lg:hidden",
+            )}
+          >
+            <Button variant="link" asChild size="sm" className="pointer-events-auto h-auto px-3 py-2 text-white">
+              <a href={href}>
+                {cta}
+                <ArrowRightIcon className="ms-2 h-4 w-4 rtl:rotate-180" />
+              </a>
+            </Button>
+          </div>
+        </>
+      ) : null}
+    </div>
+
+    {showCta ? (
       <div
         className={cn(
-          "pointer-events-none flex w-full translate-y-0 transform-gpu flex-row items-center pt-3 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 lg:hidden"
+          "pointer-events-none absolute bottom-0 hidden w-full translate-y-10 transform-gpu flex-row items-center p-5 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 lg:flex",
         )}
       >
         <Button variant="link" asChild size="sm" className="pointer-events-auto h-auto px-3 py-2 text-white">
@@ -97,22 +124,10 @@ const BentoCard = ({
           </a>
         </Button>
       </div>
-    </div>
-
-    <div
-      className={cn(
-        "pointer-events-none absolute bottom-0 hidden w-full translate-y-10 transform-gpu flex-row items-center p-5 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 lg:flex"
-      )}
-    >
-      <Button variant="link" asChild size="sm" className="pointer-events-auto h-auto px-3 py-2 text-white">
-        <a href={href}>
-          {cta}
-          <ArrowRightIcon className="ms-2 h-4 w-4 rtl:rotate-180" />
-        </a>
-      </Button>
-    </div>
+    ) : null}
   </div>
-)
+  )
+}
 
 const BentoGrid = ({ children, className, ...props }: BentoGridProps) => {
   return (

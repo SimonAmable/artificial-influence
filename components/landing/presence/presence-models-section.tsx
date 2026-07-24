@@ -4,8 +4,8 @@ import Link from "next/link"
 import { aiVendorIconSrc } from "@/lib/constants/ai-vendor-icons"
 import {
   HOMEPAGE_BENTO_VENDOR_MODEL_NAME_LIMIT,
-  modelsBentoCopy,
 } from "@/lib/constants/models-bento-content"
+import { presenceLandingCopy } from "@/lib/constants/presence-landing-content"
 import {
   getHomepageBentoVendorGroups,
   pickBentoCardMedia,
@@ -19,8 +19,8 @@ import type { LandingBentoCardMedia } from "@/lib/types/landing"
 import { cn } from "@/lib/utils"
 
 const BENTO_MIN_H = "lg:min-h-[280px]"
+const { modelsBento } = presenceLandingCopy
 
-/** 12-column spans that always fill each row (no orphan columns). */
 function modelBentoColSpans(total: number): number[] {
   if (total <= 0) return []
   if (total === 1) return [12]
@@ -32,7 +32,6 @@ function modelBentoColSpans(total: number): number[] {
   return [8, 4, ...modelBentoColSpans(total - 2)]
 }
 
-/** Kling + Grok: keep each tile at one-third width so the row reads lighter than the default 8/4 split. */
 const NARROW_VENDOR_SLUGS = new Set(["kwaivgi", "xai"])
 
 function modelBentoLayoutClass(index: number, total: number, vendorSlug: string): string {
@@ -81,11 +80,6 @@ function BentoMediaBackground({ media }: { media: LandingBentoCardMedia }) {
   return (
     <>
       {mediaNode}
-      {/*
-        Depth overlay: carries the custom --shadow-l (inset top highlight + drop shadows)
-        on top of the media so the highlight paints over the image instead of behind it.
-        rounded-3xl matches the card so the highlight tracks the corner radius.
-      */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 rounded-3xl shadow-lg"
@@ -94,7 +88,7 @@ function BentoMediaBackground({ media }: { media: LandingBentoCardMedia }) {
   )
 }
 
-export function ModelsBentoSection() {
+export function PresenceModelsSection() {
   const groups = getHomepageBentoVendorGroups()
   const totalGroups = groups.length
 
@@ -104,15 +98,17 @@ export function ModelsBentoSection() {
         <BlurFade inView blur="10px" direction="up" offset={14} duration={0.5} className="w-full">
           <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
             <div className="max-w-2xl">
-              <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">{modelsBentoCopy.title}</h2>
-              <p className="mt-4 text-muted-foreground">{modelsBentoCopy.description}</p>
+              <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
+                {modelsBento.title}
+              </h2>
+              <p className="mt-4 text-muted-foreground">{modelsBento.description}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 md:shrink-0">
               <Button variant="outline" asChild>
-                <Link href={modelsBentoCopy.secondaryCtaHref}>{modelsBentoCopy.secondaryCtaLabel}</Link>
+                <Link href={modelsBento.secondaryCtaHref}>{modelsBento.secondaryCtaLabel}</Link>
               </Button>
               <Button asChild>
-                <Link href={modelsBentoCopy.primaryCtaHref}>{modelsBentoCopy.primaryCtaLabel}</Link>
+                <Link href={modelsBento.primaryCtaHref}>{modelsBento.primaryCtaLabel}</Link>
               </Button>
             </div>
           </div>
@@ -138,7 +134,7 @@ export function ModelsBentoSection() {
                 delay={index * 0.05}
                 className={cn(
                   "h-full",
-                  modelBentoLayoutClass(index, totalGroups, vendorSlug)
+                  modelBentoLayoutClass(index, totalGroups, vendorSlug),
                 )}
               >
                 <BentoCard

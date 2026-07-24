@@ -32,6 +32,7 @@ import type { PlanCtaKind } from '@/lib/pricing-plan-cta';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { FOUNDER_NOTE_PHOTO_SRC } from '@/lib/onboarding/founder-note';
+import { presenceLandingCopy } from '@/lib/constants/presence-landing-content';
 
 const FOUNDER_X_PROFILE_HREF = 'https://x.com/Simoncodingshit' as const;
 const FOUNDER_X_PROOF_POST_HREF =
@@ -968,14 +969,20 @@ export function PricingSection({
     : activePricingTab === 'yearly'
       ? yearlyPlans
       : monthlyPlans;
-  const staticHeaderCopy = {
-    title: 'Pick Your Plan',
-    description: 'Simple affordable pricing. Credits never expire.',
-  };
+  const staticHeaderCopy = isPresence
+    ? {
+        title: presenceLandingCopy.pricing.title,
+        description: presenceLandingCopy.pricing.description,
+      }
+    : {
+        title: 'Pick Your Plan',
+        description: 'Simple affordable pricing. Credits never expire.',
+      };
   const headerCopy: Record<PricingTab, { footer: string }> = {
     monthly: {
-      footer:
-        'Create consistently with credits that stay in your balance, plus priority access on higher tiers and unlimited Instagram and TikTok connections on every plan. Cancel anytime.',
+      footer: isPresence
+        ? presenceLandingCopy.pricing.monthlyFooter
+        : 'Create consistently with credits that stay in your balance, plus priority access on higher tiers and unlimited Instagram and TikTok connections on every plan. Cancel anytime.',
     },
     yearly: {
       footer:

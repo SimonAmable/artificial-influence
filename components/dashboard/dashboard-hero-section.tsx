@@ -64,20 +64,22 @@ const HERO_TAB_INDEX: Record<DashboardHeroMode, number> = {
 }
 
 const HERO_TITLES = [
-  "What will you create?",
-  "Got an idea?",
-  "Tell us what you want",
-  "Your turn to make something",
-  "Ready when you are",
+  "What are we making today?",
+  "What's up right now?",
+  "Got something in mind?",
+  "What should we create?",
+  "Ready to make something?",
 ] as const
 
-const HERO_TITLE_ROTATE_MS = 3200
+function pickRandomHeroTitle() {
+  return HERO_TITLES[Math.floor(Math.random() * HERO_TITLES.length)] ?? HERO_TITLES[0]
+}
 
 function GlowContainer({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div
       className={cn(
-        "relative mx-auto w-full max-w-4xl rounded-[28px] p-[2.5px] transition-all duration-500 ease-in-out z-10",
+        "relative z-10 mx-auto w-full max-w-4xl rounded-[28px] p-[2.5px] transition-all duration-500 ease-in-out",
         className
       )}
       style={{
@@ -94,7 +96,12 @@ function GlowContainer({ children, className }: { children: React.ReactNode; cla
         shineColor={["var(--foreground)", "var(--muted-foreground)", "var(--foreground)"]}
         className="rounded-[28px]"
       />
-      <div className="rounded-[25.5px] overflow-hidden bg-background/95 backdrop-blur-md relative z-10">
+      <div
+        className={cn(
+          "relative z-10 overflow-hidden rounded-[25.5px] bg-background/95 backdrop-blur-md",
+          "[&_[data-slot=card]]:mx-0 [&_[data-slot=card]]:w-full [&_[data-slot=card]]:max-w-none [&_[data-slot=card]]:rounded-none [&_[data-slot=card]]:ring-0"
+        )}
+      >
         {children}
       </div>
     </div>
@@ -106,15 +113,11 @@ export function DashboardHeroSection({ className }: { className?: string }) {
   const prefersReducedMotion = useReducedMotion()
   const [activeTab, setActiveTab] = React.useState<DashboardHeroMode>("agent")
   const [tabDirection, setTabDirection] = React.useState(1)
-  const [titleIndex, setTitleIndex] = React.useState(0)
+  const [heroTitle, setHeroTitle] = React.useState<string>(HERO_TITLES[0])
 
   React.useEffect(() => {
-    if (prefersReducedMotion) return
-    const id = window.setInterval(() => {
-      setTitleIndex((prev) => (prev + 1) % HERO_TITLES.length)
-    }, HERO_TITLE_ROTATE_MS)
-    return () => window.clearInterval(id)
-  }, [prefersReducedMotion])
+    setHeroTitle(pickRandomHeroTitle())
+  }, [])
 
   const { models: imageModels, isLoading: imageModelsLoading } = useModels("image")
   const { models: videoModels, isLoading: videoModelsLoading } = useModels("video")
@@ -419,19 +422,8 @@ export function DashboardHeroSection({ className }: { className?: string }) {
     >
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center gap-5 py-8 sm:py-12">
         <div className="text-center">
-          <h1 className="relative mx-auto flex min-h-[1.2em] w-full max-w-3xl items-center justify-center text-balance text-2xl font-sans font-extrabold normal-case tracking-tight text-foreground sm:text-4xl md:text-5xl">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={HERO_TITLES[titleIndex]}
-                initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: "blur(4px)" }}
-                animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -10, filter: "blur(4px)" }}
-                transition={{ duration: prefersReducedMotion ? 0.12 : 0.35, ease: [0.22, 1, 0.36, 1] }}
-                className="block"
-              >
-                {HERO_TITLES[titleIndex]}
-              </motion.span>
-            </AnimatePresence>
+          <h1 className="text-balance text-2xl font-sans font-extrabold normal-case tracking-tight text-foreground sm:text-4xl md:text-5xl">
+            {heroTitle}
           </h1>
         </div>
 
@@ -514,7 +506,7 @@ export function DashboardHeroSection({ className }: { className?: string }) {
                 selectedVideoModel ? (
                   <GlowContainer>
                     <VideoInputBox
-                      className="mx-auto !border-transparent !bg-transparent !shadow-none"
+                      className="w-full !max-w-full !border-transparent !bg-transparent !shadow-none"
                       videoModels={videoModels}
                       promptValue={videoPrompt}
                       onPromptChange={setVideoPrompt}
@@ -555,7 +547,7 @@ export function DashboardHeroSection({ className }: { className?: string }) {
                 selectedImageModel || !imageModelsLoading ? (
                   <GlowContainer>
                     <InfluencerInputBox
-                      className="mx-auto !border-transparent !bg-transparent !shadow-none"
+                      className="w-full !max-w-full !border-transparent !bg-transparent !shadow-none"
                       generateButtonLayout="bar"
                       promptValue={imagePrompt}
                       onPromptChange={setImagePrompt}
@@ -589,7 +581,7 @@ export function DashboardHeroSection({ className }: { className?: string }) {
               {activeTab === "agent" ? (
                 <GlowContainer>
                   <DashboardAgentPromptBox
-                    className="mx-auto max-w-4xl !shadow-none !bg-transparent"
+                    className="w-full max-w-none !bg-transparent !shadow-none"
                     promptValue={agentPrompt}
                     onPromptChange={setAgentPrompt}
                     attachedRefs={agentAttachedRefs}

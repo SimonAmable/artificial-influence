@@ -15,6 +15,7 @@ import { FAQSection } from "@/components/landing/faq-section"
 import { PricingSection } from "@/components/landing/pricing-section"
 import { FinalCTASection } from "@/components/landing/final-cta-section"
 import { Footer } from "@/components/landing/footer"
+import { PresenceLandingPage } from "@/components/landing/presence/presence-landing-page"
 import { ONBOARDING_DONE_COOKIE } from "@/lib/onboarding/constants"
 import { currentProduct } from "@/lib/product/current"
 import { isOnboardingEnabled } from "@/lib/product/onboarding"
@@ -23,7 +24,7 @@ const HOME_AUTH_TIMEOUT_MS = 2500
 const HOME_PROFILE_TIMEOUT_MS = 2500
 const landingPageVariants = {
   default: DefaultLandingPage,
-  presence: PresenceLandingPage,
+  presence: PresenceLandingPageRoute,
 }
 
 async function withTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs: number): Promise<T> {
@@ -91,27 +92,8 @@ export default async function Page() {
   return <LandingPage />
 }
 
-function PresenceLandingPage() {
-  return (
-    <>
-      <div className="flex min-h-dvh bg-background">
-        <main className="min-w-0 flex-1">
-          <TempHero />
-        </main>
-      </div>
-      <div id="platform-surfaces">
-        <ProofSection />
-      </div>
-      <PlatformSurfacesSection />
-      <ModelsBentoSection />
-      <PricingSection embedded />
-      <div id="faq">
-        <FAQSection />
-      </div>
-      <FinalCTASection />
-      <Footer />
-    </>
-  )
+function PresenceLandingPageRoute() {
+  return <PresenceLandingPage />
 }
 
 function DefaultLandingPage() {

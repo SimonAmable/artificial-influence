@@ -1,4 +1,5 @@
 import type { ProductConfig } from "@/lib/product/types"
+import { presenceLandingCopy } from "@/lib/constants/presence-landing-content"
 
 export const presenceStudioProduct: ProductConfig = {
   id: "presence-studio",
@@ -12,20 +13,18 @@ export const presenceStudioProduct: ProductConfig = {
   webManifest: "/presence-studio/site.webmanifest",
   themeClass: "theme-presence",
   metadata: {
-    title: "Presence Studio - AI influencer content studio",
+    title: presenceLandingCopy.metadata.title,
     titleTemplate: "%s | Presence Studio",
-    description:
-      "Create AI influencers, generate character-led content, reuse creator templates, and build a repeatable posting pipeline from one focused studio.",
+    description: presenceLandingCopy.metadata.description,
   },
   landing: {
-    heroTitle: "Create and grow AI influencers",
-    heroDescription:
-      "Build consistent characters, generate influencer content, reuse proven templates, and prepare posts from one focused AI creator studio.",
-    primaryCtaLabel: "Start for free",
-    primaryCtaHref: "/login?mode=signup",
-    secondaryCtaLabel: "Explore templates",
-    secondaryCtaHref: "/templates",
-    previewAlt: "Presence Studio AI influencer workflow screenshot",
+    heroTitle: presenceLandingCopy.hero.title,
+    heroDescription: presenceLandingCopy.hero.description,
+    primaryCtaLabel: presenceLandingCopy.hero.primaryCtaLabel,
+    primaryCtaHref: presenceLandingCopy.hero.primaryCtaHref,
+    secondaryCtaLabel: presenceLandingCopy.hero.secondaryCtaLabel,
+    secondaryCtaHref: presenceLandingCopy.hero.secondaryCtaHref,
+    previewAlt: presenceLandingCopy.hero.previewAlt,
   },
   visibleRoutes: [
     "/",
