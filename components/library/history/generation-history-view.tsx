@@ -24,6 +24,7 @@ import {
 import { copyMediaToClipboard, downloadMediaFile } from "@/components/shared/display/media-viewer-utils"
 import { Button } from "@/components/ui/button"
 import type { AssetType } from "@/lib/assets/types"
+import { carouselShotsHrefFromImage } from "@/lib/carousel-shots/constants"
 import { isCarouselShotsGeneration } from "@/lib/carousel-shots/library-summary"
 import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
 import { cn } from "@/lib/utils"
@@ -39,6 +40,7 @@ type GenerationHistoryViewProps = {
   onSave?: (draft: SaveAssetDraft) => void
   onSaveExample?: (generation: Generation) => void
   onAnimate?: (generation: Generation) => void
+  onCreateShotVariations?: (generation: Generation) => void
   onEditImage?: (url: string) => void
   onDelete?: (generation: Generation) => void | Promise<void>
   getDefaultCategoryByMediaType?: (type: AssetType) => import("@/lib/assets/types").AssetCategory
@@ -53,6 +55,7 @@ export function GenerationHistoryView({
   onSave,
   onSaveExample,
   onAnimate,
+  onCreateShotVariations,
   onEditImage,
   onDelete,
   getDefaultCategoryByMediaType,
@@ -273,6 +276,13 @@ export function GenerationHistoryView({
         onSave={onSave}
         onSaveExample={onSaveExample}
         onAnimate={onAnimate}
+        onCreateShotVariations={
+          onCreateShotVariations ??
+          ((generation) => {
+            if (generation.type !== "image") return
+            router.push(carouselShotsHrefFromImage(generation.url))
+          })
+        }
         onEditImage={onEditImage ?? ((url) => router.push(`/image-editor?image=${encodeURIComponent(url)}`))}
         fanvueActions={fanvueActions}
         getDefaultCategoryByMediaType={getDefaultCategoryByMediaType}

@@ -38,6 +38,7 @@ type HistoryPanelProps = {
   onSave?: (draft: SaveAssetDraft) => void
   onSaveExample?: (generation: Generation) => void
   onAnimate?: (generation: Generation) => void
+  onCreateShotVariations?: (generation: Generation) => void
   onEditImage?: (url: string) => void
   fanvueActions?: FanvueGenerationActions
   getDefaultCategoryByMediaType?: (type: AssetType) => AssetCategory
@@ -62,6 +63,7 @@ export function HistoryPanel({
   onSave,
   onSaveExample,
   onAnimate,
+  onCreateShotVariations,
   onEditImage,
   fanvueActions,
   getDefaultCategoryByMediaType,
@@ -119,6 +121,7 @@ export function HistoryPanel({
                   onSave={onSave}
                   onSaveExample={onSaveExample}
                   onAnimate={onAnimate}
+                  onCreateShotVariations={onCreateShotVariations}
                   onEditImage={onEditImage}
                   fanvueActions={fanvueActions}
                   getDefaultCategoryByMediaType={getDefaultCategoryByMediaType}

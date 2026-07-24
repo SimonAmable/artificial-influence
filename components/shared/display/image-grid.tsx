@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
-import { ArrowsOutSimple, Copy, DownloadSimple, Check, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple, ShieldCheck, Eraser, Sparkle, ImageSquare, PaperPlaneTilt, Vault } from "@phosphor-icons/react"
+import { ArrowsOutSimple, Copy, DownloadSimple, Check, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple, ShieldCheck, Eraser, Sparkle, ImageSquare, PaperPlaneTilt, Vault, SquaresFour } from "@phosphor-icons/react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type { ImageGridAgentAction } from "@/lib/chat/image-grid-agent-actions"
+import { carouselShotsHrefFromImage } from "@/lib/carousel-shots/constants"
 import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
 import { FullscreenMediaViewer, type FullscreenMediaViewerAction } from "./fullscreen-media-viewer"
 import { copyMediaToClipboard, downloadMediaFile } from "./media-viewer-utils"
@@ -229,6 +230,18 @@ export function ImageGrid({
           <Play className="mr-2 size-4" weight="fill" />
           Animate
         </DropdownMenuItem>
+        {showExtendedActions ? (
+          <DropdownMenuItem
+            onClick={(event) => {
+              event.stopPropagation()
+              runShotVariationsAction(data)
+            }}
+            className="cursor-pointer"
+          >
+            <SquaresFour className="mr-2 size-4" />
+            Create Shot Variations
+          </DropdownMenuItem>
+        ) : null}
 
         <DropdownMenuSeparator />
 
@@ -546,6 +559,13 @@ export function ImageGrid({
     [isAgentMode, onAgentAction, router],
   )
 
+  const runShotVariationsAction = React.useCallback(
+    (data: ImageData) => {
+      router.push(carouselShotsHrefFromImage(data.url))
+    },
+    [router],
+  )
+
   const runRemoveBackgroundAction = React.useCallback(
     (data: ImageData, index: number) => {
       onRemoveBackground?.(data.url, index)
@@ -789,6 +809,23 @@ export function ImageGrid({
                   </Button>
                 )}
 
+                {showExtendedActions && !isCondensed ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      runShotVariationsAction(item.data)
+                    }}
+                    aria-label="Create shot variations"
+                    title="Create Shot Variations"
+                  >
+                    <SquaresFour className="size-3.5" />
+                  </Button>
+                ) : null}
+
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -928,6 +965,19 @@ export function ImageGrid({
                     >
                       <Play className="mr-1 size-3" weight="fill" />
                       Animate
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        runShotVariationsAction(item.data)
+                      }}
+                    >
+                      <SquaresFour className="mr-1 size-3" />
+                      Shot Variations
                     </Button>
                     {onUpscale && (
                       <Button
@@ -1079,6 +1129,16 @@ export function ImageGrid({
                 label: "Animate Video",
                 icon: <Play className="size-4" weight="fill" />,
                 onClick: () => runAnimateAction(itemData, imageIndexByUrl),
+              })
+            }
+
+            // Shot variations
+            if (showExtendedActions && itemData && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "shot-variations",
+                label: "Create Shot Variations",
+                icon: <SquaresFour className="size-4" />,
+                onClick: () => runShotVariationsAction(itemData),
               })
             }
 

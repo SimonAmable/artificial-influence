@@ -1,6 +1,7 @@
 /**
  * Shared navigation items for app header and canvas header
  */
+import type { NavIconKey } from "@/lib/navigation/nav-icons"
 import { currentProduct } from "@/lib/product/current"
 import { productLogo } from "@/lib/product/branding"
 import type { ProductConfig, ProductId } from "@/lib/product/types"
@@ -23,27 +24,8 @@ export interface NavigationItem {
 
 export type MegaNavBadge = "new" | "popular" | "beta"
 
-/** Phosphor icons for feature rows, clearer than generic brand SVGs for create/edit flows */
-export type MegaNavPhosphorIcon =
-  | "folder"
-  | "image"
-  | "images"
-  | "video"
-  | "paint-brush"
-  | "film-strip"
-  | "flow-arrow"
-  | "microphone"
-  | "chat-circle-dots"
-  | "robot"
-  | "user"
-  | "smiley"
-  | "paper-plane-tilt"
-  | "shield-check"
-  | "magnifying-glass"
-  | "download-simple"
-  | "squares-four"
-  | "clock-counter-clockwise"
-  | "pencil-simple"
+/** Phosphor icons for feature rows — see `lib/navigation/nav-icons.ts` */
+export type MegaNavPhosphorIcon = NavIconKey
 
 export interface MegaNavItem {
   path: string
@@ -77,23 +59,7 @@ export interface MegaNavGroup {
   hiddenFor?: ProductId[]
 }
 
-export type DashboardToolIcon =
-  | "palette"
-  | "flow-arrow"
-  | "microphone"
-  | "image"
-  | "images"
-  | "video"
-  | "paint-brush"
-  | "arrows-left-right"
-  | "users"
-  | "pencil-simple"
-  | "squares-four"
-  | "chat-circle-dots"
-  | "robot"
-  | "user"
-  | "smiley"
-  | "shield-check"
+export type DashboardToolIcon = NavIconKey
 
 export interface DashboardToolNavItem {
   label: string
@@ -200,14 +166,14 @@ const baseMegaNavGroups: MegaNavGroup[] = [
         label: "Templates",
         description: "Browse reusable creation workflows and manage your own templates",
         badge: "new",
-        iconPhosphor: "flow-arrow",
+        iconPhosphor: "stack",
       },
       {
         path: "/slideshows",
         label: "Slideshows",
         description: "Create repeatable collection and AI-powered image slideshows",
         badge: "new",
-        iconPhosphor: "squares-four",
+        iconPhosphor: "images",
         hiddenFor: ["presence-studio"],
       },
     ],
@@ -236,21 +202,21 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             label: "Character Swap",
             description: "Create realistic character swaps",
             badge: "new",
-            iconSrc: "/users-icon.svg",
+            iconPhosphor: "user-switch",
           },
           {
             path: "/carousel-shots",
             label: "Carousel Shots",
             description: "Generate multi-shot carousels from one reference",
             badge: "new",
-            iconPhosphor: "images",
+            iconPhosphor: "squares-four",
           },
           {
             path: "/image?model=custom/face-swap",
             label: "Face Swap",
             description: "Transfer facial identity onto a target scene",
             badge: "new",
-            iconPhosphor: "smiley",
+            iconPhosphor: "user-focus",
           },
           {
             path: "/ai-influencer",
@@ -269,21 +235,21 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             path: "/upscale",
             label: "Upscale",
             description: "Enhance resolution (1 credit)",
-            iconPhosphor: "magnifying-glass",
+            iconPhosphor: "arrows-out",
           },
           {
             path: "/free-tools/metadata-remover",
             label: "Metadata Remover",
             description: "Remove metadata from AI images locally",
             badge: "new",
-            iconPhosphor: "shield-check",
+            iconPhosphor: "broom",
           },
           {
             path: "/free-tools/image-compressor",
             label: "Image Compressor",
             description: "Resize and compress images locally",
             badge: "new",
-            iconPhosphor: "image",
+            iconPhosphor: "corners-in",
           },
         ],
       },
@@ -366,7 +332,7 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             label: "Motion Copy",
             description: "Transfer movement patterns",
             badge: "popular",
-            iconSrc: "/users-icon.svg",
+            iconPhosphor: "person-simple-run",
           },
           {
             path: "/lipsync",
@@ -393,14 +359,14 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             label: "TikTok Video Fixer",
             description: "Repair videos for safer TikTok uploads",
             badge: "new",
-            iconPhosphor: "shield-check",
+            iconPhosphor: "wrench",
           },
           {
             path: "/free-tools/video-compressor",
             label: "Video Compressor",
             description: "Shrink short clips locally",
             badge: "new",
-            iconPhosphor: "video",
+            iconPhosphor: "file-arrow-down",
           },
         ],
       },
@@ -469,7 +435,7 @@ const baseMegaNavGroups: MegaNavGroup[] = [
     simpleItems: [
       { path: "/assets", label: "Assets", description: "Store and sort your generated assets", iconPhosphor: "folder", badge: "new" },
       { path: "/assets?tab=history", label: "History", description: "Past generations and edits", iconPhosphor: "clock-counter-clockwise" },
-      { path: "/resources", label: "Resources", description: "Search live stock and meme references", iconPhosphor: "image", badge: "new" },
+      { path: "/resources", label: "Resources", description: "Search live stock and meme references", iconPhosphor: "newspaper", badge: "new" },
       {
         path: "/assets?tab=brands",
         label: "Brand",
@@ -500,7 +466,7 @@ const baseMegaNavGroups: MegaNavGroup[] = [
         path: "/canvases",
         label: "Canvas",
         description: "Build node-based workflows and visual pipelines",
-        iconPhosphor: "pencil-simple",
+        iconPhosphor: "tree-structure",
         searchKeywords: ["workflow", "workflows", "pipeline", "pipelines", "node", "nodes", "canvases"],
       },
     ],
@@ -513,21 +479,21 @@ const baseMegaNavGroups: MegaNavGroup[] = [
         path: "/free-tools",
         label: "Free Tools",
         description: "Browse free browser-based creator utilities",
-        iconPhosphor: "shield-check",
+        iconPhosphor: "toolbox",
       },
       {
         path: "/free-tools/metadata-remover",
         label: "Metadata Remover",
         description: "Clean AI image metadata in your browser",
         badge: "new",
-        iconPhosphor: "shield-check",
+        iconPhosphor: "broom",
       },
       {
         path: "/free-tools/image-compressor",
         label: "Image Compressor",
         description: "Resize and compress images locally",
         badge: "new",
-        iconPhosphor: "image",
+        iconPhosphor: "corners-in",
       },
       {
         path: "/free-tools/tiktok-reference-downloader",
@@ -548,14 +514,14 @@ const baseMegaNavGroups: MegaNavGroup[] = [
         label: "TikTok Video Fixer",
         description: "Repair video format issues for TikTok",
         badge: "new",
-        iconPhosphor: "shield-check",
+        iconPhosphor: "wrench",
       },
       {
         path: "/free-tools/video-compressor",
         label: "Video Compressor",
         description: "Create smaller WebM clips locally",
         badge: "new",
-        iconPhosphor: "video",
+        iconPhosphor: "file-arrow-down",
       },
     ],
   },
@@ -697,27 +663,27 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
   {
     label: "Templates",
     href: "/templates",
-    icon: "flow-arrow",
+    icon: "stack",
     hint: "Browse reusable workflows and launch your own template runs.",
   },
   {
     label: "Slideshows",
     href: "/slideshows",
-    icon: "squares-four",
+    icon: "images",
     hint: "Create repeatable collection and AI-powered image slideshows.",
     hiddenFor: ["presence-studio"],
   },
   {
     label: "Content",
     href: "/content",
-    icon: "palette",
+    icon: "calendar-dots",
     hint: "Upload Fanvue vault media and schedule posts.",
     products: ["presence-studio"],
   },
   {
     label: "Autopost",
     href: "/autopost",
-    icon: "palette",
+    icon: "paper-plane-tilt",
     hint: "Schedule and publish posts to Instagram and TikTok.",
     hiddenFor: ["presence-studio"],
   },
@@ -749,7 +715,7 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
   {
     label: "Motion Copy",
     href: "/motion-copy",
-    icon: "users",
+    icon: "person-simple-run",
     hint: "Copy motion from ads or dance clips onto your character-animate a still with prompts.",
   },
   {
@@ -767,19 +733,19 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
   {
     label: "Character Swap",
     href: "/image?model=custom/character-swap",
-    icon: "arrows-left-right",
+    icon: "user-switch",
     hint: "Swap a subject while keeping the scene.",
   },
   {
     label: "Carousel Shots",
     href: "/carousel-shots",
-    icon: "images",
+    icon: "squares-four",
     hint: "Generate consistent carousel panels from one reference image.",
   },
   {
     label: "Face Swap",
     href: "/image?model=custom/face-swap",
-    icon: "smiley",
+    icon: "user-focus",
     hint: "Transfer facial identity onto a target person or scene.",
   },
   {
@@ -791,31 +757,31 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
   {
     label: "Workflow",
     href: "/canvases",
-    icon: "pencil-simple",
+    icon: "tree-structure",
     hint: "Node-based pipelines and canvas projects.",
   },
   {
     label: "Video Editor",
     href: "/editor",
-    icon: "video",
+    icon: "film-strip",
     hint: "Edit and assemble AI videos on a timeline.",
   },
   {
     label: "History",
     href: "/assets?tab=history",
-    icon: "pencil-simple",
+    icon: "clock-counter-clockwise",
     hint: "Review past generations and edits.",
   },
   {
     label: "Library",
     href: "/assets",
-    icon: "squares-four",
+    icon: "folder",
     hint: "Browse saved assets, history, brands, and collections.",
   },
   {
     label: "Resources",
     href: "/resources",
-    icon: "image",
+    icon: "newspaper",
     hint: "Search live stock references and meme sources.",
   },
 ]

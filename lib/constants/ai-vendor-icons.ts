@@ -37,11 +37,15 @@ export const AI_VENDOR_ICON_BY_SLUG: Record<string, string> = {
   minimax: "/ai_icons/minimax.svg",
   /** Veed, replace `veed.svg` in `public/ai_icons/` with your brand asset */
   veed: "/ai_icons/veed.svg",
+  /** Black Forest Labs / Flux */
+  "black-forest-labs": "/ai_icons/flux.svg",
   /** Alibaba / Qwen family models */
   alibaba: "/ai_icons/qwen.svg",
   qwen: "/ai_icons/qwen.svg",
   /** Wan video (Wan 2.x), Qwen family */
   "wan-video": "/ai_icons/qwen.svg",
+  /** Fal-hosted Qwen / Wan image models */
+  "fal-ai": "/ai_icons/qwen.svg",
 }
 
 export function aiVendorIconSrc(vendorSlug: string): string {

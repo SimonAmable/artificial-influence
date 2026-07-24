@@ -51,6 +51,7 @@ type PendingResult = {
 export function CarouselShotsTool() {
   const searchParams = useSearchParams()
   const focusedGenerationId = searchParams.get("generation")
+  const referenceImageParam = searchParams.get("image")
   const [form, setForm] = React.useState<CarouselShotsFormState>(DEFAULT_FORM)
   const [pendingJobs, setPendingJobs] = React.useState<PendingJob[]>([])
   const [pendingResults, setPendingResults] = React.useState<PendingResult[]>([])
@@ -59,6 +60,18 @@ export function CarouselShotsTool() {
   )
   const [historyRefreshKey, setHistoryRefreshKey] = React.useState(0)
   const [regeneratingId, setRegeneratingId] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    const imageUrl = referenceImageParam?.trim()
+    if (!imageUrl) return
+
+    setForm((current) => ({
+      ...current,
+      referenceImage: {
+        url: imageUrl,
+      },
+    }))
+  }, [referenceImageParam])
 
   React.useEffect(() => {
     if (!focusedGenerationId) return

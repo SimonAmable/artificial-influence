@@ -16,6 +16,7 @@ import {
   Plus,
   SlidersHorizontal,
   Sparkle,
+  SquaresFour,
   UploadSimple,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
@@ -70,6 +71,7 @@ import type { AssetCategory, AssetRecord, AssetType, AssetVisibility } from "@/l
 import { deleteAsset } from "@/lib/assets/library"
 import type { BrandKit } from "@/lib/brand-kit/types"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { carouselShotsHrefFromImage } from "@/lib/carousel-shots/constants"
 import type { SlideshowCollection } from "@/lib/slideshow/types"
 import { createClient } from "@/lib/supabase/client"
 import { isPresenceProduct } from "@/lib/product/require-presence"
@@ -391,6 +393,18 @@ function LibraryPageContent() {
       }
 
       router.push(`/video?startFrame=${encodeURIComponent(url)}`)
+    },
+    [router],
+  )
+
+  const handleCreateShotVariationsUrl = React.useCallback(
+    (url: string, type: AssetType | MediaGenerationType) => {
+      if (type !== "image") {
+        toast.error("Shot variations are only available for image media")
+        return
+      }
+
+      router.push(carouselShotsHrefFromImage(url))
     },
     [router],
   )
@@ -839,6 +853,12 @@ function LibraryPageContent() {
                 icon: <Play className="size-4" weight="fill" />,
                 onClick: () => handleAnimateUrl(asset.url, asset.assetType),
               } satisfies FullscreenMediaViewerAction,
+              {
+                id: "shot-variations",
+                label: "Create Shot Variations",
+                icon: <SquaresFour className="size-4" />,
+                onClick: () => handleCreateShotVariationsUrl(asset.url, asset.assetType),
+              } satisfies FullscreenMediaViewerAction,
             ]
           : []),
         {
@@ -872,7 +892,15 @@ function LibraryPageContent() {
         actions,
       })
     },
-    [copyMedia, copyReference, downloadByUrl, handleAnimateUrl, handleSaveExampleFromAsset, openImageEditor],
+    [
+      copyMedia,
+      copyReference,
+      downloadByUrl,
+      handleAnimateUrl,
+      handleCreateShotVariationsUrl,
+      handleSaveExampleFromAsset,
+      openImageEditor,
+    ],
   )
 
   const openGenerationViewer = React.useCallback(
@@ -908,6 +936,12 @@ function LibraryPageContent() {
                 label: "Animate",
                 icon: <Play className="size-4" weight="fill" />,
                 onClick: () => handleAnimateUrl(generation.url, generation.type),
+              } satisfies FullscreenMediaViewerAction,
+              {
+                id: "shot-variations",
+                label: "Create Shot Variations",
+                icon: <SquaresFour className="size-4" />,
+                onClick: () => handleCreateShotVariationsUrl(generation.url, generation.type),
               } satisfies FullscreenMediaViewerAction,
             ]
           : []),
@@ -962,6 +996,7 @@ function LibraryPageContent() {
       copyReference,
       downloadByUrl,
       handleAnimateUrl,
+      handleCreateShotVariationsUrl,
       handleSaveExampleFromGeneration,
       openImageEditor,
       openSaveDraft,
@@ -1195,6 +1230,9 @@ function LibraryPageContent() {
               onSave={openSaveDraft}
               onSaveExample={handleSaveExampleFromGeneration}
               onAnimate={(media) => handleAnimateUrl(media.url, media.type)}
+              onCreateShotVariations={(media) =>
+                handleCreateShotVariationsUrl(media.url, media.type)
+              }
               onCopy={copyMedia}
               onDownload={downloadByUrl}
               onDelete={handleDeleteGeneration}
@@ -1216,6 +1254,9 @@ function LibraryPageContent() {
               onOpen={openAssetViewer}
               onSaveExample={handleSaveExampleFromAsset}
               onAnimate={(asset) => handleAnimateUrl(asset.url, asset.assetType)}
+              onCreateShotVariations={(asset) =>
+                handleCreateShotVariationsUrl(asset.url, asset.assetType)
+              }
               onCopy={copyMedia}
               onReference={copyReference}
               onDownload={downloadByUrl}

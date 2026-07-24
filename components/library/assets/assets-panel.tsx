@@ -24,6 +24,7 @@ type AssetsPanelProps = {
   onSelect?: (asset: AssetRecord) => void
   onSaveExample?: (asset: AssetRecord) => void
   onAnimate?: (asset: AssetRecord) => void
+  onCreateShotVariations?: (asset: AssetRecord) => void
   onCopy?: (url: string, type: AssetType) => void
   onReference?: (url: string) => void
   onDownload?: (url: string, type: AssetType, title?: string) => void
@@ -48,6 +49,7 @@ export function AssetsPanel({
   onSelect,
   onSaveExample,
   onAnimate,
+  onCreateShotVariations,
   onCopy,
   onReference,
   onDownload,
@@ -121,6 +123,7 @@ export function AssetsPanel({
                 onSelect={onSelect}
                 onSaveExample={onSaveExample}
                 onAnimate={onAnimate}
+                onCreateShotVariations={onCreateShotVariations}
                 onCopy={onCopy}
                 onReference={onReference}
                 onDownload={onDownload}

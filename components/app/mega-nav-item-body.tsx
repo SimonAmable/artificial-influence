@@ -1,57 +1,14 @@
 "use client"
 
 import Image from "next/image"
-import {
-  ChatCircleDots,
-  ClockCounterClockwise,
-  DownloadSimple,
-  FilmStrip,
-  Folder,
-  FlowArrow,
-  Image as ImageIcon,
-  Images,
-  MagnifyingGlass,
-  PaperPlaneTilt,
-  Microphone as MicrophoneIcon,
-  PaintBrush as PaintBrushIcon,
-  PencilSimple,
-  Robot as RobotIcon,
-  Smiley,
-  User as UserIcon,
-  ShieldCheck,
-  SquaresFour,
-  Video as VideoIcon,
-} from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 import { isAiMonochromeIconPath } from "@/lib/constants/ai-vendor-icons"
 import {
   type MegaNavBadge,
   type MegaNavItem,
-  type MegaNavPhosphorIcon,
 } from "@/lib/constants/navigation"
-
-const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
-  folder: Folder,
-  image: ImageIcon,
-  images: Images,
-  video: VideoIcon,
-  "paint-brush": PaintBrushIcon,
-  "film-strip": FilmStrip,
-  "flow-arrow": FlowArrow,
-  microphone: MicrophoneIcon,
-  "chat-circle-dots": ChatCircleDots,
-  robot: RobotIcon,
-  user: UserIcon,
-  smiley: Smiley,
-  "paper-plane-tilt": PaperPlaneTilt,
-  "shield-check": ShieldCheck,
-  "magnifying-glass": MagnifyingGlass,
-  "download-simple": DownloadSimple,
-  "squares-four": SquaresFour,
-  "clock-counter-clockwise": ClockCounterClockwise,
-  "pencil-simple": PencilSimple,
-}
+import { getNavIcon } from "@/lib/navigation/nav-icons"
 
 function getBadgeClasses(badge: MegaNavBadge) {
   switch (badge) {
@@ -108,7 +65,7 @@ export function MenuBadge({ badge }: { badge: MegaNavBadge }) {
 
 export function MegaNavItemBody({ item }: { item: MegaNavItem }) {
   const classes = item.badge ? getBadgeClasses(item.badge) : null
-  const PhosphorIcon = item.iconPhosphor ? MEGA_NAV_PHOSPHOR[item.iconPhosphor] : null
+  const PhosphorIcon = item.iconPhosphor ? getNavIcon(item.iconPhosphor) : null
   return (
     <div className="flex w-full items-start gap-3">
       <div className="relative">

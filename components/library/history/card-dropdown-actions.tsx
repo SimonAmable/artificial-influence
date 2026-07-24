@@ -7,6 +7,7 @@ import {
   PencilSimple,
   Play,
   Sparkle,
+  SquaresFour,
   Trash,
 } from "@phosphor-icons/react"
 
@@ -25,10 +26,12 @@ export function CardDropdownActions({
   canDelete = true,
   canSaveExample = false,
   canAnimate = false,
+  canCreateShotVariations = false,
   onEditAsset,
   onEditImage,
   onSaveExample,
   onAnimate,
+  onCreateShotVariations,
   onCopy,
   onDownload,
   onDelete,
@@ -39,10 +42,12 @@ export function CardDropdownActions({
   canDelete?: boolean
   canSaveExample?: boolean
   canAnimate?: boolean
+  canCreateShotVariations?: boolean
   onEditAsset?: () => void
   onEditImage?: () => void
   onSaveExample?: () => void
   onAnimate?: () => void
+  onCreateShotVariations?: () => void
   onCopy: () => void
   onDownload: () => void
   onDelete: () => void
@@ -79,6 +84,12 @@ export function CardDropdownActions({
           <DropdownMenuItem onClick={onAnimate}>
             <Play className="mr-2 h-4 w-4" weight="fill" />
             Animate
+          </DropdownMenuItem>
+        ) : null}
+        {canCreateShotVariations && onCreateShotVariations ? (
+          <DropdownMenuItem onClick={onCreateShotVariations}>
+            <SquaresFour className="mr-2 h-4 w-4" />
+            Create Shot Variations
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem onClick={onCopy}>

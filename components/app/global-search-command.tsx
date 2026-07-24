@@ -4,10 +4,10 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowSquareOut,
-  FlowArrow,
   Images,
   MagnifyingGlass,
   Sparkle,
+  Stack,
   Video,
 } from "@phosphor-icons/react"
 
@@ -22,14 +22,23 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command"
-import { searchCorePages, type PageSearchItem } from "@/lib/navigation/page-search"
+import {
+  searchCorePages,
+  type PageSearchItem,
+  type PageSearchSettingsTab,
+} from "@/lib/navigation/page-search"
 import type { Template } from "@/lib/templates/types"
 import type { MegaNavItem } from "@/lib/constants/navigation"
 import { cn } from "@/lib/utils"
 
 type SearchRow =
   | { kind: "page"; item: PageSearchItem }
+  | { kind: "settings"; item: PageSearchItem }
   | { kind: "template"; item: Template }
+
+export type GlobalSearchCommandProps = {
+  onOpenSettings?: (tab: PageSearchSettingsTab) => void
+}
 
 function pageToMegaNavItem(item: PageSearchItem): MegaNavItem {
   return {
@@ -38,7 +47,7 @@ function pageToMegaNavItem(item: PageSearchItem): MegaNavItem {
     description: item.description,
     badge: item.badge,
     iconSrc: item.iconSrc,
-    iconText: item.iconText,
+    iconText: item.iconText ?? "/",
     iconPhosphor: item.iconPhosphor,
   }
 }
@@ -52,7 +61,7 @@ function TemplatePreview({ template }: { template: Template }) {
     ) : template.category === "photo" ? (
       <Sparkle className="h-[18px] w-[18px]" weight="regular" />
     ) : (
-      <FlowArrow className="h-[18px] w-[18px]" weight="regular" />
+      <Stack className="h-[18px] w-[18px]" weight="regular" />
     )
 
   return (
@@ -84,7 +93,7 @@ function TemplatePreview({ template }: { template: Template }) {
   )
 }
 
-export function GlobalSearchCommand() {
+export function GlobalSearchCommand({ onOpenSettings }: GlobalSearchCommandProps) {
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
@@ -141,17 +150,33 @@ export function GlobalSearchCommand() {
     return () => controller.abort()
   }, [debouncedQuery, open])
 
+  const includeSettings = Boolean(onOpenSettings)
+
+  const allPages = React.useMemo(
+    () =>
+      searchCorePages(query, {
+        includeSettings,
+      }),
+    [includeSettings, query],
+  )
+
   const pages = React.useMemo(
-    () => searchCorePages(query, query.trim() ? 12 : 8),
-    [query],
+    () => allPages.filter((item) => !item.settingsTab),
+    [allPages],
+  )
+
+  const settingsPages = React.useMemo(
+    () => allPages.filter((item) => Boolean(item.settingsTab)),
+    [allPages],
   )
 
   const rows = React.useMemo<SearchRow[]>(
     () => [
       ...pages.map((item) => ({ kind: "page" as const, item })),
+      ...settingsPages.map((item) => ({ kind: "settings" as const, item })),
       ...templates.map((item) => ({ kind: "template" as const, item })),
     ],
-    [pages, templates],
+    [pages, settingsPages, templates],
   )
 
   React.useEffect(() => {
@@ -168,13 +193,18 @@ export function GlobalSearchCommand() {
     (row: SearchRow) => {
       setOpen(false)
       setQuery("")
+      if (row.kind === "settings") {
+        const tab = row.item.settingsTab
+        if (tab) onOpenSettings?.(tab)
+        return
+      }
       if (row.kind === "page") {
         router.push(row.item.path)
         return
       }
       router.push(`/templates/${row.item.slug}`)
     },
-    [router],
+    [onOpenSettings, router],
   )
 
   const handleInputKeyDown = React.useCallback(
@@ -200,7 +230,11 @@ export function GlobalSearchCommand() {
     [activeIndex, rows, selectRow],
   )
 
-  const noResults = pages.length === 0 && templates.length === 0 && !templatesLoading
+  const noResults =
+    pages.length === 0 &&
+    settingsPages.length === 0 &&
+    templates.length === 0 &&
+    !templatesLoading
 
   return (
     <>
@@ -231,18 +265,18 @@ export function GlobalSearchCommand() {
           if (!nextOpen) setQuery("")
         }}
         title="Search tools and templates"
-        description="Find tools and visible templates."
+        description="Find tools, settings, and visible templates."
       >
         <CommandInput
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleInputKeyDown}
-          placeholder="Search tools or templates..."
+          placeholder="Search tools, settings, or templates..."
           autoFocus
           icon={<MagnifyingGlass className="h-5 w-5" />}
         />
         <CommandList>
-          {noResults ? <CommandEmpty>No tools or templates found.</CommandEmpty> : null}
+          {noResults ? <CommandEmpty>No tools, settings, or templates found.</CommandEmpty> : null}
 
           {pages.length > 0 ? (
             <CommandGroup heading="Tools">
@@ -265,7 +299,28 @@ export function GlobalSearchCommand() {
             </CommandGroup>
           ) : null}
 
-          {pages.length > 0 && (templates.length > 0 || templatesLoading) ? (
+          {pages.length > 0 && settingsPages.length > 0 ? <CommandSeparator /> : null}
+
+          {settingsPages.length > 0 ? (
+            <CommandGroup heading="Settings">
+              {settingsPages.map((page, settingsIndex) => {
+                const rowIndex = pages.length + settingsIndex
+                return (
+                  <CommandItem
+                    key={page.id}
+                    active={activeIndex === rowIndex}
+                    onMouseEnter={() => setActiveIndex(rowIndex)}
+                    onClick={() => selectRow({ kind: "settings", item: page })}
+                  >
+                    <MegaNavItemBody item={pageToMegaNavItem(page)} />
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+          ) : null}
+
+          {(pages.length > 0 || settingsPages.length > 0) &&
+          (templates.length > 0 || templatesLoading) ? (
             <CommandSeparator />
           ) : null}
 
@@ -275,7 +330,7 @@ export function GlobalSearchCommand() {
                 <div className="px-3 py-6 text-sm text-muted-foreground">Searching templates...</div>
               ) : null}
               {templates.map((template, templateIndex) => {
-                const rowIndex = pages.length + templateIndex
+                const rowIndex = pages.length + settingsPages.length + templateIndex
                 return (
                   <CommandItem
                     key={template.id}

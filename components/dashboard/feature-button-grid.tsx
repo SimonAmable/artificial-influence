@@ -3,46 +3,11 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { PencilSimple } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { dashboardToolNavItems, getDashboardToolNavItems, type DashboardToolIcon } from "@/lib/constants/navigation"
-import {
-  ImageIcon,
-  Images,
-  VideoIcon,
-  MicrophoneIcon,
-  PaintBrushIcon,
-  PencilSimpleIcon,
-  ArrowsLeftRight,
-  FlowArrow,
-  Palette,
-  SquaresFour,
-  ChatCircleDots,
-  Robot,
-  ShieldCheck,
-  Smiley,
-  User,
-  Users,
-} from "@phosphor-icons/react"
-
-const toolIconMap: Record<DashboardToolIcon, typeof ImageIcon> = {
-  palette: Palette,
-  "flow-arrow": FlowArrow,
-  microphone: MicrophoneIcon,
-  image: ImageIcon,
-  images: Images,
-  video: VideoIcon,
-  "paint-brush": PaintBrushIcon,
-  "arrows-left-right": ArrowsLeftRight,
-  users: Users,
-  user: User,
-  "pencil-simple": PencilSimpleIcon,
-  "squares-four": SquaresFour,
-  "chat-circle-dots": ChatCircleDots,
-  robot: Robot,
-  smiley: Smiley,
-  "shield-check": ShieldCheck,
-}
+import { getDashboardToolNavItems } from "@/lib/constants/navigation"
+import { getNavIcon } from "@/lib/navigation/nav-icons"
 
 export function FeatureButtonGrid() {
   const router = useRouter()
@@ -87,14 +52,14 @@ export function FeatureButtonGrid() {
           variant="ghost"
           className="shadow-md transition-shadow hover:shadow-lg"
         >
-          <PencilSimpleIcon size={18} weight="bold" className="mr-2" />
+          <PencilSimple size={18} weight="bold" className="mr-2" />
           Create New Project
         </Button>
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
         {getDashboardToolNavItems().map((tool) => {
-          const Icon = toolIconMap[tool.icon]
+          const Icon = getNavIcon(tool.icon)
           return (
             <Tooltip key={tool.href}>
               <TooltipTrigger asChild>

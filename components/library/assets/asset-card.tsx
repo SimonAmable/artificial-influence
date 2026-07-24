@@ -23,6 +23,7 @@ type AssetCardProps = {
   onSelect?: (asset: AssetRecord) => void
   onSaveExample?: (asset: AssetRecord) => void
   onAnimate?: (asset: AssetRecord) => void
+  onCreateShotVariations?: (asset: AssetRecord) => void
   onCopy?: (url: string, type: AssetType) => void
   onReference?: (url: string) => void
   onDownload?: (url: string, type: AssetType, title?: string) => void
@@ -39,6 +40,7 @@ export function AssetCard({
   onSelect,
   onSaveExample,
   onAnimate,
+  onCreateShotVariations,
   onCopy,
   onReference,
   onDownload,
@@ -195,10 +197,14 @@ export function AssetCard({
                 canDelete={isOwner}
                 canSaveExample={asset.assetType === "image"}
                 canAnimate={asset.assetType === "image"}
+                canCreateShotVariations={asset.assetType === "image"}
                 onEditAsset={onEdit ? () => onEdit(asset) : undefined}
                 onEditImage={onEditImage ? () => onEditImage(asset.url) : undefined}
                 onSaveExample={onSaveExample ? () => onSaveExample(asset) : undefined}
                 onAnimate={onAnimate ? () => onAnimate(asset) : undefined}
+                onCreateShotVariations={
+                  onCreateShotVariations ? () => onCreateShotVariations(asset) : undefined
+                }
                 onCopy={() => onCopy(asset.url, asset.assetType)}
                 onDownload={() => onDownload(asset.url, asset.assetType, asset.title)}
                 onDelete={() => onDelete(asset)}
@@ -217,10 +223,14 @@ export function AssetCard({
             canDelete={isOwner}
             canSaveExample={asset.assetType === "image"}
             canAnimate={asset.assetType === "image"}
+            canCreateShotVariations={asset.assetType === "image"}
             onEditAsset={onEdit ? () => onEdit(asset) : undefined}
             onEditImage={onEditImage ? () => onEditImage(asset.url) : undefined}
             onSaveExample={onSaveExample ? () => onSaveExample(asset) : undefined}
             onAnimate={onAnimate ? () => onAnimate(asset) : undefined}
+            onCreateShotVariations={
+              onCreateShotVariations ? () => onCreateShotVariations(asset) : undefined
+            }
             onCopy={() => onCopy(asset.url, asset.assetType)}
             onDownload={() => onDownload(asset.url, asset.assetType, asset.title)}
             onDelete={() => onDelete(asset)}

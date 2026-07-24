@@ -12,7 +12,7 @@ import {
   HandTap,
   NotePencil,
   Robot,
-  SquaresFour,
+  Stack,
 } from "@phosphor-icons/react"
 
 import { NewChatButton } from "@/components/chat/new-chat-button"
@@ -280,7 +280,7 @@ export function ChatSidebar({
             <IconTooltip label="Templates (new)">
               <Button asChild variant="ghost" size="icon-sm" className="rounded-full">
                 <Link href="/templates" aria-label="Templates">
-                  <SquaresFour className="size-4" aria-hidden />
+                  <Stack className="size-4" aria-hidden />
                 </Link>
               </Button>
             </IconTooltip>
@@ -329,7 +329,7 @@ export function ChatSidebar({
               </SidebarActionLink>
               <SidebarActionLink
                 href="/templates"
-                icon={<SquaresFour className="size-4 shrink-0" aria-hidden />}
+                icon={<Stack className="size-4 shrink-0" aria-hidden />}
                 badge={
                   <Badge
                     variant="secondary"

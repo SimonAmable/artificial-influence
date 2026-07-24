@@ -4,24 +4,7 @@ import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import {
-  CaretDownIcon,
-  ChatCircleDots,
-  CurrencyDollar,
-  FlowArrow,
-  Microphone as MicrophoneIcon,
-  Palette,
-  PaperPlaneTilt,
-  PencilSimple,
-  Robot as RobotIcon,
-  ShieldCheck,
-  SquaresFour,
-  Image as ImageIcon,
-  Video as VideoIcon,
-  FolderSimple,
-  MagnifyingGlass,
-  User,
-} from "@phosphor-icons/react"
+import { CaretDownIcon, SquaresFour, User } from "@phosphor-icons/react"
 
 import { MenuBadge } from "@/components/app/mega-nav-item-body"
 import { HeaderPillButton } from "@/components/app/header-controls"
@@ -49,6 +32,7 @@ import {
   isPageInMegaNavigation,
   megaNavPathMatches,
 } from "@/lib/navigation/mobile-sidebar"
+import { getNavIcon, type NavIconKey } from "@/lib/navigation/nav-icons"
 import { cn } from "@/lib/utils"
 import { currentProduct } from "@/lib/product/current"
 import type { ProductId } from "@/lib/product/types"
@@ -61,7 +45,7 @@ type NavBadge = "new" | "beta"
 interface FlatNavItem {
   path: string
   label: string
-  icon?: React.ElementType
+  icon?: NavIconKey
   iconSrc?: string
   badge?: NavBadge
   products?: ProductId[]
@@ -69,21 +53,21 @@ interface FlatNavItem {
 }
 
 const FLAT_NAV_ITEMS: FlatNavItem[] = [
-  { path: "/chat",          label: "Agent",         icon: ChatCircleDots,  badge: "beta" },
-  { path: "/automations",   label: "Automations",   icon: RobotIcon,       badge: "beta" },
-  { path: "/templates",     label: "Templates",     icon: FlowArrow,       badge: "new"  },
-  { path: "/slideshows",    label: "Slideshows",    icon: SquaresFour,     badge: "new", hiddenFor: ["presence-studio"] },
+  { path: "/chat",          label: "Agent",         icon: "chat-circle-dots", badge: "beta" },
+  { path: "/automations",   label: "Automations",   icon: "robot",            badge: "beta" },
+  { path: "/templates",     label: "Templates",     icon: "stack",            badge: "new"  },
+  { path: "/slideshows",    label: "Slideshows",    icon: "images",           badge: "new", hiddenFor: ["presence-studio"] },
   { path: "/content",       label: "Content",       iconSrc: "/brand_icons/fanvue_logo.png", badge: "new", products: ["presence-studio"] },
-  { path: "/autopost",      label: "Autopost",      icon: PaperPlaneTilt,  badge: "new", hiddenFor: ["presence-studio"] },
-  { path: "/ai-influencer", label: "AI Influencer", icon: User,            badge: "new"  },
-  { path: "/explore",       label: "Explore",       icon: MagnifyingGlass, badge: "new"  },
-  { path: "/image",         label: "Image",         icon: ImageIcon                      },
-  { path: "/video",         label: "Video",         icon: VideoIcon                      },
-  { path: "/audio",         label: "Audio",         icon: MicrophoneIcon                 },
-  { path: "/assets?tab=history", label: "Assets",   icon: FolderSimple,    badge: "new"  },
-  { path: "/canvases",      label: "Canvas",        icon: PencilSimple                   },
-  { path: "/free-tools",    label: "Free Tools",    icon: ShieldCheck                   },
-  { path: "/pricing",       label: "Pricing",       icon: CurrencyDollar                },
+  { path: "/autopost",      label: "Autopost",      icon: "paper-plane-tilt", badge: "new", hiddenFor: ["presence-studio"] },
+  { path: "/ai-influencer", label: "AI Influencer", icon: "user",             badge: "new"  },
+  { path: "/explore",       label: "Explore",       icon: "magnifying-glass", badge: "new"  },
+  { path: "/image",         label: "Image",         icon: "image"                           },
+  { path: "/video",         label: "Video",         icon: "video"                           },
+  { path: "/audio",         label: "Audio",         icon: "microphone"                      },
+  { path: "/assets?tab=history", label: "Assets",   icon: "folder",           badge: "new"  },
+  { path: "/canvases",      label: "Canvas",        icon: "tree-structure"                  },
+  { path: "/free-tools",    label: "Free Tools",    icon: "toolbox"                         },
+  { path: "/pricing",       label: "Pricing",       icon: "currency-dollar"                 },
 ]
 
 function getMobileFlatNavItems(product = currentProduct): FlatNavItem[] {
@@ -99,14 +83,10 @@ function getMobileFlatNavItems(product = currentProduct): FlatNavItem[] {
 function FlatNavItemIcon({
   item,
   className,
-  fallback: Fallback = SquaresFour,
 }: {
   item: Pick<FlatNavItem, "icon" | "iconSrc" | "path">
   className?: string
-  fallback?: React.ElementType
 }) {
-  const Icon = item.icon
-
   if (item.iconSrc) {
     return (
       <Image
@@ -125,11 +105,12 @@ function FlatNavItemIcon({
     )
   }
 
-  if (Icon) {
+  if (item.icon) {
+    const Icon = getNavIcon(item.icon)
     return <Icon className={cn("size-4 shrink-0", className)} weight="regular" aria-hidden />
   }
 
-  return <Fallback className={cn("size-4 shrink-0", className)} weight="regular" aria-hidden />
+  return <SquaresFour className={cn("size-4 shrink-0", className)} weight="regular" aria-hidden />
 }
 
 // ─── Single nav item ──────────────────────────────────────────────────────────

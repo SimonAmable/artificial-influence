@@ -45,3 +45,8 @@ export function getCarouselReferencePublicUrl(storagePath: string): string | nul
 export function isCarouselShotsModelId(value: string): value is CarouselShotsModelId {
   return CAROUSEL_SHOTS_MODELS.some((model) => model.id === value)
 }
+
+/** Deep-link into Carousel Shots with a reference image prefilled. */
+export function carouselShotsHrefFromImage(imageUrl: string): string {
+  return `/carousel-shots?image=${encodeURIComponent(imageUrl)}`
+}

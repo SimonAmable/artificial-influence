@@ -1,3 +1,4 @@
+import { AI_VENDOR_ICON_BY_SLUG } from "@/lib/constants/ai-vendor-icons"
 import { productLogo } from "@/lib/product/branding"
 
 /**
@@ -8,31 +9,17 @@ export function getModelIconPath(identifier: string): string | null {
     return productLogo
   }
 
+  // Flux models hosted under non-BFL prefixes still use the Flux mark
+  if (
+    identifier === 'prunaai/flux-kontext-fast' ||
+    identifier.startsWith('black-forest-labs/')
+  ) {
+    return '/ai_icons/flux.svg'
+  }
+
   // Extract the provider/prefix from identifier (e.g., "google/nano-banana" -> "google")
   const prefix = identifier.split('/')[0]?.toLowerCase()
-  
-  switch (prefix) {
-    case 'prunaai':
-      return '/ai_icons/prunaai.svg'
-    case 'google':
-      return '/ai_icons/gemini-color.svg'
-    case 'openai':
-      return '/ai_icons/openai.svg'
-    case 'bytedance':
-      return '/ai_icons/bytedance-color.svg'
-    case 'xai':
-    case 'x-ai':
-      return '/ai_icons/grok.svg'
-    case 'kwaivgi':
-      return '/ai_icons/kling-color.svg'
-    case 'minimax':
-      return '/ai_icons/minimax.svg'
-    case 'fal-ai':
-    case 'alibaba':
-    case 'wan-video':
-      // Wan (Wan 2.x), Alibaba Qwen family; same mark as fal-ai/qwen-image-2
-      return '/ai_icons/qwen.svg'
-    default:
-      return null
-  }
+  if (!prefix) return null
+
+  return AI_VENDOR_ICON_BY_SLUG[prefix] ?? null
 }

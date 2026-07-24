@@ -366,7 +366,9 @@ export function Header() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <GlobalSearchCommand />
+          <GlobalSearchCommand
+            onOpenSettings={user ? openSettingsModal : undefined}
+          />
           {loading ? null : user ? (
             <>
               <HeaderPillButton

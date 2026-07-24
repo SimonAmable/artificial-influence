@@ -6,6 +6,16 @@ import {
   type MegaNavPhosphorIcon,
 } from "@/lib/constants/navigation"
 
+/** Mirrors profile settings modal tabs — kept here to avoid lib → client imports. */
+export type PageSearchSettingsTab =
+  | "profile"
+  | "notifications"
+  | "accounts"
+  | "credits"
+  | "affiliate"
+  | "feedback"
+  | "pets"
+
 export interface PageSearchItem {
   id: string
   label: string
@@ -16,8 +26,66 @@ export interface PageSearchItem {
   iconSrc?: string
   iconText?: string
   iconPhosphor?: MegaNavPhosphorIcon
+  /** When set, selecting this row opens the profile settings modal on that tab */
+  settingsTab?: PageSearchSettingsTab
   searchText: string
 }
+
+const SETTINGS_SEARCH_ITEMS: Array<{
+  tab: PageSearchSettingsTab
+  label: string
+  description: string
+  iconPhosphor?: MegaNavPhosphorIcon
+  searchKeywords: string[]
+}> = [
+  {
+    tab: "profile",
+    label: "Profile",
+    description: "Account profile, display name, and preferences",
+    iconPhosphor: "user",
+    searchKeywords: ["settings", "account", "name", "email", "preferences"],
+  },
+  {
+    tab: "accounts",
+    label: "Accounts",
+    description: "Connected social and publishing accounts",
+    iconPhosphor: "user-focus",
+    searchKeywords: ["settings", "connected", "social", "fanvue", "link"],
+  },
+  {
+    tab: "notifications",
+    label: "Notifications",
+    description: "Notification preferences and alerts",
+    searchKeywords: ["settings", "alerts", "bell", "unread"],
+  },
+  {
+    tab: "credits",
+    label: "Credits",
+    description: "Balance, plans, and buy more credits",
+    iconPhosphor: "currency-dollar",
+    searchKeywords: ["settings", "billing", "plan", "subscription", "buy", "top up"],
+  },
+  {
+    tab: "affiliate",
+    label: "Affiliate",
+    description: "Affiliate program and referral links",
+    iconPhosphor: "currency-dollar",
+    searchKeywords: ["settings", "referral", "partner", "commission"],
+  },
+  {
+    tab: "feedback",
+    label: "Feedback",
+    description: "Send product feedback and requests",
+    iconPhosphor: "chat-circle-dots",
+    searchKeywords: ["settings", "support", "request", "report"],
+  },
+  {
+    tab: "pets",
+    label: "Pets",
+    description: "Companion pets and hatch collection",
+    searchKeywords: ["settings", "hatch", "companion", "pet", "bloop"],
+  },
+]
 
 function isAppPath(path: string) {
   return path === "/apps" || path.startsWith("/apps/")
@@ -64,6 +132,12 @@ function hasMenuItemAtPath(group: MegaNavGroup, path: string) {
   )
 }
 
+function routeIconText(item: Pick<MegaNavItem, "iconText" | "iconSrc" | "iconPhosphor">) {
+  if (item.iconText) return item.iconText
+  if (item.iconSrc || item.iconPhosphor) return undefined
+  return "/"
+}
+
 function itemToSearchItem(item: MegaNavItem, group: string): PageSearchItem | null {
   if (isAppPath(item.path)) return null
 
@@ -75,7 +149,7 @@ function itemToSearchItem(item: MegaNavItem, group: string): PageSearchItem | nu
     group,
     badge: item.badge,
     iconSrc: item.iconSrc,
-    iconText: item.iconText,
+    iconText: routeIconText(item),
     iconPhosphor: item.iconPhosphor,
     searchText: buildSearchText(
       [item.label, item.description, group, item.searchKeywords],
@@ -101,7 +175,30 @@ function getSearchRank(item: PageSearchItem, query: string) {
   return Number.POSITIVE_INFINITY
 }
 
-export function getCorePageSearchItems(): PageSearchItem[] {
+function getSettingsSearchItems(): PageSearchItem[] {
+  return SETTINGS_SEARCH_ITEMS.map((item) => ({
+    id: `settings:${item.tab}`,
+    label: item.label,
+    description: item.description,
+    path: `settings:${item.tab}`,
+    group: "Settings",
+    iconText: item.iconPhosphor ? undefined : "/",
+    iconPhosphor: item.iconPhosphor,
+    settingsTab: item.tab,
+    searchText: buildSearchText([
+      item.label,
+      item.description,
+      "settings",
+      "profile",
+      item.tab,
+      item.searchKeywords,
+    ]),
+  }))
+}
+
+export function getCorePageSearchItems(options?: {
+  includeSettings?: boolean
+}): PageSearchItem[] {
   const items: PageSearchItem[] = []
   const seen = new Set<string>()
 
@@ -129,6 +226,7 @@ export function getCorePageSearchItems(): PageSearchItem[] {
               path: group.path,
               group: group.label,
               badge: group.badge,
+              iconText: "/",
               searchText: buildSearchText([group.label], group.path),
             },
       )
@@ -146,21 +244,37 @@ export function getCorePageSearchItems(): PageSearchItem[] {
     }
   }
 
+  if (options?.includeSettings) {
+    for (const item of getSettingsSearchItems()) {
+      push(item)
+    }
+  }
+
   return items
 }
 
-export function searchCorePages(query: string, limit = 12): PageSearchItem[] {
+export function searchCorePages(
+  query: string,
+  options?: {
+    limit?: number
+    includeSettings?: boolean
+  },
+): PageSearchItem[] {
   const q = query.trim().toLowerCase()
-  const pages = getCorePageSearchItems()
-  if (!q) return pages.slice(0, limit)
+  const pages = getCorePageSearchItems({
+    includeSettings: options?.includeSettings,
+  })
+  const ranked = !q
+    ? pages
+    : pages
+        .map((item) => ({ item, rank: getSearchRank(item, q) }))
+        .filter(({ rank }) => Number.isFinite(rank))
+        .sort((a, b) => {
+          if (a.rank !== b.rank) return a.rank - b.rank
+          return a.item.label.localeCompare(b.item.label)
+        })
+        .map(({ item }) => item)
 
-  return pages
-    .map((item) => ({ item, rank: getSearchRank(item, q) }))
-    .filter(({ rank }) => Number.isFinite(rank))
-    .sort((a, b) => {
-      if (a.rank !== b.rank) return a.rank - b.rank
-      return a.item.label.localeCompare(b.item.label)
-    })
-    .map(({ item }) => item)
-    .slice(0, limit)
+  if (options?.limit != null) return ranked.slice(0, options.limit)
+  return ranked
 }
