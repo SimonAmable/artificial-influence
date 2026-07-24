@@ -4,7 +4,7 @@ import { PresenceFaqSection } from "@/components/landing/presence/presence-faq-s
 import { PresenceFinalCta } from "@/components/landing/presence/presence-final-cta"
 import { PresenceHero } from "@/components/landing/presence/presence-hero"
 import { PresenceModelsSection } from "@/components/landing/presence/presence-models-section"
-import { PresenceMonetizeSection } from "@/components/landing/presence/presence-monetize-section"
+// import { PresenceMonetizeSection } from "@/components/landing/presence/presence-monetize-section"
 import { PresenceProofSection } from "@/components/landing/presence/presence-proof-section"
 import { PresenceWorkflowSection } from "@/components/landing/presence/presence-workflow-section"
 
@@ -17,7 +17,8 @@ export function PresenceLandingPage() {
         </main>
       </div>
       <PresenceWorkflowSection />
-      <PresenceMonetizeSection />
+      {/* Hidden while monetize media is in progress */}
+      {/* <PresenceMonetizeSection /> */}
       <PresenceModelsSection />
       <PricingSection embedded />
       <PresenceFaqSection />

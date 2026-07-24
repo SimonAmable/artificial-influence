@@ -239,7 +239,7 @@ export function PresenceHero() {
 
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-5 bg-gradient-to-b from-transparent to-background"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-32 bg-gradient-to-b from-transparent via-background/80 to-background sm:h-40"
       />
     </section>
   )

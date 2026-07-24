@@ -78,8 +78,8 @@ export const presenceLandingCopy = {
     secondaryCtaHref: "/#pricing",
   },
   pricing: {
-    title: "Professional AI, priced for creators",
-    description: "Start free, upgrade when you are ready. Credits stack month to month.",
+    title: "Professional AI, priced for everyone",
+    description: "Start free, upgrade when you are ready. Credits NEVER expire.",
     monthlyFooter:
       "Create consistently with credits that stay in your balance. Publish to Fanvue on every plan. Cancel anytime.",
   },

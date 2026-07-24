@@ -146,8 +146,12 @@ export function PresenceWorkflowSection() {
   }, [advanceToNextTab, shouldAutoplay])
 
   return (
-    <section ref={sectionRef} className="w-full bg-background py-16 sm:py-24">
-      <div className={`mx-auto w-full max-w-7xl ${sectionGutterClass}`}>
+    <section ref={sectionRef} className="relative z-10 w-full bg-background py-16 sm:py-24">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 z-20 h-28 -translate-y-[calc(100%-1px)] bg-gradient-to-b from-transparent via-background/70 to-background"
+      />
+      <div className={`relative z-10 mx-auto w-full max-w-7xl ${sectionGutterClass}`}>
         <div className="max-w-2xl">
           <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
             {presenceLandingCopy.workflow.title}
