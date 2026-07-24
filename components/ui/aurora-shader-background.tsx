@@ -7,8 +7,7 @@ import {
 } from "@/lib/constants/aurora-shader"
 import { cn } from "@/lib/utils"
 
-const MAX_RENDER_WIDTH = 128
-const MAX_RENDER_HEIGHT = 56
+const MAX_DPR = 2
 
 const VERTEX_SHADER_SOURCE = `
 attribute vec2 a_position;
@@ -370,9 +369,12 @@ function AuroraShaderBackgroundComponent({
       const rect = eventTarget().getBoundingClientRect()
       const width = Math.max(1, Math.floor(rect.width))
       const height = Math.max(1, Math.floor(rect.height))
-      const scale = Math.min(1, MAX_RENDER_WIDTH / width, MAX_RENDER_HEIGHT / height)
-      const renderWidth = Math.max(1, Math.floor(width * scale))
-      const renderHeight = Math.max(1, Math.floor(height * scale))
+      const dpr = Math.min(
+        MAX_DPR,
+        typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1,
+      )
+      const renderWidth = Math.max(1, Math.floor(width * dpr))
+      const renderHeight = Math.max(1, Math.floor(height * dpr))
 
       canvas.width = renderWidth
       canvas.height = renderHeight
