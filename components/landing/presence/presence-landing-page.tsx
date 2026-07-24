@@ -16,14 +16,14 @@ export function PresenceLandingPage() {
           <PresenceHero />
         </main>
       </div>
-      <div id="platform-surfaces">
-        <PresenceProofSection />
-      </div>
       <PresenceWorkflowSection />
       <PresenceMonetizeSection />
       <PresenceModelsSection />
       <PricingSection embedded />
       <PresenceFaqSection />
+      <div id="platform-surfaces">
+        <PresenceProofSection />
+      </div>
       <PresenceFinalCta />
       <Footer />
     </>
