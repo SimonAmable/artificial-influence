@@ -184,9 +184,9 @@ export function SavedExamplesGallery({
                       />
                       
                       {/* Dark overlay showing only on hover */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/0 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/0 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
 
-                       <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                       <div className="pointer-events-none absolute left-2.5 top-2.5 z-20 flex flex-wrap gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                         <Badge variant="secondary" className="bg-background/90 text-[10px] uppercase tracking-wide text-foreground backdrop-blur-sm">
                           {example.surface}
                         </Badge>
@@ -207,7 +207,7 @@ export function SavedExamplesGallery({
                            type="button"
                            variant="secondary"
                            size="icon"
-                           className="absolute right-2.5 top-2.5 size-8 rounded-full opacity-0 transition-all group-hover:opacity-100"
+                           className="absolute right-2.5 top-2.5 z-20 size-8 rounded-full opacity-0 transition-all group-hover:opacity-100"
                            aria-label="Edit example"
                            onClick={(event) => {
                              event.stopPropagation()
@@ -217,7 +217,7 @@ export function SavedExamplesGallery({
                            <PencilSimple className="size-3.5" weight="bold" />
                          </Button>
                        ) : example.visibility === "public" ? (
-                         <div className="absolute right-2.5 top-2.5 opacity-0 transition-all group-hover:opacity-100">
+                         <div className="absolute right-2.5 top-2.5 z-20 opacity-0 transition-all group-hover:opacity-100">
                            <ReportContentButton
                              contentType="saved_example"
                              contentId={example.id}
@@ -228,10 +228,10 @@ export function SavedExamplesGallery({
                        ) : null}
 
                       {/* Center Glass Button */}
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20 active:bg-white/30 shadow-lg translate-y-1 group-hover:translate-y-0"
+                          className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20 active:bg-white/30 shadow-lg translate-y-1 group-hover:translate-y-0"
                           onClick={(event) => {
                             event.stopPropagation()
                             openExample(example)
@@ -243,7 +243,7 @@ export function SavedExamplesGallery({
                       </div>
 
                       {/* Prompt overlaying at bottom */}
-                      <div className="absolute inset-x-0 bottom-0 p-3.5 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-3.5 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                         <p className="line-clamp-3 text-xs leading-relaxed text-white/90">{promptPreview(example.prompt)}</p>
                       </div>
                     </div>

@@ -629,13 +629,27 @@ export function ImageGrid({
                 <div
                   key={item.id}
                   className={cn(
-                    "relative isolate w-full min-w-0 overflow-hidden rounded-lg border border-white/10 bg-zinc-900",
+                    "relative isolate w-full min-w-0 overflow-hidden rounded-lg border border-white/10",
+                    item.type === "failed" ? "bg-black" : "bg-zinc-900",
                     isOneColumn ? "min-h-[50vh]" : "aspect-square min-h-0"
                   )}
                 >
+                  {item.type === "failed" ? (
+                    <img
+                      src="/FAILED/failed.jpg"
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                      draggable={false}
+                    />
+                  ) : null}
                   {item.type === "generating" ? <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-zinc-800 to-zinc-700" style={{ width: "0%", animation: "fillProgress 20s linear infinite", boxShadow: "2px 0 8px 0 rgba(255, 255, 255, 0.4)" }} /> : null}
                   {/* Overlay gradient for depth */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30 pointer-events-none" />
+                  <div className={cn(
+                    "absolute inset-0 pointer-events-none",
+                    item.type === "failed"
+                      ? "bg-gradient-to-t from-black/80 via-black/20 to-black/10"
+                      : "bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30"
+                  )} />
                   <div className="absolute inset-x-2 bottom-2 z-10 text-left text-[10px] text-white/90 drop-shadow-md">
                     <p className="truncate font-semibold">{item.type === "failed" ? "Generation failed · Credit refunded" : item.model ?? "Generating..."}</p>
                     <p className="truncate text-white/60">{item.type === "failed" ? "Sorry for the issue. We refunded your credits so you can try again." : item.prompt ?? "Generating..."}</p>

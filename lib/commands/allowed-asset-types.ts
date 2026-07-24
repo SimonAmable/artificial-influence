@@ -1,4 +1,5 @@
 import type { AssetType } from "@/lib/assets/types"
+import { usesFalMultimodalVideoInputs } from "@/lib/constants/models"
 import type { Model } from "@/lib/types/models"
 
 /**
@@ -28,6 +29,7 @@ export function allowedAssetTypesForVideoModel(model: Model): AssetType[] {
 
   if (
     model.supports_reference_image === true ||
+    usesFalMultimodalVideoInputs(id) ||
     hasStartOrImageParam ||
     hasLastFrame ||
     isKlingOmni ||

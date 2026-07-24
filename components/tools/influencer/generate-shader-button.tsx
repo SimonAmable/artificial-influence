@@ -1,10 +1,13 @@
 "use client"
 
 import * as React from "react"
-import { Sparkle } from "@phosphor-icons/react"
+import { CircleNotch, Sparkle } from "@phosphor-icons/react"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { getControlLayoutTransition } from "./animated-control-item"
+
+type GenerateShaderButtonLayout = "compact" | "bar"
 
 type GenerateShaderButtonProps = {
   isReady: boolean
@@ -12,6 +15,10 @@ type GenerateShaderButtonProps = {
   allowConcurrent: boolean
   onGenerate?: () => void
   creditCost: number | string
+  /** Shown when generating with concurrent queue enabled */
+  activeSlotCount?: number
+  /** `bar` = full-width single row for custom tools; `compact` = side column (default) */
+  layout?: GenerateShaderButtonLayout
 }
 
 function AnimatedCreditCost({ value }: { value: number | string }) {
@@ -63,8 +70,15 @@ function GenerateShaderButtonComponent({
   allowConcurrent,
   onGenerate,
   creditCost,
+  activeSlotCount = 0,
+  layout = "compact",
 }: GenerateShaderButtonProps) {
+  const prefersReducedMotion = useReducedMotion()
+  const layoutTransition = getControlLayoutTransition(prefersReducedMotion)
   const onGenerateRef = React.useRef(onGenerate)
+  const showGeneratingState = isGenerating && !allowConcurrent
+  const showActiveBadge = allowConcurrent && isGenerating && activeSlotCount > 1
+  const isBarLayout = layout === "bar"
 
   onGenerateRef.current = onGenerate
 
@@ -72,33 +86,83 @@ function GenerateShaderButtonComponent({
     onGenerateRef.current?.()
   }, [])
 
+  const labelContent = showGeneratingState ? (
+    <span className="inline-flex items-center justify-center gap-1.5">
+      <CircleNotch className="size-3.5 shrink-0 animate-spin" aria-hidden />
+      <span className="whitespace-nowrap">Generating...</span>
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1.5">
+      <span>Generate</span>
+      {showActiveBadge ? (
+        <span className="rounded-full bg-white/15 px-1.5 py-px text-[9px] font-medium leading-4 text-white/90">
+          {activeSlotCount} active
+        </span>
+      ) : null}
+    </span>
+  )
+
+  const creditContent = (
+    <div className="flex items-center gap-0.5 font-bold text-white">
+      <Sparkle size={8} weight="fill" className="text-white" />
+      <AnimatedCreditCost value={creditCost} />
+    </div>
+  )
+
   return (
-    <div className="shrink-0">
-      <div
+    <motion.div
+      layout
+      transition={layoutTransition}
+      className={cn(isBarLayout ? "w-full" : "shrink-0")}
+    >
+      <motion.div
+        layout
+        transition={layoutTransition}
         className={cn(
-          "relative inline-block transition-all duration-300",
+          "relative transition-colors duration-300",
+          isBarLayout ? "block w-full" : "inline-block",
           isReady &&
             "before:absolute before:inset-[-12px] before:-z-10 before:rounded-full before:bg-[#00D3FF] before:opacity-40 before:blur-[15px] before:content-['']",
+          isBarLayout &&
+            isReady &&
+            "before:rounded-2xl before:inset-[-8px]",
         )}
       >
         <Button
           onClick={handleGenerate}
           disabled={!isReady || (isGenerating && !allowConcurrent)}
           className={cn(
-            "relative z-0 h-10 min-w-[100px] border-0 bg-black px-4 py-6 text-sm font-bold text-white shadow-none transition-all duration-300 hover:bg-black/90 dark:bg-black dark:text-white dark:hover:bg-black/90",
+            "relative z-0 h-10 border-0 bg-black text-sm font-bold text-white shadow-none transition-colors duration-300 hover:bg-black/90 dark:bg-black dark:text-white dark:hover:bg-black/90",
+            isBarLayout
+              ? "w-full px-4 py-2.5"
+              : "min-w-[100px] px-4 py-6",
             !isReady && "cursor-not-allowed opacity-50",
           )}
         >
-          <div className="flex flex-col items-center gap-0.5 text-white">
-            <span className="text-sm font-bold text-white">Generate</span>
-            <div className="flex items-center gap-0.5 font-bold text-white">
-              <Sparkle size={8} weight="fill" className="text-white" />
-              <AnimatedCreditCost value={creditCost} />
-            </div>
-          </div>
+          <motion.div
+            layout
+            transition={layoutTransition}
+            className={cn(
+              "text-white",
+              isBarLayout
+                ? "flex flex-row items-center justify-center gap-2"
+                : "flex flex-col items-center gap-0.5",
+            )}
+          >
+            <motion.span
+              layout="position"
+              transition={layoutTransition}
+              className="text-sm font-bold text-white"
+            >
+              {labelContent}
+            </motion.span>
+            <motion.div layout="position" transition={layoutTransition}>
+              {creditContent}
+            </motion.div>
+          </motion.div>
         </Button>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -107,7 +171,9 @@ function propsAreEqual(prev: GenerateShaderButtonProps, next: GenerateShaderButt
     prev.isReady === next.isReady &&
     prev.isGenerating === next.isGenerating &&
     prev.allowConcurrent === next.allowConcurrent &&
-    prev.creditCost === next.creditCost
+    prev.creditCost === next.creditCost &&
+    prev.activeSlotCount === next.activeSlotCount &&
+    prev.layout === next.layout
   )
 }
 

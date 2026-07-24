@@ -233,6 +233,19 @@ runTest("Seedream 5 Lite routes prompt-only generations to Fal text-to-image", (
   assert.equal(result.input.enable_safety_checker, false)
 })
 
+runTest("Seedream 5 Pro routes 1K preset to auto_1K", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: "16:9",
+    modelIdentifier: SEEDREAM_5_PRO_CANONICAL_ID,
+    numImages: 1,
+    prompt: "A minimalist poster",
+    referenceImageUrls: [],
+    resolutionPreset: "1K",
+  })
+
+  assert.equal(result.input.image_size, "auto_1K")
+})
+
 runTest("Seedream 5 Pro routes prompt-only generations to Fal text-to-image with safety checker off", () => {
   const result = buildFalImageRequest({
     aspectRatio: "16:9",

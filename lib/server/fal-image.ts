@@ -212,6 +212,7 @@ export function coerceWanImagePrompt(prompt: string): string {
 
 type SeedreamImageSize =
   | FalImageSize
+  | "auto_1K"
   | "auto_2K"
   | "auto_3K"
   | "auto_4K"
@@ -221,6 +222,7 @@ function aspectRatioToSeedreamImageSize(
   options?: {
     allowAuto?: boolean
     resolutionPreset?: string | null
+    supportsAuto1K?: boolean
     supportsAuto3K?: boolean
   },
 ): SeedreamImageSize {
@@ -230,6 +232,7 @@ function aspectRatioToSeedreamImageSize(
   if (preset === "4K") return "auto_4K"
   if (preset === "3K" && options?.supportsAuto3K) return "auto_3K"
   if (preset === "2K") return "auto_2K"
+  if (preset === "1K" && options?.supportsAuto1K) return "auto_1K"
 
   if (options?.allowAuto && (aspect === "match_input_image" || aspect === "auto")) {
     return "auto_2K"
@@ -399,6 +402,7 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
     const imageSize = aspectRatioToSeedreamImageSize(resolvedAspectRatio, {
       allowAuto: isEdit,
       resolutionPreset: options.resolutionPreset,
+      supportsAuto1K: options.modelIdentifier === SEEDREAM_5_PRO_CANONICAL_ID,
       supportsAuto3K: options.modelIdentifier === SEEDREAM_5_LITE_CANONICAL_ID,
     })
     const input: Record<string, unknown> = {

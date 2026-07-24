@@ -20,6 +20,8 @@ export interface PhotoUploadProps {
   accept?: string
   maxHeight?: string
   minHeight?: string
+  /** How the preview image fills its box when an upload is present. */
+  previewFit?: "contain" | "cover"
   /** When true, accepts common video types and previews with a video element. */
   allowVideo?: boolean
 }
@@ -36,6 +38,7 @@ export function PhotoUpload({
   accept = "image/*",
   maxHeight = "max-h-[45px]",
   minHeight = "min-h-[50px] sm:min-h-[55px]",
+  previewFit = "contain",
   allowVideo = false,
 }: PhotoUploadProps) {
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
@@ -119,15 +122,16 @@ export function PhotoUpload({
     >
       <CardContent className={cn("p-1.5 sm:p-2 h-full min-h-0 flex items-center justify-center", minHeight)}>
         {value?.url ? (
-          <div className="relative group flex h-full min-h-0 w-full items-center justify-center p-1">
+          <div className="relative group flex h-full min-h-0 w-full items-center justify-center overflow-hidden p-1">
             {previewIsVideo ? (
               <video
                 src={value.url}
                 muted
                 playsInline
                 className={cn(
-                  "w-full max-w-full object-contain object-center rounded-xl",
-                  maxHeight
+                  "h-full w-full max-w-full rounded-xl object-center",
+                  previewFit === "cover" ? "object-cover" : "object-contain",
+                  maxHeight,
                 )}
               />
             ) : (
@@ -135,8 +139,9 @@ export function PhotoUpload({
                 src={value.url}
                 alt="Uploaded photo"
                 className={cn(
-                  "w-full max-w-full object-contain object-center rounded-xl cursor-pointer",
-                  maxHeight
+                  "h-full w-full max-w-full rounded-xl object-center cursor-pointer",
+                  previewFit === "cover" ? "object-cover" : "object-contain",
+                  maxHeight,
                 )}
                 onClick={handleImageClick}
               />

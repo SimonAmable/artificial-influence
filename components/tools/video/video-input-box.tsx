@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, FilePlus, X, Sparkle, Check, Waveform, CircleNotch } from "@phosphor-icons/react"
+import { Plus, FilePlus, X, Check, Waveform, FilmStrip } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import type { Model } from "@/lib/types/models"
 import { PhotoUpload, ImageUpload } from "@/components/shared/upload/photo-upload"
@@ -19,8 +19,13 @@ import {
 import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
 import { VideoModelParameterControls } from "@/components/tools/video/video-model-parameter-controls"
 import { MultiShotEditor, type MultiShotItem } from "@/components/tools/video/multi-shot-editor"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
+import { GenerateShaderButton } from "@/components/tools/influencer/generate-shader-button"
+import {
+  AnimatedControlItem,
+  influencerControlIconButtonClassName,
+} from "@/components/tools/influencer/animated-control-item"
+import { IconCompactSwitch } from "@/components/tools/influencer/prompt-control-menu"
+import { LayoutGroup } from "framer-motion"
 import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
 import { usesFalMultimodalVideoInputs } from "@/lib/constants/models"
 import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
@@ -659,65 +664,35 @@ export function VideoInputBox({
   const displayGenerationSlotCount =
     activeGenerationCount ?? (isGenerating ? 1 : 0)
 
+  const generateButtonLayout = needsPrompt ? "compact" : "bar"
+
   const generateButtonEl = (
-    <div className="shrink-0">
-      <div
-        className={cn(
-          "relative inline-block transition-all duration-300",
-          isReady &&
-            "before:content-[''] before:absolute before:inset-[-12px] before:bg-primary before:rounded-full before:blur-[15px] before:opacity-50 before:-z-10"
-        )}
-      >
-        <Button
-          onClick={onGenerate}
-          disabled={!isReady || (isGenerating && !allowConcurrent)}
-          className={cn(
-            "bg-primary hover:bg-primary/80 text-primary-foreground font-semibold h-10 min-w-[100px] text-sm px-4 py-6 transition-all duration-300 relative z-0",
-            !isReady && "opacity-50 cursor-not-allowed"
-          )}
-        >
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-sm font-semibold">
-              {isGenerating && displayGenerationSlotCount > 0 ? (
-                <span className="inline-flex items-center justify-center gap-1.5">
-                  <CircleNotch className="size-3.5 shrink-0 animate-spin" aria-hidden />
-                  <span className="whitespace-nowrap">
-                    {allowConcurrent ? "Generate" : "Generating..."}
-                  </span>
-                  {displayGenerationSlotCount > 1 ? (
-                    <span className="rounded-full bg-black/20 px-1.5 py-px text-[9px] font-medium leading-4 text-primary-foreground/90">
-                      {displayGenerationSlotCount} active
-                    </span>
-                  ) : null}
-                </span>
-              ) : (
-                "Generate"
-              )}
-            </span>
-            <div className="flex items-center gap-0.5">
-                <Sparkle size={8} weight="fill" />
-                <span className="text-[10px]">
-                  {estimatedCredits != null ? estimatedCredits : selectedModel.model_cost ?? "-"}
-                </span>
-              </div>
-          </div>
-        </Button>
-      </div>
-    </div>
+    <GenerateShaderButton
+      layout={generateButtonLayout}
+      isReady={isReady}
+      isGenerating={isGenerating}
+      allowConcurrent={allowConcurrent}
+      onGenerate={onGenerate}
+      creditCost={estimatedCredits != null ? estimatedCredits : selectedModel.model_cost ?? "-"}
+      activeSlotCount={displayGenerationSlotCount}
+    />
   )
 
+  const showMediaPlusMenu =
+    (modelSupportsImage || modelSupportsLastFrame || isReferenceVideoSupported) &&
+    !isMotionCopyModel &&
+    !isLipsyncModel
+
   const videoToolbarRow = (
-    <div className="flex items-center gap-1 flex-wrap px-2">
-      {(modelSupportsImage || modelSupportsLastFrame || isReferenceVideoSupported) &&
-        !isMotionCopyModel &&
-        !isLipsyncModel && (
-          <>
+    <LayoutGroup id="video-controls">
+      <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden px-2 [-webkit-overflow-scrolling:touch] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {showMediaPlusMenu ? (
+          <AnimatedControlItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-muted/80"
+                  variant="outline"
+                  className={influencerControlIconButtonClassName}
                   aria-label={
                     isSeedance2
                       ? "Add image, video, or reference (image/audio)"
@@ -815,7 +790,11 @@ export function VideoInputBox({
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+          </AnimatedControlItem>
+        ) : null}
 
+        {showMediaPlusMenu ? (
+          <>
             <input
               ref={inputRef}
               type="file"
@@ -851,10 +830,10 @@ export function VideoInputBox({
               />
             ) : null}
           </>
-        )}
+        ) : null}
 
-      <VideoModelParameterControls
-        videoModels={videoModels}
+        <VideoModelParameterControls
+          videoModels={videoModels}
         selectedModel={selectedModel}
         onModelChange={onModelChange}
         parameters={parameters}
@@ -862,10 +841,10 @@ export function VideoInputBox({
         disabled={!allowOptionsDuringGeneration && isGenerating}
         variant="image"
         referenceVideoProvided={!!inputVideo || chipSlotInfo.referenceVideoSlotFromChip}
-      />
+        />
 
-      {!needsPrompt && generateButtonEl}
-    </div>
+      </div>
+    </LayoutGroup>
   )
 
   // Unified interface structure
@@ -884,7 +863,7 @@ export function VideoInputBox({
       {isPromptDragActive && canAcceptPromptDrop && (
         <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] border-2 border-dashed border-primary bg-primary/20" />
       )}
-      <CardContent className="p-2 flex flex-col gap-1.5">
+      <CardContent className="flex min-w-0 flex-col gap-1.5 p-2">
         {/* Image/Video Previews, manual uploads + @ library slots (same API fields) */}
         {((!isMotionCopyModel &&
           !isLipsyncModel &&
@@ -897,7 +876,7 @@ export function VideoInputBox({
             chipSlotInfo.referenceVideoSlotFromChip ||
             (usesRefImageGallery && chipSlotInfo.omniStyleImageChipUrls.length > 0))) ||
           (isMotionCopyModel && (inputImage || inputVideo))) && (
-          <div className="flex flex-wrap gap-2 px-2 pt-1">
+          <div className="flex min-w-0 flex-nowrap items-start gap-2 overflow-x-auto overflow-y-hidden px-2 pt-1 [-webkit-overflow-scrolling:touch] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {(inputImage?.url || chipSlotInfo.startImageChipUrl) && !isMotionCopyModel && !isLipsyncModel && (
               <div className="relative inline-block">
                 <Image
@@ -1095,7 +1074,7 @@ export function VideoInputBox({
         {/* Prompt + Generate (same row as /image); model row below */}
         {needsPrompt && (
           <>
-            <div className="flex items-start gap-2 pt-1 px-2">
+            <div className="flex min-w-0 items-start gap-2 px-2 pt-1">
               <div className="min-w-0 flex-1">
                 <VideoPromptFields
                   promptValue={promptValue}
@@ -1121,19 +1100,21 @@ export function VideoInputBox({
         )}
 
         {/* Kling v3 / Omni: Multishot */}
-        {isKlingV3OrOmni && onMultiShotModeChange && onMultiShotShotsChange && (
-          <div className="px-2 space-y-2 border-t border-border/50 pt-2 mt-1">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="multi-shot-mode"
-                checked={multiShotMode}
-                onCheckedChange={onMultiShotModeChange}
-                disabled={!allowOptionsDuringGeneration && isGenerating}
-              />
-              <Label htmlFor="multi-shot-mode" className="text-xs font-medium cursor-pointer">
-                Multishot
-              </Label>
-            </div>
+        {isKlingV3OrOmni && onMultiShotModeChange && onMultiShotShotsChange ? (
+          <div className="mt-1 space-y-2 border-t border-border/50 px-2 pt-2">
+            <IconCompactSwitch
+              id="multi-shot-mode"
+              checked={multiShotMode}
+              onCheckedChange={onMultiShotModeChange}
+              disabled={!allowOptionsDuringGeneration && isGenerating}
+              ariaLabel="Multishot"
+              icon={
+                <FilmStrip
+                  className="size-3.5"
+                  weight={multiShotMode ? "fill" : "regular"}
+                />
+              }
+            />
             {multiShotMode && (
               <>
                 <p className="text-[11px] text-muted-foreground">
@@ -1150,7 +1131,7 @@ export function VideoInputBox({
               </>
             )}
           </div>
-        )}
+        ) : null}
 
         {usesRefImageGallery && onReferenceImagesChange ? (
           <input
@@ -1207,7 +1188,12 @@ export function VideoInputBox({
           </div>
         )}
 
-        {/* Motion / lipsync: model row + Generate (same toolbar as /image bottom row) */}
+        {/* Motion / lipsync: full-width generate, then model toolbar */}
+        {!needsPrompt ? (
+          <div className="px-2 pt-1">
+            {generateButtonEl}
+          </div>
+        ) : null}
         {!needsPrompt && videoToolbarRow}
 
         <input

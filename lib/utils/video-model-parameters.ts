@@ -1,4 +1,4 @@
-import { getModelParameters } from "@/lib/constants/models";
+import { getModelParameters, usesFalMultimodalVideoInputs } from "@/lib/constants/models";
 import type { ParameterDefinition } from "@/lib/types/models";
 
 /** Minimal shape for video model params (Model or ModelMetadata) */
@@ -15,6 +15,16 @@ const FALLBACK_FIRST_FRAME: ParameterDefinition = {
   type: "string",
   label: "First Frame",
   description: "First frame image",
+  required: false,
+  default: null,
+  ui_type: "text",
+};
+
+const FALLBACK_START_FRAME: ParameterDefinition = {
+  name: "image",
+  type: "string",
+  label: "Start Frame",
+  description: "Optional first frame for image-to-video. Disabled when reference images are attached.",
   required: false,
   default: null,
   ui_type: "text",
@@ -42,6 +52,12 @@ const FALLBACK_NEGATIVE_PROMPT: ParameterDefinition = {
 
 function hasParameter(params: ParameterDefinition[], name: string): boolean {
   return params.some((param) => param.name === name);
+}
+
+function hasStartFrameParameter(params: ParameterDefinition[]): boolean {
+  return params.some((param) =>
+    ["image", "first_frame_image", "start_image"].includes(param.name),
+  );
 }
 
 export function buildVideoModelParameters(input: VideoParamsInput): ParameterDefinition[] {
@@ -78,7 +94,15 @@ export function buildVideoModelParameters(input: VideoParamsInput): ParameterDef
     }
   }
 
-  if (input.supports_first_frame && !hasParameter(params, "first_frame_image")) {
+  if (usesFalMultimodalVideoInputs(input.identifier) && !hasStartFrameParameter(params)) {
+    params.unshift(FALLBACK_START_FRAME);
+  }
+
+  if (
+    input.supports_first_frame &&
+    !usesFalMultimodalVideoInputs(input.identifier) &&
+    !hasParameter(params, "first_frame_image")
+  ) {
     params.push(FALLBACK_FIRST_FRAME);
   }
 

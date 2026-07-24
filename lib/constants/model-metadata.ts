@@ -251,7 +251,7 @@ export const SEEDREAM_5_PRO_META: ModelMetadata = {
     {
       name: 'size',
       label: 'Size Preset',
-      options: ['2K'],
+      options: ['1K', '2K'],
       default: '2K',
       description: 'Pre-set image resolution',
     },

@@ -8,7 +8,19 @@ import {
   SelectLabel,
   SelectSeparator,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
+import { influencerControlPillClassName } from "@/components/tools/influencer/animated-control-item"
+
+type IconCompactSwitchProps = {
+  id: string
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+  icon: React.ReactNode
+  ariaLabel: string
+  className?: string
+  disabled?: boolean
+}
 
 export function PromptControlMenuContent({
   className,
@@ -99,6 +111,37 @@ export function PromptControlMenuItem({
         {iconPosition === "end" ? iconNode : null}
       </div>
     </SelectItem>
+  )
+}
+
+export function IconCompactSwitch({
+  id,
+  checked,
+  onCheckedChange,
+  icon,
+  ariaLabel,
+  className,
+  disabled,
+}: IconCompactSwitchProps) {
+  return (
+    <div
+      className={cn(
+        influencerControlPillClassName,
+        "flex items-center gap-1.5 px-2",
+        disabled && "pointer-events-none opacity-50",
+        className,
+      )}
+    >
+      <span className={cn("shrink-0", checked ? "text-primary" : "text-muted-foreground")}>{icon}</span>
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        aria-label={ariaLabel}
+        disabled={disabled}
+        className="h-4 w-7 shrink-0 border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=unchecked]:bg-muted [&>span]:size-3 [&>span]:shadow-sm [&>span]:data-[state=checked]:translate-x-3"
+      />
+    </div>
   )
 }
 

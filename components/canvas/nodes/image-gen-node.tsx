@@ -42,7 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
-import { useModels } from "@/hooks/use-models"
+import { useEffectiveImageModels } from "@/lib/image/studio-tools"
 import { useNodeErrorToast } from "@/hooks/use-node-error-toast"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
@@ -100,8 +100,6 @@ const getImageDimensions = (aspectRatio: string) => {
 }
 
 const MAX_GENERATED_IMAGES = 20
-const CHARACTER_SWAP_UI_MODEL_IDENTIFIER = "custom/character-swap"
-const CHARACTER_SWAP_BASE_MODEL_IDENTIFIER = "google/nano-banana-pro"
 
 function getNormalizedGeneratedImages(data: ImageGenNodeData): {
   urls: string[]
@@ -136,23 +134,7 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const nodeData = data as ImageGenNodeData
   useNodeErrorToast(id, nodeData.error)
   const multiSelectActive = useFlowMultiSelectActive()
-  const { models: imageModels } = useModels("image")
-  const effectiveImageModels = React.useMemo(() => {
-    if (imageModels.length === 0) return imageModels
-    if (imageModels.some((m) => m.identifier === CHARACTER_SWAP_UI_MODEL_IDENTIFIER)) return imageModels
-    const baseModel = imageModels.find((m) => m.identifier === CHARACTER_SWAP_BASE_MODEL_IDENTIFIER)
-    if (!baseModel) return imageModels
-    return [
-      ...imageModels,
-      {
-        ...baseModel,
-        id: `ui-${CHARACTER_SWAP_UI_MODEL_IDENTIFIER}`,
-        identifier: CHARACTER_SWAP_UI_MODEL_IDENTIFIER,
-        name: "Character Swap",
-        description: "Swap a character into a scene using two references.",
-      } as Model,
-    ]
-  }, [imageModels])
+  const { models: effectiveImageModels } = useEffectiveImageModels()
 
   /** Align with app default; fix Radix Select when stored id is missing from the list. */
   const canvasSelectedImageModel = React.useMemo(() => {

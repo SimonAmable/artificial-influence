@@ -73,6 +73,16 @@ const nextConfig: NextConfig = {
         destination: "/inpaint",
         permanent: true,
       },
+      {
+        source: "/character-swap",
+        destination: "/image?model=custom/character-swap",
+        permanent: true,
+      },
+      {
+        source: "/face-swap",
+        destination: "/image?model=custom/face-swap",
+        permanent: true,
+      },
     ]
   },
   typescript: {

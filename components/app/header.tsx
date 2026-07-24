@@ -88,7 +88,6 @@ export function Header() {
   const isInpaintPage =
     pathname === "/inpaint" || pathname === "/image-editor"
   const isImagePage = pathname === "/image"
-  const isCharacterSwapPage = pathname === "/character-swap"
   const isMotionCopyPage = pathname === "/motion-copy"
   const isLipsyncPage = pathname === "/lipsync"
   const isCanvasPage = pathname === "/canvas"
@@ -111,7 +110,6 @@ export function Header() {
     (isCustomComponentsPage ||
       isInpaintPage ||
       isImagePage ||
-      isCharacterSwapPage ||
       isMotionCopyPage ||
       isLipsyncPage) &&
     layoutModeContext
@@ -446,8 +444,8 @@ export function Header() {
           )}
           {!loading && !user ? (
             <SettingsDropdown
-              layoutMode={(isCustomComponentsPage || isInpaintPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.layoutMode : undefined}
-              onLayoutModeChange={(isCustomComponentsPage || isInpaintPage || isImagePage || isCharacterSwapPage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.setLayoutMode : undefined}
+              layoutMode={(isCustomComponentsPage || isInpaintPage || isImagePage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.layoutMode : undefined}
+              onLayoutModeChange={(isCustomComponentsPage || isInpaintPage || isImagePage || isMotionCopyPage || isLipsyncPage) && layoutModeContext ? layoutModeContext.setLayoutMode : undefined}
             />
           ) : null}
         </div>

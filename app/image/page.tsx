@@ -3,8 +3,13 @@
 import * as React from "react"
 import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
 import { InfluencerInputBox, InfluencerShowcaseCard } from "@/components/tools/influencer"
-import { CharacterSwapInputBox } from "@/components/tools/character-swap"
-import type { CharacterSwapMode } from "@/components/tools/character-swap/character-swap-input-box"
+import { ImageStudioToolInput } from "@/components/tools/image-studio"
+import {
+  buildStudioToolGenerationRequest,
+  getStudioToolByUiModel,
+  useEffectiveImageModels,
+  validateDualReferenceSwapState,
+} from "@/lib/image/studio-tools"
 import { ImageGrid, type GridItem } from "@/components/shared/display/image-grid"
 import { useGenerationTasks } from "@/components/generation-companion/generation-tasks-provider"
 // import { GenerationHistoryColumn } from "@/components/shared/display/generation-history-column" // Temporarily disabled
@@ -16,7 +21,6 @@ import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { useDefaultEnhancePrompt } from "@/hooks/use-default-enhance-prompt"
-import { useModels } from "@/hooks/use-models"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { useRouter, useSearchParams } from "next/navigation"
 import { consumeImageGenerationIntent } from "@/lib/image/image-generation-intent"
@@ -159,8 +163,6 @@ function showImageGenerationErrorToast(message: string, err: unknown) {
   })
 }
 
-const CHARACTER_SWAP_UI_MODEL_IDENTIFIER = "custom/character-swap"
-const CHARACTER_SWAP_BASE_MODEL_IDENTIFIER = "google/nano-banana-pro"
 const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
   "nano-banana-lite": "google/nano-banana-2-lite",
   "nano-banana": "google/nano-banana-2",
@@ -185,24 +187,6 @@ const FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF = new Set([
   "bytedance/seedream-5-lite",
   "bytedance/seedream-5-pro",
 ])
-const CHARACTER_SWAP_PROMPTS: Record<CharacterSwapMode, string> = {
-  full_character:
-    "Character swap task using two reference images. First image is the reference character. " +
-    "Second image is the reference scene and pose. Place the character from the first image into the scene from the second image. " +
-    "Preserve the character's facial identity, hairstyle, body shape, skin tone, clothing, outfit, and accessories from the first image. " +
-    "Strictly preserve the exact pose, body positioning, limb placement, gesture, and overall stance from the second image. " +
-    "Preserve scene composition, camera angle, environment layout, and lighting mood from the second image. " +
-    "Blend naturally with correct perspective, realistic scale, contact shadows, reflections, and occlusion.",
-  identity_only:
-    "Identity-only face transfer using two reference images. First image is the identity source (face to transfer). " +
-    "Second image is the reference person/scene (clothes, pose, body, and setting to keep). " +
-    "Transfer ONLY the facial identity from the first image onto the person in the second image. " +
-    "From the first image preserve ONLY: face shape, eyes, nose, mouth, bone structure, and facial features; nothing else. " +
-    "From the second image preserve: the exact clothing, outfit, and accessories; body proportions and pose; hairstyle and hair; skin tone; scene composition; camera angle; environment; and lighting. " +
-    "The result must show the person from image two wearing their own clothes in their own pose and setting, but with the face from image one. " +
-    "Adjust the transferred face to match the reference's lighting direction, color temperature, perspective, and scale. Blend seamlessly with no visible seams.",
-}
-
 function ImagePageContent() {
   const layoutModeContext = useLayoutMode()
   const searchParams = useSearchParams()
@@ -225,9 +209,8 @@ function ImagePageContent() {
   const [attachedCommandRefs, setAttachedCommandRefs] = React.useState<AttachedRef[]>([])
   const [referenceImage, setReferenceImage] = React.useState<ImageUpload | null>(null)
   const [referenceImages, setReferenceImages] = React.useState<ImageUpload[]>([])
-  const [characterSwapCharacterImage, setCharacterSwapCharacterImage] = React.useState<ImageUpload | null>(null)
-  const [characterSwapSceneImage, setCharacterSwapSceneImage] = React.useState<ImageUpload | null>(null)
-  const [characterSwapMode, setCharacterSwapMode] = React.useState<CharacterSwapMode>("full_character")
+  const [studioToolSourceImage, setStudioToolSourceImage] = React.useState<ImageUpload | null>(null)
+  const [studioToolSceneImage, setStudioToolSceneImage] = React.useState<ImageUpload | null>(null)
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
   const [savedExamples, setSavedExamples] = React.useState<SavedExample[]>([])
   const [examplesViewerId, setExamplesViewerId] = React.useState<string | null>(null)
@@ -252,35 +235,17 @@ function ImagePageContent() {
   const isGenerating = pendingRequests.length > 0
   const hasInitializedTabRef = React.useRef(false)
 
-  const { models: imageModels, isLoading: modelsLoading } = useModels('image')
-  const effectiveImageModels = React.useMemo(() => {
-    if (imageModels.length === 0) return imageModels
-
-    if (imageModels.some((model) => model.identifier === CHARACTER_SWAP_UI_MODEL_IDENTIFIER)) {
-      return imageModels
-    }
-
-    const baseModel = imageModels.find((model) => model.identifier === CHARACTER_SWAP_BASE_MODEL_IDENTIFIER)
-    if (!baseModel) return imageModels
-
-    return [
-      ...imageModels,
-      {
-        ...baseModel,
-        id: `ui-${CHARACTER_SWAP_UI_MODEL_IDENTIFIER}`,
-        identifier: CHARACTER_SWAP_UI_MODEL_IDENTIFIER,
-        name: "Character Swap",
-        description: "Swap a character into a scene using two references.",
-      },
-    ]
-  }, [imageModels])
+  const { models: effectiveImageModels, isLoading: modelsLoading } = useEffectiveImageModels()
   
   const [selectedModel, setSelectedModel] = React.useState<string>("")
   const [selectedAspectRatio, setSelectedAspectRatio] = React.useState<string>("match_input_image")
   const [selectedNumImages, setSelectedNumImages] = React.useState<number>(1)
   const [selectedModelParameters, setSelectedModelParameters] = React.useState<ModelInputValues>({})
   const prevModelForAspectRef = React.useRef<string | null>(null)
-  const isCharacterSwapModel = selectedModel === CHARACTER_SWAP_UI_MODEL_IDENTIFIER
+  const selectedStudioTool = React.useMemo(
+    () => getStudioToolByUiModel(selectedModel),
+    [selectedModel],
+  )
   const selectedModelObject = React.useMemo(
     () => effectiveImageModels.find((model) => model.identifier === selectedModel) ?? null,
     [effectiveImageModels, selectedModel]
@@ -584,7 +549,7 @@ function ImagePageContent() {
 
   // Handle image generation
   const handleGenerate = async () => {
-    if (!isCharacterSwapModel && hasVideoOrAudioAssetRefs(attachedCommandRefs)) {
+    if (!selectedStudioTool && hasVideoOrAudioAssetRefs(attachedCommandRefs)) {
       toast.error("Video and audio assets can't be used as references for image generation.", {
         description: "Remove those @ chips or use image assets only.",
       })
@@ -594,7 +559,7 @@ function ImagePageContent() {
     const mergedPrompt = buildPromptWithRefs(prompt, brandRefsOnly(attachedCommandRefs))
     const chipImageUrls = getImageAssetUrlsFromRefChips(attachedCommandRefs)
     if (
-      !isCharacterSwapModel &&
+      !selectedStudioTool &&
       !mergedPrompt.trim() &&
       chipImageUrls.length === 0 &&
       referenceImages.length === 0 &&
@@ -604,16 +569,21 @@ function ImagePageContent() {
       return
     }
 
-    if (isCharacterSwapModel) {
-      if (!characterSwapCharacterImage?.file) {
-        reportImageInputError("Please upload a reference character image")
+    let studioToolPayload: ReturnType<typeof buildStudioToolGenerationRequest> | null = null
+    if (selectedStudioTool) {
+      const validationError = validateDualReferenceSwapState(selectedStudioTool, {
+        sourceImage: studioToolSourceImage,
+        sceneImage: studioToolSceneImage,
+      })
+      if (validationError) {
+        reportImageInputError(validationError.message)
         return
       }
 
-      if (!characterSwapSceneImage?.file) {
-        reportImageInputError("Please upload a reference scene image")
-        return
-      }
+      studioToolPayload = buildStudioToolGenerationRequest(selectedStudioTool, {
+        sourceImage: studioToolSourceImage,
+        sceneImage: studioToolSceneImage,
+      })
     }
 
     setError(null)
@@ -639,21 +609,23 @@ function ImagePageContent() {
     }
 
     // Capture form state for append (avoids stale closure when concurrent requests complete out of order)
-    const capturedPrompt = isCharacterSwapModel
-      ? CHARACTER_SWAP_PROMPTS[characterSwapMode]
+    const capturedPrompt = studioToolPayload
+      ? studioToolPayload.prompt
       : mergedPrompt.trim()
     const capturedModel = selectedModel
-    const capturedTool = isCharacterSwapModel ? "character_swap" : "image"
-    const manualRefUrls = isCharacterSwapModel
-      ? ([characterSwapCharacterImage?.url, characterSwapSceneImage?.url].filter(Boolean) as string[])
+    const capturedTool = studioToolPayload ? studioToolPayload.tool : "image"
+    const manualRefUrls = studioToolPayload
+      ? studioToolPayload.referenceImages
+          .map((image) => image.url)
+          .filter((url): url is string => Boolean(url))
       : (referenceImages.length > 0 ? referenceImages : referenceImage ? [referenceImage] : [])
           .map((image) => image.url)
-          .filter(Boolean) as string[]
-    const capturedRefUrls = isCharacterSwapModel
+          .filter((url): url is string => Boolean(url))
+    const capturedRefUrls = studioToolPayload
       ? manualRefUrls
       : [...new Set([...manualRefUrls, ...chipImageUrls])]
-    const capturedAspectRatio = isCharacterSwapModel
-      ? "match_input_image"
+    const capturedAspectRatio = studioToolPayload
+      ? studioToolPayload.aspectRatio
       : resolveAspectRatioForRequest({
           model: selectedModelObject,
           selectedAspectRatio,
@@ -668,7 +640,7 @@ function ImagePageContent() {
       tool: capturedTool,
       aspectRatio: capturedAspectRatio,
       referenceImageUrls: capturedRefUrls,
-      numImages: isCharacterSwapModel ? 1 : Math.max(1, selectedNumImages),
+      numImages: studioToolPayload ? studioToolPayload.numImages : Math.max(1, selectedNumImages),
     }
     const capturedModelParameters = { ...selectedModelParameters }
 
@@ -681,22 +653,22 @@ function ImagePageContent() {
       const formData = new FormData()
       formData.append(
         "prompt",
-        isCharacterSwapModel ? CHARACTER_SWAP_PROMPTS[characterSwapMode] : mergedPrompt.trim()
+        studioToolPayload ? studioToolPayload.prompt : mergedPrompt.trim()
       )
-      formData.append('enhancePrompt', enhancePrompt.toString())
+      formData.append(
+        "enhancePrompt",
+        studioToolPayload
+          ? String(studioToolPayload.enhancePrompt)
+          : enhancePrompt.toString(),
+      )
       
-      // Add model identifier if selected
       if (selectedModel) {
-        const modelForRequest =
-          selectedModel === CHARACTER_SWAP_UI_MODEL_IDENTIFIER
-            ? CHARACTER_SWAP_BASE_MODEL_IDENTIFIER
-            : selectedModel
+        const modelForRequest = studioToolPayload?.model ?? selectedModel
         formData.append('model', modelForRequest)
       }
       
-      // Add aspect ratio if selected
-      if (isCharacterSwapModel) {
-        formData.append('aspect_ratio', 'match_input_image')
+      if (studioToolPayload) {
+        formData.append('aspect_ratio', studioToolPayload.aspectRatio)
       } else if (capturedAspectRatio) {
         formData.append('aspectRatio', capturedAspectRatio)
         formData.append('aspect_ratio', capturedAspectRatio)
@@ -707,17 +679,15 @@ function ImagePageContent() {
         formData.append(key, String(value))
       }
       if (
-        capturedModel &&
-        FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF.has(capturedModel)
+        (studioToolPayload?.model ?? capturedModel) &&
+        FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF.has(studioToolPayload?.model ?? capturedModel)
       ) {
         formData.set("enable_safety_checker", "false")
       }
       
       // Add reference image files if present (supports both single and multiple)
-      const baseRefImages = isCharacterSwapModel
-        ? [characterSwapCharacterImage, characterSwapSceneImage].filter(
-            (img): img is ImageUpload => Boolean(img)
-          )
+      const baseRefImages = studioToolPayload
+        ? studioToolPayload.referenceImages
         : referenceImages.length > 0
           ? referenceImages
           : referenceImage
@@ -733,11 +703,11 @@ function ImagePageContent() {
       appendImageReferencesToFormData(formData, imagesToUpload)
       
       // Add number of images when > 1
-      if (!isCharacterSwapModel && selectedNumImages > 1) {
+      if (!studioToolPayload && selectedNumImages > 1) {
         formData.append('n', String(selectedNumImages))
       }
 
-      const selectedTool = isCharacterSwapModel ? 'character_swap' : 'image'
+      const selectedTool = studioToolPayload ? studioToolPayload.tool : 'image'
       formData.append('tool', selectedTool)
 
       const totalRefImages = imagesToUpload.length
@@ -855,7 +825,7 @@ function ImagePageContent() {
   )
 
   const renderInputBox = React.useCallback((forceRowLayout: boolean) => {
-    if (!isCharacterSwapModel) {
+    if (!selectedStudioTool) {
       return (
         <InfluencerInputBox
           forceRowLayout={forceRowLayout}
@@ -891,11 +861,12 @@ function ImagePageContent() {
     }
 
     return (
-      <CharacterSwapInputBox
-        characterImage={characterSwapCharacterImage}
-        sceneImage={characterSwapSceneImage}
-        onCharacterImageChange={setCharacterSwapCharacterImage}
-        onSceneImageChange={setCharacterSwapSceneImage}
+      <ImageStudioToolInput
+        tool={selectedStudioTool}
+        sourceImage={studioToolSourceImage}
+        sceneImage={studioToolSceneImage}
+        onSourceImageChange={setStudioToolSourceImage}
+        onSceneImageChange={setStudioToolSceneImage}
         onGenerate={handleGenerate}
         isGenerating={isGenerating}
         allowConcurrent={true}
@@ -904,19 +875,13 @@ function ImagePageContent() {
         onModelChange={setSelectedModel}
         models={effectiveImageModels}
         showModelSelector={true}
-        selectedSwapMode={characterSwapMode}
-        onSwapModeChange={setCharacterSwapMode}
       />
     )
   }, [
     activeGenerationSlotCount,
-    characterSwapMode,
-    characterSwapCharacterImage,
-    characterSwapSceneImage,
     effectiveImageModels,
     enhancePrompt,
     handleGenerate,
-    isCharacterSwapModel,
     isGenerating,
     prompt,
     referenceImage,
@@ -925,6 +890,9 @@ function ImagePageContent() {
     selectedModel,
     selectedModelParameters,
     selectedNumImages,
+    selectedStudioTool,
+    studioToolSceneImage,
+    studioToolSourceImage,
   ])
 
   const handleRecreate = React.useCallback((image: { prompt?: string | null; url: string; referenceImageUrls?: string[] }) => {

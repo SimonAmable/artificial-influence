@@ -1380,10 +1380,10 @@ const FAL_SEEDREAM_PRO_IMAGE_PARAMS: ParameterDefinition[] = [
     name: 'size',
     type: 'string',
     label: 'Resolution preset',
-    description: 'Fal auto resolution preset (2K)',
+    description: 'Fal auto resolution preset (1K / 2K)',
     required: false,
     default: '2K',
-    enum: ['2K'],
+    enum: ['1K', '2K'],
     ui_type: 'select',
   },
   {

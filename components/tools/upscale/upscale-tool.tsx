@@ -4,7 +4,6 @@ import * as React from "react"
 import {
   CircleNotch,
   DownloadSimple,
-  SlidersHorizontal,
   Sparkle,
   Trash,
   UploadSimple,
@@ -12,26 +11,16 @@ import {
 import { toast } from "sonner"
 
 import { ImageCompareSlider } from "@/components/shared/display/image-compare-slider"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
+  UpscaleSettingsPopover,
+  buildUpscaleRequestPayload,
+  DEFAULT_UPSCALE_PAGE_SETTINGS,
+  type UpscaleSettings,
+} from "@/components/tools/upscale/upscale-settings-popover"
+import { Button } from "@/components/ui/button"
 import { downloadBlob } from "@/lib/images/strip-metadata"
 import { tryShowContentModerationToast } from "@/lib/content-moderation-toast"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
-import {
-  SEEDVR2_MODEL_IDENTIFIER,
-  UPSCALE_MODEL_IDENTIFIER,
-  isSeedVr2ModelIdentifier,
-  type UpscaleRunParameters,
-} from "@/lib/upscale/constants"
 import { cn } from "@/lib/utils"
 
 const ACCEPTED_IMAGE_TYPES = "image/png,image/jpeg,image/webp"
@@ -45,205 +34,6 @@ type SelectedImage = {
 
 type UpscalePhase = "idle" | "preview" | "processing" | "result"
 
-type UpscaleModelId = typeof UPSCALE_MODEL_IDENTIFIER | typeof SEEDVR2_MODEL_IDENTIFIER
-
-type SeedVrStrength = "mild" | "balanced" | "strong"
-
-type UpscaleSettings = {
-  modelIdentifier: UpscaleModelId
-  enhanceRealism: boolean
-  enhanceDetails: boolean
-  targetMegapixels: number
-  seedVrColorFix: boolean
-  seedVrStrength: SeedVrStrength
-}
-
-const DEFAULT_UPSCALE_SETTINGS: UpscaleSettings = {
-  modelIdentifier: UPSCALE_MODEL_IDENTIFIER,
-  enhanceRealism: true,
-  enhanceDetails: false,
-  targetMegapixels: 4,
-  seedVrColorFix: false,
-  seedVrStrength: "balanced",
-}
-
-const SEEDVR_STRENGTH_TO_CFG: Record<SeedVrStrength, number> = {
-  mild: 0.8,
-  balanced: 1,
-  strong: 1.5,
-}
-
-function buildUpscaleRequestPayload(settings: UpscaleSettings): {
-  modelIdentifier: UpscaleModelId
-  parameters: UpscaleRunParameters
-} {
-  if (isSeedVr2ModelIdentifier(settings.modelIdentifier)) {
-    return {
-      modelIdentifier: SEEDVR2_MODEL_IDENTIFIER,
-      parameters: {
-        model_variant: "3b",
-        sample_steps: 1,
-        cfg_scale: SEEDVR_STRENGTH_TO_CFG[settings.seedVrStrength],
-        apply_color_fix: settings.seedVrColorFix,
-        output_format: "png",
-      },
-    }
-  }
-
-  return {
-    modelIdentifier: UPSCALE_MODEL_IDENTIFIER,
-    parameters: {
-      upscale_mode: "target",
-      target: settings.targetMegapixels,
-      enhance_realism: settings.enhanceRealism,
-      enhance_details: settings.enhanceDetails,
-      output_format: "png",
-    },
-  }
-}
-
-function UpscaleSettingsPopover({
-  settings,
-  onSettingsChange,
-}: {
-  settings: UpscaleSettings
-  onSettingsChange: (next: UpscaleSettings) => void
-}) {
-  const isSeedVr = isSeedVr2ModelIdentifier(settings.modelIdentifier)
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="size-10 shrink-0 rounded-full"
-          aria-label="Upscale settings"
-        >
-          <SlidersHorizontal className="size-4" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="center" className="w-[min(92vw,280px)] space-y-4 p-4">
-        <div className="space-y-2">
-          <Label htmlFor="upscale-model" className="text-xs text-muted-foreground">
-            Model
-          </Label>
-          <Select
-            value={settings.modelIdentifier}
-            onValueChange={(value) =>
-              onSettingsChange({
-                ...settings,
-                modelIdentifier: value as UpscaleModelId,
-              })
-            }
-          >
-            <SelectTrigger id="upscale-model" className="h-9 w-full text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UPSCALE_MODEL_IDENTIFIER}>P-Image Upscale</SelectItem>
-              <SelectItem value={SEEDVR2_MODEL_IDENTIFIER}>SeedVR2</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {isSeedVr ? (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="seedvr-strength" className="text-xs text-muted-foreground">
-                Restoration strength
-              </Label>
-              <Select
-                value={settings.seedVrStrength}
-                onValueChange={(value) =>
-                  onSettingsChange({
-                    ...settings,
-                    seedVrStrength: value as SeedVrStrength,
-                  })
-                }
-              >
-                <SelectTrigger id="seedvr-strength" className="h-9 w-full text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mild">Mild</SelectItem>
-                  <SelectItem value="balanced">Balanced</SelectItem>
-                  <SelectItem value="strong">Strong</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="seedvr-color-fix" className="text-xs leading-snug">
-                Preserve original colors
-              </Label>
-              <Switch
-                id="seedvr-color-fix"
-                checked={settings.seedVrColorFix}
-                onCheckedChange={(checked) =>
-                  onSettingsChange({ ...settings, seedVrColorFix: checked })
-                }
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="upscale-target" className="text-xs text-muted-foreground">
-                Target resolution
-              </Label>
-              <Select
-                value={String(settings.targetMegapixels)}
-                onValueChange={(value) =>
-                  onSettingsChange({
-                    ...settings,
-                    targetMegapixels: Number(value),
-                  })
-                }
-              >
-                <SelectTrigger id="upscale-target" className="h-9 w-full text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[2, 4, 6, 8].map((value) => (
-                    <SelectItem key={value} value={String(value)}>
-                      {value} MP
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="enhance-realism" className="text-xs leading-snug">
-                Enhance realism
-              </Label>
-              <Switch
-                id="enhance-realism"
-                checked={settings.enhanceRealism}
-                onCheckedChange={(checked) =>
-                  onSettingsChange({ ...settings, enhanceRealism: checked })
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="enhance-details" className="text-xs leading-snug">
-                Creative detail boost
-              </Label>
-              <Switch
-                id="enhance-details"
-                checked={settings.enhanceDetails}
-                onCheckedChange={(checked) =>
-                  onSettingsChange({ ...settings, enhanceDetails: checked })
-                }
-              />
-            </div>
-          </>
-        )}
-      </PopoverContent>
-    </Popover>
-  )
-}
-
 function getUpscaledFileName(originalName: string) {
   const base = originalName.replace(/\.[^.]+$/, "") || "image"
   return `upscaled-${base}.png`
@@ -255,7 +45,7 @@ export function UpscaleTool() {
   const [upscaledUrl, setUpscaledUrl] = React.useState<string | null>(null)
   const [isDragging, setIsDragging] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState(false)
-  const [settings, setSettings] = React.useState<UpscaleSettings>(DEFAULT_UPSCALE_SETTINGS)
+  const [settings, setSettings] = React.useState<UpscaleSettings>(DEFAULT_UPSCALE_PAGE_SETTINGS)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const dragCounterRef = React.useRef(0)
 

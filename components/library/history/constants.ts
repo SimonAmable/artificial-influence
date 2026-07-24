@@ -16,6 +16,7 @@ export const HISTORY_TOOLS = [
   { value: "video", label: "Video Studio" },
   { value: "lipsync", label: "Lip Sync" },
   { value: "character_swap", label: "Character Swap" },
+  { value: "face_swap", label: "Face Swap" },
   { value: "motion_copy", label: "Motion Copy" },
   { value: "ai_influencer", label: "AI Influencer" },
   { value: "remove-background", label: "Background Remover" },

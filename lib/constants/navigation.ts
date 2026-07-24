@@ -35,6 +35,7 @@ export type MegaNavPhosphorIcon =
   | "chat-circle-dots"
   | "robot"
   | "user"
+  | "smiley"
   | "paper-plane-tilt"
   | "shield-check"
   | "magnifying-glass"
@@ -89,6 +90,7 @@ export type DashboardToolIcon =
   | "chat-circle-dots"
   | "robot"
   | "user"
+  | "smiley"
   | "shield-check"
 
 export interface DashboardToolNavItem {
@@ -114,7 +116,9 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/motion-copy", label: "Motion Copy" },
   { path: "/lipsync", label: "Lipsync" },
   { path: "/inpaint", label: "Image Editing" },
-  { path: "/character-swap", label: "Character Swap" },
+  { path: "/image?model=custom/character-swap", label: "Character Swap" },
+  { path: "/carousel-shots", label: "Carousel Shots" },
+  { path: "/image?model=custom/face-swap", label: "Face Swap" },
   { path: "/ai-influencer", label: "AI Influencer" },
   { path: "/canvases", label: "Canvas" },
   { path: "/editor", label: "Editor" },
@@ -226,11 +230,25 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             iconPhosphor: "image",
           },
           {
-            path: "/character-swap",
+            path: "/image?model=custom/character-swap",
             label: "Character Swap",
             description: "Create realistic character swaps",
             badge: "new",
             iconSrc: "/users-icon.svg",
+          },
+          {
+            path: "/carousel-shots",
+            label: "Carousel Shots",
+            description: "Generate multi-shot carousels from one reference",
+            badge: "new",
+            iconPhosphor: "images",
+          },
+          {
+            path: "/image?model=custom/face-swap",
+            label: "Face Swap",
+            description: "Transfer facial identity onto a target scene",
+            badge: "new",
+            iconPhosphor: "smiley",
           },
           {
             path: "/ai-influencer",
@@ -746,9 +764,21 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
   },
   {
     label: "Character Swap",
-    href: "/character-swap",
+    href: "/image?model=custom/character-swap",
     icon: "arrows-left-right",
     hint: "Swap a subject while keeping the scene.",
+  },
+  {
+    label: "Carousel Shots",
+    href: "/carousel-shots",
+    icon: "images",
+    hint: "Generate consistent carousel panels from one reference image.",
+  },
+  {
+    label: "Face Swap",
+    href: "/image?model=custom/face-swap",
+    icon: "smiley",
+    hint: "Transfer facial identity onto a target person or scene.",
   },
   {
     label: "AI Influencer",
