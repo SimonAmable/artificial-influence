@@ -123,21 +123,10 @@ export function CanvasesPage() {
 
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50 rounded-[24px]">
-                      <svg
-                        className="w-12 h-12 text-muted-foreground/30"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z"
-                        />
-                      </svg>
-                    </div>
+                    <div
+                      className="w-full h-full overflow-hidden rounded-[24px] bg-muted/40 bg-[radial-gradient(circle,color-mix(in_oklch,var(--foreground)_18%,transparent)_1px,transparent_1.5px)] bg-size-[16px_16px] bg-position-center"
+                      aria-hidden
+                    />
                   )}
 
                   {/* Delete button (appears on hover) */}
