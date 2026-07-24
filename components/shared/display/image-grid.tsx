@@ -814,7 +814,7 @@ export function ImageGrid({
                     type="button"
                     variant="secondary"
                     size="icon"
-                    className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+                    className="h-7 w-7 rounded-full border border-primary/40 bg-primary/70 text-black shadow-sm shadow-primary/25 hover:bg-primary/85"
                     onClick={(event) => {
                       event.stopPropagation()
                       runShotVariationsAction(item.data)

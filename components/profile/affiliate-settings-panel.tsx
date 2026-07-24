@@ -54,15 +54,15 @@ export function AffiliateSettingsPanel({
           isModal && "bg-muted/30"
         )}
       >
-        <div className="mb-3 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <div className="mb-3 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary shadow-s">
           <HandCoins className="size-5" weight="regular" />
         </div>
         <h3 className="text-lg font-semibold tracking-tight text-foreground">
-          Earn 20% for 12 months
+          Earn 20% on every referral
         </h3>
         <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted-foreground">
-          Share your link. Get paid on every qualifying subscription you refer—no cap on
-          how many creators you bring in.
+          Share your link. Get paid on every qualifying subscription for 12 months, with
+          no cap on how many creators you bring in.
         </p>
         <Button asChild className={cn("mt-5", isModal && "rounded-full")}>
           <Link href="/affiliate" onClick={() => onCloseModal?.()}>

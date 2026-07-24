@@ -61,9 +61,21 @@ export function CarouselShotsTool() {
     focusedGenerationId ? "history" : "example",
   )
   const [historyRefreshKey, setHistoryRefreshKey] = React.useState(0)
-  const [regeneratingId, setRegeneratingId] = React.useState<string | null>(null)
+  const [historyScrollNonce, setHistoryScrollNonce] = React.useState(0)
   const [isDraggingFile, setIsDraggingFile] = React.useState(false)
   const dragCounterRef = React.useRef(0)
+  const historyPanelAnchorRef = React.useRef<HTMLDivElement>(null)
+
+  const scrollHistoryIntoView = React.useCallback(() => {
+    window.requestAnimationFrame(() => {
+      historyPanelAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+  }, [])
+
+  const bumpHistoryScroll = React.useCallback(() => {
+    setHistoryScrollNonce((current) => current + 1)
+    scrollHistoryIntoView()
+  }, [scrollHistoryIntoView])
 
   const applyReferenceFile = React.useCallback((file?: File | null) => {
     if (!file) return
@@ -231,6 +243,7 @@ export function CarouselShotsTool() {
 
     setPendingJobs((current) => [jobSnapshot, ...current])
     setRightView("history")
+    bumpHistoryScroll()
 
     try {
       let referenceFile = formSnapshot.file
@@ -284,6 +297,7 @@ export function CarouselShotsTool() {
         ])
       }
       setHistoryRefreshKey((current) => current + 1)
+      setHistoryScrollNonce((current) => current + 1)
       toast.success("Carousel shots ready")
     } catch (err) {
       const message = err instanceof Error ? err.message : "Generation failed"
@@ -303,65 +317,7 @@ export function CarouselShotsTool() {
     } finally {
       setPendingJobs((current) => current.filter((job) => job.id !== jobId))
     }
-  }, [form, handleGenerationFailure])
-
-  const runRegenerate = React.useCallback(
-    async (generationId: string) => {
-      setRegeneratingId(generationId)
-      setRightView("history")
-
-      try {
-        const response = await fetch(`/api/carousel-shots/${generationId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "regenerate" }),
-        })
-        const data = await response.json().catch(() => ({}))
-        if (!response.ok) {
-          const message =
-            typeof data.message === "string"
-              ? data.message
-              : typeof data.error === "string"
-                ? data.error
-                : "Regeneration failed"
-          handleGenerationFailure(response.status, message)
-          return
-        }
-        if (!isCarouselShotsMetadata(data.metadata)) {
-          throw new Error("Invalid carousel shots response")
-        }
-
-        const nextGenerationId =
-          typeof data.generationId === "string" ? data.generationId : generationId
-        setPendingResults((current) => [
-          { generationId: nextGenerationId, metadata: data.metadata },
-          ...current.filter((entry) => entry.generationId !== nextGenerationId),
-        ])
-        setHistoryRefreshKey((current) => current + 1)
-        toast.success("Carousel shots regenerated")
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Regeneration failed"
-        if (isInsufficientCreditsError(err) || isInsufficientCreditsMessage(message)) {
-          showCreditsUpsellToast({
-            message,
-            description: "Upgrade your plan to continue generating",
-            toastId: "carousel-shots-credits-upsell",
-          })
-        } else if (
-          !tryShowContentModerationToast(message, err, {
-            toastId: "carousel-shots-moderation-error",
-          })
-        ) {
-          toast.error(
-            toUserFacingGenerationError(message, "Regeneration failed. Please try again."),
-          )
-        }
-      } finally {
-        setRegeneratingId(null)
-      }
-    },
-    [handleGenerationFailure],
-  )
+  }, [bumpHistoryScroll, form, handleGenerationFailure])
 
   const handleShotsChange = React.useCallback(
     (generationId: string, shots: CarouselShotsMetadata["shots"]) => {
@@ -415,16 +371,18 @@ export function CarouselShotsTool() {
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain lg:grid lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:items-stretch lg:overflow-hidden">
-        <div className="relative order-1 flex min-h-[70dvh] min-w-0 flex-1 flex-col lg:order-2 lg:min-h-0 lg:overflow-hidden">
+        <div
+          ref={historyPanelAnchorRef}
+          className="relative order-1 flex min-h-[70dvh] min-w-0 flex-1 flex-col lg:order-2 lg:min-h-0 lg:overflow-hidden"
+        >
           <CarouselShotsRightPanel
             view={rightView}
             onViewChange={setRightView}
             historyRefreshKey={historyRefreshKey}
+            historyScrollNonce={historyScrollNonce}
             pendingJobs={pendingJobs}
             pendingResults={pendingResults}
-            regeneratingId={regeneratingId}
             focusedGenerationId={focusedGenerationId}
-            onRegenerate={runRegenerate}
             onShotsChange={handleShotsChange}
           />
         </div>

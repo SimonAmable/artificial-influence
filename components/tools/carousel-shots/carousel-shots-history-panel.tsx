@@ -16,25 +16,42 @@ import type { UpscaleSettings } from "@/components/tools/upscale/upscale-setting
 import type { CarouselShotsMetadata } from "@/lib/carousel-shots/types"
 import { cn } from "@/lib/utils"
 
+function scrollChildIntoView(
+  root: HTMLElement,
+  child: HTMLElement,
+  block: "start" | "center" = "start",
+) {
+  const rootRect = root.getBoundingClientRect()
+  const childRect = child.getBoundingClientRect()
+
+  if (block === "center") {
+    const top =
+      childRect.top - rootRect.top + root.scrollTop - (rootRect.height - childRect.height) / 2
+    root.scrollTo({ top: Math.max(0, top), behavior: "smooth" })
+    return
+  }
+
+  const top = childRect.top - rootRect.top + root.scrollTop - 8
+  root.scrollTo({ top: Math.max(0, top), behavior: "smooth" })
+}
+
 type CarouselShotsHistoryPanelProps = {
   historyRefreshKey: number
+  historyScrollNonce?: number
   pendingJobs: CarouselShotsPendingJob[]
   pendingResults: CarouselShotsPendingResult[]
-  regeneratingId: string | null
   focusedGenerationId?: string | null
   upscaleSettings: UpscaleSettings
-  onRegenerate: (generationId: string) => Promise<void>
   onShotsChange: (generationId: string, shots: CarouselShotsMetadata["shots"]) => void
 }
 
 export function CarouselShotsHistoryPanel({
   historyRefreshKey,
+  historyScrollNonce = 0,
   pendingJobs,
   pendingResults,
-  regeneratingId,
   focusedGenerationId = null,
   upscaleSettings,
-  onRegenerate,
   onShotsChange,
 }: CarouselShotsHistoryPanelProps) {
   const { error, hasMore, isLoading, isLoadingMore, items, loadMore, updateItemShots } =
@@ -87,14 +104,43 @@ export function CarouselShotsHistoryPanel({
     if (!focusedGenerationId || isLoading) return
 
     const frame = window.requestAnimationFrame(() => {
-      const element = document.querySelector(
+      const root = scrollRootRef.current
+      if (!root) return
+
+      const element = root.querySelector<HTMLElement>(
         `[data-carousel-generation-id="${focusedGenerationId}"]`,
       )
-      element?.scrollIntoView({ behavior: "smooth", block: "center" })
+      if (element) {
+        scrollChildIntoView(root, element, "center")
+      }
     })
 
     return () => window.cancelAnimationFrame(frame)
   }, [displayItems, focusedGenerationId, isLoading])
+
+  React.useEffect(() => {
+    if (!historyScrollNonce) return
+
+    const frame = window.requestAnimationFrame(() => {
+      const root = scrollRootRef.current
+      if (!root) return
+
+      const pendingElement = root.querySelector<HTMLElement>("[data-carousel-pending-job]")
+      const newestGenerationElement = root.querySelector<HTMLElement>(
+        "[data-carousel-generation-id]",
+      )
+      const target = pendingElement ?? newestGenerationElement
+
+      if (target) {
+        scrollChildIntoView(root, target, "start")
+        return
+      }
+
+      root.scrollTo({ top: 0, behavior: "smooth" })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [displayItems, historyScrollNonce, pendingJobs])
 
   React.useEffect(() => {
     const root = scrollRootRef.current
@@ -145,7 +191,12 @@ export function CarouselShotsHistoryPanel({
       className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1"
     >
       {pendingJobs.map((job) => (
-        <div key={job.id} className="rounded-2xl border bg-card p-4">
+        <div
+          key={job.id}
+          data-carousel-pending-job
+          data-carousel-pending-job-id={job.id}
+          className="rounded-2xl border bg-card p-4"
+        >
           <CarouselShotsGenerationCard
             generationId={null}
             metadata={{
@@ -181,9 +232,7 @@ export function CarouselShotsHistoryPanel({
             generationId={item.id}
             metadata={item.metadata}
             layout="card"
-            regenerating={regeneratingId === item.id}
             upscaleSettings={upscaleSettings}
-            onRegenerate={() => void onRegenerate(item.id)}
             onShotsChange={(shots) => handleShotsChange(item.id, shots)}
           />
         </div>

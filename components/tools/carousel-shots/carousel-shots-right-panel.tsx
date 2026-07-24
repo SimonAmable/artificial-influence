@@ -43,24 +43,22 @@ function loadUpscaleSettings(): UpscaleSettings {
 
 type CarouselShotsRightPanelProps = {
   historyRefreshKey: number
+  historyScrollNonce?: number
   pendingJobs: CarouselShotsPendingJob[]
   pendingResults: CarouselShotsPendingResult[]
-  regeneratingId: string | null
   focusedGenerationId?: string | null
   view: CarouselShotsRightView
-  onRegenerate: (generationId: string) => Promise<void>
   onShotsChange: (generationId: string, shots: CarouselShotsMetadata["shots"]) => void
   onViewChange: (view: CarouselShotsRightView) => void
 }
 
 export function CarouselShotsRightPanel({
   historyRefreshKey,
+  historyScrollNonce = 0,
   pendingJobs,
   pendingResults,
-  regeneratingId,
   focusedGenerationId = null,
   view,
-  onRegenerate,
   onShotsChange,
   onViewChange,
 }: CarouselShotsRightPanelProps) {
@@ -104,12 +102,11 @@ export function CarouselShotsRightPanel({
       ) : (
         <CarouselShotsHistoryPanel
           historyRefreshKey={historyRefreshKey}
+          historyScrollNonce={historyScrollNonce}
           pendingJobs={pendingJobs}
           pendingResults={pendingResults}
-          regeneratingId={regeneratingId}
           focusedGenerationId={focusedGenerationId}
           upscaleSettings={upscaleSettings}
-          onRegenerate={onRegenerate}
           onShotsChange={onShotsChange}
         />
       )}

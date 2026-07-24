@@ -1,9 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { CircleNotch } from "@phosphor-icons/react"
+import { useReducedMotion } from "framer-motion"
 
 import { Button } from "@/components/ui/button"
+import { AuroraShaderBackground } from "@/components/ui/aurora-shader-background"
 import { CarouselShotsShotCard } from "@/components/tools/carousel-shots/carousel-shots-shot-card"
 import { CarouselShotsLightbox } from "@/components/tools/carousel-shots/carousel-shots-lightbox"
 import { UpscaleCreditCost } from "@/components/tools/carousel-shots/upscale-credit-cost"
@@ -14,12 +15,6 @@ import { getCarouselReferencePublicUrl } from "@/lib/carousel-shots/constants"
 import type { CarouselShotsMetadata, CarouselShotRecord } from "@/lib/carousel-shots/types"
 import { DEFAULT_UPSCALE_CREDITS_COST } from "@/lib/upscale/constants"
 import { cn } from "@/lib/utils"
-
-function aspectRatioClass(aspectRatio: string) {
-  if (aspectRatio === "3:4") return "aspect-[3/4]"
-  if (aspectRatio === "4:5") return "aspect-[4/5]"
-  return "aspect-[9/16]"
-}
 
 function formatCreatedAt(value: string) {
   const date = new Date(value)
@@ -38,9 +33,7 @@ type CarouselShotsGenerationCardProps = {
   isGenerating?: boolean
   layout?: "card" | "viewport"
   metadata: CarouselShotsMetadata | null
-  onRegenerate?: () => void
   onShotsChange: (shots: CarouselShotRecord[]) => void
-  regenerating?: boolean
   upscaleSettings: UpscaleSettings
 }
 
@@ -50,20 +43,21 @@ export function CarouselShotsGenerationCard({
   isGenerating = false,
   layout = "viewport",
   metadata,
-  onRegenerate,
   onShotsChange,
-  regenerating = false,
   upscaleSettings,
 }: CarouselShotsGenerationCardProps) {
   const [selectMode, setSelectMode] = React.useState(false)
   const [selectedShotIds, setSelectedShotIds] = React.useState<Set<string>>(new Set())
   const [activeIndex, setActiveIndex] = React.useState<number | null>(null)
+  const prefersReducedMotion = useReducedMotion()
   const { models: upscaleModels } = useModels("upscale")
 
   const shots = metadata?.shots ?? []
   const gridSize = metadata?.gridSize ?? 4
   const gridCols = gridSize === 9 ? "grid-cols-3 lg:grid-cols-3" : "grid-cols-2 lg:grid-cols-2"
   const isCardLayout = layout === "card"
+  const animateShader = !prefersReducedMotion
+  const fastShader = !prefersReducedMotion
   const referenceUrl = metadata?.referenceImageStoragePaths[0]
     ? getCarouselReferencePublicUrl(metadata.referenceImageStoragePaths[0])
     : null
@@ -158,33 +152,6 @@ export function CarouselShotsGenerationCard({
               : "border-muted-foreground/55 bg-transparent hover:border-foreground/70",
           )}
         />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={shots.length === 0 || isGenerating}
-          onClick={() => void actions.downloadShots(shots)}
-        >
-          {shots.length > 3 ? "Download ZIP" : "Download all"}
-        </Button>
-        {onRegenerate ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={!metadata || regenerating}
-            onClick={onRegenerate}
-          >
-            {regenerating ? (
-              <>
-                <CircleNotch className="mr-2 size-4 animate-spin" />
-                Regenerating…
-              </>
-            ) : (
-              "Regenerate"
-            )}
-          </Button>
-        ) : null}
       </div>
 
       {metadata ? (
@@ -194,42 +161,9 @@ export function CarouselShotsGenerationCard({
         </p>
       ) : null}
 
-      <div className="relative min-h-0">
-        <div
-          className={cn(
-            "grid w-full min-h-0 gap-2 sm:gap-3",
-            gridCols,
-            gridSize === 9 ? "grid-rows-3" : "grid-rows-2",
-            "h-[min(560px,calc(100dvh-220px))] max-h-[70dvh]",
-            selectMode && "pb-16",
-          )}
-        >
-          {isGenerating
-            ? Array.from({ length: gridSize }).map((_, index) => (
-                <div
-                  key={`skeleton-${index}`}
-                  className="h-full min-h-0 animate-pulse rounded-xl border bg-muted/30"
-                />
-              ))
-            : shots.map((shot, index) => (
-                <CarouselShotsShotCard
-                  key={shot.id}
-                  shot={shot}
-                  selectMode={selectMode}
-                  isSelected={selectedShotIds.has(shot.id)}
-                  isUpscaling={actions.isUpscalingShot(shot.id)}
-                  upscaleCreditCost={upscaleCreditCost}
-                  onSelectChange={(selected) => toggleSelected(shot.id, selected)}
-                  onOpen={() => setActiveIndex(index)}
-                  onDownload={() => void actions.downloadShot(shot)}
-                  onUpscale={() => void actions.upscaleOne(shot)}
-                  onUpscaleAndDownload={() => void actions.upscaleAndDownloadShot(shot)}
-                />
-              ))}
-        </div>
-
+      <div className="relative min-h-0 h-[min(560px,calc(100dvh-220px))] max-h-[70dvh]">
         {selectMode ? (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center px-2 pb-2">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center px-2 pt-2">
             <div
               className={cn(
                 "pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-2 rounded-2xl border border-border/80",
@@ -274,11 +208,48 @@ export function CarouselShotsGenerationCard({
             </div>
           </div>
         ) : null}
+
+        <div
+          className={cn(
+            "grid h-full w-full min-h-0 gap-2 transition-transform duration-200 sm:gap-3",
+            gridCols,
+            gridSize === 9 ? "grid-rows-3" : "grid-rows-2",
+            selectMode && "origin-top scale-[0.94] translate-y-12",
+          )}
+        >
+          {isGenerating
+            ? Array.from({ length: gridSize }).map((_, index) => (
+                <div
+                  key={`skeleton-${index}`}
+                  className="relative h-full min-h-0 overflow-hidden rounded-xl border bg-muted/30"
+                >
+                  <AuroraShaderBackground
+                    className="rounded-[inherit]"
+                    animate={animateShader}
+                    fast={fastShader}
+                  />
+                </div>
+              ))
+            : shots.map((shot, index) => (
+                <CarouselShotsShotCard
+                  key={shot.id}
+                  shot={shot}
+                  selectMode={selectMode}
+                  isSelected={selectedShotIds.has(shot.id)}
+                  isUpscaling={actions.isUpscalingShot(shot.id)}
+                  upscaleCreditCost={upscaleCreditCost}
+                  onSelectChange={(selected) => toggleSelected(shot.id, selected)}
+                  onOpen={() => setActiveIndex(index)}
+                  onDownload={() => void actions.downloadShot(shot)}
+                  onUpscale={() => void actions.upscaleOne(shot)}
+                  onUpscaleAndDownload={() => void actions.upscaleAndDownloadShot(shot)}
+                />
+              ))}
+        </div>
       </div>
 
       <CarouselShotsLightbox
         activeIndex={activeIndex}
-        aspectRatioClass={aspectRatioClass(metadata?.aspectRatio ?? "3:4")}
         shots={shots}
         isUpscaling={activeIndex != null && actions.isUpscalingShot(shots[activeIndex]?.id ?? "")}
         upscaleCreditCost={upscaleCreditCost}
