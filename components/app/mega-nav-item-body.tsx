@@ -71,7 +71,7 @@ export function MegaNavItemBody({ item }: { item: MegaNavItem }) {
       <div className="relative">
         <div
           className={cn(
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-muted text-[10px] font-bold text-foreground shadow-sm",
+            "flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/80 bg-muted text-[10px] font-bold text-foreground shadow-sm",
             classes?.ring
           )}
         >
@@ -81,10 +81,10 @@ export function MegaNavItemBody({ item }: { item: MegaNavItem }) {
             <Image
               src={item.iconSrc}
               alt={`${item.label} icon`}
-              width={18}
-              height={18}
+              width={36}
+              height={36}
               className={cn(
-                "h-[18px] w-[18px] object-contain",
+                "h-full w-full object-cover",
                 isAiMonochromeIconPath(item.iconSrc) && "brightness-0 dark:invert",
                 item.path === "/brand" && "invert"
               )}

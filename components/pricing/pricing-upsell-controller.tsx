@@ -2,13 +2,20 @@
 
 import * as React from "react"
 import { PricingPlansDialog } from "@/components/pricing/pricing-plans-dialog"
-import { OPEN_PRICING_PLANS_EVENT } from "@/lib/pricing-upsell"
+import {
+  OPEN_PRICING_PLANS_EVENT,
+  type OpenPricingPlansModalDetail,
+  type PricingPlansModalTab,
+} from "@/lib/pricing-upsell"
 
 export function PricingUpsellController() {
   const [open, setOpen] = React.useState(false)
+  const [initialTab, setInitialTab] = React.useState<PricingPlansModalTab | undefined>()
 
   React.useEffect(() => {
-    const handleOpen = () => {
+    const handleOpen = (event: Event) => {
+      const detail = (event as CustomEvent<OpenPricingPlansModalDetail>).detail
+      setInitialTab(detail?.tab)
       setOpen(true)
     }
 
@@ -18,5 +25,11 @@ export function PricingUpsellController() {
     }
   }, [])
 
-  return <PricingPlansDialog open={open} onOpenChange={setOpen} />
+  return (
+    <PricingPlansDialog
+      open={open}
+      onOpenChange={setOpen}
+      initialTab={initialTab}
+    />
+  )
 }

@@ -5,16 +5,12 @@ import {
   type MegaNavItem,
   type MegaNavPhosphorIcon,
 } from "@/lib/constants/navigation"
+import {
+  SETTINGS_TABS,
+  type SettingsTab,
+} from "@/lib/profile/settings-tabs"
 
-/** Mirrors profile settings modal tabs — kept here to avoid lib → client imports. */
-export type PageSearchSettingsTab =
-  | "profile"
-  | "notifications"
-  | "accounts"
-  | "credits"
-  | "affiliate"
-  | "feedback"
-  | "pets"
+export type PageSearchSettingsTab = SettingsTab
 
 export interface PageSearchItem {
   id: string
@@ -30,62 +26,6 @@ export interface PageSearchItem {
   settingsTab?: PageSearchSettingsTab
   searchText: string
 }
-
-const SETTINGS_SEARCH_ITEMS: Array<{
-  tab: PageSearchSettingsTab
-  label: string
-  description: string
-  iconPhosphor?: MegaNavPhosphorIcon
-  searchKeywords: string[]
-}> = [
-  {
-    tab: "profile",
-    label: "Profile",
-    description: "Account profile, display name, and preferences",
-    iconPhosphor: "user",
-    searchKeywords: ["settings", "account", "name", "email", "preferences"],
-  },
-  {
-    tab: "accounts",
-    label: "Accounts",
-    description: "Connected social and publishing accounts",
-    iconPhosphor: "user-focus",
-    searchKeywords: ["settings", "connected", "social", "fanvue", "link"],
-  },
-  {
-    tab: "notifications",
-    label: "Notifications",
-    description: "Notification preferences and alerts",
-    searchKeywords: ["settings", "alerts", "bell", "unread"],
-  },
-  {
-    tab: "credits",
-    label: "Credits",
-    description: "Balance, plans, and buy more credits",
-    iconPhosphor: "currency-dollar",
-    searchKeywords: ["settings", "billing", "plan", "subscription", "buy", "top up"],
-  },
-  {
-    tab: "affiliate",
-    label: "Affiliate",
-    description: "Affiliate program and referral links",
-    iconPhosphor: "currency-dollar",
-    searchKeywords: ["settings", "referral", "partner", "commission"],
-  },
-  {
-    tab: "feedback",
-    label: "Feedback",
-    description: "Send product feedback and requests",
-    iconPhosphor: "chat-circle-dots",
-    searchKeywords: ["settings", "support", "request", "report"],
-  },
-  {
-    tab: "pets",
-    label: "Pets",
-    description: "Companion pets and hatch collection",
-    searchKeywords: ["settings", "hatch", "companion", "pet", "bloop"],
-  },
-]
 
 function isAppPath(path: string) {
   return path === "/apps" || path.startsWith("/apps/")
@@ -176,21 +116,20 @@ function getSearchRank(item: PageSearchItem, query: string) {
 }
 
 function getSettingsSearchItems(): PageSearchItem[] {
-  return SETTINGS_SEARCH_ITEMS.map((item) => ({
-    id: `settings:${item.tab}`,
+  return SETTINGS_TABS.map((item) => ({
+    id: `settings:${item.id}`,
     label: item.label,
     description: item.description,
-    path: `settings:${item.tab}`,
+    path: `settings:${item.id}`,
     group: "Settings",
-    iconText: item.iconPhosphor ? undefined : "/",
-    iconPhosphor: item.iconPhosphor,
-    settingsTab: item.tab,
+    iconSrc: item.iconSrc,
+    settingsTab: item.id,
     searchText: buildSearchText([
       item.label,
       item.description,
       "settings",
       "profile",
-      item.tab,
+      item.id,
       item.searchKeywords,
     ]),
   }))
@@ -226,7 +165,12 @@ export function getCorePageSearchItems(options?: {
               path: group.path,
               group: group.label,
               badge: group.badge,
-              iconText: "/",
+              iconSrc: group.iconSrc,
+              iconPhosphor: group.iconPhosphor,
+              iconText:
+                group.iconSrc || group.iconPhosphor
+                  ? undefined
+                  : "/",
               searchText: buildSearchText([group.label], group.path),
             },
       )

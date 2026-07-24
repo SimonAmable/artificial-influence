@@ -110,6 +110,9 @@ import { Collapsible as CollapsiblePrimitive, Dialog as DialogPrimitive } from "
 import { AutomationRunPreviewModal } from "@/components/automations/automation-run-preview-modal"
 import { Shimmer } from "@/components/ai-elements/shimmer"
 import { MessageParts } from "@/components/chat/message-parts"
+import { FeatureLanding } from "@/components/feature-landing/feature-landing"
+import { AutomationLogoConnection } from "@/components/landing/automation-logo-connection"
+import { automationsLanding } from "@/lib/constants/feature-landings/automations"
 import type { UIMessage } from "ai"
 
 type AutomationApi = {
@@ -360,91 +363,132 @@ function attachedRefFromAssetPick(pick: AssetSelectionPick): AttachedRef {
   }
 }
 
+type CardMediaResult = { type: "image" | "video" | "audio" | null; url: string | null }
+
+const cardMediaCache = new Map<string, CardMediaResult>()
+const cardMediaInflight = new Map<string, Promise<CardMediaResult>>()
+
+function extractMediaFromMessages(messages: unknown): CardMediaResult {
+  if (!Array.isArray(messages)) return { type: null, url: null }
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i] as { role?: string; parts?: unknown[] }
+    if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue
+
+    for (const part of msg.parts) {
+      const partObj = part as Record<string, unknown>
+      const output = partObj.output as Record<string, unknown> | undefined
+      if (!output || output.status !== "completed") continue
+
+      if (partObj.type === "tool-generateImage" || partObj.type === "tool-generateImageWithNanoBanana") {
+        if (Array.isArray(output.images) && output.images.length > 0) {
+          const firstImg = output.images[0]
+          const mediaUrl =
+            typeof firstImg === "string"
+              ? firstImg
+              : ((firstImg as Record<string, unknown>)?.url as string | undefined)
+          if (mediaUrl) return { type: "image", url: mediaUrl }
+        }
+      } else if (partObj.type === "tool-generateVideo") {
+        const videoUrl = (output.video as Record<string, unknown> | undefined)?.url
+        if (typeof videoUrl === "string") return { type: "video", url: videoUrl }
+      } else if (partObj.type === "tool-generateAudio") {
+        const audioUrl = (output.audio as Record<string, unknown> | undefined)?.url
+        if (typeof audioUrl === "string") return { type: "audio", url: audioUrl }
+      }
+    }
+  }
+
+  return { type: null, url: null }
+}
+
+async function loadCardMedia(cacheKey: string, url: string): Promise<CardMediaResult> {
+  const cached = cardMediaCache.get(cacheKey)
+  if (cached) return cached
+
+  const inflight = cardMediaInflight.get(cacheKey)
+  if (inflight) return inflight
+
+  const request = fetch(url)
+    .then(async (res) => {
+      if (!res.ok) throw new Error("preview fetch failed")
+      const data = (await res.json()) as { messages?: unknown; thread?: { messages?: unknown } }
+      const result = extractMediaFromMessages(data.messages ?? data.thread?.messages)
+      cardMediaCache.set(cacheKey, result)
+      return result
+    })
+    .catch(() => {
+      const empty: CardMediaResult = { type: null, url: null }
+      cardMediaCache.set(cacheKey, empty)
+      return empty
+    })
+    .finally(() => {
+      cardMediaInflight.delete(cacheKey)
+    })
+
+  cardMediaInflight.set(cacheKey, request)
+  return request
+}
+
 function AutomationCardMedia({
   threadId,
   automationId = null,
   isCommunity = false,
+  hasPreview = false,
 }: {
   threadId: string | null
   automationId?: string | null
   isCommunity?: boolean
+  hasPreview?: boolean
 }) {
-  const [media, setMedia] = React.useState<{ type: "image" | "video" | "audio" | null; url: string | null }>({ type: null, url: null })
-  const [loading, setLoading] = React.useState(false)
+  const requestUrl = React.useMemo(() => {
+    // Prefer stored preview snapshot over full chat thread fetches (avoids N thread GETs on list load).
+    if (hasPreview && automationId) {
+      return { cacheKey: `preview:${automationId}`, url: `/api/automations/${automationId}/preview` }
+    }
+    if (isCommunity && automationId) {
+      return { cacheKey: `preview:${automationId}`, url: `/api/automations/${automationId}/preview` }
+    }
+    if (threadId) {
+      return { cacheKey: `thread:${threadId}`, url: `/api/chat/threads/${threadId}` }
+    }
+    return null
+  }, [automationId, hasPreview, isCommunity, threadId])
+
+  const [media, setMedia] = React.useState<CardMediaResult>(() =>
+    requestUrl ? (cardMediaCache.get(requestUrl.cacheKey) ?? { type: null, url: null }) : { type: null, url: null },
+  )
+  const [loading, setLoading] = React.useState(() =>
+    Boolean(requestUrl) && !cardMediaCache.has(requestUrl!.cacheKey),
+  )
 
   React.useEffect(() => {
-    const url = isCommunity
-      ? automationId
-        ? `/api/automations/${automationId}/preview`
-        : null
-      : threadId
-        ? `/api/chat/threads/${threadId}`
-        : null
-
-    if (!url) {
+    if (!requestUrl) {
       setMedia({ type: null, url: null })
+      setLoading(false)
       return
     }
+
+    const cached = cardMediaCache.get(requestUrl.cacheKey)
+    if (cached) {
+      setMedia(cached)
+      setLoading(false)
+      return
+    }
+
     let cancelled = false
     setLoading(true)
 
-    fetch(url)
-      .then((res) => {
-        if (!res.ok) throw new Error()
-        return res.json()
-      })
-      .then((data) => {
-        if (cancelled) return
-        const messages = data.messages ?? data.thread?.messages
-        if (Array.isArray(messages)) {
-          // Scan backwards to find the latest generated media
-          for (let i = messages.length - 1; i >= 0; i--) {
-            const msg = messages[i];
-            if (msg.role !== "assistant" || !msg.parts) continue;
-            
-            for (const part of msg.parts) {
-              if (part.type === "tool-generateImage" || part.type === "tool-generateImageWithNanoBanana") {
-                const partObj = part as unknown as Record<string, unknown>;
-                const output = partObj.output as Record<string, unknown> | undefined;
-                if (output && output.status === "completed" && Array.isArray(output.images) && output.images.length > 0) {
-                  const firstImg = output.images[0];
-                  const url = typeof firstImg === "string" ? firstImg : (firstImg as Record<string, unknown>)?.url as string | undefined;
-                  if (url) {
-                    setMedia({ type: "image", url });
-                    return;
-                  }
-                }
-              } else if (part.type === "tool-generateVideo") {
-                const partObj = part as unknown as Record<string, unknown>;
-                const output = partObj.output as Record<string, unknown> | undefined;
-                if (output && output.status === "completed" && (output.video as Record<string, unknown>)?.url) {
-                  setMedia({ type: "video", url: (output.video as Record<string, unknown>).url as string });
-                  return;
-                }
-              } else if (part.type === "tool-generateAudio") {
-                const partObj = part as unknown as Record<string, unknown>;
-                const output = partObj.output as Record<string, unknown> | undefined;
-                if (output && output.status === "completed" && (output.audio as Record<string, unknown>)?.url) {
-                  setMedia({ type: "audio", url: (output.audio as Record<string, unknown>).url as string });
-                  return;
-                }
-              }
-            }
-          }
-        }
-        setMedia({ type: null, url: null })
-      })
-      .catch(() => {
-        if (!cancelled) setMedia({ type: null, url: null })
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+    void loadCardMedia(requestUrl.cacheKey, requestUrl.url).then((result) => {
+      if (cancelled) return
+      setMedia(result)
+      setLoading(false)
+    })
 
     return () => {
       cancelled = true
     }
-  }, [threadId, automationId, isCommunity])
+  }, [requestUrl])
 
   if (loading) {
     return <div className="h-full w-full animate-pulse bg-muted/40" />
@@ -2510,13 +2554,18 @@ export function AutomationsPage() {
 
   if (!userId) {
     return (
-      <div className="mx-auto max-w-lg px-4 pt-24 text-center">
-        <h1 className="text-2xl font-semibold">Automations</h1>
-        <p className="mt-2 text-muted-foreground">Your session expired. Sign in to manage automations.</p>
-        <Button asChild className="mt-6">
-          <Link href="/login">Sign in</Link>
-        </Button>
-      </div>
+      <FeatureLanding
+        config={automationsLanding}
+        slots={{
+          afterHero: (
+            <div className="border-b border-border/60 bg-background px-4 py-8 lg:px-8">
+              <div className="mx-auto max-w-6xl overflow-hidden rounded-2xl border border-border/60">
+                <AutomationLogoConnection fillContainer className="min-h-[240px]" />
+              </div>
+            </div>
+          ),
+        }}
+      />
     )
   }
 
@@ -2653,6 +2702,7 @@ export function AutomationsPage() {
                         threadId={latestRunThreadId as string | null}
                         automationId={a.id}
                         isCommunity={isCommunityScope}
+                        hasPreview={a.hasPreview === true}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/10" />
                     </div>

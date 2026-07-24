@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import {
   ArrowSquareOut,
@@ -27,6 +28,7 @@ import {
   type PageSearchItem,
   type PageSearchSettingsTab,
 } from "@/lib/navigation/page-search"
+import { getSettingsTabItem } from "@/lib/profile/settings-tabs"
 import type { Template } from "@/lib/templates/types"
 import type { MegaNavItem } from "@/lib/constants/navigation"
 import { cn } from "@/lib/utils"
@@ -50,6 +52,36 @@ function pageToMegaNavItem(item: PageSearchItem): MegaNavItem {
     iconText: item.iconText ?? "/",
     iconPhosphor: item.iconPhosphor,
   }
+}
+
+function SettingsSearchItemBody({ item }: { item: PageSearchItem }) {
+  const tab = item.settingsTab ? getSettingsTabItem(item.settingsTab) : null
+  const Icon = tab?.icon
+  const iconSrc = tab?.iconSrc ?? item.iconSrc
+
+  return (
+    <div className="flex w-full items-start gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/80 bg-muted text-foreground shadow-sm">
+        {iconSrc ? (
+          <Image
+            src={iconSrc}
+            alt={`${item.label} icon`}
+            width={36}
+            height={36}
+            className="h-full w-full object-cover"
+          />
+        ) : Icon ? (
+          <Icon className="h-[18px] w-[18px] text-foreground" weight="regular" />
+        ) : (
+          <span className="text-[10px] font-bold">/</span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-foreground">{item.label}</p>
+        <p className="line-clamp-1 text-xs text-muted-foreground">{item.description}</p>
+      </div>
+    </div>
+  )
 }
 
 function TemplatePreview({ template }: { template: Template }) {
@@ -312,7 +344,7 @@ export function GlobalSearchCommand({ onOpenSettings }: GlobalSearchCommandProps
                     onMouseEnter={() => setActiveIndex(rowIndex)}
                     onClick={() => selectRow({ kind: "settings", item: page })}
                   >
-                    <MegaNavItemBody item={pageToMegaNavItem(page)} />
+                    <SettingsSearchItemBody item={page} />
                   </CommandItem>
                 )
               })}

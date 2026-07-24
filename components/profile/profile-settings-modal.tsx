@@ -2,16 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
-import {
-  Bell,
-  ChatCircleDots,
-  Coin,
-  HandCoins,
-  PawPrint,
-  User,
-  X,
-  type Icon,
-} from "@phosphor-icons/react"
+import { X, type Icon } from "@phosphor-icons/react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { AffiliateSettingsPanel } from "@/components/profile/affiliate-settings-panel"
@@ -32,17 +23,14 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
-import { isPresenceProduct } from "@/lib/product/require-presence"
+import {
+  SETTINGS_TAB_LABELS,
+  SETTINGS_TABS,
+  type SettingsTab,
+} from "@/lib/profile/settings-tabs"
 import { cn } from "@/lib/utils"
 
-export type SettingsTab =
-  | "profile"
-  | "notifications"
-  | "accounts"
-  | "credits"
-  | "affiliate"
-  | "feedback"
-  | "pets"
+export type { SettingsTab }
 
 type ProfileData = {
   displayName: string
@@ -57,30 +45,6 @@ type ProfileData = {
   defaultEnhancePrompt: boolean
   userId: string
 }
-
-const SETTINGS_TABS: {
-  id: SettingsTab
-  label: string
-  icon: Icon
-  iconSrc?: string
-}[] = [
-  { id: "profile", label: "Profile", icon: User },
-  {
-    id: "accounts",
-    label: "Accounts",
-    icon: User,
-    ...(isPresenceProduct() ? { iconSrc: "/brand_icons/fanvue_logo.png" } : {}),
-  },
-  { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "credits", label: "Credits", icon: Coin },
-  { id: "affiliate", label: "Affiliate", icon: HandCoins },
-  { id: "feedback", label: "Feedback", icon: ChatCircleDots },
-  { id: "pets", label: "Pets", icon: PawPrint },
-]
-
-const TAB_LABELS = Object.fromEntries(
-  SETTINGS_TABS.map((t) => [t.id, t.label])
-) as Record<SettingsTab, string>
 
 export type ProfileSettingsModalProps = {
   open: boolean
@@ -304,7 +268,7 @@ export function ProfileSettingsModal({
     }
   }, [open, activeTab, markNotificationsSeen])
 
-  const sectionTitle = TAB_LABELS[activeTab]
+  const sectionTitle = SETTINGS_TAB_LABELS[activeTab]
   const needsProfileData = activeTab === "profile" || activeTab === "credits"
 
   function renderPanel() {

@@ -53,6 +53,9 @@ export interface MegaNavGroup {
   label: string
   badge?: MegaNavBadge
   path?: string
+  /** Used when the group itself is searchable and has no matching menu item */
+  iconSrc?: string
+  iconPhosphor?: MegaNavPhosphorIcon
   sections?: MegaNavSection[]
   simpleItems?: MegaNavItem[]
   products?: ProductId[]
@@ -450,6 +453,7 @@ const baseMegaNavGroups: MegaNavGroup[] = [
     label: "Content",
     path: "/content",
     badge: "new",
+    iconSrc: "/brand_icons/fanvue_logo.png",
     products: ["presence-studio"],
   },
   {
@@ -525,7 +529,7 @@ const baseMegaNavGroups: MegaNavGroup[] = [
       },
     ],
   },
-  { label: "Pricing", path: "/pricing" },
+  { label: "Pricing", path: "/pricing", iconPhosphor: "currency-dollar" },
 ]
 
 function filterMegaNavItems(items: MegaNavItem[] | undefined, product: ProductConfig) {

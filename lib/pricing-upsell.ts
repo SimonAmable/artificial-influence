@@ -2,6 +2,12 @@ import { toast } from "sonner"
 
 export const OPEN_PRICING_PLANS_EVENT = "unican:open-pricing-plans"
 
+export type PricingPlansModalTab = "monthly" | "yearly" | "one-time" | "enterprise"
+
+export type OpenPricingPlansModalDetail = {
+  tab?: PricingPlansModalTab
+}
+
 type CreditsUpsellToastOptions = {
   message: string
   description?: string
@@ -9,10 +15,14 @@ type CreditsUpsellToastOptions = {
   delayMs?: number
 }
 
-export function openPricingPlansModal() {
+export function openPricingPlansModal(detail?: OpenPricingPlansModalDetail) {
   if (typeof window === "undefined") return
 
-  window.dispatchEvent(new CustomEvent(OPEN_PRICING_PLANS_EVENT))
+  window.dispatchEvent(
+    new CustomEvent<OpenPricingPlansModalDetail>(OPEN_PRICING_PLANS_EVENT, {
+      detail: detail ?? {},
+    })
+  )
 }
 
 export function showCreditsUpsellToast({
