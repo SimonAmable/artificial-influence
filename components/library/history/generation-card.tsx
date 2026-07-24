@@ -8,6 +8,7 @@ import {
 } from "@phosphor-icons/react"
 
 import { CardDropdownActions } from "@/components/library/history/card-dropdown-actions"
+import { CarouselShotsHistoryCard } from "@/components/library/history/carousel-shots-history-card"
 import { MediaPreview, MediaTypeIcon } from "@/components/library/history/media-preview"
 import type {
   FanvueGenerationActions,
@@ -17,6 +18,8 @@ import type {
 } from "@/components/library/history/types"
 import { formatRelativeDate } from "@/components/library/history/utils"
 import type { AssetType } from "@/lib/assets/types"
+import { isCarouselShotsGeneration } from "@/lib/carousel-shots/library-summary"
+import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
@@ -56,6 +59,18 @@ export function GenerationCard({
   const supportsFanvue = generation.type === "image" || generation.type === "video"
   const source = generation.source === "upload" ? "upload" : "generation"
 
+  if (isCarouselShotsGeneration(generation.tool)) {
+    return (
+      <CarouselShotsHistoryCard
+        generation={generation}
+        onOpen={onOpen}
+        onCopy={onCopy}
+        onDownload={onDownload}
+        onDelete={onDelete}
+      />
+    )
+  }
+
   if (actionVariant === "select") {
     return (
       <article className="group relative aspect-square overflow-hidden rounded-2xl border border-border/70 bg-card/45 shadow-sm transition-all hover:border-primary/50 hover:shadow-md">
@@ -86,7 +101,7 @@ export function GenerationCard({
             </span>
           </div>
 
-          {generation.prompt ? (
+          {generation.prompt && !shouldHideGenerationDetails(generation.tool) ? (
             <p className="truncate select-none text-left text-[10px] font-medium leading-tight text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
               {generation.prompt}
             </p>
@@ -242,7 +257,7 @@ export function GenerationCard({
           </div>
         </div>
 
-        {generation.prompt ? (
+        {generation.prompt && !shouldHideGenerationDetails(generation.tool) ? (
           <p className="truncate select-none text-left text-[10px] font-medium leading-tight text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
             {generation.prompt}
           </p>

@@ -829,6 +829,8 @@ function ImagePageContent() {
       return (
         <InfluencerInputBox
           forceRowLayout={forceRowLayout}
+          generateButtonLayout="bar"
+          showGenerateInBottomRow
           promptValue={prompt}
           onPromptChange={setPrompt}
           onAttachedRefsChange={setAttachedCommandRefs}
@@ -1198,7 +1200,13 @@ function ImagePageContent() {
     const generating = pendingRequests.flatMap((request) =>
       Array.from({ length: request.numImages }, (_, i) => ({
         createdAt: request.startedAt,
-        item: { type: "generating" as const, id: `slot-${request.clientRequestId}-${i}`, model: request.model, prompt: request.prompt },
+        item: {
+          type: "generating" as const,
+          id: `slot-${request.clientRequestId}-${i}`,
+          model: request.model,
+          prompt: request.prompt,
+          tool: request.tool,
+        },
       }))
     )
     const persisted = persistedTasks
@@ -1208,8 +1216,8 @@ function ImagePageContent() {
       .filter((task) => !historyIds.has(task.id))
       .filter((task) => !(task.url != null && historyUrls.has(task.url)))
       .map((task) => ({ createdAt: task.createdAt, item: task.status === "failed"
-        ? { type: "failed" as const, id: task.id, model: task.model, prompt: task.prompt, error: task.errorMessage }
-        : { type: "generating" as const, id: task.id, model: task.model, prompt: task.prompt } }))
+        ? { type: "failed" as const, id: task.id, model: task.model, prompt: task.prompt, tool: task.tool, error: task.errorMessage }
+        : { type: "generating" as const, id: task.id, model: task.model, prompt: task.prompt, tool: task.tool } }))
     const completed = historyImages.map((img) => ({ createdAt: img.createdAt, item: { type: "image" as const, data: toImageData(img) } }))
     return [...generating, ...persisted, ...completed]
       .sort((a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? ""))

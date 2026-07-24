@@ -4,6 +4,7 @@ import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import {
   isSeedVr2ModelIdentifier,
   normalizeUpscaleModelIdentifier,
+  DEFAULT_UPSCALE_CREDITS_COST,
   SEEDVR2_MODEL_IDENTIFIER,
   UPSCALE_MODEL_IDENTIFIER,
   type SeedVr2Parameters,
@@ -15,6 +16,7 @@ import {
 export {
   isSeedVr2ModelIdentifier,
   normalizeUpscaleModelIdentifier,
+  DEFAULT_UPSCALE_CREDITS_COST,
   SEEDVR2_MODEL_IDENTIFIER,
   UPSCALE_MODEL_IDENTIFIER,
   type SeedVr2ModelVariant,
@@ -31,8 +33,6 @@ export const UPSCALE_REPLICATE_MODEL_ID =
 /** Pinned Replicate version — https://replicate.com/zsxkib/seedvr2 */
 export const SEEDVR2_REPLICATE_MODEL_ID =
   "zsxkib/seedvr2:ca98249be9cb623f02a80a7851a2b1a33d5104c251a8f5a1588f251f79bf7c78"
-
-export const DEFAULT_UPSCALE_CREDITS_COST = 1
 
 export const DEFAULT_UPSCALE_REPLICATE_INPUT: Record<string, unknown> = {
   upscale_mode: "target",

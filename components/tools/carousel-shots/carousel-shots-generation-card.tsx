@@ -6,10 +6,13 @@ import { CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { CarouselShotsShotCard } from "@/components/tools/carousel-shots/carousel-shots-shot-card"
 import { CarouselShotsLightbox } from "@/components/tools/carousel-shots/carousel-shots-lightbox"
+import { UpscaleCreditCost } from "@/components/tools/carousel-shots/upscale-credit-cost"
 import type { UpscaleSettings } from "@/components/tools/upscale/upscale-settings-popover"
 import { useCarouselShotActions } from "@/components/tools/carousel-shots/use-carousel-shot-actions"
+import { useModels } from "@/hooks/use-models"
 import { getCarouselReferencePublicUrl } from "@/lib/carousel-shots/constants"
 import type { CarouselShotsMetadata, CarouselShotRecord } from "@/lib/carousel-shots/types"
+import { DEFAULT_UPSCALE_CREDITS_COST } from "@/lib/upscale/constants"
 import { cn } from "@/lib/utils"
 
 function aspectRatioClass(aspectRatio: string) {
@@ -55,6 +58,7 @@ export function CarouselShotsGenerationCard({
   const [selectMode, setSelectMode] = React.useState(false)
   const [selectedShotIds, setSelectedShotIds] = React.useState<Set<string>>(new Set())
   const [activeIndex, setActiveIndex] = React.useState<number | null>(null)
+  const { models: upscaleModels } = useModels("upscale")
 
   const shots = metadata?.shots ?? []
   const gridSize = metadata?.gridSize ?? 4
@@ -73,6 +77,17 @@ export function CarouselShotsGenerationCard({
   })
 
   const selectedShots = shots.filter((shot) => selectedShotIds.has(shot.id))
+  const pendingUpscaleCount = selectedShots.filter((shot) => !shot.upscaledUrl).length
+
+  const upscaleCreditCost = React.useMemo(() => {
+    const match = upscaleModels.find(
+      (model) => model.identifier === upscaleSettings.modelIdentifier,
+    )
+    const cost = Number(match?.model_cost ?? DEFAULT_UPSCALE_CREDITS_COST)
+    return Math.max(1, Number.isFinite(cost) ? cost : DEFAULT_UPSCALE_CREDITS_COST)
+  }, [upscaleModels, upscaleSettings.modelIdentifier])
+
+  const batchUpscaleCreditCost = pendingUpscaleCount * upscaleCreditCost
 
   const toggleSelected = (shotId: string, selected: boolean) => {
     setSelectedShotIds((current) => {
@@ -203,6 +218,7 @@ export function CarouselShotsGenerationCard({
                   selectMode={selectMode}
                   isSelected={selectedShotIds.has(shot.id)}
                   isUpscaling={actions.isUpscalingShot(shot.id)}
+                  upscaleCreditCost={upscaleCreditCost}
                   onSelectChange={(selected) => toggleSelected(shot.id, selected)}
                   onOpen={() => setActiveIndex(index)}
                   onDownload={() => void actions.downloadShot(shot)}
@@ -238,18 +254,22 @@ export function CarouselShotsGenerationCard({
                 type="button"
                 variant="outline"
                 size="sm"
+                className="gap-1.5"
                 disabled={selectedShots.length === 0}
                 onClick={() => void actions.upscaleShots(selectedShots)}
               >
                 Upscale
+                <UpscaleCreditCost cost={batchUpscaleCreditCost} />
               </Button>
               <Button
                 type="button"
                 size="sm"
+                className="gap-1.5"
                 disabled={selectedShots.length === 0}
                 onClick={() => void actions.upscaleAndDownloadShots(selectedShots)}
               >
                 Upscale & Download
+                <UpscaleCreditCost cost={batchUpscaleCreditCost} />
               </Button>
             </div>
           </div>
@@ -261,6 +281,7 @@ export function CarouselShotsGenerationCard({
         aspectRatioClass={aspectRatioClass(metadata?.aspectRatio ?? "3:4")}
         shots={shots}
         isUpscaling={activeIndex != null && actions.isUpscalingShot(shots[activeIndex]?.id ?? "")}
+        upscaleCreditCost={upscaleCreditCost}
         onClose={() => setActiveIndex(null)}
         onNavigate={setActiveIndex}
         onDownload={(shot) => void actions.downloadShot(shot)}

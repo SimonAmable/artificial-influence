@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
 import {
@@ -48,12 +49,64 @@ type PendingResult = {
 }
 
 export function CarouselShotsTool() {
+  const searchParams = useSearchParams()
+  const focusedGenerationId = searchParams.get("generation")
   const [form, setForm] = React.useState<CarouselShotsFormState>(DEFAULT_FORM)
   const [pendingJobs, setPendingJobs] = React.useState<PendingJob[]>([])
   const [pendingResults, setPendingResults] = React.useState<PendingResult[]>([])
-  const [rightView, setRightView] = React.useState<CarouselShotsRightView>("example")
+  const [rightView, setRightView] = React.useState<CarouselShotsRightView>(
+    focusedGenerationId ? "history" : "example",
+  )
   const [historyRefreshKey, setHistoryRefreshKey] = React.useState(0)
   const [regeneratingId, setRegeneratingId] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    if (!focusedGenerationId) return
+
+    setRightView("history")
+
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/carousel-shots/${focusedGenerationId}`)
+        const data = (await response.json().catch(() => ({}))) as {
+          metadata?: CarouselShotsMetadata
+        }
+
+        if (!response.ok || !isCarouselShotsMetadata(data.metadata)) {
+          if (!cancelled) {
+            toast.error("Could not open that carousel set")
+          }
+          return
+        }
+
+        if (cancelled) return
+
+        setPendingResults((current) => {
+          if (current.some((entry) => entry.generationId === focusedGenerationId)) {
+            return current.map((entry) =>
+              entry.generationId === focusedGenerationId
+                ? { ...entry, metadata: data.metadata! }
+                : entry,
+            )
+          }
+          return [
+            { generationId: focusedGenerationId, metadata: data.metadata! },
+            ...current,
+          ]
+        })
+      } catch {
+        if (!cancelled) {
+          toast.error("Could not open that carousel set")
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [focusedGenerationId])
 
   const activeSlotCount = pendingJobs.length
   const isGenerating = activeSlotCount > 0
@@ -275,6 +328,7 @@ export function CarouselShotsTool() {
             pendingJobs={pendingJobs}
             pendingResults={pendingResults}
             regeneratingId={regeneratingId}
+            focusedGenerationId={focusedGenerationId}
             onRegenerate={runRegenerate}
             onShotsChange={handleShotsChange}
           />

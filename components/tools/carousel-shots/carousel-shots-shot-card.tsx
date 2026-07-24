@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { UpscaleCreditCost } from "@/components/tools/carousel-shots/upscale-credit-cost"
 import type { CarouselShotRecord } from "@/lib/carousel-shots/types"
 import { cn } from "@/lib/utils"
 
@@ -25,6 +26,7 @@ type CarouselShotsShotCardProps = {
   onUpscaleAndDownload: () => void
   selectMode: boolean
   shot: CarouselShotRecord
+  upscaleCreditCost: number
 }
 
 export function CarouselShotsShotCard({
@@ -37,7 +39,10 @@ export function CarouselShotsShotCard({
   onUpscaleAndDownload,
   selectMode,
   shot,
+  upscaleCreditCost,
 }: CarouselShotsShotCardProps) {
+  const downloadUpscaleCost = shot.upscaledUrl ? 0 : upscaleCreditCost
+
   return (
     <div
       className={cn(
@@ -117,8 +122,14 @@ export function CarouselShotsShotCard({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
                 <DropdownMenuItem onClick={onDownload}>Download</DropdownMenuItem>
-                <DropdownMenuItem onClick={onUpscale}>Upscale</DropdownMenuItem>
-                <DropdownMenuItem onClick={onUpscaleAndDownload}>Upscale & Download</DropdownMenuItem>
+                <DropdownMenuItem onClick={onUpscale} className="justify-between gap-3">
+                  <span>Upscale</span>
+                  <UpscaleCreditCost cost={upscaleCreditCost} />
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onUpscaleAndDownload} className="justify-between gap-3">
+                  <span>Upscale & Download</span>
+                  <UpscaleCreditCost cost={downloadUpscaleCost} />
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={onOpen}>Open preview</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

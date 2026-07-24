@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { extractCarouselShotsLibrarySummary } from "@/lib/carousel-shots/library-summary"
 import { resolveStoredObjectUrl } from "@/lib/uploads/resolve-stored-object-url"
+import type { CarouselShotsLibrarySummary } from "@/lib/carousel-shots/library-summary"
 
 export type HistoryFeedMediaType = "image" | "video" | "audio"
 export type HistoryFeedSourceFilter = "all" | "generation" | "upload"
@@ -19,6 +21,7 @@ export type HistoryFeedItem = {
   reference_image_urls: string[]
   source: HistoryFeedItemSource
   uploadId?: string
+  carousel_summary?: CarouselShotsLibrarySummary | null
 }
 
 type GenerationRow = {
@@ -33,6 +36,7 @@ type GenerationRow = {
   created_at: string
   reference_images_supabase_storage_path: string[] | null
   status: string | null
+  metadata: unknown
 }
 
 type UploadRow = {
@@ -132,6 +136,7 @@ function mapGenerationRow(
     url,
     reference_image_urls,
     source: "generation",
+    carousel_summary: extractCarouselShotsLibrarySummary(generation.metadata),
   }
 }
 
@@ -234,7 +239,7 @@ async function fetchGenerationsPage(
   let query = supabase
     .from("generations")
     .select(
-      "id, user_id, prompt, supabase_storage_path, type, model, tool, aspect_ratio, created_at, reference_images_supabase_storage_path, status"
+      "id, user_id, prompt, supabase_storage_path, type, model, tool, aspect_ratio, created_at, reference_images_supabase_storage_path, status, metadata"
     )
     .eq("user_id", options.userId)
     .order("created_at", { ascending: false })

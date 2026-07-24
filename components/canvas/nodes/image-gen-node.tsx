@@ -1203,7 +1203,9 @@ export const ImageGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           allowedAssetTypes={["image"]}
           isReadyOverride={
             [nodeData.connectedPrompt, nodeData.prompt].filter((p) => p?.trim()).join(" ").trim().length > 0 ||
-            attachedCommandRefCount > 0
+            attachedCommandRefCount > 0 ||
+            (nodeData.manualImageUrls?.length ?? 0) > 0 ||
+            connectedImageUrls.length > 0
           }
         />
       </div>

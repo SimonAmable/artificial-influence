@@ -1,4 +1,5 @@
 import type { AssetType } from "@/lib/assets/types"
+import type { CarouselShotsLibrarySummary } from "@/lib/carousel-shots/library-summary"
 
 export type GenerationType = "image" | "video" | "audio" | "all"
 export type MediaGenerationType = Exclude<GenerationType, "all">
@@ -17,6 +18,7 @@ export type Generation = {
   created_at: string
   url: string
   reference_image_urls?: string[]
+  carousel_summary?: CarouselShotsLibrarySummary | null
   /** Where this history row came from. Missing means generation (legacy API). */
   source?: HistoryItemSource
   uploadId?: string

@@ -24,6 +24,8 @@ import {
 import { copyMediaToClipboard, downloadMediaFile } from "@/components/shared/display/media-viewer-utils"
 import { Button } from "@/components/ui/button"
 import type { AssetType } from "@/lib/assets/types"
+import { isCarouselShotsGeneration } from "@/lib/carousel-shots/library-summary"
+import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
 import { cn } from "@/lib/utils"
 
 const COLUMN_COUNT_STORAGE_KEY = "unican-content-media-column-count"
@@ -109,6 +111,17 @@ export function GenerationHistoryView({
           }
         : undefined,
     [actionVariant, openFanvueAction]
+  )
+
+  const handleOpenGeneration = React.useCallback(
+    (generation: Generation) => {
+      if (isCarouselShotsGeneration(generation.tool)) {
+        router.push(`/carousel-shots?generation=${encodeURIComponent(generation.id)}`)
+        return
+      }
+      setViewerGeneration(generation)
+    },
+    [router],
   )
 
   const copyMedia = React.useCallback(async (url: string, type: AssetType) => {
@@ -251,7 +264,7 @@ export function GenerationHistoryView({
         onRefresh={refresh}
         onLoadMore={loadMore}
         loadMoreRef={loadMoreSentinelRef}
-        onOpen={setViewerGeneration}
+        onOpen={handleOpenGeneration}
         onCopy={copyMedia}
         onDownload={downloadByUrl}
         onDelete={(generation) => void handleDelete(generation)}
@@ -269,11 +282,15 @@ export function GenerationHistoryView({
         <FullscreenMediaViewer
           kind={viewerGeneration.type}
           url={viewerGeneration.url}
-          title={viewerGeneration.prompt || "Generated media"}
+          title={
+            shouldHideGenerationDetails(viewerGeneration.tool)
+              ? "Generated media"
+              : viewerGeneration.prompt || "Generated media"
+          }
           metadata={{
             id: viewerGeneration.id,
-            model: viewerGeneration.model,
-            prompt: viewerGeneration.prompt,
+            model: shouldHideGenerationDetails(viewerGeneration.tool) ? null : viewerGeneration.model,
+            prompt: shouldHideGenerationDetails(viewerGeneration.tool) ? null : viewerGeneration.prompt,
             tool: viewerGeneration.tool,
             aspectRatio: viewerGeneration.aspect_ratio,
             type: viewerGeneration.type,

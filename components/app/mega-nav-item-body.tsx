@@ -9,6 +9,7 @@ import {
   Folder,
   FlowArrow,
   Image as ImageIcon,
+  Images,
   MagnifyingGlass,
   PaperPlaneTilt,
   Microphone as MicrophoneIcon,
@@ -33,6 +34,7 @@ import {
 const MEGA_NAV_PHOSPHOR: Record<MegaNavPhosphorIcon, typeof ImageIcon> = {
   folder: Folder,
   image: ImageIcon,
+  images: Images,
   video: VideoIcon,
   "paint-brush": PaintBrushIcon,
   "film-strip": FilmStrip,

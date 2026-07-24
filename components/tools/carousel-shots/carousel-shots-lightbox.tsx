@@ -10,6 +10,7 @@ import {
   DialogFooter,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { UpscaleCreditCost } from "@/components/tools/carousel-shots/upscale-credit-cost"
 import type { CarouselShotRecord } from "@/lib/carousel-shots/types"
 import { cn } from "@/lib/utils"
 
@@ -23,6 +24,7 @@ type CarouselShotsLightboxProps = {
   onUpscale: (shot: CarouselShotRecord) => void
   onUpscaleAndDownload: (shot: CarouselShotRecord) => void
   shots: CarouselShotRecord[]
+  upscaleCreditCost: number
 }
 
 export function CarouselShotsLightbox({
@@ -35,6 +37,7 @@ export function CarouselShotsLightbox({
   onUpscale,
   onUpscaleAndDownload,
   shots,
+  upscaleCreditCost,
 }: CarouselShotsLightboxProps) {
   const shot = activeIndex == null ? null : shots[activeIndex] ?? null
   const open = shot != null
@@ -140,11 +143,22 @@ export function CarouselShotsLightbox({
               <Button type="button" variant="outline" onClick={() => onDownload(shot)}>
                 Download
               </Button>
-              <Button type="button" variant="outline" onClick={() => onUpscale(shot)}>
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => onUpscale(shot)}
+              >
                 Upscale
+                <UpscaleCreditCost cost={upscaleCreditCost} />
               </Button>
-              <Button type="button" onClick={() => onUpscaleAndDownload(shot)}>
+              <Button
+                type="button"
+                className="gap-1.5"
+                onClick={() => onUpscaleAndDownload(shot)}
+              >
                 Upscale & Download
+                <UpscaleCreditCost cost={shot.upscaledUrl ? 0 : upscaleCreditCost} />
               </Button>
             </DialogFooter>
           </>

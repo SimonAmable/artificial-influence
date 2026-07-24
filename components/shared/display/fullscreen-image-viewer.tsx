@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { X, DownloadSimple, Copy, Trash, Plus, Check, CalendarBlank, ImageSquare, ShieldCheck } from "@phosphor-icons/react"
+import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
 
 export type ImageViewerMetadata = {
   id?: string
@@ -237,7 +238,7 @@ export function FullscreenImageViewer({
                 </Badge>
               </div>
 
-              {currentMetadata.model && (
+              {currentMetadata.model && !shouldHideGenerationDetails(currentMetadata.tool) && (
                 <div>
                   <p className="mb-2 text-xs font-medium text-muted-foreground">Model</p>
                   <Badge variant="outline" className="text-xs">
@@ -263,7 +264,7 @@ export function FullscreenImageViewer({
                 </div>
               )}
 
-              {currentMetadata.prompt && (
+              {currentMetadata.prompt && !shouldHideGenerationDetails(currentMetadata.tool) && (
                 <div>
                   <p className="mb-2 text-xs font-medium text-muted-foreground">Prompt</p>
                   <p className="max-h-32 overflow-y-auto rounded-md border border-border bg-muted/30 p-3 text-xs leading-relaxed text-foreground">

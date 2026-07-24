@@ -18,6 +18,7 @@ import {
   type FullscreenMediaKind,
 } from "./media-viewer-utils"
 import { ImageCompareSlider } from "./image-compare-slider"
+import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
 
 export type MediaViewerMetadata = {
   id?: string
@@ -225,7 +226,7 @@ export function FullscreenMediaViewer({
                 </Badge>
               </div>
 
-              {currentMetadata.model && (
+              {currentMetadata.model && !shouldHideGenerationDetails(currentMetadata.tool) && (
                 <div>
                   <p className="mb-2 text-xs font-medium text-muted-foreground">Model</p>
                   <Badge variant="outline" className="text-xs">
@@ -263,7 +264,7 @@ export function FullscreenMediaViewer({
                 </div>
               )}
 
-              {currentMetadata.prompt && (
+              {currentMetadata.prompt && !shouldHideGenerationDetails(currentMetadata.tool) && (
                 <div>
                   <p className="mb-2 text-xs font-medium text-muted-foreground">Prompt</p>
                   <p className="max-h-32 overflow-y-auto rounded-md border border-border bg-muted/30 p-3 text-xs leading-relaxed text-foreground">

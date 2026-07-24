@@ -14,12 +14,14 @@ import {
 } from "@/components/tools/carousel-shots/use-carousel-shots-history"
 import type { UpscaleSettings } from "@/components/tools/upscale/upscale-settings-popover"
 import type { CarouselShotsMetadata } from "@/lib/carousel-shots/types"
+import { cn } from "@/lib/utils"
 
 type CarouselShotsHistoryPanelProps = {
   historyRefreshKey: number
   pendingJobs: CarouselShotsPendingJob[]
   pendingResults: CarouselShotsPendingResult[]
   regeneratingId: string | null
+  focusedGenerationId?: string | null
   upscaleSettings: UpscaleSettings
   onRegenerate: (generationId: string) => Promise<void>
   onShotsChange: (generationId: string, shots: CarouselShotsMetadata["shots"]) => void
@@ -30,6 +32,7 @@ export function CarouselShotsHistoryPanel({
   pendingJobs,
   pendingResults,
   regeneratingId,
+  focusedGenerationId = null,
   upscaleSettings,
   onRegenerate,
   onShotsChange,
@@ -75,6 +78,19 @@ export function CarouselShotsHistoryPanel({
       toast.error(error)
     }
   }, [error])
+
+  React.useEffect(() => {
+    if (!focusedGenerationId || isLoading) return
+
+    const frame = window.requestAnimationFrame(() => {
+      const element = document.querySelector(
+        `[data-carousel-generation-id="${focusedGenerationId}"]`,
+      )
+      element?.scrollIntoView({ behavior: "smooth", block: "center" })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [displayItems, focusedGenerationId, isLoading])
 
   const hasPendingJobs = pendingJobs.length > 0
 
@@ -125,7 +141,14 @@ export function CarouselShotsHistoryPanel({
       ))}
 
       {displayItems.map((item) => (
-        <div key={item.id} className="rounded-2xl border bg-card p-4">
+        <div
+          key={item.id}
+          data-carousel-generation-id={item.id}
+          className={cn(
+            "rounded-2xl border bg-card p-4 transition-shadow",
+            focusedGenerationId === item.id && "ring-2 ring-primary shadow-md",
+          )}
+        >
           <CarouselShotsGenerationCard
             createdAt={item.createdAt}
             generationId={item.id}

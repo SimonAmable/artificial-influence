@@ -8,6 +8,40 @@ type RouteContext = {
   params: Promise<{ id: string }>
 }
 
+export async function GET(_request: NextRequest, context: RouteContext) {
+  const { id } = await context.params
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const { data: generation, error: fetchError } = await supabase
+    .from("generations")
+    .select("id, created_at, metadata, tool, user_id")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  if (fetchError || !generation) {
+    return NextResponse.json({ error: "Generation not found" }, { status: 404 })
+  }
+
+  if (generation.tool !== CAROUSEL_SHOTS_TOOL || !isCarouselShotsMetadata(generation.metadata)) {
+    return NextResponse.json({ error: "Not a carousel shots generation" }, { status: 400 })
+  }
+
+  return NextResponse.json({
+    generationId: generation.id,
+    createdAt: generation.created_at,
+    metadata: generation.metadata,
+  })
+}
+
 export async function PATCH(request: NextRequest, context: RouteContext) {
   const { id } = await context.params
   const supabase = await createClient()

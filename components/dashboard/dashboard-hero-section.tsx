@@ -529,6 +529,7 @@ export function DashboardHeroSection({ className }: { className?: string }) {
                   <GlowContainer>
                     <InfluencerInputBox
                       className="mx-auto !border-transparent !bg-transparent !shadow-none"
+                      generateButtonLayout="bar"
                       promptValue={imagePrompt}
                       onPromptChange={setImagePrompt}
                       onAttachedRefsChange={setImageAttachedRefs}

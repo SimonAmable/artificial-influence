@@ -1,18 +1,20 @@
 export const AURORA_SHADER_COLORS = [
   "#000000",
-  "#FF0000",
-  "#FFEA00",
-  "#00D3FF",
-  "#0028FF",
+  "#00FF37",
+  "#B6FF41",
+  "#000000",
 ] as const
 
+/** Shimmer recipe — Silk path in the multi-style fragment shader. */
 export const AURORA_SHADER_UNIFORMS = {
-  style: 4,
+  style: 0,
   intensity: 0.87,
   zoom: 0.84,
   warp: 0.41,
   contrast: 0.7,
-  speed: 0.83,
+  speed: 0.28,
+  /** ~8× idle speed while a generation job is running. */
+  generatingSpeed: 2.24,
   grain: 0.17,
   drift: 0.59,
   animate: 1,
@@ -23,10 +25,13 @@ export const AURORA_SHADER_UNIFORMS = {
   offsetX: 0.11,
   offsetY: 0.39,
   cursorOn: 1,
-  cursorEffect: 4,
-  cursorStrength: 0.87,
-  cursorRadius: 0.5,
+  /** Swirl cursor mode */
+  cursorEffect: 2,
+  cursorStrength: 0.01,
+  cursorRadius: 0.15,
 } as const
+
+export const AURORA_SHADER_GLOW = "#00FF37"
 
 function hexToRgb(hex: string): [number, number, number] {
   const normalized = hex.replace("#", "")
@@ -37,5 +42,9 @@ function hexToRgb(hex: string): [number, number, number] {
 export function getAuroraShaderColorUniforms(): [number, number, number][] {
   const base = AURORA_SHADER_COLORS.map(hexToRgb)
   const last = base[base.length - 1] ?? [0, 0, 0]
-  return [...base, last, last, last]
+  const colors: [number, number, number][] = [...base]
+  while (colors.length < 8) {
+    colors.push(last)
+  }
+  return colors.slice(0, 8)
 }

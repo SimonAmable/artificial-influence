@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type { ImageGridAgentAction } from "@/lib/chat/image-grid-agent-actions"
+import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
 import { FullscreenMediaViewer, type FullscreenMediaViewerAction } from "./fullscreen-media-viewer"
 import { copyMediaToClipboard, downloadMediaFile } from "./media-viewer-utils"
 import { toast } from "sonner"
@@ -44,8 +45,8 @@ interface ImageData {
 
 export type GridItem =
   | { type: "image"; data: ImageData }
-  | { type: "generating"; id: string; model?: string | null; prompt?: string | null }
-  | { type: "failed"; id: string; model?: string | null; prompt?: string | null; error?: string | null }
+  | { type: "generating"; id: string; model?: string | null; prompt?: string | null; tool?: string | null }
+  | { type: "failed"; id: string; model?: string | null; prompt?: string | null; tool?: string | null; error?: string | null }
 
 interface ImageGridProps {
   /** Unified list of items (images + generating slots). When provided, takes precedence over images/isGenerating/generatingCount. */
@@ -325,7 +326,7 @@ export function ImageGrid({
             </>
           )}
         </DropdownMenuItem>
-        {data.prompt && (
+        {data.prompt && !shouldHideGenerationDetails(data.tool) && (
           <DropdownMenuItem
             onClick={(event) => {
               event.stopPropagation()
@@ -651,8 +652,8 @@ export function ImageGrid({
                       : "bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30"
                   )} />
                   <div className="absolute inset-x-2 bottom-2 z-10 text-left text-[10px] text-white/90 drop-shadow-md">
-                    <p className="truncate font-semibold">{item.type === "failed" ? "Generation failed · Credit refunded" : item.model ?? "Generating..."}</p>
-                    <p className="truncate text-white/60">{item.type === "failed" ? "Sorry for the issue. We refunded your credits so you can try again." : item.prompt ?? "Generating..."}</p>
+                    <p className="truncate font-semibold">{item.type === "failed" ? "Generation failed · Credit refunded" : shouldHideGenerationDetails(item.tool) ? "Generating..." : item.model ?? "Generating..."}</p>
+                    <p className="truncate text-white/60">{item.type === "failed" ? "Sorry for the issue. We refunded your credits so you can try again." : (shouldHideGenerationDetails(item.tool) ? null : item.prompt) ?? "Generating..."}</p>
                   </div>
                 </div>
               ) : (
@@ -810,12 +811,12 @@ export function ImageGrid({
               {/* Bottom bar: prompt (left) + buttons (right) - no overlap */}
               <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-1 px-2 pb-2 pt-6 opacity-100 transition-opacity duration-200 lg:gap-2 lg:opacity-0 lg:group-hover:opacity-100">
                 <div className="min-w-0 flex-1 overflow-hidden pr-1 sm:pr-2">
-                  {item.data.model && (
+                  {item.data.model && !shouldHideGenerationDetails(item.data.tool) && (
                     <p className="truncate text-[10px] font-semibold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                       {normalizeModelName(item.data.model)}
                     </p>
                   )}
-                  {item.data.prompt && (
+                  {item.data.prompt && !shouldHideGenerationDetails(item.data.tool) && (
                     <button
                       type="button"
                       className="truncate w-full text-left text-[10px] leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-white/95"
@@ -831,19 +832,20 @@ export function ImageGrid({
                 </div>
                 {showExtendedActions && !isCondensed ? (
                   <div className="hidden shrink-0 flex-col items-end gap-1 lg:flex">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={!item.data.prompt?.trim()}
-                      className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        void handleCopyPrompt(item.data.prompt ?? "", `${item.data.url}-button`)
-                      }}
-                    >
-                      {copiedPromptKey && copiedPromptKey.startsWith(item.data.url) ? "Copied" : "Copy Prompt"}
-                    </Button>
+                    {item.data.prompt?.trim() && !shouldHideGenerationDetails(item.data.tool) ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void handleCopyPrompt(item.data.prompt ?? "", `${item.data.url}-button`)
+                        }}
+                      >
+                        {copiedPromptKey && copiedPromptKey.startsWith(item.data.url) ? "Copied" : "Copy Prompt"}
+                      </Button>
+                    ) : null}
                     {onSaveExample ? (
                       <Button
                         type="button"
@@ -1001,8 +1003,8 @@ export function ImageGrid({
           url={fullscreenImage.url}
           metadata={{
             id: fullscreenImage.id,
-            model: fullscreenImage.model ?? null,
-            prompt: fullscreenImage.prompt ?? null,
+            model: shouldHideGenerationDetails(fullscreenImage.tool) ? null : fullscreenImage.model ?? null,
+            prompt: shouldHideGenerationDetails(fullscreenImage.tool) ? null : fullscreenImage.prompt ?? null,
             tool: fullscreenImage.tool ?? null,
             aspectRatio: fullscreenImage.aspectRatio ?? null,
             type: fullscreenImage.type ?? null,

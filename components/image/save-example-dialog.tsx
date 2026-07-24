@@ -7,7 +7,7 @@ import { Sparkle, Plus, X, Trash, FolderOpen, Images } from "@phosphor-icons/rea
 
 import { useModels } from "@/hooks/use-models"
 import { cn } from "@/lib/utils"
-import type { Model } from "@/lib/types/models"
+import type { Model, ModelInputValues } from "@/lib/types/models"
 import type { DraftTemplateInput } from "@/lib/templates/input-utils"
 import {
   assignInputIds,
@@ -19,18 +19,14 @@ import type { TemplatePromptAttachment } from "@/lib/templates/types"
 import type { SavedExample } from "@/lib/examples/types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
-
+import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ImageEnhanceSwitch } from "@/components/tools/influencer/image-enhance-switch"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { InfluencerInputBox } from "@/components/tools/influencer"
+import { influencerControlPillClassName } from "@/components/tools/influencer/animated-control-item"
+import type { ImageUpload } from "@/components/shared/upload/photo-upload"
 
 type SaveExampleVisibility = "private" | "public"
 
@@ -69,15 +65,6 @@ type SelectionState = {
   text: string
   rect: DOMRect
 }
-
-const ASPECT_RATIO_OPTIONS = [
-  { value: "auto", label: "Auto" },
-  { value: "9:16", label: "Vertical" },
-  { value: "1:1", label: "Square" },
-  { value: "16:9", label: "Wide" },
-]
-
-const NUM_IMAGES_OPTIONS = [1, 2, 3, 4]
 
 function createClientId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -192,7 +179,7 @@ export function SaveExampleDialog({
     setMounted(true)
   }, [])
 
-  const { models: imageModels, isLoading: modelsLoading } = useModels("image")
+  const { models: imageModels } = useModels("image")
   const promptEditorRef = React.useRef<HTMLDivElement>(null)
   const promptBoxRef = React.useRef<HTMLDivElement>(null)
   const selectionStateRef = React.useRef<SelectionState | null>(null)
@@ -207,30 +194,6 @@ export function SaveExampleDialog({
   const [enhancePrompt, setEnhancePrompt] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState(false)
   const [selectionState, setSelectionState] = React.useState<SelectionState | null>(null)
-
-  const selectedModelOptions = React.useMemo(() => {
-    const models = imageModels as Model[]
-    const hasSelected = models.some((model) => model.identifier === selectedModel)
-
-    const options = [...models]
-    if (selectedModel && !hasSelected) {
-      options.unshift({
-        id: `fallback-${selectedModel}`,
-        identifier: selectedModel,
-        name: selectedModel,
-        description: "",
-        type: "image",
-        provider: "",
-        is_active: true,
-        model_cost: null,
-        parameters: { parameters: [] },
-        created_at: "",
-        updated_at: "",
-      } as unknown as Model)
-    }
-
-    return options
-  }, [imageModels, selectedModel])
 
   React.useEffect(() => {
     if (!open || !snapshot) return
@@ -390,6 +353,43 @@ export function SaveExampleDialog({
     setDraftInputs((inputs) => [...inputs, nextDraft])
     setAttachments((current) => current.filter((item) => item.id !== attachmentId))
   }, [attachments])
+
+  const handleReferenceImageAction = React.useCallback(
+    (index: number) => {
+      const attachment = attachments[index]
+      if (!attachment) return
+      handleAttachmentAsInput(attachment.id)
+    },
+    [attachments, handleAttachmentAsInput],
+  )
+
+  const referenceImages = React.useMemo<ImageUpload[]>(
+    () => attachments.map((attachment) => ({ url: attachment.url })),
+    [attachments],
+  )
+
+  const exampleImageModels = React.useMemo(() => {
+    const models = imageModels as Model[]
+    const hasSelected = models.some((model) => model.identifier === selectedModel)
+    if (!selectedModel || hasSelected) return models
+
+    return [
+      {
+        id: `fallback-${selectedModel}`,
+        identifier: selectedModel,
+        name: selectedModel,
+        description: "",
+        type: "image",
+        provider: "",
+        is_active: true,
+        model_cost: null,
+        parameters: { parameters: [] },
+        created_at: "",
+        updated_at: "",
+      } as unknown as Model,
+      ...models,
+    ]
+  }, [imageModels, selectedModel])
 
   // Fixed React 18 side effect updater bug
   const handleRemoveInput = React.useCallback((inputId: string) => {
@@ -740,208 +740,132 @@ export function SaveExampleDialog({
                 </Card>
               </section>
 
-              {/* Element 3: PROMPT BOX CARD (Replica of InfluencerInputBox) */}
+              {/* Element 3: shared InfluencerInputBox with example-specific compose slots */}
               <section className="space-y-3">
                 <div ref={promptBoxRef} className="relative">
-                  <Card className="w-full relative overflow-visible border-0 bg-transparent shadow-none">
-                    <CardContent className="p-2 flex flex-col gap-1.5">
-                      
-                      {/* Image attachments list: displays thumbnails styled like InfluencerInputBox reference images */}
-                      {attachments.length > 0 && (
-                        <div className="relative w-full flex gap-2 flex-wrap px-2 pt-2">
-                          {attachments.map((attachment) => (
-                            <button
-                              key={attachment.id}
-                              type="button"
-                              className="group relative overflow-hidden rounded-xl border border-border/70 bg-muted/20 text-left transition-transform hover:-translate-y-0.5"
-                              onClick={() => handleAttachmentAsInput(attachment.id)}
-                              title="Click to turn into a media input slot"
-                            >
-                              <img
-                                src={attachment.url}
-                                alt={attachment.title?.trim() || "Prompt media"}
-                                className="h-[60px] w-auto max-w-[120px] object-cover"
-                              />
-                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                <span className="text-[9px] uppercase font-bold text-white tracking-wide text-center px-1">
-                                  Make Slot
-                                </span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                  {selectionState && bubbleStyle ? (
+                    <div
+                      className="pointer-events-none absolute z-30"
+                      style={bubbleStyle}
+                    >
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="pointer-events-auto h-8 rounded-full px-3 shadow-lg bg-primary text-primary-foreground"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={handleMakeVariable}
+                      >
+                        <Sparkle className="mr-1.5 size-3.5" weight="fill" />
+                        Make variable
+                      </Button>
+                    </div>
+                  ) : null}
 
-                      {/* Text editor and action buttons side-by-side */}
-                      <div className="flex items-start gap-2 pt-1 px-2">
-                        <div className="flex-1 relative">
-                          {/* Selection Bubble */}
-                          {selectionState && bubbleStyle && (
-                            <div
-                              className="pointer-events-none absolute z-20"
-                              style={bubbleStyle}
-                            >
-                              <Button
-                                type="button"
-                                size="sm"
-                                className="pointer-events-auto h-8 rounded-full px-3 shadow-lg bg-primary text-primary-foreground"
-                                onMouseDown={(event) => event.preventDefault()}
-                                onClick={handleMakeVariable}
-                              >
-                                <Sparkle className="mr-1.5 size-3.5" weight="fill" />
-                                Make variable
-                              </Button>
-                            </div>
+                  <InfluencerInputBox
+                    className="max-w-none w-full"
+                    referenceImages={referenceImages}
+                    referenceImageActionLabel="Make Slot"
+                    onReferenceImageAction={handleReferenceImageAction}
+                    hideReferenceRemove
+                    customPromptContent={
+                      <div className="relative min-h-[120px] p-1">
+                        <div
+                          ref={promptEditorRef}
+                          contentEditable
+                          suppressContentEditableWarning
+                          spellCheck
+                          className={cn(
+                            "min-h-[100px] w-full whitespace-pre-wrap break-words px-1 py-1 text-base leading-6 outline-none sm:text-sm",
+                            "selection:bg-primary/25",
                           )}
-
-                          <div className="min-h-[120px] p-3.5 relative">
-                            <div
-                              ref={promptEditorRef}
-                              contentEditable
-                              suppressContentEditableWarning
-                              spellCheck
-                              className={cn(
-                                "min-h-[100px] w-full whitespace-pre-wrap break-words px-1 py-1 text-base leading-6 outline-none sm:text-sm",
-                                "selection:bg-primary/25",
-                              )}
-                              onInput={handlePromptInput}
-                              onMouseUp={updateSelectionFromDOM}
-                              onKeyUp={updateSelectionFromDOM}
-                              onBlur={() => {
-                                window.setTimeout(() => {
-                                  const root = promptEditorRef.current
-                                  if (!root || root.contains(document.activeElement)) return
-                                  updateSelectionFromDOM()
-                                }, 0)
-                              }}
-                              onPaste={handlePromptPaste}
-                            />
-                            {prompt.trim().length === 0 && (
-                              <div className="pointer-events-none absolute left-4.5 top-4.5 text-sm leading-6 text-muted-foreground/70">
-                                Describe what the AI should do. Highlight any text to turn it into a variable.
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Save Actions Stack on the right */}
-                        <div className="shrink-0 flex flex-col gap-2">
-                          <Button
-                            onClick={() => void handleSave()}
-                            disabled={isSaving || prompt.trim().length === 0}
-                            className="bg-primary hover:bg-primary/80 text-primary-foreground font-semibold h-10 min-w-[100px] text-xs px-4 py-6 rounded-full transition-all duration-300"
-                          >
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span className="text-sm font-semibold">{isSaving ? "Saving..." : "Save"}</span>
-                              <div className="flex items-center gap-0.5">
-                                <Sparkle size={8} weight="fill" />
-                                <span className="text-[10px]">Example</span>
-                              </div>
-                            </div>
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => onOpenChange(false)}
-                            className="h-10 text-xs rounded-full border border-border/70 hover:bg-muted"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Controls Bottom Row with visibility option */}
-                      <div className="flex items-center gap-1.5 flex-wrap px-2 pb-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 rounded-full bg-muted hover:bg-muted/80"
-                              aria-label="Add variable"
-                            >
-                              <Plus className="size-3.5" weight="bold" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" side="top" sideOffset={8}>
-                            <DropdownMenuItem onClick={() => handleAddManualTextInput()}>
-                              <Plus className="mr-2 size-4" />
-                              Add text variable
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-
-                        <Select value={selectedModel} onValueChange={setSelectedModel}>
-                          <SelectTrigger className="h-7 text-xs w-fit min-w-[140px] px-2 rounded-full">
-                            <SelectValue placeholder="Model" />
-                          </SelectTrigger>
-                          <SelectContent position="popper" side="top" sideOffset={4}>
-                            {modelsLoading && selectedModelOptions.length === 0 ? (
-                              <SelectItem value="loading" disabled>
-                                Loading models...
-                              </SelectItem>
-                            ) : (
-                              selectedModelOptions.map((model) => (
-                                <SelectItem key={model.identifier} value={model.identifier}>
-                                  {model.name || model.identifier}
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
-
-                        <Select value={selectedAspectRatio} onValueChange={setSelectedAspectRatio}>
-                          <SelectTrigger className="h-7 text-xs w-fit min-w-[110px] px-2 rounded-full">
-                            <SelectValue placeholder="Aspect ratio" />
-                          </SelectTrigger>
-                          <SelectContent position="popper" side="top" sideOffset={4}>
-                            {ASPECT_RATIO_OPTIONS.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <Select
-                          value={String(selectedNumImages)}
-                          onValueChange={(value) => setSelectedNumImages(Number(value))}
-                        >
-                          <SelectTrigger className="h-7 text-xs w-fit min-w-[80px] px-2 rounded-full">
-                            <SelectValue placeholder="Images" />
-                          </SelectTrigger>
-                          <SelectContent position="popper" side="top" sideOffset={4}>
-                            {Array.from(
-                              new Set([...NUM_IMAGES_OPTIONS, selectedNumImages].filter(Boolean)),
-                            ).map((value) => (
-                              <SelectItem key={value} value={String(value)}>
-                                {value} {value === 1 ? "image" : "images"}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <ImageEnhanceSwitch
-                          checked={enhancePrompt}
-                          onCheckedChange={setEnhancePrompt}
-                          className="h-7 px-2.5 border border-border/70 rounded-full bg-background/50 hover:bg-background/80"
+                          onInput={handlePromptInput}
+                          onMouseUp={updateSelectionFromDOM}
+                          onKeyUp={updateSelectionFromDOM}
+                          onBlur={() => {
+                            window.setTimeout(() => {
+                              const root = promptEditorRef.current
+                              if (!root || root.contains(document.activeElement)) return
+                              updateSelectionFromDOM()
+                            }, 0)
+                          }}
+                          onPaste={handlePromptPaste}
                         />
-
-                        {/* Visibility options integrated into the options row */}
-                        <Select value={visibility} onValueChange={(value) => setVisibility(value as SaveExampleVisibility)}>
-                          <SelectTrigger className="h-7 text-xs w-fit min-w-[110px] px-2 rounded-full border border-border/70 bg-background/50">
-                            <SelectValue placeholder="Visibility" />
-                          </SelectTrigger>
-                          <SelectContent position="popper" side="top" sideOffset={4}>
-                            <SelectItem value="private">Private</SelectItem>
-                            <SelectItem value="public">Public</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {prompt.trim().length === 0 ? (
+                          <div className="pointer-events-none absolute left-2 top-2 text-sm leading-6 text-muted-foreground/70">
+                            Describe what the AI should do. Highlight any text to turn it into a variable.
+                          </div>
+                        ) : null}
                       </div>
-
-                    </CardContent>
-                  </Card>
+                    }
+                    customPrimaryAction={
+                      <div className="flex shrink-0 flex-col gap-2">
+                        <Button
+                          onClick={() => void handleSave()}
+                          disabled={isSaving || prompt.trim().length === 0}
+                          className={cn(
+                            "relative z-0 h-10 min-w-[100px] border-0 bg-black px-4 py-6 text-sm font-bold text-white shadow-none transition-colors duration-300",
+                            "hover:bg-black/90 dark:bg-black dark:text-white dark:hover:bg-black/90",
+                            (isSaving || prompt.trim().length === 0) && "cursor-not-allowed opacity-50",
+                          )}
+                        >
+                          <div className="flex flex-col items-center gap-0.5 text-white">
+                            <span className="whitespace-nowrap">
+                              {isSaving ? "Saving..." : "Save"}
+                            </span>
+                            <div className="flex items-center gap-0.5 font-bold">
+                              <Sparkle size={8} weight="fill" className="text-white" />
+                              <span className="text-[10px]">Example</span>
+                            </div>
+                          </div>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => onOpenChange(false)}
+                          className="h-10 rounded-full border border-border/70 text-xs hover:bg-muted"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    }
+                    uploadMenuItems={
+                      <DropdownMenuItem onClick={() => handleAddManualTextInput()}>
+                        <Plus className="mr-2 size-4" />
+                        Add text variable
+                      </DropdownMenuItem>
+                    }
+                    showModelSelector
+                    imageModels={exampleImageModels}
+                    selectedModel={selectedModel}
+                    onModelChange={setSelectedModel}
+                    showAspectRatioSelector
+                    selectedAspectRatio={selectedAspectRatio}
+                    onAspectRatioChange={setSelectedAspectRatio}
+                    showNumImagesSelector
+                    forcedMaxImages={4}
+                    selectedNumImages={selectedNumImages}
+                    onNumImagesChange={setSelectedNumImages}
+                    enhancePrompt={enhancePrompt}
+                    onEnhancePromptChange={setEnhancePrompt}
+                    modelParameters={selectedModelParameters as ModelInputValues}
+                    onModelParametersChange={(params) =>
+                      setSelectedModelParameters(params as Record<string, unknown>)
+                    }
+                    customControlsEnd={
+                      <Select
+                        value={visibility}
+                        onValueChange={(value) => setVisibility(value as SaveExampleVisibility)}
+                      >
+                        <SelectTrigger hideChevron className={influencerControlPillClassName}>
+                          <SelectValue placeholder="Visibility" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" side="top" sideOffset={4}>
+                          <SelectItem value="private">Private</SelectItem>
+                          <SelectItem value="public">Public</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    }
+                  />
                 </div>
               </section>
 

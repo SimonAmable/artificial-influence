@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { dashboardToolNavItems, getDashboardToolNavItems, type DashboardToolIcon } from "@/lib/constants/navigation"
 import {
   ImageIcon,
+  Images,
   VideoIcon,
   MicrophoneIcon,
   PaintBrushIcon,
@@ -29,6 +30,7 @@ const toolIconMap: Record<DashboardToolIcon, typeof ImageIcon> = {
   "flow-arrow": FlowArrow,
   microphone: MicrophoneIcon,
   image: ImageIcon,
+  images: Images,
   video: VideoIcon,
   "paint-brush": PaintBrushIcon,
   "arrows-left-right": ArrowsLeftRight,

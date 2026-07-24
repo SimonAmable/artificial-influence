@@ -2,15 +2,14 @@
 
 import * as React from "react"
 import {
-  Sparkle,
   Plus,
   X,
-  CircleNotch,
   FolderOpen,
   FilePlus,
 } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { GenerateShaderButton } from "@/components/tools/influencer/generate-shader-button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   DropdownMenu,
@@ -527,40 +526,13 @@ export function ImageEditorPromptBar({
             />
           </div>
 
-          <div className="shrink-0">
-            <div
-              className={cn(
-                "relative inline-block transition-all duration-300",
-                isReady &&
-                  "before:content-[''] before:absolute before:inset-[-12px] before:bg-primary before:rounded-full before:blur-[15px] before:opacity-50 before:-z-10"
-              )}
-            >
-              <Button
-                onClick={handleGenerate}
-                disabled={!isReady || isGenerating}
-                className={cn(
-                  "relative z-0 flex h-[60px] min-w-[100px] items-center justify-center gap-2 px-4 text-sm font-semibold transition-all duration-300",
-                  "bg-primary text-primary-foreground hover:bg-primary/80",
-                  !isReady && "cursor-not-allowed opacity-50"
-                )}
-              >
-                {isGenerating ? (
-                  <>
-                    <CircleNotch className="size-3.5 shrink-0 animate-spin" aria-hidden />
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="shrink-0 font-semibold">Generate</span>
-                    <Sparkle className="size-2.5 shrink-0" weight="fill" aria-hidden />
-                    <span className="text-[10px] font-medium leading-none tabular-nums opacity-95">
-                      {estimatedCredits ?? "-"}
-                    </span>
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
+          <GenerateShaderButton
+            isReady={isReady}
+            isGenerating={isGenerating}
+            allowConcurrent={false}
+            onGenerate={() => void handleGenerate()}
+            creditCost={estimatedCredits ?? "-"}
+          />
         </div>
 
         {/* Controls: Add Reference Image, Model Selector, Size, Enhance Prompt */}

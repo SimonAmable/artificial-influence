@@ -2,6 +2,8 @@ export const UPSCALE_MODEL_IDENTIFIER = "prunaai/p-image-upscale"
 
 export const SEEDVR2_MODEL_IDENTIFIER = "zsxkib/seedvr2"
 
+export const DEFAULT_UPSCALE_CREDITS_COST = 1
+
 export type UpscaleMode = "target" | "factor"
 
 export type UpscaleParameters = {

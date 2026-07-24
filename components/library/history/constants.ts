@@ -19,6 +19,7 @@ export const HISTORY_TOOLS = [
   { value: "face_swap", label: "Face Swap" },
   { value: "motion_copy", label: "Motion Copy" },
   { value: "ai_influencer", label: "AI Influencer" },
+  { value: "carousel_shots", label: "Carousel Shots" },
   { value: "remove-background", label: "Background Remover" },
   { value: "upscale", label: "Upscale" },
   { value: "chat-generation", label: "AI Chat Agent" },

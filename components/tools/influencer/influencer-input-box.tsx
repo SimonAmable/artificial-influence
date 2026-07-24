@@ -75,6 +75,8 @@ interface InfluencerInputBoxProps {
   onEnhancePromptChange?: (enabled: boolean) => void
   isGenerating?: boolean
   forceRowLayout?: boolean
+  /** `bar` = full-width generate row (image page / studio tools); `compact` = beside prompt */
+  generateButtonLayout?: "compact" | "bar"
   placeholder?: string
   selectedModel?: string
   onModelChange?: (modelIdentifier: string) => void
@@ -91,14 +93,35 @@ interface InfluencerInputBoxProps {
   selectedNumImages?: number
   onNumImagesChange?: (n: number) => void
   showNumImagesSelector?: boolean
+  /** Replace the default prompt textarea (e.g. example save editor) */
   customPromptContent?: React.ReactNode
+  /** Extra controls rendered after the + button, before model/aspect pills */
   customControlsStart?: React.ReactNode
+  /** Extra controls rendered at the end of the bottom toolbar */
+  customControlsEnd?: React.ReactNode
+  /** Replace Generate with a custom action stack (e.g. Save / Cancel) */
+  customPrimaryAction?: React.ReactNode
   hidePromptInput?: boolean
   showReferenceControls?: boolean
+  /** Place Generate as a send icon on the right of the bottom controls row */
   showGenerateInBottomRow?: boolean
   hideEnhancePrompt?: boolean
+  /** Hide the default + reference upload menu */
+  hideAddReferenceButton?: boolean
   isReadyOverride?: boolean
+  /** Replace default upload menu items inside the + dropdown */
   uploadMenuItems?: React.ReactNode
+  /** Hover/click label on reference thumbs (e.g. "Make Slot") */
+  referenceImageActionLabel?: string
+  /** When set, reference thumb click runs this instead of fullscreen preview */
+  onReferenceImageAction?: (index: number) => void
+  /** Hide the remove (X) control on reference thumbs */
+  hideReferenceRemove?: boolean
+  /**
+   * When set with showNumImagesSelector, always show 1..n options
+   * (ignores model max_images gate). Useful for example templates.
+   */
+  forcedMaxImages?: number
   /** When true, Generate button stays enabled during generation so user can send concurrent requests */
   allowConcurrent?: boolean
   /** When true, model selector, aspect ratio, and other options stay enabled during generation */
@@ -126,6 +149,7 @@ export function InfluencerInputBox({
   onEnhancePromptChange,
   isGenerating = false,
   forceRowLayout: _forceRowLayout = false,
+  generateButtonLayout = "compact",
   placeholder = "Describe your image, use / for presets and @ for brand kits & assets.",
   selectedModel,
   onModelChange,
@@ -142,17 +166,24 @@ export function InfluencerInputBox({
   showNumImagesSelector = false,
   customPromptContent,
   customControlsStart,
+  customControlsEnd,
+  customPrimaryAction,
   hidePromptInput = false,
   showReferenceControls = true,
   showGenerateInBottomRow = false,
   hideEnhancePrompt = false,
+  hideAddReferenceButton = false,
   isReadyOverride,
   uploadMenuItems,
+  referenceImageActionLabel,
+  onReferenceImageAction,
+  hideReferenceRemove = false,
+  forcedMaxImages,
   allowConcurrent = false,
   allowOptionsDuringGeneration = false,
   onAttachedRefsChange,
   allowedAssetTypes,
-  activeGenerationSlotCount: _activeGenerationSlotCount,
+  activeGenerationSlotCount = 0,
   modelParameters,
   onModelParametersChange,
 }: InfluencerInputBoxProps) {
@@ -501,23 +532,51 @@ export function InfluencerInputBox({
     outputCount: selectedNumImages,
   })
 
-  // Determine if button is ready (prompt must not be empty)
+  // Manually uploaded reference(s), same row as @-attached image assets below.
+  // Show controlled `referenceImages` even without a change handler (e.g. example save).
+  const manualDisplayImages =
+    onReferenceImagesChange || referenceImages !== undefined
+      ? localReferenceImages
+      : localReferenceImage
+        ? [localReferenceImage]
+        : []
+
+  // Ready when prompt, @-attached images, or uploaded reference images are present.
   const isReady = React.useMemo(() => {
     if (typeof isReadyOverride === "boolean") {
       return isReadyOverride
     }
     return (
       buildPromptWithRefs(localPrompt, brandRefsOnly(attachedRefs)).trim().length > 0 ||
-      getImageAssetUrlsFromRefChips(attachedRefs).length > 0
+      getImageAssetUrlsFromRefChips(attachedRefs).length > 0 ||
+      manualDisplayImages.length > 0
     )
-  }, [isReadyOverride, localPrompt, attachedRefs])
+  }, [isReadyOverride, localPrompt, attachedRefs, manualDisplayImages.length])
 
-  // Manually uploaded reference(s), same row as @-attached image assets below
-  const manualDisplayImages = onReferenceImagesChange
-    ? localReferenceImages
-    : localReferenceImage
-      ? [localReferenceImage]
-      : []
+  const generateButton = customPrimaryAction ?? (
+    <GenerateShaderButton
+      layout={showGenerateInBottomRow ? "icon" : generateButtonLayout}
+      isReady={isReady}
+      isGenerating={isGenerating}
+      allowConcurrent={allowConcurrent}
+      onGenerate={onGenerate}
+      creditCost={estimatedCredits ?? "-"}
+      activeSlotCount={activeGenerationSlotCount}
+    />
+  )
+
+  const numImagesCeiling = React.useMemo(() => {
+    if (typeof forcedMaxImages === "number" && forcedMaxImages > 0) {
+      return forcedMaxImages
+    }
+    return selectedModelObject?.max_images ?? 1
+  }, [forcedMaxImages, selectedModelObject?.max_images])
+
+  const showNumImagesControl =
+    showNumImagesSelector &&
+    (typeof forcedMaxImages === "number"
+      ? forcedMaxImages > 0
+      : Boolean(selectedModelObject && (selectedModelObject.max_images ?? 1) > 1))
 
   /** Image library assets tagged in the prompt with a usable preview URL */
   const attachedImageAssetsWithPreview = React.useMemo(
@@ -568,27 +627,55 @@ export function InfluencerInputBox({
         {/* Image Preview - Above Text Input */}
         {showReferenceControls && previewRowCount > 0 && (
           <div className="relative w-full flex gap-2 flex-wrap">
-            {manualDisplayImages.map((image, index) => (
-              <div key={`upload-${index}`} className="relative">
+            {manualDisplayImages.map((image, index) => {
+              const actionLabel = referenceImageActionLabel
+              const handleThumbClick = () => {
+                if (onReferenceImageAction) {
+                  onReferenceImageAction(index)
+                  return
+                }
+                handleImagePreviewClick(index)
+              }
+
+              return (
+              <div key={`upload-${index}`} className="group relative">
                 <img
                   src={image.url}
                   alt={`Reference image ${index + 1}`}
-                  className="h-[60px] w-auto max-w-full rounded object-contain border border-border cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => handleImagePreviewClick(index)}
+                  className={cn(
+                    "h-[60px] w-auto max-w-full rounded object-contain border border-border cursor-pointer transition-opacity",
+                    !actionLabel && "hover:opacity-80",
+                  )}
+                  onClick={handleThumbClick}
                 />
+                {actionLabel ? (
+                  <button
+                    type="button"
+                    className="absolute inset-0 flex items-center justify-center rounded bg-black/60 opacity-0 transition-opacity group-hover:opacity-100"
+                    onClick={handleThumbClick}
+                    title={actionLabel}
+                  >
+                    <span className="px-1 text-center text-[9px] font-bold uppercase tracking-wide text-white">
+                      {actionLabel}
+                    </span>
+                  </button>
+                ) : null}
+                {!hideReferenceRemove ? (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
-                    handleReferenceImageRemove(onReferenceImagesChange ? index : undefined)
+                    handleReferenceImageRemove(onReferenceImagesChange || referenceImages !== undefined ? index : undefined)
                   }}
                   className="absolute -top-1 -right-1 bg-background hover:bg-destructive text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10"
                   aria-label={`Remove reference image ${index + 1}`}
                 >
                   <X className="size-3" weight="bold" />
                 </button>
+                ) : null}
               </div>
-            ))}
+              )
+            })}
             {attachedImageAssetsWithPreview.map((ref, assetIdx) => {
               const url = (ref.assetUrl || ref.previewUrl || "").trim()
               const globalIndex = manualDisplayImages.length + assetIdx
@@ -618,8 +705,17 @@ export function InfluencerInputBox({
         )}
 
         {/* Textarea and Generate Button - Side by Side */}
-        <div className="flex items-start gap-2 pt-1 px-2">
+        {(!hidePromptInput || customPromptContent || customPrimaryAction) && (
+        <>
+        <div
+          className={cn(
+            "flex items-start gap-2 pt-1 px-2",
+            (generateButtonLayout === "bar" || showGenerateInBottomRow) && "pb-0",
+          )}
+        >
+          {!hidePromptInput ? (
           <div className="flex-1">
+            {customPromptContent ?? (
             <ImagePromptFields
               promptValue={localPrompt}
               onPromptChange={(value) => {
@@ -635,20 +731,23 @@ export function InfluencerInputBox({
               allowedAssetTypes={allowedAssetTypes}
               onSlashUiAction={handleSlashUiAction}
             />
+            )}
           </div>
+          ) : null}
 
-          <GenerateShaderButton
-            isReady={isReady}
-            isGenerating={isGenerating}
-            allowConcurrent={allowConcurrent}
-            onGenerate={onGenerate}
-            creditCost={estimatedCredits ?? "-"}
-          />
+          {generateButtonLayout === "compact" && !showGenerateInBottomRow ? generateButton : null}
         </div>
+        {generateButtonLayout === "bar" && !showGenerateInBottomRow ? (
+          <div className="w-full px-2 pt-1">{generateButton}</div>
+        ) : null}
+        </>
+        )}
 
         {/* Controls: Add Reference Image, Model Selector, Enhance Prompt */}
         <LayoutGroup id="influencer-controls">
-          <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex min-w-0 items-center gap-1">
+            <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {!hideAddReferenceButton ? (
             <AnimatedControlItem>
               <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -661,6 +760,8 @@ export function InfluencerInputBox({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
+              {uploadMenuItems ?? (
+                <>
               <DropdownMenuItem onClick={handleUploadReferenceImage}>
                 <FilePlus className="size-4 mr-2" />
                 Upload Reference Image
@@ -669,9 +770,16 @@ export function InfluencerInputBox({
                 <FolderOpen className="size-4 mr-2" />
                 Select Asset
               </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
             </AnimatedControlItem>
+            ) : null}
+
+            {customControlsStart ? (
+              <AnimatedControlItem>{customControlsStart}</AnimatedControlItem>
+            ) : null}
 
           <AnimatePresence {...influencerControlsPresenceProps}>
           {/* Model Selector (if enabled) */}
@@ -755,8 +863,8 @@ export function InfluencerInputBox({
               </AnimatedControlItem>
             ) : null}
 
-          {/* Number of Images Selector (when model supports max_images > 1) */}
-            {showNumImagesSelector && selectedModelObject && (selectedModelObject.max_images ?? 1) > 1 ? (
+          {/* Number of Images Selector (when model supports max_images > 1, or forced) */}
+            {showNumImagesControl ? (
               <AnimatedControlItem key="num-images-selector" appear>
             <Select
               value={String(selectedNumImages)}
@@ -773,7 +881,7 @@ export function InfluencerInputBox({
               </SelectTrigger>
               <PromptControlMenuContent>
                 <PromptControlMenuGroup label="Images">
-                  {Array.from({ length: selectedModelObject.max_images ?? 1 }, (_, i) => i + 1).map((n) => (
+                  {Array.from({ length: numImagesCeiling }, (_, i) => i + 1).map((n) => (
                     <PromptControlMenuItem
                       key={n}
                       value={String(n)}
@@ -881,6 +989,14 @@ export function InfluencerInputBox({
               </AnimatedControlItem>
             ) : null}
           </AnimatePresence>
+
+            {customControlsEnd ? (
+              <AnimatedControlItem>{customControlsEnd}</AnimatedControlItem>
+            ) : null}
+            </div>
+            {showGenerateInBottomRow ? (
+              <div className="ml-auto shrink-0">{generateButton}</div>
+            ) : null}
           </div>
         </LayoutGroup>
 

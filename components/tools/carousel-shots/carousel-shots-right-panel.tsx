@@ -46,6 +46,7 @@ type CarouselShotsRightPanelProps = {
   pendingJobs: CarouselShotsPendingJob[]
   pendingResults: CarouselShotsPendingResult[]
   regeneratingId: string | null
+  focusedGenerationId?: string | null
   view: CarouselShotsRightView
   onRegenerate: (generationId: string) => Promise<void>
   onShotsChange: (generationId: string, shots: CarouselShotsMetadata["shots"]) => void
@@ -57,6 +58,7 @@ export function CarouselShotsRightPanel({
   pendingJobs,
   pendingResults,
   regeneratingId,
+  focusedGenerationId = null,
   view,
   onRegenerate,
   onShotsChange,
@@ -105,6 +107,7 @@ export function CarouselShotsRightPanel({
           pendingJobs={pendingJobs}
           pendingResults={pendingResults}
           regeneratingId={regeneratingId}
+          focusedGenerationId={focusedGenerationId}
           upscaleSettings={upscaleSettings}
           onRegenerate={onRegenerate}
           onShotsChange={onShotsChange}
