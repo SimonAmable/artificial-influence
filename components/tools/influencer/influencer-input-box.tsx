@@ -746,7 +746,7 @@ export function InfluencerInputBox({
         {/* Controls: Add Reference Image, Model Selector, Enhance Prompt */}
         <LayoutGroup id="influencer-controls">
           <div className="flex min-w-0 items-center gap-1">
-            <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-fade-x no-scrollbar [-webkit-overflow-scrolling:touch]">
             {!hideAddReferenceButton ? (
             <AnimatedControlItem>
               <DropdownMenu>

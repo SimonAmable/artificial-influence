@@ -202,7 +202,7 @@ export function DualReferenceSwapInputBox({
         </div>
 
         <LayoutGroup id="studio-tool-controls">
-          <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-fade-x no-scrollbar [-webkit-overflow-scrolling:touch]">
             <AnimatedControlItem>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

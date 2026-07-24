@@ -410,6 +410,29 @@ body::-webkit-scrollbar-button:horizontal,
   display: none;
 }
 
+/*
+ * Beat the global *:not(html):not(body) scrollbar rules so shadcn `no-scrollbar`
+ * actually hides the bar (scroll-fade still works on the mask).
+ */
+*:not(html):not(body).no-scrollbar,
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+}
+
+*:not(html):not(body).no-scrollbar::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+*:not(html):not(body).no-scrollbar::-webkit-scrollbar-button,
+.no-scrollbar::-webkit-scrollbar-button {
+  display: none;
+}
+
 /* Shadow Utility Classes - Can be used with Tailwind */
 .shadow-s,
 .shadow-depth-s {

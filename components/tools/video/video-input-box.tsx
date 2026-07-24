@@ -685,7 +685,7 @@ export function VideoInputBox({
 
   const videoToolbarRow = (
     <LayoutGroup id="video-controls">
-      <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden px-2 [-webkit-overflow-scrolling:touch] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-fade-x no-scrollbar px-2 [-webkit-overflow-scrolling:touch]">
         {showMediaPlusMenu ? (
           <AnimatedControlItem>
             <DropdownMenu>

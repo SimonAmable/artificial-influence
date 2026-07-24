@@ -32,7 +32,7 @@ export const CAROUSEL_SHOTS_EXAMPLE = {
   aspectRatioClass: "aspect-[9/16]",
   title: "Carousel Shots",
   description:
-    "Upload one photo to create a full carousel of matching shots. Download or upscale any panel.",
+    "Upload one photo to create a full carousel of matching shots for the cost of one image.  Download or upscale any panel.",
 } as const
 
 export function getCarouselReferencePublicUrl(storagePath: string): string | null {
