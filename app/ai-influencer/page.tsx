@@ -820,11 +820,13 @@ export default function AIInfluencerPage() {
         <h2 className="text-xs font-bold uppercase tracking-wider text-foreground font-display">Builder</h2>
         <Button
           variant="ghost"
-          size="sm"
+          size="icon-sm"
           onClick={handleReset}
-          className="text-xs font-semibold text-muted-foreground hover:text-foreground h-7 px-2.5"
+          aria-label="Reset"
+          title="Reset"
+          className="text-muted-foreground hover:text-foreground"
         >
-          Reset
+          <ArrowsClockwise className="size-4" aria-hidden />
         </Button>
       </div>
       <ScrollArea className="flex-1 min-h-0 px-4 pb-4">

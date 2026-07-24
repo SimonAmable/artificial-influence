@@ -5,13 +5,19 @@ import { XIcon } from "@phosphor-icons/react"
 import { PricingSection } from "@/components/landing/pricing-section"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogOverlay, DialogPortal } from "@/components/ui/dialog"
+import type { PricingPlansModalTab } from "@/lib/pricing-upsell"
 
 type PricingPlansDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialTab?: PricingPlansModalTab
 }
 
-export function PricingPlansDialog({ open, onOpenChange }: PricingPlansDialogProps) {
+export function PricingPlansDialog({
+  open,
+  onOpenChange,
+  initialTab,
+}: PricingPlansDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
@@ -36,7 +42,12 @@ export function PricingPlansDialog({ open, onOpenChange }: PricingPlansDialogPro
           </Button>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <PricingSection embedded compact />
+            <PricingSection
+              key={open ? `open-${initialTab ?? "monthly"}` : "closed"}
+              embedded
+              compact
+              initialTab={initialTab}
+            />
           </div>
         </DialogPrimitive.Content>
       </DialogPortal>

@@ -2,6 +2,10 @@
 
 export const NANO_BANANA_2_LITE_CREDITS_PER_IMAGE = 2;
 export const VEO_31_FAST_CREDITS_PER_SECOND = 6;
+/** Marketing default clip length for plan-card video estimates. */
+export const VEO_31_FAST_FEATURED_CLIP_SECONDS = 5;
+export const VEO_31_FAST_CREDITS_PER_5S_VIDEO =
+  VEO_31_FAST_CREDITS_PER_SECOND * VEO_31_FAST_FEATURED_CLIP_SECONDS;
 
 export type PricingEstimateUnit = 'image' | 'second';
 
@@ -104,11 +108,14 @@ export function formatTieredCreditsLabel(model: PricingEstimateModel): string {
 export function getFeaturedPlanEstimates(credits: number) {
   const nanoBanana2LiteImages = estimateCount(credits, NANO_BANANA_2_LITE_CREDITS_PER_IMAGE);
   const veoSeconds = estimateCount(credits, VEO_31_FAST_CREDITS_PER_SECOND);
+  const veo5sVideos = estimateCount(credits, VEO_31_FAST_CREDITS_PER_5S_VIDEO);
+  const videoNoun = veo5sVideos === 1 ? 'video' : 'videos';
   return {
     nanoBanana2LiteImages,
     veoSeconds,
+    veo5sVideos,
     imageLine: `Up to ${nanoBanana2LiteImages} NB2 ${nanoBanana2LiteImages === 1 ? 'image' : 'images'}`,
-    videoLine: `Up to ${veoSeconds} ${veoSeconds === 1 ? 'second' : 'seconds'} of Veo 3.1 Fast`,
+    videoLine: `Approx. ${veo5sVideos} × 5s Veo 3.1 Fast ${videoNoun}`,
   };
 }
 

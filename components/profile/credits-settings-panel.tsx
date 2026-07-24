@@ -69,6 +69,11 @@ export function CreditsSettingsPanel({
     openPricingPlansModal()
   }
 
+  const handleBuyCredits = () => {
+    onCloseModal?.()
+    openPricingPlansModal({ tab: "one-time" })
+  }
+
   const pillBtn = isModal ? "rounded-full" : undefined
 
   return (
@@ -89,9 +94,13 @@ export function CreditsSettingsPanel({
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <Button type="button" className={pillBtn} onClick={handleBuyCredits}>
+          Buy credits
+        </Button>
         {hasSubscription ? (
           <Button
             type="button"
+            variant="outline"
             disabled={portalLoading}
             className={pillBtn}
             onClick={() => void handleManageBilling()}
@@ -99,7 +108,7 @@ export function CreditsSettingsPanel({
             {portalLoading ? "Opening…" : "Manage billing"}
           </Button>
         ) : (
-          <Button type="button" className={pillBtn} onClick={handleUpgrade}>
+          <Button type="button" variant="outline" className={pillBtn} onClick={handleUpgrade}>
             Upgrade plan
           </Button>
         )}

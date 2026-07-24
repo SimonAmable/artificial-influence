@@ -781,10 +781,10 @@ function getPlanComparisonRows(starterCredits: number, paidCredits: number): Com
       plus: `Up to ${plus.nanoBanana2LiteImages}`,
     },
     {
-      feature: 'Veo 3.1 Fast',
-      free: `Up to ${free.veoSeconds}s`,
-      starter: `Up to ${starter.veoSeconds}s`,
-      plus: `Up to ${plus.veoSeconds}s`,
+      feature: 'Veo 3.1 Fast (5s)',
+      free: `Approx. ${free.veo5sVideos}`,
+      starter: `Approx. ${starter.veo5sVideos}`,
+      plus: `Approx. ${plus.veo5sVideos}`,
     },
     {
       feature: 'Commercial license',
@@ -917,6 +917,7 @@ function EnterprisePlanCard({ className }: { className?: string }) {
 type PricingSectionProps = {
   embedded?: boolean;
   compact?: boolean;
+  initialTab?: PricingTab;
 };
 
 type SubscriptionUiState =
@@ -929,10 +930,14 @@ type SubscriptionUiState =
       activePlanName: string | null;
     };
 
-export function PricingSection({ embedded = false, compact = false }: PricingSectionProps) {
+export function PricingSection({
+  embedded = false,
+  compact = false,
+  initialTab = 'monthly',
+}: PricingSectionProps) {
   const isPresence = isPresenceProduct();
   const [loading, setLoading] = useState<string | null>(null);
-  const [activePricingTab, setActivePricingTab] = useState<PricingTab>('monthly');
+  const [activePricingTab, setActivePricingTab] = useState<PricingTab>(initialTab);
   const [subscriptionState, setSubscriptionState] = useState<SubscriptionUiState>({
     status: 'pending',
   });

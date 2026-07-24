@@ -21,6 +21,8 @@ type GenerateShaderButtonProps = {
   activeSlotCount?: number
   /** `bar` = full-width single row; `compact` = side column; `icon` = send icon for toolbar */
   layout?: GenerateShaderButtonLayout
+  /** Primary action label when not generating. Defaults to "Generate". */
+  label?: string
   className?: string
 }
 
