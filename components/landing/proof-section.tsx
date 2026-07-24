@@ -56,9 +56,9 @@ function ProofMarquee({ images, priority = false }: ProofMarqueeProps) {
         {marqueeImages.map((imageSrc, index) => (
         <article
           key={`${index}-${imageSrc}`}
-          className="relative h-[var(--proof-card-height)] w-[var(--proof-card-width)] shrink-0 overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur-sm"
+          className="relative h-[var(--proof-card-height)] w-[var(--proof-card-width)] shrink-0 rounded-2xl border border-border/70 bg-card/80 backdrop-blur-sm"
         >
-          <div className="relative h-full w-full overflow-hidden bg-muted/30">
+          <div className="relative h-full w-full overflow-hidden rounded-2xl bg-muted/30">
             <Image
               src={encodeURI(imageSrc)}
               alt={`Proof showcase screenshot ${index + 1}`}
@@ -69,6 +69,10 @@ function ProofMarquee({ images, priority = false }: ProofMarqueeProps) {
               sizes="(min-width: 1280px) 16vw, (min-width: 1024px) 18vw, (min-width: 768px) 22vw, 42vw"
             />
           </div>
+          <div
+            className="pointer-events-none absolute inset-0 z-10 rounded-2xl shadow-md"
+            aria-hidden
+          />
         </article>
         ))}
       </div>

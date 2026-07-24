@@ -603,9 +603,11 @@ function getSubscriptionCardBullets(plan: PricingPlan) {
 function PlanCreditEstimates({
   credits,
   creditsLabel,
+  hideVideoEstimate = false,
 }: {
   credits: number;
   creditsLabel?: string;
+  hideVideoEstimate?: boolean;
 }) {
   const featured = getFeaturedPlanEstimates(credits);
   const modelLines = getModelEstimateLines(credits);
@@ -635,7 +637,12 @@ function PlanCreditEstimates({
       </div>
       <div className="mt-2 space-y-0.5">
         <p className="text-xs leading-relaxed text-muted-foreground">{featured.imageLine}</p>
-        <p className="text-xs leading-relaxed text-muted-foreground">{featured.videoLine}</p>
+        <p
+          className="text-xs leading-relaxed text-muted-foreground"
+          aria-hidden={hideVideoEstimate}
+        >
+          {hideVideoEstimate ? '\u00A0' : featured.videoLine}
+        </p>
       </div>
     </div>
   );
@@ -762,7 +769,11 @@ type ComparisonRow = {
   plus: ComparisonCell;
 };
 
-function getPlanComparisonRows(starterCredits: number, paidCredits: number): ComparisonRow[] {
+function getPlanComparisonRows(
+  starterCredits: number,
+  paidCredits: number,
+  isPresence = false,
+): ComparisonRow[] {
   const free = getFeaturedPlanEstimates(freePlan.credits);
   const starter = getFeaturedPlanEstimates(starterCredits);
   const plus = getFeaturedPlanEstimates(paidCredits);
@@ -805,7 +816,7 @@ function getPlanComparisonRows(starterCredits: number, paidCredits: number): Com
       plus: 'Expanded',
     },
     {
-      feature: 'Instagram & TikTok',
+      feature: isPresence ? 'Fanvue' : 'Instagram & TikTok',
       free: '—',
       starter: 'Unlimited',
       plus: 'Unlimited',
@@ -824,7 +835,8 @@ function PlanComparisonDetails({ proLabel = 'Plus' }: { proLabel?: string }) {
   const isPresence = isPresenceProduct();
   const rows = getPlanComparisonRows(
     isPresence ? FANVUE_MONTHLY_CREDITS.starter : 400,
-    isPresence ? FANVUE_MONTHLY_CREDITS.pro : 1000
+    isPresence ? FANVUE_MONTHLY_CREDITS.pro : 1000,
+    isPresence,
   );
 
   return (
@@ -1467,6 +1479,7 @@ export function PricingSection({
                         <PlanCreditEstimates
                           credits={plan.credits}
                           creditsLabel={plan.creditsLabel}
+                          hideVideoEstimate={plan.name === 'Free'}
                         />
 
                         <ul className="space-y-2">

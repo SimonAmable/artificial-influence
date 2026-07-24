@@ -9,9 +9,43 @@ import { Button } from "@/components/ui/button"
 import { WebGLShader } from "@/components/ui/web-gl-shader"
 import { HERO_SHOWCASE_IMAGE_DURATION_MS, getHeroShowcaseMedia } from "@/lib/constants/hero-showcase-media"
 import { currentProduct } from "@/lib/product/current"
+import { cn } from "@/lib/utils"
 
 const heroEase = [0.22, 1, 0.36, 1] as const
 const DESKTOP_HERO_MEDIA_QUERY = "(min-width: 768px)"
+/** Full-bleed layer on top of media; shadow must not live on the `overflow-hidden` clip (see platform-surfaces-section). */
+const heroPreviewShadowOverlayClass =
+  "pointer-events-none absolute inset-0 z-10 rounded-lg shadow-lg"
+
+function HeroPreviewImage({
+  className,
+  gradientOverlayClassName,
+  imageAlt,
+}: {
+  className?: string
+  gradientOverlayClassName?: string
+  imageAlt: string
+}) {
+  return (
+    <div className={cn("relative rounded-lg border border-border/60 bg-card/95", className)}>
+      <div className="absolute inset-0 overflow-hidden rounded-lg">
+        <Image
+          src="/page_screenshots_or_screenrecordings/agent.png"
+          alt={imageAlt}
+          fill
+          className="object-contain object-top"
+        />
+        <div
+          className={cn(
+            "absolute inset-0 bg-gradient-to-t from-background/18 via-transparent to-transparent",
+            gradientOverlayClassName,
+          )}
+        />
+      </div>
+      <div className={heroPreviewShadowOverlayClass} aria-hidden />
+    </div>
+  )
+}
 
 export function TempHero() {
   const heroBackgroundMedia = React.useMemo(
@@ -87,13 +121,16 @@ export function TempHero() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: prefersReducedMotion ? 0.01 : 0.9, ease: heroEase }}
         >
-          <AnimatePresence mode="wait">
+          <AnimatePresence initial={false}>
             <motion.div
               key={activeMedia.src}
-              initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 1.02 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.985 }}
-              transition={{ duration: prefersReducedMotion ? 0.01 : 0.45, ease: heroEase }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{
+                duration: prefersReducedMotion ? 0.01 : 0.28,
+                ease: heroEase,
+              }}
               className="absolute inset-0"
             >
               {activeMedia.kind === "image" ? (
@@ -192,25 +229,17 @@ export function TempHero() {
         className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-0 md:px-6"
       >
         <div className="w-full max-w-6xl translate-y-[24%] md:translate-y-[20%]">
-          <div className="relative mx-auto hidden aspect-[16/9.2] w-full max-w-[1120px] overflow-hidden rounded-[1.75rem] border border-border/60 bg-card/95 shadow-[0_22px_70px_rgba(15,23,42,0.12)] dark:shadow-[0_22px_70px_rgba(0,0,0,0.55)] md:block">
-            <Image
-              src="/page_screenshots_or_screenrecordings/agent.png"
-              alt={landing.previewAlt}
-              fill
-              className="object-contain object-top"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-background/18 via-transparent to-transparent dark:from-black/28" />
-          </div>
+          <HeroPreviewImage
+            className="mx-auto hidden aspect-[16/9.2] w-full max-w-[1120px] md:block"
+            gradientOverlayClassName="dark:from-black/28"
+            imageAlt={landing.previewAlt}
+          />
 
-          <div className="relative mx-auto aspect-[16/9.2] w-[min(92vw,30rem)] overflow-hidden rounded-[1.4rem] border border-border/60 bg-card/95 shadow-[0_22px_70px_rgba(15,23,42,0.12)] dark:shadow-[0_22px_70px_rgba(0,0,0,0.55)] md:hidden">
-            <Image
-              src="/page_screenshots_or_screenrecordings/agent.png"
-              alt={landing.previewAlt}
-              fill
-              className="object-contain object-top"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-background/18 via-transparent to-transparent dark:from-black/32" />
-          </div>
+          <HeroPreviewImage
+            className="mx-auto aspect-[16/9.2] w-[min(92vw,30rem)] md:hidden"
+            gradientOverlayClassName="dark:from-black/32"
+            imageAlt={landing.previewAlt}
+          />
         </div>
       </motion.div>
 

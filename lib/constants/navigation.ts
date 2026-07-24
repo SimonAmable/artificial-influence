@@ -87,8 +87,8 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/motion-copy", label: "Motion Copy" },
   { path: "/lipsync", label: "Lipsync" },
   { path: "/inpaint", label: "Image Editing" },
-  { path: "/image?model=custom/character-swap", label: "Character Swap" },
   { path: "/carousel-shots", label: "Carousel Shots" },
+  { path: "/image?model=custom/character-swap", label: "Character Swap" },
   { path: "/image?model=custom/face-swap", label: "Face Swap" },
   { path: "/ai-influencer", label: "AI Influencer" },
   { path: "/canvases", label: "Canvas" },
@@ -201,18 +201,18 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             iconPhosphor: "image",
           },
           {
-            path: "/image?model=custom/character-swap",
-            label: "Character Swap",
-            description: "Create realistic character swaps",
-            badge: "new",
-            iconPhosphor: "user-switch",
-          },
-          {
             path: "/carousel-shots",
             label: "Carousel Shots",
             description: "Generate multi-shot carousels from one reference",
             badge: "new",
             iconPhosphor: "squares-four",
+          },
+          {
+            path: "/image?model=custom/character-swap",
+            label: "Character Swap",
+            description: "Create realistic character swaps",
+            badge: "new",
+            iconPhosphor: "user-switch",
           },
           {
             path: "/image?model=custom/face-swap",
@@ -735,16 +735,16 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     hint: "Edit regions of an image with prompts.",
   },
   {
-    label: "Character Swap",
-    href: "/image?model=custom/character-swap",
-    icon: "user-switch",
-    hint: "Swap a subject while keeping the scene.",
-  },
-  {
     label: "Carousel Shots",
     href: "/carousel-shots",
     icon: "squares-four",
     hint: "Generate consistent carousel panels from one reference image.",
+  },
+  {
+    label: "Character Swap",
+    href: "/image?model=custom/character-swap",
+    icon: "user-switch",
+    hint: "Swap a subject while keeping the scene.",
   },
   {
     label: "Face Swap",
