@@ -336,7 +336,7 @@ function LiquidGlassCard({
   )
 }
 
-export default function AIInfluencerPage() {
+function AIInfluencerPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
@@ -1673,5 +1673,13 @@ export default function AIInfluencerPage() {
       </Dialog>
 
     </div>
+  )
+}
+
+export default function AIInfluencerPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <AIInfluencerPageContent />
+    </React.Suspense>
   )
 }
