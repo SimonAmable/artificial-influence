@@ -3,12 +3,26 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { Water } from "@paper-design/shaders-react"
 import { motion, useReducedMotion } from "framer-motion"
 
 import { AuroraShaderBackground } from "@/components/ui/aurora-shader-background"
 import { cn } from "@/lib/utils"
 
 const LOOP_SECONDS = 2.1
+
+const WATER_MEDIA_PROPS = {
+  colorBack: "#8f8f8f",
+  colorHighlight: "#ffffff",
+  highlights: 0.07,
+  layering: 0.5,
+  edges: 0.8,
+  waves: 0.3,
+  caustic: 0.1,
+  size: 1,
+  scale: 0.8,
+  fit: "contain" as const,
+}
 
 /** Compact modern pointer — solid tip, no stem/tail. */
 function ModernPointerCursor({ className }: { className?: string }) {
@@ -41,13 +55,15 @@ export type ShaderDemoCardProps = {
   copyPlacement?: "above" | "below"
   /** How media fills the frame. Default: cover. */
   mediaFit?: "cover" | "contain"
+  /** Paper Design Water distortion over the media image. */
+  mediaWater?: boolean
   className?: string
 }
 
 /**
  * Reusable demo card.
  * Default (no media): aurora shader background, centered CTA, looping click cursor.
- * With media: image card (hub-style).
+ * With media: image card (hub-style), optionally with Paper Water shader.
  */
 export function ShaderDemoCard({
   href,
@@ -60,12 +76,14 @@ export function ShaderDemoCard({
   disabled = false,
   copyPlacement = "below",
   mediaFit = "cover",
+  mediaWater = false,
   className,
 }: ShaderDemoCardProps) {
   const prefersReducedMotion = useReducedMotion()
   const cardRef = React.useRef<HTMLElement | null>(null)
   const [pressed, setPressed] = React.useState(false)
   const showShaderDemo = !mediaSrc
+  const useWaterMedia = Boolean(mediaSrc && mediaWater)
   const displayTitle = title ?? buttonLabel
   const isInteractive = !disabled && Boolean(href)
 
@@ -145,6 +163,20 @@ export function ShaderDemoCard({
         </motion.div>
       ) : null}
     </>
+  ) : useWaterMedia ? (
+    <>
+      <span className="sr-only">{mediaAlt ?? displayTitle}</span>
+      <Water
+        aria-hidden
+        className="absolute inset-0 size-full"
+        width="100%"
+        height="100%"
+        image={encodeURI(mediaSrc)}
+        {...WATER_MEDIA_PROPS}
+        fit={mediaFit}
+        speed={prefersReducedMotion ? 0 : 1}
+      />
+    </>
   ) : (
     <Image
       src={encodeURI(mediaSrc)}
@@ -188,6 +220,7 @@ export function ShaderDemoCard({
           ref={cardRef as React.RefObject<HTMLAnchorElement | null>}
           href={href!}
           className={mediaClassName}
+          aria-label={displayTitle}
         >
           {mediaContent}
         </Link>

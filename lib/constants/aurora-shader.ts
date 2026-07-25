@@ -1,9 +1,36 @@
-export const AURORA_SHADER_COLORS = [
+import { currentProduct } from "@/lib/product/current"
+import type { ProductId } from "@/lib/product/types"
+
+/** Unican: black + --primary pink + --badge-beta lime + black. */
+const UNICAN_AURORA_SHADER_COLORS = [
   "#000000",
-  "#00FF37",
-  "#B6FF41",
+  "#F529A0", // theme-unican --primary (dark)
+  "#DBEE00", // theme-unican --badge-beta
   "#000000",
 ] as const
+
+/** Presence: black + --primary green + --chart-2 teal-green + black. */
+const PRESENCE_AURORA_SHADER_COLORS = [
+  "#000000",
+  "#30F251", // theme-presence --primary (dark)
+  "#00C877", // theme-presence --chart-2
+  "#000000",
+] as const
+
+function auroraColorsForProduct(productId: ProductId) {
+  switch (productId) {
+    case "presence-studio":
+      return PRESENCE_AURORA_SHADER_COLORS
+    case "unican":
+      return UNICAN_AURORA_SHADER_COLORS
+    default: {
+      const _exhaustive: never = productId
+      return _exhaustive
+    }
+  }
+}
+
+export const AURORA_SHADER_COLORS = auroraColorsForProduct(currentProduct.id)
 
 /** Shimmer recipe — Silk path in the multi-style fragment shader. */
 export const AURORA_SHADER_UNIFORMS = {
@@ -31,7 +58,7 @@ export const AURORA_SHADER_UNIFORMS = {
   cursorRadius: 0.15,
 } as const
 
-export const AURORA_SHADER_GLOW = "#00FF37"
+export const AURORA_SHADER_GLOW = AURORA_SHADER_COLORS[1]
 
 function hexToRgb(hex: string): [number, number, number] {
   const normalized = hex.replace("#", "")

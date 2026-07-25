@@ -3,7 +3,7 @@ import type { ProductId } from "@/lib/product/types"
 import { isVisibleByProductMetadata } from "@/lib/product/visibility"
 import type { GuideArticle, GuideHubCard, GuideSectionId } from "@/lib/guides/types"
 
-export const GUIDE_SECTION_ORDER: GuideSectionId[] = ["start", "publish", "platform"]
+export const GUIDE_SECTION_ORDER: GuideSectionId[] = ["platform", "start", "publish"]
 
 export const GUIDE_SECTION_LABELS: Record<GuideSectionId, string> = {
   start: "Start here",
@@ -25,6 +25,8 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
     slug: "shoot-week-of-content",
     title: "Shoot a week of content",
     description: "Batch 7–14 stills ready to post.",
+    mediaSrc: "/docs/shoot-week/order/1/slide-06.png",
+    mediaAlt: "AI influencer portrait from a weekly content batch",
     section: "start",
     available: true,
   },
@@ -43,7 +45,7 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
     description: "Send vault-ready posts straight to Fanvue.",
     mediaSrc: "/brand_icons/fanvue_logo.png",
     mediaAlt: "Fanvue",
-    section: "publish",
+    section: "start",
     available: true,
     products: ["presence-studio"],
   },
@@ -59,8 +61,6 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
     slug: "introduction",
     title: "Introduction",
     description: "What this studio is built for.",
-    mediaSrc: "/ai_influencer/learn_influencer_faceless.jpg",
-    mediaAlt: "AI influencer content example",
     section: "platform",
     available: true,
   },
@@ -361,11 +361,15 @@ Publish (Fanvue and later Instagram) sits after that pipeline. Platform guides �
   {
     slug: "credits-and-models",
     title: "Credits & models",
-    result: "Know what spends credits, where to top up, and which model family fits the job.",
+    result: "Credits never expire — spend smart, pick the right model, keep what you buy.",
     presentation: "info",
-    overview: `Credits are the studio currency. Almost every generation — image, video, Carousel Shots, upscale, and similar tools — spends them. Costs are per model: lighter models burn less; premium video and image models cost more. Failed jobs can refund.
+    overview: `Credits never expire. Buy a pack or roll unused monthly credits forward — they stay on your balance until you spend them. That is a hard advantage over platforms like Higgsfield, where unused allotments typically vanish when the cycle resets. Top up once, shoot when you are ready.
 
-Your balance sits in the header (coin control) and under Settings → Credits. Plans grant a monthly allotment; one-time packs top up when you need more. Exact plan sizes and billing portals differ by product, but the credit meter and model picker work the same way.
+Credits are the studio currency. Almost every generation — image, video, Carousel Shots, upscale, and similar tools — spends them. Costs are per model: lighter models burn less; premium video and image models cost more.
+
+Failed generations always refund. If a job fails, those credits come back — you only pay for successful outputs.
+
+Your balance sits in the header (coin control) and under Settings → Credits. Plans grant a monthly allotment; one-time packs top up when you need more. Exact plan sizes and billing portals differ by product, but the credit meter and model picker work the same way. A $10 top-up is 200 credits (~5¢ each).
 
 Models are chosen inside each tool. Image, Video, Carousel Shots, and AI Influencer each expose the models that fit that job. You do not need every model — match quality and cost to the step you are on. Locking a face with Direct Save is free; Merge and Build use GPT Image 2. Day-to-day stills and carousels usually run on Nano Banana, GPT Image, or Seedream. Motion leans on Kling, Veo, Seedance, and related video models.
 
@@ -390,16 +394,22 @@ Spend smart: batch with a mid-tier model while exploring, then upscale or re-run
     infoSectionsHeading: "Key points",
     infoSections: [
       {
+        title: "Credits never expire",
+        body: `Unused credits stay yours — monthly grants stack, and purchased packs do not time out. Platforms like Higgsfield usually wipe unused credits when the billing period ends. Here you can bank a top-up for a quiet week and burn it on a big shoot later.`,
+      },
+      {
         title: "What spends credits",
         body: `Image and video generations, Carousel Shots, upscale, SynthID scrub, and remove-background all deduct credits. Cost follows the selected model.
 
-Direct Save for AI Influencer is free. Most free-tools (compressor and similar) do not spend credits. Failed generations can refund.`,
+Direct Save for AI Influencer is free. Most free-tools (compressor and similar) do not spend credits.
+
+Failed generations always refund. Credits return automatically when a job fails — you are not charged for broken runs.`,
       },
       {
         title: "Balance, plans, and packs",
-        body: `Check the coin in the header or Settings → Credits. Plans add monthly credits; packs are one-time top-ups on Pricing.
+        body: `Check the coin in the header or Settings → Credits. Plans add monthly credits; packs are one-time top-ups on Pricing. $10 buys 200 credits. Whatever you do not spend stays.
 
-Buy credits when you are mid-batch so you do not stall on a keeper run. Monthly allotments stack with what you already have until they are spent.`,
+Buy credits when you are mid-batch so you do not stall on a keeper run — or buy ahead knowing they will not evaporate.`,
         ctaLabel: "Open Pricing",
         ctaHref: "/pricing",
       },
@@ -432,8 +442,43 @@ Draft motion on a cheaper/faster option, then spend on a premium pass only for f
         ctaHref: "/video",
       },
     ],
+    compareTable: {
+      heading: "How far $10 goes",
+      description: "Nano Banana stills from the same ~$10 spend.",
+      columns: ["", "This studio", "dirtybunny.ai", "Prism"],
+      rows: [
+        {
+          label: "$10 of credits",
+          values: ["200", "200", "~1,000"],
+        },
+        {
+          label: "Stills",
+          values: ["~100", "~25", "~66"],
+        },
+        {
+          label: "$ / Nano Banana still",
+          values: ["~$0.10", "~$0.40", "~$0.15"],
+        },
+        {
+          label: "Multi-angle",
+          values: ["4–8 credits (~$0.20–$0.40)", "32 credits (~$1.60)", "60 credits (~$0.60)"],
+        },
+        {
+          label: "Credits expire?",
+          values: ["Never", "Paid: never · Free: yes", "Typically cycle"],
+        },
+      ],
+      footnote:
+        "Studio: $10 = 200 credits, Nano Banana 2 Lite @ 2 cr — and credits never expire (unlike Higgsfield-style monthly resets). dirtybunny.ai (PixelBunny): $10 = 200 credits @ 5¢, 8 cr / gen; multi-angle ~32 cr. Prism: NB2 @ 15 cr (~$0.01 / credit); multi-angle ~60 cr.",
+      sources: [
+        { label: "PixelBunny guides", href: "https://pixelbunny.ai/guides" },
+        { label: "How credits work", href: "https://pixelbunny.ai/guides/credits-and-pricing" },
+        { label: "Multi-angle shots", href: "https://pixelbunny.ai/guides/multi-angle-product-shots" },
+      ],
+    },
     outcomes: [
-      "You know where balance lives and how to top up",
+      "You know credits never expire — unlike Higgsfield-style resets",
+      "You know failed generations always refund",
       "You can match image vs video models to the job without overspending",
       "You treat Carousel Shots and Direct Save as credit-smart shortcuts",
     ],
@@ -451,7 +496,7 @@ Draft motion on a cheaper/faster option, then spend on a premium pass only for f
 
 Assets is the curated shelf. Save keepers, characters, and files you want to find again without scrolling the whole timeline. Characters you lock live here so you can reuse them.
 
-The @ system ties them together in prompts. Tap a face under Working with, or type @, to attach a character reference (from a saved Asset or a generation). That mention keeps the next stills on the same person instead of drifting.`,
+In prompts, type {{@}} to attach a saved character or generation, or tap {{+}} when you need a new one. That reference keeps the next stills on the same person instead of drifting.`,
     timeEstimate: "~1 min",
     tools: [
       { label: "History", href: "/assets?tab=history" },

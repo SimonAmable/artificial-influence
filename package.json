@@ -29,6 +29,7 @@
     "@base-ui/react": "^1.1.0",
     "@fal-ai/client": "^1.9.0",
     "@lobehub/icons": "^4.2.0",
+    "@paper-design/shaders-react": "^0.0.77",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-dialog": "^1.1.15",

@@ -22,10 +22,8 @@ export function GuideStepsSection({
   )
 
   return (
-    <section className="flex flex-col gap-6 border-t border-border/70 pt-8">
-      <h2 className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
-        {heading}
-      </h2>
+    <section className="flex flex-col gap-8 border-t border-border/70 pt-8">
+      <h2 className="sr-only">{heading}</h2>
 
       <ol className="flex flex-col gap-10">
         {visibleSteps.map((step, index) => {
@@ -42,12 +40,14 @@ export function GuideStepsSection({
                 )}
               >
                 <div className="flex items-start gap-3">
-                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-border bg-muted/40 text-xs font-medium text-foreground">
-                    {index + 1}
+                  <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center text-xs text-muted-foreground">
+                    {index + 1}.
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-base font-semibold tracking-tight">{step.title}</h3>
-                    <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{step.body}</p>
+                    <h3 className="text-sm font-medium tracking-tight text-foreground">
+                      {step.title}
+                    </h3>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">{step.body}</p>
                     {step.ctaHref && step.ctaLabel ? (
                       <Button asChild variant="outline" size="sm" className="mt-3">
                         <Link href={step.ctaHref}>

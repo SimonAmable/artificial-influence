@@ -20,12 +20,13 @@ function GuideHubCardView({
     <ShaderDemoCard
       href={card.available ? `/guides/${card.slug}` : undefined}
       disabled={!card.available}
-      buttonLabel={card.available ? "Open guide" : "Soon"}
+      buttonLabel={card.available ? card.title : "Soon"}
       title={card.title}
       description={card.description}
       mediaSrc={card.mediaSrc}
       mediaAlt={card.mediaAlt}
-      mediaFit={card.mediaSrc ? "contain" : "cover"}
+      mediaFit="contain"
+      mediaWater={Boolean(card.mediaSrc)}
       animationDelay={animationDelay}
     />
   )
@@ -47,7 +48,7 @@ function GuideSection({
       <h2 className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
         {GUIDE_SECTION_LABELS[section]}
       </h2>
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {cards.map((card, index) => (
           <GuideHubCardView
             key={card.slug}

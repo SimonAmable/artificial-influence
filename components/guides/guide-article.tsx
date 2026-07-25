@@ -5,7 +5,9 @@ import { GuideModePathCards } from "@/components/guides/guide-mode-path-cards"
 import { GuidePromptTrySection } from "@/components/guides/guide-prompt-try"
 import { GuideCarouselUploadSection } from "@/components/guides/guide-carousel-upload"
 import { GuideFanvueTrySection } from "@/components/guides/guide-fanvue-try"
+import { GuideCompareTableSection } from "@/components/guides/guide-compare-table"
 import { GuideInfoSections, GuideLogoStrip } from "@/components/guides/guide-info-sections"
+import { GuideOverviewText } from "@/components/guides/guide-overview-text"
 import { GuideStepsSection } from "@/components/guides/guide-steps-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -50,6 +52,7 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
             mediaSrc={heroMediaSrc}
             mediaAlt={heroMediaAlt}
             mediaFit="contain"
+            mediaWater={Boolean(heroMediaSrc)}
             className="w-full"
           />
         ) : null}
@@ -99,10 +102,7 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
       </header>
 
       {article.overview ? (
-        <section className="flex flex-col gap-2 border-t border-border/70 pt-8">
-          <h2 className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Overview
-          </h2>
+        <section className="flex flex-col gap-4 border-t border-border/70 pt-8">
           <div className="flex flex-col gap-4">
             {article.overview
               .split(/\n\n+/)
@@ -110,7 +110,7 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
               .filter(Boolean)
               .map((paragraph, index) => (
                 <p key={index} className="text-base leading-7 text-muted-foreground">
-                  {paragraph}
+                  <GuideOverviewText text={paragraph} />
                 </p>
               ))}
           </div>
@@ -139,6 +139,17 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
         />
       ) : null}
 
+      {article.compareTable ? (
+        <GuideCompareTableSection
+          table={{
+            ...article.compareTable,
+            columns: article.compareTable.columns.map((column, index) =>
+              index === 1 ? currentProduct.name : column
+            ),
+          }}
+        />
+      ) : null}
+
       {article.promptTry ? <GuidePromptTrySection promptTry={article.promptTry} /> : null}
 
       {article.carouselUpload ? (
@@ -149,7 +160,7 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
 
       {article.outcomes && article.outcomes.length > 0 ? (
         <section className="flex flex-col gap-3 border-t border-border/70 pt-8">
-          <h2 className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          <h2 className="text-sm text-muted-foreground">
             {article.outcomesHeading ?? "You'll leave with"}
           </h2>
           <ul className="flex flex-col gap-2 text-sm leading-6 text-muted-foreground">
@@ -165,7 +176,7 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
 
       {nextGuideCard ? (
         <section className="flex flex-col gap-4 border-t border-border/70 pt-8">
-          <h2 className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          <h2 className="text-sm text-muted-foreground">
             Next guide
           </h2>
           {isInfo ? (
@@ -198,6 +209,8 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
               description={nextGuideCard.description}
               mediaSrc={nextGuideCard.mediaSrc}
               mediaAlt={nextGuideCard.mediaAlt}
+              mediaFit="contain"
+              mediaWater={Boolean(nextGuideCard.mediaSrc)}
               copyPlacement="above"
               className="w-full"
             />
@@ -205,7 +218,7 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
         </section>
       ) : article.nextGuideLabel && !article.nextGuideSlug ? (
         <section className="flex flex-col gap-4 border-t border-border/70 pt-8">
-          <h2 className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          <h2 className="text-sm text-muted-foreground">
             Next guide
           </h2>
           {isInfo ? (

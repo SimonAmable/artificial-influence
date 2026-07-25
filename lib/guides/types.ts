@@ -103,6 +103,23 @@ export type GuideInfoSection = {
   ctaHref?: string
 }
 
+/** Simple comparison table for info guides. */
+export type GuideCompareTable = {
+  heading: string
+  description?: string
+  /** Column headers; first is the row label column. */
+  columns: string[]
+  rows: Array<{
+    label: string
+    values: string[]
+  }>
+  footnote?: string
+  sources?: Array<{
+    label: string
+    href: string
+  }>
+}
+
 export type GuideArticle = {
   slug: string
   title: string
@@ -134,6 +151,7 @@ export type GuideArticle = {
   steps?: GuideStep[]
   infoSectionsHeading?: string
   infoSections?: GuideInfoSection[]
+  compareTable?: GuideCompareTable
   /** Optional upload → open in Carousel Shots. */
   carouselUpload?: GuideCarouselUpload
   /** Optional keeper picker → Create Fanvue post. */

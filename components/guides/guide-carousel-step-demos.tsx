@@ -242,18 +242,26 @@ function ShotsGenerateDemo() {
 
   return (
     <GuideDemoShell label="Demo: generate a matching shot set" className={DEMO_FRAME}>
-      <div ref={rootRef} className="relative flex h-full min-h-0 flex-col gap-2">
-        <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5">
-          {GRID_SRC.map((src) => (
-            <div
-              key={src}
-              data-demo-shot
-              className="min-h-0 overflow-hidden rounded-lg border border-border/50 bg-background/40"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt="" className="size-full object-cover" />
-            </div>
-          ))}
+      <div ref={rootRef} className="relative flex h-full min-h-0 flex-col gap-1.5">
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          {/* 2×2 of 9:16 slides — outer ratio matches the tile stack so nothing crops */}
+          <div
+            className={cn(
+              "grid h-full max-h-full w-auto grid-cols-2 grid-rows-2 gap-px",
+              CAROUSEL_SHOTS_EXAMPLE.aspectRatioClass,
+            )}
+          >
+            {GRID_SRC.map((src) => (
+              <div
+                key={src}
+                data-demo-shot
+                className="min-h-0 overflow-hidden rounded-sm border border-border/50 bg-background/40"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" className="size-full object-contain" />
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="relative flex shrink-0 justify-center pb-0.5">
