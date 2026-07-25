@@ -441,14 +441,6 @@ const baseMegaNavGroups: MegaNavGroup[] = [
       { path: "/assets?tab=history", label: "History", description: "Past generations and edits", iconPhosphor: "clock-counter-clockwise" },
       { path: "/resources", label: "Resources", description: "Search live stock and meme references", iconPhosphor: "newspaper", badge: "new" },
       {
-        path: "/guides",
-        label: "Guides",
-        description: "Short action-to-result playbooks",
-        iconPhosphor: "book-open-text",
-        badge: "new",
-        searchKeywords: ["guide", "tutorial", "academy", "how to", "playbook"],
-      },
-      {
         path: "/assets?tab=brands",
         label: "Brand",
         description: "Manage brand settings",
@@ -457,6 +449,12 @@ const baseMegaNavGroups: MegaNavGroup[] = [
         hiddenFor: ["presence-studio"],
       },
     ],
+  },
+  {
+    label: "Guides",
+    path: "/guides",
+    badge: "new",
+    iconPhosphor: "book-open-text",
   },
   {
     label: "Content",

@@ -6,6 +6,10 @@ import {
   type MegaNavPhosphorIcon,
 } from "@/lib/constants/navigation"
 import {
+  GUIDE_SECTION_LABELS,
+  getGuideHubCardsForProduct,
+} from "@/lib/guides/content"
+import {
   SETTINGS_TABS,
   type SettingsTab,
 } from "@/lib/profile/settings-tabs"
@@ -154,6 +158,65 @@ function getHomeSearchItem(): PageSearchItem {
   }
 }
 
+function getGuideSearchItems(): PageSearchItem[] {
+  const cards = getGuideHubCardsForProduct(currentProduct.id)
+  const items: PageSearchItem[] = [
+    {
+      id: "guides:hub",
+      label: "Guide · All guides",
+      description:
+        "How to make the most realistic AI influencer content — with guides written alongside the biggest creators in the industry.",
+      path: "/guides",
+      group: "Guides",
+      iconPhosphor: "book-open-text",
+      searchText: buildSearchText(
+        [
+          "guide",
+          "guides",
+          "all guides",
+          "learn",
+          "tutorial",
+          "academy",
+          "playbook",
+          "knowledge base",
+          "fanvue",
+        ],
+        "/guides",
+      ),
+    },
+  ]
+
+  for (const card of cards) {
+    if (!card.available) continue
+    const path = `/guides/${card.slug}`
+    const sectionLabel = GUIDE_SECTION_LABELS[card.section]
+    items.push({
+      id: `guides:${card.slug}`,
+      label: `Guide · ${card.title}`,
+      description: card.description,
+      path,
+      group: "Guides",
+      iconPhosphor: "book-open-text",
+      searchText: buildSearchText(
+        [
+          "guide",
+          "guides",
+          card.title,
+          card.description,
+          sectionLabel,
+          card.slug,
+          "tutorial",
+          "playbook",
+          "how to",
+        ],
+        path,
+      ),
+    })
+  }
+
+  return items
+}
+
 export function getCorePageSearchItems(options?: {
   includeSettings?: boolean
 }): PageSearchItem[] {
@@ -170,6 +233,10 @@ export function getCorePageSearchItems(options?: {
 
   // Always first: signed-in home / dashboard is not in mega nav groups.
   push(getHomeSearchItem())
+
+  for (const item of getGuideSearchItems()) {
+    push(item)
+  }
 
   for (const group of megaNavGroups) {
     if (group.path && !isAppPath(group.path) && !hasMenuItemAtPath(group, group.path)) {

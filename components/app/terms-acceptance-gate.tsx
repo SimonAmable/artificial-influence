@@ -42,6 +42,10 @@ function isExemptPath(pathname: string | null) {
   )
 }
 
+function isDashboardPath(pathname: string | null) {
+  return pathname === "/dashboard"
+}
+
 export function TermsAcceptanceGate() {
   const router = useRouter()
   const pathname = usePathname()
@@ -72,7 +76,7 @@ export function TermsAcceptanceGate() {
   }, [supabase])
 
   React.useEffect(() => {
-    if (!userId || isExemptPath(pathname)) {
+    if (!userId || !isDashboardPath(pathname) || isExemptPath(pathname)) {
       return
     }
 
@@ -106,7 +110,8 @@ export function TermsAcceptanceGate() {
     }
   }, [pathname, userId])
 
-  const open = Boolean(status?.needsAcceptance) && !isExemptPath(pathname)
+  const open =
+    Boolean(status?.needsAcceptance) && isDashboardPath(pathname) && !isExemptPath(pathname)
   const canAccept = checked && !submitting
 
   const handleAccept = async () => {

@@ -35,7 +35,6 @@ function resolveNextGuideCard(article: GuideArticle): GuideHubCard | null {
 }
 
 export function GuideArticleView({ article }: { article: GuideArticle }) {
-  const agentName = currentProduct.assistantName
   const hubCard = resolveHubCard(article.slug)
   const nextGuideCard = resolveNextGuideCard(article)
   const heroMediaSrc = article.mediaSrc ?? hubCard?.mediaSrc
@@ -237,20 +236,6 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
               className="w-full"
             />
           )}
-        </section>
-      ) : null}
-
-      {!article.promptTry ? (
-        <section className="rounded-2xl border border-border/70 bg-muted/20 px-5 py-5">
-          <p className="text-sm text-muted-foreground">Ask {agentName}</p>
-          <p className="mt-1 text-base font-medium tracking-tight">
-            “{article.askAgentPrompt}”
-          </p>
-          <div className="mt-4">
-            <Button asChild variant="outline">
-              <Link href="/chat">Open Agent</Link>
-            </Button>
-          </div>
         </section>
       ) : null}
     </article>

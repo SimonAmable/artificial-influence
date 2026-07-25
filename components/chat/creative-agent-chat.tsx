@@ -104,6 +104,10 @@ import type {
   UniversalGenerateImageToolPart,
 } from "@/lib/chat/agent-tool-part-types"
 import { consumeDashboardAgentHandoff } from "@/lib/chat/dashboard-agent-handoff"
+import {
+  AGENT_COMPOSER_SEED_EVENT,
+  consumeAgentComposerSeed,
+} from "@/lib/chat/composer-seed"
 import { consumePendingTemplateHandoff } from "@/lib/templates/handoff"
 import { buildActivateSkillPrompt, buildSkillSlashCommands, normalizeLeadingSkillSlashPrompt } from "@/lib/chat/skills/slash-skill-prompt"
 import type { SkillPickerEntry } from "@/lib/chat/skills/catalog"
@@ -529,6 +533,7 @@ export function CreativeAgentChat({
                   mode: "chat",
                   model,
                   ...(editorProjectId ? { editorProjectId } : {}),
+                  ...(pathnameRef.current ? { pagePath: pathnameRef.current } : {}),
                   ...(onboardingHandoff ? { onboardingHandoff: true } : {}),
                   threadId: threadIdRef.current,
                 },
@@ -542,6 +547,7 @@ export function CreativeAgentChat({
                 mode: "chat",
                 model,
                 ...(editorProjectId ? { editorProjectId } : {}),
+                ...(pathnameRef.current ? { pagePath: pathnameRef.current } : {}),
                 ...(onboardingHandoff ? { onboardingHandoff: true } : {}),
                 threadId: threadIdRef.current,
               },
@@ -1235,6 +1241,32 @@ export function CreativeAgentChat({
     },
     [enablePersistence, onThreadIdChange, resolvedUiChatBootstrapId, syncUrlOnThreadCreate, threadId],
   )
+
+  React.useEffect(() => {
+    const applySeed = (prompt: string) => {
+      const trimmed = prompt.trim()
+      if (!trimmed) return
+      setComposerValue(trimmed)
+    }
+
+    const fromStore = consumeAgentComposerSeed()
+    if (fromStore) {
+      applySeed(fromStore)
+    }
+
+    const onSeed = (event: Event) => {
+      const detail = (event as CustomEvent<{ prompt?: string }>).detail
+      const prompt = typeof detail?.prompt === "string" ? detail.prompt : null
+      if (!prompt) return
+      consumeAgentComposerSeed()
+      applySeed(prompt)
+    }
+
+    window.addEventListener(AGENT_COMPOSER_SEED_EVENT, onSeed as EventListener)
+    return () => {
+      window.removeEventListener(AGENT_COMPOSER_SEED_EVENT, onSeed as EventListener)
+    }
+  }, [])
 
   React.useEffect(() => {
     if (!authReady) return

@@ -45,7 +45,8 @@ export default async function GuidePage({ params }: GuidePageProps) {
     (card) => card.slug === article.slug,
   )
 
-  if (!hubCard?.available) {
+  // Missing hub card should not 404 a valid article; only hide explicitly unavailable guides.
+  if (hubCard?.available === false) {
     notFound()
   }
 

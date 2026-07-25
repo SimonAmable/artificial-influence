@@ -4,8 +4,9 @@ import { GuidesHub } from "@/components/guides/guides-hub"
 import { currentProduct } from "@/lib/product/current"
 
 export const metadata: Metadata = {
-  title: "Guides",
-  description: `Short action-to-result playbooks for ${currentProduct.name}.`,
+  title: `Learn ${currentProduct.name}`,
+  description:
+    "How to make the most realistic AI influencer content — with guides written alongside the biggest creators in the industry.",
 }
 
 export default function GuidesPage() {

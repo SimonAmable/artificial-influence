@@ -11,6 +11,7 @@ export const ALWAYS_AVAILABLE_CREATIVE_CHAT_TOOL_KEYS = [
   "falMediaOps",
   "extractVideoFrames",
   "getBrandContext",
+  "getCurrentPage",
   "listRecentGenerations",
   "saveGenerationAsAsset",
   "searchWeb",

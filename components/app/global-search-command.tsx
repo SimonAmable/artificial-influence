@@ -28,6 +28,10 @@ import {
   type PageSearchItem,
   type PageSearchSettingsTab,
 } from "@/lib/navigation/page-search"
+import {
+  OPEN_GLOBAL_SEARCH_EVENT,
+  type OpenGlobalSearchDetail,
+} from "@/lib/navigation/open-global-search"
 import { getSettingsTabItem } from "@/lib/profile/settings-tabs"
 import type { Template } from "@/lib/templates/types"
 import type { MegaNavItem } from "@/lib/constants/navigation"
@@ -159,6 +163,19 @@ export function GlobalSearchCommand({
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
+  }, [setOpen])
+
+  React.useEffect(() => {
+    const onOpenSearch = (event: Event) => {
+      const detail = (event as CustomEvent<OpenGlobalSearchDetail>).detail
+      if (typeof detail?.query === "string") {
+        setQuery(detail.query)
+      }
+      setOpen(true)
+    }
+
+    window.addEventListener(OPEN_GLOBAL_SEARCH_EVENT, onOpenSearch)
+    return () => window.removeEventListener(OPEN_GLOBAL_SEARCH_EVENT, onOpenSearch)
   }, [setOpen])
 
   React.useEffect(() => {
@@ -318,12 +335,12 @@ export function GlobalSearchCommand({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleInputKeyDown}
-          placeholder="Search tools, settings, or templates..."
+          placeholder="Search tools, settings, guides, or templates..."
           autoFocus
           icon={<MagnifyingGlass className="h-5 w-5" />}
         />
         <CommandList>
-          {noResults ? <CommandEmpty>No tools, settings, or templates found.</CommandEmpty> : null}
+          {noResults ? <CommandEmpty>No tools, settings, guides, or templates found.</CommandEmpty> : null}
 
           {pages.length > 0 ? (
             <CommandGroup heading="Tools">

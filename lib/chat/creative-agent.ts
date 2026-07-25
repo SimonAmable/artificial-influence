@@ -28,6 +28,7 @@ import {
 import type { PinnedSkillInstructionEntry } from "@/lib/chat/skills/pins"
 import type { AttachedRef } from "@/lib/commands/types"
 import type { GenerationApprovalMode } from "@/lib/chat/generation-approval"
+import { formatPagePathRuntimeHint } from "@/lib/chat/page-context"
 
 function buildReferenceManifest(
   imageRefs: AvailableChatImageReference[],
@@ -70,6 +71,7 @@ You are operating as a creative tool-calling agent inside UniCan chat.
 
 Agent rules:
 - You also have web research tools: **searchWeb** finds source links/snippets, **readWebPage** extracts one URL, **searchWebImages** finds license-unverified visual inspiration/reference images, **searchStockReferences** searches live external stock/reference providers such as GIPHY for memes, GIFs, stickers, and future stock sources, and **capturePageScreenshot** captures a viewport screenshot only when the user explicitly asks for a screenshot or visual page capture. Use full-page capture only if the user explicitly asks for full page.
+- You also have **getCurrentPage** for structured context about the in-app page the user is viewing (guides first). Call it when they ask about this page, this guide, steps on this screen, or what to do next here — do not invent guide content from memory.
 - You also have **generateAudio** for text-to-speech and **searchVoices** for catalog voice discovery inside chat.
 - You can also manage automations from chat with **listAutomations** and **manageAutomation**.
 - You currently have creative tools for image generation, **upscaleImage** (resolution upscaling via **prunaai/p-image-upscale** — use for pure upscale/sharpen/higher-MP requests on an existing image; do **not** use **generateImage** for that), video generation, **falMediaOps** (general Fal FFmpeg/media utility gateway for direct documented endpoints under **fal-ai/ffmpeg-api/** and **fal-ai/workflow-utilities/**; accepts raw Fal payloads and auto-resolves thread media ids like **upl_...** / **gen_...** to public URLs), **extractVideoFrames** (ffmpeg stills from user videos; first/last by default, optional interior times and timestamps), **composeTimelineVideo** (Fal-backed timeline assembly for existing thread media: sequence images, GIFs, and videos into one MP4, and optionally add soundtrack/voiceover tracks; requires a persisted thread + **listThreadMedia** "mediaIds"; use **durationSeconds** to control image/GIF pacing, **trimStartSeconds** / **trimEndSeconds** to keep only the useful part of video clips, and prefer **one full-length audio track** with optional **startAtSeconds** for the most reliable audio attach path on Fal; set **normalizeAudio** when the soundtrack or voiceover should be leveled before merge; **outputPreset** controls 16:9 vs 9:16), **scheduleGenerationFollowUp** (persisted thread + **chained** workflow only: run follow-up when the webhook fires - **reserve for long video** jobs where the next step **must** have the finished file but same-turn waiting is unrealistic, e.g. **Kling Motion Control** (\`kwaivgi/kling-v2.6-motion-control\`, \`kwaivgi/kling-v3-motion-control\`), **Seedance 2.0** (\`bytedance/seedance-2.0\`), or other multi-minute video; **never** for images; **do not** use if there is no real next-step chain), **awaitGeneration** (poll until complete - **only** when a **chain** in the **same** turn needs the file; **images**: this is the right wait tool when chaining; **video**: use only when the job can finish within ~90s; otherwise use **scheduleGenerationFollowUp** for long models), **estimateModelLatency** (typical wait ranges from recent completions or fallbacks), thread media listing (listThreadMedia, when the chat thread is persisted), model lookup, asset lookup, recent generation lookup, generation-to-asset saving, saved brand-kit context, social connection listing, and social post preparation.
@@ -230,6 +232,7 @@ ${onboardingContext}
 - If the user says "use <model>" or "<model> model", treat that as a hard requirement unless impossible with currently active models.
 - Use searchVoices when the user asks for a voice by qualities instead of an exact voice id.
 - Use getBrandContext when the user wants on-brand output and the target brand is identifiable.
+- Use **getCurrentPage** when the user refers to this page, this guide, the steps here, or what to do next on the current screen. Runtime context may include a "User viewing: /path" hint only; call **getCurrentPage** for the structured summary.
 - Use listAutomations before controlling an existing automation unless the exact automation id was returned by a tool in this turn.
 - Use manageAutomation for create, update, pause, resume, run-now, and delete automation requests.
 - Use listSocialConnections before prepareSocialPost when the target account is not explicit.
@@ -269,6 +272,8 @@ interface CreateCreativeAgentOptions {
   defaultAutomationRefs?: AttachedRef[]
   defaultAutomationAttachments?: AutomationPromptAttachment[]
   editorProjectId?: string
+  /** Current app pathname from the client. */
+  pagePath?: string
   model: string
   selectedReferenceContext?: string
   onboardingContext?: string
@@ -382,6 +387,7 @@ export function createCreativeAgent({
   defaultAutomationRefs = [],
   defaultAutomationAttachments = [],
   editorProjectId,
+  pagePath,
   model,
   selectedReferenceContext,
   onboardingContext,
@@ -410,6 +416,7 @@ export function createCreativeAgent({
   })
   const turnStartedAtMs = Date.now()
   const providerOptions = getChatGatewayModelProviderOptions(model)
+  const pagePathHint = formatPagePathRuntimeHint(pagePath)
   const tools = adaptChatToolsForGatewayModel(
     createCreativeChatTools({
       availableReferences,
@@ -418,6 +425,7 @@ export function createCreativeAgent({
       defaultAutomationRefs,
       defaultAutomationAttachments,
       editorProjectId,
+      pagePath,
       supabase,
       threadId,
       userId,
@@ -436,7 +444,12 @@ export function createCreativeAgent({
     ...(!isXaiChatGatewayModel(model)
       ? {
           prepareStep: ({ stepNumber }: { stepNumber: number }) => ({
-            system: `Runtime context (automatic): ISO UTC time: ${new Date().toISOString()}; agent step: ${stepNumber}; turn elapsed ms: ${Date.now() - turnStartedAtMs}`,
+            system: [
+              `Runtime context (automatic): ISO UTC time: ${new Date().toISOString()}; agent step: ${stepNumber}; turn elapsed ms: ${Date.now() - turnStartedAtMs}`,
+              pagePathHint || null,
+            ]
+              .filter(Boolean)
+              .join("; "),
           }),
         }
       : {}),

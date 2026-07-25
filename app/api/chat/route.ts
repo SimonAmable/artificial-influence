@@ -42,6 +42,7 @@ import {
 import { scheduleThreadIntentTitleJob } from "@/lib/chat/thread-intent-title-scheduler"
 import { finalizeTemplateRunFromChat } from "@/lib/templates/finalize-run"
 import { normalizeGenerationApprovalMode } from "@/lib/chat/generation-approval"
+import { normalizePagePath } from "@/lib/chat/page-context"
 
 /** Allows long chained tool turns (e.g. awaitGeneration + follow-up tools) on Vercel Pro (max 300s). */
 export const maxDuration = 300
@@ -120,6 +121,7 @@ export async function POST(req: Request) {
       model: modelFromBody,
       generationApprovalMode: generationApprovalModeFromBody,
       editorProjectId: editorProjectIdFromBody,
+      pagePath: pagePathFromBody,
       threadId,
       onboardingHandoff,
     }: {
@@ -129,6 +131,7 @@ export async function POST(req: Request) {
       model?: string
       generationApprovalMode?: unknown
       editorProjectId?: unknown
+      pagePath?: unknown
       threadId?: string
       onboardingHandoff?: boolean
     } = body
@@ -141,6 +144,7 @@ export async function POST(req: Request) {
       typeof editorProjectIdFromBody === "string" && editorProjectIdFromBody.length > 0
         ? editorProjectIdFromBody
         : undefined
+    const pagePath = normalizePagePath(pagePathFromBody)
     let persistedChatThread: ChatThread | null = null
 
     if (threadId) {
@@ -199,6 +203,7 @@ export async function POST(req: Request) {
       threadId,
       userId: user.id,
       editorProjectId,
+      pagePath,
       skillsCatalog,
     }) as NonNullable<Parameters<typeof validateUIMessages>[0]["tools"]>
 
@@ -322,6 +327,8 @@ export async function POST(req: Request) {
       supabase,
       threadId,
       userId: user.id,
+      editorProjectId,
+      pagePath,
       preloadedModels,
     })
     type CreativeAgentUIMessage = InferAgentUIMessage<typeof creativeAgent>

@@ -43,7 +43,17 @@ import {
 import { useNotificationsRead } from "@/lib/notifications/use-notifications-read"
 
 function isGroupActive(pathname: string, group: MegaNavGroup) {
-  if (group.path && pathname === group.path) return true
+  if (group.path) {
+    if (pathname === group.path) return true
+    // Top-level link groups (no menu) should stay active on nested routes.
+    if (
+      !group.sections?.length &&
+      !group.simpleItems?.length &&
+      pathname.startsWith(`${group.path}/`)
+    ) {
+      return true
+    }
+  }
   const items = [
     ...(group.simpleItems ?? []),
     ...((group.sections ?? []).flatMap((section) => section.items)),
@@ -239,7 +249,7 @@ export function Header() {
             />
           </Link>
           {/* Desktop navigation — sheet below xl to avoid cramped tablets */}
-          <nav className="hidden min-w-0 xl:flex items-center gap-2 whitespace-nowrap">
+          <nav className="hidden min-w-0 xl:flex items-center gap-0.5 whitespace-nowrap">
             {megaNavGroups.map((group) => {
               const active = isGroupActive(pathname, group)
 
@@ -249,7 +259,7 @@ export function Header() {
                     key={group.label}
                     href={group.path}
                     className={cn(
-                      "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-bold text-foreground transition-colors hover:text-primary",
+                      "inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-bold text-foreground transition-colors hover:text-primary",
                       active && "text-primary"
                     )}
                   >
@@ -282,28 +292,26 @@ export function Header() {
                         }}
                         onPointerLeave={scheduleClose}
                         className={cn(
-                          "inline-flex h-8 items-center gap-1 rounded-md px-3 text-sm font-bold text-foreground transition-colors hover:text-primary",
+                          "inline-flex h-8 items-center rounded-md px-2 text-sm font-bold text-foreground transition-colors hover:text-primary",
                           active && "text-primary"
                         )}
                       >
-                        <Link href={groupPath} className="inline-flex items-center gap-2">
+                        <Link href={groupPath} className="inline-flex items-center gap-1.5">
                           <span>{group.label}</span>
                           {group.badge ? <MenuBadge badge={group.badge} /> : null}
                         </Link>
-                        <CaretDownIcon className="h-3.5 w-3.5 opacity-60" />
                       </div>
                     ) : (
                       <button
                         type="button"
                         aria-expanded={isOpen}
                         className={cn(
-                          "inline-flex h-8 items-center gap-1 rounded-md px-3 text-sm font-bold text-foreground transition-colors hover:text-primary",
+                          "inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm font-bold text-foreground transition-colors hover:text-primary",
                           active && "text-primary"
                         )}
                       >
                         <span>{group.label}</span>
                         {group.badge ? <MenuBadge badge={group.badge} /> : null}
-                        <CaretDownIcon className="h-3.5 w-3.5 opacity-60" />
                       </button>
                     )}
                   </DropdownMenuTrigger>

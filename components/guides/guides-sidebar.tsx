@@ -3,17 +3,10 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { List } from "@phosphor-icons/react"
+import { List, MagnifyingGlass } from "@phosphor-icons/react"
 
-import {
-  GUIDE_SECTION_LABELS,
-  GUIDE_SECTION_ORDER,
-  getGuideHubCardsForProduct,
-} from "@/lib/guides/content"
-import type { GuideHubCard, GuideSectionId } from "@/lib/guides/types"
-import { currentProduct } from "@/lib/product/current"
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Sheet,
   SheetContent,
@@ -21,6 +14,41 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import {
+  GUIDE_SECTION_LABELS,
+  GUIDE_SECTION_ORDER,
+  getGuideHubCardsForProduct,
+} from "@/lib/guides/content"
+import type { GuideHubCard, GuideSectionId } from "@/lib/guides/types"
+import { openGlobalSearch } from "@/lib/navigation/open-global-search"
+import { currentProduct } from "@/lib/product/current"
+import { cn } from "@/lib/utils"
+
+function GuidesSidebarSearch({ id }: { id: string }) {
+  return (
+    <button
+      type="button"
+      onClick={() => openGlobalSearch({ query: "guide" })}
+      className="block w-full text-left"
+      aria-label="Search guides"
+    >
+      <span className="relative block">
+        <MagnifyingGlass
+          className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          id={id}
+          type="search"
+          readOnly
+          tabIndex={-1}
+          placeholder="Search..."
+          className="pointer-events-none h-8 rounded-lg bg-input/40 pl-8 text-sm"
+        />
+      </span>
+    </button>
+  )
+}
 
 function GuidesNav({
   cards,
@@ -118,7 +146,8 @@ export function GuidesSidebar() {
             <SheetHeader className="border-b border-border/60 p-4 text-left">
               <SheetTitle>Guides</SheetTitle>
             </SheetHeader>
-            <div className="p-3">
+            <div className="flex flex-col gap-4 p-3">
+              <GuidesSidebarSearch id="guides-sidebar-search-mobile" />
               <GuidesNav
                 cards={cards}
                 pathname={pathname}
@@ -131,7 +160,8 @@ export function GuidesSidebar() {
       </div>
 
       <aside className="hidden w-56 shrink-0 lg:block xl:w-60">
-        <div className="sticky top-24">
+        <div className="sticky top-24 flex flex-col gap-4">
+          <GuidesSidebarSearch id="guides-sidebar-search" />
           <GuidesNav cards={cards} pathname={pathname} isHub={isHub} />
         </div>
       </aside>

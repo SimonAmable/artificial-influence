@@ -82,34 +82,34 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
 
 const SHOOT_WEEK_PROMPT_TRY_TABS = [
   {
-    id: "coffee",
-    label: "Coffee shop",
+    id: "bedroom",
+    label: "Bedroom",
     prompt:
-      "Using my locked AI influencer, generate a photoreal Instagram still: casual coffee-shop morning, soft window light, latte on the table, natural pose looking slightly off-camera, same face and hair as my character reference, vertical 4:5.",
+      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy — using my locked AI influencer sitting on the edge of an unmade bed, lamp light only, looking away, messy room half in frame, same face as my character, vertical 4:5",
   },
   {
-    id: "gym",
-    label: "Gym",
+    id: "car",
+    label: "Car",
     prompt:
-      "Using my locked AI influencer, generate a photoreal gym selfie: athleticwear, mirror or machine framing, bright overhead light, confident expression, same face and body type as my character, vertical 4:5.",
+      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy — using my locked AI influencer in a dark passenger seat at night, dashboard glow, face slightly cut off, same face as my character, vertical 4:5",
   },
   {
     id: "night-out",
     label: "Night out",
     prompt:
-      "Using my locked AI influencer, generate a photoreal night-out still: city evening, warm street lights, elevated outfit, candid mid-step pose, same face and look as my character, vertical 4:5.",
+      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy — using my locked AI influencer on a night street, mixed streetlights, mid-turn, outfit cropped weirdly, same face as my character, vertical 4:5",
   },
   {
     id: "mirror",
-    label: "Mirror selfie",
+    label: "Mirror",
     prompt:
-      "Using my locked AI influencer, generate a photoreal bedroom mirror selfie: soft indoor light, phone in hand, relaxed outfit, clean background, same face and proportions as my character, vertical 9:16.",
+      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy — using my locked AI influencer in a dim bathroom mirror selfie, phone flash, cluttered background, hesitant stance, same face as my character, vertical 9:16",
   },
   {
-    id: "street",
-    label: "Street walk",
+    id: "corner-store",
+    label: "Corner store",
     prompt:
-      "Using my locked AI influencer, generate a photoreal daytime street walk: golden-hour sidewalk, casual outfit, walking toward camera with natural motion blur hint, same face as my character, vertical 4:5.",
+      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy — using my locked AI influencer in a late-night convenience store aisle, harsh fluorescents, snack in hand, looking down, same face as my character, vertical 4:5",
   },
 ] as const
 

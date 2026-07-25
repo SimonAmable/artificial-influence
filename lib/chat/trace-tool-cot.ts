@@ -17,6 +17,7 @@ export const TRACE_COT_TOOLS = {
     "tool-capturePageScreenshot",
     "tool-analyzeMedia",
     "tool-downloadSocialReference",
+    "tool-getCurrentPage",
   ],
   catalog: ["tool-listModels", "tool-searchModels", "tool-searchVoices"],
   social: ["tool-listSocialConnections", "tool-listInstagramConnections"],
@@ -278,6 +279,20 @@ export function getTraceToolStepMeta(part: UIMessage["parts"][number]): TraceToo
             : Array.isArray(brands)
               ? formatCount(brands.length, "brand")
               : truncateQuery(tool.input?.brandName),
+        status,
+      }
+    }
+    case "tool-getCurrentPage": {
+      const title = tool.output?.title
+      const path = tool.output?.path
+      return {
+        label: "Current page",
+        description:
+          typeof title === "string"
+            ? title
+            : typeof path === "string"
+              ? path
+              : countDescription,
         status,
       }
     }

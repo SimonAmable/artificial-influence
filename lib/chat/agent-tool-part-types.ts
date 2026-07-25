@@ -808,6 +808,26 @@ export type GetBrandContextToolPart = {
   errorText?: string
 }
 
+export type GetCurrentPageToolPart = {
+  type: "tool-getCurrentPage"
+  toolCallId: string
+  state: "input-streaming" | "input-available" | "output-available" | "output-error"
+  input?: Record<string, never>
+  output?: {
+    kind?: "guide" | "guides-hub" | "unknown" | "unavailable"
+    path?: string
+    slug?: string
+    title?: string
+    result?: string
+    message?: string
+    primaryCta?: { label: string; href: string }
+    tools?: Array<{ label: string; href: string }>
+    stepTitles?: string[]
+    askAgentPrompt?: string
+  }
+  errorText?: string
+}
+
 export type InstagramConnectionToolSummary = {
   accountType?: string | null
   id: string

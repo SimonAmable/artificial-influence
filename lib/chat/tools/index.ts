@@ -12,6 +12,7 @@ import type {
 import { createGenerateVideoTool } from "@/lib/chat/tools/generate-video"
 import { createFalMediaOpsTool } from "@/lib/chat/tools/fal-media-ops"
 import { createGetBrandContextTool } from "@/lib/chat/tools/get-brand-context"
+import { createGetCurrentPageTool } from "@/lib/chat/tools/get-current-page"
 import { createListInstagramConnectionsTool } from "@/lib/chat/tools/list-instagram-connections"
 import { createListSocialConnectionsTool } from "@/lib/chat/tools/list-social-connections"
 import { createListRecentGenerationsTool } from "@/lib/chat/tools/list-recent-generations"
@@ -51,6 +52,8 @@ interface CreateCreativeChatToolsOptions {
   defaultAutomationRefs?: AttachedRef[]
   defaultAutomationAttachments?: AutomationPromptAttachment[]
   editorProjectId?: string
+  /** Current app pathname from the client (e.g. /guides/...). */
+  pagePath?: string
   supabase: SupabaseClient
   threadId?: string
   userId: string
@@ -67,6 +70,7 @@ export function createCreativeChatTools({
   defaultAutomationRefs = [],
   defaultAutomationAttachments = [],
   editorProjectId,
+  pagePath,
   supabase,
   threadId,
   userId,
@@ -178,6 +182,9 @@ export function createCreativeChatTools({
     getBrandContext: createGetBrandContextTool({
       supabase,
       userId,
+    }),
+    getCurrentPage: createGetCurrentPageTool({
+      pagePath,
     }),
     listRecentGenerations: createListRecentGenerationsTool({
       supabase,

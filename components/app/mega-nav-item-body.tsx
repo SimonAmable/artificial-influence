@@ -14,7 +14,7 @@ function getBadgeClasses(badge: MegaNavBadge) {
   switch (badge) {
     case "new":
       return {
-        pill: "bg-primary text-primary-foreground",
+        pill: "bg-primary text-black",
         ring: "ring-1 ring-primary/70 border-primary/60",
       }
     case "popular":

@@ -28,6 +28,7 @@
     "@ai-sdk/xai": "^3.0.47",
     "@base-ui/react": "^1.1.0",
     "@fal-ai/client": "^1.9.0",
+    "@gsap/react": "^2.1.2",
     "@lobehub/icons": "^4.2.0",
     "@paper-design/shaders-react": "^0.0.77",
     "@phosphor-icons/react": "^2.1.10",

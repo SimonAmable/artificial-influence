@@ -492,9 +492,47 @@ export function AIChatDesktopDock() {
   )
 }
 
+function useIsGuideRoute(pathname: string | null) {
+  return pathname === "/guides" || (pathname?.startsWith("/guides/") ?? false)
+}
+
+function parseGuideSlug(pathname: string | null): string | null {
+  if (!pathname) return null
+  const match = pathname.match(/^\/guides\/([^/]+)\/?$/)
+  if (!match?.[1]) return null
+
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return match[1]
+  }
+}
+
+async function seedGuideAskPrompt(pathname: string | null) {
+  const slug = parseGuideSlug(pathname)
+  if (!slug) return
+
+  const [{ getGuideArticleBySlug }, { saveAgentComposerSeed }] = await Promise.all([
+    import("@/lib/guides/content"),
+    import("@/lib/chat/composer-seed"),
+  ])
+
+  const prompt = getGuideArticleBySlug(slug)?.askAgentPrompt?.trim()
+  if (prompt) {
+    saveAgentComposerSeed(prompt)
+  }
+}
+
 function AIChatLauncher() {
+  const pathname = usePathname()
   const { open, hideFloatingChatLauncher, setSidebarOpen } = useAIChatContext()
   const prefersReducedMotion = useReducedMotion()
+  const expandAskAgent = useIsGuideRoute(pathname)
+
+  const handleOpenAgent = React.useCallback(() => {
+    void seedGuideAskPrompt(pathname)
+    setSidebarOpen(true)
+  }, [pathname, setSidebarOpen])
 
   return (
     <AnimatePresence>
@@ -508,10 +546,26 @@ function AIChatLauncher() {
           className="fixed right-0 bottom-0 z-60 sm:right-6 sm:bottom-6"
         >
           <Button
-            onClick={() => setSidebarOpen(true)}
-            className="size-8 rounded-full bg-primary text-primary-foreground shadow-depth-l hover:bg-primary/80 sm:size-14 dark:bg-primary dark:hover:bg-primary/80"
-            size="icon"
+            onClick={handleOpenAgent}
+            aria-label="Ask Agent"
+            className={cn(
+              "rounded-full bg-primary text-primary-foreground shadow-depth-l hover:bg-primary/80 dark:bg-primary dark:hover:bg-primary/80",
+              expandAskAgent
+                ? "h-8 gap-2 px-3 sm:h-14 sm:gap-2.5 sm:px-4"
+                : "size-8 sm:size-14",
+            )}
+            size={expandAskAgent ? "default" : "icon"}
           >
+            {expandAskAgent ? (
+              <motion.span
+                initial={prefersReducedMotion ? false : { opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                transition={{ duration: 0.22, ease: CHAT_DOCK_TRANSITION.ease }}
+                className="overflow-hidden text-xs font-medium whitespace-nowrap sm:text-sm"
+              >
+                Ask Agent
+              </motion.span>
+            ) : null}
             <ProductLogo size={14} className="sm:size-[22px]" alt="" />
           </Button>
         </motion.div>
