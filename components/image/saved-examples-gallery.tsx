@@ -165,7 +165,16 @@ export function SavedExamplesGallery({
                   key={example.id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => openExample(example)}
+                  onClick={(event) => {
+                    const target = event.target
+                    if (
+                      target instanceof Element &&
+                      target.closest("button, a, input, textarea, [data-report-content]")
+                    ) {
+                      return
+                    }
+                    openExample(example)
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault()
@@ -261,7 +270,7 @@ export function SavedExamplesGallery({
               <div className="relative flex h-full w-full max-w-none flex-col overflow-hidden rounded-[32px] border border-border/70 bg-background shadow-2xl">
                 <div className="flex h-full min-h-0 flex-col bg-background">
             {/* Header */}
-            <div className="border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur sm:px-6">
+            <div className="bg-background/95 px-4 py-3 backdrop-blur sm:px-6">
               <div className="mx-auto flex w-full max-w-none items-start justify-between gap-4">
                 <div className="space-y-1 text-left">
                   <h2 className="text-base font-semibold sm:text-lg text-foreground">

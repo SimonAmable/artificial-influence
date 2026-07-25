@@ -14,7 +14,7 @@ export type PresenceMonetizeTile = {
 
 export const presenceLandingCopy = {
   hero: {
-    title: "The ultimate content creation suite for AI influencers",
+    title: "The ultimate content creation studio for AI influencers",
     description:
       "Design consistent characters, generate photos and video, publish to Fanvue, and build a content business from one focused studio.",
     primaryCtaLabel: "Start creating free",
@@ -32,7 +32,7 @@ export const presenceLandingCopy = {
     title: "AI influencers are already winning on social",
   },
   workflow: {
-    title: "Create and publish, all in one place",
+    title: "Create, publish, and earn all in one place",
   },
   monetize: {
     title: "From studio to Fanvue",
@@ -79,7 +79,7 @@ export const presenceLandingCopy = {
   },
   pricing: {
     title: "Professional AI, priced for everyone",
-    description: "Start free, upgrade when you are ready. Credits NEVER expire.",
+    description: "Start for free, upgrade when you're ready. Credits NEVER expire.",
     monthlyFooter:
       "Create consistently with credits that stay in your balance. Publish to Fanvue on every plan. Cancel anytime.",
   },

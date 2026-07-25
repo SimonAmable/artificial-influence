@@ -49,6 +49,7 @@ export const unicanProduct: ProductConfig = {
     "/canvas",
     "/editor",
     "/resources",
+    "/guides",
     "/free-tools",
     "/pricing",
     "/mcp",

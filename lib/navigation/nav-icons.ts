@@ -4,6 +4,7 @@
  */
 import {
   ArrowsOut,
+  BookOpenText,
   Broom,
   CalendarDots,
   ChatCircleDots,
@@ -48,6 +49,7 @@ export type NavIconKey =
   | "user"
   | "paint-brush"
   | "arrows-out"
+  | "book-open-text"
   | "broom"
   | "corners-in"
   | "video"
@@ -82,6 +84,7 @@ export const NAV_ICON_MAP: Record<NavIconKey, NavIconComponent> = {
   user: UserIcon,
   "paint-brush": PaintBrushIcon,
   "arrows-out": ArrowsOut,
+  "book-open-text": BookOpenText,
   broom: Broom,
   "corners-in": CornersIn,
   video: VideoIcon,

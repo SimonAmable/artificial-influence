@@ -1,0 +1,1 @@
+export const SYNTH_ID_SCRUB_CREDITS_COST = 1

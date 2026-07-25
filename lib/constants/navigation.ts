@@ -96,6 +96,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/assets?tab=history", label: "History" },
   { path: "/assets", label: "Library" },
   { path: "/resources", label: "Resources" },
+  { path: "/guides", label: "Guides" },
   { path: "/free-tools", label: "Free Tools" },
   { path: "/pricing-test", label: "Pricing (Test)", devOnly: true },
   { path: "/pricing", label: "Pricing" },
@@ -439,6 +440,14 @@ const baseMegaNavGroups: MegaNavGroup[] = [
       { path: "/assets", label: "Assets", description: "Store and sort your generated assets", iconPhosphor: "folder", badge: "new" },
       { path: "/assets?tab=history", label: "History", description: "Past generations and edits", iconPhosphor: "clock-counter-clockwise" },
       { path: "/resources", label: "Resources", description: "Search live stock and meme references", iconPhosphor: "newspaper", badge: "new" },
+      {
+        path: "/guides",
+        label: "Guides",
+        description: "Short action-to-result playbooks",
+        iconPhosphor: "book-open-text",
+        badge: "new",
+        searchKeywords: ["guide", "tutorial", "academy", "how to", "playbook"],
+      },
       {
         path: "/assets?tab=brands",
         label: "Brand",
@@ -787,6 +796,12 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     href: "/resources",
     icon: "newspaper",
     hint: "Search live stock references and meme sources.",
+  },
+  {
+    label: "Guides",
+    href: "/guides",
+    icon: "book-open-text",
+    hint: "Short action-to-result playbooks for creating and publishing.",
   },
 ]
 

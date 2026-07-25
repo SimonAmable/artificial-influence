@@ -161,22 +161,10 @@ export function PresenceHero() {
             transition={{ duration: prefersReducedMotion ? 0.01 : 0.7, delay: prefersReducedMotion ? 0 : 0.02, ease: heroEase }}
           />
           <motion.div
-            className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.16),transparent_34%)] dark:bg-[radial-gradient(circle_at_top,rgba(85,145,255,0.26),transparent_34%)]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: prefersReducedMotion ? 0.01 : 0.7, delay: prefersReducedMotion ? 0 : 0.04, ease: heroEase }}
-          />
-          <motion.div
             className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/35 to-background/95 dark:from-background/15 dark:via-background/45 dark:to-background/95"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: prefersReducedMotion ? 0.01 : 0.7, delay: prefersReducedMotion ? 0 : 0.08, ease: heroEase }}
-          />
-          <motion.div
-            className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-sky-300/20 via-transparent to-transparent dark:from-sky-400/28"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: prefersReducedMotion ? 0.01 : 0.7, delay: prefersReducedMotion ? 0 : 0.12, ease: heroEase }}
           />
           <motion.div
             className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-background"

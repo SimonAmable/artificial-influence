@@ -43,6 +43,7 @@ export const presenceStudioProduct: ProductConfig = {
     "/dashboard",
     "/pricing",
     "/mcp",
+    "/guides",
     "/free-tools/metadata-remover",
   ],
   defaultSignedInRoute: "/dashboard",

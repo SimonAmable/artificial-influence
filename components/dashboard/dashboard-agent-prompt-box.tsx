@@ -74,22 +74,59 @@ export function DashboardAgentPromptBox({
       <div className={cn("w-full", isTransparent && "p-2", className)}>
         {attachedRefs.length > 0 ? (
           <div className="mb-3 flex flex-wrap gap-2">
-            {attachedRefs.map((ref) => (
-              <div
-                key={ref.chipId}
-                className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs text-foreground/85"
-              >
-                <span className="max-w-[14rem] truncate">{ref.label || "Reference"}</span>
-                <button
-                  type="button"
-                  onClick={() => onAttachedRefsChange(attachedRefs.filter((item) => item.chipId !== ref.chipId))}
-                  className="rounded-full p-0.5 text-foreground/60 transition hover:bg-background hover:text-foreground"
-                  aria-label={`Remove ${ref.label || "reference"}`}
+            {attachedRefs.map((ref) => {
+              const preview = (ref.previewUrl || ref.assetUrl || "").trim()
+              const showImage =
+                Boolean(preview) &&
+                (ref.assetType === "image" || ref.assetType == null || ref.category === "asset")
+
+              const remove = () => {
+                onAttachedRefsChange(attachedRefs.filter((item) => item.chipId !== ref.chipId))
+                if (ref.mentionToken && promptValue.includes(ref.mentionToken)) {
+                  onPromptChange(
+                    promptValue.split(ref.mentionToken).join(" ").replace(/\s+/g, " ").trim()
+                  )
+                }
+              }
+
+              if (showImage) {
+                return (
+                  <div key={ref.chipId} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={preview}
+                      alt={ref.label ? `Reference: ${ref.label}` : "Attached reference"}
+                      className="h-[60px] w-auto max-w-[7.5rem] rounded-lg border border-border object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={remove}
+                      className="absolute -right-1 -top-1 z-10 rounded-full border border-border bg-background p-1 text-foreground shadow-sm transition hover:bg-destructive hover:text-destructive-foreground"
+                      aria-label={`Remove ${ref.label || "reference"}`}
+                    >
+                      <X className="size-3" weight="bold" />
+                    </button>
+                  </div>
+                )
+              }
+
+              return (
+                <div
+                  key={ref.chipId}
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs text-foreground/85"
                 >
-                  <X className="size-3" weight="bold" />
-                </button>
-              </div>
-            ))}
+                  <span className="max-w-[14rem] truncate">{ref.label || "Reference"}</span>
+                  <button
+                    type="button"
+                    onClick={remove}
+                    className="rounded-full p-0.5 text-foreground/60 transition hover:bg-background hover:text-foreground"
+                    aria-label={`Remove ${ref.label || "reference"}`}
+                  >
+                    <X className="size-3" weight="bold" />
+                  </button>
+                </div>
+              )
+            })}
           </div>
         ) : null}
 

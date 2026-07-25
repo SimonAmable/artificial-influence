@@ -29,6 +29,11 @@ function buildReportMessage({
   return lines.join("\n")
 }
 
+function stopCardActivation(event: React.SyntheticEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+}
+
 export function ReportContentButton({
   contentType,
   contentId,
@@ -54,11 +59,13 @@ export function ReportContentButton({
         type="button"
         variant="ghost"
         size="icon"
+        data-report-content
         className={cn("h-8 w-8 text-muted-foreground hover:text-foreground", className)}
         aria-label="Report content"
+        onPointerDown={stopCardActivation}
+        onMouseDown={stopCardActivation}
         onClick={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
+          stopCardActivation(event)
           setOpen(true)
         }}
       >

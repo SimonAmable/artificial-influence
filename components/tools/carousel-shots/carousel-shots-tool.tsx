@@ -39,6 +39,9 @@ const DEFAULT_FORM: CarouselShotsFormState = {
   model: DEFAULT_CAROUSEL_SHOTS_MODEL,
 }
 
+const DRAG_PREVIEW_OFFSET_X = 18
+const DRAG_PREVIEW_OFFSET_Y = 18
+
 type PendingJob = {
   id: string
   aspectRatio: CarouselPanelAspectRatio
@@ -48,6 +51,20 @@ type PendingJob = {
 type PendingResult = {
   generationId: string
   metadata: CarouselShotsMetadata
+}
+
+function getImageFileFromDataTransfer(dataTransfer: DataTransfer): File | null {
+  for (const item of Array.from(dataTransfer.items ?? [])) {
+    if (item.kind !== "file" || !item.type.startsWith("image/")) continue
+    const file = item.getAsFile()
+    if (file) return file
+  }
+
+  for (const file of Array.from(dataTransfer.files ?? [])) {
+    if (file.type.startsWith("image/")) return file
+  }
+
+  return null
 }
 
 export function CarouselShotsTool() {
@@ -63,7 +80,10 @@ export function CarouselShotsTool() {
   const [historyRefreshKey, setHistoryRefreshKey] = React.useState(0)
   const [historyScrollNonce, setHistoryScrollNonce] = React.useState(0)
   const [isDraggingFile, setIsDraggingFile] = React.useState(false)
+  const [dragPreviewUrl, setDragPreviewUrl] = React.useState<string | null>(null)
   const dragCounterRef = React.useRef(0)
+  const dragPreviewUrlRef = React.useRef<string | null>(null)
+  const dragPreviewElRef = React.useRef<HTMLDivElement>(null)
   const historyPanelAnchorRef = React.useRef<HTMLDivElement>(null)
 
   const scrollHistoryIntoView = React.useCallback(() => {
@@ -93,33 +113,82 @@ export function CarouselShotsTool() {
     }))
   }, [])
 
+  const clearDragPreview = React.useCallback(() => {
+    if (dragPreviewUrlRef.current) {
+      URL.revokeObjectURL(dragPreviewUrlRef.current)
+      dragPreviewUrlRef.current = null
+    }
+    setDragPreviewUrl(null)
+  }, [])
+
   const clearPageDragState = React.useCallback(() => {
     dragCounterRef.current = 0
     setIsDraggingFile(false)
+    clearDragPreview()
+  }, [clearDragPreview])
+
+  const updateDragPreviewPosition = React.useCallback((clientX: number, clientY: number) => {
+    const el = dragPreviewElRef.current
+    if (!el) return
+    el.style.transform = `translate3d(${clientX + DRAG_PREVIEW_OFFSET_X}px, ${clientY + DRAG_PREVIEW_OFFSET_Y}px, 0) rotate(-8deg)`
   }, [])
 
-  const handlePageDragOver = React.useCallback((event: React.DragEvent<HTMLElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
-  }, [])
+  const ensureDragPreview = React.useCallback(
+    (dataTransfer: DataTransfer, clientX: number, clientY: number) => {
+      if (dragPreviewUrlRef.current) {
+        updateDragPreviewPosition(clientX, clientY)
+        return
+      }
 
-  const handlePageDragEnter = React.useCallback((event: React.DragEvent<HTMLElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
-    if (!event.dataTransfer.types.includes("Files")) return
-    dragCounterRef.current += 1
-    setIsDraggingFile(true)
-  }, [])
+      const file = getImageFileFromDataTransfer(dataTransfer)
+      if (!file) return
 
-  const handlePageDragLeave = React.useCallback((event: React.DragEvent<HTMLElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
-    dragCounterRef.current -= 1
-    if (dragCounterRef.current <= 0) {
-      dragCounterRef.current = 0
-      setIsDraggingFile(false)
-    }
-  }, [])
+      const url = URL.createObjectURL(file)
+      dragPreviewUrlRef.current = url
+      setDragPreviewUrl(url)
+      // Position after paint so the ref exists
+      window.requestAnimationFrame(() => {
+        updateDragPreviewPosition(clientX, clientY)
+      })
+    },
+    [updateDragPreviewPosition],
+  )
+
+  const handlePageDragOver = React.useCallback(
+    (event: React.DragEvent<HTMLElement>) => {
+      event.preventDefault()
+      event.stopPropagation()
+      if (!event.dataTransfer.types.includes("Files")) return
+      event.dataTransfer.dropEffect = "copy"
+      ensureDragPreview(event.dataTransfer, event.clientX, event.clientY)
+      updateDragPreviewPosition(event.clientX, event.clientY)
+    },
+    [ensureDragPreview, updateDragPreviewPosition],
+  )
+
+  const handlePageDragEnter = React.useCallback(
+    (event: React.DragEvent<HTMLElement>) => {
+      event.preventDefault()
+      event.stopPropagation()
+      if (!event.dataTransfer.types.includes("Files")) return
+      dragCounterRef.current += 1
+      setIsDraggingFile(true)
+      ensureDragPreview(event.dataTransfer, event.clientX, event.clientY)
+    },
+    [ensureDragPreview],
+  )
+
+  const handlePageDragLeave = React.useCallback(
+    (event: React.DragEvent<HTMLElement>) => {
+      event.preventDefault()
+      event.stopPropagation()
+      dragCounterRef.current -= 1
+      if (dragCounterRef.current <= 0) {
+        clearPageDragState()
+      }
+    },
+    [clearPageDragState],
+  )
 
   const handlePageDropCapture = React.useCallback(() => {
     clearPageDragState()
@@ -134,6 +203,15 @@ export function CarouselShotsTool() {
     },
     [applyReferenceFile, clearPageDragState],
   )
+
+  React.useEffect(() => {
+    return () => {
+      if (dragPreviewUrlRef.current) {
+        URL.revokeObjectURL(dragPreviewUrlRef.current)
+        dragPreviewUrlRef.current = null
+      }
+    }
+  }, [])
 
   React.useEffect(() => {
     const imageUrl = referenceImageParam?.trim()
@@ -366,6 +444,25 @@ export function CarouselShotsTool() {
                 Sets the subject, outfit, and scene for your carousel
               </p>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {dragPreviewUrl ? (
+        <div
+          ref={dragPreviewElRef}
+          className="pointer-events-none fixed left-0 top-0 z-60 will-change-transform"
+          style={{ transform: "translate3d(-9999px, -9999px, 0) rotate(-8deg)" }}
+          aria-hidden
+        >
+          <div className="overflow-hidden rounded-2xl border-[3px] border-primary bg-background shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+            {/* eslint-disable-next-line @next/next/no-img-element -- blob preview URL during drag */}
+            <img
+              src={dragPreviewUrl}
+              alt=""
+              draggable={false}
+              className="block h-40 w-28 object-cover sm:h-48 sm:w-32"
+            />
           </div>
         </div>
       ) : null}

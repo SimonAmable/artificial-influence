@@ -4,7 +4,7 @@ import { MetadataRemoverTool } from "@/components/tools/metadata-remover"
 
 export const metadata: Metadata = {
   title: "Metadata Remover",
-  description: "Remove embedded metadata from AI images locally in your browser.",
+  description: "Strip metadata for free. Add SynthID scrub for Google AI images.",
 }
 
 export default function MetadataRemoverPage() {

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import {
   Plus,
@@ -13,7 +13,6 @@ import {
   Info,
   X,
   GenderFemale,
-  GenderMale,
   Globe,
   Eye,
   User,
@@ -30,10 +29,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { GenerationLoadingSlots } from "@/components/shared/display/generation-loading-slots"
 import { GenerateShaderButton } from "@/components/tools/influencer/generate-shader-button"
 import { cn } from "@/lib/utils"
 import { GPT_IMAGE_2_META } from "@/lib/constants/model-metadata"
+import {
+  assertNeverInfluencerMode,
+  getInfluencerModeCopy,
+  INFLUENCER_MODE_LIST,
+  influencerHelpSubtitle,
+  parseInfluencerCreationMode,
+  type InfluencerCreationMode,
+} from "@/lib/ai-influencer/modes"
 import { currentProduct } from "@/lib/product/current"
 import { generateImageAndWait, isInsufficientCreditsError, isInsufficientCreditsMessage } from "@/lib/generate-image-client"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
@@ -330,10 +338,14 @@ function LiquidGlassCard({
 
 export default function AIInfluencerPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
   const [selectedCharacter, setSelectedCharacter] = React.useState<ImageHistoryItem | null>(null)
   
   // Creation States
+  const [creationMode, setCreationMode] = React.useState<InfluencerCreationMode>(
+    () => parseInfluencerCreationMode(searchParams.get("mode")) ?? "direct",
+  )
   const [characterName, setCharacterName] = React.useState("")
   const [uploadedFiles, setUploadedFiles] = React.useState<Array<{ file: File; url: string }>>([])
   const [selectedTraits, setSelectedTraits] = React.useState<{ [key: string]: string }>({})
@@ -345,13 +357,16 @@ export default function AIInfluencerPage() {
   
   // Global page UI states
   const [isGenerating, setIsGenerating] = React.useState(false)
-  const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
+  const [, setIsHistoryLoading] = React.useState(false)
   const [isHelpOpen, setIsHelpOpen] = React.useState(false)
   const [isNameDialogOpen, setIsNameDialogOpen] = React.useState(false)
   const [isBuilderSheetOpen, setIsBuilderSheetOpen] = React.useState(false)
   
   const fileInputRef = React.useRef<HTMLInputElement>(null)
-  
+  const modeCopy = getInfluencerModeCopy(creationMode)
+  const showBuilder = creationMode === "build"
+  const maxUploadCount = creationMode === "direct" ? 1 : creationMode === "merge" ? 3 : 0
+
   // Fetch history
   const fetchHistory = React.useCallback(async () => {
     setIsHistoryLoading(true)
@@ -381,23 +396,33 @@ export default function AIInfluencerPage() {
           .filter(([, title]) => typeof title === "string" && title.trim().length > 0)
       )
 
-      const parsed: ImageHistoryItem[] = (generationData.generations || [])
-        .map((gen: any) => ({
-          id: gen.id,
-          url: gen.url,
-          model: gen.model,
-          prompt: gen.prompt,
-          displayName:
-            assetTitleByGenerationId.get(gen.id) ||
-            assetTitleByUrl.get(gen.url) ||
-            null,
-          tool: gen.tool,
-          aspectRatio: gen.aspect_ratio,
-          type: gen.type,
-          createdAt: gen.created_at,
-          reference_image_urls: gen.reference_image_urls || [],
-        }))
-        .filter((item: ImageHistoryItem) => typeof item.url === "string" && item.url.length > 0)
+      const generations = Array.isArray(generationData.generations)
+        ? (generationData.generations as Array<Record<string, unknown>>)
+        : []
+
+      const parsed: ImageHistoryItem[] = generations
+        .map((gen) => {
+          const id = typeof gen.id === "string" ? gen.id : ""
+          const url = typeof gen.url === "string" ? gen.url : ""
+          return {
+            id,
+            url,
+            model: typeof gen.model === "string" ? gen.model : null,
+            prompt: typeof gen.prompt === "string" ? gen.prompt : null,
+            displayName:
+              assetTitleByGenerationId.get(id) ||
+              assetTitleByUrl.get(url) ||
+              null,
+            tool: typeof gen.tool === "string" ? gen.tool : null,
+            aspectRatio: typeof gen.aspect_ratio === "string" ? gen.aspect_ratio : null,
+            type: typeof gen.type === "string" ? gen.type : null,
+            createdAt: typeof gen.created_at === "string" ? gen.created_at : null,
+            reference_image_urls: Array.isArray(gen.reference_image_urls)
+              ? gen.reference_image_urls.filter((value): value is string => typeof value === "string")
+              : [],
+          }
+        })
+        .filter((item) => item.url.length > 0)
       
       setHistoryImages(parsed)
       return parsed
@@ -420,11 +445,60 @@ export default function AIInfluencerPage() {
     }
   }, [fetchHistory])
 
+  React.useEffect(() => {
+    const modeFromUrl = parseInfluencerCreationMode(searchParams.get("mode"))
+    if (modeFromUrl && modeFromUrl !== creationMode) {
+      setCreationMode(modeFromUrl)
+    }
+    if (searchParams.get("help") === "1") {
+      setIsHelpOpen(true)
+    }
+    // Only sync from URL when search params change — avoid fighting local tab clicks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional URL → state sync
+  }, [searchParams])
+
+  const applyCreationMode = React.useCallback(
+    (mode: InfluencerCreationMode) => {
+      setCreationMode(mode)
+      setSelectedCharacter(null)
+      setIsBuilderSheetOpen(false)
+
+      setUploadedFiles((prev) => {
+        if (mode === "build") {
+          prev.forEach((item) => URL.revokeObjectURL(item.url))
+          return []
+        }
+        if (mode === "direct") {
+          const kept = prev.slice(0, 1)
+          prev.slice(1).forEach((item) => URL.revokeObjectURL(item.url))
+          return kept
+        }
+        return prev.slice(0, 3)
+      })
+
+      if (mode !== "build") {
+        setSelectedTraits({})
+        setCustomTraits({})
+        setCustomInputs({})
+        setEditingCustomTraitKey(null)
+      }
+
+      const params = new URLSearchParams(searchParams.toString())
+      params.set("mode", mode)
+      params.delete("help")
+      router.replace(`/ai-influencer?${params.toString()}`, { scroll: false })
+    },
+    [router, searchParams],
+  )
+
   // Reset current builder selections
   const handleReset = React.useCallback(() => {
     setSelectedCharacter(null)
     setCharacterName("")
-    setUploadedFiles([])
+    setUploadedFiles((prev) => {
+      prev.forEach((item) => URL.revokeObjectURL(item.url))
+      return []
+    })
     setSelectedTraits({})
     setCustomTraits({})
     setCustomInputs({})
@@ -517,27 +591,52 @@ export default function AIInfluencerPage() {
     [router, selectedCharacter?.url]
   )
 
-  // Detect mode based on uploaded reference files
-  const getDetectedMode = () => {
-    if (uploadedFiles.length === 1) return "Direct Save (Mode 1)"
-    if (uploadedFiles.length >= 2) return "Merge References (Mode 2)"
-    return "Build from Traits (Mode 3)"
-  }
-
+  // Mode-aware upload guidance
   const getUploadGuidance = () => {
-    if (uploadedFiles.length === 1) {
-      return "Save this photo as your character, or add another to blend faces."
+    switch (creationMode) {
+      case "direct":
+        if (uploadedFiles.length === 1) {
+          return "Ready to save this photo as your character."
+        }
+        return null
+      case "merge":
+        if (uploadedFiles.length === 1) {
+          return "Add at least one more closeup to merge faces."
+        }
+        if (uploadedFiles.length === 2) {
+          return "Create to merge these faces, or add one more to refine the blend."
+        }
+        if (uploadedFiles.length >= 3) {
+          return "Ready to blend these faces into one consistent character."
+        }
+        return null
+      case "build":
+        return null
+      default: {
+        const _exhaustive: never = creationMode
+        return assertNeverInfluencerMode(_exhaustive)
+      }
     }
-    if (uploadedFiles.length === 2) {
-      return "Create to merge these faces, or add one more to refine the blend."
-    }
-    if (uploadedFiles.length >= 3) {
-      return "Ready to blend these faces into one consistent character."
-    }
-    return null
   }
 
   const uploadGuidance = getUploadGuidance()
+
+  const canCreateCharacter = (() => {
+    switch (creationMode) {
+      case "direct":
+        return uploadedFiles.length === 1
+      case "merge":
+        return uploadedFiles.length >= 2 && uploadedFiles.length <= 3
+      case "build":
+        return true
+      default: {
+        const _exhaustive: never = creationMode
+        return assertNeverInfluencerMode(_exhaustive)
+      }
+    }
+  })()
+
+  const createCreditCost = creationMode === "direct" ? 0 : GPT_IMAGE_2_META.model_cost
 
   // Shuffle/randomize options
   const handleShuffle = () => {
@@ -555,13 +654,18 @@ export default function AIInfluencerPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
+    if (maxUploadCount <= 0) return
 
-    const newFiles = files.slice(0, 3 - uploadedFiles.length).map(file => ({
+    const slotsLeft = maxUploadCount - uploadedFiles.length
+    if (slotsLeft <= 0) return
+
+    const newFiles = files.slice(0, slotsLeft).map(file => ({
       file,
       url: URL.createObjectURL(file)
     }))
 
-    setUploadedFiles(prev => [...prev, ...newFiles].slice(0, 3))
+    setUploadedFiles(prev => [...prev, ...newFiles].slice(0, maxUploadCount))
+    e.target.value = ""
   }
 
   const removeUploadedFile = (index: number) => {
@@ -601,7 +705,22 @@ export default function AIInfluencerPage() {
 
   // Trigger naming modal or create
   const handleCreateTrigger = () => {
-    // Open name prompt dialog
+    if (!canCreateCharacter) {
+      switch (creationMode) {
+        case "direct":
+          toast.error("Upload exactly one photo for Direct Save")
+          return
+        case "merge":
+          toast.error("Upload 2 or 3 closeups to merge")
+          return
+        case "build":
+          return
+        default: {
+          const _exhaustive: never = creationMode
+          return assertNeverInfluencerMode(_exhaustive)
+        }
+      }
+    }
     setIsNameDialogOpen(true)
   }
 
@@ -613,16 +732,20 @@ export default function AIInfluencerPage() {
       return
     }
 
+    if (!canCreateCharacter) {
+      handleCreateTrigger()
+      return
+    }
+
     setIsNameDialogOpen(false)
     setIsGenerating(true)
     try {
-      const mode = getDetectedMode()
       // Sonner merges updates by id and keeps a prior description unless cleared
       // (e.g. content-moderation's "No credits were used..." stuck on the next loading toast).
       const influencerToast = { id: "influencer-toast", description: "" } as const
 
-      if (uploadedFiles.length === 1) {
-        // Mode 1: Upload and save directly
+      if (creationMode === "direct") {
+        // Direct Save: Upload and save directly
         toast.loading("Saving your character upload...", influencerToast)
         const uploadResult = await uploadFileToSupabase(uploadedFiles[0].file, "ai-influencer")
         if (!uploadResult) throw new Error("Failed to upload character photo")
@@ -692,13 +815,17 @@ export default function AIInfluencerPage() {
           })
         }
       } else {
-        // Mode 2 & 3: Run model generation with GPT Image 2
+        // Merge & Build: Run model generation with GPT Image 2
         toast.loading(
           "Generating your AI Influencer (this may take a few seconds)...",
           influencerToast,
         )
 
-        const prompt = buildCharacterGenerationPrompt(name, selectedTraits, uploadedFiles.length >= 2)
+        const prompt = buildCharacterGenerationPrompt(
+          name,
+          selectedTraits,
+          creationMode === "merge",
+        )
 
         const formData = new FormData()
         formData.append("model", "openai/gpt-image-2")
@@ -707,10 +834,11 @@ export default function AIInfluencerPage() {
         formData.append("tool", "ai_influencer")
         formData.append("aspect_ratio", "1:1")
 
-        // Append files if they exist (Mode 2)
-        uploadedFiles.forEach(item => {
-          formData.append("referenceImages", item.file)
-        })
+        if (creationMode === "merge") {
+          uploadedFiles.forEach(item => {
+            formData.append("referenceImages", item.file)
+          })
+        }
 
         let acceptedGenerationId: string | null = null
         const result = await generateImageAndWait(
@@ -736,7 +864,7 @@ export default function AIInfluencerPage() {
           aspectRatio: "1:1",
           type: "image",
           createdAt: new Date().toISOString(),
-          reference_image_urls: uploadedFiles.map((item) => item.url),
+          reference_image_urls: creationMode === "merge" ? uploadedFiles.map((item) => item.url) : [],
         }
         try {
           await saveCharacterAsset({
@@ -814,6 +942,12 @@ export default function AIInfluencerPage() {
       localStorage.setItem("unican-influencer-guide-seen", "true")
     }
     setIsHelpOpen(false)
+    if (searchParams.get("help") === "1") {
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete("help")
+      const query = params.toString()
+      router.replace(query ? `/ai-influencer?${query}` : "/ai-influencer", { scroll: false })
+    }
   }
 
   const builderPanel = (mobile = false) => (
@@ -1070,6 +1204,29 @@ export default function AIInfluencerPage() {
         {/* Middle Column: Preview & Action Canvas (Spacious, Centered card) */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col justify-between items-center p-4 lg:px-4 lg:py-0 bg-background relative overflow-visible lg:overflow-hidden h-auto lg:h-full">
           <div className="w-full max-w-lg flex-1 flex flex-col justify-start py-4 lg:py-0">
+
+            {!selectedCharacter ? (
+              <Tabs
+                value={creationMode}
+                onValueChange={(value) => {
+                  const next = parseInfluencerCreationMode(value)
+                  if (next) applyCreationMode(next)
+                }}
+                className="mb-4 w-full"
+              >
+                <TabsList className="grid h-10 w-full grid-cols-3">
+                  {INFLUENCER_MODE_LIST.map((mode) => (
+                    <TabsTrigger
+                      key={mode.id}
+                      value={mode.id}
+                      className="px-2 text-xs sm:text-sm"
+                    >
+                      {mode.tabLabel}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            ) : null}
             
             {/* Main Preview Card with big round borders */}
             <Card className="w-full aspect-[4/5] sm:aspect-square lg:aspect-[4/5] bg-secondary/5 border-border/40 overflow-hidden relative shadow-2xl flex flex-col justify-center items-center p-0 group rounded-2xl">
@@ -1148,90 +1305,105 @@ export default function AIInfluencerPage() {
                 // Creation / Mode Input Mode
                 <div className="w-full h-full flex flex-col justify-between items-stretch">
                   
-                  {/* File Upload Drop Area */}
-                  <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex-1 w-full flex flex-col justify-center items-center cursor-pointer px-4 py-6 transition-colors hover:bg-primary/5"
-                  >
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileChange}
-                      multiple
-                      accept="image/*"
-                      className="hidden"
-                    />
-
-                    {uploadedFiles.length === 0 ? (
+                  {creationMode === "build" ? (
+                    <div className="flex-1 w-full flex flex-col justify-center items-center px-4 py-6">
                       <div className="text-center flex flex-col items-center max-w-sm">
-                        <h4 className="text-sm font-bold text-foreground mb-1 font-display uppercase tracking-wider">Add reference photos</h4>
-                        <div className="mt-1 max-w-[280px] space-y-1 text-center">
-                          <span className="shimmer block text-xs leading-normal text-muted-foreground">
-                            Save characters instantly with 1 photo.
-                          </span>
-                          <span className="shimmer block text-xs leading-normal text-muted-foreground">
-                            Blend 2-3 photos into one new face.
-                          </span>
-                          <span className="shimmer block text-xs leading-normal text-muted-foreground">
-                            Or build a new character with the builder.
-                          </span>
-                        </div>
-                        <Button 
-                          variant="secondary" 
-                          size="sm" 
-                          className="mt-6 gap-1.5 h-8 font-semibold shadow-sm rounded-full bg-secondary/50 hover:bg-secondary border border-border/30 text-xs px-4"
+                        <h4 className="text-sm font-bold text-foreground mb-1 font-display uppercase tracking-wider">
+                          {modeCopy.emptyStateTitle}
+                        </h4>
+                        <p className="mt-1 max-w-[280px] text-center text-xs leading-normal text-muted-foreground">
+                          {modeCopy.emptyStateHint}
+                        </p>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="mt-6 gap-1.5 h-8 font-semibold shadow-sm rounded-full bg-secondary/50 hover:bg-secondary border border-border/30 text-xs px-4 lg:hidden"
+                          onClick={() => setIsBuilderSheetOpen(true)}
                         >
-                          <UploadSimple className="size-3.5" />
-                          Upload photos
+                          <User className="size-3.5" />
+                          Open Builder
                         </Button>
                       </div>
-                    ) : (
-                      <div className="w-full flex flex-col items-center gap-5">
-                        {uploadGuidance && (
-                          <p className="shimmer text-center text-xs leading-relaxed text-muted-foreground max-w-[260px]">
-                            {uploadGuidance}
-                          </p>
-                        )}
-                        <div
-                          className={cn(
-                            "w-full grid gap-3",
-                            uploadedFiles.length === 1
-                              ? "grid-cols-2 max-w-[240px]"
-                              : "grid-cols-3"
-                          )}
-                        >
-                          {uploadedFiles.map((item, idx) => (
-                            <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-border/40 bg-muted group/thumb">
-                              <img
-                                src={item.url}
-                                alt="preview"
-                                className="w-full h-full object-cover"
-                              />
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  removeUploadedFile(idx)
-                                }}
-                                className="absolute top-1 right-1 p-1 bg-background/80 text-foreground hover:bg-destructive hover:text-destructive-foreground rounded-full transition-colors"
-                                aria-label="Remove photo"
-                              >
-                                <X className="size-3" />
-                              </button>
-                            </div>
-                          ))}
-                          {uploadedFiles.length < 3 && (
-                            <div className="border border-dashed border-border/40 hover:border-primary/40 flex flex-col justify-center items-center rounded-lg aspect-[3/4] transition-colors">
-                              <Plus className="size-5 text-muted-foreground" />
-                              <span className="text-[10px] font-medium text-muted-foreground mt-1">Add</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex-1 w-full flex flex-col justify-center items-center cursor-pointer px-4 py-6 transition-colors hover:bg-primary/5"
+                    >
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        multiple={creationMode === "merge"}
+                        accept="image/*"
+                        className="hidden"
+                      />
 
-                  {/* Dynamic Traits Tags container attached to bottom of preview */}
-                  {Object.keys(selectedTraits).length > 0 && (
+                      {uploadedFiles.length === 0 ? (
+                        <div className="text-center flex flex-col items-center max-w-sm">
+                          <h4 className="text-sm font-bold text-foreground mb-1 font-display uppercase tracking-wider">
+                            {modeCopy.emptyStateTitle}
+                          </h4>
+                          <p className="mt-1 max-w-[280px] text-center text-xs leading-normal text-muted-foreground">
+                            {modeCopy.emptyStateHint}
+                          </p>
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="mt-6 gap-1.5 h-8 font-semibold shadow-sm rounded-full bg-secondary/50 hover:bg-secondary border border-border/30 text-xs px-4"
+                          >
+                            <UploadSimple className="size-3.5" />
+                            Upload photos
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="w-full flex flex-col items-center gap-5">
+                          {uploadGuidance && (
+                            <p className="shimmer text-center text-xs leading-relaxed text-muted-foreground max-w-[260px]">
+                              {uploadGuidance}
+                            </p>
+                          )}
+                          <div
+                            className={cn(
+                              "w-full grid gap-3",
+                              uploadedFiles.length === 1
+                                ? "grid-cols-2 max-w-[240px]"
+                                : "grid-cols-3"
+                            )}
+                          >
+                            {uploadedFiles.map((item, idx) => (
+                              <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-border/40 bg-muted group/thumb">
+                                <img
+                                  src={item.url}
+                                  alt="preview"
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    removeUploadedFile(idx)
+                                  }}
+                                  className="absolute top-1 right-1 p-1 bg-background/80 text-foreground hover:bg-destructive hover:text-destructive-foreground rounded-full transition-colors"
+                                  aria-label="Remove photo"
+                                >
+                                  <X className="size-3" />
+                                </button>
+                              </div>
+                            ))}
+                            {uploadedFiles.length < maxUploadCount && (
+                              <div className="border border-dashed border-border/40 hover:border-primary/40 flex flex-col justify-center items-center rounded-lg aspect-[3/4] transition-colors">
+                                <Plus className="size-5 text-muted-foreground" />
+                                <span className="text-[10px] font-medium text-muted-foreground mt-1">Add</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Dynamic Traits Tags — Build mode only */}
+                  {showBuilder && Object.keys(selectedTraits).length > 0 && (
                     <div className="w-full px-4 pb-4 pt-3 border-t border-border/20 bg-muted/30">
                       <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto pr-1">
                         <AnimatePresence initial={false} mode="popLayout">
@@ -1278,56 +1450,39 @@ export default function AIInfluencerPage() {
             {!selectedCharacter && (
               <div className="mt-6 flex flex-col gap-3 w-full items-center">
                 <div className="flex items-center gap-3 w-full max-w-md">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleShuffle}
-                    disabled={isGenerating}
-                    className="size-11 shrink-0 rounded-full border-border/40 hover:bg-secondary/20 transition-colors shadow-sm bg-secondary/5"
-                    title="Randomize Traits"
-                  >
-                    <Shuffle className="size-4 text-foreground" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setIsBuilderSheetOpen(true)}
-                    className="size-11 shrink-0 rounded-full border-border/40 hover:bg-secondary/20 transition-colors shadow-sm bg-secondary/5 lg:hidden"
-                    title="Open Builder"
-                  >
-                    <User className="size-4 text-foreground" />
-                  </Button>
-                  {uploadedFiles.length > 0 ? (
-                    <GenerateShaderButton
-                      layout="bar"
-                      className="flex-1 [&>div]:before:!rounded-full [&_button]:rounded-full"
-                      isReady
-                      isGenerating={isGenerating}
-                      allowConcurrent={false}
-                      onGenerate={handleCreateTrigger}
-                      creditCost={
-                        uploadedFiles.length === 1
-                          ? 0
-                          : GPT_IMAGE_2_META.model_cost
-                      }
-                      label="Create character"
-                    />
-                  ) : (
-                    <Button
-                      onClick={handleCreateTrigger}
-                      disabled={isGenerating}
-                      className="flex-1 h-11 font-bold text-base uppercase tracking-wider rounded-full border-0 bg-black text-white hover:bg-black/90 dark:bg-black dark:text-white dark:hover:bg-black/90 transition-all"
-                    >
-                      {isGenerating ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <ArrowsClockwise className="size-4 animate-spin" />
-                          Generating...
-                        </span>
-                      ) : (
-                        "Create character"
-                      )}
-                    </Button>
-                  )}
+                  {showBuilder ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleShuffle}
+                        disabled={isGenerating}
+                        className="size-11 shrink-0 rounded-full border-border/40 hover:bg-secondary/20 transition-colors shadow-sm bg-secondary/5"
+                        title="Randomize Traits"
+                      >
+                        <Shuffle className="size-4 text-foreground" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setIsBuilderSheetOpen(true)}
+                        className="size-11 shrink-0 rounded-full border-border/40 hover:bg-secondary/20 transition-colors shadow-sm bg-secondary/5 lg:hidden"
+                        title="Open Builder"
+                      >
+                        <User className="size-4 text-foreground" />
+                      </Button>
+                    </>
+                  ) : null}
+                  <GenerateShaderButton
+                    layout="bar"
+                    className="flex-1 [&>div]:before:!rounded-full [&_button]:rounded-full"
+                    isReady={canCreateCharacter}
+                    isGenerating={isGenerating}
+                    allowConcurrent={false}
+                    onGenerate={handleCreateTrigger}
+                    creditCost={createCreditCost}
+                    label="Create character"
+                  />
                 </div>
               </div>
             )}
@@ -1335,14 +1490,16 @@ export default function AIInfluencerPage() {
           </div>
         </div>
 
-        {/* Right Column: Visual Prompt Builder (floating panel) */}
-        <div className="hidden lg:flex w-full lg:w-[420px] shrink-0 border border-border/40 bg-secondary/5 flex-col h-full min-h-0 overflow-hidden rounded-2xl shadow-2xl">
-          {builderPanel()}
-        </div>
+        {/* Right Column: Visual Prompt Builder — Build mode only */}
+        {showBuilder ? (
+          <div className="hidden lg:flex w-full lg:w-[420px] shrink-0 border border-border/40 bg-secondary/5 flex-col h-full min-h-0 overflow-hidden rounded-2xl shadow-2xl">
+            {builderPanel()}
+          </div>
+        ) : null}
 
         </div>
 
-        <Sheet open={isBuilderSheetOpen} onOpenChange={setIsBuilderSheetOpen}>
+        <Sheet open={isBuilderSheetOpen && showBuilder} onOpenChange={setIsBuilderSheetOpen}>
           <SheetContent side="right" className="w-[92vw] max-w-[420px] p-0 overflow-hidden bg-background">
             <SheetHeader className="sr-only">
               <SheetTitle>Builder</SheetTitle>
@@ -1447,7 +1604,13 @@ export default function AIInfluencerPage() {
       </Dialog>
 
       {/* Onboarding Guide Modal remade using installed premium LiquidGlass component wrapper */}
-      <Dialog open={isHelpOpen} onOpenChange={setIsHelpOpen}>
+      <Dialog
+        open={isHelpOpen}
+        onOpenChange={(open) => {
+          if (open) setIsHelpOpen(true)
+          else handleCloseHelp(false)
+        }}
+      >
         <DialogContent className="!bg-transparent !p-0 !border-none !ring-0 !shadow-none max-w-md w-full overflow-visible">
           <LiquidGlassCard
             className="w-full"
@@ -1459,40 +1622,26 @@ export default function AIInfluencerPage() {
                   AI Influencer Builder
                 </DialogTitle>
                 <DialogDescription className="text-center text-xs text-muted-foreground mt-1.5 max-w-sm mx-auto leading-normal">
-                  {currentProduct.name} enables you to create and save consistent AI characters and influencers in three modes.
+                  {influencerHelpSubtitle(currentProduct.name)}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4 my-5">
-                <div className="flex gap-3">
-                  <div className="size-6 rounded-full bg-secondary text-primary flex items-center justify-center text-xs font-extrabold shrink-0 mt-0.5">1</div>
-                  <div>
-                    <h4 className="text-xs font-bold text-foreground font-display uppercase tracking-wider">Direct Save Mode</h4>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-normal">
-                      Upload exactly one photo of a character you already have, name them, and save them directly to your library.
-                    </p>
+                {INFLUENCER_MODE_LIST.map((mode, index) => (
+                  <div key={mode.id} className="flex gap-3">
+                    <div className="size-6 rounded-full bg-secondary text-primary flex items-center justify-center text-xs font-extrabold shrink-0 mt-0.5">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-foreground font-display uppercase tracking-wider">
+                        {mode.title}
+                      </h4>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-normal">
+                        {mode.description}
+                      </p>
+                    </div>
                   </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="size-6 rounded-full bg-secondary text-primary flex items-center justify-center text-xs font-extrabold shrink-0 mt-0.5">2</div>
-                  <div>
-                    <h4 className="text-xs font-bold text-foreground font-display uppercase tracking-wider">Merge References Mode</h4>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-normal">
-                      Upload 2 or 3 closeups of different faces. We will blend and merge their facial structures into one consistent face.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="size-6 rounded-full bg-secondary text-primary flex items-center justify-center text-xs font-extrabold shrink-0 mt-0.5">3</div>
-                  <div>
-                    <h4 className="text-xs font-bold text-foreground font-display uppercase tracking-wider">Build from Traits Mode</h4>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-normal">
-                      No reference photos? Select a combination of gender, race, eye color, hair, and style on the right. We will build a new character prompt.
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
 
               <div className="flex flex-col gap-2 mt-4">
@@ -1501,6 +1650,16 @@ export default function AIInfluencerPage() {
                   className="w-full font-bold bg-primary hover:bg-primary/90 text-primary-foreground h-11 text-xs uppercase tracking-wider rounded-full shadow-lg shadow-primary/20"
                 >
                   Get Started
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full text-xs text-muted-foreground h-9 font-semibold hover:text-foreground uppercase tracking-wider rounded-full hover:bg-secondary/40"
+                  onClick={() => {
+                    handleCloseHelp(true)
+                    router.push("/guides/create-ai-influencer")
+                  }}
+                >
+                  Open full guide
                 </Button>
                 <DialogClose asChild>
                   <Button variant="ghost" className="w-full text-xs text-muted-foreground h-9 font-semibold hover:text-foreground uppercase tracking-wider rounded-full hover:bg-secondary/40">

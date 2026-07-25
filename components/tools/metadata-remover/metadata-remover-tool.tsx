@@ -8,21 +8,27 @@ import {
   DownloadSimple,
   ImageSquare,
   ShieldCheck,
+  Sparkle,
   Trash,
   UploadSimple,
 } from "@phosphor-icons/react"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { isRouteVisibleForProduct } from "@/lib/product/visibility"
-import { cn } from "@/lib/utils"
+import { Switch } from "@/components/ui/switch"
+import { AnimatedSelectLabel } from "@/components/tools/influencer/animated-control-item"
+import { SYNTH_ID_SCRUB_CREDITS_COST } from "@/lib/constants/metadata-remover"
 import {
   downloadBlob,
   stripImageMetadata,
   type StrippedImageResult,
 } from "@/lib/images/strip-metadata"
+import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
+import { isRouteVisibleForProduct } from "@/lib/product/visibility"
+import { cn } from "@/lib/utils"
 
 type SelectedImage = {
   file: File
@@ -42,13 +48,65 @@ function formatMimeType(mimeType: string) {
   return mimeType.replace("image/", "").toUpperCase()
 }
 
+function createScrubbedFileName(originalName: string, mimeType: string) {
+  const base = originalName.replace(/\.[^.]+$/, "") || "image"
+  const extension = mimeType === "image/jpeg"
+    ? "jpg"
+    : mimeType === "image/webp"
+      ? "webp"
+      : mimeType === "image/avif"
+        ? "avif"
+        : "png"
+  return `${base}-clean.${extension}`
+}
+
+function AnimatedCreditBadge({ cost, visible }: { cost: number; visible: boolean }) {
+  const prefersReducedMotion = useReducedMotion()
+
+  return (
+    <AnimatePresence initial={false} mode="popLayout">
+      {visible ? (
+        <motion.span
+          key="credit-badge"
+          layout
+          initial={
+            prefersReducedMotion
+              ? { opacity: 0 }
+              : { opacity: 0, scale: 0.85, y: 6 }
+          }
+          animate={
+            prefersReducedMotion
+              ? { opacity: 1 }
+              : { opacity: 1, scale: 1, y: 0 }
+          }
+          exit={
+            prefersReducedMotion
+              ? { opacity: 0 }
+              : { opacity: 0, scale: 0.85, y: -6 }
+          }
+          transition={{
+            duration: prefersReducedMotion ? 0.12 : 0.22,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          className="inline-flex items-center gap-0.5 tabular-nums text-xs font-semibold opacity-90"
+        >
+          <Sparkle className="size-3" weight="fill" aria-hidden />
+          {cost}
+        </motion.span>
+      ) : null}
+    </AnimatePresence>
+  )
+}
+
 export function MetadataRemoverTool() {
   const [selectedImage, setSelectedImage] = React.useState<SelectedImage | null>(null)
   const [cleanResult, setCleanResult] = React.useState<StrippedImageResult | null>(null)
+  const [scrubSynthId, setScrubSynthId] = React.useState(false)
   const [isDragging, setIsDragging] = React.useState(false)
   const [isProcessing, setIsProcessing] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const dragCounterRef = React.useRef(0)
+  const scrubSynthIdSwitchId = React.useId()
 
   React.useEffect(() => {
     return () => {
@@ -133,17 +191,88 @@ export function MetadataRemoverTool() {
 
     setIsProcessing(true)
     try {
+      if (scrubSynthId) {
+        const form = new FormData()
+        form.append("image", selectedImage.file)
+
+        const response = await fetch("/api/metadata-remover/scrub-synth-id", {
+          method: "POST",
+          body: form,
+        })
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}))
+          const message = (data.error ?? data.message ?? "SynthID scrub failed") as string
+
+          if (response.status === 401) {
+            toast.error("Sign in to run a SynthID scrub", {
+              action: {
+                label: "Sign in",
+                onClick: () => {
+                  window.location.href = "/login?next=/free-tools/metadata-remover"
+                },
+              },
+            })
+            return
+          }
+
+          if (response.status === 402) {
+            showCreditsUpsellToast({
+              message,
+              description: "Get more credits to continue",
+              toastId: "metadata-remover-credits-upsell",
+            })
+            return
+          }
+
+          toast.error(message)
+          return
+        }
+
+        const blob = await response.blob()
+        const mimeType = response.headers.get("content-type")?.split(";")[0]?.trim() || blob.type || "image/png"
+        const width = Number(response.headers.get("x-image-width") ?? 0)
+        const height = Number(response.headers.get("x-image-height") ?? 0)
+
+        setCleanResult({
+          blob,
+          mimeType,
+          fileName: createScrubbedFileName(selectedImage.file.name, mimeType),
+          width,
+          height,
+          originalSizeBytes: selectedImage.file.size,
+        })
+        toast.success("Done", {
+          description: `1 credit used.`,
+        })
+        return
+      }
+
       const result = await stripImageMetadata(selectedImage.file)
       setCleanResult(result)
       toast.success("Metadata removed", {
-        description: "Your clean image is ready to download.",
+        description: "Ready to download.",
       })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not remove metadata")
+      toast.error(error instanceof Error ? error.message : "Could not process image")
     } finally {
       setIsProcessing(false)
     }
-  }, [selectedImage])
+  }, [scrubSynthId, selectedImage])
+
+  const scrubSynthIdDescription = scrubSynthId
+    ? "Google AI images"
+    : "Free · stays in your browser"
+
+  const processButtonLabel = isProcessing
+    ? scrubSynthId
+      ? "Scrubbing..."
+      : "Removing..."
+    : cleanResult
+      ? "Run again"
+      : scrubSynthId
+        ? "Clean image"
+        : "Remove metadata"
 
   const handleDownload = React.useCallback(() => {
     if (!cleanResult) return
@@ -157,7 +286,7 @@ export function MetadataRemoverTool() {
     <div className="min-h-screen bg-background px-4 pb-12 pt-24 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-3xl">
+          <div>
             <Badge variant="secondary" className="mb-3 w-fit gap-1.5">
               <ShieldCheck className="size-3.5" weight="regular" />
               Free local tool
@@ -166,7 +295,7 @@ export function MetadataRemoverTool() {
               Metadata Remover
             </h1>
             <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">
-              Re-encode AI images into clean raster files in your browser. Nothing uploads, and no credits are used.
+              Strip metadata for free. Add SynthID scrub for Google AI images.
             </p>
           </div>
           {showAllToolsLink ? (
@@ -291,10 +420,45 @@ export function MetadataRemoverTool() {
                   </div>
                 )}
 
+                <label
+                  htmlFor={scrubSynthIdSwitchId}
+                  className="flex cursor-pointer items-start justify-between gap-4 rounded-lg border bg-muted/20 p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">
+                      Scrub SynthID
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      <AnimatedSelectLabel value={scrubSynthIdDescription} />
+                    </p>
+                  </div>
+                  <Switch
+                    id={scrubSynthIdSwitchId}
+                    checked={scrubSynthId}
+                    onCheckedChange={(checked) => {
+                      setScrubSynthId(checked)
+                      setCleanResult(null)
+                    }}
+                    disabled={isProcessing}
+                    aria-label="Scrub SynthID"
+                    className="mt-0.5"
+                  />
+                </label>
+
                 <div className="flex flex-col gap-2">
-                  <Button onClick={handleStrip} disabled={!selectedImage || isProcessing}>
-                    <ShieldCheck className="mr-2 size-4" weight="regular" />
-                    {isProcessing ? "Removing..." : cleanResult ? "Remove again" : "Remove metadata"}
+                  <Button
+                    onClick={handleStrip}
+                    disabled={!selectedImage || isProcessing}
+                    className="gap-2"
+                  >
+                    <ShieldCheck className="size-4 shrink-0" weight="regular" />
+                    <span className="inline-flex items-center gap-1.5">
+                      <AnimatedSelectLabel value={processButtonLabel} />
+                      <AnimatedCreditBadge
+                        cost={SYNTH_ID_SCRUB_CREDITS_COST}
+                        visible={scrubSynthId}
+                      />
+                    </span>
                   </Button>
                   <Button variant="outline" onClick={handleDownload} disabled={!cleanResult}>
                     <DownloadSimple className="mr-2 size-4" />
@@ -310,7 +474,13 @@ export function MetadataRemoverTool() {
             </Card>
 
             <div className="rounded-lg border bg-muted/20 p-4 text-xs leading-5 text-muted-foreground">
-              Files stay in your browser. This tool removes embedded metadata by making a new image from the visible pixels.
+              <AnimatedSelectLabel
+                value={
+                  scrubSynthId
+                    ? "Runs on our servers. May slightly change pixels."
+                    : "Processed locally in your browser."
+                }
+              />
             </div>
           </div>
         </div>
