@@ -87,7 +87,7 @@ export function CreditPackGrid({ className, redirectPath = '/pricing' }: CreditP
         const checkoutUrl = itemKey
           ? await fetchFanvueBillingUrl({ kind: 'item', item: itemKey })
           : await fetchFanvueBillingUrl({ kind: 'listing' });
-        window.location.href = checkoutUrl;
+        window.location.assign(checkoutUrl);
         return;
       }
 
@@ -105,7 +105,7 @@ export function CreditPackGrid({ className, redirectPath = '/pricing' }: CreditP
       }
 
       if (data.url) {
-        window.location.href = data.url;
+        window.location.assign(data.url);
       }
     } catch (checkoutError) {
       console.error('Credit checkout failed:', checkoutError);

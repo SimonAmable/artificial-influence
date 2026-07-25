@@ -1,4 +1,4 @@
-// @ts-ignore TS5097: regression script imports this file directly via Node strip-types.
+// @ts-expect-error TS5097: regression script imports this file directly via Node strip-types.
 import { CHATBOT_SYSTEM_PROMPT as LEGACY_CHATBOT_SYSTEM_PROMPT } from "../constants/system-prompts.ts"
 
 /** In-app chat guide name (header, empty state, and system prompt). */

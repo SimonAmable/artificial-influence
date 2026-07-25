@@ -84,8 +84,8 @@ export function groupModelsByVendor(models: ModelMetadata[]): VendorModelGroup[]
   return groups
 }
 
-const featuredVendorOrder = new Map(
-  modelsBentoFeaturedVendorSlugs.map((slug, index) => [slug, index] as const),
+const featuredVendorOrder = new Map<string, number>(
+  modelsBentoFeaturedVendorSlugs.map((slug, index) => [slug, index]),
 )
 
 /** Homepage bento: fixed vendor family cards, each listing all active models in that family. */

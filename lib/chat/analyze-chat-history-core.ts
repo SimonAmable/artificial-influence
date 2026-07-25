@@ -113,8 +113,13 @@ export interface ChatHistoryAnalysis {
   outputKind: ChatAnalysisOutputKind
 }
 
-function isToolPart(part: UIMessage["parts"][number]): part is ToolMessagePart {
+function isToolPart(part: UIMessage["parts"][number]): boolean {
   return typeof part.type === "string" && part.type.startsWith("tool-")
+}
+
+function asToolPart(part: UIMessage["parts"][number]): ToolMessagePart | null {
+  if (!isToolPart(part)) return null
+  return part as ToolMessagePart
 }
 
 function resolveModel(part: ToolMessagePart): string | undefined {
@@ -189,16 +194,17 @@ function extractMediaFromPart(
   part: UIMessage["parts"][number],
   messageId: string,
 ): ExtractedMedia | null {
-  if (!isToolPart(part) || !MEDIA_TOOL_TYPES.has(part.type)) return null
-  if (part.state !== "output-available") return null
+  const toolPart = asToolPart(part)
+  if (!toolPart || !MEDIA_TOOL_TYPES.has(toolPart.type)) return null
+  if (toolPart.state !== "output-available") return null
 
-  const output = part.output
+  const output = toolPart.output
   if (!output || output.status === "failed" || output.status === "pending") return null
 
-  const model = resolveModel(part)
-  const toolCallId = part.toolCallId ?? ""
+  const model = resolveModel(toolPart)
+  const toolCallId = toolPart.toolCallId ?? ""
   const base = {
-    sourceTool: part.type,
+    sourceTool: toolPart.type,
     toolCallId,
     messageId,
     model,
@@ -275,22 +281,23 @@ export function extractGenerationToolCalls(messages: UIMessage[]): GenerationToo
     if (message.role !== "assistant") continue
 
     for (const part of message.parts) {
-      if (!isToolPart(part) || !GENERATION_TOOL_TYPES.has(part.type)) continue
+      const toolPart = asToolPart(part)
+      if (!toolPart || !GENERATION_TOOL_TYPES.has(toolPart.type)) continue
 
-      const credits = resolveCredits(part.output)
+      const credits = resolveCredits(toolPart.output)
       calls.push({
-        toolType: part.type,
-        toolCallId: part.toolCallId ?? "",
+        toolType: toolPart.type,
+        toolCallId: toolPart.toolCallId ?? "",
         messageId: message.id,
-        state: part.state,
-        status: part.output?.status,
-        model: resolveModel(part),
+        state: toolPart.state,
+        status: toolPart.output?.status,
+        model: resolveModel(toolPart),
         creditsUsed: credits.creditsUsed,
         creditsQuoted: credits.creditsQuoted,
         creditsEstimated: credits.credits,
         creditSource: credits.creditSource,
-        generationId: part.output?.generationId,
-        succeeded: isSuccessfulGeneration(part),
+        generationId: toolPart.output?.generationId,
+        succeeded: isSuccessfulGeneration(toolPart),
       })
     }
   }

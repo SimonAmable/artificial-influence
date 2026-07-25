@@ -1,4 +1,12 @@
-export const INWORLD_TTS_MODEL_OPTIONS = [
+export type InworldTtsModelGroup = "Current" | "Legacy"
+
+export const INWORLD_TTS_MODEL_OPTIONS: readonly {
+  id: string
+  label: string
+  description: string
+  group: InworldTtsModelGroup
+  deprecated: boolean
+}[] = [
   {
     id: "inworld-tts-1.5-max",
     label: "Inworld 1.5 Max",
@@ -6,7 +14,7 @@ export const INWORLD_TTS_MODEL_OPTIONS = [
     group: "Current",
     deprecated: false,
   },
-] as const
+]
 
 export type InworldTtsModelId =
   (typeof INWORLD_TTS_MODEL_OPTIONS)[number]["id"]

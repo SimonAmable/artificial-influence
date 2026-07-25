@@ -386,7 +386,9 @@ function textValue(value: unknown) {
 }
 
 function arrayValues(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim()) : []
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : []
 }
 
 function valueText(value: unknown) {

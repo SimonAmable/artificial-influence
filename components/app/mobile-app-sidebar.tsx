@@ -32,7 +32,7 @@ import {
   isPageInMegaNavigation,
   megaNavPathMatches,
 } from "@/lib/navigation/mobile-sidebar"
-import { getNavIcon, type NavIconKey } from "@/lib/navigation/nav-icons"
+import { NAV_ICON_MAP, type NavIconKey } from "@/lib/navigation/nav-icons"
 import { cn } from "@/lib/utils"
 import { currentProduct } from "@/lib/product/current"
 import type { ProductId } from "@/lib/product/types"
@@ -108,7 +108,7 @@ function FlatNavItemIcon({
   }
 
   if (item.icon) {
-    const Icon = getNavIcon(item.icon)
+    const Icon = NAV_ICON_MAP[item.icon]
     return <Icon className={cn("size-4 shrink-0", className)} weight="regular" aria-hidden />
   }
 

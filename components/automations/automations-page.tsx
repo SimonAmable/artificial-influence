@@ -613,7 +613,11 @@ function AutomationPreviewTab({
           setError("Run not found")
           return false
         }
-        setRunStatus(row.status)
+        const nextStatus =
+          row.status === "running" || row.status === "completed" || row.status === "failed"
+            ? row.status
+            : null
+        setRunStatus(nextStatus)
         setThreadId(row.thread_id)
         setRunError(row.error)
 
@@ -1707,7 +1711,7 @@ export function AutomationsPage() {
       toast.error("No preview available yet")
       return
     }
-    setCommunityPreviewOpen(true)
+    setSelectedId(a.id)
   }
 
   const setCommunityPreviewRun = async (automationId: string, runId: string) => {
@@ -2949,7 +2953,6 @@ export function AutomationsPage() {
                               setScope("mine")
                               lastHydratedId.current = null
                               setSelectedId(id)
-                              setCommunityPreviewOpen(false)
                             }}
                           >
                             Edit in Mine
@@ -3041,7 +3044,6 @@ export function AutomationsPage() {
                                 setScope("mine")
                                 lastHydratedId.current = null
                                 setSelectedId(id)
-                                setCommunityPreviewOpen(false)
                               }}
                             >
                               Edit

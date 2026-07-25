@@ -56,10 +56,10 @@ export function FanvueComposerStep({
   const [scheduleDate, setScheduleDate] = React.useState<Date>(
     () => initialScheduleDate ?? new Date(Date.now() + 60 * 60 * 1000)
   )
-  const [scheduleHour, setScheduleHour] = React.useState(
+  const [scheduleHour, setScheduleHour] = React.useState(() =>
     String((initialScheduleDate ?? new Date(Date.now() + 60 * 60 * 1000)).getHours())
   )
-  const [scheduleMinute, setScheduleMinute] = React.useState(
+  const [scheduleMinute, setScheduleMinute] = React.useState(() =>
     String((initialScheduleDate ?? new Date(Date.now() + 60 * 60 * 1000)).getMinutes())
   )
   const [isSubmitting, setIsSubmitting] = React.useState(false)

@@ -26,11 +26,7 @@ export {
   SNAPCHAT_REFERENCE_PADDING_Y,
   SNAPCHAT_REFERENCE_WIDTH,
   SNAPCHAT_STYLE_PRESET_ID,
-  estimateSnapchatWrappedLineCount,
-  snapchatBarContentHeight,
-  snapchatBarHeightForLineCount,
   snapchatFontSizeForWidth,
-  snapchatPaddingForWidth,
 }
 
 export type SnapchatBarStyleSettings = {

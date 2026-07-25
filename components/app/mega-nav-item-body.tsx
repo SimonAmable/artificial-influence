@@ -8,7 +8,7 @@ import {
   type MegaNavBadge,
   type MegaNavItem,
 } from "@/lib/constants/navigation"
-import { getNavIcon } from "@/lib/navigation/nav-icons"
+import { NAV_ICON_MAP } from "@/lib/navigation/nav-icons"
 
 function getBadgeClasses(badge: MegaNavBadge) {
   switch (badge) {
@@ -65,7 +65,7 @@ export function MenuBadge({ badge }: { badge: MegaNavBadge }) {
 
 export function MegaNavItemBody({ item }: { item: MegaNavItem }) {
   const classes = item.badge ? getBadgeClasses(item.badge) : null
-  const PhosphorIcon = item.iconPhosphor ? getNavIcon(item.iconPhosphor) : null
+  const PhosphorIcon = item.iconPhosphor ? NAV_ICON_MAP[item.iconPhosphor] : null
   return (
     <div className="flex w-full items-start gap-3">
       <div className="relative">

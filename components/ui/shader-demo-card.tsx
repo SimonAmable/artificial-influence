@@ -91,7 +91,6 @@ export function ShaderDemoCard({
     if (prefersReducedMotion || !showShaderDemo || !isInteractive) return
 
     let cancelled = false
-    let timeoutId: number | undefined
     let intervalId: number | undefined
 
     const runClickPulse = () => {
@@ -103,14 +102,14 @@ export function ShaderDemoCard({
     }
 
     // Click lands when the cursor reaches center (~38% into the loop)
-    timeoutId = window.setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       runClickPulse()
       intervalId = window.setInterval(runClickPulse, LOOP_SECONDS * 1000)
     }, animationDelay * 1000 + LOOP_SECONDS * 1000 * 0.38)
 
     return () => {
       cancelled = true
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId)
+      window.clearTimeout(timeoutId)
       if (intervalId !== undefined) window.clearInterval(intervalId)
     }
   }, [animationDelay, isInteractive, prefersReducedMotion, showShaderDemo])

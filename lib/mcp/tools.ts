@@ -646,11 +646,12 @@ async function resolveMediaId(userId: string, mediaId: string): Promise<Resolved
   }
 
   const { generation } = await getGeneration(userId, parsed.id)
-  const type = generation && typeof generation === "object" && isMediaType((generation as Record<string, unknown>).type)
-    ? (generation as Record<string, unknown>).type
-    : null
-  const status = generation && typeof generation === "object" ? stringOrNull((generation as Record<string, unknown>).status) : null
-  const url = generation && typeof generation === "object" ? stringOrNull((generation as Record<string, unknown>).url) : null
+  const generationRow =
+    generation && typeof generation === "object" ? (generation as Record<string, unknown>) : null
+  const typeValue = generationRow?.type
+  const type = isMediaType(typeValue) ? typeValue : null
+  const status = generationRow ? stringOrNull(generationRow.status) : null
+  const url = generationRow ? stringOrNull(generationRow.url) : null
   if (!type || status !== "completed" || !url) throw new Error("Generated media is not ready to use as a reference")
   return {
     mediaId: mediaIdFor("generation", parsed.id),
@@ -658,7 +659,7 @@ async function resolveMediaId(userId: string, mediaId: string): Promise<Resolved
     sourceId: parsed.id,
     type,
     status,
-    title: stringOrNull((generation as Record<string, unknown>).prompt) || "Generated media",
+    title: stringOrNull(generationRow?.prompt) || "Generated media",
     url,
   }
 }

@@ -66,7 +66,7 @@ export const presenceLandingCopy = {
         description: "Let fans support you directly with one-tap tips on your best content.",
         href: "/content",
       },
-    ] satisfies PresenceMonetizeTile[],
+    ] as PresenceMonetizeTile[],
   },
   modelsBento: {
     title: "Win the feed with one subscription",

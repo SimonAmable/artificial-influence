@@ -44,7 +44,7 @@ export function McpIconFan({
   useGSAP(
     (context, contextSafe) => {
       const root = rootRef.current
-      if (!root) return
+      if (!root || !contextSafe) return
 
       const brand = root.querySelector<HTMLElement>("[data-fan-brand]")
       const xMark = root.querySelector<HTMLElement>("[data-fan-x]")

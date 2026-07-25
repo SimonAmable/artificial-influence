@@ -36,7 +36,16 @@ export const DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE = "en-US" as const
 export const DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT =
   "Say the following." as const
 
-export const AUDIO_MODEL_OPTIONS = [
+export type AudioModelGroup = "Current" | "Legacy"
+
+export const AUDIO_MODEL_OPTIONS: readonly {
+  id: string
+  label: string
+  description: string
+  group: AudioModelGroup
+  provider: AudioProvider
+  deprecated: boolean
+}[] = [
   {
     id: GOOGLE_GEMINI_TTS_MODEL,
     label: GOOGLE_GEMINI_TTS_MODEL_LABEL,
@@ -49,7 +58,7 @@ export const AUDIO_MODEL_OPTIONS = [
     ...option,
     provider: "inworld" as const,
   })),
-] as const
+]
 
 type GoogleGeminiVoiceSeed = {
   voiceId: string

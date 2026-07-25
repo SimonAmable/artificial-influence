@@ -86,10 +86,11 @@ export function CollectionEditorDialog({
   }, [collection, open])
 
   if (!collection) return null
+  const activeCollection = collection
 
   async function refreshCollection() {
     const { collection: latest } = await readJson<{ collection: SlideshowCollection }>(
-      await fetch(`/api/slideshow/collections/${collection.id}`, { cache: "no-store" }),
+      await fetch(`/api/slideshow/collections/${activeCollection.id}`, { cache: "no-store" }),
     )
     onChange(latest)
     return latest
@@ -99,7 +100,7 @@ export function CollectionEditorDialog({
     setBusy(true)
     try {
       const { collection: updated } = await readJson<{ collection: SlideshowCollection }>(
-        await fetch(`/api/slideshow/collections/${collection.id}`, {
+        await fetch(`/api/slideshow/collections/${activeCollection.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -118,14 +119,14 @@ export function CollectionEditorDialog({
   }
 
   async function removeImage(itemId: string) {
-    const nextItemIds = collection.items
+    const nextItemIds = activeCollection.items
       .map((item) => item.id)
       .filter((id) => id !== itemId)
 
     setBusy(true)
     try {
       const { collection: updated } = await readJson<{ collection: SlideshowCollection }>(
-        await fetch(`/api/slideshow/collections/${collection.id}`, {
+        await fetch(`/api/slideshow/collections/${activeCollection.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ itemIds: nextItemIds }),
@@ -142,7 +143,7 @@ export function CollectionEditorDialog({
 
   async function postCollectionImages(body: Record<string, unknown>) {
     return readJson<{ collection: SlideshowCollection }>(
-      await fetch(`/api/slideshow/collections/${collection.id}/images`, {
+      await fetch(`/api/slideshow/collections/${activeCollection.id}/images`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -269,7 +270,7 @@ export function CollectionEditorDialog({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            collectionId: collection.id,
+            collectionId: activeCollection.id,
             mode: importMode,
             query,
             limit: 24,
@@ -303,7 +304,7 @@ export function CollectionEditorDialog({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            collectionId: collection.id,
+            collectionId: activeCollection.id,
             jobId: importJobId,
             candidateIds: selectedCandidateIds,
           }),
@@ -322,12 +323,12 @@ export function CollectionEditorDialog({
   }
 
   async function deleteCollection() {
-    if (!window.confirm(`Delete "${collection.name}"? This cannot be undone.`)) return
+    if (!window.confirm(`Delete "${activeCollection.name}"? This cannot be undone.`)) return
 
     setBusy(true)
     try {
-      await readJson(await fetch(`/api/slideshow/collections/${collection.id}`, { method: "DELETE" }))
-      onDeleted?.(collection.id)
+      await readJson(await fetch(`/api/slideshow/collections/${activeCollection.id}`, { method: "DELETE" }))
+      onDeleted?.(activeCollection.id)
       onOpenChange(false)
       toast.success("Collection deleted.")
     } catch (error) {

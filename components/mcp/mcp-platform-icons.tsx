@@ -38,6 +38,34 @@ const PLATFORM_ICONS: Record<McpConnectPlatform, LobeCompoundIcon> = {
   hermes: NousResearch as LobeCompoundIcon,
 }
 
+function resolveColorIcon(Icon: LobeCompoundIcon): ComponentType<IconProps> {
+  return Icon.Color ?? Icon
+}
+
+function resolveAvatarIcon(Icon: LobeCompoundIcon): ComponentType<IconProps> {
+  return Icon.Avatar ?? Icon.Color ?? Icon
+}
+
+const PLATFORM_COLOR_ICONS = {
+  claude: resolveColorIcon(PLATFORM_ICONS.claude),
+  chatgpt: resolveColorIcon(PLATFORM_ICONS.chatgpt),
+  cursor: resolveColorIcon(PLATFORM_ICONS.cursor),
+  "claude-code": resolveColorIcon(PLATFORM_ICONS["claude-code"]),
+  codex: resolveColorIcon(PLATFORM_ICONS.codex),
+  openclaw: resolveColorIcon(PLATFORM_ICONS.openclaw),
+  hermes: resolveColorIcon(PLATFORM_ICONS.hermes),
+} as const satisfies Record<McpConnectPlatform, ComponentType<IconProps>>
+
+const PLATFORM_AVATAR_ICONS = {
+  claude: resolveAvatarIcon(PLATFORM_ICONS.claude),
+  chatgpt: resolveAvatarIcon(PLATFORM_ICONS.chatgpt),
+  cursor: resolveAvatarIcon(PLATFORM_ICONS.cursor),
+  "claude-code": resolveAvatarIcon(PLATFORM_ICONS["claude-code"]),
+  codex: resolveAvatarIcon(PLATFORM_ICONS.codex),
+  openclaw: resolveAvatarIcon(PLATFORM_ICONS.openclaw),
+  hermes: resolveAvatarIcon(PLATFORM_ICONS.hermes),
+} as const satisfies Record<McpConnectPlatform, ComponentType<IconProps>>
+
 export function getPlatformLobeIcon(platform: McpConnectPlatform): LobeCompoundIcon {
   return PLATFORM_ICONS[platform]
 }
@@ -51,8 +79,7 @@ export function PlatformLobeIcon({
   size?: number
   className?: string
 }) {
-  const Icon = getPlatformLobeIcon(platform)
-  const ColorIcon = Icon.Color ?? Icon
+  const ColorIcon = PLATFORM_COLOR_ICONS[platform]
   return <ColorIcon size={size} className={className} />
 }
 
@@ -67,8 +94,7 @@ export function PlatformFanAvatar({
   className?: string
   style?: CSSProperties
 }) {
-  const Icon = getPlatformLobeIcon(platform)
-  const Avatar = Icon.Avatar ?? Icon.Color ?? Icon
+  const Avatar = PLATFORM_AVATAR_ICONS[platform]
   return <Avatar size={size} shape="square" className={className} style={style} />
 }
 
