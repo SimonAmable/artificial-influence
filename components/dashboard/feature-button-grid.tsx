@@ -1,59 +1,27 @@
 "use client"
 
-import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { PencilSimple } from "@phosphor-icons/react"
+import { MagnifyingGlass } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { getDashboardToolNavItems } from "@/lib/constants/navigation"
+import { openGlobalSearch } from "@/lib/navigation/open-global-search"
 import { getNavIcon } from "@/lib/navigation/nav-icons"
 
 export function FeatureButtonGrid() {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = React.useState(false)
-
-  const handleCreateProject = async () => {
-    try {
-      setIsLoading(true)
-      const response = await fetch("/api/canvases", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: `Canvas ${new Date().toLocaleDateString()}`,
-          description: "New canvas project",
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to create canvas")
-      }
-
-      const canvas = await response.json()
-      router.push(`/canvas/${canvas.id}`)
-    } catch (error) {
-      console.error("Error creating canvas:", error)
-      alert("Failed to create canvas. Please try again.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   return (
     <div className="w-full space-y-6 rounded-[24px]">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-semibold">Tools</h2>
         <Button
-          onClick={handleCreateProject}
-          disabled={isLoading}
+          type="button"
+          onClick={() => openGlobalSearch()}
           size="lg"
           variant="ghost"
           className="shadow-md transition-shadow hover:shadow-lg"
         >
-          <PencilSimple size={18} weight="bold" className="mr-2" />
-          Create New Project
+          <MagnifyingGlass size={18} weight="bold" className="mr-2" />
+          Search
         </Button>
       </div>
 
