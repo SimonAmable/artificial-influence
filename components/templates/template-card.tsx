@@ -9,6 +9,7 @@ import {
   Video,
 } from "@phosphor-icons/react"
 import type { Template } from "@/lib/templates/types"
+import { TemplatePreviewMedia } from "@/components/templates/template-preview-media"
 import { ReportContentButton } from "@/components/app/report-content-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -66,22 +67,15 @@ export function TemplateCard({
           )}
         >
           {template.thumbnail_url ? (
-            template.thumbnail_kind === "video" ? (
-              <video
-                src={template.thumbnail_url}
-                className="h-full w-full object-cover opacity-90 transition group-hover:scale-[1.02]"
-                muted
-                playsInline
-                loop
-                autoPlay
-              />
-            ) : (
-              <img
-                src={template.thumbnail_url}
-                alt={template.title}
-                className="h-full w-full object-cover opacity-90 transition group-hover:scale-[1.02]"
-              />
-            )
+            <TemplatePreviewMedia
+              afterUrl={template.thumbnail_url}
+              afterKind={template.thumbnail_kind}
+              beforeUrl={template.preview_before_url}
+              beforeKind={template.preview_before_kind}
+              layout={template.preview_layout}
+              alt={template.title}
+              className="opacity-90 transition group-hover:scale-[1.02]"
+            />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-xs text-zinc-500">
               No preview

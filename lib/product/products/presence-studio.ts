@@ -37,6 +37,7 @@ export const presenceStudioProduct: ProductConfig = {
     "/audio",
     "/carousel-shots",
     "/video",
+    "/motion-copy",
     "/assets",
     "/ai-influencer",
     "/canvases",

@@ -23,6 +23,7 @@ import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import type { AttachedRef } from "@/lib/commands/types"
 import { setPendingTemplateHandoff } from "@/lib/templates/handoff"
 import type { Template } from "@/lib/templates/types"
+import type { UIMessage } from "ai"
 import { getDefaultInputValue, isMediaInputKind } from "@/lib/templates/validation"
 import { cn } from "@/lib/utils"
 
@@ -55,6 +56,13 @@ interface TemplateRunFormProps {
   disabled?: boolean
   className?: string
   compactDesktop?: boolean
+  submitLabel?: string
+  onRunStarted?: (run: {
+    threadId: string
+    templateSlug: string
+    openingMessage: UIMessage
+    inputValues: Record<string, unknown>
+  }) => void
 }
 
 function createClientId() {
@@ -104,6 +112,8 @@ export function TemplateRunForm({
   disabled = false,
   className,
   compactDesktop = false,
+  submitLabel = "Generate",
+  onRunStarted,
 }: TemplateRunFormProps) {
   const router = useRouter()
   const [values, setValues] = React.useState<Record<string, TemplateFieldValue>>(() =>
@@ -227,6 +237,7 @@ export function TemplateRunForm({
         body: JSON.stringify({
           values: payload,
           promptImageUrlsByInputId,
+          isTest: Boolean(onRunStarted),
         }),
       })
 
@@ -239,13 +250,21 @@ export function TemplateRunForm({
         throw new Error(data.error ?? "Failed to run template")
       }
 
-      setPendingTemplateHandoff({
-        threadId: data.threadId,
-        templateSlug: data.templateSlug,
-        openingMessage: data.openingMessage,
-      })
-
-      router.push(`/chat/${data.threadId}`)
+      if (onRunStarted) {
+        onRunStarted({
+          threadId: data.threadId,
+          templateSlug: data.templateSlug,
+          openingMessage: data.openingMessage,
+          inputValues: payload,
+        })
+      } else {
+        setPendingTemplateHandoff({
+          threadId: data.threadId,
+          templateSlug: data.templateSlug,
+          openingMessage: data.openingMessage,
+        })
+        router.push(`/chat/${data.threadId}`)
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not start generation")
     } finally {
@@ -392,7 +411,7 @@ export function TemplateRunForm({
             </>
           ) : (
             <>
-              <span>Generate</span>
+              <span>{submitLabel}</span>
               <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-background/16 px-2.5 py-1 text-xs font-medium text-primary-foreground/90 ring-1 ring-white/15">
                 <Sparkle className="size-3.5" weight="fill" />
                 {template.credits_cost}

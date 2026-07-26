@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { CircleNotch, FilePlus, FolderOpen, Plus, Trash, Image as ImageIcon } from "@phosphor-icons/react"
+import { CheckCircle, CircleNotch, FilePlus, FolderOpen, Play, Plus, Trash, Image as ImageIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 import type {
   OutputKind,
@@ -11,6 +11,7 @@ import type {
   TemplateInput,
   TemplateInputKind,
   TemplatePromptAttachment,
+  TemplatePreviewLayout,
   TemplateVisibility,
 } from "@/lib/templates/types"
 import {
@@ -38,6 +39,12 @@ import { ComposerAttachmentPreviews } from "@/components/chat/composer/attachmen
 import type { ComposerAssetAttachment, ComposerAttachment } from "@/components/chat/composer/types"
 import { AssetSelectionModal, type AssetSelectionPick } from "@/components/shared/modals/asset-selection-modal"
 import { TemplateRunForm } from "@/components/templates/template-run-form"
+import {
+  TemplateInlineTestRunner,
+  type TemplateInlineTestResult,
+  type TemplateInlineTestStart,
+} from "@/components/templates/template-inline-test-runner"
+import { TemplatePreviewMedia } from "@/components/templates/template-preview-media"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -104,7 +111,8 @@ interface TemplateEditorProps {
 
 export function TemplateEditor({ initial }: TemplateEditorProps) {
   const router = useRouter()
-  const isEdit = Boolean(initial)
+  const [persistedTemplate, setPersistedTemplate] = React.useState<Template | undefined>(initial)
+  const isEdit = Boolean(persistedTemplate)
   const promptRef = React.useRef<HTMLTextAreaElement>(null)
   const hasHydratedPendingDraftRef = React.useRef(false)
 
@@ -130,6 +138,32 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
   const [thumbnailKind, setThumbnailKind] = React.useState<"image" | "video">(
     initial?.thumbnail_kind ?? "image",
   )
+  const [previewLayout, setPreviewLayout] = React.useState<TemplatePreviewLayout>(
+    initial?.preview_layout ?? "single",
+  )
+  const [previewBeforeUrl, setPreviewBeforeUrl] = React.useState<string | null>(
+    initial?.preview_before_url ?? null,
+  )
+  const [previewBeforeKind, setPreviewBeforeKind] = React.useState<"image" | "video" | null>(
+    initial?.preview_before_kind ?? null,
+  )
+  const [calibratedCredits, setCalibratedCredits] = React.useState<number | null>(
+    initial?.credits_cost_locked ? initial.credits_cost : null,
+  )
+  const [testStart, setTestStart] = React.useState<TemplateInlineTestStart | null>(null)
+  const [lastTestResult, setLastTestResult] = React.useState<TemplateInlineTestResult | null>(null)
+  const [isPreparingTest, setIsPreparingTest] = React.useState(false)
+  const [savedTestSignature, setSavedTestSignature] = React.useState<string | null>(() =>
+    initial
+      ? JSON.stringify({
+          title: initial.title,
+          category: initial.category,
+          prompt: initial.prompt,
+          promptAttachments: initial.prompt_attachments,
+          inputs: initial.inputs,
+        })
+      : null,
+  )
   const [isSaving, setIsSaving] = React.useState(false)
   const [isDeleting, setIsDeleting] = React.useState(false)
   const [isUploadingThumb, setIsUploadingThumb] = React.useState(false)
@@ -144,33 +178,45 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
   )
 
   const outputKind = React.useMemo<OutputKind>(() => outputKindForCategory(category), [category])
+  const currentTestSignature = React.useMemo(
+    () =>
+      JSON.stringify({
+        title: name.trim(),
+        category,
+        prompt: prompt.trim(),
+        promptAttachments,
+        inputs: resolvedInputs,
+      }),
+    [category, name, prompt, promptAttachments, resolvedInputs],
+  )
 
-  const creditsCost = initial?.credits_cost_locked
-    ? (initial.credits_cost ?? guessCreditsCostForCategory(category))
-    : guessCreditsCostForCategory(category)
+  const creditsCost = calibratedCredits ?? guessCreditsCostForCategory(category)
 
   const previewTemplate: Template = {
-    id: initial?.id ?? "preview",
-    creator_id: initial?.creator_id ?? "",
+    id: persistedTemplate?.id ?? "preview",
+    creator_id: persistedTemplate?.creator_id ?? "",
     slug: buildTemplateSlug(name || "preview"),
     title: name || "Untitled",
     description,
     tips: tips || null,
     thumbnail_url: thumbnailUrl,
     thumbnail_kind: thumbnailKind,
+    preview_layout: previewLayout,
+    preview_before_url: previewBeforeUrl,
+    preview_before_kind: previewBeforeKind,
     category,
     prompt,
     prompt_attachments: promptAttachments.map((attachment) => ({ ...attachment })),
     output_kind: outputKind,
     inputs: resolvedInputs,
     credits_cost: creditsCost,
-    credits_cost_locked: initial?.credits_cost_locked ?? false,
-    last_run_credits: initial?.last_run_credits ?? null,
-    run_count: initial?.run_count ?? 0,
+    credits_cost_locked: calibratedCredits !== null,
+    last_run_credits: lastTestResult?.credits ?? persistedTemplate?.last_run_credits ?? null,
+    run_count: persistedTemplate?.run_count ?? 0,
     visibility,
     product_ids: initial?.product_ids ?? ["unican"],
-    created_at: initial?.created_at ?? new Date().toISOString(),
-    updated_at: initial?.updated_at ?? new Date().toISOString(),
+    created_at: persistedTemplate?.created_at ?? new Date().toISOString(),
+    updated_at: persistedTemplate?.updated_at ?? new Date().toISOString(),
   }
 
   const applyDraft = React.useCallback((draft: TemplateEditorDraft) => {
@@ -260,6 +306,9 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
         tips: tips.trim() || null,
         thumbnail_url: thumbnailUrl,
         thumbnail_kind: thumbnailKind,
+        preview_layout: previewLayout,
+        preview_before_url: previewBeforeUrl,
+        preview_before_kind: previewBeforeKind,
         category,
         prompt: prompt.trim(),
         prompt_attachments: promptAttachments,
@@ -269,7 +318,7 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
         visibility,
       }
 
-      const url = isEdit ? `/api/templates/${initial!.id}` : "/api/templates"
+      const url = isEdit ? `/api/templates/${persistedTemplate!.id}` : "/api/templates"
       const method = isEdit ? "PATCH" : "POST"
 
       const response = await fetch(url, {
@@ -287,6 +336,7 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
         throw new Error(err)
       }
 
+      if (data.template) setPersistedTemplate(data.template as Template)
       toast.success(isEdit ? "Template saved" : "Template created")
       router.push(`/templates/${data.template?.slug ?? slug}`)
       router.refresh()
@@ -297,15 +347,130 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
     }
   }
 
-  const handleDelete = async () => {
-    if (!initial?.id || isDeleting) return
+  const handlePrepareTest = async () => {
+    if (!name.trim()) {
+      toast.error("Give your template a name")
+      return
+    }
+    if (!prompt.trim()) {
+      toast.error("Describe what the AI should do")
+      return
+    }
 
-    const ok = window.confirm(`Delete "${initial.title}"? This cannot be undone.`)
+    setIsPreparingTest(true)
+    try {
+      const body = {
+        slug: buildTemplateSlug(name),
+        title: name.trim(),
+        description: description.trim(),
+        tips: tips.trim() || null,
+        thumbnail_url: thumbnailUrl,
+        thumbnail_kind: thumbnailKind,
+        preview_layout: previewLayout,
+        preview_before_url: previewBeforeUrl,
+        preview_before_kind: previewBeforeKind,
+        category,
+        prompt: prompt.trim(),
+        prompt_attachments: promptAttachments,
+        output_kind: outputKind,
+        inputs: assignInputIds(draftInputs),
+        credits_cost: creditsCost,
+        visibility: persistedTemplate ? visibility : "private",
+      }
+
+      const response = await fetch(
+        persistedTemplate ? `/api/templates/${persistedTemplate.id}` : "/api/templates",
+        {
+          method: persistedTemplate ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      )
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        const message =
+          typeof data.error === "string"
+            ? data.error
+            : JSON.stringify(data.error ?? "Could not prepare the test")
+        throw new Error(message)
+      }
+
+      const saved = data.template as Template
+      setPersistedTemplate(saved)
+      setSavedTestSignature(currentTestSignature)
+      router.replace(`/templates/edit/${saved.id}`)
+      router.refresh()
+      toast.success("Draft ready to test")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not prepare the test")
+    } finally {
+      setIsPreparingTest(false)
+    }
+  }
+
+  const handleTestComplete = React.useCallback(
+    async (result: TemplateInlineTestResult) => {
+      setLastTestResult(result)
+      if (!result.outputUrl || !persistedTemplate) return
+
+      const beforeInput = resolvedInputs.find(
+        (input) =>
+          (input.kind === "image" || input.kind === "video") &&
+          typeof result.inputValues[input.id] === "string",
+      )
+      const beforeUrl = beforeInput
+        ? (result.inputValues[beforeInput.id] as string)
+        : null
+      const beforeKind =
+        beforeInput?.kind === "image" || beforeInput?.kind === "video"
+          ? beforeInput.kind
+          : null
+      const nextCredits = result.credits > 0 ? result.credits : creditsCost
+
+      setThumbnailUrl(result.outputUrl)
+      setThumbnailKind(result.outputKind)
+      setPreviewBeforeUrl(beforeUrl)
+      setPreviewBeforeKind(beforeKind)
+      setCalibratedCredits(nextCredits)
+
+      try {
+        const response = await fetch(`/api/templates/${persistedTemplate.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            thumbnail_url: result.outputUrl,
+            thumbnail_kind: result.outputKind,
+            preview_layout: previewLayout,
+            preview_before_url: beforeUrl,
+            preview_before_kind: beforeKind,
+            credits_cost: nextCredits,
+            credits_cost_locked: result.credits > 0,
+          }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          throw new Error(
+            typeof data.error === "string" ? data.error : "Could not save the test result",
+          )
+        }
+        setPersistedTemplate(data.template as Template)
+        toast.success("Test result added to your preview")
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not save the test result")
+      }
+    },
+    [creditsCost, persistedTemplate, previewLayout, resolvedInputs],
+  )
+
+  const handleDelete = async () => {
+    if (!persistedTemplate?.id || isDeleting) return
+
+    const ok = window.confirm(`Delete "${persistedTemplate.title}"? This cannot be undone.`)
     if (!ok) return
 
     setIsDeleting(true)
     try {
-      const response = await fetch(`/api/templates/${initial.id}`, {
+      const response = await fetch(`/api/templates/${persistedTemplate.id}`, {
         method: "DELETE",
       })
 
@@ -560,9 +725,9 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
             />
           </div>
 
-          {initial?.credits_cost_locked ? (
+          {calibratedCredits !== null ? (
             <p className="text-xs text-muted-foreground">
-              Credit cost is set to ~{initial.credits_cost} based on real runs.
+              Tested cost: {creditsCost} credits.
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
@@ -864,7 +1029,152 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
         </Button>
       </div>
 
-      <div className="space-y-4 p-6 sm:p-8 bg-muted/20 overflow-y-auto max-h-[calc(100vh-60px)]">
+      <div className="space-y-5 bg-muted/20 p-6 sm:p-8 overflow-y-auto max-h-[calc(100vh-60px)]">
+        <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">Test template</p>
+            <p className="text-xs text-muted-foreground">
+              Run it here before anyone else does.
+            </p>
+          </div>
+          <Badge
+            variant={
+              lastTestResult && savedTestSignature === currentTestSignature
+                ? "default"
+                : "secondary"
+            }
+          >
+            {lastTestResult && savedTestSignature === currentTestSignature ? (
+              <>
+                <CheckCircle className="size-3.5" weight="fill" />
+                Tested
+              </>
+            ) : lastTestResult ? (
+              "Changes need test"
+            ) : (
+              "Not tested"
+            )}
+          </Badge>
+        </div>
+
+        <div className="mx-auto max-w-lg">
+          {testStart ? (
+            <TemplateInlineTestRunner
+              start={testStart}
+              onComplete={handleTestComplete}
+              onReset={() => {
+                setTestStart(null)
+                setLastTestResult(null)
+              }}
+            />
+          ) : persistedTemplate && savedTestSignature === currentTestSignature ? (
+            <div className="rounded-2xl border bg-background p-6 shadow-sm">
+              <div className="mb-6 space-y-2 text-center">
+                <h2 className="text-xl font-semibold">{previewTemplate.title}</h2>
+                {previewTemplate.description ? (
+                  <p className="text-sm text-muted-foreground">{previewTemplate.description}</p>
+                ) : null}
+                {previewTemplate.tips ? (
+                  <div className="rounded-lg bg-primary/10 px-3 py-2 text-left text-xs text-primary">
+                    {previewTemplate.tips}
+                  </div>
+                ) : null}
+              </div>
+              <TemplateRunForm
+                template={{ ...persistedTemplate, ...previewTemplate, inputs: resolvedInputs }}
+                submitLabel="Run test"
+                onRunStarted={(run) => {
+                  setLastTestResult(null)
+                  setTestStart(run)
+                }}
+              />
+            </div>
+          ) : (
+            <div className="rounded-2xl border bg-background p-6 shadow-sm">
+              <div className="mb-6 space-y-2 text-center">
+                <h2 className="text-xl font-semibold">{previewTemplate.title}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {persistedTemplate
+                    ? "Save your latest changes, then fill the example inputs and run a real test."
+                    : "Save a private draft, then fill the example inputs and run a real test."}
+                </p>
+              </div>
+              <TemplateRunForm template={previewTemplate} disabled />
+              <Button
+                className="mt-6 h-12 w-full rounded-full"
+                disabled={isPreparingTest || isSaving}
+                onClick={() => void handlePrepareTest()}
+              >
+                {isPreparingTest ? (
+                  <CircleNotch className="mr-2 size-4 animate-spin" weight="bold" />
+                ) : (
+                  <Play className="mr-2 size-4" weight="fill" />
+                )}
+                {isPreparingTest
+                  ? "Saving draft..."
+                  : persistedTemplate
+                    ? "Save changes to test"
+                    : "Save draft to test"}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {thumbnailUrl ? (
+          <div className="mx-auto max-w-lg space-y-4 rounded-2xl border bg-background p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium">Gallery preview</p>
+                <p className="text-xs text-muted-foreground">
+                  The finished result shows first.
+                </p>
+              </div>
+              <Select
+                value={previewLayout}
+                onValueChange={(value) => setPreviewLayout(value as TemplatePreviewLayout)}
+              >
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single">Single result</SelectItem>
+                  <SelectItem
+                    value="before_after"
+                    disabled={!previewBeforeUrl || !previewBeforeKind}
+                  >
+                    Before &amp; after
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="mx-auto aspect-[3/4] w-full max-w-[280px] overflow-hidden rounded-2xl bg-muted">
+              <TemplatePreviewMedia
+                afterUrl={thumbnailUrl}
+                afterKind={thumbnailKind}
+                beforeUrl={previewBeforeUrl}
+                beforeKind={previewBeforeKind}
+                layout={previewLayout}
+                alt={`${previewTemplate.title} gallery preview`}
+              />
+            </div>
+
+            {testStart ? (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setTestStart(null)
+                  setLastTestResult(null)
+                }}
+              >
+                Run another test
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="hidden">
         <p className="text-sm font-medium text-muted-foreground mb-4">Preview — what runners see</p>
         <div className="mx-auto max-w-lg rounded-2xl border bg-background p-6 shadow-sm">
           <div className="mb-6 space-y-2 text-center">
@@ -898,6 +1208,7 @@ export function TemplateEditor({ initial }: TemplateEditorProps) {
         </div>
 
         {/* AI-powered template editing is temporarily hidden. */}
+      </div>
       </div>
 
       <AssetSelectionModal

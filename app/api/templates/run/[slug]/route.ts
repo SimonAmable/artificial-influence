@@ -73,6 +73,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const body = await request.json().catch(() => ({}))
+    const isTest = body.isTest === true && template.creator_id === user.id
     const valuesParsed = templateRunValuesSchema.safeParse(body.values ?? body)
     if (!valuesParsed.success) {
       return NextResponse.json({ error: "Invalid input values" }, { status: 400 })
@@ -109,6 +110,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       inputValues: validated.values,
       templateContext,
       creditsEstimated: template.credits_cost,
+      isTest,
     })
 
     return NextResponse.json({

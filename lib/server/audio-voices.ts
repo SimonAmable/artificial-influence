@@ -5,6 +5,8 @@ import {
   type AudioProvider,
   type AudioVoice,
   buildFallbackGoogleGeminiVoices,
+  buildFallbackQwenVoices,
+  buildFallbackSeedAudioVoices,
   getAudioVoiceSearchText,
 } from "@/lib/constants/audio"
 
@@ -20,6 +22,41 @@ interface VoiceRow {
   model: string | null
   preview_text: string | null
   preview_audio_url: string | null
+}
+
+interface PrivateVoiceRow {
+  id: string
+  name: string
+  provider: string
+  model_id: string
+  kind: "clone" | "design"
+  config: Record<string, unknown> | null
+}
+
+function mapPrivateVoiceRow(row: PrivateVoiceRow): AudioVoice {
+  const config = row.config ?? {}
+  return {
+    voiceId: `private:${row.id}`,
+    displayName: row.name,
+    description:
+      row.kind === "clone"
+        ? "Your private cloned voice."
+        : "Your reusable designed voice.",
+    langCode:
+      typeof config.languageCode === "string"
+        ? config.languageCode
+        : typeof config.language === "string"
+          ? config.language
+          : "",
+    tags: ["private", row.kind, row.provider],
+    source: row.kind === "clone" ? "CLONE" : "DESIGN",
+    provider: row.provider,
+    providerVoiceId: `private:${row.id}`,
+    model: row.model_id,
+    privateVoiceId: row.id,
+    privateVoiceKind: row.kind,
+    privateVoiceConfig: config,
+  }
 }
 
 function mapVoiceRow(row: VoiceRow): AudioVoice {
@@ -65,20 +102,42 @@ export async function listCatalogVoices(
     query = query.in("lang_code", languages)
   }
 
-  const { data, error } = await query
-  if (error) {
+  const [{ data, error }, { data: privateData, error: privateError }] =
+    await Promise.all([
+      query,
+      supabase
+        .from("private_audio_voices")
+        .select("id, name, provider, model_id, kind, config")
+        .eq("provider", provider)
+        .order("created_at", { ascending: false }),
+    ])
+
+  const missingPrivateTable =
+    privateError?.code === "42P01" || privateError?.code === "PGRST205"
+  if (error && error.code !== "42P01" && error.code !== "PGRST205") {
     throw new Error(error.message)
   }
+  if (privateError && !missingPrivateTable) {
+    throw new Error(privateError.message)
+  }
 
-  const voices = Array.isArray(data)
+  const privateVoices = Array.isArray(privateData)
+    ? (privateData as PrivateVoiceRow[]).map(mapPrivateVoiceRow)
+    : []
+  const catalogVoices = Array.isArray(data)
     ? (data as VoiceRow[]).map(mapVoiceRow)
     : []
 
-  if (provider === "google" && voices.length === 0) {
-    return buildFallbackGoogleGeminiVoices()
+  let fallbackVoices: AudioVoice[] = []
+  if (provider === "google" && catalogVoices.length === 0) {
+    fallbackVoices = buildFallbackGoogleGeminiVoices()
+  } else if (provider === "qwen") {
+    fallbackVoices = buildFallbackQwenVoices()
+  } else if (provider === "fal") {
+    fallbackVoices = buildFallbackSeedAudioVoices()
   }
 
-  return voices
+  return [...privateVoices, ...catalogVoices, ...fallbackVoices]
 }
 
 function normalizeSearchQuery(value: string) {
@@ -120,7 +179,9 @@ export async function searchCatalogVoices(
     source?: string
   },
 ) {
-  const providers: AudioProvider[] = provider ? [provider] : ["inworld", "google"]
+  const providers: AudioProvider[] = provider
+    ? [provider]
+    : ["inworld", "google", "qwen", "fal"]
   const normalizedQuery = (query ?? "").trim()
 
   const allVoices = (

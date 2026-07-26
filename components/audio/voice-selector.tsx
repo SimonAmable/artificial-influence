@@ -22,6 +22,8 @@ import {
 } from "@/components/ai-elements/voice-selector"
 import {
   buildFallbackGoogleGeminiVoices,
+  buildFallbackQwenVoices,
+  buildFallbackSeedAudioVoices,
   formatAudioLangCode,
   getAudioProviderLabel,
   getAudioVoiceSearchText,
@@ -42,6 +44,7 @@ interface AudioVoiceSelectorProps {
   className?: string
   triggerClassName?: string
   placeholder?: string
+  onCreateVoice?: () => void
   renderTrigger?: (args: {
     selectedVoice: AudioVoice | null
     triggerLabel: string
@@ -90,6 +93,7 @@ export function AudioVoiceSelector({
   className,
   triggerClassName,
   placeholder = "Search voices...",
+  onCreateVoice,
   renderTrigger,
 }: AudioVoiceSelectorProps) {
   const [voices, setVoices] = React.useState<AudioVoice[]>([])
@@ -112,8 +116,14 @@ export function AudioVoiceSelector({
 
   React.useEffect(() => {
     const controller = new AbortController()
-    const fallbackGoogleVoices =
-      provider === "google" ? buildFallbackGoogleGeminiVoices() : []
+    const fallbackVoices =
+      provider === "google"
+        ? buildFallbackGoogleGeminiVoices()
+        : provider === "qwen"
+          ? buildFallbackQwenVoices()
+          : provider === "fal"
+            ? buildFallbackSeedAudioVoices()
+            : []
 
     function syncSelectedVoice(nextVoices: AudioVoice[]) {
       const hasCurrentValue = nextVoices.some((voice) => voice.voiceId === value)
@@ -157,7 +167,7 @@ export function AudioVoiceSelector({
         const nextVoices =
           Array.isArray(data.voices) && data.voices.length > 0
             ? data.voices
-            : fallbackGoogleVoices
+            : fallbackVoices
         setVoices(nextVoices)
         syncSelectedVoice(nextVoices)
       } catch (fetchError) {
@@ -165,10 +175,10 @@ export function AudioVoiceSelector({
           return
         }
 
-        if (provider === "google" && fallbackGoogleVoices.length > 0) {
-          console.warn("Falling back to built-in Gemini voices.", fetchError)
-          setVoices(fallbackGoogleVoices)
-          syncSelectedVoice(fallbackGoogleVoices)
+        if (fallbackVoices.length > 0) {
+          console.warn(`Falling back to built-in ${provider} voices.`, fetchError)
+          setVoices(fallbackVoices)
+          syncSelectedVoice(fallbackVoices)
           return
         }
 
@@ -334,6 +344,21 @@ export function AudioVoiceSelector({
             placeholder={placeholder}
             value={query}
           />
+          {onCreateVoice ? (
+            <div className="px-2 pb-2">
+              <Button
+                className="w-full justify-start"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setOpen(false)
+                  onCreateVoice()
+                }}
+              >
+                Create private voice
+              </Button>
+            </div>
+          ) : null}
           <VoiceSelectorList>
             {error ? (
               <VoiceSelectorEmpty>{error}</VoiceSelectorEmpty>

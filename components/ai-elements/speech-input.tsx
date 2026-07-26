@@ -75,6 +75,8 @@ export type SpeechInputProps = ComponentProps<typeof Button> & {
   onAudioRecorded?: (audioBlob: Blob) => Promise<string>;
   /** Called when server-side transcription (MediaRecorder path) fails. */
   onTranscriptionError?: (error: unknown) => void;
+  /** Automatically stops MediaRecorder captures after this many seconds. */
+  maxDurationSeconds?: number;
   lang?: string;
 };
 
@@ -112,6 +114,7 @@ export const SpeechInput = ({
   forceServerTranscription,
   onAudioRecorded,
   onTranscriptionError,
+  maxDurationSeconds,
   lang = "en-US",
   variant = "default",
   ...props
@@ -129,6 +132,7 @@ export const SpeechInput = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onTranscriptionChangeRef = useRef<
     SpeechInputProps["onTranscriptionChange"]
   >(onTranscriptionChange);
@@ -218,6 +222,9 @@ export const SpeechInput = ({
           track.stop();
         }
       }
+      if (recordingTimeoutRef.current) {
+        clearTimeout(recordingTimeoutRef.current);
+      }
     },
     []
   );
@@ -241,6 +248,10 @@ export const SpeechInput = ({
       };
 
       const handleStop = async () => {
+        if (recordingTimeoutRef.current) {
+          clearTimeout(recordingTimeoutRef.current);
+          recordingTimeoutRef.current = null;
+        }
         for (const track of stream.getTracks()) {
           track.stop();
         }
@@ -267,6 +278,10 @@ export const SpeechInput = ({
 
       const handleError = () => {
         setIsListening(false);
+        if (recordingTimeoutRef.current) {
+          clearTimeout(recordingTimeoutRef.current);
+          recordingTimeoutRef.current = null;
+        }
         for (const track of stream.getTracks()) {
           track.stop();
         }
@@ -280,13 +295,25 @@ export const SpeechInput = ({
       mediaRecorderRef.current = mediaRecorder;
       mediaRecorder.start();
       setIsListening(true);
+      if (maxDurationSeconds && maxDurationSeconds > 0) {
+        recordingTimeoutRef.current = setTimeout(() => {
+          if (mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+            setIsListening(false);
+          }
+        }, maxDurationSeconds * 1000);
+      }
     } catch {
       setIsListening(false);
     }
-  }, []);
+  }, [maxDurationSeconds]);
 
   // Stop MediaRecorder recording
   const stopMediaRecorder = useCallback(() => {
+    if (recordingTimeoutRef.current) {
+      clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
+    }
     if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.stop();
     }

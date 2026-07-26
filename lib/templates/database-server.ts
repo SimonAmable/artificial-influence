@@ -31,6 +31,13 @@ function mapTemplateRow(row: Record<string, unknown>): Template {
     product_ids: Array.isArray(row.product_ids)
       ? row.product_ids.filter((item): item is string => typeof item === "string")
       : ["unican"],
+    preview_layout: row.preview_layout === "before_after" ? "before_after" : "single",
+    preview_before_url:
+      typeof row.preview_before_url === "string" ? row.preview_before_url : null,
+    preview_before_kind:
+      row.preview_before_kind === "image" || row.preview_before_kind === "video"
+        ? row.preview_before_kind
+        : null,
   }
 }
 
@@ -57,6 +64,9 @@ export async function createTemplate(
       tips: input.tips ?? null,
       thumbnail_url: input.thumbnail_url ?? null,
       thumbnail_kind: input.thumbnail_kind ?? "image",
+      preview_layout: input.preview_layout ?? "single",
+      preview_before_url: input.preview_before_url ?? null,
+      preview_before_kind: input.preview_before_kind ?? null,
       category: input.category,
       prompt: input.prompt,
       prompt_attachments: input.prompt_attachments ?? [],
@@ -102,6 +112,9 @@ export async function updateTemplate(
   if (input.tips !== undefined) updates.tips = input.tips
   if (input.thumbnail_url !== undefined) updates.thumbnail_url = input.thumbnail_url
   if (input.thumbnail_kind !== undefined) updates.thumbnail_kind = input.thumbnail_kind
+  if (input.preview_layout !== undefined) updates.preview_layout = input.preview_layout
+  if (input.preview_before_url !== undefined) updates.preview_before_url = input.preview_before_url
+  if (input.preview_before_kind !== undefined) updates.preview_before_kind = input.preview_before_kind
   if (input.category !== undefined) updates.category = input.category
   if (input.prompt !== undefined) updates.prompt = input.prompt
   if (input.prompt_attachments !== undefined) updates.prompt_attachments = input.prompt_attachments
@@ -312,6 +325,7 @@ export async function createTemplateRun(input: {
   inputValues: TemplateInputValues
   templateContext: TemplateHiddenContext
   creditsEstimated: number
+  isTest?: boolean
 }): Promise<TemplateRun> {
   const supabase = await createClient()
 
@@ -324,6 +338,7 @@ export async function createTemplateRun(input: {
       input_values: input.inputValues,
       template_context: input.templateContext,
       credits_estimated: input.creditsEstimated,
+      is_test: input.isTest ?? false,
       status: "pending",
     })
     .select("*")
@@ -334,17 +349,19 @@ export async function createTemplateRun(input: {
     throw new Error(`Failed to create template run: ${error.message}`)
   }
 
-  const { data: templateRow } = await supabase
-    .from("templates")
-    .select("run_count")
-    .eq("id", input.templateId)
-    .single()
-
-  if (templateRow) {
-    await supabase
+  if (!input.isTest) {
+    const { data: templateRow } = await supabase
       .from("templates")
-      .update({ run_count: (templateRow.run_count ?? 0) + 1 })
+      .select("run_count")
       .eq("id", input.templateId)
+      .single()
+
+    if (templateRow) {
+      await supabase
+        .from("templates")
+        .update({ run_count: (templateRow.run_count ?? 0) + 1 })
+        .eq("id", input.templateId)
+    }
   }
 
   return data as TemplateRun

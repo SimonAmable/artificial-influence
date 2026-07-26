@@ -4,6 +4,7 @@ import * as React from "react"
 import { useSearchParams } from "next/navigation"
 import {
   CircleNotch,
+  Info,
   Microphone,
   MusicNotesSimple,
   Pause,
@@ -15,6 +16,11 @@ import {
 import { toast } from "sonner"
 
 import { AudioModelOptionLabel } from "@/components/audio/audio-model-option-label"
+import {
+  AudioModelControls,
+  type SeedAudioSettings,
+} from "@/components/audio/audio-model-controls"
+import { PrivateVoiceDialog } from "@/components/audio/private-voice-dialog"
 import { AudioVoiceSelector } from "@/components/audio/voice-selector"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,7 +30,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -35,13 +40,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { tryShowContentModerationToast, toUserFacingGenerationError } from "@/lib/content-moderation-toast"
 import {
+  AUDIO_GENERATION_CREDIT_COST,
   AUDIO_MODEL_OPTIONS,
   DEFAULT_AUDIO_PROVIDER,
   DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE,
   DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT,
+  DEFAULT_QWEN3_LANGUAGE,
+  MAX_AUDIO_SCRIPT_CHARACTERS,
   getAudioModelLabel,
   getAudioProviderLabel,
   getDefaultAudioModel,
@@ -53,6 +67,17 @@ import {
 import { cn } from "@/lib/utils"
 
 type AudioMode = "voiceover" | "change-voice"
+
+const AUDIO_MODEL_ADVICE: Record<AudioProvider, string> = {
+  inworld:
+    "Inworld 1.5 Max: start with a preset whose age, timbre, accent, and energy already fit. Use natural punctuation and coherent wording to guide expression.",
+  google:
+    "Gemini 3.1: write an audio profile, a short scene, then director notes for tone, accent, pace, breathing, and articulation. Keep the script consistent with that direction.",
+  qwen:
+    "Qwen3 TTS: cloning works best from 5–15 seconds of clean single-speaker speech. For Voice Design, describe age, pitch, timbre, accent, vocal texture, and persona.",
+  fal:
+    "Seed Audio 1.0: reference up to three clips in the script as @Audio1, @Audio2, and @Audio3. Explain what to borrow from each; use an image instead when the sound should follow a visual scene.",
+}
 
 type AudioHistoryItem = {
   id: string
@@ -297,6 +322,7 @@ function DockPromptPanel({
   statusMessage,
   modelId,
   onModelChange,
+  onOpenModelControls,
   embedInDock = false,
 }: {
   mode: AudioMode
@@ -314,6 +340,7 @@ function DockPromptPanel({
   statusMessage: string | null
   modelId: string
   onModelChange: (value: string) => void
+  onOpenModelControls: () => void
   referenceVideo: ReferenceVideo | null
   onReferenceVideoChange: (video: ReferenceVideo | null) => void
   embedInDock?: boolean
@@ -332,6 +359,7 @@ function DockPromptPanel({
           value={script}
           onChange={(event) => onScriptChange(event.target.value)}
           placeholder={scriptPlaceholder}
+          maxLength={MAX_AUDIO_SCRIPT_CHARACTERS}
           className="min-h-16 w-full resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           rows={3}
         />
@@ -369,6 +397,22 @@ function DockPromptPanel({
               </SelectGroup>
             </SelectContent>
           </Select>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`${getAudioModelLabel(modelId)} prompting advice`}
+                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+                >
+                  <Info className="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-80 text-pretty leading-relaxed">
+                {AUDIO_MODEL_ADVICE[provider]}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
           <Button
             type="button"
@@ -450,11 +494,33 @@ function DockPromptPanel({
                 </DialogContent>
               </Dialog>
             </>
+          ) : provider === "qwen" || provider === "fal" ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onOpenModelControls}
+              className="h-8 rounded-[14px] px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground hover:bg-accent/30 hover:text-foreground"
+            >
+              {provider === "qwen" ? "Voice Controls" : "Audio Controls"}
+            </Button>
           ) : null}
 
-          <span className={cn("ml-auto", error ? "text-destructive" : "text-muted-foreground")}>
-            {error ?? statusMessage ?? `${script.trim().length} chars`}
-          </span>
+          <div className="ml-auto flex items-center gap-2">
+            {error || statusMessage ? (
+              <span className={error ? "text-destructive" : "text-muted-foreground"}>
+                {error ?? statusMessage}
+              </span>
+            ) : null}
+            <span
+              className={cn(
+                "tabular-nums text-muted-foreground",
+                script.length >= MAX_AUDIO_SCRIPT_CHARACTERS ? "text-destructive" : undefined
+              )}
+            >
+              {script.length}/{MAX_AUDIO_SCRIPT_CHARACTERS} chars
+            </span>
+          </div>
         </div>
     </div>
   )
@@ -649,7 +715,25 @@ export function AudioStudioPage() {
   const [languageCode, setLanguageCode] = React.useState<string>(
     DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE
   )
+  const [qwenLanguage, setQwenLanguage] = React.useState<string>(
+    DEFAULT_QWEN3_LANGUAGE
+  )
+  const [styleInstruction, setStyleInstruction] = React.useState("")
+  const [seedSettings, setSeedSettings] = React.useState<SeedAudioSettings>({
+    voice: "",
+    referenceAudios: [],
+    referenceImage: null,
+    outputFormat: "mp3",
+    sampleRate: 24000,
+    speed: 1,
+    volume: 1,
+    pitch: 0,
+    multilingual: false,
+  })
   const [selectedVoice, setSelectedVoice] = React.useState<AudioVoice | null>(null)
+  const [showPrivateVoiceDialog, setShowPrivateVoiceDialog] = React.useState(false)
+  const [showModelControls, setShowModelControls] = React.useState(false)
+  const [voiceCatalogVersion, setVoiceCatalogVersion] = React.useState(0)
   const [referenceVideo, setReferenceVideo] = React.useState<ReferenceVideo | null>(null)
   const [audioHistory, setAudioHistory] = React.useState<AudioHistoryItem[]>([])
   const [changeVoiceHistory, setChangeVoiceHistory] = React.useState<VideoHistoryItem[]>([])
@@ -676,9 +760,10 @@ export function AudioStudioPage() {
     previousProviderRef.current = provider
     setVoiceId(getDefaultAudioVoiceId(provider))
     setSelectedVoice(null)
-    if (provider === "inworld") {
+    if (provider !== "google") {
       setStylePrompt("")
-    } else {
+    }
+    if (provider === "google") {
       if (!languageCode.trim()) {
         setLanguageCode(DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE)
       }
@@ -793,6 +878,8 @@ export function AudioStudioPage() {
           voice: voiceId,
           stylePrompt,
           languageCode,
+          qwenLanguage,
+          styleInstruction,
         }),
       })
 
@@ -812,7 +899,7 @@ export function AudioStudioPage() {
         throw new Error("The enhancer returned empty text.")
       }
 
-      setScript(data.text)
+      setScript(data.text.slice(0, MAX_AUDIO_SCRIPT_CHARACTERS))
       if (provider === "google") {
         if (typeof data.languageCode === "string" && data.languageCode.trim().length > 0) {
           setLanguageCode(data.languageCode.trim())
@@ -832,7 +919,16 @@ export function AudioStudioPage() {
     } finally {
       setIsEnhancing(false)
     }
-  }, [languageCode, modelId, provider, script, stylePrompt, voiceId])
+  }, [
+    languageCode,
+    modelId,
+    provider,
+    qwenLanguage,
+    script,
+    styleInstruction,
+    stylePrompt,
+    voiceId,
+  ])
 
   const handleGenerate = React.useCallback(async () => {
     const trimmedScript = script.trim()
@@ -842,6 +938,10 @@ export function AudioStudioPage() {
           ? "Write a script to generate audio."
           : "Write a script to create the replacement voice."
       )
+      return
+    }
+    if (trimmedScript.length > MAX_AUDIO_SCRIPT_CHARACTERS) {
+      setError(`Audio scripts are limited to ${MAX_AUDIO_SCRIPT_CHARACTERS} characters.`)
       return
     }
 
@@ -862,16 +962,54 @@ export function AudioStudioPage() {
     setError(null)
 
     try {
+      let seedAudioUrls: string[] = []
+      let seedImageUrl: string | undefined
+      if (provider === "fal") {
+        if (seedSettings.referenceAudios.length > 0) {
+          setStatusMessage("Uploading audio references...")
+          const uploads = await Promise.all(
+            seedSettings.referenceAudios.map((file) =>
+              uploadFileToSupabase(file, "seed-audio-references")
+            )
+          )
+          seedAudioUrls = uploads
+            .filter((upload): upload is NonNullable<typeof upload> => Boolean(upload))
+            .map((upload) => upload.url)
+          if (seedAudioUrls.length !== seedSettings.referenceAudios.length) {
+            throw new Error("One or more audio references could not be uploaded.")
+          }
+        } else if (seedSettings.referenceImage) {
+          setStatusMessage("Uploading image reference...")
+          const upload = await uploadFileToSupabase(
+            seedSettings.referenceImage,
+            "seed-audio-images"
+          )
+          if (!upload) throw new Error("The image reference could not be uploaded.")
+          seedImageUrl = upload.url
+        }
+        setStatusMessage("Generating audio...")
+      }
+
       const audioResponse = await fetch("/api/generate-audio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           provider,
           text: trimmedScript,
-          voice: voiceId,
+          voice: provider === "fal" ? seedSettings.voice.trim() || voiceId : voiceId,
           model: modelId,
           stylePrompt: provider === "google" ? stylePrompt : undefined,
           languageCode: provider === "google" ? languageCode : undefined,
+          qwenLanguage: provider === "qwen" ? qwenLanguage : undefined,
+          styleInstruction: provider === "qwen" ? styleInstruction : undefined,
+          audioUrls: provider === "fal" ? seedAudioUrls : undefined,
+          imageUrl: provider === "fal" ? seedImageUrl : undefined,
+          outputFormat: provider === "fal" ? seedSettings.outputFormat : undefined,
+          sampleRate: provider === "fal" ? seedSettings.sampleRate : undefined,
+          speed: provider === "fal" ? seedSettings.speed : undefined,
+          volume: provider === "fal" ? seedSettings.volume : undefined,
+          pitch: provider === "fal" ? seedSettings.pitch : undefined,
+          multilingual: provider === "fal" ? seedSettings.multilingual : undefined,
         }),
       })
 
@@ -965,10 +1103,23 @@ export function AudioStudioPage() {
       setIsGenerating(false)
       setStatusMessage(null)
     }
-  }, [languageCode, mode, modelId, provider, referenceVideo, script, stylePrompt, voiceId])
+  }, [
+    languageCode,
+    mode,
+    modelId,
+    provider,
+    qwenLanguage,
+    referenceVideo,
+    script,
+    seedSettings,
+    styleInstruction,
+    stylePrompt,
+    voiceId,
+  ])
 
   const canGenerate =
     script.trim().length > 0 &&
+    script.trim().length <= MAX_AUDIO_SCRIPT_CHARACTERS &&
     voiceId.trim().length > 0 &&
     (mode === "voiceover" || Boolean(referenceVideo?.file))
 
@@ -1010,6 +1161,7 @@ export function AudioStudioPage() {
         setModelId(value)
         if (error) setError(null)
       }}
+      onOpenModelControls={() => setShowModelControls(true)}
       referenceVideo={referenceVideo}
       onReferenceVideoChange={(video) => {
         setReferenceVideo(video)
@@ -1051,9 +1203,9 @@ export function AudioStudioPage() {
               </h1>
             </div>
             <p className="mt-5 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              {mode === "voiceover"
-                ? "Write the line, choose Inworld or Gemini TTS, and generate polished narration that fits the rest of the UniCan workflow."
-                : "Create a new spoken line with Inworld or Gemini TTS, then push it through your existing lip-sync video model to revoice a talking-head clip."}
+               {mode === "voiceover"
+                 ? "Write the line, choose a voice model, and generate polished narration or complete audio scenes without leaving your workflow."
+                 : "Create a new spoken line, then push it through your existing lip-sync video model to revoice a talking-head clip."}
             </p>
           </section>
         ) : (
@@ -1126,15 +1278,21 @@ export function AudioStudioPage() {
                   {renderDockPromptPanel()}
                 </div>
                 <div className="flex h-full min-h-0 min-w-0 flex-col">
-                  <AudioVoiceSelector
-                    provider={provider}
+                   <AudioVoiceSelector
+                     key={`desktop-${provider}-${voiceCatalogVersion}`}
+                     provider={provider}
                     className="flex h-full min-h-0 flex-1 flex-col gap-0"
                     value={voiceId}
                     onSelectedVoiceChange={setSelectedVoice}
-                    onValueChange={(nextVoiceId) => {
+                     onValueChange={(nextVoiceId) => {
                       setVoiceId(nextVoiceId)
                       if (error) setError(null)
-                    }}
+                     }}
+                     onCreateVoice={
+                       provider === "qwen" || provider === "google"
+                         ? () => setShowPrivateVoiceDialog(true)
+                         : undefined
+                     }
                     renderTrigger={({ disabled }) => (
                       <div
                         aria-disabled={disabled}
@@ -1172,7 +1330,12 @@ export function AudioStudioPage() {
                     </>
                   ) : (
                     <>
-                      Generate
+                      <span className="flex flex-col items-center leading-tight">
+                        Generate
+                        <span className="font-sans text-[10px] font-medium normal-case tracking-normal opacity-75">
+                          {AUDIO_GENERATION_CREDIT_COST} credit
+                        </span>
+                      </span>
                       <Sparkle className="size-5" weight="fill" />
                     </>
                   )}
@@ -1195,15 +1358,21 @@ export function AudioStudioPage() {
                 </div>
                 <div className="flex items-stretch gap-2">
                   <div className="flex min-h-[104px] min-w-0 flex-1 basis-0 flex-col">
-                    <AudioVoiceSelector
-                      provider={provider}
+                     <AudioVoiceSelector
+                       key={`mobile-${provider}-${voiceCatalogVersion}`}
+                       provider={provider}
                       className="flex h-full min-h-0 flex-1 flex-col gap-0"
                       value={voiceId}
                       onSelectedVoiceChange={setSelectedVoice}
-                      onValueChange={(nextVoiceId) => {
+                       onValueChange={(nextVoiceId) => {
                         setVoiceId(nextVoiceId)
                         if (error) setError(null)
-                      }}
+                       }}
+                       onCreateVoice={
+                         provider === "qwen" || provider === "google"
+                           ? () => setShowPrivateVoiceDialog(true)
+                           : undefined
+                       }
                       renderTrigger={({ disabled }) => (
                         <div
                           aria-disabled={disabled}
@@ -1244,7 +1413,12 @@ export function AudioStudioPage() {
                       </>
                     ) : (
                       <>
-                        <span>Generate</span>
+                        <span className="text-center leading-tight">
+                          Generate
+                          <span className="mt-0.5 block font-sans text-[9px] font-medium normal-case tracking-normal opacity-75">
+                            {AUDIO_GENERATION_CREDIT_COST} credit
+                          </span>
+                        </span>
                         <Sparkle className="size-4 shrink-0" weight="fill" />
                       </>
                     )}
@@ -1255,6 +1429,29 @@ export function AudioStudioPage() {
           </div>
         </div>
       </div>
+      <PrivateVoiceDialog
+        open={showPrivateVoiceDialog}
+        onOpenChange={setShowPrivateVoiceDialog}
+        provider={provider}
+        onCreated={(voice) => {
+          setVoiceCatalogVersion((current) => current + 1)
+          setVoiceId(voice.voiceId)
+          setSelectedVoice(voice)
+        }}
+      />
+      {(provider === "qwen" || provider === "fal") ? (
+        <AudioModelControls
+          open={showModelControls}
+          onOpenChange={setShowModelControls}
+          provider={provider}
+          qwenLanguage={qwenLanguage}
+          onQwenLanguageChange={setQwenLanguage}
+          styleInstruction={styleInstruction}
+          onStyleInstructionChange={setStyleInstruction}
+          seed={seedSettings}
+          onSeedChange={setSeedSettings}
+        />
+      ) : null}
     </div>
   )
 }

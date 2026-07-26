@@ -87,6 +87,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/motion-copy", label: "Motion Copy" },
   { path: "/lipsync", label: "Lipsync" },
   { path: "/inpaint", label: "Image Editing" },
+  { path: "/angles", label: "Angles" },
   { path: "/carousel-shots", label: "Carousel Shots" },
   { path: "/image?model=custom/character-swap", label: "Character Swap" },
   { path: "/image?model=custom/face-swap", label: "Face Swap" },
@@ -200,6 +201,13 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             description: "Generate AI images",
             badge: "new",
             iconPhosphor: "image",
+          },
+          {
+            path: "/angles",
+            label: "Angles",
+            description: "Move the camera around one reference image",
+            badge: "new",
+            iconPhosphor: "arrows-out",
           },
           {
             path: "/carousel-shots",
@@ -740,6 +748,12 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     href: "/inpaint",
     icon: "paint-brush",
     hint: "Edit regions of an image with prompts.",
+  },
+  {
+    label: "Angles",
+    href: "/angles",
+    icon: "arrows-out",
+    hint: "Move the camera around one image and create a new point of view.",
   },
   {
     label: "Carousel Shots",

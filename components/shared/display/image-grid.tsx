@@ -23,6 +23,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import type { ImageGridAgentAction } from "@/lib/chat/image-grid-agent-actions"
 import { carouselShotsHrefFromImage } from "@/lib/carousel-shots/constants"
 import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
@@ -762,72 +767,8 @@ export function ImageGrid({
                   isCondensed ? "flex-row" : "flex-col"
                 )}
               >
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    setFullscreenImage(item.data)
-                  }}
-                  aria-label="View full screen"
-                >
-                  <ArrowsOutSimple className="size-3.5" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    void handleDownload(item.data.url)
-                  }}
-                  aria-label="Download image"
-                >
-                  <DownloadSimple className="size-3.5" />
-                </Button>
-
-                {!isCondensed && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      void handleCopy(item.data.url)
-                    }}
-                    aria-label="Copy image"
-                  >
-                    {copiedImageUrl === item.data.url ? (
-                      <Check className="size-3.5" />
-                    ) : (
-                      <Copy className="size-3.5" />
-                    )}
-                  </Button>
-                )}
-
-                {showExtendedActions && !isCondensed ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="h-7 w-7 rounded-full border border-primary/40 bg-primary/70 text-black shadow-sm shadow-primary/25 hover:bg-primary/85"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      runShotVariationsAction(item.data)
-                    }}
-                    aria-label="Create shot variations"
-                    title="Create Shot Variations"
-                  >
-                    <SquaresFour className="size-3.5" />
-                  </Button>
-                ) : null}
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <Button
                       type="button"
                       variant="secondary"
@@ -835,12 +776,110 @@ export function ImageGrid({
                       className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
                       onClick={(event) => {
                         event.stopPropagation()
+                        setFullscreenImage(item.data)
                       }}
-                      aria-label="More options"
+                      aria-label="View full screen"
                     >
-                      <DotsThree className="size-4" weight="bold" />
+                      <ArrowsOutSimple className="size-3.5" />
                     </Button>
-                  </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" sideOffset={8}>
+                    Full screen
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        void handleDownload(item.data.url)
+                      }}
+                      aria-label="Download image"
+                    >
+                      <DownloadSimple className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" sideOffset={8}>
+                    Download
+                  </TooltipContent>
+                </Tooltip>
+
+                {!isCondensed && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void handleCopy(item.data.url)
+                        }}
+                        aria-label="Copy image"
+                      >
+                        {copiedImageUrl === item.data.url ? (
+                          <Check className="size-3.5" />
+                        ) : (
+                          <Copy className="size-3.5" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" sideOffset={8}>
+                      {copiedImageUrl === item.data.url ? "Copied" : "Copy image"}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+
+                {showExtendedActions && !isCondensed ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7 rounded-full border border-primary/40 bg-primary/70 text-black shadow-sm shadow-primary/25 hover:bg-primary/85"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          runShotVariationsAction(item.data)
+                        }}
+                        aria-label="Create shot variations"
+                      >
+                        <SquaresFour className="size-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" sideOffset={8}>
+                      Create shot variations
+                    </TooltipContent>
+                  </Tooltip>
+                ) : null}
+
+                <DropdownMenu>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                          }}
+                          aria-label="More options"
+                        >
+                          <DotsThree className="size-4" weight="bold" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" sideOffset={8}>
+                      More options
+                    </TooltipContent>
+                  </Tooltip>
                   {renderDropdownContent(item.data, index)}
                 </DropdownMenu>
               </div>

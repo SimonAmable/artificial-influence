@@ -5,7 +5,23 @@ import {
   DEFAULT_INWORLD_VOICE_NAME,
 } from "@/lib/constants/inworld-tts"
 
-export type AudioProvider = "inworld" | "google"
+export type AudioProvider = "inworld" | "google" | "qwen" | "fal"
+
+export type PrivateVoiceKind = "clone" | "design"
+
+export const AUDIO_GENERATION_CREDIT_COST = 1
+export const MAX_AUDIO_SCRIPT_CHARACTERS = 1000
+export const MAX_PRIVATE_VOICE_REFERENCE_SECONDS = 15
+
+export interface PrivateVoiceConfig {
+  baseVoice?: string
+  language?: string
+  languageCode?: string
+  referenceText?: string
+  styleInstruction?: string
+  stylePrompt?: string
+  voiceDescription?: string
+}
 
 export interface AudioVoice {
   voiceId: string
@@ -20,11 +36,16 @@ export interface AudioVoice {
   model?: string | null
   previewText?: string
   previewAudioUrl?: string
+  privateVoiceId?: string
+  privateVoiceKind?: PrivateVoiceKind
+  privateVoiceConfig?: PrivateVoiceConfig
 }
 
 export const AUDIO_PROVIDER_OPTIONS = [
   { id: "inworld", label: "Inworld" },
   { id: "google", label: "Gemini" },
+  { id: "qwen", label: "Qwen" },
+  { id: "fal", label: "Seed Audio" },
 ] as const
 
 export const DEFAULT_AUDIO_PROVIDER: AudioProvider = "inworld"
@@ -35,6 +56,13 @@ export const DEFAULT_GOOGLE_GEMINI_VOICE_ID = "Kore" as const
 export const DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE = "en-US" as const
 export const DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT =
   "Say the following." as const
+export const QWEN3_TTS_MODEL = "qwen/qwen3-tts" as const
+export const QWEN3_TTS_MODEL_LABEL = "Qwen3 TTS" as const
+export const DEFAULT_QWEN3_SPEAKER = "Serena" as const
+export const DEFAULT_QWEN3_LANGUAGE = "auto" as const
+export const SEED_AUDIO_MODEL = "bytedance/seed-audio-1.0" as const
+export const SEED_AUDIO_MODEL_LABEL = "Seed Audio 1.0" as const
+export const DEFAULT_SEED_AUDIO_VOICE = "auto" as const
 
 export type AudioModelGroup = "Current" | "Legacy"
 
@@ -52,6 +80,22 @@ export const AUDIO_MODEL_OPTIONS: readonly {
     description: "Google Gemini speech generation with style prompts and inline delivery tags.",
     group: "Current",
     provider: "google",
+    deprecated: false,
+  },
+  {
+    id: QWEN3_TTS_MODEL,
+    label: QWEN3_TTS_MODEL_LABEL,
+    description: "Natural multilingual speech with instant voice cloning and voice design.",
+    group: "Current",
+    provider: "qwen",
+    deprecated: false,
+  },
+  {
+    id: SEED_AUDIO_MODEL,
+    label: SEED_AUDIO_MODEL_LABEL,
+    description: "Generate speech and complete audio scenes from text, audio, or an image.",
+    group: "Current",
+    provider: "fal",
     deprecated: false,
   },
   ...INWORLD_TTS_MODEL_OPTIONS.map((option) => ({
@@ -99,6 +143,48 @@ export const GOOGLE_GEMINI_TTS_VOICES: readonly GoogleGeminiVoiceSeed[] = [
   { voiceId: "Rasalgethi", gender: "Male", character: "Informative" },
 ] as const
 
+export const QWEN3_TTS_SPEAKERS = [
+  "Aiden",
+  "Dylan",
+  "Eric",
+  "Ono_anna",
+  "Ryan",
+  "Serena",
+  "Sohee",
+  "Uncle_fu",
+  "Vivian",
+] as const
+
+export const QWEN3_TTS_LANGUAGES = [
+  "auto",
+  "Chinese",
+  "English",
+  "Japanese",
+  "Korean",
+  "French",
+  "German",
+  "Italian",
+  "Spanish",
+  "Portuguese",
+  "Russian",
+] as const
+
+export const SEED_AUDIO_SAMPLE_RATES = [
+  8000,
+  16000,
+  24000,
+  32000,
+  44100,
+  48000,
+] as const
+
+export const SEED_AUDIO_OUTPUT_FORMATS = [
+  "wav",
+  "mp3",
+  "pcm",
+  "ogg_opus",
+] as const
+
 export function getAudioProviderLabel(provider: AudioProvider | string) {
   return (
     AUDIO_PROVIDER_OPTIONS.find((option) => option.id === provider)?.label ??
@@ -107,21 +193,24 @@ export function getAudioProviderLabel(provider: AudioProvider | string) {
 }
 
 export function getDefaultAudioVoiceId(provider: AudioProvider) {
-  return provider === "google"
-    ? DEFAULT_GOOGLE_GEMINI_VOICE_ID
-    : DEFAULT_INWORLD_VOICE_ID
+  if (provider === "google") return DEFAULT_GOOGLE_GEMINI_VOICE_ID
+  if (provider === "qwen") return DEFAULT_QWEN3_SPEAKER
+  if (provider === "fal") return DEFAULT_SEED_AUDIO_VOICE
+  return DEFAULT_INWORLD_VOICE_ID
 }
 
 export function getDefaultAudioVoiceName(provider: AudioProvider) {
-  return provider === "google"
-    ? DEFAULT_GOOGLE_GEMINI_VOICE_ID
-    : DEFAULT_INWORLD_VOICE_NAME
+  if (provider === "google") return DEFAULT_GOOGLE_GEMINI_VOICE_ID
+  if (provider === "qwen") return DEFAULT_QWEN3_SPEAKER
+  if (provider === "fal") return "Automatic"
+  return DEFAULT_INWORLD_VOICE_NAME
 }
 
 export function getDefaultAudioModel(provider: AudioProvider) {
-  return provider === "google"
-    ? GOOGLE_GEMINI_TTS_MODEL
-    : DEFAULT_INWORLD_TTS_MODEL
+  if (provider === "google") return GOOGLE_GEMINI_TTS_MODEL
+  if (provider === "qwen") return QWEN3_TTS_MODEL
+  if (provider === "fal") return SEED_AUDIO_MODEL
+  return DEFAULT_INWORLD_TTS_MODEL
 }
 
 export function getAudioModelOption(modelId?: string | null) {
@@ -136,9 +225,11 @@ import { productLogo } from "@/lib/product/branding"
 
 /** Icon shown next to TTS model options (brand logo for Inworld, Gemini mark for Google). */
 export function getAudioModelIconSrc(modelId?: string | null) {
-  return getAudioProviderForModel(modelId) === "google"
-    ? "/ai_icons/gemini-color.svg"
-    : productLogo
+  const provider = getAudioProviderForModel(modelId)
+  if (provider === "google") return "/ai_icons/gemini-color.svg"
+  if (provider === "qwen") return "/ai_icons/qwen.svg"
+  if (provider === "fal") return "/ai_icons/bytedance-color.svg"
+  return productLogo
 }
 
 export function getAudioModelLabel(modelId?: string | null) {
@@ -153,6 +244,10 @@ export function getAudioVoiceSourceLabel(source: string) {
       return "Cloned"
     case "PVC":
       return "Pro Clone"
+    case "CLONE":
+      return "My Clones"
+    case "DESIGN":
+      return "My Designs"
     default:
       return source
   }
@@ -191,4 +286,34 @@ export function buildFallbackGoogleGeminiVoices(): AudioVoice[] {
     providerVoiceId: voice.voiceId,
     model: GOOGLE_GEMINI_TTS_MODEL,
   }))
+}
+
+export function buildFallbackQwenVoices(): AudioVoice[] {
+  return QWEN3_TTS_SPEAKERS.map((speaker) => ({
+    voiceId: speaker,
+    displayName: speaker.replace(/_/g, " "),
+    description: "Built-in Qwen3 voice.",
+    langCode: DEFAULT_QWEN3_LANGUAGE,
+    tags: ["qwen3-tts", "preset"],
+    source: "SYSTEM",
+    provider: "qwen",
+    providerVoiceId: speaker,
+    model: QWEN3_TTS_MODEL,
+  }))
+}
+
+export function buildFallbackSeedAudioVoices(): AudioVoice[] {
+  return [
+    {
+      voiceId: DEFAULT_SEED_AUDIO_VOICE,
+      displayName: "Automatic",
+      description: "Let Seed Audio choose a voice from your prompt.",
+      langCode: "",
+      tags: ["seed-audio", "automatic"],
+      source: "SYSTEM",
+      provider: "fal",
+      providerVoiceId: DEFAULT_SEED_AUDIO_VOICE,
+      model: SEED_AUDIO_MODEL,
+    },
+  ]
 }

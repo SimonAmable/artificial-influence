@@ -3,9 +3,12 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import type { AudioProvider } from "@/lib/constants/audio"
 import {
+  AUDIO_GENERATION_CREDIT_COST,
+  MAX_AUDIO_SCRIPT_CHARACTERS,
   getDefaultAudioModel,
   getDefaultAudioVoiceId,
 } from "@/lib/constants/audio"
+import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import { listCatalogVoices } from "@/lib/server/audio-voices"
 import {
   resolveAudioProvider,
@@ -42,7 +45,7 @@ export function createGenerateAudioTool({
       text: z
         .string()
         .min(1)
-        .max(5000)
+        .max(MAX_AUDIO_SCRIPT_CHARACTERS)
         .describe("Exact spoken script to synthesize. Preserve the user's wording unless they explicitly asked for writing help."),
       provider: z
         .enum(["inworld", "google"])
@@ -96,6 +99,14 @@ export function createGenerateAudioTool({
 
       if (!trimmedText) {
         throw new Error("Audio generation requires non-empty spoken text.")
+      }
+      const hasCredits = await checkUserHasCredits(
+        userId,
+        AUDIO_GENERATION_CREDIT_COST,
+        supabase
+      )
+      if (!hasCredits) {
+        throw new Error("Insufficient credits. Audio generation costs 1 credit.")
       }
 
       const result = await synthesizeSpeech({
@@ -151,6 +162,14 @@ export function createGenerateAudioTool({
       if (saveError || !savedGeneration) {
         throw new Error(`Failed to save generated audio: ${saveError?.message ?? "Unknown error"}`)
       }
+      const updatedCreditBalance = await deductUserCredits(
+        userId,
+        AUDIO_GENERATION_CREDIT_COST,
+        supabase
+      )
+      if (updatedCreditBalance === -1) {
+        throw new Error("Audio was generated, but the generation credit could not be charged.")
+      }
 
       return {
         audio: {
@@ -159,6 +178,7 @@ export function createGenerateAudioTool({
           url: publicUrl,
         },
         generationId: savedGeneration.id,
+        creditsUsed: AUDIO_GENERATION_CREDIT_COST,
         message: `Generated audio with ${result.modelId}${matchedVoice ? ` using ${matchedVoice.displayName}` : ""}.`,
         model: result.modelId,
         provider: resolvedProvider,

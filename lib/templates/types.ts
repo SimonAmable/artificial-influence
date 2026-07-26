@@ -4,6 +4,7 @@ export type TemplateCategory = "photo" | "video" | "slideshow"
 export type TemplateVisibility = "private" | "public"
 export type TemplateRunStatus = "pending" | "complete" | "failed"
 export type ThumbnailKind = "image" | "video"
+export type TemplatePreviewLayout = "single" | "before_after"
 
 export type TemplateInputKind = "image" | "video" | "audio" | "text" | "boolean" | "aspect_ratio"
 
@@ -87,6 +88,9 @@ export interface Template {
   tips: string | null
   thumbnail_url: string | null
   thumbnail_kind: ThumbnailKind
+  preview_layout?: TemplatePreviewLayout
+  preview_before_url?: string | null
+  preview_before_kind?: ThumbnailKind | null
   category: TemplateCategory
   prompt: string
   prompt_attachments: TemplatePromptAttachment[]
@@ -114,6 +118,7 @@ export interface TemplateRun {
   status: TemplateRunStatus
   credits_estimated: number
   credits_actual: number | null
+  is_test?: boolean
 }
 
 export interface CreateTemplateInput {
@@ -123,6 +128,9 @@ export interface CreateTemplateInput {
   tips?: string | null
   thumbnail_url?: string | null
   thumbnail_kind?: ThumbnailKind
+  preview_layout?: TemplatePreviewLayout
+  preview_before_url?: string | null
+  preview_before_kind?: ThumbnailKind | null
   category: TemplateCategory
   prompt: string
   prompt_attachments?: TemplatePromptAttachment[]
@@ -140,6 +148,9 @@ export interface UpdateTemplateInput {
   tips?: string | null
   thumbnail_url?: string | null
   thumbnail_kind?: ThumbnailKind
+  preview_layout?: TemplatePreviewLayout
+  preview_before_url?: string | null
+  preview_before_kind?: ThumbnailKind | null
   category?: TemplateCategory
   prompt?: string
   prompt_attachments?: TemplatePromptAttachment[]

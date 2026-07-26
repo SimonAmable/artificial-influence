@@ -39,6 +39,7 @@ import {
   parseReferenceImageUrlsFromForm,
   resolveFormReferenceImageUrl,
 } from '@/lib/server/form-reference-image-urls';
+import { ANGLES_TOOL, isAnglesModelId } from '@/lib/angles/constants';
 
 const STALE_PENDING_MINUTES = 30;
 const FREE_CONCURRENCY_LIMIT = 1;
@@ -187,6 +188,13 @@ export async function POST(request: NextRequest) {
     const loraScaleRaw = formData.get('lora_scale') as string | null;
     const lora_scale =
       loraScaleRaw != null && loraScaleRaw !== '' ? Number(loraScaleRaw) : null;
+
+    if (tool === ANGLES_TOOL && !isAnglesModelId(modelIdentifier)) {
+      return NextResponse.json(
+        { error: `Model "${modelIdentifier}" is not available in Angles` },
+        { status: 400 },
+      );
+    }
 
     // Fetch model details from database
     console.log('[generate-image] Fetching model details for:', modelIdentifier);
