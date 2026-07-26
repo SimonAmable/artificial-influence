@@ -1,11 +1,12 @@
 "use client"
 
 import { useLayoutEffect, useRef } from "react"
+import Image from "next/image"
 import { gsap } from "gsap"
-import { Check, MagicWand, Play, Sparkle } from "@phosphor-icons/react"
+import { Check, MagicWand, Paperclip, Play, Plus, Sparkle } from "@phosphor-icons/react"
 
 import type { DashboardToolNavItem } from "@/lib/constants/navigation"
-import { getNavIcon } from "@/lib/navigation/nav-icons"
+import { NAV_ICON_MAP, type NavIconComponent } from "@/lib/navigation/nav-icons"
 import type { ToolShowcasePreview } from "@/components/dashboard/tool-showcase-preview-data"
 
 type ToolShowcaseDemoProps = {
@@ -17,10 +18,40 @@ type ToolShowcaseDemoProps = {
 function DemoFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center p-5">
-      <div className="relative w-full max-w-[17rem] overflow-hidden rounded-[20px] border border-white/15 bg-background/78 p-3 text-foreground shadow-lg backdrop-blur-xl">
+      <div className="relative w-full max-w-[17rem] overflow-hidden rounded-[20px] border border-border/70 bg-background/78 p-3 text-foreground shadow-lg backdrop-blur-xl">
         {children}
       </div>
     </div>
+  )
+}
+
+function DemoMedia({
+  preview,
+  index,
+  className,
+}: {
+  preview: ToolShowcasePreview
+  index: number
+  className?: string
+}) {
+  const media = preview.media[index % preview.media.length]
+  const src = media.type === "video" ? media.poster : media.src
+
+  if (!src) {
+    return <span className={className} />
+  }
+
+  return (
+    <span className={`relative block overflow-hidden ${className ?? ""}`}>
+      <Image
+        src={src}
+        alt=""
+        fill
+        sizes="150px"
+        className="object-cover"
+        style={{ objectPosition: media.position }}
+      />
+    </span>
   )
 }
 
@@ -38,31 +69,95 @@ function ResultBadge({ label }: { label: string }) {
   )
 }
 
-function PromptDemo({
-  inputLabel,
-  resultLabel,
-}: Pick<ToolShowcasePreview, "inputLabel" | "resultLabel">) {
+function ImageStudioDemo({ preview }: { preview: ToolShowcasePreview }) {
   return (
     <DemoFrame>
-      <div className="flex items-center gap-2 text-[10px] font-medium text-muted-foreground">
-        <Sparkle className="size-3.5 text-primary" weight="fill" />
-        Describe what you want
+      <div className="grid grid-cols-4 gap-1.5">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <span key={index} data-demo-step>
+            <DemoMedia
+              preview={preview}
+              index={index}
+              className="aspect-[3/4] rounded-md border border-border/60 bg-muted shadow-sm"
+            />
+          </span>
+        ))}
       </div>
-      <div className="mt-2 min-h-12 rounded-xl border border-border/60 bg-muted/45 px-3 py-2.5 text-[11px] leading-4">
+      <div className="mt-2 rounded-xl border border-border/70 bg-background/90 p-2 shadow-sm">
+        <div className="min-h-8 text-[10px] leading-4 text-foreground">
+          <span data-demo-typed />
+          <span data-demo-caret className="ml-0.5 inline-block h-3 w-px bg-foreground" />
+        </div>
+        <div className="mt-1.5 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <span className="flex size-5 items-center justify-center rounded-full border border-border">
+              <Plus className="size-2.5" weight="bold" />
+            </span>
+            <span className="rounded-full bg-muted px-2 py-1 text-[8px] font-medium">
+              Image · 4
+            </span>
+          </div>
+          <span
+            data-demo-result
+            className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
+          >
+            <Sparkle className="size-3" weight="fill" />
+          </span>
+        </div>
+      </div>
+      <div className="sr-only">{preview.resultLabel}</div>
+    </DemoFrame>
+  )
+}
+
+function AgentDemo({ preview }: { preview: ToolShowcasePreview }) {
+  return (
+    <DemoFrame>
+      <div className="flex items-center gap-2 text-[9px] font-semibold text-muted-foreground">
+        <Sparkle className="size-3 text-primary" weight="fill" />
+        UniCan Agent
+      </div>
+      <div className="mt-2 ml-auto max-w-[82%] rounded-[14px] rounded-br-sm bg-muted px-2.5 py-2 text-[9px] leading-4">
         <span data-demo-typed />
         <span data-demo-caret className="ml-0.5 inline-block h-3 w-px bg-foreground" />
       </div>
-      <div className="mt-2 grid grid-cols-4 gap-1.5">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <span
+      <div className="mt-2 flex gap-1.5">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <DemoMedia
             key={index}
-            data-demo-step
-            className="aspect-[3/4] rounded-md border border-white/10 bg-linear-to-br from-primary/75 via-primary/20 to-background/90 shadow-sm"
+            preview={preview}
+            index={index}
+            className="aspect-square flex-1 rounded-lg border border-border/60 bg-muted"
           />
         ))}
       </div>
-      <ResultBadge label={resultLabel} />
-      <span className="sr-only">{inputLabel}</span>
+      <div className="mt-2 flex items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-2 py-1.5">
+        <Paperclip className="size-3 text-muted-foreground" />
+        <span className="flex-1 text-[8px] text-muted-foreground">Ask anything…</span>
+        <span data-demo-result className="size-4 rounded-full bg-primary" />
+      </div>
+    </DemoFrame>
+  )
+}
+
+function SearchDemo({ preview }: { preview: ToolShowcasePreview }) {
+  return (
+    <DemoFrame>
+      <div className="rounded-full border border-border/70 bg-background/90 px-3 py-2 text-[10px]">
+        <span data-demo-typed />
+        <span data-demo-caret className="ml-0.5 inline-block h-3 w-px bg-foreground" />
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <DemoMedia
+            key={index}
+            preview={preview}
+            index={index}
+            className="aspect-[4/5] rounded-lg border border-border/60 bg-muted"
+          />
+        ))}
+      </div>
+      <ResultBadge label={preview.resultLabel} />
     </DemoFrame>
   )
 }
@@ -72,7 +167,7 @@ function FlowDemo({
   resultLabel,
   icon: Icon,
 }: Pick<ToolShowcasePreview, "inputLabel" | "resultLabel"> & {
-  icon: ReturnType<typeof getNavIcon>
+  icon: NavIconComponent
 }) {
   return (
     <DemoFrame>
@@ -105,29 +200,137 @@ function FlowDemo({
 }
 
 function TransformDemo({
-  inputLabel,
-  resultLabel,
-}: Pick<ToolShowcasePreview, "inputLabel" | "resultLabel">) {
+  preview,
+}: {
+  preview: ToolShowcasePreview
+}) {
   return (
     <DemoFrame>
       <div className="mb-2 truncate text-[11px] font-medium text-muted-foreground">
-        {inputLabel}
+        {preview.inputLabel}
       </div>
       <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <div
-          data-demo-source
-          className="aspect-[4/5] rounded-xl border border-border/60 bg-linear-to-br from-muted via-background to-muted/40 shadow-sm"
-        />
+        <div data-demo-source>
+          <DemoMedia
+            preview={preview}
+            index={0}
+            className="aspect-[4/5] rounded-xl border border-border/60 bg-muted shadow-sm"
+          />
+        </div>
         <MagicWand data-demo-wand className="size-5 text-primary" weight="fill" />
         <div className="relative aspect-[4/5] overflow-hidden rounded-xl border border-border/60 bg-muted shadow-sm">
-          <div className="absolute inset-0 bg-linear-to-br from-primary via-primary/35 to-background" />
+          <DemoMedia preview={preview} index={1} className="absolute inset-0" />
           <div
             data-demo-reveal
-            className="absolute inset-y-0 left-0 w-px bg-white shadow-[0_0_14px_var(--primary)]"
+            className="absolute inset-y-0 left-0 w-px bg-foreground shadow-[0_0_14px_var(--primary)]"
           />
         </div>
       </div>
-      <ResultBadge label={resultLabel} />
+      <ResultBadge label={preview.resultLabel} />
+    </DemoFrame>
+  )
+}
+
+function WorkflowDemo({ preview }: { preview: ToolShowcasePreview }) {
+  return (
+    <DemoFrame>
+      <div className="relative h-32 overflow-hidden rounded-xl border border-border/60 bg-muted/25">
+        <svg className="absolute inset-0 size-full" viewBox="0 0 260 128" aria-hidden>
+          <path
+            data-demo-line
+            d="M62 34 C 98 34, 94 65, 130 65"
+            fill="none"
+            stroke="currentColor"
+            className="text-primary"
+            strokeWidth="2"
+          />
+          <path
+            data-demo-line
+            d="M160 65 C 196 65, 190 96, 224 96"
+            fill="none"
+            stroke="currentColor"
+            className="text-primary"
+            strokeWidth="2"
+          />
+        </svg>
+        {[
+          { label: "Prompt", className: "left-3 top-4" },
+          { label: "Generate", className: "left-[6.4rem] top-[3.1rem]" },
+          { label: "Save", className: "right-3 bottom-3" },
+        ].map((node, index) => (
+          <span
+            key={node.label}
+            data-demo-step
+            className={`absolute ${node.className} flex w-16 items-center gap-1.5 rounded-lg border border-border bg-background/90 p-1.5 text-[8px] font-semibold shadow-sm`}
+          >
+            <span className="size-3 rounded bg-primary/70" />
+            {node.label}
+            {index === 2 ? <Check className="ml-auto size-2.5" weight="bold" /> : null}
+          </span>
+        ))}
+      </div>
+      <ResultBadge label={preview.resultLabel} />
+    </DemoFrame>
+  )
+}
+
+function CarouselDemo({ preview }: { preview: ToolShowcasePreview }) {
+  return (
+    <DemoFrame>
+      <div className="flex items-center gap-2">
+        <DemoMedia
+          preview={preview}
+          index={0}
+          className="aspect-[3/4] w-16 shrink-0 rounded-xl border-2 border-primary bg-muted"
+        />
+        <span data-demo-line className="h-px flex-1 origin-left bg-primary" />
+        <div className="grid flex-1 grid-cols-2 gap-1">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <span key={index} data-demo-step>
+              <DemoMedia
+                preview={preview}
+                index={index}
+                className="aspect-[3/4] rounded-md border border-border/60 bg-muted"
+              />
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="mt-2 rounded-xl border border-border/70 bg-background/90 p-2">
+        <div className="text-[9px] text-muted-foreground">{preview.inputLabel}</div>
+        <div className="mt-1 flex items-center justify-between">
+          <span className="rounded-full bg-muted px-2 py-1 text-[8px]">4 shots</span>
+          <span data-demo-result className="rounded-full bg-primary px-2 py-1 text-[8px] font-semibold text-primary-foreground">
+            Generate
+          </span>
+        </div>
+      </div>
+    </DemoFrame>
+  )
+}
+
+function VideoStudioDemo({ preview }: { preview: ToolShowcasePreview }) {
+  return (
+    <DemoFrame>
+      <div className="relative aspect-video overflow-hidden rounded-xl border border-border/60 bg-muted">
+        <DemoMedia preview={preview} index={0} className="absolute inset-0" />
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="flex size-8 items-center justify-center rounded-full bg-background/80 shadow-sm backdrop-blur">
+            <Play className="size-3.5" weight="fill" />
+          </span>
+        </span>
+      </div>
+      <div className="relative mt-2 flex h-6 gap-1 overflow-hidden rounded-lg bg-muted/60 p-1">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <span key={index} data-demo-step className="flex-1 rounded bg-primary/55" />
+        ))}
+        <span data-demo-playhead className="absolute inset-y-1 left-1 w-px bg-foreground" />
+      </div>
+      <div className="mt-2 flex items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-2 py-2">
+        <Plus className="size-3 text-muted-foreground" />
+        <span className="flex-1 truncate text-[8px] text-muted-foreground">{preview.inputLabel}</span>
+        <span data-demo-result className="size-5 rounded-full bg-primary" />
+      </div>
     </DemoFrame>
   )
 }
@@ -149,7 +352,7 @@ function TimelineDemo({
               <span
                 key={index}
                 data-demo-step
-                className={`${width} rounded-md border border-white/10 bg-primary/65`}
+                className={`${width} rounded-md border border-border/60 bg-primary/65`}
               />
             ))}
           </div>
@@ -194,25 +397,27 @@ function SignalDemo({
   )
 }
 
-function OrganizeDemo({
-  inputLabel,
-  resultLabel,
-}: Pick<ToolShowcasePreview, "inputLabel" | "resultLabel">) {
+function OrganizeDemo({ preview }: { preview: ToolShowcasePreview }) {
   return (
     <DemoFrame>
       <div className="truncate text-[11px] font-medium text-muted-foreground">
-        {inputLabel}
+        {preview.inputLabel}
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2">
         {Array.from({ length: 6 }).map((_, index) => (
           <span
             key={index}
             data-demo-step
-            className="aspect-[4/5] rounded-lg border border-border/60 bg-linear-to-br from-primary/65 via-muted to-background shadow-sm"
-          />
+          >
+            <DemoMedia
+              preview={preview}
+              index={index}
+              className="aspect-[4/5] rounded-lg border border-border/60 bg-muted shadow-sm"
+            />
+          </span>
         ))}
       </div>
-      <ResultBadge label={resultLabel} />
+      <ResultBadge label={preview.resultLabel} />
     </DemoFrame>
   )
 }
@@ -223,7 +428,7 @@ export function ToolShowcaseDemo({
   reducedMotion,
 }: ToolShowcaseDemoProps) {
   const rootRef = useRef<HTMLDivElement>(null)
-  const Icon = getNavIcon(tool.icon)
+  const Icon = NAV_ICON_MAP[tool.icon]
 
   useLayoutEffect(() => {
     const root = rootRef.current
@@ -321,34 +526,49 @@ export function ToolShowcaseDemo({
   }, [preview, reducedMotion])
 
   let content: React.ReactNode
-  switch (preview.motion) {
-    case "prompt":
-      content = <PromptDemo inputLabel={preview.inputLabel} resultLabel={preview.resultLabel} />
-      break
-    case "flow":
-      content = (
-        <FlowDemo
-          inputLabel={preview.inputLabel}
-          resultLabel={preview.resultLabel}
-          icon={Icon}
-        />
-      )
-      break
-    case "transform":
-      content = <TransformDemo inputLabel={preview.inputLabel} resultLabel={preview.resultLabel} />
-      break
-    case "timeline":
-      content = <TimelineDemo inputLabel={preview.inputLabel} resultLabel={preview.resultLabel} />
-      break
-    case "signal":
-      content = <SignalDemo inputLabel={preview.inputLabel} resultLabel={preview.resultLabel} />
-      break
-    case "organize":
-      content = <OrganizeDemo inputLabel={preview.inputLabel} resultLabel={preview.resultLabel} />
-      break
-    default: {
-      const _exhaustive: never = preview.motion
-      content = _exhaustive
+
+  if (tool.label === "Image Studio") {
+    content = <ImageStudioDemo preview={preview} />
+  } else if (tool.label === "Agent") {
+    content = <AgentDemo preview={preview} />
+  } else if (tool.label === "Resources") {
+    content = <SearchDemo preview={preview} />
+  } else if (tool.label === "Workflow") {
+    content = <WorkflowDemo preview={preview} />
+  } else if (tool.label === "Carousel Shots") {
+    content = <CarouselDemo preview={preview} />
+  } else if (tool.label === "Video Studio" || tool.label === "Video Editor") {
+    content = <VideoStudioDemo preview={preview} />
+  } else {
+    switch (preview.motion) {
+      case "prompt":
+        content = <SearchDemo preview={preview} />
+        break
+      case "flow":
+        content = (
+          <FlowDemo
+            inputLabel={preview.inputLabel}
+            resultLabel={preview.resultLabel}
+            icon={Icon}
+          />
+        )
+        break
+      case "transform":
+        content = <TransformDemo preview={preview} />
+        break
+      case "timeline":
+        content = <TimelineDemo inputLabel={preview.inputLabel} resultLabel={preview.resultLabel} />
+        break
+      case "signal":
+        content = <SignalDemo inputLabel={preview.inputLabel} resultLabel={preview.resultLabel} />
+        break
+      case "organize":
+        content = <OrganizeDemo preview={preview} />
+        break
+      default: {
+        const _exhaustive: never = preview.motion
+        content = _exhaustive
+      }
     }
   }
 

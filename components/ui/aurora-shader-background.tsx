@@ -199,7 +199,7 @@ export type AuroraShaderVariant =
 
 const AURORA_SHADER_VARIANTS: Record<
   AuroraShaderVariant,
-  Partial<typeof AURORA_SHADER_UNIFORMS>
+  Partial<Record<keyof typeof AURORA_SHADER_UNIFORMS, number>>
 > = {
   aurora: {},
   flow: { style: 21, zoom: 0.72, warp: 0.56, seed: 12, rotate: 0.35 },

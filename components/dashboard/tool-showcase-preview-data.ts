@@ -97,7 +97,10 @@ const previewByLabel: Record<string, ToolShowcasePreview> = {
     resultLabel: "Published",
   },
   "Image Studio": {
-    media: [{ src: "/hero_showcase_images/image_generation.png" }],
+    media: [
+      { src: "/hero_showcase_images/image_generation.png" },
+      ...creatorShots.slice(0, 3).map((src) => ({ src })),
+    ],
     shader: "generative",
     motion: "prompt",
     inputLabel: "Editorial portrait, soft light",

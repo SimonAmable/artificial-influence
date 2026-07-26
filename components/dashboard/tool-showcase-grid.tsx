@@ -19,7 +19,7 @@ import {
   getDashboardToolNavItems,
   type DashboardToolNavItem,
 } from "@/lib/constants/navigation"
-import { getNavIcon } from "@/lib/navigation/nav-icons"
+import { NAV_ICON_MAP } from "@/lib/navigation/nav-icons"
 import { cn } from "@/lib/utils"
 
 function PreviewMediaItem({
@@ -142,7 +142,7 @@ function ToolShowcaseCard({
   onActivate: () => void
   onDeactivate: () => void
 }) {
-  const Icon = getNavIcon(tool.icon)
+  const Icon = NAV_ICON_MAP[tool.icon]
 
   return (
     <Link
