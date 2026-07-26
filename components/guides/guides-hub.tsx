@@ -101,25 +101,30 @@ function GuidesSearchTrigger({
 
 export function GuidesHub() {
   const cards = getGuideHubCardsForProduct(currentProduct.id)
+  const showFanvueBadge = currentProduct.id === "presence-studio"
 
   return (
     <div className="flex w-full flex-col gap-12">
       <header className="mx-auto flex w-full max-w-2xl flex-col items-center text-center">
-        <span className="inline-flex items-center gap-2 rounded-full bg-[#49F264] px-3 py-1.5 text-xs font-semibold tracking-tight text-black">
-          <span className="flex items-center gap-1.5" aria-hidden>
-            <BookOpen className="size-3.5 shrink-0 text-black" weight="bold" />
-            <Image
-              src={FANVUE_LOGO_SRC}
-              alt=""
-              width={16}
-              height={16}
-              className="size-4 rounded-sm"
-            />
+        {showFanvueBadge ? (
+          <span className="inline-flex items-center gap-2 rounded-full bg-[#49F264] px-3 py-1.5 text-xs font-semibold tracking-tight text-black">
+            <span className="flex items-center gap-1.5" aria-hidden>
+              <BookOpen className="size-3.5 shrink-0 text-black" weight="bold" />
+              <Image
+                src={FANVUE_LOGO_SRC}
+                alt=""
+                width={16}
+                height={16}
+                className="size-4 rounded-sm"
+              />
+            </span>
+            Made for Fanvue Creators
           </span>
-          Made for Fanvue Creators
-        </span>
+        ) : null}
 
-        <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
+        <h1
+          className={`${showFanvueBadge ? "mt-5" : ""} text-3xl font-semibold tracking-tight sm:text-4xl`}
+        >
           Learn {currentProduct.name}
         </h1>
 

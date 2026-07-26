@@ -8,7 +8,9 @@ import { Card } from "@/components/ui/card"
 import { Stack } from "@phosphor-icons/react"
 // import { FeatureShowcaseCarousel } from "@/components/dashboard/feature-showcase-carousel"
 import { DashboardHeroSection } from "@/components/dashboard/dashboard-hero-section"
-import { FeatureButtonGrid } from "@/components/dashboard/feature-button-grid"
+import { ToolShowcaseGrid } from "@/components/dashboard/tool-showcase-grid"
+// Swap back to this import and component if the compact icon grid is preferred:
+// import { FeatureButtonGrid } from "@/components/dashboard/feature-button-grid"
 import { CharactersSection } from "@/components/dashboard/characters-section"
 import { CanvasesSection } from "@/components/dashboard/canvases-section"
 import { Footer } from "@/components/landing/footer"
@@ -25,7 +27,8 @@ export function DashboardPage() {
 
         {/* Tools Section */}
         <section className="mx-auto w-full py-10">
-          <FeatureButtonGrid />
+          <ToolShowcaseGrid />
+          {/* Previous component: <FeatureButtonGrid /> */}
         </section>
 
         {/* Canvases Section */}

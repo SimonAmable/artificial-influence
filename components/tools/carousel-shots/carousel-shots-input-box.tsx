@@ -353,7 +353,7 @@ export function CarouselShotsInputBox({
             </PromptControlMenuContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Highest available quality is used automatically.
+Highest available quality is used automatically.
           </p>
         </div>
 

@@ -188,6 +188,28 @@ void main(){
 }
 `
 
+export type AuroraShaderVariant =
+  | "aurora"
+  | "flow"
+  | "generative"
+  | "motion"
+  | "transform"
+  | "signal"
+  | "organize"
+
+const AURORA_SHADER_VARIANTS: Record<
+  AuroraShaderVariant,
+  Partial<typeof AURORA_SHADER_UNIFORMS>
+> = {
+  aurora: {},
+  flow: { style: 21, zoom: 0.72, warp: 0.56, seed: 12, rotate: 0.35 },
+  generative: { style: 8, zoom: 0.76, warp: 0.62, seed: 48, rotate: 1.1 },
+  motion: { style: 24, zoom: 0.82, warp: 0.48, seed: 73, rotate: 0.2 },
+  transform: { style: 22, zoom: 0.68, warp: 0.38, seed: 31, rotate: 0.7 },
+  signal: { style: 11, zoom: 0.78, warp: 0.3, seed: 91, rotate: 0 },
+  organize: { style: 14, zoom: 0.72, warp: 0.28, seed: 57, rotate: 1.45 },
+}
+
 type AuroraShaderBackgroundProps = {
   className?: string
   targetRef?: React.RefObject<HTMLElement | null>
@@ -195,6 +217,8 @@ type AuroraShaderBackgroundProps = {
   animate?: boolean
   /** Use the fast generating playback speed. */
   fast?: boolean
+  /** Visual recipe for the surface using the shader. */
+  variant?: AuroraShaderVariant
 }
 
 function compileShader(gl: WebGLRenderingContext, type: number, source: string) {
@@ -256,6 +280,7 @@ function AuroraShaderBackgroundComponent({
   targetRef,
   animate = false,
   fast = false,
+  variant = "aurora",
 }: AuroraShaderBackgroundProps) {
   const rootRef = React.useRef<HTMLDivElement>(null)
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
@@ -328,6 +353,10 @@ function AuroraShaderBackgroundComponent({
     )
 
     const colors = getAuroraShaderColorUniforms()
+    const uniforms = {
+      ...AURORA_SHADER_UNIFORMS,
+      ...AURORA_SHADER_VARIANTS[variant],
+    }
     let animationFrame = 0
     let startTime = performance.now()
     let frozenTime = 0
@@ -340,24 +369,24 @@ function AuroraShaderBackgroundComponent({
     gl.enableVertexAttribArray(positionLocation)
     gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0)
 
-    gl.uniform1f(styleLocation, AURORA_SHADER_UNIFORMS.style)
-    gl.uniform1f(intensityLocation, AURORA_SHADER_UNIFORMS.intensity)
-    gl.uniform1f(zoomLocation, AURORA_SHADER_UNIFORMS.zoom)
-    gl.uniform1f(warpLocation, AURORA_SHADER_UNIFORMS.warp)
-    gl.uniform1f(contrastLocation, AURORA_SHADER_UNIFORMS.contrast)
-    gl.uniform1f(speedLocation, AURORA_SHADER_UNIFORMS.speed)
-    gl.uniform1f(grainLocation, AURORA_SHADER_UNIFORMS.grain)
-    gl.uniform1f(driftLocation, AURORA_SHADER_UNIFORMS.drift)
-    gl.uniform1f(animateLocation, AURORA_SHADER_UNIFORMS.animate)
-    gl.uniform1f(reverseLocation, AURORA_SHADER_UNIFORMS.reverse)
-    gl.uniform1f(rotateLocation, AURORA_SHADER_UNIFORMS.rotate)
-    gl.uniform1f(seedLocation, AURORA_SHADER_UNIFORMS.seed)
-    gl.uniform1f(smoothBlendLocation, AURORA_SHADER_UNIFORMS.smoothBlend)
-    gl.uniform2f(offsetLocation, AURORA_SHADER_UNIFORMS.offsetX, AURORA_SHADER_UNIFORMS.offsetY)
-    gl.uniform1f(cursorOnLocation, AURORA_SHADER_UNIFORMS.cursorOn)
-    gl.uniform1f(cursorEffectLocation, AURORA_SHADER_UNIFORMS.cursorEffect)
-    gl.uniform1f(cursorStrengthLocation, AURORA_SHADER_UNIFORMS.cursorStrength)
-    gl.uniform1f(cursorRadiusLocation, AURORA_SHADER_UNIFORMS.cursorRadius)
+    gl.uniform1f(styleLocation, uniforms.style)
+    gl.uniform1f(intensityLocation, uniforms.intensity)
+    gl.uniform1f(zoomLocation, uniforms.zoom)
+    gl.uniform1f(warpLocation, uniforms.warp)
+    gl.uniform1f(contrastLocation, uniforms.contrast)
+    gl.uniform1f(speedLocation, uniforms.speed)
+    gl.uniform1f(grainLocation, uniforms.grain)
+    gl.uniform1f(driftLocation, uniforms.drift)
+    gl.uniform1f(animateLocation, uniforms.animate)
+    gl.uniform1f(reverseLocation, uniforms.reverse)
+    gl.uniform1f(rotateLocation, uniforms.rotate)
+    gl.uniform1f(seedLocation, uniforms.seed)
+    gl.uniform1f(smoothBlendLocation, uniforms.smoothBlend)
+    gl.uniform2f(offsetLocation, uniforms.offsetX, uniforms.offsetY)
+    gl.uniform1f(cursorOnLocation, uniforms.cursorOn)
+    gl.uniform1f(cursorEffectLocation, uniforms.cursorEffect)
+    gl.uniform1f(cursorStrengthLocation, uniforms.cursorStrength)
+    gl.uniform1f(cursorRadiusLocation, uniforms.cursorRadius)
     colors.forEach((color, index) => {
       const location = colorLocations[index]
       if (location) {
@@ -391,8 +420,8 @@ function AuroraShaderBackgroundComponent({
       gl.uniform1f(
         speedLocation,
         fastRef.current
-          ? AURORA_SHADER_UNIFORMS.generatingSpeed
-          : AURORA_SHADER_UNIFORMS.speed,
+          ? uniforms.generatingSpeed
+          : uniforms.speed,
       )
     }
 
@@ -512,7 +541,7 @@ function AuroraShaderBackgroundComponent({
       gl.deleteBuffer(buffer)
       gl.deleteProgram(program)
     }
-  }, [])
+  }, [variant])
 
   React.useEffect(() => {
     syncAnimationRef.current?.()
