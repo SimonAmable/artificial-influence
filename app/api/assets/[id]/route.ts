@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { ASSET_CATEGORIES, inferStoragePathFromUrl, normalizeTags } from "@/lib/assets/library"
+import {
+  parseOptionalPrivateVoiceId,
+  resolveVoiceAttachmentUpdate,
+} from "@/lib/assets/private-voice"
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
 import { mapAssetRowWithFreshUrl } from "@/lib/assets/map-asset-row"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
@@ -20,6 +24,72 @@ export async function PATCH(
     const resolvedParams = await Promise.resolve(params)
     const assetId = resolvedParams.id
     const body = await request.json()
+    const siteOrigin = request.nextUrl.origin
+    const storageClient = createServiceRoleClient() ?? supabase
+
+    if (body.patch === "privateVoice" || body.patch === "voice") {
+      const resolved = await resolveVoiceAttachmentUpdate(supabase, user.id, {
+        voiceId:
+          body.patch === "privateVoice"
+            ? body.privateVoiceId
+              ? `private:${body.privateVoiceId}`
+              : null
+            : body.voiceId ?? null,
+        voiceProvider:
+          body.patch === "privateVoice"
+            ? body.voiceProvider ?? "qwen"
+            : body.voiceProvider ?? null,
+        privateVoiceId: body.privateVoiceId ?? null,
+      })
+      if (!resolved.ok) {
+        return NextResponse.json({ error: resolved.error }, { status: 400 })
+      }
+
+      // Old privateVoice-only clients may omit provider; infer from owned row when needed.
+      let voiceProvider = resolved.voiceProvider
+      if (body.patch === "privateVoice" && resolved.privateVoiceId && !body.voiceProvider) {
+        const { data: owned } = await supabase
+          .from("private_audio_voices")
+          .select("provider")
+          .eq("id", resolved.privateVoiceId)
+          .eq("user_id", user.id)
+          .maybeSingle()
+        if (owned?.provider === "qwen" || owned?.provider === "google") {
+          voiceProvider = owned.provider
+        }
+      }
+
+      if (resolved.voiceId && !voiceProvider) {
+        return NextResponse.json({ error: "Voice provider is required" }, { status: 400 })
+      }
+
+      const { data, error } = await supabase
+        .from("assets")
+        .update({
+          private_voice_id: resolved.privateVoiceId,
+          voice_id: resolved.voiceId,
+          voice_provider: voiceProvider,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", assetId)
+        .eq("user_id", user.id)
+        .select("*")
+        .single()
+
+      if (error || !data) {
+        console.error("[assets] PATCH voice failed:", error)
+        return NextResponse.json(
+          { error: "Failed to update character voice", message: error?.message },
+          { status: 500 },
+        )
+      }
+
+      return NextResponse.json({
+        asset: await mapAssetRowWithFreshUrl(storageClient, data as Record<string, unknown>, {
+          siteOrigin,
+        }),
+      })
+    }
 
     const title = String(body.title || "").trim()
     const url = String(body.url || "").trim()
@@ -41,9 +111,6 @@ export async function PATCH(
     if (visibility === "public") {
       return NextResponse.json({ error: "Public assets are disabled" }, { status: 400 })
     }
-
-    const siteOrigin = request.nextUrl.origin
-    const storageClient = createServiceRoleClient() ?? supabase
 
     const tags = normalizeTags(Array.isArray(body.tags) ? (body.tags as string[]) : [])
     let assetUrl = url
@@ -79,6 +146,55 @@ export async function PATCH(
         ? body.thumbnailUrl.trim()
         : null
 
+    const privateVoiceId = parseOptionalPrivateVoiceId(body.privateVoiceId)
+    if (body.privateVoiceId !== undefined && privateVoiceId === undefined) {
+      return NextResponse.json({ error: "Invalid private voice id" }, { status: 400 })
+    }
+
+    const hasVoiceFields =
+      body.voiceId !== undefined ||
+      body.voiceProvider !== undefined ||
+      body.privateVoiceId !== undefined
+
+    let voiceAttachment:
+      | {
+          privateVoiceId: string | null
+          voiceId: string | null
+          voiceProvider: string | null
+        }
+      | null = null
+
+    if (hasVoiceFields) {
+      const resolved = await resolveVoiceAttachmentUpdate(supabase, user.id, {
+        voiceId:
+          body.voiceId !== undefined
+            ? body.voiceId
+            : privateVoiceId
+              ? `private:${privateVoiceId}`
+              : null,
+        voiceProvider: body.voiceProvider ?? (privateVoiceId ? "qwen" : null),
+        privateVoiceId: privateVoiceId ?? null,
+      })
+      if (!resolved.ok) {
+        return NextResponse.json({ error: resolved.error }, { status: 400 })
+      }
+      voiceAttachment = resolved
+      if (voiceAttachment.privateVoiceId && !body.voiceProvider) {
+        const { data: owned } = await supabase
+          .from("private_audio_voices")
+          .select("provider")
+          .eq("id", voiceAttachment.privateVoiceId)
+          .eq("user_id", user.id)
+          .maybeSingle()
+        if (owned?.provider === "qwen" || owned?.provider === "google") {
+          voiceAttachment = {
+            ...voiceAttachment,
+            voiceProvider: owned.provider,
+          }
+        }
+      }
+    }
+
     const updateData: Record<string, unknown> = {
       title,
       asset_type: assetType,
@@ -101,6 +217,12 @@ export async function PATCH(
 
     if (uploadId !== undefined) {
       updateData.upload_id = uploadId
+    }
+
+    if (voiceAttachment) {
+      updateData.private_voice_id = voiceAttachment.privateVoiceId
+      updateData.voice_id = voiceAttachment.voiceId
+      updateData.voice_provider = voiceAttachment.voiceProvider
     }
 
     const { data, error } = await supabase

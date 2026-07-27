@@ -50,6 +50,13 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
     products: ["presence-studio"],
   },
   {
+    slug: "scale-with-agents",
+    title: "Scale with agents",
+    description: "Drive the studio from Claude, Cursor, and automations.",
+    section: "start",
+    available: true,
+  },
+  {
     slug: "publish-to-instagram",
     title: "Publish to Instagram",
     description: "Export and post Instagram-ready content.",
@@ -110,6 +117,33 @@ const SHOOT_WEEK_PROMPT_TRY_TABS = [
     label: "Corner store",
     prompt:
       "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy — using my locked AI influencer in a late-night convenience store aisle, harsh fluorescents, snack in hand, looking down, same face as my character, vertical 4:5",
+  },
+] as const
+
+const SCALE_WITH_AGENTS_PROMPT_TRY_TABS = [
+  {
+    id: "skill",
+    label: "Save a skill",
+    prompt:
+      "Save a skill for my weekly AI influencer batch: always use my locked character via @, run 5 scene briefs, cull to keepers, and save winners to Assets.",
+  },
+  {
+    id: "automation",
+    label: "Automation",
+    prompt:
+      "List my automations, then help me create one that posts a new carousel set to Instagram every Tuesday at 6pm using my saved character.",
+  },
+  {
+    id: "template",
+    label: "Request template",
+    prompt:
+      "Search my templates for carousel workflows. If nothing fits, create a reusable photo template for a 4-panel 4:5 carousel with @ character and a bedroom scene placeholder.",
+  },
+  {
+    id: "generate",
+    label: "Generate",
+    prompt:
+      "Using my locked AI influencer, generate 3 candid iPhone-style stills for a night-out carousel. Same face, different angles, vertical 4:5.",
   },
 ] as const
 
@@ -292,18 +326,79 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
       description:
         "Pick a still from your history, then create a Fanvue post or upload it to your vault.",
     },
+    nextGuideSlug: "scale-with-agents",
+    nextGuideLabel: "Scale with agents",
+    askAgentPrompt:
+      "Help me publish an AI influencer still to Fanvue with a PPV price from Presence Content",
+  },
+  {
+    slug: "scale-with-agents",
+    title: "Scale with agents",
+    result: "Connect MCP once, then scale with skills, automations, and on-demand templates.",
+    presentation: "mcp",
+    overview: `You already locked a face, batched stills, built carousels, and — on Presence — published to Fanvue. This is the last Start here step: how you scale without living in the UI.
+
+MCP connects Claude, Cursor, ChatGPT, and coding agents to your studio account. Same credits, same characters, same History — but you drive create and publish from the AI tool you already use.
+
+Once connected, three levers compound: skills (reusable agent instructions), automations (scheduled runs), and templates (gallery workflows you can search or ask the agent to build). MCP is the pipe; those three are how output keeps moving while you focus on the next batch.`,
+    timeEstimate: "~5 min",
+    tools: [
+      { label: "MCP", href: "/mcp" },
+      { label: "Chat", href: "/chat" },
+      { label: "Automations", href: "/automations" },
+      { label: "Templates", href: "/templates" },
+    ],
+    primaryCtaLabel: "Connect MCP",
+    primaryCtaHref: "#mcp-setup",
+    infoSectionsHeading: "Scale levers",
+    infoSections: [
+      {
+        title: "Skills",
+        body: "Skills are reusable instructions the agent follows across turns — your batch brief format, culling rules, caption tone, or Fanvue pricing habits. Pin skills in Chat so they load automatically, or ask the agent to save a new one after a workflow clicks.",
+        ctaLabel: "Open Chat",
+        ctaHref: "/chat",
+      },
+      {
+        title: "Automations",
+        body: "Automations are scheduled agent runs: post a carousel on Tuesdays, refresh vault media weekly, or prep a slideshow draft before you wake up. Set the trigger once; the agent uses your characters, templates, and brand context on each run.",
+        ctaLabel: "Open Automations",
+        ctaHref: "/automations",
+      },
+      {
+        title: "Request templates",
+        body: "Templates are reusable gallery workflows — photo sets, video lanes, slideshows. Browse Templates to run one, or ask Chat to search yours, inspect a slug, or create a new template from a brief you describe. Great when you want the same output shape every week without retyping the setup.",
+        ctaLabel: "Open Templates",
+        ctaHref: "/templates",
+      },
+      {
+        title: "MCP vs in-app Chat",
+        body: "Same account either way. Use MCP when you want generation inside Claude, Cursor, Codex, or ChatGPT. Use in-app Chat when you want the studio skills UI, pinned instructions, and tool traces in one place. Many creators connect MCP for daily prompts and open Chat for heavy batch days.",
+        ctaLabel: "Open MCP",
+        ctaHref: "/mcp",
+      },
+    ],
+    promptTry: {
+      heading: "Try an agent ask",
+      tabs: [...SCALE_WITH_AGENTS_PROMPT_TRY_TABS],
+    },
+    outcomes: [
+      "You connected at least one external AI tool via MCP",
+      "You know when to pin a skill vs run a one-off Chat turn",
+      "You can tell Automations apart from manual agent sessions",
+      "You can ask the agent to find or create a reusable template",
+    ],
     nextGuideSlug: null,
     nextGuideLabel: null,
     askAgentPrompt:
-      "Help me publish an AI influencer still to Fanvue with a PPV price from Presence Content",
+      "Help me connect MCP and set up skills, automations, or a reusable template to scale my AI influencer workflow",
   },
   {
     slug: "introduction",
     title: "Introduction",
     result: "A clear map of the studio — then you start with locking a face.",
-    overview: `This studio is built for one job: run a consistent AI creator without juggling five apps. Lock a face once, generate stills that still look like that person, turn keepers into multi-angle sets when you need a carousel, and publish from the same place you create — including Fanvue via Content on Presence.
+    overview: `This studio is built for one job: run a consistent AI creator without juggling five apps. Lock a face once, generate stills that still look like that person, turn keepers into multi-angle sets when you need a carousel, publish from the same place you create — and scale with agents when the pipeline is running.
 
-Most setups fall apart on consistency. New faces every session means no brand and no library worth posting from. The Start here guides are the fix: three pages, in order, that take you from a reusable character to a week of stills to a matching carousel set.
+Most setups fall apart on consistency. New faces every session means no brand and no library worth posting from. The Start here guides walk you in order: lock a face, batch a week of stills, build a carousel set, publish (Fanvue on Presence), then connect MCP and compound with skills, automations, and templates.
 
 Create your AI influencer first. Merge usually wins for realism — blend a few strong closeups into one face that holds up across scenes. Direct Save is fine when you already love a photo; Build is for starting from traits with no reference. The goal is one character you can @ again and again.
 
@@ -311,7 +406,9 @@ Shoot a week of content next. Keep that locked face, batch different scenes and 
 
 Make a carousel / multi-angle shoot when one still needs a full post set. Carousel Shots turns a single keeper into matching angles for roughly the cost of one image — same person, different panels.
 
-Publish (Fanvue and later Instagram) sits after that pipeline. Platform guides — this Introduction, Credits & models, History & Assets — explain how the studio works day to day. You do not need every surface on day one. Walk Start here in order, then open the first guide when you are ready to lock a face.`,
+Publish to Fanvue on Presence, then finish with Scale with agents — MCP connect plus skills, automations, and template requests so output keeps moving without babysitting every session.
+
+Platform guides — Introduction, Credits & models, History & Assets — explain how the studio works day to day. Walk Start here in order, then open the first guide when you are ready to lock a face.`,
     timeEstimate: "~3 min",
     tools: [
       { label: "Guides", href: "/guides" },
@@ -351,6 +448,12 @@ Publish (Fanvue and later Instagram) sits after that pipeline. Platform guides �
         ctaHref: "/guides/publish-to-fanvue",
         demo: "fanvue-publish",
         products: ["presence-studio"],
+      },
+      {
+        title: "Scale with agents",
+        body: "Connect MCP to Claude or Cursor, then compound with skills, automations, and template requests.",
+        ctaLabel: "Open guide",
+        ctaHref: "/guides/scale-with-agents",
       },
     ],
     nextGuideSlug: "create-ai-influencer",

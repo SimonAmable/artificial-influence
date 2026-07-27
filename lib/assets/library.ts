@@ -117,6 +117,47 @@ export async function updateAsset(assetId: string, input: CreateAssetInput): Pro
   return data.asset as AssetRecord
 }
 
+/** Attach or clear a voice on a character asset without rewriting other fields. */
+export async function setAssetVoice(
+  assetId: string,
+  input: {
+    voiceId: string | null
+    voiceProvider: string | null
+    privateVoiceId?: string | null
+  },
+): Promise<AssetRecord> {
+  const response = await fetch(`/api/assets/${assetId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      patch: "voice",
+      voiceId: input.voiceId,
+      voiceProvider: input.voiceProvider,
+      privateVoiceId: input.privateVoiceId ?? null,
+    }),
+  })
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}))
+    throw new Error(payload.error || "Failed to update character voice")
+  }
+
+  const data = await response.json()
+  return data.asset as AssetRecord
+}
+
+/** @deprecated Prefer setAssetVoice */
+export async function setAssetPrivateVoice(
+  assetId: string,
+  privateVoiceId: string | null,
+): Promise<AssetRecord> {
+  return setAssetVoice(assetId, {
+    voiceId: privateVoiceId ? `private:${privateVoiceId}` : null,
+    voiceProvider: privateVoiceId ? "qwen" : null,
+    privateVoiceId,
+  })
+}
+
 export function normalizeTags(tags: string[] | undefined) {
   return (tags || [])
     .map((tag) => tag.trim().toLowerCase())

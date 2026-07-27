@@ -5,15 +5,18 @@ import {
   buildFallbackQwenVoices,
   buildFallbackSeedAudioVoices,
   GOOGLE_GEMINI_TTS_MODEL,
-  MAX_PRIVATE_VOICE_REFERENCE_SECONDS,
   QWEN3_TTS_MODEL,
   type AudioProvider,
 } from "@/lib/constants/audio"
 import { isAudioProvider } from "@/lib/server/audio-tts"
-import { listCatalogVoices } from "@/lib/server/audio-voices"
+import { listCatalogVoices, mapPrivateVoiceRows } from "@/lib/server/audio-voices"
+import {
+  readFormString,
+  readPrivateVoiceConfigFromForm,
+  validateAndUploadPrivateVoiceReference,
+} from "@/lib/server/private-voice-upload"
 import { getAuthenticatedRequestContext } from "@/lib/server/request-auth"
 import { createClient } from "@/lib/supabase/server"
-import { getAudioDurationSeconds } from "@/lib/video-editor/media-parser"
 
 export async function GET(request: NextRequest) {
   const requestedProvider = request.nextUrl.searchParams.get("provider")?.trim()
@@ -60,23 +63,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function readFormString(formData: FormData, key: string) {
-  const value = formData.get(key)
-  return typeof value === "string" ? value.trim() : ""
-}
-
-function safeAudioExtension(file: File) {
-  const fromName = file.name.split(".").pop()?.toLowerCase()
-  if (fromName && /^(wav|mp3|mpeg|m4a|ogg|opus|flac|webm)$/.test(fromName)) {
-    return fromName === "mpeg" ? "mp3" : fromName
-  }
-  if (file.type.includes("wav")) return "wav"
-  if (file.type.includes("ogg") || file.type.includes("opus")) return "ogg"
-  if (file.type.includes("webm")) return "webm"
-  if (file.type.includes("mp4")) return "m4a"
-  return "mp3"
-}
-
 export async function POST(request: NextRequest) {
   const { supabase, user, error: authError } =
     await getAuthenticatedRequestContext(request, ["generations:write"])
@@ -105,60 +91,27 @@ export async function POST(request: NextRequest) {
 
     const id = crypto.randomUUID()
     let referenceStoragePath: string | null = null
-    const config: Record<string, string> = {}
-
-    for (const key of [
-      "baseVoice",
-      "language",
-      "languageCode",
-      "referenceText",
-      "styleInstruction",
-      "stylePrompt",
-      "voiceDescription",
-    ]) {
-      const value = readFormString(formData, key)
-      if (value) config[key] = value
-    }
+    const config = readPrivateVoiceConfigFromForm(formData)
 
     if (kind === "clone") {
       const file = formData.get("referenceAudio")
-      if (!(file instanceof File) || !file.type.startsWith("audio/")) {
+      if (!(file instanceof File)) {
         return NextResponse.json(
           { error: "Upload an audio recording to clone this voice." },
           { status: 400 }
         )
       }
-      if (file.size > 20 * 1024 * 1024) {
-        return NextResponse.json({ error: "Voice recordings must be under 20 MB." }, { status: 400 })
-      }
-      let durationSeconds: number
-      try {
-        durationSeconds = await getAudioDurationSeconds(file)
-      } catch {
-        return NextResponse.json(
-          { error: "Could not read the reference recording duration." },
-          { status: 400 }
-        )
-      }
-      if (
-        !Number.isFinite(durationSeconds) ||
-        durationSeconds <= 0 ||
-        durationSeconds > MAX_PRIVATE_VOICE_REFERENCE_SECONDS
-      ) {
-        return NextResponse.json(
-          { error: "Reference recordings must be 15 seconds or shorter." },
-          { status: 400 }
-        )
-      }
 
-      referenceStoragePath = `${user.id}/${id}/reference.${safeAudioExtension(file)}`
-      const { error: uploadError } = await supabase.storage
-        .from("private-voices")
-        .upload(referenceStoragePath, Buffer.from(await file.arrayBuffer()), {
-          contentType: file.type || "audio/mpeg",
-          upsert: false,
-        })
-      if (uploadError) throw new Error(uploadError.message)
+      const upload = await validateAndUploadPrivateVoiceReference({
+        supabase,
+        userId: user.id,
+        voiceId: id,
+        file,
+      })
+      if (!upload.ok) {
+        return NextResponse.json({ error: upload.error }, { status: upload.status })
+      }
+      referenceStoragePath = upload.path
     }
 
     const modelId = provider === "qwen" ? QWEN3_TTS_MODEL : GOOGLE_GEMINI_TTS_MODEL
@@ -174,7 +127,7 @@ export async function POST(request: NextRequest) {
         config,
         reference_storage_path: referenceStoragePath,
       })
-      .select("id, name, provider, model_id, kind, config")
+      .select("id, name, provider, model_id, kind, config, reference_storage_path, preview_storage_path")
       .single()
 
     if (error) {
@@ -184,21 +137,8 @@ export async function POST(request: NextRequest) {
       throw new Error(error.message)
     }
 
-    return NextResponse.json({
-      voice: {
-        voiceId: `private:${data.id}`,
-        displayName: data.name,
-        description: kind === "clone" ? "Your private cloned voice." : "Your reusable designed voice.",
-        langCode: config.languageCode ?? config.language ?? "",
-        tags: ["private", kind, provider],
-        source: kind === "clone" ? "CLONE" : "DESIGN",
-        provider,
-        model: modelId,
-        privateVoiceId: data.id,
-        privateVoiceKind: kind,
-        privateVoiceConfig: config,
-      },
-    })
+    const [voice] = await mapPrivateVoiceRows(supabase, [data])
+    return NextResponse.json({ voice })
   } catch (error) {
     return NextResponse.json(
       {

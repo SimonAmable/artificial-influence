@@ -30,6 +30,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CharacterVoiceField } from "@/components/assets/character-voice-field"
 import { GenerationLoadingSlots } from "@/components/shared/display/generation-loading-slots"
 import { GenerateShaderButton } from "@/components/tools/influencer/generate-shader-button"
 import { cn } from "@/lib/utils"
@@ -42,6 +43,12 @@ import {
   parseInfluencerCreationMode,
   type InfluencerCreationMode,
 } from "@/lib/ai-influencer/modes"
+import { attachVoiceToCharacter } from "@/lib/assets/character-voice"
+import {
+  hasCharacterVoice,
+  type CharacterVoiceValue,
+} from "@/lib/assets/character-voice-value"
+import type { AssetRecord } from "@/lib/assets/types"
 import { currentProduct } from "@/lib/product/current"
 import { generateImageAndWait, isInsufficientCreditsError, isInsufficientCreditsMessage } from "@/lib/generate-image-client"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
@@ -62,6 +69,13 @@ interface ImageHistoryItem {
   type: string | null
   createdAt: string | null
   reference_image_urls?: string[]
+  assetId?: string | null
+  voiceId?: string | null
+  voiceProvider?: string | null
+  privateVoiceId?: string | null
+  privateVoiceName?: string | null
+  privateVoicePreviewUrl?: string | null
+  privateVoiceProvider?: string | null
 }
 
 const EYE_COLORS: { [key: string]: string } = {
@@ -382,18 +396,22 @@ function AIInfluencerPageContent() {
         assetsResponse.json(),
       ])
 
-      const characterAssets = Array.isArray(assetData.assets) ? (assetData.assets as Array<{ title?: string; sourceGenerationId?: string | null; url?: string }>) : []
-      const assetTitleByGenerationId = new Map(
+      const characterAssets = Array.isArray(assetData.assets)
+        ? (assetData.assets as AssetRecord[])
+        : []
+      const assetByGenerationId = new Map(
         characterAssets
-          .filter((asset) => typeof asset.sourceGenerationId === "string" && asset.sourceGenerationId.trim().length > 0)
-          .map((asset) => [asset.sourceGenerationId as string, typeof asset.title === "string" ? asset.title : null] as const)
-          .filter(([, title]) => typeof title === "string" && title.trim().length > 0)
+          .filter(
+            (asset) =>
+              typeof asset.sourceGenerationId === "string" &&
+              asset.sourceGenerationId.trim().length > 0,
+          )
+          .map((asset) => [asset.sourceGenerationId as string, asset] as const),
       )
-      const assetTitleByUrl = new Map(
+      const assetByUrl = new Map(
         characterAssets
           .filter((asset) => typeof asset.url === "string" && asset.url.trim().length > 0)
-          .map((asset) => [asset.url as string, typeof asset.title === "string" ? asset.title : null] as const)
-          .filter(([, title]) => typeof title === "string" && title.trim().length > 0)
+          .map((asset) => [asset.url, asset] as const),
       )
 
       const generations = Array.isArray(generationData.generations)
@@ -404,15 +422,13 @@ function AIInfluencerPageContent() {
         .map((gen) => {
           const id = typeof gen.id === "string" ? gen.id : ""
           const url = typeof gen.url === "string" ? gen.url : ""
+          const linkedAsset = assetByGenerationId.get(id) || assetByUrl.get(url) || null
           return {
             id,
             url,
             model: typeof gen.model === "string" ? gen.model : null,
             prompt: typeof gen.prompt === "string" ? gen.prompt : null,
-            displayName:
-              assetTitleByGenerationId.get(id) ||
-              assetTitleByUrl.get(url) ||
-              null,
+            displayName: linkedAsset?.title?.trim() || null,
             tool: typeof gen.tool === "string" ? gen.tool : null,
             aspectRatio: typeof gen.aspect_ratio === "string" ? gen.aspect_ratio : null,
             type: typeof gen.type === "string" ? gen.type : null,
@@ -420,6 +436,13 @@ function AIInfluencerPageContent() {
             reference_image_urls: Array.isArray(gen.reference_image_urls)
               ? gen.reference_image_urls.filter((value): value is string => typeof value === "string")
               : [],
+            assetId: linkedAsset?.id ?? null,
+            voiceId: linkedAsset?.voiceId ?? null,
+            voiceProvider: linkedAsset?.voiceProvider ?? null,
+            privateVoiceId: linkedAsset?.privateVoiceId ?? null,
+            privateVoiceName: linkedAsset?.privateVoiceName ?? null,
+            privateVoicePreviewUrl: linkedAsset?.privateVoicePreviewUrl ?? null,
+            privateVoiceProvider: linkedAsset?.privateVoiceProvider ?? null,
           }
         })
         .filter((item) => item.url.length > 0)
@@ -521,6 +544,102 @@ function AIInfluencerPageContent() {
     }
   }, [selectedCharacter])
 
+  const [isSavingVoice, setIsSavingVoice] = React.useState(false)
+
+  const applyVoiceToSelectedCharacter = React.useCallback(
+    async (next: CharacterVoiceValue) => {
+      if (!selectedCharacter) return
+
+      const previous = {
+        assetId: selectedCharacter.assetId ?? null,
+        voiceId: selectedCharacter.voiceId ?? null,
+        voiceProvider: selectedCharacter.voiceProvider ?? null,
+        privateVoiceId: selectedCharacter.privateVoiceId ?? null,
+        privateVoiceName: selectedCharacter.privateVoiceName ?? null,
+        privateVoicePreviewUrl: selectedCharacter.privateVoicePreviewUrl ?? null,
+        privateVoiceProvider: selectedCharacter.privateVoiceProvider ?? null,
+      }
+
+      const optimistic = {
+        voiceId: next.voiceId,
+        voiceProvider: next.voiceProvider,
+        privateVoiceId: next.privateVoiceId,
+        privateVoiceName: next.displayName ?? null,
+        privateVoicePreviewUrl: next.previewUrl ?? null,
+        privateVoiceProvider: next.voiceProvider,
+      }
+
+      setSelectedCharacter((current) =>
+        current ? { ...current, ...optimistic } : current,
+      )
+      setHistoryImages((prev) =>
+        prev.map((item) =>
+          item.id === selectedCharacter.id ? { ...item, ...optimistic } : item,
+        ),
+      )
+
+      setIsSavingVoice(true)
+      try {
+        const asset = await attachVoiceToCharacter({
+          title: getCharacterDisplayName(selectedCharacter),
+          url: selectedCharacter.url,
+          sourceGenerationId: selectedCharacter.id,
+          voiceId: next.voiceId,
+          voiceProvider: next.voiceProvider,
+          privateVoiceId: next.privateVoiceId,
+          description: selectedCharacter.prompt,
+          model: selectedCharacter.model,
+        })
+
+        const confirmed = {
+          assetId: asset.id,
+          displayName: asset.title || selectedCharacter.displayName,
+          voiceId: asset.voiceId ?? null,
+          voiceProvider: asset.voiceProvider ?? null,
+          privateVoiceId: asset.privateVoiceId ?? null,
+          privateVoiceName: asset.privateVoiceName ?? null,
+          privateVoicePreviewUrl: asset.privateVoicePreviewUrl ?? null,
+          privateVoiceProvider: asset.privateVoiceProvider ?? null,
+        }
+
+        setSelectedCharacter((current) =>
+          current && current.id === selectedCharacter.id
+            ? { ...current, ...confirmed }
+            : current,
+        )
+        setHistoryImages((prev) =>
+          prev.map((item) =>
+            item.id === selectedCharacter.id ? { ...item, ...confirmed } : item,
+          ),
+        )
+
+        toast.success(
+          hasCharacterVoice(next)
+            ? "Voice attached to character"
+            : "Voice removed from character",
+        )
+      } catch (error) {
+        console.error(error)
+        setSelectedCharacter((current) =>
+          current && current.id === selectedCharacter.id
+            ? { ...current, ...previous }
+            : current,
+        )
+        setHistoryImages((prev) =>
+          prev.map((item) =>
+            item.id === selectedCharacter.id ? { ...item, ...previous } : item,
+          ),
+        )
+        toast.error(
+          error instanceof Error ? error.message : "Failed to update character voice",
+        )
+      } finally {
+        setIsSavingVoice(false)
+      }
+    },
+    [selectedCharacter],
+  )
+
   const saveCharacterAsset = React.useCallback(
     async ({
       title,
@@ -590,6 +709,22 @@ function AIInfluencerPageContent() {
     },
     [router, selectedCharacter?.url]
   )
+
+  const openCharacterVoiceInAudio = React.useCallback(() => {
+    if (!selectedCharacter?.voiceId) return
+    const provider =
+      selectedCharacter.voiceProvider === "google" ||
+      selectedCharacter.voiceProvider === "qwen" ||
+      selectedCharacter.voiceProvider === "inworld" ||
+      selectedCharacter.voiceProvider === "fal"
+        ? selectedCharacter.voiceProvider
+        : "qwen"
+    const params = new URLSearchParams({
+      voice: selectedCharacter.voiceId,
+      provider,
+    })
+    router.push(`/audio?${params.toString()}`)
+  }, [router, selectedCharacter?.voiceId, selectedCharacter?.voiceProvider])
 
   // Mode-aware upload guidance
   const getUploadGuidance = () => {
@@ -1267,6 +1402,28 @@ function AIInfluencerPageContent() {
                             ))}
                           </div>
                         ) : null}
+                        <div className="mt-3">
+                          <CharacterVoiceField
+                            appearance="overlay"
+                            disabled={isSavingVoice}
+                            value={{
+                              voiceId: selectedCharacter.voiceId ?? null,
+                              voiceProvider: selectedCharacter.voiceProvider ?? null,
+                              privateVoiceId: selectedCharacter.privateVoiceId ?? null,
+                              displayName: selectedCharacter.privateVoiceName ?? null,
+                              previewUrl:
+                                selectedCharacter.privateVoicePreviewUrl ?? null,
+                            }}
+                            onChange={(next) => {
+                              void applyVoiceToSelectedCharacter(next)
+                            }}
+                            onUseVoice={
+                              selectedCharacter.voiceId
+                                ? openCharacterVoiceInAudio
+                                : undefined
+                            }
+                          />
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <Button

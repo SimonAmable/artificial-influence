@@ -136,8 +136,9 @@ export type GuideArticle = {
   /**
    * `demo` (default): shader hero + optional GSAP steps.
    * `info`: text-first — no shader hero; use infoSections + optional logoStrip.
+   * `mcp`: McpIconFan hero + embedded connect panel; use infoSections for scale levers.
    */
-  presentation?: "demo" | "info"
+  presentation?: "demo" | "info" | "mcp"
   /** Vendor logos under the header on info guides. */
   logoStrip?: GuideLogoChip[]
   /** Optional path chooser (e.g. Direct Save / Merge / Build). */

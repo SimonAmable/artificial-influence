@@ -38,6 +38,7 @@ type HistoryPanelProps = {
   onSave?: (draft: SaveAssetDraft) => void
   onSaveExample?: (generation: Generation) => void
   onAnimate?: (generation: Generation) => void
+  onChangeAngle?: (generation: Generation) => void
   onCreateShotVariations?: (generation: Generation) => void
   onEditImage?: (url: string) => void
   fanvueActions?: FanvueGenerationActions
@@ -63,6 +64,7 @@ export function HistoryPanel({
   onSave,
   onSaveExample,
   onAnimate,
+  onChangeAngle,
   onCreateShotVariations,
   onEditImage,
   fanvueActions,
@@ -121,6 +123,7 @@ export function HistoryPanel({
                   onSave={onSave}
                   onSaveExample={onSaveExample}
                   onAnimate={onAnimate}
+                  onChangeAngle={onChangeAngle}
                   onCreateShotVariations={onCreateShotVariations}
                   onEditImage={onEditImage}
                   fanvueActions={fanvueActions}

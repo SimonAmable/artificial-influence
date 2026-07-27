@@ -50,6 +50,7 @@ import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { tryShowContentModerationToast, toUserFacingGenerationError } from "@/lib/content-moderation-toast"
 import {
   AUDIO_GENERATION_CREDIT_COST,
+  AUDIO_MODEL_ADVICE,
   AUDIO_MODEL_OPTIONS,
   DEFAULT_AUDIO_PROVIDER,
   DEFAULT_GOOGLE_GEMINI_LANGUAGE_CODE,
@@ -67,17 +68,6 @@ import {
 import { cn } from "@/lib/utils"
 
 type AudioMode = "voiceover" | "change-voice"
-
-const AUDIO_MODEL_ADVICE: Record<AudioProvider, string> = {
-  inworld:
-    "Inworld 1.5 Max: start with a preset whose age, timbre, accent, and energy already fit. Use natural punctuation and coherent wording to guide expression.",
-  google:
-    "Gemini 3.1: write an audio profile, a short scene, then director notes for tone, accent, pace, breathing, and articulation. Keep the script consistent with that direction.",
-  qwen:
-    "Qwen3 TTS: cloning works best from 5–15 seconds of clean single-speaker speech. For Voice Design, describe age, pitch, timbre, accent, vocal texture, and persona.",
-  fal:
-    "Seed Audio 1.0: reference up to three clips in the script as @Audio1, @Audio2, and @Audio3. Explain what to borrow from each; use an image instead when the sound should follow a visual scene.",
-}
 
 type AudioHistoryItem = {
   id: string
@@ -698,18 +688,47 @@ function VideoResultCard({ item }: { item: VideoHistoryItem }) {
   )
 }
 
+function resolveAudioDeepLink(searchParams: URLSearchParams): {
+  voiceId: string
+  modelId: string
+  provider: AudioProvider
+} | null {
+  const voice = searchParams.get("voice")?.trim() || ""
+  const providerRaw = searchParams.get("provider")?.trim() || ""
+  if (!voice) return null
+  if (
+    providerRaw !== "qwen" &&
+    providerRaw !== "google" &&
+    providerRaw !== "inworld" &&
+    providerRaw !== "fal"
+  ) {
+    return null
+  }
+  return {
+    voiceId: voice,
+    provider: providerRaw,
+    modelId: getDefaultAudioModel(providerRaw),
+  }
+}
+
 export function AudioStudioPage() {
   const searchParams = useSearchParams()
   const initialMode = React.useMemo<AudioMode>(() => {
     const raw = searchParams.get("mode")
     return raw === "change-voice" ? "change-voice" : "voiceover"
   }, [searchParams])
+  const deepLink = React.useMemo(
+    () => resolveAudioDeepLink(searchParams),
+    [searchParams],
+  )
 
   const [mode, setMode] = React.useState<AudioMode>(initialMode)
   const [script, setScript] = React.useState("")
-  const [voiceId, setVoiceId] = React.useState(getDefaultAudioVoiceId(DEFAULT_AUDIO_PROVIDER))
+  const [voiceId, setVoiceId] = React.useState(
+    () => deepLink?.voiceId ?? getDefaultAudioVoiceId(DEFAULT_AUDIO_PROVIDER),
+  )
   const [modelId, setModelId] = React.useState<string>(
-    getDefaultAudioModel(DEFAULT_AUDIO_PROVIDER)
+    () => deepLink?.modelId ?? getDefaultAudioModel(DEFAULT_AUDIO_PROVIDER),
   )
   const [stylePrompt, setStylePrompt] = React.useState<string>(DEFAULT_GOOGLE_GEMINI_STYLE_PROMPT)
   const [languageCode, setLanguageCode] = React.useState<string>(
@@ -732,6 +751,8 @@ export function AudioStudioPage() {
   })
   const [selectedVoice, setSelectedVoice] = React.useState<AudioVoice | null>(null)
   const [showPrivateVoiceDialog, setShowPrivateVoiceDialog] = React.useState(false)
+  const [editingPrivateVoice, setEditingPrivateVoice] =
+    React.useState<AudioVoice | null>(null)
   const [showModelControls, setShowModelControls] = React.useState(false)
   const [voiceCatalogVersion, setVoiceCatalogVersion] = React.useState(0)
   const [referenceVideo, setReferenceVideo] = React.useState<ReferenceVideo | null>(null)
@@ -746,11 +767,25 @@ export function AudioStudioPage() {
 
   const previewAudioRef = React.useRef<HTMLAudioElement | null>(null)
   const provider = getAudioProviderForModel(modelId)
-  const previousProviderRef = React.useRef<AudioProvider>(provider)
+  const previousProviderRef = React.useRef<AudioProvider>(
+    deepLink?.provider ?? provider,
+  )
+  const appliedDeepLinkRef = React.useRef<string | null>(null)
 
   React.useEffect(() => {
     setMode(initialMode)
   }, [initialMode])
+
+  React.useEffect(() => {
+    if (!deepLink) return
+    const key = `${deepLink.provider}:${deepLink.voiceId}`
+    if (appliedDeepLinkRef.current === key) return
+    appliedDeepLinkRef.current = key
+    previousProviderRef.current = deepLink.provider
+    setModelId(deepLink.modelId)
+    setVoiceId(deepLink.voiceId)
+    setSelectedVoice(null)
+  }, [deepLink])
 
   React.useEffect(() => {
     if (previousProviderRef.current === provider) {
@@ -1290,7 +1325,18 @@ export function AudioStudioPage() {
                      }}
                      onCreateVoice={
                        provider === "qwen" || provider === "google"
-                         ? () => setShowPrivateVoiceDialog(true)
+                         ? () => {
+                             setEditingPrivateVoice(null)
+                             setShowPrivateVoiceDialog(true)
+                           }
+                         : undefined
+                     }
+                     onEditVoice={
+                       provider === "qwen" || provider === "google"
+                         ? (voice) => {
+                             setEditingPrivateVoice(voice)
+                             setShowPrivateVoiceDialog(true)
+                           }
                          : undefined
                      }
                     renderTrigger={({ disabled }) => (
@@ -1370,7 +1416,18 @@ export function AudioStudioPage() {
                        }}
                        onCreateVoice={
                          provider === "qwen" || provider === "google"
-                           ? () => setShowPrivateVoiceDialog(true)
+                           ? () => {
+                               setEditingPrivateVoice(null)
+                               setShowPrivateVoiceDialog(true)
+                             }
+                           : undefined
+                       }
+                       onEditVoice={
+                         provider === "qwen" || provider === "google"
+                           ? (voice) => {
+                               setEditingPrivateVoice(voice)
+                               setShowPrivateVoiceDialog(true)
+                             }
                            : undefined
                        }
                       renderTrigger={({ disabled }) => (
@@ -1431,12 +1488,23 @@ export function AudioStudioPage() {
       </div>
       <PrivateVoiceDialog
         open={showPrivateVoiceDialog}
-        onOpenChange={setShowPrivateVoiceDialog}
+        onOpenChange={(nextOpen) => {
+          setShowPrivateVoiceDialog(nextOpen)
+          if (!nextOpen) setEditingPrivateVoice(null)
+        }}
         provider={provider}
+        voice={editingPrivateVoice}
         onCreated={(voice) => {
           setVoiceCatalogVersion((current) => current + 1)
           setVoiceId(voice.voiceId)
           setSelectedVoice(voice)
+          setEditingPrivateVoice(null)
+        }}
+        onUpdated={(voice) => {
+          setVoiceCatalogVersion((current) => current + 1)
+          setVoiceId(voice.voiceId)
+          setSelectedVoice(voice)
+          setEditingPrivateVoice(null)
         }}
       />
       {(provider === "qwen" || provider === "fal") ? (

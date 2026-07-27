@@ -14,7 +14,7 @@ function Command({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="command"
-      className={cn("flex h-full w-full flex-col overflow-hidden", className)}
+      className={cn("flex h-full min-h-0 w-full flex-col overflow-hidden", className)}
       {...props}
     />
   )
@@ -35,13 +35,15 @@ function CommandDialog({
     <Dialog {...props}>
       <DialogContent
         className={cn(
-          "top-[12vh] max-h-[min(560px,65vh)] max-w-[min(46rem,calc(100vw-1.5rem))] translate-y-0 overflow-hidden rounded-[1.75rem] border border-border/70 bg-background/95 p-0 shadow-2xl backdrop-blur-xl sm:top-[14vh]",
+          // flex! overrides DialogContent's default `grid` so the list can shrink and scroll
+          // under react-remove-scroll on mobile (touch gestures need a real overflow scroller).
+          "flex! top-[max(0.75rem,12dvh)] max-h-[min(560px,calc(100dvh-1.5rem))] w-[calc(100%-1.5rem)] max-w-[min(46rem,calc(100vw-1.5rem))]! translate-y-0 flex-col gap-0 overflow-hidden rounded-[1.75rem] border border-border/70 bg-background/95 p-0 shadow-2xl backdrop-blur-xl sm:top-[14dvh]",
           className,
         )}
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription className="sr-only">{description}</DialogDescription>
-        <Command>{children}</Command>
+        <Command className="min-h-0 flex-1">{children}</Command>
       </DialogContent>
     </Dialog>
   )
@@ -60,7 +62,7 @@ function CommandInput({
     <div
       data-slot="command-input-wrapper"
       className={cn(
-        "flex h-12 items-center gap-2 border-b border-border/60 px-4",
+        "flex h-12 shrink-0 items-center gap-2 px-4",
         wrapperClassName,
       )}
     >
@@ -81,7 +83,10 @@ function CommandList({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="command-list"
-      className={cn("max-h-[calc(min(560px,65vh)-3rem)] overflow-y-auto p-2", className)}
+      className={cn(
+        "min-h-0 flex-1 touch-pan-y scroll-fade overflow-y-auto overscroll-contain p-2",
+        className,
+      )}
       {...props}
     />
   )
@@ -130,7 +135,7 @@ function CommandItem({
       data-slot="command-item"
       data-active={active ? "true" : undefined}
       className={cn(
-        "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm outline-none transition-colors hover:bg-muted/80 focus-visible:bg-muted/80 data-[active=true]:bg-muted",
+        "flex w-full touch-pan-y items-center gap-3 rounded-xl px-3 py-2 text-left text-sm outline-none transition-colors hover:bg-muted/80 focus-visible:bg-muted/80 data-[active=true]:bg-muted",
         className,
       )}
       {...props}

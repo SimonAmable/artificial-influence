@@ -24,6 +24,7 @@ import {
 import { copyMediaToClipboard, downloadMediaFile } from "@/components/shared/display/media-viewer-utils"
 import { Button } from "@/components/ui/button"
 import type { AssetType } from "@/lib/assets/types"
+import { anglesHrefFromImage } from "@/lib/angles/constants"
 import { carouselShotsHrefFromImage } from "@/lib/carousel-shots/constants"
 import { isCarouselShotsGeneration } from "@/lib/carousel-shots/library-summary"
 import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
@@ -40,6 +41,7 @@ type GenerationHistoryViewProps = {
   onSave?: (draft: SaveAssetDraft) => void
   onSaveExample?: (generation: Generation) => void
   onAnimate?: (generation: Generation) => void
+  onChangeAngle?: (generation: Generation) => void
   onCreateShotVariations?: (generation: Generation) => void
   onEditImage?: (url: string) => void
   onDelete?: (generation: Generation) => void | Promise<void>
@@ -55,6 +57,7 @@ export function GenerationHistoryView({
   onSave,
   onSaveExample,
   onAnimate,
+  onChangeAngle,
   onCreateShotVariations,
   onEditImage,
   onDelete,
@@ -276,6 +279,13 @@ export function GenerationHistoryView({
         onSave={onSave}
         onSaveExample={onSaveExample}
         onAnimate={onAnimate}
+        onChangeAngle={
+          onChangeAngle ??
+          ((generation) => {
+            if (generation.type !== "image") return
+            router.push(anglesHrefFromImage(generation.url))
+          })
+        }
         onCreateShotVariations={
           onCreateShotVariations ??
           ((generation) => {

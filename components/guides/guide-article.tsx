@@ -1,7 +1,13 @@
 import Link from "next/link"
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr"
 
+import { GuideMarkComplete } from "@/components/guides/guide-mark-complete"
 import { GuideModePathCards } from "@/components/guides/guide-mode-path-cards"
+import {
+  GuideMcpConnectEmbed,
+  GuideMcpFan,
+  GuideMcpPlatformProvider,
+} from "@/components/guides/guide-mcp-section"
 import { GuidePromptTrySection } from "@/components/guides/guide-prompt-try"
 import { GuideCarouselUploadSection } from "@/components/guides/guide-carousel-upload"
 import { GuideFanvueTrySection } from "@/components/guides/guide-fanvue-try"
@@ -12,9 +18,10 @@ import { GuideStepsSection } from "@/components/guides/guide-steps-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ShaderDemoCard } from "@/components/ui/shader-demo-card"
-import { GUIDE_HUB_CARDS } from "@/lib/guides/content"
+import { GUIDE_ARTICLES, GUIDE_HUB_CARDS } from "@/lib/guides/content"
 import type { GuideArticle, GuideHubCard } from "@/lib/guides/types"
-import { currentProduct } from "@/lib/product/current"
+import { getMcpConnectBaseUrl } from "@/lib/mcp/auth"
+import { currentProduct, getCurrentProductSiteUrl } from "@/lib/product/current"
 import { isVisibleByProductMetadata } from "@/lib/product/visibility"
 
 function resolveHubCard(slug: string): GuideHubCard | null {
@@ -24,14 +31,27 @@ function resolveHubCard(slug: string): GuideHubCard | null {
 }
 
 function resolveNextGuideCard(article: GuideArticle): GuideHubCard | null {
-  const card = article.nextGuideSlug
-    ? GUIDE_HUB_CARDS.find((item) => item.slug === article.nextGuideSlug)
-    : article.nextGuideLabel
-      ? GUIDE_HUB_CARDS.find((item) => item.title === article.nextGuideLabel)
-      : undefined
+  const visited = new Set<string>()
+  let slug: string | null | undefined = article.nextGuideSlug
 
-  if (!card || !isVisibleByProductMetadata(card, currentProduct.id)) return null
-  return card
+  while (slug) {
+    if (visited.has(slug)) break
+    visited.add(slug)
+
+    const card = GUIDE_HUB_CARDS.find((item) => item.slug === slug)
+    if (!card) break
+    if (isVisibleByProductMetadata(card, currentProduct.id)) return card
+
+    const nextArticle = GUIDE_ARTICLES.find((item) => item.slug === slug)
+    slug = nextArticle?.nextGuideSlug ?? null
+  }
+
+  if (article.nextGuideLabel) {
+    const card = GUIDE_HUB_CARDS.find((item) => item.title === article.nextGuideLabel)
+    if (card && isVisibleByProductMetadata(card, currentProduct.id)) return card
+  }
+
+  return null
 }
 
 export function GuideArticleView({ article }: { article: GuideArticle }) {
@@ -40,11 +60,19 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
   const heroMediaSrc = article.mediaSrc ?? hubCard?.mediaSrc
   const heroMediaAlt = article.mediaAlt ?? hubCard?.mediaAlt ?? article.title
   const isInfo = article.presentation === "info"
+  const isMcp = article.presentation === "mcp"
+  const siteUrl = getCurrentProductSiteUrl()
+  const mcpBaseUrl = getMcpConnectBaseUrl(currentProduct.mcpSiteUrl ?? siteUrl)
 
-  return (
-    <article className="flex w-full max-w-3xl flex-col gap-10">
+  const articleBody = (
+    <>
+      <GuideMarkComplete slug={article.slug} />
       <header className="flex flex-col gap-4">
-        {!isInfo ? (
+        {isMcp ? (
+          <GuideMcpFan productName={currentProduct.name} logoSrc={currentProduct.logo} />
+        ) : null}
+
+        {!isInfo && !isMcp ? (
           <ShaderDemoCard
             href={article.primaryCtaHref}
             buttonLabel={article.primaryCtaLabel}
@@ -116,6 +144,16 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
         </section>
       ) : null}
 
+      {isMcp ? (
+        <section className="border-t border-border/70 pt-8">
+          <GuideMcpConnectEmbed
+            productName={currentProduct.name}
+            mcpBaseUrl={mcpBaseUrl}
+            logoSrc={currentProduct.logo}
+          />
+        </section>
+      ) : null}
+
       {article.paths && article.paths.length > 0 ? (
         <GuideModePathCards
           heading={article.pathsHeading ?? "Pick one starting point"}
@@ -178,7 +216,7 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
           <h2 className="text-sm text-muted-foreground">
             Next guide
           </h2>
-          {isInfo ? (
+          {isInfo || isMcp ? (
             <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/20 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="text-base font-semibold tracking-tight">{nextGuideCard.title}</p>
@@ -220,7 +258,7 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
           <h2 className="text-sm text-muted-foreground">
             Next guide
           </h2>
-          {isInfo ? (
+          {isInfo || isMcp ? (
             <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-muted/20 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-base font-semibold tracking-tight">{article.nextGuideLabel}</p>
               <Badge variant="secondary" className="w-fit shrink-0 rounded-full">
@@ -238,6 +276,16 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
           )}
         </section>
       ) : null}
+    </>
+  )
+
+  return (
+    <article className="flex w-full max-w-3xl flex-col gap-10">
+      {isMcp ? (
+        <GuideMcpPlatformProvider>{articleBody}</GuideMcpPlatformProvider>
+      ) : (
+        articleBody
+      )}
     </article>
   )
 }

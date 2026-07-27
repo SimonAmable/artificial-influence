@@ -21,6 +21,13 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  CharacterVoiceField,
+  type CharacterVoiceValue,
+} from "@/components/assets/character-voice-field"
+import {
+  emptyCharacterVoice,
+} from "@/lib/assets/character-voice-value"
+import {
   ASSET_CATEGORIES,
   ASSET_CATEGORY_LABELS,
   getDefaultCategoryByType,
@@ -50,6 +57,12 @@ interface CreateAssetDialogProps {
     description?: string | null
     sourceNodeType?: string
     sourceGenerationId?: string
+    privateVoiceId?: string | null
+    privateVoiceName?: string | null
+    privateVoicePreviewUrl?: string | null
+    privateVoiceProvider?: string | null
+    voiceId?: string | null
+    voiceProvider?: string | null
   }
   onSaved?: () => void
   /** When the dialog opens, call the same AI autofill used by the manual button (e.g. onboarding upload). */
@@ -77,6 +90,7 @@ export function CreateAssetDialog({
   const [category, setCategory] = React.useState<AssetCategory>(getDefaultCategoryByType(initial.assetType))
   const [tagsInput, setTagsInput] = React.useState("")
   const [description, setDescription] = React.useState("")
+  const [voice, setVoice] = React.useState<CharacterVoiceValue>(emptyCharacterVoice)
   const [isAutofilling, setIsAutofilling] = React.useState(false)
 
   React.useEffect(() => {
@@ -85,7 +99,30 @@ export function CreateAssetDialog({
     setCategory(initial.category || getDefaultCategoryByType(initial.assetType))
     setTagsInput((initial.tags || []).join(", "))
     setDescription((initial.description ?? "").trim() ? String(initial.description) : "")
-  }, [initial.assetType, initial.category, initial.description, initial.tags, initial.title, open])
+    setVoice({
+      voiceId:
+        initial.voiceId ??
+        (initial.privateVoiceId ? `private:${initial.privateVoiceId}` : null),
+      voiceProvider:
+        initial.voiceProvider ?? initial.privateVoiceProvider ?? null,
+      privateVoiceId: initial.privateVoiceId ?? null,
+      displayName: initial.privateVoiceName ?? null,
+      previewUrl: initial.privateVoicePreviewUrl ?? null,
+    })
+  }, [
+    initial.assetType,
+    initial.category,
+    initial.description,
+    initial.privateVoiceId,
+    initial.privateVoiceName,
+    initial.privateVoicePreviewUrl,
+    initial.privateVoiceProvider,
+    initial.tags,
+    initial.title,
+    initial.voiceId,
+    initial.voiceProvider,
+    open,
+  ])
 
   const runAutofill = React.useCallback(async () => {
     if (!initial.url) return
@@ -142,6 +179,12 @@ export function CreateAssetDialog({
       .map((tag) => tag.trim())
       .filter(Boolean)
 
+    const privateVoiceId =
+      category === "character" ? voice.privateVoiceId ?? null : null
+    const voiceId = category === "character" ? voice.voiceId ?? null : null
+    const voiceProvider =
+      category === "character" ? voice.voiceProvider ?? null : null
+
     try {
       if (mode === "edit") {
         if (!assetId) {
@@ -160,6 +203,9 @@ export function CreateAssetDialog({
           supabaseStoragePath: initial.supabaseStoragePath,
           sourceNodeType: initial.sourceNodeType,
           sourceGenerationId: initial.sourceGenerationId,
+          privateVoiceId,
+          voiceId,
+          voiceProvider,
         })
         toast.success("Asset updated")
         invalidateCommandCache()
@@ -176,6 +222,9 @@ export function CreateAssetDialog({
           supabaseStoragePath: initial.supabaseStoragePath,
           sourceNodeType: initial.sourceNodeType,
           sourceGenerationId: initial.sourceGenerationId,
+          privateVoiceId,
+          voiceId,
+          voiceProvider,
         })
         toast.success("Asset saved")
         invalidateCommandCache()
@@ -262,6 +311,21 @@ export function CreateAssetDialog({
               </Select>
             </div>
           </div>
+
+          {category === "character" ? (
+            <div className="space-y-2">
+              <Label>Voice</Label>
+              <CharacterVoiceField
+                value={voice}
+                onChange={setVoice}
+                disabled={isAutofilling}
+                appearance="form"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Attach a private voice so this character stays consistent in audio tools.
+              </p>
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="asset-tags">Tags (comma separated, optional)</Label>

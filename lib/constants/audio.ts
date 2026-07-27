@@ -12,6 +12,9 @@ export type PrivateVoiceKind = "clone" | "design"
 export const AUDIO_GENERATION_CREDIT_COST = 1
 export const MAX_AUDIO_SCRIPT_CHARACTERS = 1000
 export const MAX_PRIVATE_VOICE_REFERENCE_SECONDS = 15
+export const PRIVATE_VOICE_PREVIEW_TEXT =
+  "Hello, this is a preview of my voice."
+export const PRIVATE_VOICE_PREVIEW_CREDIT_COST = AUDIO_GENERATION_CREDIT_COST
 
 export interface PrivateVoiceConfig {
   baseVoice?: string
@@ -36,6 +39,7 @@ export interface AudioVoice {
   model?: string | null
   previewText?: string
   previewAudioUrl?: string
+  referenceAudioUrl?: string
   privateVoiceId?: string
   privateVoiceKind?: PrivateVoiceKind
   privateVoiceConfig?: PrivateVoiceConfig
@@ -234,6 +238,17 @@ export function getAudioModelIconSrc(modelId?: string | null) {
 
 export function getAudioModelLabel(modelId?: string | null) {
   return getAudioModelOption(modelId)?.label ?? modelId ?? null
+}
+
+export const AUDIO_MODEL_ADVICE: Record<AudioProvider, string> = {
+  inworld:
+    "Inworld 1.5 Max: start with a preset whose age, timbre, accent, and energy already fit. Use natural punctuation and coherent wording to guide expression.",
+  google:
+    "Gemini 3.1: write an audio profile, a short scene, then director notes for tone, accent, pace, breathing, and articulation. Keep the script consistent with that direction.",
+  qwen:
+    "Qwen3 TTS: cloning works best from 5–15 seconds of clean single-speaker speech. For Voice Design, describe age, pitch, timbre, accent, vocal texture, and persona.",
+  fal:
+    "Seed Audio 1.0: reference up to three clips in the script as @Audio1, @Audio2, and @Audio3. Explain what to borrow from each; use an image instead when the sound should follow a visual scene.",
 }
 
 export function getAudioVoiceSourceLabel(source: string) {

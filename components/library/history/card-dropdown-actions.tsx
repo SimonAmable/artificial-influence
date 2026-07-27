@@ -2,6 +2,7 @@
 
 import {
   Copy,
+  CubeFocus,
   DotsThreeVertical,
   DownloadSimple,
   PencilSimple,
@@ -26,11 +27,13 @@ export function CardDropdownActions({
   canDelete = true,
   canSaveExample = false,
   canAnimate = false,
+  canChangeAngle = false,
   canCreateShotVariations = false,
   onEditAsset,
   onEditImage,
   onSaveExample,
   onAnimate,
+  onChangeAngle,
   onCreateShotVariations,
   onCopy,
   onDownload,
@@ -42,11 +45,13 @@ export function CardDropdownActions({
   canDelete?: boolean
   canSaveExample?: boolean
   canAnimate?: boolean
+  canChangeAngle?: boolean
   canCreateShotVariations?: boolean
   onEditAsset?: () => void
   onEditImage?: () => void
   onSaveExample?: () => void
   onAnimate?: () => void
+  onChangeAngle?: () => void
   onCreateShotVariations?: () => void
   onCopy: () => void
   onDownload: () => void
@@ -84,6 +89,12 @@ export function CardDropdownActions({
           <DropdownMenuItem onClick={onAnimate}>
             <Play className="mr-2 h-4 w-4" weight="fill" />
             Animate
+          </DropdownMenuItem>
+        ) : null}
+        {canChangeAngle && onChangeAngle ? (
+          <DropdownMenuItem onClick={onChangeAngle}>
+            <CubeFocus className="mr-2 h-4 w-4" />
+            Change Angle
           </DropdownMenuItem>
         ) : null}
         {canCreateShotVariations && onCreateShotVariations ? (

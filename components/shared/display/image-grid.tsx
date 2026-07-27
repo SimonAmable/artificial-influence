@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
-import { ArrowsOutSimple, Copy, DownloadSimple, Check, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple, ShieldCheck, Eraser, Sparkle, ImageSquare, PaperPlaneTilt, Vault, SquaresFour } from "@phosphor-icons/react"
+import { ArrowsOutSimple, Copy, CubeFocus, DownloadSimple, Check, DotsThree, Plus, Trash, Play, MagnifyingGlassPlus, ArrowsClockwise, PencilSimple, ShieldCheck, Eraser, Sparkle, ImageSquare, PaperPlaneTilt, Vault, SquaresFour } from "@phosphor-icons/react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import type { ImageGridAgentAction } from "@/lib/chat/image-grid-agent-actions"
+import { anglesHrefFromImage } from "@/lib/angles/constants"
 import { carouselShotsHrefFromImage } from "@/lib/carousel-shots/constants"
 import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
 import { FullscreenMediaViewer, type FullscreenMediaViewerAction } from "./fullscreen-media-viewer"
@@ -236,16 +237,28 @@ export function ImageGrid({
           Animate
         </DropdownMenuItem>
         {showExtendedActions ? (
-          <DropdownMenuItem
-            onClick={(event) => {
-              event.stopPropagation()
-              runShotVariationsAction(data)
-            }}
-            className="cursor-pointer"
-          >
-            <SquaresFour className="mr-2 size-4" />
-            Create Shot Variations
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem
+              onClick={(event) => {
+                event.stopPropagation()
+                runChangeAngleAction(data)
+              }}
+              className="cursor-pointer"
+            >
+              <CubeFocus className="mr-2 size-4" />
+              Change Angle
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(event) => {
+                event.stopPropagation()
+                runShotVariationsAction(data)
+              }}
+              className="cursor-pointer"
+            >
+              <SquaresFour className="mr-2 size-4" />
+              Create Shot Variations
+            </DropdownMenuItem>
+          </>
         ) : null}
 
         <DropdownMenuSeparator />
@@ -562,6 +575,13 @@ export function ImageGrid({
       router.push(`/video?startFrame=${encodeURIComponent(data.url)}`)
     },
     [isAgentMode, onAgentAction, router],
+  )
+
+  const runChangeAngleAction = React.useCallback(
+    (data: ImageData) => {
+      router.push(anglesHrefFromImage(data.url))
+    },
+    [router],
   )
 
   const runShotVariationsAction = React.useCallback(
@@ -1171,8 +1191,14 @@ export function ImageGrid({
               })
             }
 
-            // Shot variations
+            // Angles + shot variations
             if (showExtendedActions && itemData && imageIndexByUrl !== -1) {
+              actions.push({
+                id: "change-angle",
+                label: "Change Angle",
+                icon: <CubeFocus className="size-4" />,
+                onClick: () => runChangeAngleAction(itemData),
+              })
               actions.push({
                 id: "shot-variations",
                 label: "Create Shot Variations",

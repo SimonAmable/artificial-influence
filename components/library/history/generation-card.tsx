@@ -33,6 +33,7 @@ type GenerationCardProps = {
   onSave?: (draft: SaveAssetDraft) => void
   onSaveExample?: (generation: Generation) => void
   onAnimate?: (generation: Generation) => void
+  onChangeAngle?: (generation: Generation) => void
   onCreateShotVariations?: (generation: Generation) => void
   onEditImage?: (url: string) => void
   fanvueActions?: FanvueGenerationActions
@@ -53,6 +54,7 @@ export function GenerationCard({
   onSave,
   onSaveExample,
   onAnimate,
+  onChangeAngle,
   onCreateShotVariations,
   onEditImage,
   fanvueActions,
@@ -141,10 +143,12 @@ export function GenerationCard({
     canEditImage: actionVariant === "library" && generation.type === "image",
     canSaveExample: actionVariant === "library" && generation.type === "image",
     canAnimate: actionVariant === "library" && generation.type === "image",
+    canChangeAngle: actionVariant === "library" && generation.type === "image",
     canCreateShotVariations: actionVariant === "library" && generation.type === "image",
     onEditImage: onEditImage ? () => onEditImage(generation.url) : undefined,
     onSaveExample: onSaveExample ? () => onSaveExample(generation) : undefined,
     onAnimate: onAnimate ? () => onAnimate(generation) : undefined,
+    onChangeAngle: onChangeAngle ? () => onChangeAngle(generation) : undefined,
     onCreateShotVariations: onCreateShotVariations
       ? () => onCreateShotVariations(generation)
       : undefined,

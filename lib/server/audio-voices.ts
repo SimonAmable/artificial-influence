@@ -4,11 +4,14 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   type AudioProvider,
   type AudioVoice,
+  type PrivateVoiceConfig,
   buildFallbackGoogleGeminiVoices,
   buildFallbackQwenVoices,
   buildFallbackSeedAudioVoices,
   getAudioVoiceSearchText,
 } from "@/lib/constants/audio"
+
+const PRIVATE_VOICE_PREVIEW_TTL_SECONDS = 60 * 60
 
 interface VoiceRow {
   provider: string
@@ -24,17 +27,52 @@ interface VoiceRow {
   preview_audio_url: string | null
 }
 
-interface PrivateVoiceRow {
+export interface PrivateVoiceRow {
   id: string
   name: string
   provider: string
   model_id: string
   kind: "clone" | "design"
   config: Record<string, unknown> | null
+  reference_storage_path?: string | null
+  preview_storage_path?: string | null
 }
 
-function mapPrivateVoiceRow(row: PrivateVoiceRow): AudioVoice {
-  const config = row.config ?? {}
+function readPrivateVoiceConfig(
+  config: Record<string, unknown> | null
+): PrivateVoiceConfig {
+  const source = config ?? {}
+  const next: PrivateVoiceConfig = {}
+
+  for (const key of [
+    "baseVoice",
+    "language",
+    "languageCode",
+    "referenceText",
+    "styleInstruction",
+    "stylePrompt",
+    "voiceDescription",
+  ] as const) {
+    const value = source[key]
+    if (typeof value === "string" && value.trim()) {
+      next[key] = value
+    }
+  }
+
+  return next
+}
+
+export function mapPrivateVoiceRow(
+  row: PrivateVoiceRow,
+  {
+    previewAudioUrl,
+    referenceAudioUrl,
+  }: {
+    previewAudioUrl?: string | null
+    referenceAudioUrl?: string | null
+  } = {}
+): AudioVoice {
+  const config = readPrivateVoiceConfig(row.config)
   return {
     voiceId: `private:${row.id}`,
     displayName: row.name,
@@ -42,21 +80,74 @@ function mapPrivateVoiceRow(row: PrivateVoiceRow): AudioVoice {
       row.kind === "clone"
         ? "Your private cloned voice."
         : "Your reusable designed voice.",
-    langCode:
-      typeof config.languageCode === "string"
-        ? config.languageCode
-        : typeof config.language === "string"
-          ? config.language
-          : "",
+    langCode: config.languageCode ?? config.language ?? "",
     tags: ["private", row.kind, row.provider],
     source: row.kind === "clone" ? "CLONE" : "DESIGN",
     provider: row.provider,
     providerVoiceId: `private:${row.id}`,
     model: row.model_id,
+    previewAudioUrl: previewAudioUrl || undefined,
+    referenceAudioUrl: referenceAudioUrl || undefined,
     privateVoiceId: row.id,
     privateVoiceKind: row.kind,
     privateVoiceConfig: config,
   }
+}
+
+async function signPrivateVoicePreviewUrls(
+  supabase: SupabaseClient,
+  rows: PrivateVoiceRow[]
+) {
+  const paths = [
+    ...new Set(
+      rows.flatMap((row) => {
+        const next: string[] = []
+        if (row.preview_storage_path) next.push(row.preview_storage_path)
+        if (row.reference_storage_path) next.push(row.reference_storage_path)
+        return next
+      })
+    ),
+  ]
+
+  if (paths.length === 0) {
+    return new Map<string, string>()
+  }
+
+  const { data, error } = await supabase.storage
+    .from("private-voices")
+    .createSignedUrls(paths, PRIVATE_VOICE_PREVIEW_TTL_SECONDS)
+
+  if (error) {
+    console.warn("Failed to sign private voice preview URLs:", error.message)
+    return new Map<string, string>()
+  }
+
+  const signedByPath = new Map<string, string>()
+  for (const entry of data ?? []) {
+    if (entry.path && entry.signedUrl && !entry.error) {
+      signedByPath.set(entry.path, entry.signedUrl)
+    }
+  }
+  return signedByPath
+}
+
+export async function mapPrivateVoiceRows(
+  supabase: SupabaseClient,
+  rows: PrivateVoiceRow[]
+): Promise<AudioVoice[]> {
+  const signedByPath = await signPrivateVoicePreviewUrls(supabase, rows)
+  return rows.map((row) => {
+    const generatedPreviewUrl = row.preview_storage_path
+      ? signedByPath.get(row.preview_storage_path)
+      : undefined
+    const referenceAudioUrl = row.reference_storage_path
+      ? signedByPath.get(row.reference_storage_path)
+      : undefined
+    return mapPrivateVoiceRow(row, {
+      previewAudioUrl: generatedPreviewUrl || referenceAudioUrl,
+      referenceAudioUrl,
+    })
+  })
 }
 
 function mapVoiceRow(row: VoiceRow): AudioVoice {
@@ -107,7 +198,7 @@ export async function listCatalogVoices(
       query,
       supabase
         .from("private_audio_voices")
-        .select("id, name, provider, model_id, kind, config")
+        .select("id, name, provider, model_id, kind, config, reference_storage_path, preview_storage_path")
         .eq("provider", provider)
         .order("created_at", { ascending: false }),
     ])
@@ -122,7 +213,7 @@ export async function listCatalogVoices(
   }
 
   const privateVoices = Array.isArray(privateData)
-    ? (privateData as PrivateVoiceRow[]).map(mapPrivateVoiceRow)
+    ? await mapPrivateVoiceRows(supabase, privateData as PrivateVoiceRow[])
     : []
   const catalogVoices = Array.isArray(data)
     ? (data as VoiceRow[]).map(mapVoiceRow)

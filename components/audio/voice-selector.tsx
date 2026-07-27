@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { PencilSimple } from "@phosphor-icons/react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -45,6 +46,7 @@ interface AudioVoiceSelectorProps {
   triggerClassName?: string
   placeholder?: string
   onCreateVoice?: () => void
+  onEditVoice?: (voice: AudioVoice) => void
   renderTrigger?: (args: {
     selectedVoice: AudioVoice | null
     triggerLabel: string
@@ -94,6 +96,7 @@ export function AudioVoiceSelector({
   triggerClassName,
   placeholder = "Search voices...",
   onCreateVoice,
+  onEditVoice,
   renderTrigger,
 }: AudioVoiceSelectorProps) {
   const [voices, setVoices] = React.useState<AudioVoice[]>([])
@@ -418,6 +421,22 @@ export function AudioVoiceSelector({
                             ) : null}
                           </VoiceSelectorAttributes>
                         </div>
+                        {onEditVoice && voice.privateVoiceId ? (
+                          <button
+                            type="button"
+                            aria-label={`Edit ${voice.displayName}`}
+                            className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-zinc-950/70 text-zinc-300 transition-colors hover:bg-zinc-800"
+                            onClick={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              setOpen(false)
+                              stopPreview()
+                              onEditVoice(voice)
+                            }}
+                          >
+                            <PencilSimple className="size-3.5" />
+                          </button>
+                        ) : null}
                       </VoiceSelectorItem>
                     ))}
                   </VoiceSelectorGroup>

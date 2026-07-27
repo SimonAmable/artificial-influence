@@ -25,6 +25,14 @@ export interface AssetRecord {
   updatedAt: string
   sourceNodeType?: string | null
   sourceGenerationId?: string | null
+  /** Runtime voice id for Audio Studio (`private:{uuid}` or catalog id). */
+  voiceId?: string | null
+  voiceProvider?: string | null
+  /** Attached private voice profile (`private_audio_voices.id`) when kind is private. */
+  privateVoiceId?: string | null
+  privateVoiceName?: string | null
+  privateVoicePreviewUrl?: string | null
+  privateVoiceProvider?: string | null
 }
 
 export interface CreateAssetInput {
@@ -41,4 +49,15 @@ export interface CreateAssetInput {
   thumbnailUrl?: string
   sourceNodeType?: string
   sourceGenerationId?: string
+  /** Optional private voice to attach (validated as owned by the current user). */
+  privateVoiceId?: string | null
+  /** Optional catalog/default or private runtime voice id. */
+  voiceId?: string | null
+  voiceProvider?: string | null
+}
+
+export interface AssetVoiceAttachmentInput {
+  voiceId: string | null
+  voiceProvider: string | null
+  privateVoiceId?: string | null
 }

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { ASSET_CATEGORIES, inferStoragePathFromUrl, normalizeTags } from "@/lib/assets/library"
+import {
+  parseOptionalPrivateVoiceId,
+  resolveVoiceAttachmentUpdate,
+} from "@/lib/assets/private-voice"
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
 import { mapAssetRowWithFreshUrl, mapAssetRowsWithFreshUrls } from "@/lib/assets/map-asset-row"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
@@ -199,7 +203,56 @@ export async function POST(request: NextRequest) {
         ? body.thumbnailUrl.trim()
         : null
 
-    const insertData = {
+    const privateVoiceId = parseOptionalPrivateVoiceId(body.privateVoiceId)
+    if (body.privateVoiceId !== undefined && privateVoiceId === undefined) {
+      return NextResponse.json({ error: "Invalid private voice id" }, { status: 400 })
+    }
+
+    const hasVoiceFields =
+      body.voiceId !== undefined ||
+      body.voiceProvider !== undefined ||
+      body.privateVoiceId !== undefined
+
+    let voiceAttachment:
+      | {
+          privateVoiceId: string | null
+          voiceId: string | null
+          voiceProvider: string | null
+        }
+      | null = null
+
+    if (hasVoiceFields) {
+      const resolved = await resolveVoiceAttachmentUpdate(supabase, user.id, {
+        voiceId:
+          body.voiceId !== undefined
+            ? body.voiceId
+            : privateVoiceId
+              ? `private:${privateVoiceId}`
+              : null,
+        voiceProvider: body.voiceProvider ?? (privateVoiceId ? "qwen" : null),
+        privateVoiceId: privateVoiceId ?? null,
+      })
+      if (!resolved.ok) {
+        return NextResponse.json({ error: resolved.error }, { status: 400 })
+      }
+      voiceAttachment = resolved
+      if (voiceAttachment.privateVoiceId && !body.voiceProvider) {
+        const { data: owned } = await supabase
+          .from("private_audio_voices")
+          .select("provider")
+          .eq("id", voiceAttachment.privateVoiceId)
+          .eq("user_id", user.id)
+          .maybeSingle()
+        if (owned?.provider === "qwen" || owned?.provider === "google") {
+          voiceAttachment = {
+            ...voiceAttachment,
+            voiceProvider: owned.provider,
+          }
+        }
+      }
+    }
+
+    const insertData: Record<string, unknown> = {
       user_id: user.id,
       title,
       description: typeof body.description === "string" ? body.description.trim() || null : null,
@@ -214,6 +267,12 @@ export async function POST(request: NextRequest) {
       source_node_type: typeof body.sourceNodeType === "string" ? body.sourceNodeType : null,
       source_generation_id: typeof body.sourceGenerationId === "string" ? body.sourceGenerationId : null,
       metadata: typeof body.metadata === "object" && body.metadata !== null ? body.metadata : {},
+    }
+
+    if (voiceAttachment) {
+      insertData.private_voice_id = voiceAttachment.privateVoiceId
+      insertData.voice_id = voiceAttachment.voiceId
+      insertData.voice_provider = voiceAttachment.voiceProvider
     }
 
     const { data, error } = await supabase

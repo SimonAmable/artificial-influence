@@ -1,8 +1,10 @@
 "use client"
 
 import Image from "next/image"
-import { BookOpen, MagnifyingGlass } from "@phosphor-icons/react"
+import { BookOpen, CheckCircle, MagnifyingGlass } from "@phosphor-icons/react"
 
+import { GuidesProgressRow } from "@/components/guides/guides-progress-row"
+import { useGuideProgress } from "@/components/guides/use-guide-progress"
 import { Input } from "@/components/ui/input"
 import { ShaderDemoCard } from "@/components/ui/shader-demo-card"
 import {
@@ -19,23 +21,35 @@ const FANVUE_LOGO_SRC = "/brand_icons/fanvue_logo.png"
 function GuideHubCardView({
   card,
   animationDelay,
+  complete,
 }: {
   card: GuideHubCard
   animationDelay: number
+  complete: boolean
 }) {
   return (
-    <ShaderDemoCard
-      href={card.available ? `/guides/${card.slug}` : undefined}
-      disabled={!card.available}
-      buttonLabel={card.available ? card.title : "Soon"}
-      title={card.title}
-      description={card.description}
-      mediaSrc={card.mediaSrc}
-      mediaAlt={card.mediaAlt}
-      mediaFit="contain"
-      mediaWater={Boolean(card.mediaSrc)}
-      animationDelay={animationDelay}
-    />
+    <div className="relative">
+      <ShaderDemoCard
+        href={card.available ? `/guides/${card.slug}` : undefined}
+        disabled={!card.available}
+        buttonLabel={card.available ? card.title : "Soon"}
+        title={card.title}
+        description={card.description}
+        mediaSrc={card.mediaSrc}
+        mediaAlt={card.mediaAlt}
+        mediaFit="contain"
+        mediaWater={Boolean(card.mediaSrc)}
+        animationDelay={animationDelay}
+      />
+      {complete ? (
+        <span
+          className="pointer-events-none absolute right-3 top-3 z-10 inline-flex size-7 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm ring-1 ring-border/60 backdrop-blur-sm"
+          aria-label="Completed"
+        >
+          <CheckCircle className="size-4" weight="fill" aria-hidden />
+        </span>
+      ) : null}
+    </div>
   )
 }
 
@@ -43,10 +57,12 @@ function GuideSection({
   section,
   cards,
   animationOffset,
+  isComplete,
 }: {
   section: GuideSectionId
   cards: GuideHubCard[]
   animationOffset: number
+  isComplete: (slug: string) => boolean
 }) {
   if (cards.length === 0) return null
 
@@ -61,6 +77,7 @@ function GuideSection({
             key={card.slug}
             card={card}
             animationDelay={animationOffset + index * 0.35}
+            complete={card.available && isComplete(card.slug)}
           />
         ))}
       </div>
@@ -101,11 +118,15 @@ function GuidesSearchTrigger({
 
 export function GuidesHub() {
   const cards = getGuideHubCardsForProduct(currentProduct.id)
+  const { isComplete } = useGuideProgress()
   const showFanvueBadge = currentProduct.id === "presence-studio"
+  const orderedCards = GUIDE_SECTION_ORDER.flatMap((section) =>
+    cards.filter((card) => card.section === section),
+  )
 
   return (
     <div className="flex w-full flex-col gap-12">
-      <header className="mx-auto flex w-full max-w-2xl flex-col items-center text-center">
+      <header className="flex w-full flex-col items-center text-center">
         {showFanvueBadge ? (
           <span className="inline-flex items-center gap-2 rounded-full bg-[#49F264] px-3 py-1.5 text-xs font-semibold tracking-tight text-black">
             <span className="flex items-center gap-1.5" aria-hidden>
@@ -128,13 +149,15 @@ export function GuidesHub() {
           Learn {currentProduct.name}
         </h1>
 
-        <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
           How to make the most realistic AI influencer content — with guides written
           alongside the biggest creators in the industry.
         </p>
 
         <GuidesSearchTrigger className="mt-8 w-full max-w-xl text-left" />
       </header>
+
+      <GuidesProgressRow cards={orderedCards} className="-mt-4" />
 
       <div className="flex flex-col gap-12">
         {cards.length === 0 ? (
@@ -148,6 +171,7 @@ export function GuidesHub() {
                 section={section}
                 cards={sectionCards}
                 animationOffset={sectionIndex * 0.2}
+                isComplete={isComplete}
               />
             )
           })

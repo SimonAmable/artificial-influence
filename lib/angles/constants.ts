@@ -20,3 +20,8 @@ export const ANGLES_ZOOM_MAX = 10
 export function isAnglesModelId(value: string): value is AnglesModelId {
   return ANGLES_MODEL_IDS.includes(value as AnglesModelId)
 }
+
+/** Deep-link into Angles with a reference image prefilled. */
+export function anglesHrefFromImage(imageUrl: string): string {
+  return `/angles?image=${encodeURIComponent(imageUrl)}`
+}

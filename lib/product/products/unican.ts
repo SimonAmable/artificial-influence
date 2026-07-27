@@ -42,6 +42,7 @@ export const unicanProduct: ProductConfig = {
     "/inpaint",
     "/image",
     "/image?model=custom/character-swap",
+    "/angles",
     "/carousel-shots",
     "/image?model=custom/face-swap",
     "/ai-influencer",

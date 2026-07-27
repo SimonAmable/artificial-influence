@@ -3,8 +3,9 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { List, MagnifyingGlass } from "@phosphor-icons/react"
+import { CheckCircle, List, MagnifyingGlass } from "@phosphor-icons/react"
 
+import { useGuideProgress } from "@/components/guides/use-guide-progress"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -55,11 +56,13 @@ function GuidesNav({
   pathname,
   isHub,
   onNavigate,
+  isComplete,
 }: {
   cards: GuideHubCard[]
   pathname: string
   isHub: boolean
   onNavigate?: () => void
+  isComplete: (slug: string) => boolean
 }) {
   return (
     <nav aria-label="Guides" className="flex flex-col gap-6">
@@ -89,6 +92,7 @@ function GuidesNav({
               {sectionCards.map((card) => {
                 const href = `/guides/${card.slug}`
                 const isActive = pathname === href
+                const complete = card.available && isComplete(card.slug)
 
                 if (!card.available) {
                   return (
@@ -106,13 +110,20 @@ function GuidesNav({
                       href={href}
                       onClick={onNavigate}
                       className={cn(
-                        "block rounded-lg px-2.5 py-1.5 text-sm transition-colors",
+                        "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors",
                         isActive
                           ? "bg-muted font-medium text-foreground"
                           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                       )}
                     >
-                      {card.title}
+                      <span className="min-w-0 flex-1 truncate">{card.title}</span>
+                      {complete ? (
+                        <CheckCircle
+                          className="size-3.5 shrink-0 text-foreground/70"
+                          weight="fill"
+                          aria-label="Completed"
+                        />
+                      ) : null}
                     </Link>
                   </li>
                 )
@@ -129,6 +140,7 @@ export function GuidesSidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const cards = getGuideHubCardsForProduct(currentProduct.id)
+  const { isComplete } = useGuideProgress()
   const isHub = pathname === "/guides"
   const closeMobile = React.useCallback(() => setMobileOpen(false), [])
 
@@ -153,6 +165,7 @@ export function GuidesSidebar() {
                 pathname={pathname}
                 isHub={isHub}
                 onNavigate={closeMobile}
+                isComplete={isComplete}
               />
             </div>
           </SheetContent>
@@ -162,7 +175,12 @@ export function GuidesSidebar() {
       <aside className="hidden w-56 shrink-0 lg:block xl:w-60">
         <div className="sticky top-24 flex flex-col gap-4">
           <GuidesSidebarSearch id="guides-sidebar-search" />
-          <GuidesNav cards={cards} pathname={pathname} isHub={isHub} />
+          <GuidesNav
+            cards={cards}
+            pathname={pathname}
+            isHub={isHub}
+            isComplete={isComplete}
+          />
         </div>
       </aside>
     </>

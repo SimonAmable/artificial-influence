@@ -10,6 +10,7 @@ import {
   ChatCircleDots,
   ClockCounterClockwise,
   CornersIn,
+  CubeFocus,
   CurrencyDollar,
   DownloadSimple,
   FileArrowDown,
@@ -49,6 +50,7 @@ export type NavIconKey =
   | "user"
   | "paint-brush"
   | "arrows-out"
+  | "cube-focus"
   | "book-open-text"
   | "broom"
   | "corners-in"
@@ -84,6 +86,7 @@ export const NAV_ICON_MAP: Record<NavIconKey, NavIconComponent> = {
   user: UserIcon,
   "paint-brush": PaintBrushIcon,
   "arrows-out": ArrowsOut,
+  "cube-focus": CubeFocus,
   "book-open-text": BookOpenText,
   broom: Broom,
   "corners-in": CornersIn,

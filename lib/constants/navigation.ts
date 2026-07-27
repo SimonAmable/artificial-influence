@@ -207,7 +207,18 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             label: "Angles",
             description: "Move the camera around one reference image",
             badge: "new",
-            iconPhosphor: "arrows-out",
+            iconPhosphor: "cube-focus",
+            searchKeywords: [
+              "shots",
+              "shot",
+              "camera",
+              "orbit",
+              "viewpoint",
+              "perspective",
+              "angle",
+              "angles",
+              "camera angle",
+            ],
           },
           {
             path: "/carousel-shots",
@@ -215,6 +226,14 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             description: "Generate multi-shot carousels from one reference",
             badge: "new",
             iconPhosphor: "squares-four",
+            searchKeywords: [
+              "shots",
+              "shot",
+              "carousel",
+              "multi-shot",
+              "panel",
+              "angles",
+            ],
           },
           {
             path: "/image?model=custom/character-swap",
@@ -752,7 +771,7 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
   {
     label: "Angles",
     href: "/angles",
-    icon: "arrows-out",
+    icon: "cube-focus",
     hint: "Move the camera around one image and create a new point of view.",
   },
   {

@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import {
   ClockCounterClockwise,
   Copy,
+  CubeFocus,
   DownloadSimple,
   FolderSimple,
   MagnifyingGlass,
@@ -71,6 +72,7 @@ import type { AssetCategory, AssetRecord, AssetType, AssetVisibility } from "@/l
 import { deleteAsset } from "@/lib/assets/library"
 import type { BrandKit } from "@/lib/brand-kit/types"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { anglesHrefFromImage } from "@/lib/angles/constants"
 import { carouselShotsHrefFromImage } from "@/lib/carousel-shots/constants"
 import type { SlideshowCollection } from "@/lib/slideshow/types"
 import { createClient } from "@/lib/supabase/client"
@@ -393,6 +395,18 @@ function LibraryPageContent() {
       }
 
       router.push(`/video?startFrame=${encodeURIComponent(url)}`)
+    },
+    [router],
+  )
+
+  const handleChangeAngleUrl = React.useCallback(
+    (url: string, type: AssetType | MediaGenerationType) => {
+      if (type !== "image") {
+        toast.error("Change angle is only available for image media")
+        return
+      }
+
+      router.push(anglesHrefFromImage(url))
     },
     [router],
   )
@@ -854,6 +868,12 @@ function LibraryPageContent() {
                 onClick: () => handleAnimateUrl(asset.url, asset.assetType),
               } satisfies FullscreenMediaViewerAction,
               {
+                id: "change-angle",
+                label: "Change Angle",
+                icon: <CubeFocus className="size-4" />,
+                onClick: () => handleChangeAngleUrl(asset.url, asset.assetType),
+              } satisfies FullscreenMediaViewerAction,
+              {
                 id: "shot-variations",
                 label: "Create Shot Variations",
                 icon: <SquaresFour className="size-4" />,
@@ -897,6 +917,7 @@ function LibraryPageContent() {
       copyReference,
       downloadByUrl,
       handleAnimateUrl,
+      handleChangeAngleUrl,
       handleCreateShotVariationsUrl,
       handleSaveExampleFromAsset,
       openImageEditor,
@@ -936,6 +957,12 @@ function LibraryPageContent() {
                 label: "Animate",
                 icon: <Play className="size-4" weight="fill" />,
                 onClick: () => handleAnimateUrl(generation.url, generation.type),
+              } satisfies FullscreenMediaViewerAction,
+              {
+                id: "change-angle",
+                label: "Change Angle",
+                icon: <CubeFocus className="size-4" />,
+                onClick: () => handleChangeAngleUrl(generation.url, generation.type),
               } satisfies FullscreenMediaViewerAction,
               {
                 id: "shot-variations",
@@ -996,6 +1023,7 @@ function LibraryPageContent() {
       copyReference,
       downloadByUrl,
       handleAnimateUrl,
+      handleChangeAngleUrl,
       handleCreateShotVariationsUrl,
       handleSaveExampleFromGeneration,
       openImageEditor,
@@ -1230,6 +1258,7 @@ function LibraryPageContent() {
               onSave={openSaveDraft}
               onSaveExample={handleSaveExampleFromGeneration}
               onAnimate={(media) => handleAnimateUrl(media.url, media.type)}
+              onChangeAngle={(media) => handleChangeAngleUrl(media.url, media.type)}
               onCreateShotVariations={(media) =>
                 handleCreateShotVariationsUrl(media.url, media.type)
               }
@@ -1254,6 +1283,7 @@ function LibraryPageContent() {
               onOpen={openAssetViewer}
               onSaveExample={handleSaveExampleFromAsset}
               onAnimate={(asset) => handleAnimateUrl(asset.url, asset.assetType)}
+              onChangeAngle={(asset) => handleChangeAngleUrl(asset.url, asset.assetType)}
               onCreateShotVariations={(asset) =>
                 handleCreateShotVariationsUrl(asset.url, asset.assetType)
               }
@@ -1350,6 +1380,13 @@ function LibraryPageContent() {
             tags: editingAsset.tags,
             description: editingAsset.description ?? undefined,
             sourceNodeType: editingAsset.sourceNodeType || undefined,
+            sourceGenerationId: editingAsset.sourceGenerationId || undefined,
+            privateVoiceId: editingAsset.privateVoiceId ?? null,
+            privateVoiceName: editingAsset.privateVoiceName ?? null,
+            privateVoicePreviewUrl: editingAsset.privateVoicePreviewUrl ?? null,
+            privateVoiceProvider: editingAsset.privateVoiceProvider ?? null,
+            voiceId: editingAsset.voiceId ?? null,
+            voiceProvider: editingAsset.voiceProvider ?? null,
           }}
           onSaved={() => void refreshAssets()}
         />
