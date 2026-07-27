@@ -11,6 +11,7 @@ export const FAL_HAPPY_HORSE_REFERENCE = "alibaba/happy-horse/v1.1/reference-to-
 export const FAL_GEMINI_OMNI_FLASH_T2V = "google/gemini-omni-flash" as const
 export const FAL_GEMINI_OMNI_FLASH_I2V = "google/gemini-omni-flash/image-to-video" as const
 export const FAL_GEMINI_OMNI_FLASH_REFERENCE = "google/gemini-omni-flash/reference-to-video" as const
+export const FAL_GEMINI_OMNI_FLASH_EDIT = "google/gemini-omni-flash/edit" as const
 
 export type SupportedFalVideoModelIdentifier =
   | typeof HAPPY_HORSE_CANONICAL_ID
@@ -23,6 +24,7 @@ export type FalVideoEndpoint =
   | typeof FAL_GEMINI_OMNI_FLASH_T2V
   | typeof FAL_GEMINI_OMNI_FLASH_I2V
   | typeof FAL_GEMINI_OMNI_FLASH_REFERENCE
+  | typeof FAL_GEMINI_OMNI_FLASH_EDIT
 
 export interface FalVideoRequestOptions {
   aspectRatio?: string | null
@@ -33,6 +35,7 @@ export interface FalVideoRequestOptions {
   referenceImageUrls: string[]
   resolution?: "720p" | "1080p" | string | null
   seed?: number | string | null
+  videoUrl?: string | null
 }
 
 const HAPPY_HORSE_ASPECT_RATIOS = new Set([
@@ -211,10 +214,11 @@ function buildGeminiOmniFlashFalVideoRequest(
 ): {
   endpointId: FalVideoEndpoint
   input: Record<string, unknown>
-  mode: "text-to-video" | "image-to-video" | "reference-to-video"
+  mode: "text-to-video" | "image-to-video" | "reference-to-video" | "video-to-video"
 } {
   const prompt = pickString(options.prompt)
   const imageUrl = pickString(options.imageUrl)
+  const videoUrl = pickString(options.videoUrl)
   const referenceImageUrls = options.referenceImageUrls
     .map((url) => pickString(url))
     .filter((url): url is string => Boolean(url))
@@ -223,6 +227,21 @@ function buildGeminiOmniFlashFalVideoRequest(
   const baseInput: Record<string, unknown> = {
     aspect_ratio: normalizeGeminiOmniFlashAspectRatio(options.aspectRatio),
     duration: normalizeGeminiOmniFlashDuration(options.duration),
+  }
+
+  if (videoUrl) {
+    if (!prompt) {
+      throw new Error("Gemini Omni Flash video editing requires a prompt.")
+    }
+
+    return {
+      endpointId: FAL_GEMINI_OMNI_FLASH_EDIT,
+      mode: "video-to-video",
+      input: {
+        prompt,
+        video_url: videoUrl,
+      },
+    }
   }
 
   if (referenceImageUrls.length > 0) {
@@ -274,7 +293,7 @@ function buildGeminiOmniFlashFalVideoRequest(
 export function buildFalVideoRequest(options: FalVideoRequestOptions): {
   endpointId: FalVideoEndpoint
   input: Record<string, unknown>
-  mode: "text-to-video" | "image-to-video" | "reference-to-video"
+  mode: "text-to-video" | "image-to-video" | "reference-to-video" | "video-to-video"
 } {
   const normalizedModel = normalizeFalVideoModelIdentifier(options.modelIdentifier)
   if (!normalizedModel) {

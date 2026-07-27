@@ -25,7 +25,7 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
     slug: "shoot-week-of-content",
     title: "Shoot a week of content",
     description: "Batch 7–14 stills ready to post.",
-    mediaSrc: "/docs/shoot-week/order/1/slide-06.png",
+    mediaSrc: "/docs/new/ez_agent_content/base.png",
     mediaAlt: "AI influencer portrait from a weekly content batch",
     section: "start",
     available: true,
@@ -34,7 +34,7 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
     slug: "carousel-multi-angle-shoot",
     title: "Make a carousel / multi-angle shoot",
     description: "Matching angles for one post set.",
-    mediaSrc: "/docs/carousel-shots/hero.png",
+    mediaSrc: "/docs/new/shots/slide-03.png",
     mediaAlt: "Carousel Shots multi-angle example",
     section: "start",
     available: true,
@@ -51,8 +51,8 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
   },
   {
     slug: "scale-with-agents",
-    title: "Scale with agents",
-    description: "Drive the studio from Claude, Cursor, and automations.",
+    title: "More scale levers",
+    description: "Turn an MCP connection into repeatable production.",
     section: "start",
     available: true,
   },
@@ -82,6 +82,13 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
     slug: "history-and-assets",
     title: "History & Assets",
     description: "Where generations live vs what you save.",
+    section: "platform",
+    available: true,
+  },
+  {
+    slug: "mcp",
+    title: "MCP",
+    description: "Connect your preferred AI tool to the studio.",
     section: "platform",
     available: true,
   },
@@ -117,33 +124,6 @@ const SHOOT_WEEK_PROMPT_TRY_TABS = [
     label: "Corner store",
     prompt:
       "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy — using my locked AI influencer in a late-night convenience store aisle, harsh fluorescents, snack in hand, looking down, same face as my character, vertical 4:5",
-  },
-] as const
-
-const SCALE_WITH_AGENTS_PROMPT_TRY_TABS = [
-  {
-    id: "skill",
-    label: "Save a skill",
-    prompt:
-      "Save a skill for my weekly AI influencer batch: always use my locked character via @, run 5 scene briefs, cull to keepers, and save winners to Assets.",
-  },
-  {
-    id: "automation",
-    label: "Automation",
-    prompt:
-      "List my automations, then help me create one that posts a new carousel set to Instagram every Tuesday at 6pm using my saved character.",
-  },
-  {
-    id: "template",
-    label: "Request template",
-    prompt:
-      "Search my templates for carousel workflows. If nothing fits, create a reusable photo template for a 4-panel 4:5 carousel with @ character and a bedroom scene placeholder.",
-  },
-  {
-    id: "generate",
-    label: "Generate",
-    prompt:
-      "Using my locked AI influencer, generate 3 candid iPhone-style stills for a night-out carousel. Same face, different angles, vertical 4:5.",
   },
 ] as const
 
@@ -248,7 +228,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
     ],
     primaryCtaLabel: "Open Carousel Shots",
     primaryCtaHref: "/carousel-shots",
-    mediaSrc: "/docs/carousel-shots/hero.png",
+    mediaSrc: "/docs/new/shots/slide-03.png",
     mediaAlt: "Carousel Shots multi-angle example panels",
     stepsHeading: "Do this in order",
     steps: [
@@ -327,76 +307,91 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
         "Pick a still from your history, then create a Fanvue post or upload it to your vault.",
     },
     nextGuideSlug: "scale-with-agents",
-    nextGuideLabel: "Scale with agents",
+    nextGuideLabel: "More scale levers",
     askAgentPrompt:
       "Help me publish an AI influencer still to Fanvue with a PPV price from Presence Content",
   },
   {
     slug: "scale-with-agents",
-    title: "Scale with agents",
-    result: "Connect MCP once, then scale with skills, automations, and on-demand templates.",
+    title: "More scale levers",
+    result: "Turn one MCP connection into repeatable workflows that keep producing.",
     presentation: "mcp",
-    overview: `You already locked a face, batched stills, built carousels, and — on Presence — published to Fanvue. This is the last Start here step: how you scale without living in the UI.
+    overview: `You already locked a face, batched stills, built carousels, and — on Presence — published to Fanvue. The next step is to operate that workflow from the external AI tool where you already plan and work.
 
-MCP connects Claude, Cursor, ChatGPT, and coding agents to your studio account. Same credits, same characters, same History — but you drive create and publish from the AI tool you already use.
+MCP connects Claude, ChatGPT, Cursor, Codex, and other supported clients to your studio account. The client can use the same credits, characters, assets, models, and History, so you do not need to rebuild context in another interface.
 
-Once connected, three levers compound: skills (reusable agent instructions), automations (scheduled runs), and templates (gallery workflows you can search or ask the agent to build). MCP is the pipe; those three are how output keeps moving while you focus on the next batch.`,
+Once the connection works, scale comes from making the work repeatable: preserve a proven brief, schedule recurring production in a client that supports automation, and reuse templates instead of rebuilding every batch. MCP is the pipe that keeps those workflows attached to the studio.`,
     timeEstimate: "~5 min",
     tools: [
       { label: "MCP", href: "/mcp" },
-      { label: "Chat", href: "/chat" },
       { label: "Automations", href: "/automations" },
       { label: "Templates", href: "/templates" },
     ],
     primaryCtaLabel: "Connect MCP",
     primaryCtaHref: "#mcp-setup",
     infoSectionsHeading: "Scale levers",
+    infoSectionsNumbered: false,
     infoSections: [
       {
-        title: "Skills",
-        body: "Skills are reusable instructions the agent follows across turns — your batch brief format, culling rules, caption tone, or Fanvue pricing habits. Pin skills in Chat so they load automatically, or ask the agent to save a new one after a workflow clicks.",
-        ctaLabel: "Open Chat",
-        ctaHref: "/chat",
+        title: "Preserve proven instructions",
+        body: "Save the brief that already works in your MCP client: character rules, shot count, aspect ratio, culling standards, caption voice, and publish requirements. Reusing a complete operating brief is faster and more consistent than reconstructing it every session.",
+        ctaLabel: "Connect MCP",
+        ctaHref: "#mcp-setup",
       },
       {
-        title: "Automations",
-        body: "Automations are scheduled agent runs: post a carousel on Tuesdays, refresh vault media weekly, or prep a slideshow draft before you wake up. Set the trigger once; the agent uses your characters, templates, and brand context on each run.",
+        title: "Schedule through an MCP workflow",
+        body: "When your client supports scheduled runs, use the MCP connection for recurring batches: prepare a carousel every Tuesday, refresh a weekly content queue, or generate drafts before review. Keep publishing behind a review step until the workflow is proven.",
         ctaLabel: "Open Automations",
         ctaHref: "/automations",
       },
       {
-        title: "Request templates",
-        body: "Templates are reusable gallery workflows — photo sets, video lanes, slideshows. Browse Templates to run one, or ask Chat to search yours, inspect a slug, or create a new template from a brief you describe. Great when you want the same output shape every week without retyping the setup.",
+        title: "Reuse output structures",
+        body: "Templates give the MCP client a stable output shape: a photo set, video lane, slideshow, or carousel structure. Search for an existing template first, then adapt it only when the recurring job genuinely needs a different structure.",
         ctaLabel: "Open Templates",
         ctaHref: "/templates",
       },
       {
-        title: "MCP vs in-app Chat",
-        body: "Same account either way. Use MCP when you want generation inside Claude, Cursor, Codex, or ChatGPT. Use in-app Chat when you want the studio skills UI, pinned instructions, and tool traces in one place. Many creators connect MCP for daily prompts and open Chat for heavy batch days.",
+        title: "Keep the studio as the source of truth",
+        body: "Your external client drives the work, but the studio remains the source of truth for credits, characters, assets, and generation History. Review results there, save the keepers, and refine the external workflow from what actually performed.",
         ctaLabel: "Open MCP",
         ctaHref: "/mcp",
       },
     ],
-    promptTry: {
-      heading: "Try an agent ask",
-      tabs: [...SCALE_WITH_AGENTS_PROMPT_TRY_TABS],
-    },
-    outcomes: [
-      "You connected at least one external AI tool via MCP",
-      "You know when to pin a skill vs run a one-off Chat turn",
-      "You can tell Automations apart from manual agent sessions",
-      "You can ask the agent to find or create a reusable template",
-    ],
     nextGuideSlug: null,
     nextGuideLabel: null,
     askAgentPrompt:
-      "Help me connect MCP and set up skills, automations, or a reusable template to scale my AI influencer workflow",
+      "Help me turn my connected MCP workflow into a repeatable content production system",
+  },
+  {
+    slug: "mcp",
+    title: "MCP",
+    result: "Understand how external AI tools connect securely to your studio.",
+    presentation: "demo",
+    overview: `MCP (Model Context Protocol) is the secure connection between an AI client and the studio. It lets Claude, ChatGPT, Cursor, Codex, and other supported tools request work from the same account without rebuilding your setup somewhere else.
+
+The connection uses OAuth. You approve access in the browser, your password is never shared with the external client, and you can revoke the connection later.
+
+Once connected, the external client works with the same credit balance, characters, assets, models, and generation History as the studio. MCP is the bridge; the full guide walks through choosing a client, connecting it, and turning the connection into a repeatable workflow.`,
+    timeEstimate: "~3 min",
+    tools: [
+      { label: "MCP", href: "/mcp" },
+    ],
+    primaryCtaLabel: "Open the full MCP guide",
+    primaryCtaHref: "/guides/scale-with-agents",
+    outcomes: [
+      "You understand what MCP connects",
+      "You know OAuth keeps your password out of the external client",
+      "You know which studio data and tools carry across the connection",
+    ],
+    nextGuideSlug: "scale-with-agents",
+    nextGuideLabel: "More scale levers",
+    askAgentPrompt: "Explain how MCP connects my preferred AI client to the studio",
   },
   {
     slug: "introduction",
     title: "Introduction",
     result: "A clear map of the studio — then you start with locking a face.",
-    overview: `This studio is built for one job: run a consistent AI creator without juggling five apps. Lock a face once, generate stills that still look like that person, turn keepers into multi-angle sets when you need a carousel, publish from the same place you create — and scale with agents when the pipeline is running.
+    overview: `This studio is built for one job: run a consistent AI creator without juggling five apps. Lock a face once, generate stills that still look like that person, turn keepers into multi-angle sets when you need a carousel, publish from the same place you create — and add more scale levers when the pipeline is running.
 
 Most setups fall apart on consistency. New faces every session means no brand and no library worth posting from. The Start here guides walk you in order: lock a face, batch a week of stills, build a carousel set, publish (Fanvue on Presence), then connect MCP and compound with skills, automations, and templates.
 
@@ -406,9 +401,9 @@ Shoot a week of content next. Keep that locked face, batch different scenes and 
 
 Make a carousel / multi-angle shoot when one still needs a full post set. Carousel Shots turns a single keeper into matching angles for roughly the cost of one image — same person, different panels.
 
-Publish to Fanvue on Presence, then finish with Scale with agents — MCP connect plus skills, automations, and template requests so output keeps moving without babysitting every session.
+Publish to Fanvue on Presence, then finish with More scale levers — use MCP plus reusable briefs, scheduled workflows, and templates so output keeps moving without babysitting every session.
 
-Platform guides — Introduction, Credits & models, History & Assets — explain how the studio works day to day. Walk Start here in order, then open the first guide when you are ready to lock a face.`,
+Platform guides — Introduction, Credits & models, History & Assets, and MCP — explain how the studio works day to day. Walk Start here in order, then open the first guide when you are ready to lock a face.`,
     timeEstimate: "~3 min",
     tools: [
       { label: "Guides", href: "/guides" },
@@ -450,8 +445,8 @@ Platform guides — Introduction, Credits & models, History & Assets — explain
         products: ["presence-studio"],
       },
       {
-        title: "Scale with agents",
-        body: "Connect MCP to Claude or Cursor, then compound with skills, automations, and template requests.",
+        title: "More scale levers",
+        body: "Use MCP with reusable briefs, scheduled workflows, and templates to make production repeatable.",
         ctaLabel: "Open guide",
         ctaHref: "/guides/scale-with-agents",
       },

@@ -4,8 +4,16 @@ import Image from "next/image"
 import { BookOpen, CheckCircle, MagnifyingGlass } from "@phosphor-icons/react"
 
 import { GuidesProgressRow } from "@/components/guides/guides-progress-row"
+import {
+  AgentGenerationShowcase,
+  FanvuePaidPostShowcase,
+  InfluencerMergeShowcase,
+  ShotsGridShowcase,
+} from "@/components/guides/guide-hub-showcase-graphics"
 import { useGuideProgress } from "@/components/guides/use-guide-progress"
+import { McpIconFan } from "@/components/mcp/mcp-icon-fan"
 import { Input } from "@/components/ui/input"
+import { AuroraShaderBackground } from "@/components/ui/aurora-shader-background"
 import { ShaderDemoCard } from "@/components/ui/shader-demo-card"
 import {
   GUIDE_SECTION_LABELS,
@@ -18,6 +26,24 @@ import { currentProduct } from "@/lib/product/current"
 
 const FANVUE_LOGO_SRC = "/brand_icons/fanvue_logo.png"
 
+function McpGuideCardGraphic() {
+  return (
+    <div className="absolute inset-0 flex items-center overflow-hidden rounded-[inherit] bg-[#0a0a0a]">
+      <AuroraShaderBackground animate className="rounded-[inherit]" />
+      <div className="absolute inset-0 bg-black/35" aria-hidden />
+      <div className="relative z-10 w-full origin-center scale-[0.72] sm:scale-[0.78]">
+        <McpIconFan
+          productName={currentProduct.name}
+          logoSrc={currentProduct.logo}
+          activePlatform="claude"
+          onPlatformSelect={() => {}}
+          interactive={false}
+        />
+      </div>
+    </div>
+  )
+}
+
 function GuideHubCardView({
   card,
   animationDelay,
@@ -27,6 +53,19 @@ function GuideHubCardView({
   animationDelay: number
   complete: boolean
 }) {
+  const showcase =
+    card.slug === "create-ai-influencer" ? (
+      <InfluencerMergeShowcase />
+    ) : card.slug === "shoot-week-of-content" ? (
+      <AgentGenerationShowcase />
+    ) : card.slug === "carousel-multi-angle-shoot" ? (
+      <ShotsGridShowcase />
+    ) : card.slug === "publish-to-fanvue" ? (
+      <FanvuePaidPostShowcase />
+    ) : card.slug === "scale-with-agents" ? (
+      <McpGuideCardGraphic />
+    ) : undefined
+
   return (
     <div className="relative">
       <ShaderDemoCard
@@ -36,6 +75,7 @@ function GuideHubCardView({
         title={card.title}
         description={card.description}
         mediaSrc={card.mediaSrc}
+        mediaContent={showcase}
         mediaAlt={card.mediaAlt}
         mediaFit="contain"
         mediaWater={Boolean(card.mediaSrc)}
@@ -71,7 +111,7 @@ function GuideSection({
       <h2 className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
         {GUIDE_SECTION_LABELS[section]}
       </h2>
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card, index) => (
           <GuideHubCardView
             key={card.slug}

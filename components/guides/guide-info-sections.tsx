@@ -37,9 +37,11 @@ export function GuideLogoStrip({ logos }: { logos: GuideLogoChip[] }) {
 export function GuideInfoSections({
   heading,
   sections,
+  numbered = true,
 }: {
   heading: string
   sections: GuideInfoSection[]
+  numbered?: boolean
 }) {
   return (
     <section className="flex flex-col gap-6 border-t border-border/70 pt-8">
@@ -50,9 +52,11 @@ export function GuideInfoSections({
       <div className="flex flex-col gap-8">
         {sections.map((section, index) => (
           <div key={section.title} className="flex gap-3">
-            <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-border bg-muted/40 text-xs font-medium text-foreground">
-              {index + 1}
-            </span>
+            {numbered ? (
+              <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-border bg-muted/40 text-xs font-medium text-foreground">
+                {index + 1}
+              </span>
+            ) : null}
             <div className="min-w-0 flex-1">
               <h3 className="text-base font-semibold tracking-tight">{section.title}</h3>
               <div className="mt-1.5 flex flex-col gap-3">

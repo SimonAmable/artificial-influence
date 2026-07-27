@@ -15,6 +15,7 @@ type GuideMcpConnectEmbedProps = {
   productName: string
   mcpBaseUrl: string
   logoSrc: string
+  showToolsPreview?: boolean
 }
 
 const GuideMcpPlatformContext = React.createContext<{
@@ -64,12 +65,13 @@ export function GuideMcpConnectEmbed({
   productName,
   mcpBaseUrl,
   logoSrc,
+  showToolsPreview = true,
 }: GuideMcpConnectEmbedProps) {
   const { platform, setPlatform } = useGuideMcpPlatform()
 
   return (
-    <div className="relative left-1/2 w-screen max-w-none -translate-x-1/2 px-4 sm:px-6">
-      <div className="mx-auto max-w-5xl">
+    <div className="w-full min-w-0">
+      <div className="min-w-0">
         <p className="mb-4 text-sm leading-6 text-muted-foreground">
           Pick your AI tool, copy the connector steps, and sign in once. OAuth ties the external
           agent to your account and credits — same balance as the studio.
@@ -81,6 +83,7 @@ export function GuideMcpConnectEmbed({
           platform={platform}
           onPlatformChange={setPlatform}
           variant="embed"
+          showToolsPreview={showToolsPreview}
         />
       </div>
     </div>

@@ -35,6 +35,7 @@ export function getSitemapEntries(): SitemapEntry[] {
     { path: "/guides", lastModified: new Date("2026-07-24T12:00:00.000Z"), changeFrequency: "weekly", priority: 0.75 },
     { path: "/guides/create-ai-influencer", lastModified: new Date("2026-07-24T12:00:00.000Z"), changeFrequency: "weekly", priority: 0.7 },
     { path: "/guides/scale-with-agents", lastModified: new Date("2026-07-26T12:00:00.000Z"), changeFrequency: "weekly", priority: 0.7 },
+    { path: "/guides/mcp", lastModified: new Date("2026-07-27T12:00:00.000Z"), changeFrequency: "weekly", priority: 0.7 },
     { path: "/free-tools/metadata-remover", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
     { path: "/free-tools/image-compressor", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
     { path: "/free-tools/tiktok-reference-downloader", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },

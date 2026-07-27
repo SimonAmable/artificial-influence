@@ -333,6 +333,23 @@
 }
 
 /*
+ * Guides use the document as their only scroll host. The global app defaults
+ * make both html and body scrollable, which otherwise creates twin scrollbars
+ * and a body-sized blank tail on long guide articles.
+ */
+html.guides-scroll-root {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+}
+
+html.guides-scroll-root body {
+  height: auto;
+  min-height: 100dvh;
+  overflow-y: visible;
+}
+
+/*
  * Global scrollbar styling: keep the scrollbar slim and transparent without hiding it.
  */
 html,

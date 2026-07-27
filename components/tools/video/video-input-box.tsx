@@ -27,7 +27,10 @@ import {
 import { IconCompactSwitch } from "@/components/tools/influencer/prompt-control-menu"
 import { LayoutGroup } from "framer-motion"
 import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
-import { usesFalMultimodalVideoInputs } from "@/lib/constants/models"
+import {
+  isGeminiOmniFlashModelIdentifier,
+  usesFalMultimodalVideoInputs,
+} from "@/lib/constants/models"
 import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
 import { brandRefsOnly, getImageAssetUrlsFromRefChips, getVideoAssetUrlsFromRefChips } from "@/lib/commands/ref-image-pipeline"
 import { allowedAssetTypesForVideoModel } from "@/lib/commands/allowed-asset-types"
@@ -161,6 +164,7 @@ export function VideoInputBox({
     selectedModel.identifier === 'veed/fabric-1.0'
   const isReferenceVideoSupported =
     selectedModel.supports_reference_video === true ||
+    isGeminiOmniFlashModelIdentifier(selectedModel.identifier) ||
     selectedModel.identifier === 'xai/grok-imagine-video' ||
     selectedModel.identifier === 'kwaivgi/kling-v3-omni-video' ||
     selectedModel.identifier === 'bytedance/seedance-2.0'
@@ -193,6 +197,7 @@ export function VideoInputBox({
   const isPrunaPVideo = selectedModel.identifier === 'prunaai/p-video'
   const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
   const isFalMultimodalVideo = usesFalMultimodalVideoInputs(selectedModel.identifier)
+  const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(selectedModel.identifier)
   const isKlingV3OrOmni = isKlingV3 || isKlingV3Omni
   const usesRefImageGallery = isKlingV3Omni || isSeedance2 || isFalMultimodalVideo
   const totalDuration = Number(parameters.duration) || 5
@@ -745,7 +750,7 @@ export function VideoInputBox({
                   >
                     <span className="flex items-center">
                       <FilePlus className="size-4 mr-2 shrink-0" />
-                      Upload Reference Video
+                      {isGeminiOmniFlash ? "Upload Video to Edit" : "Upload Reference Video"}
                     </span>
                     {(chipSlotInfo.referenceVideoSlotFromChip || inputVideo) && (
                       <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
@@ -959,7 +964,9 @@ export function VideoInputBox({
                   {inputVideo?.url
                     ? isMotionCopyModel
                       ? "Background source"
-                      : "Reference Video"
+                      : isGeminiOmniFlash
+                        ? "Video to Edit"
+                        : "Reference Video"
                     : "@ Library · video"}
                 </div>
               </div>

@@ -2,6 +2,12 @@ import Link from "next/link"
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr"
 
 import { GuideMarkComplete } from "@/components/guides/guide-mark-complete"
+import {
+  AgentGenerationShowcase,
+  FanvuePaidPostShowcase,
+  InfluencerMergeShowcase,
+  ShotsGridShowcase,
+} from "@/components/guides/guide-hub-showcase-graphics"
 import { GuideModePathCards } from "@/components/guides/guide-mode-path-cards"
 import {
   GuideMcpConnectEmbed,
@@ -63,6 +69,16 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
   const isMcp = article.presentation === "mcp"
   const siteUrl = getCurrentProductSiteUrl()
   const mcpBaseUrl = getMcpConnectBaseUrl(currentProduct.mcpSiteUrl ?? siteUrl)
+  const heroShowcase =
+    article.slug === "create-ai-influencer" ? (
+      <InfluencerMergeShowcase />
+    ) : article.slug === "shoot-week-of-content" ? (
+      <AgentGenerationShowcase />
+    ) : article.slug === "carousel-multi-angle-shoot" ? (
+      <ShotsGridShowcase />
+    ) : article.slug === "publish-to-fanvue" ? (
+      <FanvuePaidPostShowcase />
+    ) : undefined
 
   const articleBody = (
     <>
@@ -77,6 +93,7 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
             href={article.primaryCtaHref}
             buttonLabel={article.primaryCtaLabel}
             mediaSrc={heroMediaSrc}
+            mediaContent={heroShowcase}
             mediaAlt={heroMediaAlt}
             mediaFit="contain"
             mediaWater={Boolean(heroMediaSrc)}
@@ -150,6 +167,7 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
             productName={currentProduct.name}
             mcpBaseUrl={mcpBaseUrl}
             logoSrc={currentProduct.logo}
+            showToolsPreview={article.slug !== "mcp"}
           />
         </section>
       ) : null}
@@ -173,6 +191,7 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
         <GuideInfoSections
           heading={article.infoSectionsHeading ?? "Key points"}
           sections={article.infoSections}
+          numbered={article.infoSectionsNumbered}
         />
       ) : null}
 
@@ -280,7 +299,7 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
   )
 
   return (
-    <article className="flex w-full max-w-3xl flex-col gap-10">
+    <article className="flex w-full min-w-0 max-w-4xl flex-col gap-10">
       {isMcp ? (
         <GuideMcpPlatformProvider>{articleBody}</GuideMcpPlatformProvider>
       ) : (

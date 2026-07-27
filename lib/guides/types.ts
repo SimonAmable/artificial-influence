@@ -136,7 +136,7 @@ export type GuideArticle = {
   /**
    * `demo` (default): shader hero + optional GSAP steps.
    * `info`: text-first — no shader hero; use infoSections + optional logoStrip.
-   * `mcp`: McpIconFan hero + embedded connect panel; use infoSections for scale levers.
+   * `mcp`: McpIconFan hero + embedded connect panel; optionally add deeper MCP context.
    */
   presentation?: "demo" | "info" | "mcp"
   /** Vendor logos under the header on info guides. */
@@ -152,6 +152,8 @@ export type GuideArticle = {
   steps?: GuideStep[]
   infoSectionsHeading?: string
   infoSections?: GuideInfoSection[]
+  /** Defaults to true; set false for unnumbered editorial sections. */
+  infoSectionsNumbered?: boolean
   compareTable?: GuideCompareTable
   /** Optional upload → open in Carousel Shots. */
   carouselUpload?: GuideCarouselUpload

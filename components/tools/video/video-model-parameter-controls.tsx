@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
-import type { Model, ParameterDefinition } from "@/lib/types/models"
+import type { Model, NumberParameterDefinition, ParameterDefinition } from "@/lib/types/models"
 import { isHappyHorseModelIdentifier } from "@/lib/constants/models"
 import { formatVideoPricingOptionLabel } from "@/lib/pricing-parameter-ui"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
@@ -38,6 +38,38 @@ import { SpeakerHigh, Timer, Waveform } from "@phosphor-icons/react"
 function formatDurationEnumLabel(option: number, unit: string): string {
   if (unit === "s" && option === -1) return "Auto"
   return `${option}${unit}`
+}
+
+function getDurationOptions(param: NumberParameterDefinition, model: Model): number[] {
+  const enumOptions =
+    "enum" in param && Array.isArray(param.enum)
+      ? param.enum
+          .map(Number)
+          .filter((option) => Number.isFinite(option))
+      : []
+
+  if (enumOptions.length > 0) return enumOptions
+
+  const modelOptions = (model.duration_options ?? [])
+    .map(Number)
+    .filter((option) => Number.isFinite(option))
+
+  if (modelOptions.length > 0) return modelOptions
+
+  const min = Number(param.min)
+  const max = Number(param.max)
+  const step = Number(param.step) > 0 ? Number(param.step) : 1
+
+  if (Number.isFinite(min) && Number.isFinite(max) && max >= min) {
+    const options: number[] = []
+    for (let option = min; option <= max && options.length < 60; option += step) {
+      options.push(option)
+    }
+    return options
+  }
+
+  const fallback = Number(param.default)
+  return Number.isFinite(fallback) ? [fallback] : []
 }
 
 function formatVideoReferenceTypeLabel(value: string): string {
@@ -132,6 +164,57 @@ export function VideoModelParameterControls({
     const triggerClass = polished
       ? influencerControlPillClassName
       : cn(rowH, "text-xs w-fit min-w-[80px] px-2", isToolbar && "min-w-[70px]")
+
+    if (param.type === "number" && param.name.includes("duration")) {
+      const durationOptions = getDurationOptions(param, selectedModel)
+      const currentValue = Number(value ?? param.default ?? durationOptions[0])
+      const select = (
+        <Select
+          key={param.name}
+          value={String(currentValue)}
+          onValueChange={(nextValue) =>
+            onParametersChange({ ...parameters, [param.name]: Number(nextValue) })
+          }
+          disabled={disabled || durationOptions.length === 0}
+        >
+          <SelectTrigger
+            id={param.name}
+            hideChevron={polished}
+            className={
+              polished
+                ? influencerControlPillClassName
+                : cn(
+                    rowH,
+                    "w-fit min-w-fit shrink-0 gap-1.5 px-2 text-xs tabular-nums",
+                    "[&_svg:not([class*='size-'])]:size-3.5",
+                  )
+            }
+            aria-label={param.label}
+          >
+            <SelectValue placeholder={param.label}>
+              <div className="flex items-center gap-1.5">
+                <Timer size={12} weight="bold" className="shrink-0" />
+                <AnimatedSelectLabel value={formatDurationEnumLabel(currentValue, "s")} />
+              </div>
+            </SelectValue>
+          </SelectTrigger>
+          <PromptControlMenuContent>
+            <PromptControlMenuGroup label={param.label}>
+              {durationOptions.map((option) => (
+                <PromptControlMenuItem
+                  key={String(option)}
+                  value={String(option)}
+                  icon={<Timer size={14} weight="bold" />}
+                  iconPosition="end"
+                  label={formatDurationEnumLabel(option, "s")}
+                />
+              ))}
+            </PromptControlMenuGroup>
+          </PromptControlMenuContent>
+        </Select>
+      )
+      return wrapControl(`param-${param.name}`, select)
+    }
 
     if (param.ui_type === "select" && "enum" in param && param.enum) {
       if (param.name === "video_reference_type") {

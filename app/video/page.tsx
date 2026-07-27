@@ -35,6 +35,7 @@ import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
 import { resolveVideoPricingQuote } from "@/lib/video-pricing"
 import {
   isHappyHorseModelIdentifier,
+  isGeminiOmniFlashModelIdentifier,
   MODEL_IDENTIFIERS,
   usesFalMultimodalVideoInputs,
 } from "@/lib/constants/models"
@@ -631,6 +632,7 @@ function VideoPageContent() {
     const isPrunaPVideo = selectedModel.identifier === 'prunaai/p-video'
     const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
     const isHappyHorse = isHappyHorseModelIdentifier(selectedModel.identifier)
+    const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(selectedModel.identifier)
     const isFalMultimodalVideo = usesFalMultimodalVideoInputs(selectedModel.identifier)
     const isLipsync =
       selectedModel.identifier.includes('lipsync') ||
@@ -762,6 +764,7 @@ function VideoPageContent() {
       isPrunaPVideo,
       isWan27,
       isHappyHorse,
+      isGeminiOmniFlash,
       isFalMultimodalVideo,
       falMultimodalReferenceMode,
       isLipsync,
@@ -801,6 +804,7 @@ function VideoPageContent() {
       const isPrunaPVideo = capture.isPrunaPVideo
       const isWan27 = capture.isWan27
       const isHappyHorse = capture.isHappyHorse
+      const isGeminiOmniFlash = capture.isGeminiOmniFlash
       const isFalMultimodalVideo = capture.isFalMultimodalVideo
       const falMultimodalReferenceMode = capture.falMultimodalReferenceMode
       const isLipsync = capture.isLipsync
@@ -971,15 +975,19 @@ function VideoPageContent() {
         requestBody.prompt = buildPromptWithRefs(first, brandRefsOnly(attachedCommandRefs)).trim()
       }
 
-      // Kling v3 Omni: reference video (editing or style reference)
-      if (isKlingV3Omni && inputVideo?.file) {
+      // Kling v3 Omni reference video / Gemini Omni Flash video editing.
+      if ((isKlingV3Omni || isGeminiOmniFlash) && inputVideo?.file) {
         const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'video-gen-reference-videos')
         requestBody.reference_video = videoUpload.url
       }
-      if (!inputVideo?.file && isKlingV3Omni && inputVideo?.url) {
+      if (!inputVideo?.file && (isKlingV3Omni || isGeminiOmniFlash) && inputVideo?.url) {
         requestBody.reference_video = inputVideo.url
       }
-      if (isKlingV3Omni && !requestBody.reference_video && chipSlots.referenceVideoChipUrl) {
+      if (
+        (isKlingV3Omni || isGeminiOmniFlash) &&
+        !requestBody.reference_video &&
+        chipSlots.referenceVideoChipUrl
+      ) {
         requestBody.reference_video = chipSlots.referenceVideoChipUrl
       }
 

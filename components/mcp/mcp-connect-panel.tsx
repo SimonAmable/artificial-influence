@@ -59,7 +59,7 @@ function CopyControl({
 
   if (multiline) {
     return (
-      <div className="relative mt-auto rounded-2xl border border-white/10 bg-black/50 p-4 pr-12">
+      <div className="relative mt-auto min-w-0 rounded-2xl border border-white/10 bg-black/50 p-4 pr-12">
         <pre className="max-h-56 overflow-auto whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-zinc-300 md:text-[13px]">
           {value}
         </pre>
@@ -67,16 +67,19 @@ function CopyControl({
           type="button"
           onClick={handleCopy}
           aria-label={copied ? "Copied" : "Copy to clipboard"}
-          className="absolute top-3 right-3 rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
+          className="absolute top-3 right-3 touch-manipulation rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
         >
           {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
+          <span className="sr-only" aria-live="polite">
+            {copied ? "Copied to clipboard" : ""}
+          </span>
         </button>
       </div>
     )
   }
 
   return (
-    <div className="mt-auto flex items-center gap-2 rounded-2xl border border-white/10 bg-black/50 p-2 pl-4">
+    <div className="mt-auto flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-black/50 p-2 pl-3 sm:pl-4">
       <code className="min-w-0 flex-1 truncate font-mono text-sm text-primary">
         {value}
       </code>
@@ -84,9 +87,12 @@ function CopyControl({
         type="button"
         onClick={handleCopy}
         aria-label={copied ? "Copied" : "Copy to clipboard"}
-        className="shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
+        className="shrink-0 touch-manipulation rounded-lg p-2.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
       >
         {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
+        <span className="sr-only" aria-live="polite">
+          {copied ? "Copied to clipboard" : ""}
+        </span>
       </button>
     </div>
   )
@@ -104,7 +110,7 @@ function StepColumn({
   platform: McpConnectPlatform
 }) {
   return (
-    <div className="flex min-h-full flex-col gap-3">
+    <div className="flex min-h-full min-w-0 flex-col gap-3">
       <span className="flex size-7 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-zinc-300">
         {index + 1}
       </span>
@@ -199,40 +205,42 @@ export function McpConnectPanel({
   const isEmbed = variant === "embed"
 
   const shellClass = isEmbed
-    ? "rounded-[1.75rem] border border-border/70 bg-[#141414] p-4 text-white shadow-md md:p-5"
+    ? "min-w-0 rounded-2xl border border-border/70 bg-[#141414] p-3 text-white shadow-md sm:p-4 md:rounded-[1.75rem] md:p-5"
     : "mx-auto max-w-6xl rounded-[1.75rem] border border-white/10 bg-[#141414] p-4 shadow-md md:p-5"
 
   return (
-    <div className={cn("flex flex-col gap-10", className)}>
+    <div className={cn("flex min-w-0 flex-col gap-10", className)}>
       <section id={setupId} className={isEmbed ? undefined : "px-4 pb-10 md:px-6"}>
         <div className={shellClass}>
-          <div className="mb-5 flex flex-col gap-3 border-b border-white/8 pb-4 lg:flex-row lg:items-center lg:justify-between">
-            <ToggleGroup
-              type="single"
-              value={mode === "mcp" ? platform : undefined}
-              onValueChange={(value) => {
-                if (!value) return
-                setMode("mcp")
-                setPlatform(value as McpConnectPlatform)
-              }}
-              variant="outline"
-              size="sm"
-              spacing={0}
-              className="flex-wrap justify-start"
-              aria-label="AI platform"
-            >
-              {MCP_PLATFORMS.map((item) => (
-                <ToggleGroupItem
-                  key={item.id}
-                  value={item.id}
-                  aria-label={item.label}
-                  className="gap-1.5 px-3"
-                >
-                  <PlatformLobeIcon platform={item.id} size={15} />
-                  {item.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+          <div className="mb-5 flex min-w-0 flex-col gap-3 border-b border-white/8 pb-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="-mx-1 min-w-0 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+              <ToggleGroup
+                type="single"
+                value={mode === "mcp" ? platform : undefined}
+                onValueChange={(value) => {
+                  if (!value) return
+                  setMode("mcp")
+                  setPlatform(value as McpConnectPlatform)
+                }}
+                variant="outline"
+                size="sm"
+                spacing={0}
+                className="w-max flex-nowrap justify-start"
+                aria-label="AI platform"
+              >
+                {MCP_PLATFORMS.map((item) => (
+                  <ToggleGroupItem
+                    key={item.id}
+                    value={item.id}
+                    aria-label={item.label}
+                    className="shrink-0 touch-manipulation gap-1.5 px-3"
+                  >
+                    <PlatformLobeIcon platform={item.id} size={15} />
+                    {item.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
 
             <ToggleGroup
               type="single"
@@ -245,9 +253,10 @@ export function McpConnectPanel({
               variant="outline"
               size="sm"
               spacing={0}
+              className="self-start xl:self-auto"
               aria-label="Connection mode"
             >
-              <ToggleGroupItem value="mcp" aria-label="MCP" className="gap-1.5 px-3">
+              <ToggleGroupItem value="mcp" aria-label="MCP" className="touch-manipulation gap-1.5 px-3">
                 <MCP size={14} />
                 MCP
               </ToggleGroupItem>
@@ -256,7 +265,7 @@ export function McpConnectPanel({
                 aria-label="CLI"
                 disabled={cliDisabled}
                 title="CLI support coming soon"
-                className="gap-1.5 px-3"
+                className="touch-manipulation gap-1.5 px-3"
               >
                 <Code2 className="size-3.5" />
                 CLI
@@ -285,7 +294,7 @@ export function McpConnectPanel({
             <div
               className={cn(
                 "grid gap-8 md:gap-6",
-                isAgentLayout ? "md:grid-cols-2" : "md:grid-cols-3",
+                isAgentLayout ? "xl:grid-cols-2" : "xl:grid-cols-3",
               )}
             >
               {steps.map((step, index) => (
@@ -314,7 +323,7 @@ export function McpConnectPanel({
               </h2>
               <p className="mx-auto mt-3 max-w-2xl text-sm text-zinc-400">
                 OAuth-secured access to your {productName} account. Endpoint:{" "}
-                <span className="font-mono text-primary">{mcpEndpoint}</span>
+                <span className="break-all font-mono text-primary">{mcpEndpoint}</span>
               </p>
             </div>
             <div className="flex flex-wrap justify-center gap-2">

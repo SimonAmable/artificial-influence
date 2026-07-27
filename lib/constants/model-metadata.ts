@@ -769,13 +769,13 @@ export const GEMINI_OMNI_FLASH_META: ModelMetadata = {
   identifier: 'google/gemini-omni-flash',
   name: 'Gemini Omni Flash',
   description:
-    'Google Gemini Omni Flash on fal: text-to-video, image-to-video, or reference-to-video with synchronized audio.',
+    'Google Gemini Omni Flash on fal: create from text or images, or edit a video with synchronized audio.',
   type: 'video',
   provider: 'fal',
   is_active: true,
   model_cost: 10,
   supports_reference_image: true,
-  supports_reference_video: false,
+  supports_reference_video: true,
   aspect_ratios: ['16:9', '9:16'],
   supports_first_frame: true,
   customParameters: [

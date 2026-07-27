@@ -17,6 +17,8 @@ type McpIconFanProps = {
   logoSrc: string
   activePlatform: McpConnectPlatform
   onPlatformSelect: (platform: McpConnectPlatform) => void
+  /** Render decorative tiles instead of buttons when nested inside another link. */
+  interactive?: boolean
 }
 
 const fillStyle = {
@@ -36,6 +38,7 @@ export function McpIconFan({
   logoSrc,
   activePlatform,
   onPlatformSelect,
+  interactive = true,
 }: McpIconFanProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const onSelectRef = useRef(onPlatformSelect)
@@ -232,6 +235,8 @@ export function McpIconFan({
 
       const cleanups: Array<() => void> = []
 
+      if (!interactive) return
+
       orbitTiles.forEach((tile) => {
         const onClick = () => {
           const platform = tile.dataset.platform as McpConnectPlatform | undefined
@@ -256,7 +261,7 @@ export function McpIconFan({
         cleanups.forEach((fn) => fn())
       }
     },
-    { scope: rootRef },
+    { scope: rootRef, dependencies: [interactive] },
   )
 
   return (
@@ -266,26 +271,46 @@ export function McpIconFan({
       style={{ perspective: "1100px" }}
     >
       {FAN_SIDE_ICONS.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          data-fan-orbit
-          data-platform={item.id}
-          aria-label={`Select ${item.id}`}
-          aria-pressed={activePlatform === item.id}
-          className={cn(
-            "size-14 cursor-pointer overflow-hidden rounded-2xl border-0 bg-transparent p-0 shadow-md outline-none md:size-16",
-            "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]",
-            activePlatform === item.id && "ring-2 ring-primary/70",
-          )}
-        >
-          <PlatformFanAvatar
-            platform={item.id}
-            size={64}
-            className="block!"
-            style={fillStyle}
-          />
-        </button>
+        interactive ? (
+          <button
+            key={item.id}
+            type="button"
+            data-fan-orbit
+            data-platform={item.id}
+            aria-label={`Select ${item.id}`}
+            aria-pressed={activePlatform === item.id}
+            className={cn(
+              "size-14 cursor-pointer overflow-hidden rounded-2xl border-0 bg-transparent p-0 shadow-md outline-none md:size-16",
+              "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]",
+              activePlatform === item.id && "ring-2 ring-primary/70",
+            )}
+          >
+            <PlatformFanAvatar
+              platform={item.id}
+              size={64}
+              className="block!"
+              style={fillStyle}
+            />
+          </button>
+        ) : (
+          <div
+            key={item.id}
+            data-fan-orbit
+            data-platform={item.id}
+            aria-hidden
+            className={cn(
+              "size-14 overflow-hidden rounded-2xl shadow-md md:size-16",
+              activePlatform === item.id && "ring-2 ring-primary/70",
+            )}
+          >
+            <PlatformFanAvatar
+              platform={item.id}
+              size={64}
+              className="block!"
+              style={fillStyle}
+            />
+          </div>
+        )
       ))}
 
       <div

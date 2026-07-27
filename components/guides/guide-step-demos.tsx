@@ -13,23 +13,16 @@ import {
 } from "@/components/guides/guide-demo-shell"
 import type { GuideStepDemoId } from "@/lib/guides/types"
 
-const CHARACTER_SRC = "/docs/shoot-week/order/1/slide-06.png"
+const CHARACTER_SRC = "/docs/new/ez_agent_content/base.png"
 
 const BATCH_SHOTS = [
-  "/docs/shoot-week/order/2/slide-05.png",
-  "/docs/shoot-week/order/2/slide-06.png",
-  "/docs/shoot-week/order/2/slide-07.png",
-  "/docs/shoot-week/order/2/slide-08.png",
-  "/docs/shoot-week/order/2/slide-09.png",
+  "/docs/new/ez_agent_content/1_car.png",
+  "/docs/new/ez_agent_content/2_restauraunt.png",
+  "/docs/new/ez_agent_content/3_bedroom.png",
+  "/docs/new/ez_agent_content/4_outdoor..png",
 ] as const
 
-const CULL_SHOTS = [
-  "/docs/shoot-week/order/3/slide-05.png",
-  "/docs/shoot-week/order/3/slide-06.png",
-  "/docs/shoot-week/order/3/slide-07.png",
-  "/docs/shoot-week/order/3/slide-08.png",
-  "/docs/shoot-week/order/3/slide-09.png",
-] as const
+const CULL_SHOTS = BATCH_SHOTS
 
 function MentionDemo() {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -183,7 +176,7 @@ function BatchDemo() {
   return (
     <GuideDemoShell label="Demo: type a week brief then generate five stills" className="min-h-[220px]">
       <div ref={rootRef} className="flex min-h-[196px] flex-col gap-3">
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-4 gap-1.5">
           {BATCH_SHOTS.map((src) => (
             <div
               key={src}
@@ -280,7 +273,7 @@ function CullDemo() {
   return (
     <GuideDemoShell label="Demo: cull weak shots and enhance keepers" className="min-h-[220px]">
       <div ref={rootRef} className="relative flex min-h-[196px] flex-col gap-2.5">
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-4 gap-1.5">
           {CULL_SHOTS.map((src, index) => {
             const isKeeper = index < 3
             return (

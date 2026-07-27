@@ -8,15 +8,19 @@ import {
   GuideDemoShell,
   ModernPointerCursor,
 } from "@/components/guides/guide-demo-shell"
-import { CAROUSEL_SHOTS_EXAMPLE } from "@/lib/carousel-shots/constants"
 import { cn } from "@/lib/utils"
 
 export type CarouselGuideDemoId = "shots-upload" | "shots-settings" | "shots-generate"
 
 const DEMO_FRAME = "h-[220px]"
 
-const REF_SRC = CAROUSEL_SHOTS_EXAMPLE.slideUrls[0]
-const GRID_SRC = CAROUSEL_SHOTS_EXAMPLE.slideUrls
+const REF_SRC = "/docs/new/shots/slide-03.png"
+const GRID_SRC = [
+  "/docs/new/shots/slide-01.png",
+  "/docs/new/shots/slide-02.png",
+  "/docs/new/shots/slide-03.png",
+  "/docs/new/shots/slide-04.png",
+] as const
 
 function ShotsUploadDemo() {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -109,7 +113,7 @@ function ShotsUploadDemo() {
             data-demo-preview
             src={REF_SRC}
             alt=""
-            className="absolute inset-0 size-full object-cover"
+            className="absolute inset-0 size-full object-contain"
           />
         </div>
 
@@ -120,7 +124,7 @@ function ShotsUploadDemo() {
           aria-hidden
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={REF_SRC} alt="" className="size-full object-cover" />
+          <img src={REF_SRC} alt="" className="size-full object-contain" />
         </div>
 
         <div
@@ -248,7 +252,7 @@ function ShotsGenerateDemo() {
           <div
             className={cn(
               "grid h-full max-h-full w-auto grid-cols-2 grid-rows-2 gap-px",
-              CAROUSEL_SHOTS_EXAMPLE.aspectRatioClass,
+              "aspect-[4/5]",
             )}
           >
             {GRID_SRC.map((src) => (

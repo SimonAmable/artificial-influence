@@ -108,6 +108,14 @@ export async function POST(request: NextRequest) {
     const hasReferenceVideo =
       typeof body.reference_video === 'string' ||
       (Array.isArray(body.reference_videos) && body.reference_videos.some((value: unknown) => typeof value === 'string'));
+    const falReferenceVideo =
+      typeof body.reference_video === 'string'
+        ? body.reference_video
+        : Array.isArray(body.reference_videos)
+          ? body.reference_videos.find(
+              (value: unknown): value is string => typeof value === 'string' && value.length > 0,
+            ) ?? null
+          : null;
     const isFalMultimodalVideo = usesFalMultimodalVideoInputs(catalogModelIdentifier);
     const isHappyHorse = isHappyHorseModelIdentifier(catalogModelIdentifier);
     const falMultimodalReferenceImages = Array.isArray(body.reference_images)
@@ -203,6 +211,10 @@ export async function POST(request: NextRequest) {
         first_frame_image,
         body.reference_images,
       ]);
+      const referenceVideoStoragePaths = collectStoragePaths([
+        body.reference_video,
+        body.reference_videos,
+      ]);
       const falRequest = buildFalVideoRequest({
         aspectRatio:
           typeof otherParams.aspect_ratio === 'string' ? otherParams.aspect_ratio : null,
@@ -225,6 +237,7 @@ export async function POST(request: NextRequest) {
           otherParams.seed !== null && otherParams.seed !== undefined
             ? (otherParams.seed as number | string)
             : null,
+        videoUrl: isFalMultimodalVideo ? falReferenceVideo : null,
       });
       const { requestId, endpointId: falEndpoint } = await submitFalVideoQueue(
         falRequest.endpointId,
@@ -239,7 +252,8 @@ export async function POST(request: NextRequest) {
           supabase_storage_path: null,
           reference_images_supabase_storage_path:
             referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
-          reference_videos_supabase_storage_path: null,
+          reference_videos_supabase_storage_path:
+            referenceVideoStoragePaths.length > 0 ? referenceVideoStoragePaths : null,
           model: catalogModelIdentifier,
           type: 'video',
           is_public: true,

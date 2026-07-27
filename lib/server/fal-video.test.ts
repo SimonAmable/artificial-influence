@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 
 const {
   buildFalVideoRequest,
+  FAL_GEMINI_OMNI_FLASH_EDIT,
   FAL_GEMINI_OMNI_FLASH_I2V,
   FAL_GEMINI_OMNI_FLASH_REFERENCE,
   FAL_GEMINI_OMNI_FLASH_T2V,
@@ -148,4 +149,23 @@ runTest("Gemini Omni Flash reference mode wins over start frame", () => {
     "https://example.com/ref-2.png",
   ])
   assert.ok(!("image_url" in result.input))
+})
+
+runTest("Gemini Omni Flash routes video input to the edit endpoint", () => {
+  const result = buildFalVideoRequest({
+    aspectRatio: "9:16",
+    duration: 8,
+    imageUrl: "https://example.com/start.png",
+    modelIdentifier: GEMINI_OMNI_FLASH_CANONICAL_ID,
+    prompt: "Replace the pomegranates with apples",
+    referenceImageUrls: ["https://example.com/ref.png"],
+    videoUrl: "https://example.com/source.mp4",
+  })
+
+  assert.equal(result.endpointId, FAL_GEMINI_OMNI_FLASH_EDIT)
+  assert.equal(result.mode, "video-to-video")
+  assert.deepEqual(result.input, {
+    prompt: "Replace the pomegranates with apples",
+    video_url: "https://example.com/source.mp4",
+  })
 })

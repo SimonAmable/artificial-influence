@@ -47,6 +47,8 @@ export type ShaderDemoCardProps = {
   description?: string
   /** When set, shows media instead of the shader + cursor demo. */
   mediaSrc?: string
+  /** Custom visual used in place of the default shader or image. */
+  mediaContent?: React.ReactNode
   mediaAlt?: string
   animationDelay?: number
   /** Non-interactive “Soon” state — shader still shows, no link/cursor loop. */
@@ -71,6 +73,7 @@ export function ShaderDemoCard({
   title,
   description,
   mediaSrc,
+  mediaContent,
   mediaAlt,
   animationDelay = 0,
   disabled = false,
@@ -82,7 +85,7 @@ export function ShaderDemoCard({
   const prefersReducedMotion = useReducedMotion()
   const cardRef = React.useRef<HTMLElement | null>(null)
   const [pressed, setPressed] = React.useState(false)
-  const showShaderDemo = !mediaSrc
+  const showShaderDemo = !mediaSrc && !mediaContent
   const useWaterMedia = Boolean(mediaSrc && mediaWater)
   const displayTitle = title ?? buttonLabel
   const isInteractive = !disabled && Boolean(href)
@@ -119,7 +122,7 @@ export function ShaderDemoCard({
     disabled && "opacity-80",
   )
 
-  const mediaContent = showShaderDemo ? (
+  const renderedMedia = showShaderDemo ? (
     <>
       <AuroraShaderBackground
         className="rounded-[inherit]"
@@ -162,6 +165,8 @@ export function ShaderDemoCard({
         </motion.div>
       ) : null}
     </>
+  ) : mediaContent ? (
+    mediaContent
   ) : useWaterMedia ? (
     <>
       <span className="sr-only">{mediaAlt ?? displayTitle}</span>
@@ -221,7 +226,7 @@ export function ShaderDemoCard({
           className={mediaClassName}
           aria-label={displayTitle}
         >
-          {mediaContent}
+          {renderedMedia}
         </Link>
       ) : (
         <div
@@ -229,7 +234,7 @@ export function ShaderDemoCard({
           className={mediaClassName}
           aria-disabled="true"
         >
-          {mediaContent}
+          {renderedMedia}
         </div>
       )}
 

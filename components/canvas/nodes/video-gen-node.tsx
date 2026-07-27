@@ -37,6 +37,7 @@ import type { Model, ParameterDefinition } from "@/lib/types/models"
 import {
   DEFAULT_MOTION_COPY_MODEL_IDENTIFIER,
   isHappyHorseModelIdentifier,
+  isGeminiOmniFlashModelIdentifier,
   isMotionCopyModelIdentifier,
   normalizeMotionCopyModelIdentifier,
   usesFalMultimodalVideoInputs,
@@ -771,6 +772,8 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     const isSeedance2 = modelIdentifier === "bytedance/seedance-2.0"
     const isPrunaPVideo = modelIdentifier === "prunaai/p-video"
     const isWan27 = modelIdentifier === "wan-video/wan-2.7"
+    const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(modelIdentifier)
+    const isFalMultimodalVideo = usesFalMultimodalVideoInputs(modelIdentifier)
 
     if (isMotionCopy && (!finalImageUrl || !finalVideoUrl)) {
       nodeData.onDataChange?.(id, { error: "Image and video are required" })
@@ -801,6 +804,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       !isMotionCopy &&
       !isLipsync &&
       modelSupportsImage &&
+      !isFalMultimodalVideo &&
       !isSeedance2 &&
       !isPrunaPVideo &&
       !isWan27 &&
@@ -1042,8 +1046,15 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
             : []
           requestBody.reference_images = [...new Set([...existing, ...chipSlots.omniStyleImageChipUrls])]
         }
-        if (isKlingOmniNode && !requestBody.reference_video && chipSlots.referenceVideoChipUrl) {
+        if (
+          (isKlingOmniNode || isGeminiOmniFlash) &&
+          !requestBody.reference_video &&
+          chipSlots.referenceVideoChipUrl
+        ) {
           requestBody.reference_video = chipSlots.referenceVideoChipUrl
+        }
+        if (isGeminiOmniFlash && videoUpload?.url) {
+          requestBody.reference_video = videoUpload.url
         }
         if (isSeedance2 && videoUpload?.url) {
           requestBody.reference_videos = [videoUpload.url]
@@ -1127,11 +1138,16 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const isSeedance2Node = selectedModel?.identifier === "bytedance/seedance-2.0"
   const isPrunaPVideoNode = selectedModel?.identifier === "prunaai/p-video"
   const isWan27Node = selectedModel?.identifier === "wan-video/wan-2.7"
+  const isGeminiOmniFlashNode = isGeminiOmniFlashModelIdentifier(selectedModel?.identifier)
   const referenceAudioConfig = selectedModel
     ? getVideoReferenceAudioConfig(selectedModel.identifier)
     : null
   const showImageUpload = !!(modelSupportsImage || isMotionCopyModel || isLipsyncModel)
-  const showVideoUpload = !!isMotionCopyModel || isSeedance2Node
+  const showVideoUpload =
+    !!isMotionCopyModel ||
+    isSeedance2Node ||
+    isGeminiOmniFlashNode ||
+    selectedModel?.supports_reference_video === true
   const showAudioUpload = !!isLipsyncModel || isSeedance2Node || isPrunaPVideoNode || isWan27Node
   const showLastFrameUpload = !!modelSupportsLastFrame
   const hasUploadOptions = showImageUpload || showVideoUpload || showAudioUpload || showLastFrameUpload

@@ -1766,7 +1766,7 @@ export const GEMINI_OMNI_FLASH_VIDEO_MODEL: Model = {
   identifier: MODEL_IDENTIFIERS.GOOGLE_GEMINI_OMNI_FLASH,
   name: 'Gemini Omni Flash',
   description:
-    'Google Gemini Omni Flash on fal: text-to-video, image-to-video, or reference-to-video with synchronized audio.',
+    'Google Gemini Omni Flash on fal: create from text or images, or edit a video with synchronized audio.',
   type: 'video',
   provider: 'fal',
   is_active: true,
@@ -1809,6 +1809,7 @@ export const GEMINI_OMNI_FLASH_VIDEO_MODEL: Model = {
   aspect_ratios: ['16:9', '9:16'],
   default_aspect_ratio: '16:9',
   supports_reference_image: true,
+  supports_reference_video: true,
   supports_first_frame: true,
   duration_options: [3, 4, 5, 6, 7, 8, 9, 10],
   created_at: new Date().toISOString(),
