@@ -207,7 +207,7 @@ async function loadAssetReferences(assetIds: string[], supabase: SupabaseClient,
 
   const { data, error } = await supabase
     .from("assets")
-    .select("id, user_id, asset_type, asset_url, visibility, title")
+    .select("id, user_id, asset_type, asset_url, visibility, title, category")
     .in("id", assetIds)
 
   if (error) {
@@ -220,6 +220,8 @@ async function loadAssetReferences(assetIds: string[], supabase: SupabaseClient,
   }
 
   return assets.map((asset) => ({
+    id: asset.id as string,
+    category: asset.category as string,
     assetType: asset.asset_type as "image" | "video" | "audio",
     storagePath: inferStoragePathFromUrl(String(asset.asset_url)),
     title: typeof asset.title === "string" ? asset.title : undefined,
@@ -375,6 +377,8 @@ export function createGenerateVideoTool({
       }
 
       const assetReferences = await loadAssetReferences(assetIds, supabase, userId)
+      const characterAssetId =
+        assetReferences.find((asset) => asset.category === "character")?.id ?? null
       const imageReferences = dedupeReferences([
         ...resolvedFromIds,
         ...assetReferences
@@ -700,6 +704,7 @@ export function createGenerateVideoTool({
           replicate_prediction_id: prediction.id,
           quoted_credits: requiredCredits,
           predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
+          character_asset_id: characterAssetId,
           ...(threadId ? { chat_thread_id: threadId } : {}),
         })
         .select("id")

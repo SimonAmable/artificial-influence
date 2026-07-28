@@ -18,14 +18,14 @@ export function validateDualReferenceSwapState(
   const sourceSlot = tool.referenceSlots[0]
   const sceneSlot = tool.referenceSlots[1]
 
-  if (!state.sourceImage?.file) {
+  if (!state.sourceImage?.file && !state.sourceImage?.url) {
     return {
       field: "source",
       message: `Please upload a ${sourceSlot?.label?.toLowerCase() ?? "source"} image`,
     }
   }
 
-  if (!state.sceneImage?.file) {
+  if (!state.sceneImage?.file && !state.sceneImage?.url) {
     return {
       field: "scene",
       message: `Please upload a ${sceneSlot?.label?.toLowerCase() ?? "scene"} image`,
@@ -39,7 +39,10 @@ export function buildStudioToolGenerationRequest(
   tool: ImageStudioToolDefinition,
   state: DualReferenceSwapToolState,
 ): ImageStudioToolGenerationRequest {
-  const referenceImages = [state.sourceImage, state.sceneImage].filter(
+  const generationImages = tool.includeSceneReferenceInGeneration === false
+    ? [state.sourceImage]
+    : [state.sourceImage, state.sceneImage]
+  const referenceImages = generationImages.filter(
     (image): image is ImageUpload => Boolean(image),
   )
 

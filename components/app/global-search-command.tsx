@@ -42,6 +42,16 @@ type SearchRow =
   | { kind: "settings"; item: PageSearchItem }
   | { kind: "template"; item: Template }
 
+type SearchSection = "all" | "core" | "settings" | "templates" | "guides"
+
+const SEARCH_SECTIONS: Array<{ id: SearchSection; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "core", label: "Core" },
+  { id: "settings", label: "Settings" },
+  { id: "templates", label: "Templates" },
+  { id: "guides", label: "Guides" },
+]
+
 export type GlobalSearchCommandProps = {
   onOpenSettings?: (tab: PageSearchSettingsTab) => void
   open?: boolean
@@ -152,6 +162,11 @@ export function GlobalSearchCommand({
   const [templates, setTemplates] = React.useState<Template[]>([])
   const [templatesLoading, setTemplatesLoading] = React.useState(false)
   const [activeIndex, setActiveIndex] = React.useState(0)
+  const [activeSection, setActiveSection] = React.useState<SearchSection>("all")
+
+  React.useEffect(() => {
+    if (!open) setActiveSection("all")
+  }, [open])
 
   React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -225,7 +240,21 @@ export function GlobalSearchCommand({
   )
 
   const pages = React.useMemo(
-    () => allPages.filter((item) => !item.settingsTab),
+    () =>
+      allPages.filter(
+        (item) =>
+          !item.settingsTab &&
+          (!item.id.startsWith("guides:") || item.id === "guides:hub") &&
+          (item.path !== "/guides" || item.id === "guides:hub"),
+      ),
+    [allPages],
+  )
+
+  const guidePages = React.useMemo(
+    () =>
+      allPages.filter(
+        (item) => item.id.startsWith("guides:") && item.id !== "guides:hub",
+      ),
     [allPages],
   )
 
@@ -234,18 +263,37 @@ export function GlobalSearchCommand({
     [allPages],
   )
 
+  const visiblePages = React.useMemo(
+    () => (activeSection === "all" || activeSection === "core" ? pages : []),
+    [activeSection, pages],
+  )
+  const visibleSettings = React.useMemo(
+    () =>
+      activeSection === "all" || activeSection === "settings" ? settingsPages : [],
+    [activeSection, settingsPages],
+  )
+  const visibleTemplates = React.useMemo(
+    () => (activeSection === "all" || activeSection === "templates" ? templates : []),
+    [activeSection, templates],
+  )
+  const visibleGuides = React.useMemo(
+    () => (activeSection === "all" || activeSection === "guides" ? guidePages : []),
+    [activeSection, guidePages],
+  )
+
   const rows = React.useMemo<SearchRow[]>(
     () => [
-      ...pages.map((item) => ({ kind: "page" as const, item })),
-      ...settingsPages.map((item) => ({ kind: "settings" as const, item })),
-      ...templates.map((item) => ({ kind: "template" as const, item })),
+      ...visiblePages.map((item) => ({ kind: "page" as const, item })),
+      ...visibleSettings.map((item) => ({ kind: "settings" as const, item })),
+      ...visibleTemplates.map((item) => ({ kind: "template" as const, item })),
+      ...visibleGuides.map((item) => ({ kind: "page" as const, item })),
     ],
-    [pages, settingsPages, templates],
+    [visibleGuides, visiblePages, visibleSettings, visibleTemplates],
   )
 
   React.useEffect(() => {
     setActiveIndex(0)
-  }, [query, rows.length])
+  }, [activeSection, query, rows.length])
 
   React.useEffect(() => {
     if (activeIndex >= rows.length && rows.length > 0) {
@@ -268,7 +316,7 @@ export function GlobalSearchCommand({
       }
       router.push(`/templates/${row.item.slug}`)
     },
-    [onOpenSettings, router],
+    [onOpenSettings, router, setOpen],
   )
 
   const handleInputKeyDown = React.useCallback(
@@ -295,10 +343,8 @@ export function GlobalSearchCommand({
   )
 
   const noResults =
-    pages.length === 0 &&
-    settingsPages.length === 0 &&
-    templates.length === 0 &&
-    !templatesLoading
+    rows.length === 0 &&
+    !(activeSection === "all" || activeSection === "templates" ? templatesLoading : false)
 
   return (
     <>
@@ -326,7 +372,10 @@ export function GlobalSearchCommand({
         open={open}
         onOpenChange={(nextOpen) => {
           setOpen(nextOpen)
-          if (!nextOpen) setQuery("")
+          if (!nextOpen) {
+            setQuery("")
+            setActiveSection("all")
+          }
         }}
         title="Search tools and templates"
         description="Find tools, settings, and visible templates."
@@ -339,12 +388,36 @@ export function GlobalSearchCommand({
           autoFocus
           icon={<MagnifyingGlass className="h-5 w-5" />}
         />
+        <div
+          className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-border/60 px-4 pb-3"
+          aria-label="Search sections"
+        >
+          {SEARCH_SECTIONS.map((section) => {
+            const selected = activeSection === section.id
+            return (
+              <button
+                key={section.id}
+                type="button"
+                aria-pressed={selected}
+                className={cn(
+                  "h-7 shrink-0 rounded-full border px-3 text-xs font-semibold transition-[color,background-color,border-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20",
+                  selected
+                    ? "border-border bg-background text-foreground shadow-md"
+                    : "border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+                onClick={() => setActiveSection(section.id)}
+              >
+                {section.label}
+              </button>
+            )
+          })}
+        </div>
         <CommandList>
           {noResults ? <CommandEmpty>No tools, settings, guides, or templates found.</CommandEmpty> : null}
 
-          {pages.length > 0 ? (
-            <CommandGroup heading="Tools">
-              {pages.map((page, index) => (
+          {visiblePages.length > 0 ? (
+            <CommandGroup heading="Core">
+              {visiblePages.map((page, index) => (
                 <CommandItem
                   key={page.id}
                   active={activeIndex === index}
@@ -363,12 +436,12 @@ export function GlobalSearchCommand({
             </CommandGroup>
           ) : null}
 
-          {pages.length > 0 && settingsPages.length > 0 ? <CommandSeparator /> : null}
+          {visiblePages.length > 0 && visibleSettings.length > 0 ? <CommandSeparator /> : null}
 
-          {settingsPages.length > 0 ? (
+          {visibleSettings.length > 0 ? (
             <CommandGroup heading="Settings">
-              {settingsPages.map((page, settingsIndex) => {
-                const rowIndex = pages.length + settingsIndex
+              {visibleSettings.map((page, settingsIndex) => {
+                const rowIndex = visiblePages.length + settingsIndex
                 return (
                   <CommandItem
                     key={page.id}
@@ -383,18 +456,21 @@ export function GlobalSearchCommand({
             </CommandGroup>
           ) : null}
 
-          {(pages.length > 0 || settingsPages.length > 0) &&
-          (templates.length > 0 || templatesLoading) ? (
+          {(visiblePages.length > 0 || visibleSettings.length > 0) &&
+          (visibleTemplates.length > 0 || templatesLoading) &&
+          (activeSection === "all" || activeSection === "templates") ? (
             <CommandSeparator />
           ) : null}
 
-          {templates.length > 0 || templatesLoading ? (
+          {(activeSection === "all" || activeSection === "templates") &&
+          (visibleTemplates.length > 0 || templatesLoading) ? (
             <CommandGroup heading="Templates">
-              {templatesLoading && templates.length === 0 ? (
+              {templatesLoading && visibleTemplates.length === 0 ? (
                 <div className="px-3 py-6 text-sm text-muted-foreground">Searching templates...</div>
               ) : null}
-              {templates.map((template, templateIndex) => {
-                const rowIndex = pages.length + settingsPages.length + templateIndex
+              {visibleTemplates.map((template, templateIndex) => {
+                const rowIndex =
+                  visiblePages.length + visibleSettings.length + templateIndex
                 return (
                   <CommandItem
                     key={template.id}
@@ -411,6 +487,41 @@ export function GlobalSearchCommand({
                         {template.description || template.slug}
                       </p>
                     </div>
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+          ) : null}
+
+          {visibleGuides.length > 0 &&
+          (visiblePages.length > 0 ||
+            visibleSettings.length > 0 ||
+            visibleTemplates.length > 0) ? (
+            <CommandSeparator />
+          ) : null}
+
+          {visibleGuides.length > 0 ? (
+            <CommandGroup heading="Guides">
+              {visibleGuides.map((page, guideIndex) => {
+                const rowIndex =
+                  visiblePages.length +
+                  visibleSettings.length +
+                  visibleTemplates.length +
+                  guideIndex
+                return (
+                  <CommandItem
+                    key={page.id}
+                    active={activeIndex === rowIndex}
+                    onMouseEnter={() => setActiveIndex(rowIndex)}
+                    onClick={() => selectRow({ kind: "page", item: page })}
+                  >
+                    <MegaNavItemBody item={pageToMegaNavItem(page)} />
+                    <ArrowSquareOut
+                      className={cn(
+                        "ml-auto h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity",
+                        activeIndex === rowIndex && "opacity-100",
+                      )}
+                    />
                   </CommandItem>
                 )
               })}

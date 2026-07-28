@@ -70,6 +70,8 @@ interface CreateGenerateImageToolOptions {
 }
 
 interface StoredAsset {
+  id?: string
+  category?: string
   mimeType: string
   storagePath: string | null
   bucket: UploadBucket | null
@@ -300,7 +302,7 @@ async function loadAssetReferences(
 
   const { data, error } = await supabase
     .from("assets")
-    .select("id, user_id, asset_type, asset_url, visibility, upload_id, supabase_storage_path")
+    .select("id, user_id, asset_type, asset_url, visibility, upload_id, supabase_storage_path, category")
     .in("id", assetIds)
 
   if (error) {
@@ -338,6 +340,8 @@ async function loadAssetReferences(
         inferStoragePathFromUrl(absolute)
 
       return {
+        id: asset.id as string,
+        category: asset.category as string,
         mimeType: "image/png",
         storagePath,
         bucket: ref?.bucket ?? null,
@@ -504,6 +508,8 @@ export function createGenerateImageTool({
       const maxImages = Math.max(1, Number(modelData.max_images ?? 1) || 1)
       const effectiveVariantCount = Math.min(variantCount, maxImages)
       const allReferences = [...uploadedReferences, ...assetReferences].slice(0, MAX_REFERENCE_IMAGES)
+      const characterAssetId =
+        (assetReferences.find((asset) => asset.category === "character")?.id as string | undefined) ?? null
       const referenceImageUrls = allReferences.map((reference) => reference.url)
       const referenceImageStoragePaths = allReferences
         .map((reference) => reference.storagePath)
@@ -711,6 +717,7 @@ export function createGenerateImageTool({
             fal_endpoint_id: falEndpoint,
             quoted_credits: requiredCredits,
             pricing_snapshot: pricingSnapshot,
+            character_asset_id: characterAssetId,
             ...(threadId ? { chat_thread_id: threadId } : {}),
           })
           .select("id")

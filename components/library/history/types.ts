@@ -18,6 +18,7 @@ export type Generation = {
   created_at: string
   url: string
   reference_image_urls?: string[]
+  character_asset_id?: string | null
   carousel_summary?: CarouselShotsLibrarySummary | null
   /** Where this history row came from. Missing means generation (legacy API). */
   source?: HistoryItemSource

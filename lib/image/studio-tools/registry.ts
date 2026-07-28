@@ -1,9 +1,18 @@
 import type { Model } from "@/lib/types/models"
 import { CHARACTER_SWAP_TOOL } from "./character-swap"
 import { FACE_SWAP_TOOL } from "./face-swap"
+import { OUTFIT_SWAP_TOOL } from "./outfit-swap"
+import { POSE_RECREATE_TOOL } from "./pose-recreate"
+import { SHOT_RECREATE_TOOL } from "./shot-recreate"
 import type { ImageStudioToolDefinition } from "./types"
 
-export const IMAGE_STUDIO_TOOLS = [CHARACTER_SWAP_TOOL, FACE_SWAP_TOOL] as const
+export const IMAGE_STUDIO_TOOLS = [
+  CHARACTER_SWAP_TOOL,
+  FACE_SWAP_TOOL,
+  OUTFIT_SWAP_TOOL,
+  POSE_RECREATE_TOOL,
+  SHOT_RECREATE_TOOL,
+] as const
 
 const TOOLS_BY_UI_MODEL = new Map<string, ImageStudioToolDefinition>(
   IMAGE_STUDIO_TOOLS.map((tool) => [tool.uiModelIdentifier, tool]),

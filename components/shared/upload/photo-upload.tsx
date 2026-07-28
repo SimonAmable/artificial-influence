@@ -2,8 +2,9 @@
 
 import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
-import { X, User, Plus } from "@phosphor-icons/react"
+import { X, User, Plus, UploadSimple, FolderOpen } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 
 export interface ImageUpload {
@@ -24,6 +25,11 @@ export interface PhotoUploadProps {
   previewFit?: "contain" | "cover"
   /** When true, accepts common video types and previews with a video element. */
   allowVideo?: boolean
+  /** Show clear upload and asset-library actions in the empty state. */
+  showSourceActions?: boolean
+  onChooseAsset?: () => void
+  /** Allow an image copied to the clipboard to be pasted into the full dropzone. */
+  enablePaste?: boolean
 }
 
 const DEFAULT_VIDEO_ACCEPT =
@@ -40,10 +46,14 @@ export function PhotoUpload({
   minHeight = "min-h-[50px] sm:min-h-[55px]",
   previewFit = "contain",
   allowVideo = false,
+  showSourceActions = false,
+  onChooseAsset,
+  enablePaste = false,
 }: PhotoUploadProps) {
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false)
   const [isDragging, setIsDragging] = React.useState(false)
   const dragCounter = React.useRef(0)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   const resolvedAccept = allowVideo ? DEFAULT_VIDEO_ACCEPT : accept
 
@@ -108,6 +118,16 @@ export function PhotoUpload({
     }
   }
 
+  const handlePaste = (event: React.ClipboardEvent) => {
+    if (!enablePaste) return
+    const imageFile = Array.from(event.clipboardData.files).find((file) =>
+      file.type.startsWith("image/"),
+    )
+    if (!imageFile) return
+    event.preventDefault()
+    handleFileUpload(imageFile)
+  }
+
   return (
     <Card
       className={cn(
@@ -119,6 +139,9 @@ export function PhotoUpload({
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
+      onPaste={handlePaste}
+      tabIndex={enablePaste && !value?.url ? 0 : undefined}
+      aria-label={enablePaste && !value?.url ? `${title}. Click, drop, or paste an image.` : undefined}
     >
       <CardContent className={cn("p-1.5 sm:p-2 h-full min-h-0 flex items-center justify-center", minHeight)}>
         {value?.url ? (
@@ -155,8 +178,20 @@ export function PhotoUpload({
             </button>
           </div>
         ) : (
-          <label className="flex flex-col items-center justify-center gap-0.5 cursor-pointer w-full h-full">
+          <div
+            role="button"
+            tabIndex={-1}
+            className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-1"
+            onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault()
+                fileInputRef.current?.click()
+              }
+            }}
+          >
             <input
+              ref={fileInputRef}
               type="file"
               accept={resolvedAccept}
               onChange={handleUpload}
@@ -170,7 +205,37 @@ export function PhotoUpload({
               <div className="text-foreground font-bold text-[9px] sm:text-[10px]">{title}</div>
               <div className="text-muted-foreground text-[8px] sm:text-[9px] text-center px-1">{description}</div>
             </div>
-          </label>
+            {showSourceActions ? (
+              <div className="mt-1.5 grid w-full max-w-[15rem] grid-cols-2 gap-1.5 px-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-[10px]"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    fileInputRef.current?.click()
+                  }}
+                >
+                  <UploadSimple className="size-3.5" weight="bold" />
+                  Upload
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-[10px]"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onChooseAsset?.()
+                  }}
+                >
+                  <FolderOpen className="size-3.5" weight="bold" />
+                  Choose asset
+                </Button>
+              </div>
+            ) : null}
+          </div>
         )}
       </CardContent>
 

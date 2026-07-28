@@ -584,6 +584,39 @@ function ImagePageContent() {
         sourceImage: studioToolSourceImage,
         sceneImage: studioToolSceneImage,
       })
+
+      if (selectedStudioTool.requiresReferenceAnalysis && studioToolSceneImage) {
+        try {
+          const analysisData = new FormData()
+          if (studioToolSceneImage.file) {
+            analysisData.append("reference", studioToolSceneImage.file)
+          } else if (studioToolSceneImage.url) {
+            analysisData.append("referenceUrl", studioToolSceneImage.url)
+          }
+
+          const analysisResponse = await fetch("/api/image/shot-recreate-analysis", {
+            method: "POST",
+            body: analysisData,
+          })
+          const analysisResult = (await analysisResponse.json()) as {
+            shotRecipe?: Record<string, string>
+            error?: string
+          }
+          if (!analysisResponse.ok || !analysisResult.shotRecipe) {
+            throw new Error(analysisResult.error || "Could not analyze this shot")
+          }
+          studioToolPayload.prompt =
+            `${studioToolPayload.prompt} Structured shot recipe JSON: ` +
+            JSON.stringify(analysisResult.shotRecipe)
+        } catch (analysisError) {
+          const message =
+            analysisError instanceof Error
+              ? analysisError.message
+              : "Could not analyze this shot"
+          reportImageInputError(message)
+          return
+        }
+      }
     }
 
     setError(null)
@@ -651,6 +684,10 @@ function ImagePageContent() {
 
       // Create FormData for the request
       const formData = new FormData()
+      const characterAssetId = searchParams.get("characterAssetId")
+      if (characterAssetId) formData.append("characterAssetId", characterAssetId)
+      const sourceGenerationId = searchParams.get("sourceGenerationId")
+      if (sourceGenerationId) formData.append("sourceGenerationId", sourceGenerationId)
       formData.append(
         "prompt",
         studioToolPayload ? studioToolPayload.prompt : mergedPrompt.trim()

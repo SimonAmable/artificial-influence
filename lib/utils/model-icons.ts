@@ -5,7 +5,7 @@ import { productLogo } from "@/lib/product/branding"
  * Maps model identifiers to their corresponding icon paths in public/ai_icons
  */
 export function getModelIconPath(identifier: string): string | null {
-  if (identifier === 'custom/character-swap' || identifier === 'custom/face-swap') {
+  if (identifier.startsWith('custom/')) {
     return productLogo
   }
 

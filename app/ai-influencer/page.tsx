@@ -698,16 +698,19 @@ function AIInfluencerPageContent() {
       if (target === "video") {
         // Video studio loads the primary frame via startFrame (input image),
         // matching Animate from Assets / image grid — not referenceImageUrl.
-        router.push(`/video?startFrame=${encodeURIComponent(characterUrl)}`)
+        const params = new URLSearchParams({ startFrame: characterUrl })
+        if (selectedCharacter.assetId) params.set("characterAssetId", selectedCharacter.assetId)
+        router.push(`/video?${params.toString()}`)
         return
       }
 
       const params = new URLSearchParams({
         referenceImageUrl: characterUrl,
       })
+      if (selectedCharacter.assetId) params.set("characterAssetId", selectedCharacter.assetId)
       router.push(`/image?${params.toString()}`)
     },
-    [router, selectedCharacter?.url]
+    [router, selectedCharacter]
   )
 
   const openCharacterVoiceInAudio = React.useCallback(() => {

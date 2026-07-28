@@ -31,7 +31,10 @@ import {
 import type { ImageGridAgentAction } from "@/lib/chat/image-grid-agent-actions"
 import { anglesHrefFromImage } from "@/lib/angles/constants"
 import { carouselShotsHrefFromImage } from "@/lib/carousel-shots/constants"
-import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
+import {
+  getGenerationToolDisplayName,
+  shouldHideGenerationDetails,
+} from "@/lib/generation/proprietary-prompt"
 import { FullscreenMediaViewer, type FullscreenMediaViewerAction } from "./fullscreen-media-viewer"
 import { copyMediaToClipboard, downloadMediaFile } from "./media-viewer-utils"
 import { toast } from "sonner"
@@ -572,7 +575,10 @@ export function ImageGrid({
         onAgentAction("animate", data, index)
         return
       }
-      router.push(`/video?startFrame=${encodeURIComponent(data.url)}`)
+      const sourceParam = data.id
+        ? `&sourceGenerationId=${encodeURIComponent(data.id)}`
+        : ""
+      router.push(`/video?startFrame=${encodeURIComponent(data.url)}${sourceParam}`)
     },
     [isAgentMode, onAgentAction, router],
   )
@@ -697,7 +703,7 @@ export function ImageGrid({
                       : "bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30"
                   )} />
                   <div className="absolute inset-x-2 bottom-2 z-10 text-left text-[10px] text-white/90 drop-shadow-md">
-                    <p className="truncate font-semibold">{item.type === "failed" ? "Generation failed · Credit refunded" : shouldHideGenerationDetails(item.tool) ? "Generating..." : item.model ?? "Generating..."}</p>
+                    <p className="truncate font-semibold">{item.type === "failed" ? "Generation failed · Credit refunded" : shouldHideGenerationDetails(item.tool) ? getGenerationToolDisplayName(item.tool) ?? "Generating..." : item.model ?? "Generating..."}</p>
                     <p className="truncate text-white/60">{item.type === "failed" ? "Sorry for the issue. We refunded your credits so you can try again." : (shouldHideGenerationDetails(item.tool) ? null : item.prompt) ?? "Generating..."}</p>
                   </div>
                 </div>
@@ -907,9 +913,9 @@ export function ImageGrid({
               {/* Bottom bar: prompt (left) + buttons (right) - no overlap */}
               <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-1 px-2 pb-2 pt-6 opacity-100 transition-opacity duration-200 lg:gap-2 lg:opacity-0 lg:group-hover:opacity-100">
                 <div className="min-w-0 flex-1 overflow-hidden pr-1 sm:pr-2">
-                  {item.data.model && !shouldHideGenerationDetails(item.data.tool) && (
+                  {(getGenerationToolDisplayName(item.data.tool) || (item.data.model && !shouldHideGenerationDetails(item.data.tool))) && (
                     <p className="truncate text-[10px] font-semibold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                      {normalizeModelName(item.data.model)}
+                      {getGenerationToolDisplayName(item.data.tool) ?? normalizeModelName(item.data.model ?? "")}
                     </p>
                   )}
                   {item.data.prompt && !shouldHideGenerationDetails(item.data.tool) && (
@@ -1112,7 +1118,9 @@ export function ImageGrid({
           url={fullscreenImage.url}
           metadata={{
             id: fullscreenImage.id,
-            model: shouldHideGenerationDetails(fullscreenImage.tool) ? null : fullscreenImage.model ?? null,
+            model: shouldHideGenerationDetails(fullscreenImage.tool)
+              ? getGenerationToolDisplayName(fullscreenImage.tool)
+              : fullscreenImage.model ?? null,
             prompt: shouldHideGenerationDetails(fullscreenImage.tool) ? null : fullscreenImage.prompt ?? null,
             tool: fullscreenImage.tool ?? null,
             aspectRatio: fullscreenImage.aspectRatio ?? null,

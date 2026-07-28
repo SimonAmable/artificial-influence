@@ -828,6 +828,10 @@ function VideoPageContent() {
         prompt: mergedPrompt,
         ...otherParameters,
       }
+      const characterAssetId = searchParams.get("characterAssetId")
+      if (characterAssetId) requestBody.characterAssetId = characterAssetId
+      const sourceGenerationId = searchParams.get("sourceGenerationId")
+      if (sourceGenerationId) requestBody.sourceGenerationId = sourceGenerationId
       if (isHappyHorse) {
         requestBody.enable_safety_checker = false
       }

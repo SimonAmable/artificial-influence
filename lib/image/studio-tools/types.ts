@@ -23,6 +23,8 @@ export interface ImageStudioToolDefinition {
   }
   referenceSlots: ImageStudioReferenceSlot[]
   inputKind: ImageStudioToolInputKind
+  requiresReferenceAnalysis?: boolean
+  includeSceneReferenceInGeneration?: boolean
   icon?: "product" | string
 }
 

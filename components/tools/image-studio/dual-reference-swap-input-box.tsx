@@ -35,6 +35,10 @@ import {
   PromptControlMenuItem,
   PromptControlMenuSeparator,
 } from "@/components/tools/influencer/prompt-control-menu"
+import {
+  AssetSelectionModal,
+  type AssetSelectionPick,
+} from "@/components/shared/modals/asset-selection-modal"
 
 export interface DualReferenceSwapInputBoxProps {
   className?: string
@@ -83,6 +87,7 @@ export function DualReferenceSwapInputBox({
 }: DualReferenceSwapInputBoxProps) {
   const sourceInputRef = React.useRef<HTMLInputElement>(null)
   const sceneInputRef = React.useRef<HTMLInputElement>(null)
+  const [assetTarget, setAssetTarget] = React.useState<"source" | "scene" | null>(null)
 
   const sourceSlot = referenceSlots[0]
   const sceneSlot = referenceSlots[1]
@@ -119,6 +124,19 @@ export function DualReferenceSwapInputBox({
     onSceneImageChange?.(sourceImage)
   }, [onSceneImageChange, onSourceImageChange, sceneImage, sourceImage])
 
+  const handleAssetSelect = React.useCallback(
+    (pick: AssetSelectionPick) => {
+      const image: ImageUpload = { url: pick.url }
+      if (assetTarget === "source") {
+        onSourceImageChange?.(image)
+      } else if (assetTarget === "scene") {
+        onSceneImageChange?.(image)
+      }
+      setAssetTarget(null)
+    },
+    [assetTarget, onSceneImageChange, onSourceImageChange],
+  )
+
   return (
     <Card
       className={cn(
@@ -133,12 +151,22 @@ export function DualReferenceSwapInputBox({
             onChange={onSourceImageChange}
             title={sourceSlot?.label ?? "Source"}
             description={sourceSlot?.description}
+            minHeight="min-h-[140px] sm:min-h-[160px]"
+            maxHeight="max-h-[130px] sm:max-h-[150px]"
+            showSourceActions
+            enablePaste
+            onChooseAsset={() => setAssetTarget("source")}
           />
           <PhotoUpload
             value={sceneImage}
             onChange={onSceneImageChange}
             title={sceneSlot?.label ?? "Scene"}
             description={sceneSlot?.description}
+            minHeight="min-h-[140px] sm:min-h-[160px]"
+            maxHeight="max-h-[130px] sm:max-h-[150px]"
+            showSourceActions
+            enablePaste
+            onChooseAsset={() => setAssetTarget("scene")}
           />
 
           <AnimatePresence>
@@ -312,6 +340,15 @@ export function DualReferenceSwapInputBox({
           accept="image/*"
           onChange={(e) => handleQuickUpload("scene", e.target.files?.[0])}
           className="hidden"
+        />
+        <AssetSelectionModal
+          open={assetTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) setAssetTarget(null)
+          }}
+          onSelect={handleAssetSelect}
+          allowedAssetTypes={["image"]}
+          defaultTab="assets"
         />
       </CardContent>
     </Card>

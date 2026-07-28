@@ -38,6 +38,7 @@ type PendingFalImageRow = {
   status: string
   type: string
   quoted_credits?: number | null
+  character_asset_id?: string | null
 }
 
 type CompleteFalImageOptions = {
@@ -56,7 +57,7 @@ export async function completeFalPendingImageAdmin(
   const { data: generation, error } = await supabaseAdmin
     .from("generations")
     .select(
-      "id, user_id, model, prompt, aspect_ratio, tool, reference_images_supabase_storage_path, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type, quoted_credits",
+      "id, user_id, model, prompt, aspect_ratio, tool, reference_images_supabase_storage_path, character_asset_id, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type, quoted_credits",
     )
     .eq("replicate_prediction_id", predictionId)
     .eq("type", "image")
@@ -226,6 +227,7 @@ export async function completeFalPendingImageAdmin(
       status: "completed",
       error_message: null,
       finished_at: completedAt,
+      character_asset_id: row.character_asset_id ?? null,
     })
     .eq("id", row.id)
 
@@ -247,6 +249,7 @@ export async function completeFalPendingImageAdmin(
       status: "completed",
       replicate_prediction_id: predictionId,
       finished_at: completedAt,
+      character_asset_id: row.character_asset_id ?? null,
     }))
     await supabaseAdmin.from("generations").insert(extraRows)
   }

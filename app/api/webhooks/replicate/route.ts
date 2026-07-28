@@ -37,6 +37,7 @@ type PendingGenerationRow = {
   tool?: string | null
   type: "image" | "video"
   user_id: string
+  character_asset_id?: string | null
 }
 
 function extractOutputUrls(output: unknown): string[] {
@@ -175,7 +176,7 @@ export async function POST(request: NextRequest) {
     const { data: generation, error: fetchError } = await supabaseAdmin
       .from("generations")
       .select(
-        "id, user_id, prompt, model, quoted_credits, predicted_duration_seconds, reference_images_supabase_storage_path, reference_videos_supabase_storage_path, aspect_ratio, tool, type, chat_thread_id, chat_message_id, chat_tool_call_id",
+        "id, user_id, prompt, model, quoted_credits, predicted_duration_seconds, reference_images_supabase_storage_path, reference_videos_supabase_storage_path, character_asset_id, aspect_ratio, tool, type, chat_thread_id, chat_message_id, chat_tool_call_id",
       )
       .eq("replicate_prediction_id", predictionId)
       .eq("status", "pending")
@@ -277,6 +278,7 @@ export async function POST(request: NextRequest) {
         status: "completed",
         error_message: null,
         finished_at: finishedAt,
+        character_asset_id: pendingGeneration.character_asset_id ?? null,
       })
       .eq("id", pendingGeneration.id)
 
@@ -298,6 +300,7 @@ export async function POST(request: NextRequest) {
         status: "completed",
         replicate_prediction_id: predictionId,
         finished_at: finishedAt,
+        character_asset_id: pendingGeneration.character_asset_id ?? null,
       }))
 
       if (extraRows.length > 0) {

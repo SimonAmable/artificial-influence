@@ -182,6 +182,30 @@ export async function POST(request: NextRequest) {
     const width = widthForm ? parseInt(widthForm as string) : null;
     const height = heightForm ? parseInt(heightForm as string) : null;
     const tool = formData.get('tool') as string | null;
+    const requestedCharacterAssetId = formData.get('characterAssetId') as string | null;
+    const sourceGenerationId = formData.get('sourceGenerationId') as string | null;
+    let characterAssetId: string | null = null;
+    if (requestedCharacterAssetId) {
+      const { data: character } = await supabase
+        .from('assets')
+        .select('id')
+        .eq('id', requestedCharacterAssetId)
+        .eq('user_id', user.id)
+        .eq('category', 'character')
+        .maybeSingle();
+      if (!character) {
+        return NextResponse.json({ error: 'Character asset not found' }, { status: 400 });
+      }
+      characterAssetId = character.id;
+    } else if (sourceGenerationId) {
+      const { data: sourceGeneration } = await supabase
+        .from('generations')
+        .select('character_asset_id')
+        .eq('id', sourceGenerationId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      characterAssetId = sourceGeneration?.character_asset_id ?? null;
+    }
     const goFastValue = formData.get('go_fast');
     const go_fast =
       goFastValue === 'true' ? true : goFastValue === 'false' ? false : null;
@@ -545,6 +569,7 @@ export async function POST(request: NextRequest) {
           fal_endpoint_id: falEndpoint,
           quoted_credits: requiredCredits,
           pricing_snapshot: pricingSnapshot,
+          character_asset_id: characterAssetId,
         })
         .select('id')
         .single();
@@ -900,6 +925,7 @@ export async function POST(request: NextRequest) {
               model: modelIdentifier,
               type: 'image',
               is_public: true,
+              character_asset_id: characterAssetId,
               tool: tool || null,
               status: 'pending',
               replicate_prediction_id: prediction.id,
@@ -1075,6 +1101,7 @@ export async function POST(request: NextRequest) {
           tool: tool || null,
           quoted_credits: requiredCredits,
           pricing_snapshot: pricingSnapshot,
+          character_asset_id: characterAssetId,
         };
 
         const { data: savedData, error: saveError } = await supabase

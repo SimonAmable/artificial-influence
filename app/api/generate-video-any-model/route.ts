@@ -69,8 +69,33 @@ export async function POST(request: NextRequest) {
       first_frame_image,
       last_frame,
       negative_prompt,
+      characterAssetId: requestedCharacterAssetId,
+      sourceGenerationId,
       ...otherParams
     } = body;
+
+    let characterAssetId: string | null = null;
+    if (typeof requestedCharacterAssetId === 'string' && requestedCharacterAssetId.length > 0) {
+      const { data: character } = await supabase
+        .from('assets')
+        .select('id')
+        .eq('id', requestedCharacterAssetId)
+        .eq('user_id', user.id)
+        .eq('category', 'character')
+        .maybeSingle();
+      if (!character) {
+        return NextResponse.json({ error: 'Character asset not found' }, { status: 400 });
+      }
+      characterAssetId = character.id;
+    } else if (typeof sourceGenerationId === 'string' && sourceGenerationId.length > 0) {
+      const { data: sourceGeneration } = await supabase
+        .from('generations')
+        .select('character_asset_id')
+        .eq('id', sourceGenerationId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      characterAssetId = sourceGeneration?.character_asset_id ?? null;
+    }
 
     console.log('[generate-video-test] Request params:', {
       model,
@@ -264,6 +289,7 @@ export async function POST(request: NextRequest) {
           fal_endpoint_id: falEndpoint,
           quoted_credits: quotedCredits,
           predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
+          character_asset_id: characterAssetId,
         })
         .select('id')
         .single();
@@ -628,6 +654,7 @@ export async function POST(request: NextRequest) {
           replicate_prediction_id: prediction.id,
           quoted_credits: quotedCredits,
           predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
+          character_asset_id: characterAssetId,
         })
         .select('id')
         .single();

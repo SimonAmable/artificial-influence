@@ -29,6 +29,7 @@ import { CreateCollectionDialog } from "@/components/collections/create-collecti
 import { SaveExampleDialog, type SaveExampleSnapshot } from "@/components/image/save-example-dialog"
 import { AssetFilterOptions } from "@/components/library/assets/asset-filters"
 import { AssetsPanel } from "@/components/library/assets/assets-panel"
+import { CharactersPanel } from "@/components/library/characters/characters-panel"
 import { ASSET_PAGE_LIMIT, COLUMN_COUNT_STORAGE_KEY } from "@/components/library/assets/constants"
 import { HistoryFilterOptions } from "@/components/library/history/history-filters"
 import { HistoryPanel } from "@/components/library/history/history-panel"
@@ -78,7 +79,7 @@ import type { SlideshowCollection } from "@/lib/slideshow/types"
 import { createClient } from "@/lib/supabase/client"
 import { isPresenceProduct } from "@/lib/product/require-presence"
 
-type LibraryTab = "history" | "assets" | "brands" | "collections"
+type LibraryTab = "history" | "assets" | "characters" | "brands" | "collections"
 
 type AssetsResponse = {
   assets?: AssetRecord[]
@@ -110,7 +111,7 @@ type ViewerItem = {
   actions: FullscreenMediaViewerAction[]
 }
 
-const ALL_LIBRARY_TABS: LibraryTab[] = ["history", "assets", "brands", "collections"]
+const ALL_LIBRARY_TABS: LibraryTab[] = ["history", "assets", "characters", "brands", "collections"]
 
 function getLibraryTabs(): LibraryTab[] {
   if (isPresenceProduct()) {
@@ -122,6 +123,7 @@ function getLibraryTabs(): LibraryTab[] {
 const tabLabels: Record<LibraryTab, string> = {
   history: "History",
   assets: "Assets",
+  characters: "Characters",
   brands: "Brands",
   collections: "Collections",
 }
@@ -218,6 +220,7 @@ function LibraryPageContent() {
   const libraryTabs = React.useMemo(() => getLibraryTabs(), [])
   const requestedTab = searchParams.get("tab")
   const [activeTab, setActiveTab] = React.useState<LibraryTab>(() => normalizeLibraryTab(requestedTab, libraryTabs))
+  const selectedCharacterId = searchParams.get("character")
 
   React.useEffect(() => {
     const nextTab = normalizeLibraryTab(requestedTab, libraryTabs)
@@ -323,6 +326,17 @@ function LibraryPageContent() {
       setActiveTab(nextTab)
       const params = new URLSearchParams(searchParams.toString())
       params.set("tab", nextTab)
+      router.replace(`/assets?${params.toString()}`, { scroll: false })
+    },
+    [router, searchParams],
+  )
+
+  const handleCharacterChange = React.useCallback(
+    (characterId: string | null) => {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set("tab", "characters")
+      if (characterId) params.set("character", characterId)
+      else params.delete("character")
       router.replace(`/assets?${params.toString()}`, { scroll: false })
     },
     [router, searchParams],
@@ -851,7 +865,17 @@ function LibraryPageContent() {
           id: "reference",
           label: "Use as reference",
           icon: <Sparkle className="size-4" />,
-          onClick: () => void copyReference(asset.url),
+          onClick: () => {
+            if (asset.category === "character" && asset.assetType === "image") {
+              const params = new URLSearchParams({
+                referenceImageUrl: asset.url,
+                characterAssetId: asset.id,
+              })
+              router.push(`/image?${params.toString()}`)
+              return
+            }
+            void copyReference(asset.url)
+          },
         },
         ...(asset.assetType === "image"
           ? [
@@ -865,7 +889,11 @@ function LibraryPageContent() {
                 id: "animate",
                 label: "Animate",
                 icon: <Play className="size-4" weight="fill" />,
-                onClick: () => handleAnimateUrl(asset.url, asset.assetType),
+                onClick: () => {
+                  const characterParam =
+                    asset.category === "character" ? `&characterAssetId=${encodeURIComponent(asset.id)}` : ""
+                  router.push(`/video?startFrame=${encodeURIComponent(asset.url)}${characterParam}`)
+                },
               } satisfies FullscreenMediaViewerAction,
               {
                 id: "change-angle",
@@ -916,11 +944,11 @@ function LibraryPageContent() {
       copyMedia,
       copyReference,
       downloadByUrl,
-      handleAnimateUrl,
       handleChangeAngleUrl,
       handleCreateShotVariationsUrl,
       handleSaveExampleFromAsset,
       openImageEditor,
+      router,
     ],
   )
 
@@ -956,7 +984,10 @@ function LibraryPageContent() {
                 id: "animate",
                 label: "Animate",
                 icon: <Play className="size-4" weight="fill" />,
-                onClick: () => handleAnimateUrl(generation.url, generation.type),
+                onClick: () =>
+                  router.push(
+                    `/video?startFrame=${encodeURIComponent(generation.url)}&sourceGenerationId=${encodeURIComponent(generation.id)}`,
+                  ),
               } satisfies FullscreenMediaViewerAction,
               {
                 id: "change-angle",
@@ -982,7 +1013,13 @@ function LibraryPageContent() {
           id: "reference",
           label: "Use as reference",
           icon: <Sparkle className="size-4" />,
-          onClick: () => void copyReference(generation.url),
+          onClick: () => {
+            const params = new URLSearchParams({
+              referenceImageUrl: generation.url,
+              sourceGenerationId: generation.id,
+            })
+            router.push(`/image?${params.toString()}`)
+          },
         },
         {
           id: "download",
@@ -1020,14 +1057,13 @@ function LibraryPageContent() {
     },
     [
       copyMedia,
-      copyReference,
       downloadByUrl,
-      handleAnimateUrl,
       handleChangeAngleUrl,
       handleCreateShotVariationsUrl,
       handleSaveExampleFromGeneration,
       openImageEditor,
       openSaveDraft,
+      router,
     ],
   )
 
@@ -1106,6 +1142,16 @@ function LibraryPageContent() {
                   Upload
                 </Button>
               </>
+            ) : null}
+            {activeTab === "characters" ? (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => router.refresh()}
+                title="Refresh character content"
+              >
+                <ClockCounterClockwise className="h-4 w-4" />
+              </Button>
             ) : null}
             {activeTab === "brands" ? (
               <>
@@ -1298,6 +1344,22 @@ function LibraryPageContent() {
               onEditImage={openImageEditor}
               columnCount={columnCount}
               onColumnCountChange={handleColumnCountChange}
+            />
+          </TabsContent>
+
+          <TabsContent value="characters" className="mt-0 w-full pt-3">
+            <CharactersPanel
+              currentUserId={currentUserId}
+              search={debouncedSearch}
+              columnCount={columnCount}
+              selectedId={selectedCharacterId}
+              onSelectedIdChange={handleCharacterChange}
+              onOpenAsset={openAssetViewer}
+              onOpenGeneration={openGenerationViewer}
+              onCopy={copyMedia}
+              onDownload={downloadByUrl}
+              onDeleteGeneration={handleDeleteGeneration}
+              onSave={openSaveDraft}
             />
           </TabsContent>
 

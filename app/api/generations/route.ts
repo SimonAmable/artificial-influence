@@ -61,6 +61,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get('type') as 'image' | 'video' | 'audio' | null;
     const tool = searchParams.get('tool');
+    const characterAssetId = searchParams.get('characterAssetId');
+    const hasCharacter = searchParams.get('hasCharacter') === 'true';
     const limit = parseLimit(searchParams.get('limit'));
     const offset = parseOffset(searchParams.get('offset'));
     const search = normalizeSearch(searchParams.get('search'));
@@ -80,6 +82,11 @@ export async function GET(request: NextRequest) {
 
     if (tool) {
       query = query.eq('tool', tool);
+    }
+    if (characterAssetId) {
+      query = query.eq('character_asset_id', characterAssetId);
+    } else if (hasCharacter) {
+      query = query.not('character_asset_id', 'is', null);
     }
 
     query = applySearchFilter(query, search);
@@ -115,6 +122,11 @@ export async function GET(request: NextRequest) {
 
     if (tool) {
       countQuery = countQuery.eq('tool', tool);
+    }
+    if (characterAssetId) {
+      countQuery = countQuery.eq('character_asset_id', characterAssetId);
+    } else if (hasCharacter) {
+      countQuery = countQuery.not('character_asset_id', 'is', null);
     }
 
     countQuery = applySearchFilter(countQuery, search);
@@ -201,7 +213,32 @@ export async function POST(request: NextRequest) {
       model,
       tool,
       type,
+      characterAssetId,
+      sourceGenerationId,
     } = body;
+
+    let resolvedCharacterAssetId: string | null = null;
+    if (typeof characterAssetId === 'string' && characterAssetId.length > 0) {
+      const { data: character } = await supabase
+        .from('assets')
+        .select('id')
+        .eq('id', characterAssetId)
+        .eq('user_id', user.id)
+        .eq('category', 'character')
+        .maybeSingle();
+      if (!character) {
+        return NextResponse.json({ error: 'Character asset not found' }, { status: 400 });
+      }
+      resolvedCharacterAssetId = character.id;
+    } else if (typeof sourceGenerationId === 'string' && sourceGenerationId.length > 0) {
+      const { data: sourceGeneration } = await supabase
+        .from('generations')
+        .select('character_asset_id')
+        .eq('id', sourceGenerationId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      resolvedCharacterAssetId = sourceGeneration?.character_asset_id ?? null;
+    }
 
     if (!prompt) {
       return NextResponse.json(
@@ -222,6 +259,7 @@ export async function POST(request: NextRequest) {
         tool: tool || 'ai_influencer',
         status: 'completed',
         is_public: true,
+        character_asset_id: resolvedCharacterAssetId,
       })
       .select('*')
       .single();
