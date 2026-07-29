@@ -53,6 +53,7 @@ export function buildStudioToolGenerationRequest(
     aspectRatio: tool.generation.aspectRatio,
     numImages: tool.generation.numImages,
     enhancePrompt: tool.generation.enhancePrompt,
+    resolution: tool.generation.resolution,
     referenceImages,
   }
 }

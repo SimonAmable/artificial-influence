@@ -20,6 +20,7 @@ export interface ImageStudioToolDefinition {
     aspectRatio: string
     numImages: number
     enhancePrompt: boolean
+    resolution?: string
   }
   referenceSlots: ImageStudioReferenceSlot[]
   inputKind: ImageStudioToolInputKind
@@ -40,5 +41,6 @@ export interface ImageStudioToolGenerationRequest {
   aspectRatio: string
   numImages: number
   enhancePrompt: boolean
+  resolution?: string
   referenceImages: ImageUpload[]
 }

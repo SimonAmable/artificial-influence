@@ -3,7 +3,7 @@ import type { ImageStudioToolDefinition } from "./types"
 export const FACE_SWAP_TOOL: ImageStudioToolDefinition = {
   id: "face_swap",
   uiModelIdentifier: "custom/face-swap",
-  baseModelIdentifier: "google/nano-banana-pro",
+  baseModelIdentifier: "google/nano-banana-2",
   name: "Face Swap",
   description: "Transfer facial identity onto a target person or scene.",
   historyToolTag: "face_swap",
@@ -19,6 +19,7 @@ export const FACE_SWAP_TOOL: ImageStudioToolDefinition = {
     aspectRatio: "match_input_image",
     numImages: 1,
     enhancePrompt: false,
+    resolution: "2K",
   },
   referenceSlots: [
     {

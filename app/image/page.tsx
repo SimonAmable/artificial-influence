@@ -246,10 +246,49 @@ function ImagePageContent() {
     () => getStudioToolByUiModel(selectedModel),
     [selectedModel],
   )
+  const previousStudioModeRef = React.useRef(false)
   const selectedModelObject = React.useMemo(
     () => effectiveImageModels.find((model) => model.identifier === selectedModel) ?? null,
     [effectiveImageModels, selectedModel]
   )
+
+  // Move references between the regular composer and the two-slot custom-tool
+  // composer. This keeps one authoritative copy of each image, so removing an
+  // asset cannot leave a hidden URL behind.
+  React.useEffect(() => {
+    const isStudioMode = Boolean(selectedStudioTool)
+    const wasStudioMode = previousStudioModeRef.current
+
+    if (isStudioMode && !wasStudioMode) {
+      const incoming = [
+        ...referenceImages,
+        ...(referenceImage ? [referenceImage] : []),
+      ]
+      if (incoming.length > 0) {
+        setStudioToolSourceImage(incoming[0] ?? null)
+        setStudioToolSceneImage(incoming[1] ?? null)
+        setReferenceImages(incoming.slice(2))
+        setReferenceImage(null)
+      }
+    } else if (!isStudioMode && wasStudioMode) {
+      const outgoing = [studioToolSourceImage, studioToolSceneImage].filter(
+        (image): image is ImageUpload => Boolean(image),
+      )
+      if (outgoing.length > 0) {
+        setReferenceImages((current) => [...outgoing, ...current])
+      }
+      setStudioToolSourceImage(null)
+      setStudioToolSceneImage(null)
+    }
+
+    previousStudioModeRef.current = isStudioMode
+  }, [
+    referenceImage,
+    referenceImages,
+    selectedStudioTool,
+    studioToolSceneImage,
+    studioToolSourceImage,
+  ])
   
   // Create asset dialog state
   const [createAssetDialogOpen, setCreateAssetDialogOpen] = React.useState(false)
@@ -706,6 +745,9 @@ function ImagePageContent() {
       
       if (studioToolPayload) {
         formData.append('aspect_ratio', studioToolPayload.aspectRatio)
+        if (studioToolPayload.resolution) {
+          formData.set('resolution', studioToolPayload.resolution)
+        }
       } else if (capturedAspectRatio) {
         formData.append('aspectRatio', capturedAspectRatio)
         formData.append('aspect_ratio', capturedAspectRatio)
