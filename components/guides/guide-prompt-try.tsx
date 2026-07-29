@@ -165,7 +165,7 @@ export function GuidePromptTrySection({ promptTry }: { promptTry: GuidePromptTry
 
             {!charactersLoading && characters.length === 0 ? (
               <div className="flex min-h-[80px] min-w-[12rem] flex-1 items-center rounded-xl border border-dashed border-border/50 bg-muted/20 px-3 text-xs text-muted-foreground sm:min-h-[88px]">
-                No locked face yet — create one to use as an @ reference.
+                No locked face yet. Create one to use as an @ reference.
               </div>
             ) : null}
 

@@ -92,7 +92,7 @@ export function GuideFanvueTrySection({ tryBlock }: { tryBlock: GuideFanvueTry }
 
             {!loading && keepers.length === 0 ? (
               <div className="flex min-h-20 min-w-56 flex-1 items-center rounded-xl border border-dashed border-border/50 bg-muted/20 px-3 text-xs text-muted-foreground sm:min-h-22">
-                No keepers yet — shoot a week of content first, then come back.
+                No keepers yet. Shoot a week of content first, then come back.
               </div>
             ) : null}
 

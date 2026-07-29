@@ -6,7 +6,7 @@ import { currentProduct } from "@/lib/product/current"
 export const metadata: Metadata = {
   title: `Learn ${currentProduct.name}`,
   description:
-    "How to make the most realistic AI influencer content — with guides written alongside the biggest creators in the industry.",
+    "Make better AI creator content, post more often, and learn what helps it spread.",
 }
 
 export default function GuidesPage() {

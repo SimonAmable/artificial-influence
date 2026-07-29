@@ -15,7 +15,7 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
   {
     slug: "create-ai-influencer",
     title: "Create your AI influencer",
-    description: "Lock a face and look you can reuse.",
+    description: "Lock a recognizable face people remember.",
     mediaSrc: "/ai_influencer/learn_influencer_faceless.jpg",
     mediaAlt: "Faceless influencer holding cash on stairs",
     section: "start",
@@ -24,7 +24,7 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
   {
     slug: "shoot-week-of-content",
     title: "Shoot a week of content",
-    description: "Batch 7–14 stills ready to post.",
+    description: "Batch a full week of posts in one shoot.",
     mediaSrc: "/docs/new/ez_agent_content/base.png",
     mediaAlt: "AI influencer portrait from a weekly content batch",
     section: "start",
@@ -33,7 +33,7 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
   {
     slug: "carousel-multi-angle-shoot",
     title: "Make a carousel / multi-angle shoot",
-    description: "Matching angles for one post set.",
+    description: "Turn one winner into a swipeable post.",
     mediaSrc: "/docs/new/shots/slide-03.png",
     mediaAlt: "Carousel Shots multi-angle example",
     section: "start",
@@ -52,7 +52,7 @@ export const GUIDE_HUB_CARDS: GuideHubCard[] = [
   {
     slug: "scale-with-agents",
     title: "More scale levers",
-    description: "Turn an MCP connection into repeatable production.",
+    description: "Build a content system that keeps posting.",
     section: "start",
     available: true,
   },
@@ -99,31 +99,31 @@ const SHOOT_WEEK_PROMPT_TRY_TABS = [
     id: "bedroom",
     label: "Bedroom",
     prompt:
-      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy — using my locked AI influencer sitting on the edge of an unmade bed, lamp light only, looking away, messy room half in frame, same face as my character, vertical 4:5",
+      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy. Use my locked AI influencer sitting on the edge of an unmade bed, lamp light only, looking away, messy room half in frame, same face as my character, vertical 4:5",
   },
   {
     id: "car",
     label: "Car",
     prompt:
-      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy — using my locked AI influencer in a dark passenger seat at night, dashboard glow, face slightly cut off, same face as my character, vertical 4:5",
+      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy. Use my locked AI influencer in a dark passenger seat at night, dashboard glow, face slightly cut off, same face as my character, vertical 4:5",
   },
   {
     id: "night-out",
     label: "Night out",
     prompt:
-      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy — using my locked AI influencer on a night street, mixed streetlights, mid-turn, outfit cropped weirdly, same face as my character, vertical 4:5",
+      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy. Use my locked AI influencer on a night street, mixed streetlights, mid-turn, outfit cropped weirdly, same face as my character, vertical 4:5",
   },
   {
     id: "mirror",
     label: "Mirror",
     prompt:
-      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy — using my locked AI influencer in a dim bathroom mirror selfie, phone flash, cluttered background, hesitant stance, same face as my character, vertical 9:16",
+      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy. Use my locked AI influencer in a dim bathroom mirror selfie, phone flash, cluttered background, hesitant stance, same face as my character, vertical 9:16",
   },
   {
     id: "corner-store",
     label: "Corner store",
     prompt:
-      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy — using my locked AI influencer in a late-night convenience store aisle, harsh fluorescents, snack in hand, looking down, same face as my character, vertical 4:5",
+      "candid image, badly framed, low light, grainy, iPhone 12 camera, unposed, shy. Use my locked AI influencer in a late-night convenience store aisle, harsh fluorescents, snack in hand, looking down, same face as my character, vertical 4:5",
   },
 ] as const
 
@@ -131,9 +131,9 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
   {
     slug: "create-ai-influencer",
     title: "Create your AI influencer",
-    result: "One reusable face you can generate from again.",
+    result: "Create one recognizable face you can grow into a real content brand.",
     overview:
-      "The best characters read as one real person — clear face, consistent features, and a look you’d recognize in a crowd. Merge is usually the most realistic path: blend 2–3 strong closeups into one face that holds up across stills. Direct Save works when you already love a photo; Build is for starting from traits when you have no reference.",
+      "People follow a face they recognize. Start with a clear, consistent character you can use in every post. Merge 2–3 strong closeups for the most realistic result. Use Direct Save if you already have the perfect photo, or Build if you want to start from scratch.",
     timeEstimate: "~10 min",
     tools: [
       { label: "AI Influencer", href: influencerModeHref("direct") },
@@ -172,9 +172,9 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
   {
     slug: "shoot-week-of-content",
     title: "Shoot a week of content",
-    result: "7–14 stills of the same person, ready to drip through the week.",
+    result: "Make 7–14 posts in one session so you can stay visible all week.",
     overview:
-      "Consistency beats variety. Keep one locked face, then batch different scenes, outfits, and poses in one sitting. Cull hard, save winners to Library, and post over the next 7 days instead of generating every morning.",
+      "Posting often gives you more chances to hit. Keep the same face, then batch new scenes, outfits, and poses in one session. Save only the strongest images and post them across the week.",
     timeEstimate: "~20 min",
     tools: [
       { label: "Image", href: "/image" },
@@ -192,7 +192,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
     steps: [
       {
         title: "Pick your character in the strip",
-        body: "Tap a face under Working with — it drops an @ reference into the prompt. No face yet? Use Create.",
+        body: "Tap a face under Working with to add it to the prompt. No face yet? Use Create.",
         ctaLabel: "Open AI Influencer",
         ctaHref: influencerModeHref("direct"),
         demo: "mention",
@@ -218,9 +218,9 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
   {
     slug: "carousel-multi-angle-shoot",
     title: "Make a carousel / multi-angle shoot",
-    result: "One reference photo → a matching multi-angle shot set ready to post.",
+    result: "Turn one strong image into a carousel people want to swipe through.",
     overview:
-      "Carousel Shots turns a single still into a coherent panel set — same person, different angles — for the cost of one image. Upload a keeper from your week batch, set grid and aspect, then generate.",
+      "Carousels can earn more watch time and shares than a single image. Upload one strong post, choose the grid and format, then generate matching angles of the same person.",
     timeEstimate: "~5 min",
     tools: [
       { label: "Carousel Shots", href: "/carousel-shots" },
@@ -234,7 +234,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
     steps: [
       {
         title: "Upload a reference photo",
-        body: "Drop in a strong still of your locked face — Upload, Select asset, or open from Library with Open in Carousel Shots.",
+        body: "Choose a strong still with a clear face. Upload it, select it from Assets, or open it from Library.",
         ctaLabel: "Open Carousel Shots",
         ctaHref: "/carousel-shots",
         demo: "shots-upload",
@@ -246,7 +246,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
       },
       {
         title: "Generate the set",
-        body: "Hit Generate once. Matching panels land in History — upscale keepers if you need sharper exports.",
+        body: "Hit Generate once. Your matching panels land in History. Upscale the best ones if you need sharper exports.",
         ctaLabel: "Open Carousel Shots",
         ctaHref: "/carousel-shots",
         demo: "shots-generate",
@@ -265,7 +265,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
   {
     slug: "publish-to-fanvue",
     title: "Publish to Fanvue",
-    result: "A keeper from Studio lands as a priced Fanvue post — vault or schedule.",
+    result: "Turn a strong image into a paid Fanvue post in a few minutes.",
     overview:
       "Content is where Fanvue lives in Presence. Connect once, pick media from your vault or Studio keepers, set a PPV price, then publish or schedule. Same path whether you start from Library or Create Fanvue post.",
     timeEstimate: "~5 min",
@@ -281,7 +281,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
     steps: [
       {
         title: "Connect Fanvue",
-        body: "Open Content and connect your Fanvue account. You only do this once — Presence keeps the link for vault sync and posts.",
+        body: "Open Content and connect your Fanvue account once. Presence keeps it ready for future posts.",
         ctaLabel: "Open Content",
         ctaHref: "/content",
         demo: "fanvue-connect",
@@ -295,7 +295,7 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
       },
       {
         title: "Set price and publish",
-        body: "Open compose, attach the media, set your PPV price, then publish now or schedule. Caption last — price and media first.",
+        body: "Attach the media, set your PPV price, and publish now or schedule it. Add the caption last.",
         ctaLabel: "Create post",
         ctaHref: "/content?tab=schedule&compose=1",
         demo: "fanvue-publish",
@@ -314,13 +314,13 @@ export const GUIDE_ARTICLES: GuideArticle[] = [
   {
     slug: "scale-with-agents",
     title: "More scale levers",
-    result: "Turn one MCP connection into repeatable workflows that keep producing.",
+    result: "Turn your best content process into a system you can run again.",
     presentation: "mcp",
-    overview: `You already locked a face, batched stills, built carousels, and — on Presence — published to Fanvue. The next step is to operate that workflow from the external AI tool where you already plan and work.
+    overview: `You have a face, a batch of posts, and a carousel. Now turn that process into a repeatable system.
 
-MCP connects Claude, ChatGPT, Cursor, Codex, and other supported clients to your studio account. The client can use the same credits, characters, assets, models, and History, so you do not need to rebuild context in another interface.
+MCP connects tools like Claude, ChatGPT, Cursor, and Codex to your studio. They can use the characters, assets, credits, and models you already have.
 
-Once the connection works, scale comes from making the work repeatable: preserve a proven brief, schedule recurring production in a client that supports automation, and reuse templates instead of rebuilding every batch. MCP is the pipe that keeps those workflows attached to the studio.`,
+Save the brief that gets good results. Reuse templates. Schedule batches when your client supports it. The goal is simple: make more strong posts without rebuilding the workflow every time.`,
     timeEstimate: "~5 min",
     tools: [
       { label: "MCP", href: "/mcp" },
@@ -334,25 +334,25 @@ Once the connection works, scale comes from making the work repeatable: preserve
     infoSections: [
       {
         title: "Preserve proven instructions",
-        body: "Save the brief that already works in your MCP client: character rules, shot count, aspect ratio, culling standards, caption voice, and publish requirements. Reusing a complete operating brief is faster and more consistent than reconstructing it every session.",
+        body: "Save the brief that already gets strong results. Include the character, shot count, format, caption voice, and what counts as a keeper. Reuse it for faster, more consistent batches.",
         ctaLabel: "Connect MCP",
         ctaHref: "#mcp-setup",
       },
       {
         title: "Schedule through an MCP workflow",
-        body: "When your client supports scheduled runs, use the MCP connection for recurring batches: prepare a carousel every Tuesday, refresh a weekly content queue, or generate drafts before review. Keep publishing behind a review step until the workflow is proven.",
+        body: "Schedule a weekly carousel, refresh your content queue, or prepare drafts before review. Keep a quick review step until the results stay consistent.",
         ctaLabel: "Open Automations",
         ctaHref: "/automations",
       },
       {
         title: "Reuse output structures",
-        body: "Templates give the MCP client a stable output shape: a photo set, video lane, slideshow, or carousel structure. Search for an existing template first, then adapt it only when the recurring job genuinely needs a different structure.",
+        body: "Start with a template for your photo set, video, slideshow, or carousel. Change it only when the format needs to change.",
         ctaLabel: "Open Templates",
         ctaHref: "/templates",
       },
       {
         title: "Keep the studio as the source of truth",
-        body: "Your external client drives the work, but the studio remains the source of truth for credits, characters, assets, and generation History. Review results there, save the keepers, and refine the external workflow from what actually performed.",
+        body: "Review results in the studio, save the winners, and improve your brief based on what people actually watch, share, and buy.",
         ctaLabel: "Open MCP",
         ctaHref: "/mcp",
       },
@@ -390,20 +390,20 @@ Once connected, the external client works with the same credit balance, characte
   {
     slug: "introduction",
     title: "Introduction",
-    result: "A clear map of the studio — then you start with locking a face.",
-    overview: `This studio is built for one job: run a consistent AI creator without juggling five apps. Lock a face once, generate stills that still look like that person, turn keepers into multi-angle sets when you need a carousel, publish from the same place you create — and add more scale levers when the pipeline is running.
+    result: "A simple path from your first character to posts that can take off.",
+    overview: `This studio helps you create and grow an AI creator from one place. Lock a face, make a week of posts, turn winners into carousels, and publish.
 
-Most setups fall apart on consistency. New faces every session means no brand and no library worth posting from. The Start here guides walk you in order: lock a face, batch a week of stills, build a carousel set, publish (Fanvue on Presence), then connect MCP and compound with skills, automations, and templates.
+Start with consistency. If the face changes every session, people will not remember the creator. Use the Start here guides in order and build a recognizable feed.
 
-Create your AI influencer first. Merge usually wins for realism — blend a few strong closeups into one face that holds up across scenes. Direct Save is fine when you already love a photo; Build is for starting from traits with no reference. The goal is one character you can @ again and again.
+Create your AI influencer first. Merge a few strong closeups for realism, save a photo you already love, or build a new face. The goal is one character you can use again and again.
 
-Shoot a week of content next. Keep that locked face, batch different scenes and outfits in one sitting, cull hard, and drip winners over the next days instead of generating every morning. Consistency beats novelty.
+Next, shoot a week of content in one sitting. Keep the winners and post them over several days. More good posts means more chances to go viral.
 
-Make a carousel / multi-angle shoot when one still needs a full post set. Carousel Shots turns a single keeper into matching angles for roughly the cost of one image — same person, different panels.
+Turn your best still into a carousel when you want more watch time and swipes. Carousel Shots gives you matching angles of the same person.
 
-Publish to Fanvue on Presence, then finish with More scale levers — use MCP plus reusable briefs, scheduled workflows, and templates so output keeps moving without babysitting every session.
+Publish to Fanvue on Presence. Then use MCP, saved briefs, schedules, and templates to keep content moving.
 
-Platform guides — Introduction, Credits & models, History & Assets, and MCP — explain how the studio works day to day. Walk Start here in order, then open the first guide when you are ready to lock a face.`,
+The Platform guides explain credits, models, History, Assets, and MCP. When you are ready, open the first guide and lock your face.`,
     timeEstimate: "~3 min",
     tools: [
       { label: "Guides", href: "/guides" },
@@ -417,7 +417,7 @@ Platform guides — Introduction, Credits & models, History & Assets, and MCP �
     steps: [
       {
         title: "Create your AI influencer",
-        body: "Lock one reusable face — Direct Save, Merge, or Build. Everything downstream depends on this.",
+        body: "Lock one reusable face with Direct Save, Merge, or Build. A consistent face makes the whole feed stronger.",
         ctaLabel: "Open guide",
         ctaHref: "/guides/create-ai-influencer",
         demo: "mention",
@@ -459,19 +459,19 @@ Platform guides — Introduction, Credits & models, History & Assets, and MCP �
   {
     slug: "credits-and-models",
     title: "Credits & models",
-    result: "Credits never expire — spend smart, pick the right model, keep what you buy.",
+    result: "Spend less while you test, then put more credits behind the winners.",
     presentation: "info",
-    overview: `Credits never expire. Buy a pack or roll unused monthly credits forward — they stay on your balance until you spend them. That is a hard advantage over platforms like Higgsfield, where unused allotments typically vanish when the cycle resets. Top up once, shoot when you are ready.
+    overview: `Credits never expire. Monthly credits roll forward and credit packs stay in your balance until you use them. Top up once and shoot when you are ready.
 
-Credits are the studio currency. Almost every generation — image, video, Carousel Shots, upscale, and similar tools — spends them. Costs are per model: lighter models burn less; premium video and image models cost more.
+Images, videos, Carousel Shots, and upscales use credits. Fast models cost less. Premium image and video models cost more.
 
-Failed generations always refund. If a job fails, those credits come back — you only pay for successful outputs.
+Failed generations refund automatically. You only pay for successful results.
 
 Your balance sits in the header (coin control) and under Settings → Credits. Plans grant a monthly allotment; one-time packs top up when you need more. Exact plan sizes and billing portals differ by product, but the credit meter and model picker work the same way. A $10 top-up is 200 credits (~5¢ each).
 
-Models are chosen inside each tool. Image, Video, Carousel Shots, and AI Influencer each expose the models that fit that job. You do not need every model — match quality and cost to the step you are on. Locking a face with Direct Save is free; Merge and Build use GPT Image 2. Day-to-day stills and carousels usually run on Nano Banana, GPT Image, or Seedream. Motion leans on Kling, Veo, Seedance, and related video models.
+Pick a model inside each tool. Use a fast, lower-cost model to test ideas. Use a premium model when a concept already looks promising.
 
-Spend smart: batch with a mid-tier model while exploring, then upscale or re-run keepers on a stronger model. Carousel Shots is priced like one image for a full multi-angle set — often cheaper than generating panels one by one.`,
+The best way to spend is to test several hooks cheaply, keep the strongest one, and upgrade only the content most likely to perform.`,
     timeEstimate: "~4 min",
     tools: [
       { label: "Pricing", href: "/pricing" },
@@ -493,7 +493,7 @@ Spend smart: batch with a mid-tier model while exploring, then upscale or re-run
     infoSections: [
       {
         title: "Credits never expire",
-        body: `Unused credits stay yours — monthly grants stack, and purchased packs do not time out. Platforms like Higgsfield usually wipe unused credits when the billing period ends. Here you can bank a top-up for a quiet week and burn it on a big shoot later.`,
+        body: `Unused credits stay yours. Monthly grants stack and purchased packs do not time out. Save them during a quiet week and use them for a bigger shoot later.`,
       },
       {
         title: "What spends credits",
@@ -501,13 +501,13 @@ Spend smart: batch with a mid-tier model while exploring, then upscale or re-run
 
 Direct Save for AI Influencer is free. Most free-tools (compressor and similar) do not spend credits.
 
-Failed generations always refund. Credits return automatically when a job fails — you are not charged for broken runs.`,
+Failed generations always refund. Credits return automatically when a job fails. You are not charged for broken runs.`,
       },
       {
         title: "Balance, plans, and packs",
         body: `Check the coin in the header or Settings → Credits. Plans add monthly credits; packs are one-time top-ups on Pricing. $10 buys 200 credits. Whatever you do not spend stays.
 
-Buy credits when you are mid-batch so you do not stall on a keeper run — or buy ahead knowing they will not evaporate.`,
+Buy credits during a batch so you do not stall on a strong idea, or buy ahead knowing they will not disappear.`,
         ctaLabel: "Open Pricing",
         ctaHref: "/pricing",
       },
@@ -515,7 +515,7 @@ Buy credits when you are mid-batch so you do not stall on a keeper run — or bu
         title: "Image models",
         body: `Common picks: Nano Banana (fast / everyday stills), GPT Image 2 (strong faces and Merge/Build), Seedream (detail and alternate looks), plus Grok Imagine, Z-Image Turbo, and Qwen Image Edit when you need those lanes.
 
-Carousel Shots defaults to Nano Banana 2 and can use GPT Image or Seedream — still billed like a single image for the set.`,
+Carousel Shots defaults to Nano Banana 2 and can use GPT Image or Seedream. The full set is still billed like one image.`,
         logos: [
           { src: "/ai_icons/gemini-color.svg", label: "Nano Banana" },
           { src: "/ai_icons/openai.svg", label: "GPT Image" },
@@ -567,7 +567,7 @@ Draft motion on a cheaper/faster option, then spend on a premium pass only for f
         },
       ],
       footnote:
-        "Studio: $10 = 200 credits, Nano Banana 2 Lite @ 2 cr — and credits never expire (unlike Higgsfield-style monthly resets). dirtybunny.ai (PixelBunny): $10 = 200 credits @ 5¢, 8 cr / gen; multi-angle ~32 cr. Prism: NB2 @ 15 cr (~$0.01 / credit); multi-angle ~60 cr.",
+        "Studio: $10 = 200 credits, Nano Banana 2 Lite @ 2 cr, and credits never expire. dirtybunny.ai (PixelBunny): $10 = 200 credits @ 5¢, 8 cr / gen; multi-angle ~32 cr. Prism: NB2 @ 15 cr (~$0.01 / credit); multi-angle ~60 cr.",
       sources: [
         { label: "PixelBunny guides", href: "https://pixelbunny.ai/guides" },
         { label: "How credits work", href: "https://pixelbunny.ai/guides/credits-and-pricing" },
@@ -575,7 +575,7 @@ Draft motion on a cheaper/faster option, then spend on a premium pass only for f
       ],
     },
     outcomes: [
-      "You know credits never expire — unlike Higgsfield-style resets",
+      "You know credits never expire",
       "You know failed generations always refund",
       "You can match image vs video models to the job without overspending",
       "You treat Carousel Shots and Direct Save as credit-smart shortcuts",
@@ -590,7 +590,7 @@ Draft motion on a cheaper/faster option, then spend on a premium pass only for f
     title: "History & Assets",
     result: "History is everything you generated. Assets is what you keep on purpose.",
     presentation: "info",
-    overview: `History is the full run log — every still and video you generate shows up there so you can reopen, compare, and pull something back into a tool.
+    overview: `History keeps every still and video you generate. Reopen old work, compare versions, and bring a strong result back into a tool.
 
 Assets is the curated shelf. Save keepers, characters, and files you want to find again without scrolling the whole timeline. Characters you lock live here so you can reuse them.
 
@@ -606,13 +606,13 @@ In prompts, type {{@}} to attach a saved character or generation, or tap {{+}} w
     infoSections: [
       {
         title: "History",
-        body: "Your generation timeline — reopen and reuse anything you already made.",
+        body: "Your generation timeline. Reopen and reuse anything you already made.",
         ctaLabel: "Open History",
         ctaHref: "/assets?tab=history",
       },
       {
         title: "Assets",
-        body: "Saved keepers and characters — the shelf you pull into @ mentions.",
+        body: "Your saved winners and characters, ready to use with @ mentions.",
         ctaLabel: "Open Assets",
         ctaHref: "/assets",
       },

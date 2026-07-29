@@ -64,7 +64,7 @@ export function GuideCarouselUploadSection({
           value={image}
           onChange={setImage}
           title="Reference photo"
-          description="Upload one still — same face across every panel"
+          description="Upload one still. Keep the same face across every panel."
           maxHeight="max-h-[220px]"
           minHeight="min-h-[160px] sm:min-h-[180px]"
           previewFit="contain"

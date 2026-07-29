@@ -11,7 +11,6 @@ import {
   ShotsGridShowcase,
 } from "@/components/guides/guide-hub-showcase-graphics"
 import { useGuideProgress } from "@/components/guides/use-guide-progress"
-import { McpIconFan } from "@/components/mcp/mcp-icon-fan"
 import { Input } from "@/components/ui/input"
 import { AuroraShaderBackground } from "@/components/ui/aurora-shader-background"
 import { ShaderDemoCard } from "@/components/ui/shader-demo-card"
@@ -28,18 +27,48 @@ const FANVUE_LOGO_SRC = "/brand_icons/fanvue_logo.png"
 
 function McpGuideCardGraphic() {
   return (
-    <div className="absolute inset-0 flex items-center overflow-hidden rounded-[inherit] bg-[#0a0a0a]">
+    <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[inherit] bg-background">
       <AuroraShaderBackground animate className="rounded-[inherit]" />
-      <div className="absolute inset-0 bg-black/35" aria-hidden />
-      <div className="relative z-10 w-full origin-center scale-[0.72] sm:scale-[0.78]">
-        <McpIconFan
-          productName={currentProduct.name}
-          logoSrc={currentProduct.logo}
-          activePlatform="claude"
-          onPlatformSelect={() => {}}
-          interactive={false}
+      <div className="absolute inset-0 bg-background/30 backdrop-blur-[1px]" aria-hidden />
+
+      <div className="absolute size-52 rounded-full border border-primary/20 animate-[spin_18s_linear_infinite] motion-reduce:animate-none">
+        <span className="absolute left-1/2 top-0 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_18px_var(--primary)]" />
+        <span className="absolute bottom-[12%] left-[8%] size-1.5 rounded-full bg-foreground/80" />
+        <span className="absolute bottom-[12%] right-[8%] size-1.5 rounded-full bg-foreground/80" />
+      </div>
+      <div className="absolute size-36 rounded-full border border-dashed border-foreground/20 animate-[spin_12s_linear_infinite_reverse] motion-reduce:animate-none" />
+
+      <div className="relative z-10 flex size-20 items-center justify-center rounded-3xl border border-foreground/15 bg-background/75 shadow-lg backdrop-blur-xl">
+        <span className="absolute inset-0 rounded-[inherit] bg-primary/10 animate-pulse motion-reduce:animate-none" />
+        <Image
+          src={currentProduct.logo}
+          alt=""
+          width={40}
+          height={40}
+          className="relative size-10 object-contain"
         />
       </div>
+
+      <span className="absolute left-[8%] top-[16%] rounded-full border border-border/60 bg-background/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-foreground shadow-sm backdrop-blur-md">
+        Plan
+      </span>
+      <span className="absolute right-[7%] top-[28%] rounded-full border border-border/60 bg-background/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-foreground shadow-sm backdrop-blur-md">
+        Create
+      </span>
+      <span className="absolute bottom-[13%] left-[15%] rounded-full border border-border/60 bg-background/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-foreground shadow-sm backdrop-blur-md">
+        Repeat
+      </span>
+
+      <div className="pointer-events-none absolute inset-x-[18%] bottom-[8%] h-px overflow-hidden bg-border/40">
+        <span className="block h-full w-1/3 bg-primary animate-[mcp-flow_2.2s_ease-in-out_infinite] motion-reduce:animate-none" />
+      </div>
+      <style>{`
+        @keyframes mcp-flow {
+          0% { transform: translateX(-110%); opacity: 0; }
+          30%, 70% { opacity: 1; }
+          100% { transform: translateX(410%); opacity: 0; }
+        }
+      `}</style>
     </div>
   )
 }
@@ -190,8 +219,8 @@ export function GuidesHub() {
         </h1>
 
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-          How to make the most realistic AI influencer content — with guides written
-          alongside the biggest creators in the industry.
+          Make better AI creator content, post more often, and learn what helps it
+          spread.
         </p>
 
         <GuidesSearchTrigger className="mt-8 w-full max-w-xl text-left" />

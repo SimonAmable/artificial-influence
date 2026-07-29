@@ -2,12 +2,6 @@ import Link from "next/link"
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr"
 
 import { GuideMarkComplete } from "@/components/guides/guide-mark-complete"
-import {
-  AgentGenerationShowcase,
-  FanvuePaidPostShowcase,
-  InfluencerMergeShowcase,
-  ShotsGridShowcase,
-} from "@/components/guides/guide-hub-showcase-graphics"
 import { GuideModePathCards } from "@/components/guides/guide-mode-path-cards"
 import {
   GuideMcpConnectEmbed,
@@ -29,12 +23,6 @@ import type { GuideArticle, GuideHubCard } from "@/lib/guides/types"
 import { getMcpConnectBaseUrl } from "@/lib/mcp/auth"
 import { currentProduct, getCurrentProductSiteUrl } from "@/lib/product/current"
 import { isVisibleByProductMetadata } from "@/lib/product/visibility"
-
-function resolveHubCard(slug: string): GuideHubCard | null {
-  const card = GUIDE_HUB_CARDS.find((item) => item.slug === slug) ?? null
-  if (!card || !isVisibleByProductMetadata(card, currentProduct.id)) return null
-  return card
-}
 
 function resolveNextGuideCard(article: GuideArticle): GuideHubCard | null {
   const visited = new Set<string>()
@@ -61,24 +49,11 @@ function resolveNextGuideCard(article: GuideArticle): GuideHubCard | null {
 }
 
 export function GuideArticleView({ article }: { article: GuideArticle }) {
-  const hubCard = resolveHubCard(article.slug)
   const nextGuideCard = resolveNextGuideCard(article)
-  const heroMediaSrc = article.mediaSrc ?? hubCard?.mediaSrc
-  const heroMediaAlt = article.mediaAlt ?? hubCard?.mediaAlt ?? article.title
   const isInfo = article.presentation === "info"
   const isMcp = article.presentation === "mcp"
   const siteUrl = getCurrentProductSiteUrl()
   const mcpBaseUrl = getMcpConnectBaseUrl(currentProduct.mcpSiteUrl ?? siteUrl)
-  const heroShowcase =
-    article.slug === "create-ai-influencer" ? (
-      <InfluencerMergeShowcase />
-    ) : article.slug === "shoot-week-of-content" ? (
-      <AgentGenerationShowcase />
-    ) : article.slug === "carousel-multi-angle-shoot" ? (
-      <ShotsGridShowcase />
-    ) : article.slug === "publish-to-fanvue" ? (
-      <FanvuePaidPostShowcase />
-    ) : undefined
 
   const articleBody = (
     <>
@@ -86,19 +61,6 @@ export function GuideArticleView({ article }: { article: GuideArticle }) {
       <header className="flex flex-col gap-4">
         {isMcp ? (
           <GuideMcpFan productName={currentProduct.name} logoSrc={currentProduct.logo} />
-        ) : null}
-
-        {!isInfo && !isMcp ? (
-          <ShaderDemoCard
-            href={article.primaryCtaHref}
-            buttonLabel={article.primaryCtaLabel}
-            mediaSrc={heroMediaSrc}
-            mediaContent={heroShowcase}
-            mediaAlt={heroMediaAlt}
-            mediaFit="contain"
-            mediaWater={Boolean(heroMediaSrc)}
-            className="w-full"
-          />
         ) : null}
 
         <div>

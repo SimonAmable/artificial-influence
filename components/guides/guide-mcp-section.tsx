@@ -74,7 +74,7 @@ export function GuideMcpConnectEmbed({
       <div className="min-w-0">
         <p className="mb-4 text-sm leading-6 text-muted-foreground">
           Pick your AI tool, copy the connector steps, and sign in once. OAuth ties the external
-          agent to your account and credits — same balance as the studio.
+          agent to your account and credits. It uses the same balance as the studio.
         </p>
         <McpConnectPanel
           productName={productName}
