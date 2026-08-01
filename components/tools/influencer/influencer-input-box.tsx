@@ -63,7 +63,11 @@ import { brandRefsOnly, getImageAssetUrlsFromRefChips } from "@/lib/commands/ref
 
 interface InfluencerInputBoxProps {
   className?: string
-  onGenerate?: () => void
+  /**
+   * The optional prompt argument keeps Enter-to-generate in sync with the
+   * textarea when React has not yet committed the parent-controlled value.
+   */
+  onGenerate?: (prompt?: string) => void
   promptValue?: string
   onPromptChange?: (value: string) => void
   referenceImage?: ImageUpload | null
@@ -384,7 +388,7 @@ export function InfluencerInputBox({
           getImageAssetUrlsFromRefChips(attachedRefs).length > 0) &&
         onGenerate
       ) {
-        onGenerate()
+        onGenerate(localPrompt)
       }
     }
   }

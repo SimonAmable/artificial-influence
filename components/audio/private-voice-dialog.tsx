@@ -50,6 +50,7 @@ import {
   PRIVATE_VOICE_PREVIEW_TEXT,
   QWEN3_TTS_LANGUAGES,
   QWEN3_TTS_MODEL,
+  FISH_AUDIO_TTS_MODEL,
   getAudioModelLabel,
   type AudioProvider,
   type AudioVoice,
@@ -61,10 +62,14 @@ function AudioPreviewPlayer({
   src,
   label,
   onClear,
+  startSeconds = 0,
+  endSeconds,
 }: {
   src: string
   label: string
   onClear?: () => void
+  startSeconds?: number
+  endSeconds?: number
 }) {
   const audioRef = React.useRef<HTMLAudioElement | null>(null)
   const [isPlaying, setIsPlaying] = React.useState(false)
@@ -77,17 +82,25 @@ function AudioPreviewPlayer({
     const handleEnded = () => setIsPlaying(false)
     const handlePause = () => setIsPlaying(false)
     const handlePlay = () => setIsPlaying(true)
+    const handleTimeUpdate = () => {
+      if (endSeconds !== undefined && audio.currentTime >= endSeconds) {
+        audio.pause()
+        audio.currentTime = startSeconds
+      }
+    }
 
     audio.addEventListener("ended", handleEnded)
     audio.addEventListener("pause", handlePause)
     audio.addEventListener("play", handlePlay)
+    audio.addEventListener("timeupdate", handleTimeUpdate)
     return () => {
       audio.removeEventListener("ended", handleEnded)
       audio.removeEventListener("pause", handlePause)
       audio.removeEventListener("play", handlePlay)
+      audio.removeEventListener("timeupdate", handleTimeUpdate)
       audio.pause()
     }
-  }, [src])
+  }, [endSeconds, src, startSeconds])
 
   async function togglePlayback() {
     const audio = audioRef.current
@@ -102,6 +115,9 @@ function AudioPreviewPlayer({
 
     setIsLoading(true)
     try {
+      if (audio.currentTime < startSeconds || (endSeconds !== undefined && audio.currentTime >= endSeconds)) {
+        audio.currentTime = startSeconds
+      }
       await audio.play()
       setIsPlaying(true)
     } catch {
@@ -153,6 +169,43 @@ function AudioPreviewPlayer({
   )
 }
 
+function audioBufferToWav(audioBuffer: AudioBuffer) {
+  const channels = audioBuffer.numberOfChannels
+  const bytesPerSample = 2
+  const blockAlign = channels * bytesPerSample
+  const dataSize = audioBuffer.length * blockAlign
+  const buffer = new ArrayBuffer(44 + dataSize)
+  const view = new DataView(buffer)
+  const writeString = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) view.setUint8(offset + index, value.charCodeAt(index))
+  }
+
+  writeString(0, "RIFF")
+  view.setUint32(4, 36 + dataSize, true)
+  writeString(8, "WAVE")
+  writeString(12, "fmt ")
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, channels, true)
+  view.setUint32(24, audioBuffer.sampleRate, true)
+  view.setUint32(28, audioBuffer.sampleRate * blockAlign, true)
+  view.setUint16(32, blockAlign, true)
+  view.setUint16(34, 16, true)
+  writeString(36, "data")
+  view.setUint32(40, dataSize, true)
+
+  const channelData = Array.from({ length: channels }, (_, index) => audioBuffer.getChannelData(index))
+  let offset = 44
+  for (let frame = 0; frame < audioBuffer.length; frame += 1) {
+    for (let channel = 0; channel < channels; channel += 1) {
+      const sample = Math.max(-1, Math.min(1, channelData[channel][frame] ?? 0))
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
+      offset += bytesPerSample
+    }
+  }
+  return buffer
+}
+
 export function PrivateVoiceDialog({
   open,
   onOpenChange,
@@ -175,6 +228,8 @@ export function PrivateVoiceDialog({
   const [kind, setKind] = React.useState<"clone" | "design">("clone")
   const [language, setLanguage] = React.useState<string>(DEFAULT_QWEN3_LANGUAGE)
   const [referenceAudio, setReferenceAudio] = React.useState<File | null>(null)
+  const [referenceDuration, setReferenceDuration] = React.useState(0)
+  const [referenceStartSeconds, setReferenceStartSeconds] = React.useState(0)
   const [referenceAudioUrl, setReferenceAudioUrl] = React.useState("")
   const [existingReferenceUrl, setExistingReferenceUrl] = React.useState("")
   const [generatedPreviewUrl, setGeneratedPreviewUrl] = React.useState("")
@@ -199,6 +254,8 @@ export function PrivateVoiceDialog({
     setKind(provider === "google" ? "design" : "clone")
     setLanguage(DEFAULT_QWEN3_LANGUAGE)
     setReferenceAudio(null)
+    setReferenceDuration(0)
+    setReferenceStartSeconds(0)
     setReferenceAudioUrl("")
     setExistingReferenceUrl("")
     setGeneratedPreviewUrl("")
@@ -224,6 +281,8 @@ export function PrivateVoiceDialog({
     setKind(voice.privateVoiceKind ?? "design")
     setLanguage(config.language ?? DEFAULT_QWEN3_LANGUAGE)
     setReferenceAudio(null)
+    setReferenceDuration(0)
+    setReferenceStartSeconds(0)
     setReferenceAudioUrl("")
     setExistingReferenceUrl(voice.referenceAudioUrl ?? "")
     setGeneratedPreviewUrl(
@@ -287,6 +346,10 @@ export function PrivateVoiceDialog({
   }, [baseVoice, open, provider])
 
   const activeReferenceUrl = referenceAudioUrl || existingReferenceUrl
+  const selectedReferenceDuration = referenceDuration
+    ? Math.min(MAX_PRIVATE_VOICE_REFERENCE_SECONDS, referenceDuration - referenceStartSeconds)
+    : 0
+  const selectedReferenceEndSeconds = referenceStartSeconds + selectedReferenceDuration
   const hasSavedVoice = Boolean(savedVoiceId || voice?.privateVoiceId)
   const canSave =
     name.trim().length >= 2 &&
@@ -305,25 +368,53 @@ export function PrivateVoiceDialog({
 
   async function validateReferenceAudio(file: File | null) {
     setReferenceAudio(null)
+    setReferenceDuration(0)
+    setReferenceStartSeconds(0)
     if (!file) return false
 
     try {
       const durationSeconds = await getAudioDurationSeconds(file)
-      if (
-        !Number.isFinite(durationSeconds) ||
-        durationSeconds <= 0 ||
-        durationSeconds > MAX_PRIVATE_VOICE_REFERENCE_SECONDS
-      ) {
-        toast.error("Reference recordings must be 15 seconds or shorter")
+      if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+        toast.error("Could not read a usable duration from the recording")
         return false
       }
 
       setReferenceAudio(file)
-      toast.success("Reference recording ready")
+      setReferenceDuration(durationSeconds)
+      toast.success(
+        durationSeconds > MAX_PRIVATE_VOICE_REFERENCE_SECONDS
+          ? "Choose the best 15-second section to use for cloning"
+          : "Reference recording ready"
+      )
       return true
     } catch {
       toast.error("Could not read the recording. Try WAV, MP3, M4A, OGG, or WebM.")
       return false
+    }
+  }
+
+  async function createReferenceClip(file: File) {
+    if (referenceDuration <= MAX_PRIVATE_VOICE_REFERENCE_SECONDS) return file
+
+    const AudioContextClass = window.AudioContext
+    if (!AudioContextClass) throw new Error("This browser cannot trim audio. Please use a 15-second recording.")
+    const context = new AudioContextClass()
+    try {
+      const decoded = await context.decodeAudioData((await file.arrayBuffer()).slice(0))
+      const startFrame = Math.floor(referenceStartSeconds * decoded.sampleRate)
+      const frameCount = Math.min(
+        Math.floor(MAX_PRIVATE_VOICE_REFERENCE_SECONDS * decoded.sampleRate),
+        decoded.length - startFrame
+      )
+      const clip = context.createBuffer(decoded.numberOfChannels, frameCount, decoded.sampleRate)
+      for (let channel = 0; channel < decoded.numberOfChannels; channel += 1) {
+        clip.copyToChannel(decoded.getChannelData(channel).slice(startFrame, startFrame + frameCount), channel)
+      }
+      return new File([audioBufferToWav(clip)], `${file.name.replace(/\.[^.]+$/, "")}-clip.wav`, {
+        type: "audio/wav",
+      })
+    } finally {
+      await context.close()
     }
   }
 
@@ -347,10 +438,11 @@ export function PrivateVoiceDialog({
     body.set("voiceDescription", voiceDescription.trim())
     body.set("styleInstruction", styleInstruction.trim())
     if (referenceAudio) {
-      body.set("referenceAudio", referenceAudio)
+      const referenceClip = await createReferenceClip(referenceAudio)
+      body.set("referenceAudio", referenceClip)
 
       const transcriptForm = new FormData()
-      transcriptForm.set("audio", referenceAudio)
+      transcriptForm.set("audio", referenceClip)
       const transcriptResponse = await fetch("/api/transcribe", {
         method: "POST",
         body: transcriptForm,
@@ -385,7 +477,13 @@ export function PrivateVoiceDialog({
     setIsSaving(true)
     try {
       const body = await buildVoiceFormData()
-      const endpoint = savedVoiceId ? `/api/voices/${savedVoiceId}` : "/api/voices"
+      // Creating a Fish clone also creates its provider-side persistent model, which
+      // happens in the preview endpoint before we expose it as a saved voice.
+      const endpoint = !savedVoiceId && provider === "fish"
+        ? "/api/voices/preview"
+        : savedVoiceId
+          ? `/api/voices/${savedVoiceId}`
+          : "/api/voices"
       const response = await fetch(endpoint, {
         method: savedVoiceId ? "PATCH" : "POST",
         body,
@@ -462,7 +560,7 @@ export function PrivateVoiceDialog({
                   <button
                     type="button"
                     aria-label={`${getAudioModelLabel(
-                      provider === "google" ? GOOGLE_GEMINI_TTS_MODEL : QWEN3_TTS_MODEL
+                      provider === "google" ? GOOGLE_GEMINI_TTS_MODEL : provider === "fish" ? FISH_AUDIO_TTS_MODEL : QWEN3_TTS_MODEL
                     )} prompting advice`}
                     className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
                   >
@@ -470,7 +568,7 @@ export function PrivateVoiceDialog({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-80 text-pretty leading-relaxed">
-                  {AUDIO_MODEL_ADVICE[provider === "google" ? "google" : "qwen"]}
+                  {AUDIO_MODEL_ADVICE[provider === "google" ? "google" : provider === "fish" ? "fish" : "qwen"]}
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -484,13 +582,13 @@ export function PrivateVoiceDialog({
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {provider === "qwen" ? (
+            {provider === "qwen" || provider === "fish" ? (
               <>
                 <Tabs
                   value={kind}
                   onValueChange={(value) => {
                     if (hasSavedVoice) return
-                    setKind(value as "clone" | "design")
+                    setKind(provider === "fish" ? "clone" : value as "clone" | "design")
                   }}
                 >
                   <TabsList
@@ -630,6 +728,29 @@ export function PrivateVoiceDialog({
                         }}
                       />
                     </div>
+                    {referenceAudio && referenceDuration > MAX_PRIVATE_VOICE_REFERENCE_SECONDS ? (
+                      <div className="rounded-xl border border-border/60 bg-muted/35 p-3">
+                        <div className="flex items-center justify-between gap-3 text-xs">
+                          <span className="font-medium text-foreground">Clone section</span>
+                          <span className="text-muted-foreground">
+                            {referenceStartSeconds.toFixed(1)}s to {selectedReferenceEndSeconds.toFixed(1)}s (15s)
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={Math.max(0, referenceDuration - MAX_PRIVATE_VOICE_REFERENCE_SECONDS)}
+                          step={0.1}
+                          value={referenceStartSeconds}
+                          onChange={(event) => setReferenceStartSeconds(Number(event.target.value))}
+                          className="mt-3 w-full accent-primary"
+                          aria-label="Start of 15-second clone section"
+                        />
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          Drag to choose the 15 seconds sent to voice cloning. Preview plays only this section.
+                        </p>
+                      </div>
+                    ) : null}
                     <p className="text-[11px] text-muted-foreground">
                       {activeReferenceUrl
                         ? referenceAudio
@@ -644,11 +765,15 @@ export function PrivateVoiceDialog({
                           referenceAudio?.name ||
                           (hasSavedVoice ? "Saved reference sample" : "Reference sample")
                         }
+                        startSeconds={referenceAudio ? referenceStartSeconds : 0}
+                        endSeconds={referenceAudio ? selectedReferenceEndSeconds || undefined : undefined}
                         onClear={
                           referenceAudio
-                            ? () => {
-                                setReferenceAudio(null)
-                              }
+                              ? () => {
+                                  setReferenceAudio(null)
+                                  setReferenceDuration(0)
+                                  setReferenceStartSeconds(0)
+                                }
                             : undefined
                         }
                       />

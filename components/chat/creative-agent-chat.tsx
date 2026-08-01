@@ -1964,6 +1964,9 @@ export function CreativeAgentChat({
                     placeholder="Describe what you want. Type /skill-name to load a skill, @ for brands & assets."
                     slashCommands={chatSlashCommands}
                     slashCommandsContext="Skills"
+                    referenceInsertMode={(item) =>
+                      item.category === "asset" ? "external" : "inline"
+                    }
                     onPasteImage={(file) => void handleAttachFiles([file])}
                     onPromptKeyDown={(event) => {
                       if (event.key === "Enter" && !event.shiftKey) {

@@ -17,6 +17,12 @@ export const PRESET_COMMANDS: CommandItem[] = [
     uiAction: "create-brand-kit",
   },
   {
+    id: "preset-candid",
+    label: "Candid",
+    description: "Unposed, imperfect iPhone snapshot aesthetic",
+    inject: "candid, Amateur image, badly framed, low light, grainy, iPhone 12 camera quality, unposed,",
+  },
+  {
     id: "preset-multi-angle-3x3",
     label: "Multi-shot: 3×3 angles",
     description:

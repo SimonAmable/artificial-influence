@@ -135,6 +135,12 @@ export async function POST(request: NextRequest) {
           referenceAudioUrl = signedData.signedUrl
         }
         voice = getDefaultAudioVoiceId("qwen")
+      } else if (provider === "fish") {
+        const fishVoiceId = typeof config.fishVoiceId === "string" ? config.fishVoiceId : ""
+        if (!fishVoiceId) {
+          return NextResponse.json({ error: "This Fish clone is missing its Fish Audio voice ID." }, { status: 409 })
+        }
+        voice = fishVoiceId
       }
     }
 

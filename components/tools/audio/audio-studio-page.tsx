@@ -1324,7 +1324,7 @@ export function AudioStudioPage() {
                       if (error) setError(null)
                      }}
                      onCreateVoice={
-                       provider === "qwen" || provider === "google"
+                       provider === "qwen" || provider === "google" || provider === "fish"
                          ? () => {
                              setEditingPrivateVoice(null)
                              setShowPrivateVoiceDialog(true)
@@ -1332,7 +1332,7 @@ export function AudioStudioPage() {
                          : undefined
                      }
                      onEditVoice={
-                       provider === "qwen" || provider === "google"
+                       provider === "qwen" || provider === "google" || provider === "fish"
                          ? (voice) => {
                              setEditingPrivateVoice(voice)
                              setShowPrivateVoiceDialog(true)
@@ -1415,7 +1415,7 @@ export function AudioStudioPage() {
                         if (error) setError(null)
                        }}
                        onCreateVoice={
-                         provider === "qwen" || provider === "google"
+                         provider === "qwen" || provider === "google" || provider === "fish"
                            ? () => {
                                setEditingPrivateVoice(null)
                                setShowPrivateVoiceDialog(true)
@@ -1423,7 +1423,7 @@ export function AudioStudioPage() {
                            : undefined
                        }
                        onEditVoice={
-                         provider === "qwen" || provider === "google"
+                         provider === "qwen" || provider === "google" || provider === "fish"
                            ? (voice) => {
                                setEditingPrivateVoice(voice)
                                setShowPrivateVoiceDialog(true)

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import {
   GOOGLE_GEMINI_TTS_MODEL,
+  FISH_AUDIO_TTS_MODEL,
   PRIVATE_VOICE_PREVIEW_TEXT,
   QWEN3_TTS_MODEL,
   getDefaultAudioVoiceId,
@@ -13,6 +14,7 @@ import {
   type PrivateVoiceRow,
 } from "@/lib/server/audio-voices"
 import { synthesizeSpeech } from "@/lib/server/audio-tts"
+import { createFishPrivateClone } from "@/lib/server/fish-audio"
 import {
   readFormString,
   readPrivateVoiceConfigFromForm,
@@ -147,7 +149,7 @@ export async function upsertPrivateVoiceFromForm({
   const kind = readFormString(formData, "kind")
   const name = readFormString(formData, "name")
 
-  if ((provider !== "qwen" && provider !== "google") || !["clone", "design"].includes(kind)) {
+  if ((provider !== "qwen" && provider !== "google" && provider !== "fish") || !["clone", "design"].includes(kind)) {
     return { ok: false, status: 400, error: "Unsupported private voice type." }
   }
   if (provider === "google" && kind !== "design") {
@@ -156,6 +158,9 @@ export async function upsertPrivateVoiceFromForm({
       status: 400,
       error: "Gemini supports saved designed voice profiles, not voice cloning.",
     }
+  }
+  if (provider === "fish" && kind !== "clone") {
+    return { ok: false, status: 400, error: "Fish Audio supports saved voice clones only." }
   }
   if (name.length < 2 || name.length > 80) {
     return { ok: false, status: 400, error: "Voice name must be 2–80 characters." }
@@ -175,6 +180,7 @@ export async function upsertPrivateVoiceFromForm({
   const id = crypto.randomUUID()
   let referenceStoragePath: string | null = null
   const config = readPrivateVoiceConfigFromForm(formData)
+  let referenceFile: File | null = null
 
   if (kind === "clone") {
     const file = formData.get("referenceAudio")
@@ -185,6 +191,7 @@ export async function upsertPrivateVoiceFromForm({
         error: "Upload an audio recording to clone this voice.",
       }
     }
+    referenceFile = file
 
     const upload = await validateAndUploadPrivateVoiceReference({
       supabase,
@@ -198,7 +205,24 @@ export async function upsertPrivateVoiceFromForm({
     referenceStoragePath = upload.path
   }
 
-  const modelId = provider === "qwen" ? QWEN3_TTS_MODEL : GOOGLE_GEMINI_TTS_MODEL
+  if (provider === "fish") {
+    if (!referenceFile) {
+      return { ok: false, status: 400, error: "Upload an audio recording to clone this voice." }
+    }
+    try {
+      const clone = await createFishPrivateClone({
+        title: name,
+        file: referenceFile,
+        transcript: typeof config.referenceText === "string" ? config.referenceText : undefined,
+      })
+      config.fishVoiceId = clone._id
+    } catch (error) {
+      if (referenceStoragePath) await supabase.storage.from("private-voices").remove([referenceStoragePath])
+      return { ok: false, status: 502, error: error instanceof Error ? error.message : "Fish Audio clone creation failed." }
+    }
+  }
+
+  const modelId = provider === "qwen" ? QWEN3_TTS_MODEL : provider === "fish" ? FISH_AUDIO_TTS_MODEL : GOOGLE_GEMINI_TTS_MODEL
   const { data, error } = await supabase
     .from("private_audio_voices")
     .insert({
@@ -234,7 +258,7 @@ export async function generateAndStorePrivateVoicePreview({
   row: PrivateVoiceRow
 }) {
   const config = row.config ?? {}
-  const provider = row.provider === "google" ? "google" : "qwen"
+  const provider = row.provider === "google" ? "google" : row.provider === "fish" ? "fish" : "qwen"
 
   let voiceId = getDefaultAudioVoiceId(provider)
   const stylePrompt =
@@ -257,6 +281,11 @@ export async function generateAndStorePrivateVoicePreview({
       typeof config.baseVoice === "string" && config.baseVoice
         ? config.baseVoice
         : getDefaultAudioVoiceId("google")
+    qwenMode = "custom_voice"
+  } else if (provider === "fish") {
+    const fishVoiceId = typeof config.fishVoiceId === "string" ? config.fishVoiceId : ""
+    if (!fishVoiceId) return { ok: false as const, status: 409, error: "This Fish clone is missing its Fish Audio voice ID." }
+    voiceId = fishVoiceId
     qwenMode = "custom_voice"
   } else if (row.kind === "clone") {
     if (!row.reference_storage_path) {

@@ -5,6 +5,7 @@ import {
   GOOGLE_GEMINI_TTS_MODEL,
   QWEN3_TTS_MODEL,
   SEED_AUDIO_MODEL,
+  FISH_AUDIO_TTS_MODEL,
   getDefaultAudioModel,
   getDefaultAudioVoiceId,
   type AudioProvider,
@@ -16,6 +17,7 @@ import {
   type Qwen3TtsMode,
 } from "@/lib/server/qwen3-tts"
 import { synthesizeSeedAudio } from "@/lib/server/seed-audio"
+import { synthesizeFishAudio } from "@/lib/server/fish-audio"
 
 export interface AudioSynthesisInput {
   provider?: string | null
@@ -46,6 +48,7 @@ export function isAudioProvider(value: string): value is AudioProvider {
     value === "google" ||
     value === "qwen" ||
     value === "fal"
+    || value === "fish"
   )
 }
 
@@ -62,6 +65,7 @@ export function resolveAudioProvider(
   }
   if (modelId === QWEN3_TTS_MODEL) return "qwen"
   if (modelId === SEED_AUDIO_MODEL) return "fal"
+  if (modelId === FISH_AUDIO_TTS_MODEL) return "fish"
 
   return DEFAULT_AUDIO_PROVIDER
 }
@@ -107,6 +111,10 @@ export async function synthesizeSpeech(input: AudioSynthesisInput) {
       pitch: input.pitch,
       multilingual: input.multilingual,
     })
+  }
+
+  if (provider === "fish") {
+    return synthesizeFishAudio({ text: input.text, voiceId })
   }
 
   return synthesizeInworldSpeech({

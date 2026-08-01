@@ -5,7 +5,7 @@ import {
   DEFAULT_INWORLD_VOICE_NAME,
 } from "@/lib/constants/inworld-tts"
 
-export type AudioProvider = "inworld" | "google" | "qwen" | "fal"
+export type AudioProvider = "inworld" | "google" | "qwen" | "fal" | "fish"
 
 export type PrivateVoiceKind = "clone" | "design"
 
@@ -24,6 +24,7 @@ export interface PrivateVoiceConfig {
   styleInstruction?: string
   stylePrompt?: string
   voiceDescription?: string
+  fishVoiceId?: string
 }
 
 export interface AudioVoice {
@@ -50,6 +51,7 @@ export const AUDIO_PROVIDER_OPTIONS = [
   { id: "google", label: "Gemini" },
   { id: "qwen", label: "Qwen" },
   { id: "fal", label: "Seed Audio" },
+  { id: "fish", label: "Fish Audio" },
 ] as const
 
 export const DEFAULT_AUDIO_PROVIDER: AudioProvider = "inworld"
@@ -67,6 +69,9 @@ export const DEFAULT_QWEN3_LANGUAGE = "auto" as const
 export const SEED_AUDIO_MODEL = "bytedance/seed-audio-1.0" as const
 export const SEED_AUDIO_MODEL_LABEL = "Seed Audio 1.0" as const
 export const DEFAULT_SEED_AUDIO_VOICE = "auto" as const
+export const FISH_AUDIO_TTS_MODEL = "s2.1-pro-free" as const
+export const FISH_AUDIO_TTS_MODEL_LABEL = "Fish S2.1 Pro Free" as const
+export const DEFAULT_FISH_AUDIO_VOICE = "default" as const
 
 export type AudioModelGroup = "Current" | "Legacy"
 
@@ -78,6 +83,14 @@ export const AUDIO_MODEL_OPTIONS: readonly {
   provider: AudioProvider
   deprecated: boolean
 }[] = [
+  {
+    id: FISH_AUDIO_TTS_MODEL,
+    label: FISH_AUDIO_TTS_MODEL_LABEL,
+    description: "Fish Audio S2.1 Pro Free with its searchable voice library and saved private clones.",
+    group: "Current",
+    provider: "fish",
+    deprecated: false,
+  },
   {
     id: GOOGLE_GEMINI_TTS_MODEL,
     label: GOOGLE_GEMINI_TTS_MODEL_LABEL,
@@ -200,6 +213,7 @@ export function getDefaultAudioVoiceId(provider: AudioProvider) {
   if (provider === "google") return DEFAULT_GOOGLE_GEMINI_VOICE_ID
   if (provider === "qwen") return DEFAULT_QWEN3_SPEAKER
   if (provider === "fal") return DEFAULT_SEED_AUDIO_VOICE
+  if (provider === "fish") return DEFAULT_FISH_AUDIO_VOICE
   return DEFAULT_INWORLD_VOICE_ID
 }
 
@@ -207,6 +221,7 @@ export function getDefaultAudioVoiceName(provider: AudioProvider) {
   if (provider === "google") return DEFAULT_GOOGLE_GEMINI_VOICE_ID
   if (provider === "qwen") return DEFAULT_QWEN3_SPEAKER
   if (provider === "fal") return "Automatic"
+  if (provider === "fish") return "Choose a Fish voice"
   return DEFAULT_INWORLD_VOICE_NAME
 }
 
@@ -214,6 +229,7 @@ export function getDefaultAudioModel(provider: AudioProvider) {
   if (provider === "google") return GOOGLE_GEMINI_TTS_MODEL
   if (provider === "qwen") return QWEN3_TTS_MODEL
   if (provider === "fal") return SEED_AUDIO_MODEL
+  if (provider === "fish") return FISH_AUDIO_TTS_MODEL
   return DEFAULT_INWORLD_TTS_MODEL
 }
 
@@ -233,6 +249,7 @@ export function getAudioModelIconSrc(modelId?: string | null) {
   if (provider === "google") return "/ai_icons/gemini-color.svg"
   if (provider === "qwen") return "/ai_icons/qwen.svg"
   if (provider === "fal") return "/ai_icons/bytedance-color.svg"
+  if (provider === "fish") return productLogo
   return productLogo
 }
 
@@ -249,6 +266,8 @@ export const AUDIO_MODEL_ADVICE: Record<AudioProvider, string> = {
     "Qwen3 TTS: cloning works best from 5–15 seconds of clean single-speaker speech. For Voice Design, describe age, pitch, timbre, accent, vocal texture, and persona.",
   fal:
     "Seed Audio 1.0: reference up to three clips in the script as @Audio1, @Audio2, and @Audio3. Explain what to borrow from each; use an image instead when the sound should follow a visual scene.",
+  fish:
+    "Fish S2.1 Pro Free: choose a voice from the Fish library or create a saved private clone from clear, single-speaker audio you own or have permission to use.",
 }
 
 export function getAudioVoiceSourceLabel(source: string) {
@@ -331,4 +350,8 @@ export function buildFallbackSeedAudioVoices(): AudioVoice[] {
       model: SEED_AUDIO_MODEL,
     },
   ]
+}
+
+export function buildFallbackFishAudioVoices(): AudioVoice[] {
+  return []
 }

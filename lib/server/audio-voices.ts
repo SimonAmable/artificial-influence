@@ -8,8 +8,10 @@ import {
   buildFallbackGoogleGeminiVoices,
   buildFallbackQwenVoices,
   buildFallbackSeedAudioVoices,
+  buildFallbackFishAudioVoices,
   getAudioVoiceSearchText,
 } from "@/lib/constants/audio"
+import { listFishLibraryVoices } from "@/lib/server/fish-audio"
 
 const PRIVATE_VOICE_PREVIEW_TTL_SECONDS = 60 * 60
 
@@ -52,6 +54,7 @@ function readPrivateVoiceConfig(
     "styleInstruction",
     "stylePrompt",
     "voiceDescription",
+    "fishVoiceId",
   ] as const) {
     const value = source[key]
     if (typeof value === "string" && value.trim()) {
@@ -226,9 +229,12 @@ export async function listCatalogVoices(
     fallbackVoices = buildFallbackQwenVoices()
   } else if (provider === "fal") {
     fallbackVoices = buildFallbackSeedAudioVoices()
+  } else if (provider === "fish") {
+    fallbackVoices = buildFallbackFishAudioVoices()
   }
 
-  return [...privateVoices, ...catalogVoices, ...fallbackVoices]
+  const fishLibraryVoices = provider === "fish" ? await listFishLibraryVoices() : []
+  return [...privateVoices, ...fishLibraryVoices, ...catalogVoices, ...fallbackVoices]
 }
 
 function normalizeSearchQuery(value: string) {
@@ -272,7 +278,7 @@ export async function searchCatalogVoices(
 ) {
   const providers: AudioProvider[] = provider
     ? [provider]
-    : ["inworld", "google", "qwen", "fal"]
+    : ["inworld", "google", "qwen", "fal", "fish"]
   const normalizedQuery = (query ?? "").trim()
 
   const allVoices = (

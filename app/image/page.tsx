@@ -587,7 +587,7 @@ function ImagePageContent() {
   }, [libraryColumnCount])
 
   // Handle image generation
-  const handleGenerate = async () => {
+  const handleGenerate = async (promptOverride?: string) => {
     if (!selectedStudioTool && hasVideoOrAudioAssetRefs(attachedCommandRefs)) {
       toast.error("Video and audio assets can't be used as references for image generation.", {
         description: "Remove those @ chips or use image assets only.",
@@ -595,7 +595,10 @@ function ImagePageContent() {
       return
     }
 
-    const mergedPrompt = buildPromptWithRefs(prompt, brandRefsOnly(attachedCommandRefs))
+    // Enter can be pressed in the same render as the last keystroke. Prefer
+    // the input's current value in that case instead of stale parent state.
+    const promptForRequest = promptOverride ?? prompt
+    const mergedPrompt = buildPromptWithRefs(promptForRequest, brandRefsOnly(attachedCommandRefs))
     const chipImageUrls = getImageAssetUrlsFromRefChips(attachedCommandRefs)
     if (
       !selectedStudioTool &&

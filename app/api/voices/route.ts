@@ -4,6 +4,7 @@ import {
   buildFallbackGoogleGeminiVoices,
   buildFallbackQwenVoices,
   buildFallbackSeedAudioVoices,
+  buildFallbackFishAudioVoices,
   GOOGLE_GEMINI_TTS_MODEL,
   QWEN3_TTS_MODEL,
   type AudioProvider,
@@ -35,13 +36,15 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ voices })
   } catch (error) {
-    if (provider === "google" || provider === "qwen" || provider === "fal") {
+    if (provider === "google" || provider === "qwen" || provider === "fal" || provider === "fish") {
       const providerFallback =
         provider === "google"
           ? buildFallbackGoogleGeminiVoices()
           : provider === "qwen"
             ? buildFallbackQwenVoices()
-            : buildFallbackSeedAudioVoices()
+            : provider === "fal"
+              ? buildFallbackSeedAudioVoices()
+              : buildFallbackFishAudioVoices()
       const fallbackVoices = providerFallback.filter((voice) =>
         languages.length > 0 ? languages.includes(voice.langCode) : true
       )
@@ -76,7 +79,7 @@ export async function POST(request: NextRequest) {
     const kind = readFormString(formData, "kind")
     const name = readFormString(formData, "name")
 
-    if ((provider !== "qwen" && provider !== "google") || !["clone", "design"].includes(kind)) {
+    if ((provider !== "qwen" && provider !== "google" && provider !== "fish") || !["clone", "design"].includes(kind)) {
       return NextResponse.json({ error: "Unsupported private voice type." }, { status: 400 })
     }
     if (provider === "google" && kind !== "design") {
@@ -84,6 +87,9 @@ export async function POST(request: NextRequest) {
         { error: "Gemini supports saved designed voice profiles, not voice cloning." },
         { status: 400 }
       )
+    }
+    if (provider === "fish" && kind !== "clone") {
+      return NextResponse.json({ error: "Fish Audio supports saved voice clones only." }, { status: 400 })
     }
     if (name.length < 2 || name.length > 80) {
       return NextResponse.json({ error: "Voice name must be 2–80 characters." }, { status: 400 })
@@ -114,7 +120,7 @@ export async function POST(request: NextRequest) {
       referenceStoragePath = upload.path
     }
 
-    const modelId = provider === "qwen" ? QWEN3_TTS_MODEL : GOOGLE_GEMINI_TTS_MODEL
+    const modelId = provider === "qwen" ? QWEN3_TTS_MODEL : provider === "fish" ? "s2.1-pro-free" : GOOGLE_GEMINI_TTS_MODEL
     const { data, error } = await supabase
       .from("private_audio_voices")
       .insert({
