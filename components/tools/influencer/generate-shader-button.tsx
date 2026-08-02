@@ -228,7 +228,8 @@ function propsAreEqual(prev: GenerateShaderButtonProps, next: GenerateShaderButt
     prev.activeSlotCount === next.activeSlotCount &&
     prev.layout === next.layout &&
     prev.label === next.label &&
-    prev.className === next.className
+    prev.className === next.className &&
+    prev.onGenerate === next.onGenerate
   )
 }
 
