@@ -1,6 +1,7 @@
 import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedRequestContext } from '@/lib/server/request-auth';
+import { authContextFailureResponse } from '@/lib/server/require-active-user';
 import { checkUserHasCredits, deductUserCreditsUpTo } from '@/lib/credits';
 import { inferStoragePathFromUrl } from '@/lib/assets/library';
 import {
@@ -53,10 +54,7 @@ export async function POST(request: NextRequest) {
     
     if (authError || !user) {
       console.error('[generate-video-test] Authentication failed:', authError?.message || 'No user');
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in to generate videos.' },
-        { status: 401 }
-      );
+      return authContextFailureResponse(authError);
     }
     console.log('[generate-video-test] ✓ User authenticated:', { userId: user.id });
 

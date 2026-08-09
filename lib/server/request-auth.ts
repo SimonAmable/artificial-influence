@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server"
 
 import { requireMcpAuth, type McpScope } from "@/lib/mcp/auth"
+import { getUserBanError } from "@/lib/server/require-active-user"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 
@@ -18,6 +19,16 @@ export async function getAuthenticatedRequestContext(
 
     try {
       const mcpAuth = await requireMcpAuth(request.headers, mcpScopes)
+      const banError = await getUserBanError(serviceRole, mcpAuth.user.id)
+      if (banError) {
+        return {
+          supabase: serviceRole,
+          user: null,
+          mcpAuth,
+          error: banError,
+        }
+      }
+
       return {
         supabase: serviceRole,
         user: mcpAuth.user,
@@ -46,6 +57,16 @@ export async function getAuthenticatedRequestContext(
       user: null,
       mcpAuth: null,
       error,
+    }
+  }
+
+  const banError = await getUserBanError(supabase, user.id)
+  if (banError) {
+    return {
+      supabase,
+      user: null,
+      mcpAuth: null,
+      error: banError,
     }
   }
 

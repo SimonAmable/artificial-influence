@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedRequestContext } from "@/lib/server/request-auth"
+import { authContextFailureResponse } from "@/lib/server/require-active-user"
 import {
   CAROUSEL_PANEL_ASPECT_RATIOS,
   CAROUSEL_VARIATION_STRENGTHS,
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
     ])
 
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 })
+      return authContextFailureResponse(authError)
     }
 
     const formData = await request.formData()

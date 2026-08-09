@@ -10,6 +10,7 @@ import {
   validateAndUploadPrivateVoiceReference,
 } from "@/lib/server/private-voice-upload"
 import { getAuthenticatedRequestContext } from "@/lib/server/request-auth"
+import { authContextFailureResponse } from "@/lib/server/require-active-user"
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -19,10 +20,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const { supabase, user, error: authError } =
     await getAuthenticatedRequestContext(request, ["generations:write"])
   if (authError || !user) {
-    return NextResponse.json(
-      { error: "Please log in to update a private voice." },
-      { status: 401 }
-    )
+    return authContextFailureResponse(authError)
   }
 
   const { id } = await context.params

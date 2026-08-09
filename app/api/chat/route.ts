@@ -15,6 +15,7 @@ import {
   updateChatThreadMessages,
 } from "@/lib/chat/database-server"
 import { createClient } from "@/lib/supabase/server"
+import { authContextFailureTextResponse, requireSessionUser } from "@/lib/server/require-active-user"
 import { PROMPT_RECREATE_SYSTEM_PROMPT } from "@/lib/constants/system-prompts"
 import { createCreativeAgent } from "@/lib/chat/creative-agent"
 import { loadActiveModels } from "@/lib/chat/tools/search-models"
@@ -100,17 +101,11 @@ export async function POST(req: Request) {
     }
 
     const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const { user, error: authError } = await requireSessionUser(supabase)
 
     if (authError || !user) {
       console.error("[chat] Authentication failed:", authError?.message || "No user")
-      return new Response(
-        JSON.stringify({ error: "Unauthorized. Please log in to use chat." }),
-        { status: 401 },
-      )
+      return authContextFailureTextResponse(authError)
     }
 
     const body = await req.json()

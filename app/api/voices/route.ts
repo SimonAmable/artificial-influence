@@ -17,6 +17,7 @@ import {
   validateAndUploadPrivateVoiceReference,
 } from "@/lib/server/private-voice-upload"
 import { getAuthenticatedRequestContext } from "@/lib/server/request-auth"
+import { authContextFailureResponse } from "@/lib/server/require-active-user"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
   const { supabase, user, error: authError } =
     await getAuthenticatedRequestContext(request, ["generations:write"])
   if (authError || !user) {
-    return NextResponse.json({ error: "Please log in to save a private voice." }, { status: 401 })
+    return authContextFailureResponse(authError)
   }
 
   try {

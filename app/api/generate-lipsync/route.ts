@@ -1,6 +1,7 @@
 import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { authContextFailureResponse, requireSessionUser } from '@/lib/server/require-active-user';
 import { checkUserHasCredits, deductUserCreditsUpTo } from '@/lib/credits';
 import { resolveVideoPricingQuote } from '@/lib/video-pricing';
 
@@ -22,14 +23,11 @@ export async function POST(request: NextRequest) {
     // Get authenticated user
     console.log('[generate-lipsync] Authenticating user...');
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { user, error: authError } = await requireSessionUser(supabase);
     
     if (authError || !user) {
       console.error('[generate-lipsync] Authentication failed:', authError?.message || 'No user');
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in to generate lipsync videos.' },
-        { status: 401 }
-      );
+      return authContextFailureResponse(authError);
     }
     console.log('[generate-lipsync] ✓ User authenticated:', { userId: user.id, email: user.email });
 

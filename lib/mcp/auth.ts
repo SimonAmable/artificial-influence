@@ -4,6 +4,7 @@ import { createHash, randomBytes, timingSafeEqual } from "crypto"
 import type { User } from "@supabase/supabase-js"
 
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
+import { getUserBanError } from "@/lib/server/require-active-user"
 
 export const MCP_ACCESS_TOKEN_PREFIX = "unican_mcp_"
 export const MCP_REFRESH_TOKEN_PREFIX = "unican_mcp_refresh_"
@@ -128,6 +129,11 @@ export async function requireMcpAuth(
 
   const { data: userResult } = await supabase.auth.admin.getUserById(auth.user.id)
   auth.user.email = userResult.user?.email
+
+  const banError = await getUserBanError(supabase, auth.user.id)
+  if (banError) {
+    throw new McpAuthError(banError.message, 403)
+  }
 
   void supabase
     .from("mcp_oauth_tokens")

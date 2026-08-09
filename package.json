@@ -16,7 +16,8 @@
     "check:chat-prompts": "node --experimental-strip-types scripts/check-chat-prompt-regression.mjs",
     "check:product-logo": "node scripts/check-product-logo.mjs",
     "check:ffmpeg-ass": "node --experimental-strip-types scripts/check-ffmpeg-ass.mjs",
-    "snapshot:ffmpeg": "node scripts/create-ffmpeg-sandbox-snapshot.mjs"
+    "snapshot:ffmpeg": "node scripts/create-ffmpeg-sandbox-snapshot.mjs",
+    "security:apply-credit-lockdown": "node scripts/apply-credit-security-lockdown.mjs"
   },
   "dependencies": {
     "@ai-sdk/devtools": "^0.0.15",

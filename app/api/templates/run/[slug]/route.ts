@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createChatThread } from "@/lib/chat/database-server"
 import { checkUserHasCredits } from "@/lib/credits"
 import { createClient } from "@/lib/supabase/server"
+import { authContextFailureResponse, requireSessionUser } from "@/lib/server/require-active-user"
 import {
   buildTemplateHiddenContext,
   buildTemplateOpeningMessage,
@@ -48,13 +49,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { slug } = await params
     const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const { user, error: authError } = await requireSessionUser(supabase)
 
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return authContextFailureResponse(authError)
     }
 
     const template = await getTemplateBySlugForUser(slug, user.id)

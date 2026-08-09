@@ -7,15 +7,13 @@ import {
   upsertPrivateVoiceFromForm,
 } from "@/lib/server/private-voice-ops"
 import { getAuthenticatedRequestContext } from "@/lib/server/request-auth"
+import { authContextFailureResponse } from "@/lib/server/require-active-user"
 
 export async function POST(request: NextRequest) {
   const { supabase, user, error: authError } =
     await getAuthenticatedRequestContext(request, ["generations:write"])
   if (authError || !user) {
-    return NextResponse.json(
-      { error: "Please log in to preview a private voice." },
-      { status: 401 }
-    )
+    return authContextFailureResponse(authError)
   }
 
   try {

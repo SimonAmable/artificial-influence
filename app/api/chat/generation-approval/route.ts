@@ -9,6 +9,7 @@ import { bindPendingGenerationsToChatMessages } from "@/lib/chat/media-persisten
 import { createCreativeChatTools } from "@/lib/chat/tools"
 import { createGenerateImageWithNanoBananaTool } from "@/lib/chat/tools/generate-image-with-nano-banana"
 import { createClient } from "@/lib/supabase/server"
+import { authContextFailureTextResponse, requireSessionUser } from "@/lib/server/require-active-user"
 
 export const maxDuration = 300
 
@@ -135,13 +136,10 @@ function findGenerationToolPart(messages: UIMessage[], toolCallId: string) {
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const { user, error: authError } = await requireSessionUser(supabase)
 
     if (authError || !user) {
-      return jsonResponse({ error: "Unauthorized. Please log in to use chat." }, 401)
+      return authContextFailureTextResponse(authError)
     }
 
     const body = (await req.json()) as {

@@ -10,6 +10,7 @@ import {
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import { resolveAudioProvider, synthesizeSpeech } from "@/lib/server/audio-tts"
 import { getAuthenticatedRequestContext } from "@/lib/server/request-auth"
+import { authContextFailureResponse } from "@/lib/server/require-active-user"
 
 type PrivateVoiceRow = {
   id: string
@@ -40,10 +41,7 @@ export async function POST(request: NextRequest) {
         "[generate-audio] Authentication failed:",
         authError?.message || "No user"
       )
-      return NextResponse.json(
-        { error: "Unauthorized. Please log in to generate audio." },
-        { status: 401 }
-      )
+      return authContextFailureResponse(authError)
     }
 
     const body = await request.json()

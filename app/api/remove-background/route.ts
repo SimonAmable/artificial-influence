@@ -2,6 +2,7 @@ import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
+import { authContextFailureResponse, requireSessionUser } from '@/lib/server/require-active-user';
 
 /** Model slug stored on generations / shown in history. */
 const REMOVE_BG_MODEL_ID = 'fottoai/remove-bg-2';
@@ -49,13 +50,10 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { user, error: authError } = await requireSessionUser(supabase);
 
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Please log in to remove background.' },
-        { status: 401 }
-      );
+      return authContextFailureResponse(authError);
     }
 
     const hasCredits = await checkUserHasCredits(user.id, CREDITS_COST);

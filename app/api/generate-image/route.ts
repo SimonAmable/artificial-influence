@@ -5,6 +5,7 @@ import Replicate from 'replicate';
 import { NextRequest, NextResponse } from 'next/server';
 import { enhancePrompt, enhancePromptForJSONModels } from '@/lib/prompt-enhancement';
 import { getAuthenticatedRequestContext } from '@/lib/server/request-auth';
+import { authContextFailureResponse } from '@/lib/server/require-active-user';
 import { checkUserHasCredits, deductUserCredits } from '@/lib/credits';
 import {
   buildImagePricingParameters,
@@ -61,10 +62,7 @@ export async function POST(request: NextRequest) {
     
     if (authError || !user) {
       console.error('[generate-image] Authentication failed:', authError?.message || 'No user');
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in to generate images.' },
-        { status: 401 }
-      );
+      return authContextFailureResponse(authError);
     }
     console.log('[generate-image] ✓ User authenticated:', { userId: user.id, email: user.email });
 

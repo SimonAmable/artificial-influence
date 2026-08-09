@@ -4,6 +4,7 @@ import { SYNTH_ID_SCRUB_CREDITS_COST } from "@/lib/constants/metadata-remover"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import { scrubSynthIdImage } from "@/lib/server/scrub-synth-id-image"
 import { createClient } from "@/lib/supabase/server"
+import { authContextFailureResponse, requireSessionUser } from "@/lib/server/require-active-user"
 
 const USER_FACING_FAILURE = "SynthID scrub failed. Please try again."
 
@@ -15,16 +16,10 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const { user, error: authError } = await requireSessionUser(supabase)
 
     if (authError || !user) {
-      return NextResponse.json(
-        { error: "Please sign in to run a SynthID scrub." },
-        { status: 401 },
-      )
+      return authContextFailureResponse(authError)
     }
 
     const hasCredits = await checkUserHasCredits(user.id, SYNTH_ID_SCRUB_CREDITS_COST, supabase)

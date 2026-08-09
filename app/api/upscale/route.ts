@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { authContextFailureResponse, requireSessionUser } from '@/lib/server/require-active-user';
 import { inferStoragePathFromUrl } from '@/lib/uploads/storage-ref';
 import {
   DEFAULT_UPSCALE_CREDITS_COST,
@@ -14,14 +15,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { user, error: authError } = await requireSessionUser(supabase);
 
     if (authError || !user) {
       console.error('[upscale] Authentication failed:', authError?.message || 'No user');
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in to use upscale.' },
-        { status: 401 }
-      );
+      return authContextFailureResponse(authError);
     }
     console.log('[upscale] ✓ User authenticated:', { userId: user.id });
 
