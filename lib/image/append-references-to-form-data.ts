@@ -1,6 +1,6 @@
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { absolutizeAssetUrl } from "@/lib/assets/absolutize-asset-url"
-import { isPersistedReferenceImageUrl } from "@/lib/image/stored-reference-url"
+import { isStoredReferenceImageUrl } from "@/lib/image/is-stored-reference-image-url"
 
 /** Append reference images to generate-image FormData without re-uploading stored URLs. */
 export function appendImageReferencesToFormData(
@@ -8,7 +8,7 @@ export function appendImageReferencesToFormData(
   images: ImageUpload[],
 ): void {
   for (const image of images) {
-    if (image.url && isPersistedReferenceImageUrl(image.url)) {
+    if (image.url && isStoredReferenceImageUrl(image.url)) {
       formData.append("referenceImageUrls", absolutizeAssetUrl(image.url))
       continue
     }

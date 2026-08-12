@@ -11,12 +11,21 @@ import {
   parseModelParameters,
   type Model,
   type ParameterDefinition,
+  type StringParameterDefinition,
 } from '@/lib/types/models';
 
 export const IMAGE_PRICING_PARAMETER_NAMES = new Set<string>(PRICING_PARAMETER_NAMES);
 
-export function formatQualityOptionLabel(paramName: string, option: string): string {
+export function formatQualityOptionLabel(
+  paramName: string,
+  option: string,
+  modelIdentifier?: string,
+): string {
   if (paramName !== 'quality') return option;
+
+  if (modelIdentifier === 'xai/grok-imagine-image-2.0') {
+    return option.charAt(0).toUpperCase() + option.slice(1);
+  }
 
   switch (option) {
     case 'low':
@@ -53,10 +62,10 @@ export function isPricingParameter(param: ParameterDefinition): boolean {
   return IMAGE_PRICING_PARAMETER_NAMES.has(param.name);
 }
 
-export function getImagePricingParameters(model: Model | null): ParameterDefinition[] {
+export function getImagePricingParameters(model: Model | null): StringParameterDefinition[] {
   if (!model) return [];
 
-  return parseModelParameters(model.parameters).filter((param) => {
+  return parseModelParameters(model.parameters).filter((param): param is StringParameterDefinition => {
     if (param.name === 'output_quality') return false;
     if (!isPricingParameter(param)) return false;
     return isStringParameter(param) && Array.isArray(param.enum) && param.enum.length > 0;
@@ -79,7 +88,26 @@ export function getDefaultImageModelParameters(model: Model | null): Record<stri
 
   return getImagePricingParameters(model).reduce<Record<string, string | number | boolean | null>>(
     (acc, param) => {
-      acc[param.name] = getParameterDefault(param);
+      const fallbackDefault = getParameterDefault(param);
+      const pricedOptions = param.enum
+        ?.map((option) => ({
+          option: String(option),
+          credits: resolveCreditsForParameterOption(model, param.name, String(option)),
+        }))
+        .filter((entry): entry is { option: string; credits: number } => entry.credits != null);
+
+      // Only override the model-provided default when this parameter has real
+      // price tiers. Flat-priced parameters retain their intended defaults.
+      const hasDifferentPrices =
+        pricedOptions != null &&
+        pricedOptions.length > 1 &&
+        new Set(pricedOptions.map((entry) => entry.credits)).size > 1;
+
+      acc[param.name] = hasDifferentPrices
+        ? pricedOptions.reduce((cheapest, entry) =>
+            entry.credits < cheapest.credits ? entry : cheapest,
+          ).option
+        : fallbackDefault;
       return acc;
     },
     {},

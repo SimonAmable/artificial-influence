@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedRequestContext } from "@/lib/server/request-auth"
 import { authContextFailureResponse } from "@/lib/server/require-active-user"
 import {
+  CAROUSEL_GENERATION_MODES,
   CAROUSEL_PANEL_ASPECT_RATIOS,
   CAROUSEL_VARIATION_STRENGTHS,
+  isCarouselHdShotCount,
   isCarouselShotsModelId,
 } from "@/lib/carousel-shots/constants"
 import type {
+  CarouselGenerationMode,
   CarouselGridSize,
   CarouselPanelAspectRatio,
   CarouselVariationStrength,
@@ -15,11 +18,26 @@ import { runCarouselShotsGeneration } from "@/lib/server/carousel-shots-run"
 import { isContentModerationMessage } from "@/lib/generate-image-client"
 
 const MAX_REFERENCE_SIZE_BYTES = 10 * 1024 * 1024
+const MAX_CUSTOM_VARIATION_LENGTH = 500
+const MAX_PER_SHOT_VARIATIONS = 12
 
 function parseGridSize(value: FormDataEntryValue | null): CarouselGridSize | null {
   const parsed = Number(value)
   if (parsed === 4 || parsed === 9) return parsed
   return null
+}
+
+function parseShotCount(value: FormDataEntryValue | null): number | null {
+  const parsed = Number(value)
+  if (!isCarouselHdShotCount(parsed)) return null
+  return parsed
+}
+
+function parseGenerationMode(value: FormDataEntryValue | null): CarouselGenerationMode | null {
+  if (typeof value !== "string") return null
+  return CAROUSEL_GENERATION_MODES.includes(value as CarouselGenerationMode)
+    ? (value as CarouselGenerationMode)
+    : null
 }
 
 function parseAspectRatio(value: FormDataEntryValue | null): CarouselPanelAspectRatio | null {
@@ -38,6 +56,30 @@ function parseVariationStrength(
     : null
 }
 
+function parseCustomVariation(value: FormDataEntryValue | null): string | null {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  return trimmed.slice(0, MAX_CUSTOM_VARIATION_LENGTH)
+}
+
+function parsePerShotVariations(value: FormDataEntryValue | null): string[] | null {
+  if (typeof value !== "string" || !value.trim()) return null
+
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) return null
+
+    const variations = parsed
+      .slice(0, MAX_PER_SHOT_VARIATIONS)
+      .map((entry) => (typeof entry === "string" ? entry.trim().slice(0, MAX_CUSTOM_VARIATION_LENGTH) : ""))
+
+    return variations.some((entry) => entry.length > 0) ? variations : null
+  } catch {
+    return null
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { supabase, user, error: authError } = await getAuthenticatedRequestContext(request, [
@@ -50,17 +92,28 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     const referenceImage = formData.get("referenceImage")
+    const generationMode = parseGenerationMode(formData.get("generationMode")) ?? "fast"
     const gridSize = parseGridSize(formData.get("gridSize"))
+    const shotCountRaw = parseShotCount(formData.get("shotCount"))
     const aspectRatio = parseAspectRatio(formData.get("aspectRatio"))
     const variationStrength = parseVariationStrength(formData.get("variationStrength"))
+    const customVariation = parseCustomVariation(formData.get("customVariation"))
+    const perShotVariations = parsePerShotVariations(formData.get("perShotVariations"))
     const modelRaw = formData.get("model")
 
     if (!(referenceImage instanceof File) || referenceImage.size === 0) {
       return NextResponse.json({ error: "referenceImage is required" }, { status: 400 })
     }
 
-    if (!gridSize) {
-      return NextResponse.json({ error: "gridSize must be 4 or 9" }, { status: 400 })
+    if (generationMode === "fast" && !gridSize) {
+      return NextResponse.json({ error: "gridSize must be 4 or 9 for fast mode" }, { status: 400 })
+    }
+
+    if (generationMode === "hd" && shotCountRaw == null) {
+      return NextResponse.json(
+        { error: "shotCount must be between 2 and 12 for HD mode" },
+        { status: 400 },
+      )
     }
 
     if (!aspectRatio) {
@@ -69,7 +122,14 @@ export async function POST(request: NextRequest) {
 
     if (!variationStrength) {
       return NextResponse.json(
-        { error: "variationStrength must be subtle, natural, or creative" },
+        { error: "variationStrength must be subtle, natural, creative, or custom" },
+        { status: 400 },
+      )
+    }
+
+    if (variationStrength === "custom" && !customVariation && !perShotVariations) {
+      return NextResponse.json(
+        { error: "customVariation or perShotVariations is required for custom variation" },
         { status: 400 },
       )
     }
@@ -88,6 +148,8 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       )
     }
+
+    const shotCount = generationMode === "hd" ? shotCountRaw! : gridSize!
 
     const fileExtension = referenceImage.name.split(".").pop() || "png"
     const timestamp = Date.now()
@@ -115,13 +177,17 @@ export async function POST(request: NextRequest) {
 
     const result = await runCarouselShotsGeneration({
       aspectRatio,
-      gridSize,
+      generationMode,
+      gridSize: generationMode === "fast" ? gridSize! : undefined,
+      shotCount,
       model: modelRaw,
       referenceImageStoragePaths: [storagePath],
       referenceImageUrls: [referenceImageUrl],
       supabase,
       userId: user.id,
       variationStrength,
+      customVariation,
+      perShotVariations,
     })
 
     return NextResponse.json({

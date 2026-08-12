@@ -81,6 +81,41 @@ runTest("Grok Imagine resolution tiers", () => {
   assert.equal(quote2k.quotedCredits, 7)
 })
 
+runTest("Grok Image 2 charges 2 credits for low and 4 for other qualities", () => {
+  const model = {
+    identifier: "xai/grok-imagine-image-2.0",
+    type: "image" as const,
+    model_cost: 4,
+    pricing_config: {
+      strategy: "tiered_per_output" as const,
+      defaultCredits: 4,
+      dimensions: [
+        { parameter: "quality", values: { low: 2, medium: 4, high: 4 } },
+      ],
+    },
+  }
+
+  const low = resolveGenerationPricingQuote({
+    model,
+    parameters: buildImagePricingParameters({ quality: "low" }),
+    outputCount: 2,
+  })
+  const medium = resolveGenerationPricingQuote({
+    model,
+    parameters: buildImagePricingParameters({ quality: "medium" }),
+    outputCount: 1,
+  })
+  const high = resolveGenerationPricingQuote({
+    model,
+    parameters: buildImagePricingParameters({ quality: "high" }),
+    outputCount: 1,
+  })
+
+  assert.equal(low.quotedCredits, 4)
+  assert.equal(medium.quotedCredits, 4)
+  assert.equal(high.quotedCredits, 4)
+})
+
 runTest("Kling v3 mode and audio matrix", () => {
   const quote = resolveGenerationPricingQuote({
     model: {

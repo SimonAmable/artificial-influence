@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 import { requireMcpAuth, type McpScope } from "@/lib/mcp/auth"
 import { getUserBanError } from "@/lib/server/require-active-user"
 import { createClient } from "@/lib/supabase/server"
+import { createSupabaseBearerClient } from "@/lib/supabase/bearer"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 
 export async function getAuthenticatedRequestContext(
@@ -42,6 +43,42 @@ export async function getAuthenticatedRequestContext(
         mcpAuth: null,
         error: error instanceof Error ? error : new Error("Invalid MCP bearer token"),
       }
+    }
+  }
+
+  const bearerMatch = authorization.match(/^Bearer\s+(\S+)$/i)
+  if (bearerMatch && !bearerMatch[1].startsWith("unican_mcp_")) {
+    const accessToken = bearerMatch[1]
+    const supabase = createSupabaseBearerClient(accessToken)
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(accessToken)
+
+    if (error || !user) {
+      return {
+        supabase,
+        user: null,
+        mcpAuth: null,
+        error: error ?? new Error("Unauthorized"),
+      }
+    }
+
+    const banError = await getUserBanError(supabase, user.id)
+    if (banError) {
+      return {
+        supabase,
+        user: null,
+        mcpAuth: null,
+        error: banError,
+      }
+    }
+
+    return {
+      supabase,
+      user,
+      mcpAuth: null,
+      error: null,
     }
   }
 

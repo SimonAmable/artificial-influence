@@ -201,10 +201,14 @@ export function CarouselShotsHistoryPanel({
             generationId={null}
             metadata={{
               kind: "carousel_shots",
-              contactSheetUrl: "",
-              contactSheetStoragePath: "",
+              generationMode: job.generationMode,
+              contactSheetUrl: null,
+              contactSheetStoragePath: null,
               shots: [],
-              gridSize: job.gridSize,
+              shotCount: job.shotCount,
+              gridSize: job.generationMode === "fast" && (job.shotCount === 4 || job.shotCount === 9)
+                ? (job.shotCount as 4 | 9)
+                : undefined,
               aspectRatio: job.aspectRatio,
               variationStrength: "natural",
               model: "google/nano-banana-2",

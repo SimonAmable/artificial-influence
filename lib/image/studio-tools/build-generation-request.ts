@@ -11,6 +11,18 @@ export interface StudioToolValidationError {
   message: string
 }
 
+export function appendStudioToolAdditionalInstructions(
+  canonicalPrompt: string,
+  additionalInstructions?: string,
+): string {
+  const trimmed = additionalInstructions?.trim()
+  if (!trimmed) {
+    return canonicalPrompt
+  }
+
+  return `${canonicalPrompt} Additional user instructions: ${trimmed}`
+}
+
 export function validateDualReferenceSwapState(
   tool: ImageStudioToolDefinition,
   state: DualReferenceSwapToolState,
@@ -47,7 +59,10 @@ export function buildStudioToolGenerationRequest(
   )
 
   return {
-    prompt: tool.canonicalPrompt,
+    prompt: appendStudioToolAdditionalInstructions(
+      tool.canonicalPrompt,
+      state.additionalInstructions,
+    ),
     tool: tool.historyToolTag,
     model: resolveBackendModelIdentifier(tool.uiModelIdentifier),
     aspectRatio: tool.generation.aspectRatio,

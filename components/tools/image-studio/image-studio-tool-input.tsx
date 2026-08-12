@@ -11,6 +11,8 @@ export interface ImageStudioToolInputProps {
   className?: string
   sourceImage?: ImageUpload | null
   sceneImage?: ImageUpload | null
+  additionalInstructions?: string
+  onAdditionalInstructionsChange?: (value: string) => void
   onSourceImageChange?: (image: ImageUpload | null) => void
   onSceneImageChange?: (image: ImageUpload | null) => void
   onGenerate?: () => void

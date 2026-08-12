@@ -141,13 +141,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const result = await runCarouselShotsGeneration({
       aspectRatio: metadata.aspectRatio,
+      generationMode: metadata.generationMode ?? "fast",
       gridSize: metadata.gridSize,
+      shotCount: metadata.shotCount ?? metadata.gridSize ?? metadata.shots.length,
       model: metadata.model,
       referenceImageStoragePaths: referencePaths,
       referenceImageUrls,
       supabase,
       userId: user.id,
       variationStrength: metadata.variationStrength,
+      customVariation: metadata.customVariation ?? null,
+      perShotVariations: metadata.perShotVariations ?? null,
     })
 
     return NextResponse.json({

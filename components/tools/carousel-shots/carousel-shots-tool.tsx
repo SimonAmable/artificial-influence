@@ -22,9 +22,9 @@ import {
   tryShowContentModerationToast,
 } from "@/lib/content-moderation-toast"
 import { showCreditsUpsellToast } from "@/lib/pricing-upsell"
-import { DEFAULT_CAROUSEL_SHOTS_MODEL } from "@/lib/carousel-shots/constants"
+import { DEFAULT_CAROUSEL_HD_SHOT_COUNT, DEFAULT_CAROUSEL_SHOTS_MODEL } from "@/lib/carousel-shots/constants"
 import type {
-  CarouselGridSize,
+  CarouselGenerationMode,
   CarouselPanelAspectRatio,
   CarouselShotsMetadata,
 } from "@/lib/carousel-shots/types"
@@ -33,9 +33,14 @@ import { cn } from "@/lib/utils"
 
 const DEFAULT_FORM: CarouselShotsFormState = {
   referenceImage: null,
+  generationMode: "fast",
   gridSize: 4,
+  hdShotCount: DEFAULT_CAROUSEL_HD_SHOT_COUNT,
   aspectRatio: "9:16",
   variationStrength: "subtle",
+  customVariation: "",
+  perShotVariationEnabled: false,
+  perShotVariations: [],
   model: DEFAULT_CAROUSEL_SHOTS_MODEL,
 }
 
@@ -45,7 +50,8 @@ const DRAG_PREVIEW_OFFSET_Y = 18
 type PendingJob = {
   id: string
   aspectRatio: CarouselPanelAspectRatio
-  gridSize: CarouselGridSize
+  generationMode: CarouselGenerationMode
+  shotCount: number
 }
 
 type PendingResult = {
@@ -304,18 +310,28 @@ export function CarouselShotsTool() {
       return
     }
 
+    const shotCount = form.generationMode === "hd" ? form.hdShotCount : form.gridSize
     const jobId = crypto.randomUUID()
     const jobSnapshot: PendingJob = {
       id: jobId,
       aspectRatio: form.aspectRatio,
-      gridSize: form.gridSize,
+      generationMode: form.generationMode,
+      shotCount,
     }
+    const perShotVariations =
+      form.variationStrength === "custom" && form.perShotVariationEnabled
+        ? Array.from({ length: shotCount }, (_, index) => form.perShotVariations[index]?.trim() ?? "")
+        : []
     const formSnapshot = {
       file: reference.file ?? null,
       url: reference.url ?? null,
+      generationMode: form.generationMode,
       gridSize: form.gridSize,
+      shotCount,
       aspectRatio: form.aspectRatio,
       variationStrength: form.variationStrength,
+      customVariation: form.customVariation.trim(),
+      perShotVariations,
       model: form.model,
     }
 
@@ -341,9 +357,20 @@ export function CarouselShotsTool() {
 
       const formData = new FormData()
       formData.append("referenceImage", referenceFile)
-      formData.append("gridSize", String(formSnapshot.gridSize))
+      formData.append("generationMode", formSnapshot.generationMode)
+      if (formSnapshot.generationMode === "fast") {
+        formData.append("gridSize", String(formSnapshot.gridSize))
+      } else {
+        formData.append("shotCount", String(formSnapshot.shotCount))
+      }
       formData.append("aspectRatio", formSnapshot.aspectRatio)
       formData.append("variationStrength", formSnapshot.variationStrength)
+      if (formSnapshot.customVariation) {
+        formData.append("customVariation", formSnapshot.customVariation)
+      }
+      if (formSnapshot.perShotVariations.some((entry) => entry.length > 0)) {
+        formData.append("perShotVariations", JSON.stringify(formSnapshot.perShotVariations))
+      }
       formData.append("model", formSnapshot.model)
 
       const response = await fetch("/api/carousel-shots/generate", {

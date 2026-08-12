@@ -19,22 +19,62 @@ import {
   Shuffle,
   Image as ImageIcon,
   VideoCamera,
-  DownloadSimple
+  DownloadSimple,
+  FloppyDisk,
 } from "@phosphor-icons/react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CharacterVoiceField } from "@/components/assets/character-voice-field"
-import { GenerationLoadingSlots } from "@/components/shared/display/generation-loading-slots"
+import {
+  CharacterVoiceField,
+  overlayActionButtonClass,
+  overlayActionButtonMutedClass,
+} from "@/components/assets/character-voice-field"
+import { GenerationLoadingOverlay } from "@/components/shared/display/generation-loading-slots"
+import {
+  InfluencerInputBox,
+  type InfluencerInputSnapshot,
+} from "@/components/tools/influencer"
 import { GenerateShaderButton } from "@/components/tools/influencer/generate-shader-button"
+import type { ImageUpload } from "@/components/shared/upload/photo-upload"
+import { Shimmer } from "@/components/ai-elements/shimmer"
 import { cn } from "@/lib/utils"
 import { GPT_IMAGE_2_META } from "@/lib/constants/model-metadata"
+import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
+import { useEffectiveImageModels } from "@/lib/image/studio-tools"
+import { appendImageReferencesToFormData } from "@/lib/image/append-references-to-form-data"
+import { useDefaultEnhancePrompt } from "@/hooks/use-default-enhance-prompt"
+import { getDefaultImageModelParameters } from "@/lib/pricing-parameter-ui"
+import {
+  getDefaultAspectRatioForModel,
+  getSupportedAspectRatios,
+  pickRetainedAspectRatio,
+  resolveAspectRatioForRequest,
+} from "@/lib/utils/aspect-ratios"
+import type { ModelInputValues } from "@/lib/types/models"
+import type { AttachedRef } from "@/lib/commands/types"
+import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
+import {
+  brandRefsOnly,
+  getImageAssetUrlsFromRefChips,
+  hasVideoOrAudioAssetRefs,
+} from "@/lib/commands/ref-image-pipeline"
 import {
   assertNeverInfluencerMode,
   getInfluencerModeCopy,
@@ -70,6 +110,8 @@ interface ImageHistoryItem {
   createdAt: string | null
   reference_image_urls?: string[]
   assetId?: string | null
+  characterAssetId?: string | null
+  isCoverImage?: boolean
   voiceId?: string | null
   voiceProvider?: string | null
   privateVoiceId?: string | null
@@ -77,6 +119,54 @@ interface ImageHistoryItem {
   privateVoicePreviewUrl?: string | null
   privateVoiceProvider?: string | null
 }
+
+type CharacterDeleteDialogState =
+  | {
+      kind: "character"
+      item: ImageHistoryItem
+      title: string
+      description: string
+    }
+  | {
+      kind: "image"
+      title: string
+      description: string
+    }
+
+type GeneratingTarget =
+  | { kind: "create" }
+  | {
+      kind: "edit"
+      characterKey: string
+      assetId: string | null
+      generationId: string
+    }
+
+function getCharacterCardKey(item: Pick<ImageHistoryItem, "id" | "assetId">): string {
+  return item.assetId ? `asset:${item.assetId}` : `generation:${item.id}`
+}
+
+function isCharacterGenerating(
+  target: GeneratingTarget | null,
+  item: Pick<ImageHistoryItem, "id" | "assetId">,
+): boolean {
+  if (target?.kind !== "edit") return false
+  if (target.characterKey === getCharacterCardKey(item)) return true
+  if (target.assetId != null && item.assetId === target.assetId) return true
+  return item.id === target.generationId
+}
+
+const CHARACTER_EDIT_MODEL = DEFAULT_IMAGE_MODEL_IDENTIFIER
+
+const FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF = new Set([
+  "fal-ai/qwen-image-2",
+  "fal-ai/wan/v2.7",
+  "fal-ai/wan/v2.7/pro",
+  "openai/gpt-image-2",
+  "bytedance/seedream-4.5",
+  "bytedance/seedream-5-lite",
+  "bytedance/seedream-5-pro",
+])
 
 const EYE_COLORS: { [key: string]: string } = {
   Brown: "radial-gradient(circle, #5c3a21 0%, #1e1108 80%)",
@@ -362,6 +452,20 @@ function AIInfluencerPageContent() {
   )
   const [characterName, setCharacterName] = React.useState("")
   const [uploadedFiles, setUploadedFiles] = React.useState<Array<{ file: File; url: string }>>([])
+  const [activeUploadIndex, setActiveUploadIndex] = React.useState(0)
+  const [characterEditPrompt, setCharacterEditPrompt] = React.useState("")
+  const [characterEditReferenceImages, setCharacterEditReferenceImages] = React.useState<ImageUpload[]>([])
+  const [characterEditAttachedRefs, setCharacterEditAttachedRefs] = React.useState<AttachedRef[]>([])
+  const [characterEditEnhancePrompt, setCharacterEditEnhancePrompt] = React.useState(false)
+  const [selectedCharacterEditModel, setSelectedCharacterEditModel] =
+    React.useState<string>(CHARACTER_EDIT_MODEL)
+  const [selectedCharacterEditAspectRatio, setSelectedCharacterEditAspectRatio] = React.useState("1:1")
+  const [selectedCharacterEditNumImages, setSelectedCharacterEditNumImages] = React.useState(1)
+  const [selectedCharacterEditModelParameters, setSelectedCharacterEditModelParameters] =
+    React.useState<ModelInputValues>({})
+  const characterEditEnhanceSeededRef = React.useRef(false)
+  const prevCharacterEditModelRef = React.useRef<string | null>(null)
+  const { defaultEnhancePrompt, isReady: defaultEnhancePromptReady } = useDefaultEnhancePrompt()
   const [selectedTraits, setSelectedTraits] = React.useState<{ [key: string]: string }>({})
   
   // Custom input states per category
@@ -370,16 +474,107 @@ function AIInfluencerPageContent() {
   const [editingCustomTraitKey, setEditingCustomTraitKey] = React.useState<string | null>(null)
   
   // Global page UI states
-  const [isGenerating, setIsGenerating] = React.useState(false)
+  const [generatingTarget, setGeneratingTarget] = React.useState<GeneratingTarget | null>(null)
+  const isGenerating = generatingTarget !== null
+  const isCreatingCharacter = generatingTarget?.kind === "create"
+  const isEditingSelectedCharacter = Boolean(
+    selectedCharacter && isCharacterGenerating(generatingTarget, selectedCharacter),
+  )
   const [, setIsHistoryLoading] = React.useState(false)
   const [isHelpOpen, setIsHelpOpen] = React.useState(false)
   const [isNameDialogOpen, setIsNameDialogOpen] = React.useState(false)
   const [isBuilderSheetOpen, setIsBuilderSheetOpen] = React.useState(false)
+  const [deleteDialog, setDeleteDialog] = React.useState<CharacterDeleteDialogState | null>(null)
+  const [isDeletingCharacter, setIsDeletingCharacter] = React.useState(false)
   
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const modeCopy = getInfluencerModeCopy(creationMode)
   const showBuilder = creationMode === "build"
   const maxUploadCount = creationMode === "direct" ? 1 : creationMode === "merge" ? 3 : 0
+
+  const characterCards = React.useMemo(() => {
+    const uniqueCharacters = new Map<string, ImageHistoryItem>()
+
+    historyImages.forEach((item) => {
+      const key = item.assetId ? `asset:${item.assetId}` : `generation:${item.id}`
+      const current = uniqueCharacters.get(key)
+      if (!current || item.isCoverImage) {
+        uniqueCharacters.set(key, item)
+      }
+    })
+
+    return Array.from(uniqueCharacters.values())
+  }, [historyImages])
+
+  const characterImages = React.useMemo(() => {
+    if (!selectedCharacter) return []
+
+    const images = selectedCharacter.assetId
+      ? historyImages.filter((item) => item.assetId === selectedCharacter.assetId)
+      : [selectedCharacter]
+
+    return [...images].sort((a, b) => {
+      if (a.isCoverImage !== b.isCoverImage) return a.isCoverImage ? -1 : 1
+      return String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? ""))
+    })
+  }, [historyImages, selectedCharacter])
+
+  const characterCoverImage = React.useMemo(
+    () => characterImages.find((image) => image.isCoverImage) ?? characterImages[0] ?? null,
+    [characterImages],
+  )
+
+  const { models: imageModels } = useEffectiveImageModels()
+  const selectedCharacterEditModelObject = React.useMemo(
+    () => imageModels.find((model) => model.identifier === selectedCharacterEditModel) ?? null,
+    [imageModels, selectedCharacterEditModel],
+  )
+
+  const activeCharacterIsCover = selectedCharacter?.isCoverImage ?? true
+
+  React.useEffect(() => {
+    if (!defaultEnhancePromptReady || characterEditEnhanceSeededRef.current) return
+    characterEditEnhanceSeededRef.current = true
+    setCharacterEditEnhancePrompt(defaultEnhancePrompt)
+  }, [defaultEnhancePrompt, defaultEnhancePromptReady])
+
+  React.useEffect(() => {
+    if (!selectedCharacter?.url) {
+      setCharacterEditReferenceImages([])
+      return
+    }
+    setCharacterEditReferenceImages([{ url: selectedCharacter.url }])
+  }, [selectedCharacter?.id, selectedCharacter?.url])
+
+  React.useEffect(() => {
+    if (!selectedCharacterEditModel || imageModels.length === 0) return
+
+    const model = imageModels.find((entry) => entry.identifier === selectedCharacterEditModel)
+    if (!model) return
+
+    const previousModel = prevCharacterEditModelRef.current
+    prevCharacterEditModelRef.current = selectedCharacterEditModel
+
+    if (previousModel === null) {
+      setSelectedCharacterEditAspectRatio(getDefaultAspectRatioForModel(model))
+    } else {
+      setSelectedCharacterEditAspectRatio((current) => {
+        const supported = getSupportedAspectRatios(model)
+        return pickRetainedAspectRatio(current, supported) ?? getDefaultAspectRatioForModel(model)
+      })
+    }
+
+    const maxImages = model.max_images ?? 1
+    setSelectedCharacterEditNumImages((current) =>
+      maxImages >= 1 ? Math.min(current, maxImages) : 1,
+    )
+  }, [imageModels, selectedCharacterEditModel])
+
+  React.useEffect(() => {
+    setSelectedCharacterEditModelParameters(
+      getDefaultImageModelParameters(selectedCharacterEditModelObject),
+    )
+  }, [selectedCharacterEditModelObject])
 
   // Fetch history
   const fetchHistory = React.useCallback(async () => {
@@ -413,6 +608,7 @@ function AIInfluencerPageContent() {
           .filter((asset) => typeof asset.url === "string" && asset.url.trim().length > 0)
           .map((asset) => [asset.url, asset] as const),
       )
+      const assetById = new Map(characterAssets.map((asset) => [asset.id, asset] as const))
 
       const generations = Array.isArray(generationData.generations)
         ? (generationData.generations as Array<Record<string, unknown>>)
@@ -422,13 +618,20 @@ function AIInfluencerPageContent() {
         .map((gen) => {
           const id = typeof gen.id === "string" ? gen.id : ""
           const url = typeof gen.url === "string" ? gen.url : ""
-          const linkedAsset = assetByGenerationId.get(id) || assetByUrl.get(url) || null
+          const characterAssetId =
+            typeof gen.character_asset_id === "string" ? gen.character_asset_id : null
+          const linkedAsset =
+            assetByGenerationId.get(id) ||
+            assetByUrl.get(url) ||
+            (characterAssetId ? assetById.get(characterAssetId) : null) ||
+            null
           return {
             id,
             url,
             model: typeof gen.model === "string" ? gen.model : null,
             prompt: typeof gen.prompt === "string" ? gen.prompt : null,
             displayName: linkedAsset?.title?.trim() || null,
+            trackedPills: linkedAsset?.tags ?? [],
             tool: typeof gen.tool === "string" ? gen.tool : null,
             aspectRatio: typeof gen.aspect_ratio === "string" ? gen.aspect_ratio : null,
             type: typeof gen.type === "string" ? gen.type : null,
@@ -437,6 +640,10 @@ function AIInfluencerPageContent() {
               ? gen.reference_image_urls.filter((value): value is string => typeof value === "string")
               : [],
             assetId: linkedAsset?.id ?? null,
+            characterAssetId,
+            isCoverImage: linkedAsset
+              ? linkedAsset.url === url || linkedAsset.sourceGenerationId === id
+              : true,
             voiceId: linkedAsset?.voiceId ?? null,
             voiceProvider: linkedAsset?.voiceProvider ?? null,
             privateVoiceId: linkedAsset?.privateVoiceId ?? null,
@@ -484,6 +691,7 @@ function AIInfluencerPageContent() {
     (mode: InfluencerCreationMode) => {
       setCreationMode(mode)
       setSelectedCharacter(null)
+      setCharacterEditPrompt("")
       setIsBuilderSheetOpen(false)
 
       setUploadedFiles((prev) => {
@@ -498,6 +706,7 @@ function AIInfluencerPageContent() {
         }
         return prev.slice(0, 3)
       })
+      setActiveUploadIndex(0)
 
       if (mode !== "build") {
         setSelectedTraits({})
@@ -517,11 +726,13 @@ function AIInfluencerPageContent() {
   // Reset current builder selections
   const handleReset = React.useCallback(() => {
     setSelectedCharacter(null)
+    setCharacterEditPrompt("")
     setCharacterName("")
     setUploadedFiles((prev) => {
       prev.forEach((item) => URL.revokeObjectURL(item.url))
       return []
     })
+    setActiveUploadIndex(0)
     setSelectedTraits({})
     setCustomTraits({})
     setCustomInputs({})
@@ -574,13 +785,17 @@ function AIInfluencerPageContent() {
       )
       setHistoryImages((prev) =>
         prev.map((item) =>
-          item.id === selectedCharacter.id ? { ...item, ...optimistic } : item,
+          item.id === selectedCharacter.id ||
+          (selectedCharacter.assetId && item.assetId === selectedCharacter.assetId)
+            ? { ...item, ...optimistic }
+            : item,
         ),
       )
 
       setIsSavingVoice(true)
       try {
         const asset = await attachVoiceToCharacter({
+          assetId: selectedCharacter.assetId,
           title: getCharacterDisplayName(selectedCharacter),
           url: selectedCharacter.url,
           sourceGenerationId: selectedCharacter.id,
@@ -609,7 +824,10 @@ function AIInfluencerPageContent() {
         )
         setHistoryImages((prev) =>
           prev.map((item) =>
-            item.id === selectedCharacter.id ? { ...item, ...confirmed } : item,
+            item.id === selectedCharacter.id ||
+            (selectedCharacter.assetId && item.assetId === selectedCharacter.assetId)
+              ? { ...item, ...confirmed }
+              : item,
           ),
         )
 
@@ -627,7 +845,10 @@ function AIInfluencerPageContent() {
         )
         setHistoryImages((prev) =>
           prev.map((item) =>
-            item.id === selectedCharacter.id ? { ...item, ...previous } : item,
+            item.id === selectedCharacter.id ||
+            (selectedCharacter.assetId && item.assetId === selectedCharacter.assetId)
+              ? { ...item, ...previous }
+              : item,
           ),
         )
         toast.error(
@@ -685,6 +906,10 @@ function AIInfluencerPageContent() {
         const payload = (await response.json().catch(() => ({}))) as { error?: string; message?: string }
         throw new Error(payload.message || payload.error || "Failed to save character asset")
       }
+
+      const payload = (await response.json()) as { asset?: AssetRecord }
+      if (!payload.asset) throw new Error("Character asset was not returned")
+      return payload.asset
     },
     []
   )
@@ -802,6 +1027,7 @@ function AIInfluencerPageContent() {
       url: URL.createObjectURL(file)
     }))
 
+    if (uploadedFiles.length === 0) setActiveUploadIndex(0)
     setUploadedFiles(prev => [...prev, ...newFiles].slice(0, maxUploadCount))
     e.target.value = ""
   }
@@ -812,6 +1038,11 @@ function AIInfluencerPageContent() {
       URL.revokeObjectURL(updated[index].url)
       updated.splice(index, 1)
       return updated
+    })
+    setActiveUploadIndex((current) => {
+      if (current > index) return current - 1
+      if (current === index) return Math.max(0, current - 1)
+      return current
     })
   }
 
@@ -876,7 +1107,7 @@ function AIInfluencerPageContent() {
     }
 
     setIsNameDialogOpen(false)
-    setIsGenerating(true)
+    setGeneratingTarget({ kind: "create" })
     try {
       // Sonner merges updates by id and keeps a prior description unless cleared
       // (e.g. content-moderation's "No credits were used..." stuck on the next loading toast).
@@ -1048,29 +1279,378 @@ function AIInfluencerPageContent() {
         toast.error(msg, { id: "influencer-toast", description: "" })
       }
     } finally {
-      setIsGenerating(false)
+      setGeneratingTarget(null)
     }
   }
 
-  // Delete Character
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!confirm("Are you sure you want to delete this character?")) return
+  const handleCharacterImageGenerate = async (
+    promptOverride?: string,
+    inputSnapshot?: InfluencerInputSnapshot,
+  ) => {
+    const coverImage = characterCoverImage ?? selectedCharacter
+    if (!selectedCharacter || !coverImage || isGenerating) return
+
+    const attachedRefsForRequest = inputSnapshot?.attachedRefs ?? characterEditAttachedRefs
+    const referenceImagesForRequest =
+      inputSnapshot?.referenceImages ??
+      (characterEditReferenceImages.length > 0 ? characterEditReferenceImages : [{ url: coverImage.url }])
+    const promptForRequest = promptOverride ?? characterEditPrompt
+    const mergedPrompt = buildPromptWithRefs(promptForRequest, brandRefsOnly(attachedRefsForRequest))
+    const chipImageUrls = getImageAssetUrlsFromRefChips(attachedRefsForRequest)
+
+    if (hasVideoOrAudioAssetRefs(attachedRefsForRequest)) {
+      toast.error("Video and audio assets can't be used as references for image generation.", {
+        description: "Remove those @ chips or use image assets only.",
+      })
+      return
+    }
+
+    if (
+      !mergedPrompt.trim() &&
+      chipImageUrls.length === 0 &&
+      referenceImagesForRequest.length === 0
+    ) {
+      toast.error("Please enter a prompt or add a reference image")
+      return
+    }
+
+    const editingCharacterKey = getCharacterCardKey(selectedCharacter)
+    setGeneratingTarget({
+      kind: "edit",
+      characterKey: editingCharacterKey,
+      assetId: selectedCharacter.assetId ?? null,
+      generationId: selectedCharacter.id,
+    })
 
     try {
-      const response = await fetch(`/api/generations/${id}`, {
-        method: "DELETE"
+      let assetId = selectedCharacter.assetId ?? null
+      if (!assetId) {
+        const asset = await saveCharacterAsset({
+          title: getCharacterDisplayName(selectedCharacter),
+          url: selectedCharacter.url,
+          description: selectedCharacter.prompt,
+          tags: selectedCharacter.trackedPills ?? ["character", "AI Influencer"],
+          model: selectedCharacter.model,
+          sourceGenerationId: selectedCharacter.id,
+          sourceMode: selectedCharacter.model === "upload" ? "upload" : "generated",
+        })
+        assetId = asset.id
+        setGeneratingTarget((current) =>
+          current?.kind === "edit"
+            ? {
+                ...current,
+                assetId: asset.id,
+                characterKey: `asset:${asset.id}`,
+              }
+            : current,
+        )
+        setHistoryImages((current) =>
+          current.map((item) =>
+            item.id === selectedCharacter.id
+              ? { ...item, assetId: asset.id, isCoverImage: true }
+              : item,
+          ),
+        )
+      }
+
+      if (!assetId) {
+        throw new Error("Could not resolve character asset")
+      }
+
+      const manualRefUrls = referenceImagesForRequest
+        .map((image) => image.url)
+        .filter((url): url is string => Boolean(url))
+      const capturedRefUrls = [...new Set([...manualRefUrls, ...chipImageUrls])]
+      const capturedAspectRatio = resolveAspectRatioForRequest({
+        model: selectedCharacterEditModelObject,
+        selectedAspectRatio: selectedCharacterEditAspectRatio,
+        hasReferenceImages: capturedRefUrls.length > 0,
       })
-      if (!response.ok) throw new Error("Failed to delete character")
-      
-      toast.success("Character deleted")
-      if (selectedCharacter?.id === id) {
+      const capturedPrompt = mergedPrompt.trim()
+      const capturedModel = selectedCharacterEditModel
+
+      const formData = new FormData()
+      formData.append("prompt", capturedPrompt)
+      formData.append("enhancePrompt", String(characterEditEnhancePrompt))
+      formData.append("tool", "ai_influencer")
+      formData.append("model", capturedModel)
+      formData.append("characterAssetId", assetId)
+      formData.append("sourceGenerationId", coverImage.id)
+
+      if (capturedAspectRatio) {
+        formData.append("aspectRatio", capturedAspectRatio)
+        formData.append("aspect_ratio", capturedAspectRatio)
+      }
+
+      for (const [key, value] of Object.entries(selectedCharacterEditModelParameters)) {
+        if (value == null || value === "") continue
+        formData.append(key, String(value))
+      }
+
+      if (FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF.has(capturedModel)) {
+        formData.set("enable_safety_checker", "false")
+      }
+
+      const manualUrlSet = new Set(manualRefUrls)
+      const extraFromAssetChips: ImageUpload[] = chipImageUrls
+        .filter((url) => !manualUrlSet.has(url))
+        .map((url) => ({ url }))
+      appendImageReferencesToFormData(formData, [
+        ...referenceImagesForRequest,
+        ...extraFromAssetChips,
+      ])
+
+      if (selectedCharacterEditNumImages > 1) {
+        formData.append("n", String(selectedCharacterEditNumImages))
+      }
+
+      let acceptedGenerationId: string | null = null
+      const result = await generateImageAndWait(formData, {
+        onAccepted: ({ generationId }) => {
+          acceptedGenerationId = generationId ?? null
+        },
+      })
+
+      const generatedUrls =
+        "image" in result && result.image?.url
+          ? [result.image.url]
+          : (result.images ?? []).map((image) => image.url).filter(Boolean)
+      const generatedIds =
+        result.generationIds && result.generationIds.length > 0
+          ? result.generationIds
+          : acceptedGenerationId
+            ? [acceptedGenerationId]
+            : []
+
+      if (generatedUrls.length === 0) {
+        throw new Error("The character edit did not return an image")
+      }
+
+      const refreshedHistory = await fetchHistory()
+      const generatedImage =
+        refreshedHistory.find(
+          (item) =>
+            (generatedIds[0] && item.id === generatedIds[0]) || item.url === generatedUrls[0],
+        ) ??
+        ({
+          ...selectedCharacter,
+          id: generatedIds[0] ?? `generated-${Date.now()}`,
+          url: generatedUrls[0],
+          prompt: capturedPrompt,
+          model: capturedModel,
+          createdAt: new Date().toISOString(),
+          assetId,
+          characterAssetId: assetId,
+          isCoverImage: false,
+        } satisfies ImageHistoryItem)
+
+      setSelectedCharacter((current) => {
+        if (!current) return generatedImage
+        return isCharacterGenerating(
+          {
+            kind: "edit",
+            characterKey: editingCharacterKey,
+            assetId,
+            generationId: selectedCharacter.id,
+          },
+          current,
+        )
+          ? generatedImage
+          : current
+      })
+      setCharacterEditPrompt("")
+      toast.success(
+        generatedUrls.length > 1
+          ? `${generatedUrls.length} character references added`
+          : "Character edit added as a new reference",
+      )
+    } catch (error) {
+      console.error(error)
+      const message = error instanceof Error ? error.message : "Failed to edit character"
+      if (isInsufficientCreditsError(error) || isInsufficientCreditsMessage(message)) {
+        showCreditsUpsellToast({
+          message,
+          description: "Add credits to keep customizing this character",
+          toastId: "character-edit-credits-upsell",
+        })
+      } else if (!tryShowContentModerationToast(message, error)) {
+        toast.error(message)
+      }
+    } finally {
+      setGeneratingTarget(null)
+    }
+  }
+
+  const saveImageAsCover = async (
+    image: ImageHistoryItem,
+    options?: { showToast?: boolean },
+  ) => {
+    if (!image.assetId) throw new Error("This character is not saved as an asset yet")
+
+    const response = await fetch(`/api/assets/${image.assetId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        patch: "coverImage",
+        url: image.url,
+        sourceGenerationId: image.id,
+      }),
+    })
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as { error?: string; message?: string }
+      throw new Error(payload.message || payload.error || "Failed to update cover image")
+    }
+
+    setHistoryImages((current) =>
+      current.map((item) =>
+        item.assetId === image.assetId
+          ? { ...item, isCoverImage: item.id === image.id }
+          : item,
+      ),
+    )
+    setSelectedCharacter({ ...image, isCoverImage: true })
+    if (options?.showToast !== false) toast.success("Cover image updated")
+  }
+
+  const handleSaveActiveImageAsCover = async () => {
+    if (!selectedCharacter || activeCharacterIsCover) return
+    try {
+      await saveImageAsCover(selectedCharacter)
+    } catch (error) {
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : "Failed to update cover image")
+    }
+  }
+
+  const deleteGenerationImage = async (id: string) => {
+    if (id.startsWith("generated-") || id.startsWith("upload-") || id.startsWith("asset-")) return
+    const response = await fetch(`/api/generations/${id}`, { method: "DELETE" })
+    if (!response.ok && response.status !== 404) {
+      throw new Error("Failed to delete character image")
+    }
+  }
+
+  const handleDeleteActiveImage = async () => {
+    if (!selectedCharacter) return
+
+    const deletingCover = activeCharacterIsCover
+    const replacement = deletingCover
+      ? characterImages.find((image) => image.id !== selectedCharacter.id) ?? null
+      : characterImages.find((image) => image.isCoverImage) ?? characterImages[0] ?? null
+
+    try {
+      if (deletingCover && replacement) {
+        await saveImageAsCover(replacement, { showToast: false })
+      } else if (deletingCover && selectedCharacter.assetId) {
+        const assetResponse = await fetch(`/api/assets/${selectedCharacter.assetId}`, {
+          method: "DELETE",
+        })
+        if (!assetResponse.ok && assetResponse.status !== 404) {
+          throw new Error("Failed to delete character asset")
+        }
+      }
+
+      await deleteGenerationImage(selectedCharacter.id)
+      const refreshed = await fetchHistory()
+      if (replacement) {
+        setSelectedCharacter(
+          refreshed.find((item) => item.id === replacement.id) ?? {
+            ...replacement,
+            isCoverImage: deletingCover || replacement.isCoverImage,
+          },
+        )
+      } else {
         setSelectedCharacter(null)
       }
-      void fetchHistory()
-    } catch (err) {
-      console.error(err)
-      toast.error("Failed to delete character")
+      toast.success(deletingCover && !replacement ? "Character deleted" : "Image deleted")
+    } catch (error) {
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : "Failed to delete image")
+      throw error
+    }
+  }
+
+  const requestDeleteActiveImage = () => {
+    if (!selectedCharacter) return
+
+    const deletingCover = activeCharacterIsCover
+    const replacement = deletingCover
+      ? characterImages.find((image) => image.id !== selectedCharacter.id) ?? null
+      : characterImages.find((image) => image.isCoverImage) ?? characterImages[0] ?? null
+
+    if (deletingCover && !replacement) {
+      setDeleteDialog({
+        kind: "image",
+        title: "Delete this character?",
+        description:
+          "This removes the character and its only image. This action cannot be undone.",
+      })
+      return
+    }
+
+    if (deletingCover) {
+      setDeleteDialog({
+        kind: "image",
+        title: "Delete cover image?",
+        description: "The next reference image will become the new cover.",
+      })
+      return
+    }
+
+    setDeleteDialog({
+      kind: "image",
+      title: "Delete this reference?",
+      description: "This removes the image from this character's references.",
+    })
+  }
+
+  const executeDeleteCharacter = async (item: ImageHistoryItem) => {
+    const images = item.assetId
+      ? historyImages.filter((image) => image.assetId === item.assetId)
+      : [item]
+    if (item.assetId) {
+      const response = await fetch(`/api/assets/${item.assetId}`, { method: "DELETE" })
+      if (!response.ok && response.status !== 404) throw new Error("Failed to delete character")
+    }
+    await Promise.all(images.map((image) => deleteGenerationImage(image.id)))
+    toast.success("Character deleted")
+    if (
+      selectedCharacter?.id === item.id ||
+      (item.assetId && selectedCharacter?.assetId === item.assetId)
+    ) {
+      setSelectedCharacter(null)
+    }
+    void fetchHistory()
+  }
+
+  const requestDeleteCharacter = (item: ImageHistoryItem, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setDeleteDialog({
+      kind: "character",
+      item,
+      title: "Delete this character?",
+      description: `This permanently removes ${getCharacterDisplayName(item)} and all associated images. This action cannot be undone.`,
+    })
+  }
+
+  const confirmPendingDelete = async () => {
+    if (!deleteDialog || isDeletingCharacter) return
+
+    setIsDeletingCharacter(true)
+    try {
+      if (deleteDialog.kind === "character") {
+        await executeDeleteCharacter(deleteDialog.item)
+      } else {
+        await handleDeleteActiveImage()
+      }
+      setDeleteDialog(null)
+    } catch (error) {
+      if (deleteDialog.kind === "character") {
+        console.error(error)
+        toast.error("Failed to delete character")
+      }
+    } finally {
+      setIsDeletingCharacter(false)
     }
   }
 
@@ -1246,6 +1826,30 @@ function AIInfluencerPageContent() {
     </div>
   )
 
+  const renderCharacterReferenceThumb = (image: ImageHistoryItem) => (
+    <button
+      key={image.id}
+      type="button"
+      onClick={() => {
+        setSelectedCharacter(image)
+      }}
+      className={cn(
+        "relative size-14 shrink-0 overflow-hidden rounded-xl border bg-muted transition-all sm:size-[72px]",
+        selectedCharacter?.id === image.id
+          ? "border-primary ring-2 ring-primary/25"
+          : "border-border/45 opacity-65 hover:opacity-100",
+      )}
+      aria-label={`View ${image.isCoverImage ? "cover" : "reference"} image`}
+    >
+      <img src={image.url} alt="" className="size-full object-cover" />
+      {image.isCoverImage ? (
+        <span className="absolute inset-x-1 bottom-1 rounded-full bg-primary px-1 py-0.5 text-[7px] font-black uppercase tracking-wider text-primary-foreground">
+          Cover
+        </span>
+      ) : null}
+    </button>
+  )
+
   const renderCharacterCards = () => {
     return (
       <>
@@ -1262,18 +1866,23 @@ function AIInfluencerPageContent() {
         </button>
 
         {/* Previously Generated Characters */}
-        {historyImages.map(item => {
-          const isActive = selectedCharacter?.id === item.id
+        {characterCards.map(item => {
+          const isActive = item.assetId
+            ? selectedCharacter?.assetId === item.assetId
+            : selectedCharacter?.id === item.id
+          const isCardGenerating = isCharacterGenerating(generatingTarget, item)
           return (
             <div
               key={item.id}
               onClick={() => {
                 setSelectedCharacter(item)
+                setCharacterEditPrompt("")
                 setCharacterName(getCharacterDisplayName(item))
               }}
               className={cn(
                 "group relative flex shrink-0 flex-col justify-end p-2 rounded-xl border border-border/30 bg-secondary/10 hover:bg-secondary/20 cursor-pointer transition-all aspect-square w-[96px] sm:w-[108px] lg:w-full overflow-hidden",
-                isActive && "border-primary ring-1 ring-primary/30"
+                isActive && "border-primary ring-1 ring-primary/30",
+                isCardGenerating && "ring-1 ring-primary/40",
               )}
             >
               <img
@@ -1281,11 +1890,14 @@ function AIInfluencerPageContent() {
                 alt={item.prompt || "Character"}
                 className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-102 transition-transform"
               />
+              {isCardGenerating ? (
+                <GenerationLoadingOverlay label="" className="rounded-xl" />
+              ) : null}
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent h-1/2 p-2 pt-4 flex items-end" />
               
               {/* Delete button overlay */}
               <button
-                onClick={(e) => handleDelete(item.id, e)}
+                onClick={(e) => requestDeleteCharacter(item, e)}
                 className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-destructive rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
                 aria-label="Delete character"
               >
@@ -1312,7 +1924,7 @@ function AIInfluencerPageContent() {
             <div className="flex items-center gap-2">
               <h2 className="text-xs font-bold uppercase tracking-wider text-foreground font-display">Characters</h2>
               <Badge variant="secondary" className="bg-secondary/45 text-muted-foreground border-border/30 text-[9px] font-bold px-1.5 py-0.5">
-                {historyImages.length}
+                {characterCards.length}
               </Badge>
             </div>
             <button
@@ -1366,101 +1978,177 @@ function AIInfluencerPageContent() {
               </Tabs>
             ) : null}
             
-            {/* Main Preview Card with big round borders */}
-            <Card className="w-full aspect-[4/5] sm:aspect-square lg:aspect-[4/5] bg-secondary/5 border-border/40 overflow-hidden relative shadow-2xl flex flex-col justify-center items-center p-0 group rounded-2xl">
-              {selectedCharacter ? (
-                // Selected/Active Character Mode
-                <div className="absolute inset-0 w-full h-full">
-                  <img
-                    src={selectedCharacter.url}
-                    alt={selectedCharacter.prompt || "AI Influencer"}
-                    className="w-full h-full object-cover object-center"
-                  />
-                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08)_0%,rgba(0,0,0,0.12)_44%,rgba(0,0,0,0.88)_100%)]" />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => void handleDownloadSelectedCharacter()}
-                    className="absolute right-4 top-4 z-20 size-11 rounded-full border-white/10 bg-black/55 text-white shadow-lg backdrop-blur-md hover:bg-black/70"
-                    aria-label="Download character image"
-                  >
-                    <DownloadSimple className="size-4" />
-                  </Button>
-                  <div className="absolute inset-x-0 bottom-0 z-10 p-5 sm:p-6">
-                    <div className="flex min-w-0 flex-col gap-4">
-                      <div className="min-w-0">
-                        <h3 className="max-w-full truncate text-[30px] leading-[0.92] font-black uppercase tracking-[-0.05em] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)] sm:text-[38px]">
-                          {getCharacterDisplayName(selectedCharacter)}
-                        </h3>
-                        {selectedCharacter.trackedPills?.length ? (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {selectedCharacter.trackedPills.map((tag) => (
-                              <Badge
-                                key={tag}
-                                className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-semibold text-white backdrop-blur-md shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
-                              >
-                                {tag}
-                              </Badge>
-                            ))}
+            {selectedCharacter ? (
+              <div className="w-full">
+                <div className="flex w-full gap-2.5 sm:gap-3">
+                  {characterImages.length > 0 ? (
+                    <div className="flex shrink-0 flex-col gap-2 pt-1">
+                      {characterImages.map((image) => renderCharacterReferenceThumb(image))}
+                    </div>
+                  ) : null}
+
+                  <div className="flex min-w-0 flex-1 flex-col gap-3">
+                    <Card
+                      className={cn(
+                        "w-full aspect-[4/5] sm:aspect-square lg:aspect-[4/5] bg-secondary/5 border-border/40 overflow-hidden relative shadow-2xl flex flex-col justify-center items-center p-0 group rounded-2xl",
+                        activeCharacterIsCover &&
+                          "border-primary/60 ring-1 ring-primary/25 shadow-[0_0_34px_color-mix(in_oklab,var(--primary)_16%,transparent)]",
+                      )}
+                    >
+                      <div className="absolute inset-0 w-full h-full">
+                        <img
+                          src={selectedCharacter.url}
+                          alt={selectedCharacter.prompt || "AI Influencer"}
+                          className="w-full h-full object-cover object-center"
+                        />
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08)_0%,rgba(0,0,0,0.12)_44%,rgba(0,0,0,0.88)_100%)]" />
+                        {isEditingSelectedCharacter ? (
+                          <GenerationLoadingOverlay label="Generating..." />
+                        ) : null}
+                        {activeCharacterIsCover ? (
+                          <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-background/80 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-primary shadow-lg backdrop-blur-xl">
+                            <span className="size-1.5 rounded-full bg-primary shadow-[0_0_10px_var(--primary)]" />
+                            Cover image
                           </div>
                         ) : null}
-                        <div className="mt-3">
-                          <CharacterVoiceField
-                            appearance="overlay"
-                            disabled={isSavingVoice}
-                            value={{
-                              voiceId: selectedCharacter.voiceId ?? null,
-                              voiceProvider: selectedCharacter.voiceProvider ?? null,
-                              privateVoiceId: selectedCharacter.privateVoiceId ?? null,
-                              displayName: selectedCharacter.privateVoiceName ?? null,
-                              previewUrl:
-                                selectedCharacter.privateVoicePreviewUrl ?? null,
-                            }}
-                            onChange={(next) => {
-                              void applyVoiceToSelectedCharacter(next)
-                            }}
-                            onUseVoice={
-                              selectedCharacter.voiceId
-                                ? openCharacterVoiceInAudio
-                                : undefined
-                            }
-                          />
+                        <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => void handleDownloadSelectedCharacter()}
+                            className="size-10 rounded-full border-border/50 bg-background/75 text-foreground shadow-lg backdrop-blur-xl hover:bg-background/90"
+                            aria-label="Download character image"
+                          >
+                            <DownloadSimple className="size-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={requestDeleteActiveImage}
+                            className="size-10 rounded-full border-destructive/35 bg-background/75 text-destructive shadow-lg backdrop-blur-xl hover:bg-destructive/15"
+                            aria-label="Delete character image"
+                          >
+                            <Trash className="size-4" weight="fill" />
+                          </Button>
+                        </div>
+                        <div className="absolute inset-x-0 bottom-0 z-20 p-5 sm:p-6">
+                          <div className="flex min-w-0 flex-col gap-4">
+                            <div className="min-w-0">
+                              <h3 className="max-w-full truncate text-[30px] leading-[0.92] font-black uppercase tracking-[-0.05em] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)] sm:text-[38px]">
+                                {getCharacterDisplayName(selectedCharacter)}
+                              </h3>
+                              {selectedCharacter.trackedPills?.length ? (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {selectedCharacter.trackedPills.map((tag) => (
+                                    <Badge
+                                      key={tag}
+                                      className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-semibold text-white backdrop-blur-md shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
+                                    >
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                            <div className="flex items-center justify-center gap-3">
+                              <CharacterVoiceField
+                                layout="compact"
+                                appearance="overlay"
+                                disabled={isSavingVoice}
+                                value={{
+                                  voiceId: selectedCharacter.voiceId ?? null,
+                                  voiceProvider: selectedCharacter.voiceProvider ?? null,
+                                  privateVoiceId: selectedCharacter.privateVoiceId ?? null,
+                                  displayName: selectedCharacter.privateVoiceName ?? null,
+                                  previewUrl:
+                                    selectedCharacter.privateVoicePreviewUrl ?? null,
+                                }}
+                                onChange={(next) => {
+                                  void applyVoiceToSelectedCharacter(next)
+                                }}
+                                onUseVoice={
+                                  selectedCharacter.voiceId
+                                    ? openCharacterVoiceInAudio
+                                    : undefined
+                                }
+                              />
+                              <Button
+                                type="button"
+                                size="icon"
+                                onClick={() => openCharacterInStudio("image")}
+                                className={overlayActionButtonClass}
+                                aria-label="Use in Image"
+                                title="Use in Image"
+                              >
+                                <ImageIcon className="size-[18px]" weight="fill" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="icon"
+                                onClick={() => openCharacterInStudio("video")}
+                                className={overlayActionButtonClass}
+                                aria-label="Use in Video"
+                                title="Use in Video"
+                              >
+                                <VideoCamera className="size-[18px]" weight="fill" />
+                              </Button>
+                              {!activeCharacterIsCover ? (
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  onClick={() => void handleSaveActiveImageAsCover()}
+                                  className={overlayActionButtonMutedClass}
+                                  aria-label="Save as cover image"
+                                  title="Save as cover"
+                                >
+                                  <FloppyDisk className="size-[18px]" weight="fill" />
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Button
-                          type="button"
-                          onClick={() => openCharacterInStudio("image")}
-                          className="h-11 rounded-full border border-white/10 bg-white/10 text-[11px] font-bold uppercase tracking-wider text-white shadow-lg backdrop-blur-md hover:bg-white/15"
-                        >
-                          <ImageIcon className="mr-2 size-4" />
-                          Use in Image
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={() => openCharacterInStudio("video")}
-                          className="h-11 rounded-full border border-white/10 bg-white/10 text-[11px] font-bold uppercase tracking-wider text-white shadow-lg backdrop-blur-md hover:bg-white/15"
-                        >
-                          <VideoCamera className="mr-2 size-4" />
-                          Use in Video
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : isGenerating ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-muted/40 px-6">
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 opacity-70 animate-pulse" />
-                  <div className="relative flex w-full max-w-[320px] justify-center">
-                    <GenerationLoadingSlots
-                      count={6}
-                      maxVisible={6}
-                      className="flex-wrap justify-center gap-2"
-                      tileClassName="h-12 w-12 rounded-2xl border-border/40 bg-secondary/30"
+                    </Card>
+
+                    <InfluencerInputBox
+                      className="w-full"
+                      generateButtonLayout="bar"
+                      showGenerateInBottomRow
+                      placeholder="Type to customize character"
+                      promptValue={characterEditPrompt}
+                      onPromptChange={setCharacterEditPrompt}
+                      onAttachedRefsChange={setCharacterEditAttachedRefs}
+                      referenceImages={characterEditReferenceImages}
+                      onReferenceImagesChange={setCharacterEditReferenceImages}
+                      enhancePrompt={characterEditEnhancePrompt}
+                      onEnhancePromptChange={setCharacterEditEnhancePrompt}
+                      isGenerating={isEditingSelectedCharacter}
+                      allowConcurrent={false}
+                      generatingSpinnerOnly
+                      onGenerate={(prompt, snapshot) => void handleCharacterImageGenerate(prompt, snapshot)}
+                      selectedModel={selectedCharacterEditModel}
+                      onModelChange={setSelectedCharacterEditModel}
+                      showModelSelector
+                      imageModels={imageModels}
+                      selectedAspectRatio={selectedCharacterEditAspectRatio}
+                      onAspectRatioChange={setSelectedCharacterEditAspectRatio}
+                      showAspectRatioSelector
+                      selectedNumImages={selectedCharacterEditNumImages}
+                      onNumImagesChange={setSelectedCharacterEditNumImages}
+                      showNumImagesSelector
+                      modelParameters={selectedCharacterEditModelParameters}
+                      onModelParametersChange={setSelectedCharacterEditModelParameters}
+                      allowedAssetTypes={["image"]}
                     />
                   </div>
                 </div>
+              </div>
+            ) : (
+              <Card className="w-full aspect-[4/5] sm:aspect-square lg:aspect-[4/5] bg-secondary/5 border-border/40 overflow-hidden relative shadow-2xl flex flex-col justify-center items-center p-0 group rounded-2xl">
+              {isCreatingCharacter ? (
+                <GenerationLoadingOverlay className="z-10" label="Generating..." />
               ) : (
                 // Creation / Mode Input Mode
                 <div className="w-full h-full flex flex-col justify-between items-stretch">
@@ -1486,9 +2174,12 @@ function AIInfluencerPageContent() {
                       </div>
                     </div>
                   ) : (
-                    <div 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex-1 w-full flex flex-col justify-center items-center cursor-pointer px-4 py-6 transition-colors hover:bg-primary/5"
+                     <div
+                       onClick={() => fileInputRef.current?.click()}
+                       className={cn(
+                         "relative flex-1 w-full flex flex-col justify-center items-center cursor-pointer transition-colors",
+                         uploadedFiles.length > 0 ? "p-0" : "px-4 py-6 hover:bg-primary/5",
+                       )}
                     >
                       <input
                         type="file"
@@ -1517,45 +2208,70 @@ function AIInfluencerPageContent() {
                           </Button>
                         </div>
                       ) : (
-                        <div className="w-full flex flex-col items-center gap-5">
-                          {uploadGuidance && (
-                            <p className="shimmer text-center text-xs leading-relaxed text-muted-foreground max-w-[260px]">
-                              {uploadGuidance}
-                            </p>
-                          )}
-                          <div
-                            className={cn(
-                              "w-full grid gap-3",
-                              uploadedFiles.length === 1
-                                ? "grid-cols-2 max-w-[240px]"
-                                : "grid-cols-3"
-                            )}
-                          >
-                            {uploadedFiles.map((item, idx) => (
-                              <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-border/40 bg-muted group/thumb">
-                                <img
-                                  src={item.url}
-                                  alt="preview"
-                                  className="w-full h-full object-cover"
-                                />
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    removeUploadedFile(idx)
-                                  }}
-                                  className="absolute top-1 right-1 p-1 bg-background/80 text-foreground hover:bg-destructive hover:text-destructive-foreground rounded-full transition-colors"
-                                  aria-label="Remove photo"
-                                >
-                                  <X className="size-3" />
-                                </button>
+                        <div className="absolute inset-0 overflow-hidden">
+                          <img
+                            src={uploadedFiles[Math.min(activeUploadIndex, uploadedFiles.length - 1)]?.url}
+                            alt="Character reference preview"
+                            className="size-full object-cover object-center"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/75" />
+                          <div className="absolute inset-x-0 bottom-0 border-t border-border/30 bg-background/88 p-3 backdrop-blur-xl sm:p-4">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="flex max-w-[45%] shrink-0 gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                {uploadedFiles.map((item, idx) => (
+                                  <div
+                                    key={item.url}
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      setActiveUploadIndex(idx)
+                                    }}
+                                    onKeyDown={(event) => {
+                                      if (event.key === "Enter" || event.key === " ") {
+                                        event.preventDefault()
+                                        event.stopPropagation()
+                                        setActiveUploadIndex(idx)
+                                      }
+                                    }}
+                                    role="button"
+                                    tabIndex={0}
+                                    className={cn(
+                                      "group/thumb relative size-12 shrink-0 overflow-hidden rounded-xl border bg-muted transition-all sm:size-14",
+                                      activeUploadIndex === idx
+                                        ? "border-primary ring-2 ring-primary/25"
+                                        : "border-border/50 opacity-70 hover:opacity-100",
+                                    )}
+                                    aria-label={`View reference ${idx + 1}`}
+                                  >
+                                    <img src={item.url} alt="" className="size-full object-cover" />
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation()
+                                        removeUploadedFile(idx)
+                                      }}
+                                      className="absolute right-0.5 top-0.5 rounded-full bg-background/85 p-0.5 text-foreground opacity-0 transition-opacity group-hover/thumb:opacity-100 focus:opacity-100"
+                                      aria-label={`Remove reference ${idx + 1}`}
+                                    >
+                                      <X className="size-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                                {uploadedFiles.length < maxUploadCount ? (
+                                  <button
+                                    type="button"
+                                    className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-dashed border-border/60 text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary sm:size-14"
+                                    aria-label="Add another reference"
+                                  >
+                                    <Plus className="size-4" weight="bold" />
+                                  </button>
+                                ) : null}
                               </div>
-                            ))}
-                            {uploadedFiles.length < maxUploadCount && (
-                              <div className="border border-dashed border-border/40 hover:border-primary/40 flex flex-col justify-center items-center rounded-lg aspect-[3/4] transition-colors">
-                                <Plus className="size-5 text-muted-foreground" />
-                                <span className="text-[10px] font-medium text-muted-foreground mt-1">Add</span>
-                              </div>
-                            )}
+                              {uploadGuidance ? (
+                                <Shimmer className="min-w-0 text-left text-[11px] leading-relaxed sm:text-xs">
+                                  {uploadGuidance}
+                                </Shimmer>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1604,7 +2320,8 @@ function AIInfluencerPageContent() {
 
                 </div>
               )}
-            </Card>
+              </Card>
+            )}
 
             {/* Character Controls - Centered capsules */}
             {!selectedCharacter && (
@@ -1637,7 +2354,7 @@ function AIInfluencerPageContent() {
                     layout="bar"
                     className="flex-1 [&>div]:before:!rounded-full [&_button]:rounded-full"
                     isReady={canCreateCharacter}
-                    isGenerating={isGenerating}
+                    isGenerating={isCreatingCharacter}
                     allowConcurrent={false}
                     onGenerate={handleCreateTrigger}
                     creditCost={createCreditCost}
@@ -1831,6 +2548,35 @@ function AIInfluencerPageContent() {
           </LiquidGlassCard>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={deleteDialog !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingCharacter) {
+            setDeleteDialog(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{deleteDialog?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{deleteDialog?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingCharacter}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={isDeletingCharacter}
+              onClick={(event) => {
+                event.preventDefault()
+                void confirmPendingDelete()
+              }}
+            >
+              {isDeletingCharacter ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   )

@@ -40,11 +40,45 @@ import {
   type AssetSelectionPick,
 } from "@/components/shared/modals/asset-selection-modal"
 
+function StudioToolAdditionalInstructionsField({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+
+  const syncHeight = React.useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${el.scrollHeight}px`
+  }, [])
+
+  React.useLayoutEffect(() => {
+    syncHeight()
+  }, [syncHeight, value])
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      rows={1}
+      placeholder="Additional instructions (e.g. smiling with messy hair)"
+      className="w-full resize-none overflow-y-auto border-none bg-transparent p-0 text-sm outline-none placeholder:text-muted-foreground max-h-20"
+    />
+  )
+}
+
 export interface DualReferenceSwapInputBoxProps {
   className?: string
   referenceSlots: ImageStudioReferenceSlot[]
   sourceImage?: ImageUpload | null
   sceneImage?: ImageUpload | null
+  additionalInstructions?: string
+  onAdditionalInstructionsChange?: (value: string) => void
   onSourceImageChange?: (image: ImageUpload | null) => void
   onSceneImageChange?: (image: ImageUpload | null) => void
   onGenerate?: () => void
@@ -74,6 +108,8 @@ export function DualReferenceSwapInputBox({
   referenceSlots,
   sourceImage,
   sceneImage,
+  additionalInstructions = "",
+  onAdditionalInstructionsChange,
   onSourceImageChange,
   onSceneImageChange,
   onGenerate,
@@ -218,9 +254,14 @@ export function DualReferenceSwapInputBox({
           )}
         </AnimatePresence>
 
+        <StudioToolAdditionalInstructionsField
+          value={additionalInstructions}
+          onChange={(value) => onAdditionalInstructionsChange?.(value)}
+        />
+
         <LayoutGroup id="studio-tool-controls">
           <div className="flex min-w-0 items-center gap-1">
-            <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-fade-x no-scrollbar [-webkit-overflow-scrolling:touch]">
+            <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-fade-x overlay-scrollbar-x [-webkit-overflow-scrolling:touch]">
               <AnimatedControlItem>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

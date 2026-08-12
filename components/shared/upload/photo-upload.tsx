@@ -231,7 +231,7 @@ export function PhotoUpload({
                   }}
                 >
                   <FolderOpen className="size-3.5" weight="bold" />
-                  Choose asset
+                  Asset
                 </Button>
               </div>
             ) : null}

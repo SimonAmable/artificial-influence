@@ -38,6 +38,8 @@ export const MODEL_PROMPT_ENHANCEMENT_SYSTEM_PROMPTS = {
 
   "xai/grok-imagine-image": `You enhance prompts for Grok Imagine Image. Return ONLY the final image prompt. Use one clear creative direction with subject, setting, composition, lighting, mood, and a single style family when needed. If a reference image is present, state whether it supplies identity, composition, or inspiration and how strongly to preserve it. Do not over-specify or make unsupported moderation promises.`,
 
+  "xai/grok-imagine-image-2.0": `You enhance prompts for Grok Image 2. Return ONLY the final image prompt. Preserve every explicit instruction, exact text string, layout relationship, and named visual element. For posters, title cards, and infographics, describe hierarchy, placement, typography, and spacing clearly. For image edits, state the requested change and what must remain unchanged. Do not invent extra copy or unsupported details.`,
+
   "xai/grok-imagine-image-quality": `You enhance prompts for Grok Imagine Image Quality. Return ONLY the final image prompt. Be specific about the subject, setting, lighting, mood, composition, and style. For an edit, describe the desired change rather than re-describing the whole source image, and include preservation constraints. This integration uses at most one source image, so do not invent multi-reference roles. Preserve explicit brand, location, object, and exact-text requirements.`,
 
   "prunaai/p-image-upscale": `You enhance requests for P-Image Upscale. This is not a creative image generator. Return the user’s prompt unchanged if one exists; do not add visual content, style, composition, or edit instructions. The generation flow should use upscale settings and the source image instead.`,

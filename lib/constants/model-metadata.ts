@@ -302,6 +302,36 @@ export const GROK_IMAGINE_META: ModelMetadata = {
   ],
 };
 
+export const GROK_IMAGINE_IMAGE_2_META: ModelMetadata = {
+  id: 'grok-imagine-image-2-meta',
+  identifier: 'xai/grok-imagine-image-2.0',
+  name: 'Grok Image 2',
+  description: 'Create structured visuals with strong prompt following, readable text, and precise image edits',
+  type: 'image',
+  provider: 'gateway',
+  is_active: true,
+  model_cost: 4,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '2:1', '1:2', '20:9', '9:20'],
+  customParameters: [
+    {
+      name: 'quality',
+      label: 'Quality',
+      options: ['low', 'medium', 'high'],
+      default: 'low',
+      description: 'Low uses 2 credits; medium and high use 4 credits',
+    },
+    {
+      name: 'resolution',
+      label: 'Resolution',
+      options: ['1k', '2k'],
+      default: '1k',
+      description: 'Output resolution tier',
+    },
+  ],
+};
+
 export const QWEN_IMAGE_EDIT_PLUS_META: ModelMetadata = {
   id: 'qwen-image-edit-plus-meta',
   identifier: 'qwen/qwen-image-edit-plus-lora',
@@ -875,6 +905,7 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
   SEEDREAM_4_5_META,
   SEEDREAM_5_LITE_META,
   SEEDREAM_5_PRO_META,
+  GROK_IMAGINE_IMAGE_2_META,
   GROK_IMAGINE_IMAGE_QUALITY_META,
   QWEN_IMAGE_EDIT_PLUS_META,
   GROK_IMAGINE_META,

@@ -26,6 +26,7 @@ export const MODEL_IDENTIFIERS = {
   PRUNAAI_Z_IMAGE_TURBO: 'prunaai/z-image-turbo',
   PRUNAAI_FLUX_KONTEXT_FAST: 'prunaai/flux-kontext-fast',
   XAI_GROK_IMAGINE: 'xai/grok-imagine-image',
+  XAI_GROK_IMAGINE_IMAGE_2: 'xai/grok-imagine-image-2.0',
   XAI_GROK_IMAGINE_IMAGE_QUALITY: 'xai/grok-imagine-image-quality',
   QWEN_IMAGE_EDIT_PLUS_LORA: 'qwen/qwen-image-edit-plus-lora',
   FAL_WAN_27_IMAGE: 'fal-ai/wan/v2.7',
@@ -852,6 +853,30 @@ const GROK_IMAGINE_PARAMS: ParameterDefinition[] = [
     required: false,
     default: null,
     ui_type: 'text',
+  },
+];
+
+const GROK_IMAGINE_IMAGE_2_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'quality',
+    type: 'string',
+    label: 'Quality',
+    description: 'Choose faster drafts or a more polished final image',
+    required: false,
+    default: 'low',
+    enum: ['low', 'medium', 'high'],
+    ui_type: 'select',
+    affects_pricing: true,
+  },
+  {
+    name: 'resolution',
+    type: 'string',
+    label: 'Resolution',
+    description: 'Output resolution tier',
+    required: false,
+    default: '1k',
+    enum: ['1k', '2k'],
+    ui_type: 'select',
   },
 ];
 
@@ -1935,6 +1960,36 @@ export const GROK_IMAGINE_MODEL: Model = {
   updated_at: new Date().toISOString(),
 };
 
+export const GROK_IMAGINE_IMAGE_2_MODEL: Model = {
+  id: 'model-grok-imagine-image-2',
+  identifier: MODEL_IDENTIFIERS.XAI_GROK_IMAGINE_IMAGE_2,
+  name: 'Grok Image 2',
+  description: 'Create structured visuals with strong prompt following, readable text, and precise image edits.',
+  type: 'image',
+  provider: 'gateway',
+  is_active: true,
+  model_cost: 4,
+  pricing_config: {
+    strategy: 'tiered_per_output',
+    defaultCredits: 4,
+    dimensions: [
+      {
+        parameter: 'quality',
+        values: { low: 2, medium: 4, high: 4 },
+      },
+    ],
+  },
+  parameters: {
+    parameters: GROK_IMAGINE_IMAGE_2_PARAMS,
+  },
+  aspect_ratios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '2:1', '1:2', '20:9', '9:20'],
+  default_aspect_ratio: '1:1',
+  supports_reference_image: true,
+  max_images: 4,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 export const GROK_IMAGINE_IMAGE_QUALITY_MODEL: Model = {
   id: 'model-grok-imagine-image-quality',
   identifier: MODEL_IDENTIFIERS.XAI_GROK_IMAGINE_IMAGE_QUALITY,
@@ -2139,6 +2194,7 @@ export const IMAGE_MODELS = [
   SEEDREAM_5_PRO_MODEL,
   Z_IMAGE_TURBO_MODEL,
   FLUX_KONTEXT_FAST_MODEL,
+  GROK_IMAGINE_IMAGE_2_MODEL,
   GROK_IMAGINE_IMAGE_QUALITY_MODEL,
   GROK_IMAGINE_MODEL,
 ] as const;
@@ -2182,6 +2238,7 @@ const IMAGE_MODELS_FIXED = [
   SEEDREAM_5_PRO_MODEL,
   Z_IMAGE_TURBO_MODEL,
   FLUX_KONTEXT_FAST_MODEL,
+  GROK_IMAGINE_IMAGE_2_MODEL,
   GROK_IMAGINE_IMAGE_QUALITY_MODEL,
   GROK_IMAGINE_MODEL,
 ] as const;

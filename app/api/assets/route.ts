@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { ASSET_CATEGORIES, inferStoragePathFromUrl, normalizeTags } from "@/lib/assets/library"
 import {
   parseOptionalPrivateVoiceId,
@@ -7,6 +6,8 @@ import {
 } from "@/lib/assets/private-voice"
 import type { AssetCategory, AssetType, AssetVisibility } from "@/lib/assets/types"
 import { mapAssetRowWithFreshUrl, mapAssetRowsWithFreshUrls } from "@/lib/assets/map-asset-row"
+import { getAuthenticatedRequestContext } from "@/lib/server/request-auth"
+import { createClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { resolveStoredObjectUrl } from "@/lib/uploads/server"
 
@@ -30,8 +31,7 @@ function parseOffset(rawOffset: string | null) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { supabase, user, error: authError } = await getAuthenticatedRequestContext(request)
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 })

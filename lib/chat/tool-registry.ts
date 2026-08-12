@@ -26,7 +26,6 @@ export const ALWAYS_AVAILABLE_CREATIVE_CHAT_TOOL_KEYS = [
   "searchVoices",
   "awaitGeneration",
   "estimateModelLatency",
-  "manageSlideshows",
   "saveSkill",
 ] as const
 

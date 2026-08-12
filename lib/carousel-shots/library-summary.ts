@@ -25,7 +25,7 @@ export function extractCarouselShotsLibrarySummary(
     previewUrls,
     extraShotCount,
     aspectRatio: metadata.aspectRatio,
-    gridSize: metadata.gridSize,
+    gridSize: metadata.gridSize ?? metadata.shotCount ?? shotCount,
     hasHd: shots.some((shot) => Boolean(shot.upscaledUrl)),
   }
 }

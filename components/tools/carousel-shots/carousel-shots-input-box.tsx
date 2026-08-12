@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { PhotoUpload, type ImageUpload } from "@/components/shared/upload/photo-upload"
 import {
   AssetSelectionModal,
@@ -20,6 +21,13 @@ import {
   AnimatedSelectLabel,
   influencerControlPillClassName,
 } from "@/components/tools/influencer/animated-control-item"
+import {
+  CarouselFastModeIcon,
+  CarouselGeneralScopeIcon,
+  CarouselHdModeIcon,
+  CarouselPerShotScopeIcon,
+  carouselToggleLabel,
+} from "@/components/tools/carousel-shots/carousel-shots-icons"
 import { GenerateShaderButton } from "@/components/tools/influencer/generate-shader-button"
 import {
   PromptControlMenuContent,
@@ -28,13 +36,17 @@ import {
 } from "@/components/tools/influencer/prompt-control-menu"
 import { useGenerationCreditEstimate } from "@/hooks/use-generation-credit-estimate"
 import {
+  CAROUSEL_GENERATION_MODES,
   CAROUSEL_GRID_SIZES,
+  CAROUSEL_HD_SHOT_COUNT_MAX,
+  CAROUSEL_HD_SHOT_COUNT_MIN,
   CAROUSEL_PANEL_ASPECT_RATIOS,
   CAROUSEL_SHOTS_MODELS,
   CAROUSEL_VARIATION_STRENGTHS,
   DEFAULT_CAROUSEL_SHOTS_MODEL,
 } from "@/lib/carousel-shots/constants"
 import type {
+  CarouselGenerationMode,
   CarouselGridSize,
   CarouselPanelAspectRatio,
   CarouselShotsModelId,
@@ -43,30 +55,43 @@ import type {
 import { useEffectiveImageModels } from "@/lib/image/studio-tools"
 import type { Model } from "@/lib/types/models"
 import { cn } from "@/lib/utils"
+import {
+  getCarouselGenerationQualityParams,
+} from "@/lib/carousel-shots/quality"
 
-function getCarouselCreditParameters(model: CarouselShotsModelId): Record<string, unknown> {
-  switch (model) {
-    case "openai/gpt-image-2":
-      return { quality: "high" }
-    case "google/nano-banana-2":
-      return { resolution: "4k" }
-    case "bytedance/seedream-4.5":
-      return { resolution: "4K" }
-    case "bytedance/seedream-5-lite":
-      return { resolution: "3K" }
-    case "bytedance/seedream-5-pro":
-      return { resolution: "2K" }
-    default: {
-      const _exhaustive: never = model
-      return _exhaustive
-    }
+function getActiveShotCount(form: CarouselShotsFormState): number {
+  return form.generationMode === "hd" ? form.hdShotCount : form.gridSize
+}
+
+function ensurePerShotVariations(current: string[], shotCount: number): string[] {
+  return Array.from({ length: shotCount }, (_, index) => current[index] ?? "")
+}
+
+function getCustomVariationScopeDescription(options: {
+  perShotEnabled: boolean
+  shotCount: number
+  generationMode: CarouselGenerationMode
+}): string {
+  if (options.perShotEnabled) {
+    return `Describe how each of the ${options.shotCount} shots should differ from the reference. Leave a shot blank to use a default variation.`
   }
+
+  if (options.generationMode === "fast") {
+    return `One instruction for all ${options.shotCount} panels on the contact sheet.`
+  }
+
+  return `One instruction applied to all ${options.shotCount} shots.`
 }
 
 export type CarouselShotsFormState = {
   aspectRatio: CarouselPanelAspectRatio
+  customVariation: string
+  generationMode: CarouselGenerationMode
   gridSize: CarouselGridSize
+  hdShotCount: number
   model: CarouselShotsModelId
+  perShotVariationEnabled: boolean
+  perShotVariations: string[]
   referenceImage: ImageUpload | null
   variationStrength: CarouselVariationStrength
 }
@@ -127,16 +152,20 @@ export function CarouselShotsInputBox({
     () => carouselModels.find((model) => model.identifier === form.model) ?? null,
     [carouselModels, form.model],
   )
+  const activeShotCount = getActiveShotCount(form)
   const creditParameters = React.useMemo(
-    () => getCarouselCreditParameters(form.model),
-    [form.model],
+    () => getCarouselGenerationQualityParams(form.generationMode, form.model),
+    [form.generationMode, form.model],
   )
+  const outputCount = form.generationMode === "hd" ? form.hdShotCount : 1
   const estimatedCredits = useGenerationCreditEstimate({
     model: selectedModel,
     parameters: creditParameters,
-    outputCount: 1,
+    outputCount,
   })
   const hasReference = Boolean(form.referenceImage?.file || form.referenceImage?.url)
+  const isCustomVariation = form.variationStrength === "custom"
+  const showPerShotInputs = isCustomVariation && form.perShotVariationEnabled
 
   React.useEffect(() => {
     if (carouselModels.length === 0) {
@@ -204,6 +233,14 @@ export function CarouselShotsInputBox({
     [form, onChange],
   )
 
+  const updateShotCount = (nextCount: number) => {
+    onChange({
+      ...form,
+      hdShotCount: nextCount,
+      perShotVariations: ensurePerShotVariations(form.perShotVariations, nextCount),
+    })
+  }
+
   return (
     <Card className="border-border/60">
       <CardContent className="space-y-5 p-4">
@@ -256,20 +293,86 @@ export function CarouselShotsInputBox({
         </div>
 
         <div className="space-y-2">
-          <Label>Grid size</Label>
+          <Label>Mode</Label>
           <PillToggleGroup
-            aria-label="Grid size"
-            value={String(form.gridSize)}
+            aria-label="Generation mode"
+            value={form.generationMode}
             onValueChange={(value) => {
-              if (value === "4" || value === "9") {
-                onChange({ ...form, gridSize: Number(value) as CarouselGridSize })
-              }
+              if (!CAROUSEL_GENERATION_MODES.includes(value as CarouselGenerationMode)) return
+              const nextMode = value as CarouselGenerationMode
+              const nextShotCount = nextMode === "hd" ? form.hdShotCount : form.gridSize
+              onChange({
+                ...form,
+                generationMode: nextMode,
+                perShotVariations: ensurePerShotVariations(form.perShotVariations, nextShotCount),
+              })
             }}
-            options={CAROUSEL_GRID_SIZES.map((size) => ({
-              value: String(size),
-              label: `${size} shots`,
-            }))}
+            options={[
+              {
+                value: "fast",
+                label: carouselToggleLabel(<CarouselFastModeIcon size={14} />, "Fast"),
+              },
+              {
+                value: "hd",
+                label: carouselToggleLabel(<CarouselHdModeIcon size={14} />, "HD"),
+              },
+            ]}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label>{form.generationMode === "fast" ? "Grid size" : "Shots"}</Label>
+          {form.generationMode === "fast" ? (
+            <PillToggleGroup
+              aria-label="Grid size"
+              value={String(form.gridSize)}
+              onValueChange={(value) => {
+                if (value === "4" || value === "9") {
+                  const nextGridSize = Number(value) as CarouselGridSize
+                  onChange({
+                    ...form,
+                    gridSize: nextGridSize,
+                    perShotVariations: ensurePerShotVariations(
+                      form.perShotVariations,
+                      nextGridSize,
+                    ),
+                  })
+                }
+              }}
+              options={CAROUSEL_GRID_SIZES.map((size) => ({
+                value: String(size),
+                label: `${size} shots`,
+              }))}
+            />
+          ) : (
+            <Select
+              value={String(form.hdShotCount)}
+              onValueChange={(value) => updateShotCount(Number(value))}
+            >
+              <SelectTrigger
+                hideChevron
+                className={cn(influencerControlPillClassName, "w-full justify-between")}
+              >
+                <SelectValue>
+                  <AnimatedSelectLabel value={`${form.hdShotCount} shots`} />
+                </SelectValue>
+              </SelectTrigger>
+              <PromptControlMenuContent>
+                <PromptControlMenuGroup label="Shots">
+                  {Array.from(
+                    { length: CAROUSEL_HD_SHOT_COUNT_MAX - CAROUSEL_HD_SHOT_COUNT_MIN + 1 },
+                    (_, index) => CAROUSEL_HD_SHOT_COUNT_MIN + index,
+                  ).map((count) => (
+                    <PromptControlMenuItem
+                      key={count}
+                      value={String(count)}
+                      label={`${count} shots`}
+                    />
+                  ))}
+                </PromptControlMenuGroup>
+              </PromptControlMenuContent>
+            </Select>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -295,7 +398,7 @@ export function CarouselShotsInputBox({
         </div>
 
         <div className="space-y-2">
-          <Label>Variation strength</Label>
+          <Label>Variation</Label>
           <PillToggleGroup
             aria-label="Variation strength"
             value={form.variationStrength}
@@ -309,6 +412,92 @@ export function CarouselShotsInputBox({
               label: strength.charAt(0).toUpperCase() + strength.slice(1),
             }))}
           />
+
+          {isCustomVariation ? (
+            <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-3">
+              <div className="space-y-2">
+                <Label>Variation scope</Label>
+                <PillToggleGroup
+                  aria-label="Variation scope"
+                  value={form.perShotVariationEnabled ? "on" : "off"}
+                  onValueChange={(value) => {
+                    const enabled = value === "on"
+                    onChange({
+                      ...form,
+                      perShotVariationEnabled: enabled,
+                      perShotVariations: ensurePerShotVariations(
+                        form.perShotVariations,
+                        activeShotCount,
+                      ),
+                    })
+                  }}
+                  options={[
+                    {
+                      value: "off",
+                      label: carouselToggleLabel(<CarouselGeneralScopeIcon size={14} />, "General"),
+                    },
+                    {
+                      value: "on",
+                      label: carouselToggleLabel(<CarouselPerShotScopeIcon size={14} />, "Per shot"),
+                    },
+                  ]}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {getCustomVariationScopeDescription({
+                    perShotEnabled: form.perShotVariationEnabled,
+                    shotCount: activeShotCount,
+                    generationMode: form.generationMode,
+                  })}
+                </p>
+              </div>
+
+              {!showPerShotInputs ? (
+                <div className="space-y-2">
+                  <Label htmlFor="carousel-custom-variation">What should vary?</Label>
+                  <Textarea
+                    id="carousel-custom-variation"
+                    value={form.customVariation}
+                    onChange={(event) =>
+                      onChange({ ...form, customVariation: event.target.value })
+                    }
+                    placeholder="e.g. alternate poses, camera angles, expressions…"
+                    rows={3}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label>What should vary?</Label>
+                    <p className="text-xs text-muted-foreground">
+                      One note per shot. Only filled shots use custom instructions.
+                    </p>
+                  </div>
+                  <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                    {Array.from({ length: activeShotCount }, (_, index) => (
+                      <div key={index} className="space-y-1.5">
+                        <Label htmlFor={`carousel-shot-variation-${index}`}>
+                          Shot {index + 1}
+                        </Label>
+                        <Textarea
+                          id={`carousel-shot-variation-${index}`}
+                          value={form.perShotVariations[index] ?? ""}
+                          onChange={(event) => {
+                            const next = [
+                              ...ensurePerShotVariations(form.perShotVariations, activeShotCount),
+                            ]
+                            next[index] = event.target.value
+                            onChange({ ...form, perShotVariations: next })
+                          }}
+                          placeholder={`Variation for shot ${index + 1}…`}
+                          rows={2}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-2">
@@ -352,9 +541,6 @@ export function CarouselShotsInputBox({
               </PromptControlMenuGroup>
             </PromptControlMenuContent>
           </Select>
-          <p className="text-xs text-muted-foreground">
-Highest available quality is used automatically.
-          </p>
         </div>
 
         <GenerateShaderButton

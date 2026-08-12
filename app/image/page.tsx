@@ -2,7 +2,11 @@
 
 import * as React from "react"
 import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
-import { InfluencerInputBox, InfluencerShowcaseCard } from "@/components/tools/influencer"
+import {
+  InfluencerInputBox,
+  InfluencerShowcaseCard,
+  type InfluencerInputSnapshot,
+} from "@/components/tools/influencer"
 import { ImageStudioToolInput } from "@/components/tools/image-studio"
 import {
   buildStudioToolGenerationRequest,
@@ -25,6 +29,7 @@ import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { useRouter, useSearchParams } from "next/navigation"
 import { consumeImageGenerationIntent } from "@/lib/image/image-generation-intent"
 import { appendImageReferencesToFormData } from "@/lib/image/append-references-to-form-data"
+import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { SaveExampleDialog, type SaveExampleSnapshot } from "@/components/image/save-example-dialog"
 import { ImageEditorDialog } from "@/components/image-editor"
@@ -82,6 +87,7 @@ interface ImageHistoryItem {
 interface PendingImageRequest {
   clientRequestId: string
   startedAt: string
+  phase: "pending" | "generating"
   prompt: string | null
   model: string
   tool: string
@@ -169,6 +175,9 @@ const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
   flux2: "prunaai/flux-kontext-fast",
   "gpt-image": "openai/gpt-image-2",
   "gpt-image-2": "openai/gpt-image-2",
+  "grok-image-2": "xai/grok-imagine-image-2.0",
+  "grok-imagine-2": "xai/grok-imagine-image-2.0",
+  "xai/grok-imagine-image-2.0-preview": "xai/grok-imagine-image-2.0",
   "grok-imagine": "xai/grok-imagine-image",
   wan: "fal-ai/wan/v2.7",
   "wan-2.7": "fal-ai/wan/v2.7",
@@ -211,6 +220,7 @@ function ImagePageContent() {
   const [referenceImages, setReferenceImages] = React.useState<ImageUpload[]>([])
   const [studioToolSourceImage, setStudioToolSourceImage] = React.useState<ImageUpload | null>(null)
   const [studioToolSceneImage, setStudioToolSceneImage] = React.useState<ImageUpload | null>(null)
+  const [studioToolAdditionalInstructions, setStudioToolAdditionalInstructions] = React.useState("")
   const [historyImages, setHistoryImages] = React.useState<ImageHistoryItem[]>([])
   const [savedExamples, setSavedExamples] = React.useState<SavedExample[]>([])
   const [examplesViewerId, setExamplesViewerId] = React.useState<string | null>(null)
@@ -279,6 +289,7 @@ function ImagePageContent() {
       }
       setStudioToolSourceImage(null)
       setStudioToolSceneImage(null)
+      setStudioToolAdditionalInstructions("")
     }
 
     previousStudioModeRef.current = isStudioMode
@@ -311,6 +322,9 @@ function ImagePageContent() {
   const autoGenerateHandoffConsumedRef = React.useRef(false)
   const pendingAutoGenerateModelRef = React.useRef<string | null>(null)
   const lastLoadedReferenceImageUrlRef = React.useRef<string | null>(null)
+  const lastLoadedSourceImageUrlRef = React.useRef<string | null>(null)
+  const lastLoadedSceneImageUrlRef = React.useRef<string | null>(null)
+  const lastLoadedCharacterAssetIdRef = React.useRef<string | null>(null)
 
   // Set default model when models load.
   React.useEffect(() => {
@@ -404,6 +418,51 @@ function ImagePageContent() {
     setReferenceImages([{ url: resolvedReferenceImageUrl }])
     setReferenceImage(null)
     lastLoadedReferenceImageUrlRef.current = referenceImageUrl
+  }, [searchParams])
+
+  React.useEffect(() => {
+    const sourceImageUrl = searchParams.get("sourceImageUrl")
+    if (sourceImageUrl && sourceImageUrl !== lastLoadedSourceImageUrlRef.current) {
+      try {
+        const resolvedSourceImageUrl = new URL(sourceImageUrl, window.location.origin).toString()
+        if (/^https?:\/\//i.test(resolvedSourceImageUrl)) {
+          setStudioToolSourceImage({ url: resolvedSourceImageUrl })
+          lastLoadedSourceImageUrlRef.current = sourceImageUrl
+        }
+      } catch {
+        // ignore invalid URLs
+      }
+    }
+
+    const sceneImageUrl = searchParams.get("sceneImageUrl")
+    if (sceneImageUrl && sceneImageUrl !== lastLoadedSceneImageUrlRef.current) {
+      try {
+        const resolvedSceneImageUrl = new URL(sceneImageUrl, window.location.origin).toString()
+        if (/^https?:\/\//i.test(resolvedSceneImageUrl)) {
+          setStudioToolSceneImage({ url: resolvedSceneImageUrl })
+          lastLoadedSceneImageUrlRef.current = sceneImageUrl
+        }
+      } catch {
+        // ignore invalid URLs
+      }
+    }
+
+    const characterAssetId = searchParams.get("characterAssetId")
+    if (characterAssetId && characterAssetId !== lastLoadedCharacterAssetIdRef.current) {
+      lastLoadedCharacterAssetIdRef.current = characterAssetId
+
+      void fetch(`/api/assets?category=character&limit=300`)
+        .then((response) => response.json())
+        .then((payload: { assets?: Array<{ id: string; url: string }> }) => {
+          const asset = payload.assets?.find((entry) => entry.id === characterAssetId)
+          if (asset?.url) {
+            setStudioToolSourceImage({ url: asset.url })
+          }
+        })
+        .catch(() => {
+          // sourceImageUrl query param is the fallback
+        })
+    }
   }, [searchParams])
 
   // When the model (or catalog) changes: keep aspect ratio if the new model supports it; else default.
@@ -587,8 +646,16 @@ function ImagePageContent() {
   }, [libraryColumnCount])
 
   // Handle image generation
-  const handleGenerate = async (promptOverride?: string) => {
-    if (!selectedStudioTool && hasVideoOrAudioAssetRefs(attachedCommandRefs)) {
+  const handleGenerate = async (
+    promptOverride?: string,
+    inputSnapshot?: InfluencerInputSnapshot,
+  ) => {
+    const attachedRefsForRequest = inputSnapshot?.attachedRefs ?? attachedCommandRefs
+    const referenceImagesForRequest = inputSnapshot?.referenceImages ?? (
+      referenceImages.length > 0 ? referenceImages : referenceImage ? [referenceImage] : []
+    )
+
+    if (!selectedStudioTool && hasVideoOrAudioAssetRefs(attachedRefsForRequest)) {
       toast.error("Video and audio assets can't be used as references for image generation.", {
         description: "Remove those @ chips or use image assets only.",
       })
@@ -598,24 +665,38 @@ function ImagePageContent() {
     // Enter can be pressed in the same render as the last keystroke. Prefer
     // the input's current value in that case instead of stale parent state.
     const promptForRequest = promptOverride ?? prompt
-    const mergedPrompt = buildPromptWithRefs(promptForRequest, brandRefsOnly(attachedCommandRefs))
-    const chipImageUrls = getImageAssetUrlsFromRefChips(attachedCommandRefs)
+    const mergedPrompt = buildPromptWithRefs(promptForRequest, brandRefsOnly(attachedRefsForRequest))
+    const chipImageUrls = getImageAssetUrlsFromRefChips(attachedRefsForRequest)
     if (
       !selectedStudioTool &&
       !mergedPrompt.trim() &&
       chipImageUrls.length === 0 &&
-      referenceImages.length === 0 &&
-      !referenceImage
+      referenceImagesForRequest.length === 0
     ) {
       reportImageInputError("Please enter a prompt")
       return
     }
 
     let studioToolPayload: ReturnType<typeof buildStudioToolGenerationRequest> | null = null
+    let resolvedStudioSourceImage = studioToolSourceImage
+    let resolvedStudioSceneImage = studioToolSceneImage
+
     if (selectedStudioTool) {
+      try {
+        resolvedStudioSourceImage = await resolveReferenceImageForGeneration(studioToolSourceImage)
+        resolvedStudioSceneImage = await resolveReferenceImageForGeneration(studioToolSceneImage)
+      } catch (resolveError) {
+        reportImageInputError(
+          resolveError instanceof Error
+            ? resolveError.message
+            : "Could not prepare reference images",
+        )
+        return
+      }
+
       const validationError = validateDualReferenceSwapState(selectedStudioTool, {
-        sourceImage: studioToolSourceImage,
-        sceneImage: studioToolSceneImage,
+        sourceImage: resolvedStudioSourceImage,
+        sceneImage: resolvedStudioSceneImage,
       })
       if (validationError) {
         reportImageInputError(validationError.message)
@@ -623,58 +704,24 @@ function ImagePageContent() {
       }
 
       studioToolPayload = buildStudioToolGenerationRequest(selectedStudioTool, {
-        sourceImage: studioToolSourceImage,
-        sceneImage: studioToolSceneImage,
+        sourceImage: resolvedStudioSourceImage,
+        sceneImage: resolvedStudioSceneImage,
+        additionalInstructions: studioToolAdditionalInstructions,
       })
-
-      if (selectedStudioTool.requiresReferenceAnalysis && studioToolSceneImage) {
-        try {
-          const analysisData = new FormData()
-          if (studioToolSceneImage.file) {
-            analysisData.append("reference", studioToolSceneImage.file)
-          } else if (studioToolSceneImage.url) {
-            analysisData.append("referenceUrl", studioToolSceneImage.url)
-          }
-
-          const analysisResponse = await fetch("/api/image/shot-recreate-analysis", {
-            method: "POST",
-            body: analysisData,
-          })
-          const analysisResult = (await analysisResponse.json()) as {
-            shotRecipe?: Record<string, string>
-            error?: string
-          }
-          if (!analysisResponse.ok || !analysisResult.shotRecipe) {
-            throw new Error(analysisResult.error || "Could not analyze this shot")
-          }
-          studioToolPayload.prompt =
-            `${studioToolPayload.prompt} Structured shot recipe JSON: ` +
-            JSON.stringify(analysisResult.shotRecipe)
-        } catch (analysisError) {
-          const message =
-            analysisError instanceof Error
-              ? analysisError.message
-              : "Could not analyze this shot"
-          reportImageInputError(message)
-          return
-        }
-      }
     }
 
     setError(null)
 
-    // Validate reference images if present
-    const imagesToValidate = referenceImages.length > 0 ? referenceImages : (referenceImage ? [referenceImage] : [])
-    
+    // Validate reference images before adding an optimistic slot. These checks
+    // are synchronous, so valid requests still appear in the grid immediately.
+    const imagesToValidate = referenceImagesForRequest
     for (const refImage of imagesToValidate) {
       if (refImage.file) {
-        // Validate file type
         if (!refImage.file.type.startsWith('image/')) {
           reportImageInputError('Reference images must be valid image files')
           return
         }
-        
-        // Validate file size (max 10MB)
+
         const maxSize = 10 * 1024 * 1024 // 10MB
         if (refImage.file.size > maxSize) {
           reportImageInputError('Reference images are too large. Maximum size is 10MB per image.')
@@ -683,8 +730,9 @@ function ImagePageContent() {
       }
     }
 
-    // Capture form state for append (avoids stale closure when concurrent requests complete out of order)
-    const capturedPrompt = studioToolPayload
+    // Capture the visible request immediately, before tool analysis or the
+    // generation API. This makes feedback synchronous with the button press.
+    let capturedPrompt = studioToolPayload
       ? studioToolPayload.prompt
       : mergedPrompt.trim()
     const capturedModel = selectedModel
@@ -693,7 +741,7 @@ function ImagePageContent() {
       ? studioToolPayload.referenceImages
           .map((image) => image.url)
           .filter((url): url is string => Boolean(url))
-      : (referenceImages.length > 0 ? referenceImages : referenceImage ? [referenceImage] : [])
+      : referenceImagesForRequest
           .map((image) => image.url)
           .filter((url): url is string => Boolean(url))
     const capturedRefUrls = studioToolPayload
@@ -710,6 +758,7 @@ function ImagePageContent() {
     const optimisticPendingRequest: PendingImageRequest = {
       clientRequestId,
       startedAt: new Date().toISOString(),
+      phase: "pending",
       prompt: capturedPrompt || null,
       model: capturedModel,
       tool: capturedTool,
@@ -721,6 +770,50 @@ function ImagePageContent() {
 
     setPendingRequests((prev) => [optimisticPendingRequest, ...prev])
     setLibraryTab("history")
+
+    if (selectedStudioTool?.requiresReferenceAnalysis && studioToolPayload && resolvedStudioSceneImage) {
+      try {
+        const analysisData = new FormData()
+        if (resolvedStudioSceneImage.file) {
+          analysisData.append("reference", resolvedStudioSceneImage.file)
+        } else if (resolvedStudioSceneImage.url) {
+          analysisData.append("referenceUrl", resolvedStudioSceneImage.url)
+        }
+
+        const analysisResponse = await fetch("/api/image/shot-recreate-analysis", {
+          method: "POST",
+          body: analysisData,
+        })
+        const analysisResult = (await analysisResponse.json()) as {
+          shotRecipe?: Record<string, string>
+          error?: string
+        }
+        if (!analysisResponse.ok || !analysisResult.shotRecipe) {
+          throw new Error(analysisResult.error || "Could not analyze this shot")
+        }
+        studioToolPayload.prompt =
+          `${studioToolPayload.prompt} Structured shot recipe JSON: ` +
+          JSON.stringify(analysisResult.shotRecipe)
+        capturedPrompt = studioToolPayload.prompt
+        setPendingRequests((prev) =>
+          prev.map((request) =>
+            request.clientRequestId === clientRequestId
+              ? { ...request, prompt: capturedPrompt || null }
+              : request
+          )
+        )
+      } catch (analysisError) {
+        const message =
+          analysisError instanceof Error
+            ? analysisError.message
+            : "Could not analyze this shot"
+        setPendingRequests((currentRequests) =>
+          removeSlotByClientId(currentRequests, clientRequestId)
+        )
+        reportImageInputError(message)
+        return
+      }
+    }
 
     try {
 
@@ -770,11 +863,7 @@ function ImagePageContent() {
       // Add reference image files if present (supports both single and multiple)
       const baseRefImages = studioToolPayload
         ? studioToolPayload.referenceImages
-        : referenceImages.length > 0
-          ? referenceImages
-          : referenceImage
-            ? [referenceImage]
-            : []
+        : referenceImagesForRequest
       const manualUrlSet = new Set(
         baseRefImages.map((i) => i.url).filter((u): u is string => Boolean(u))
       )
@@ -807,6 +896,7 @@ function ImagePageContent() {
               request.clientRequestId === clientRequestId
                 ? {
                     ...request,
+                    phase: "generating",
                     generationId: generationId ?? request.generationId ?? null,
                     predictionId,
                   }
@@ -949,6 +1039,8 @@ function ImagePageContent() {
         tool={selectedStudioTool}
         sourceImage={studioToolSourceImage}
         sceneImage={studioToolSceneImage}
+        additionalInstructions={studioToolAdditionalInstructions}
+        onAdditionalInstructionsChange={setStudioToolAdditionalInstructions}
         onSourceImageChange={setStudioToolSourceImage}
         onSceneImageChange={setStudioToolSceneImage}
         onGenerate={handleGenerate}
@@ -975,6 +1067,7 @@ function ImagePageContent() {
     selectedModelParameters,
     selectedNumImages,
     selectedStudioTool,
+    studioToolAdditionalInstructions,
     studioToolSceneImage,
     studioToolSourceImage,
   ])
@@ -1285,6 +1378,7 @@ function ImagePageContent() {
         item: {
           type: "generating" as const,
           id: `slot-${request.clientRequestId}-${i}`,
+          phase: request.phase,
           model: request.model,
           prompt: request.prompt,
           tool: request.tool,
@@ -1299,7 +1393,7 @@ function ImagePageContent() {
       .filter((task) => !(task.url != null && historyUrls.has(task.url)))
       .map((task) => ({ createdAt: task.createdAt, item: task.status === "failed"
         ? { type: "failed" as const, id: task.id, model: task.model, prompt: task.prompt, tool: task.tool, error: task.errorMessage }
-        : { type: "generating" as const, id: task.id, model: task.model, prompt: task.prompt, tool: task.tool } }))
+        : { type: "generating" as const, id: task.id, phase: "generating" as const, model: task.model, prompt: task.prompt, tool: task.tool } }))
     const completed = historyImages.map((img) => ({ createdAt: img.createdAt, item: { type: "image" as const, data: toImageData(img) } }))
     return [...generating, ...persisted, ...completed]
       .sort((a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? ""))
@@ -1361,7 +1455,7 @@ function ImagePageContent() {
         <Card className="flex h-full flex-col border-border/60 bg-card/70">
           <CardContent className="flex flex-1 flex-col items-center justify-center p-8">
             <p className="mb-4 text-destructive">{error}</p>
-            <Button onClick={handleGenerate} variant="default">
+            <Button onClick={() => void handleGenerate()} variant="default">
               Try Again
             </Button>
           </CardContent>

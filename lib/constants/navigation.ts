@@ -309,6 +309,13 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             iconSrc: "/ai_icons/openai.svg",
           },
           {
+            path: "/image?model=xai/grok-imagine-image-2.0",
+            label: "Grok Image 2",
+            description: "Strong layouts, readable text, and precise edits",
+            badge: "new",
+            iconSrc: "/ai_icons/grok.svg",
+          },
+          {
             path: "/image?model=xai/grok-imagine-image",
             label: "Grok Imagine",
             description: "Versatile image styles",

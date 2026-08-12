@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getAuthenticatedRequestContext } from "@/lib/server/request-auth"
 import type { FinalizeUploadRequest } from "@/lib/uploads/shared"
 import { finalizeUploadedObject } from "@/lib/uploads/server"
 
 export async function POST(request: NextRequest) {
   try {
+    const { supabase, user, error: authError } = await getAuthenticatedRequestContext(request)
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const body = (await request.json()) as FinalizeUploadRequest
 
     if (
@@ -16,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing upload finalization fields" }, { status: 400 })
     }
 
-    const upload = await finalizeUploadedObject(body)
+    const upload = await finalizeUploadedObject(body, { supabase, userId: user.id })
     return NextResponse.json({ upload })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to finalize upload"

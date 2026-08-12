@@ -12,7 +12,7 @@ import {
 } from "@/components/tools/upscale/upscale-settings-popover"
 import { CAROUSEL_UPSCALE_SETTINGS_STORAGE_KEY } from "@/lib/carousel-shots/constants"
 import type {
-  CarouselGridSize,
+  CarouselGenerationMode,
   CarouselPanelAspectRatio,
   CarouselShotsMetadata,
 } from "@/lib/carousel-shots/types"
@@ -22,7 +22,8 @@ export type CarouselShotsRightView = "example" | "history"
 export type CarouselShotsPendingJob = {
   id: string
   aspectRatio: CarouselPanelAspectRatio
-  gridSize: CarouselGridSize
+  generationMode: CarouselGenerationMode
+  shotCount: number
 }
 
 export type CarouselShotsPendingResult = {

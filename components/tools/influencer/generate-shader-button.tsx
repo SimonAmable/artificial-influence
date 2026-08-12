@@ -23,6 +23,8 @@ type GenerateShaderButtonProps = {
   layout?: GenerateShaderButtonLayout
   /** Primary action label when not generating. Defaults to "Generate". */
   label?: string
+  /** When generating, show only a spinner (no "Generating..." label). */
+  generatingSpinnerOnly?: boolean
   className?: string
 }
 
@@ -78,6 +80,7 @@ function GenerateShaderButtonComponent({
   activeSlotCount = 0,
   layout = "compact",
   label = "Generate",
+  generatingSpinnerOnly = false,
   className,
 }: GenerateShaderButtonProps) {
   const prefersReducedMotion = useReducedMotion()
@@ -99,7 +102,7 @@ function GenerateShaderButtonComponent({
   }, [])
 
   const labelContent = showGeneratingState ? (
-    isIconLayout ? (
+    generatingSpinnerOnly || isIconLayout ? (
       <CircleNotch className="size-4 shrink-0 animate-spin" aria-hidden />
     ) : (
       <span className="inline-flex items-center justify-center gap-1.5 uppercase">
@@ -207,7 +210,7 @@ function GenerateShaderButtonComponent({
             >
               {labelContent}
             </motion.span>
-            {!showGeneratingState || !isIconLayout ? (
+            {!showGeneratingState || (!isIconLayout && !generatingSpinnerOnly) ? (
               <motion.div layout="position" transition={layoutTransition}>
                 {creditContent}
               </motion.div>
@@ -228,6 +231,7 @@ function propsAreEqual(prev: GenerateShaderButtonProps, next: GenerateShaderButt
     prev.activeSlotCount === next.activeSlotCount &&
     prev.layout === next.layout &&
     prev.label === next.label &&
+    prev.generatingSpinnerOnly === next.generatingSpinnerOnly &&
     prev.className === next.className &&
     prev.onGenerate === next.onGenerate
   )

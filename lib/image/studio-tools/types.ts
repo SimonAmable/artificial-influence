@@ -32,6 +32,8 @@ export interface ImageStudioToolDefinition {
 export interface DualReferenceSwapToolState {
   sourceImage: ImageUpload | null
   sceneImage: ImageUpload | null
+  /** Optional short refinements appended to the tool's canonical prompt. */
+  additionalInstructions?: string
 }
 
 export interface ImageStudioToolGenerationRequest {

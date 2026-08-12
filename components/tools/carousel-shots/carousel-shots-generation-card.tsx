@@ -13,6 +13,10 @@ import { useCarouselShotActions } from "@/components/tools/carousel-shots/use-ca
 import { useModels } from "@/hooks/use-models"
 import { getCarouselReferencePublicUrl } from "@/lib/carousel-shots/constants"
 import type { CarouselShotsMetadata, CarouselShotRecord } from "@/lib/carousel-shots/types"
+import {
+  getCarouselGenerationMode,
+  getCarouselShotCount,
+} from "@/lib/carousel-shots/types"
 import { DEFAULT_UPSCALE_CREDITS_COST } from "@/lib/upscale/constants"
 import { cn } from "@/lib/utils"
 
@@ -25,6 +29,43 @@ function formatCreatedAt(value: string) {
     hour: "numeric",
     minute: "2-digit",
   })
+}
+
+function formatVariationLabel(metadata: CarouselShotsMetadata): string {
+  if (metadata.variationStrength === "custom") {
+    if (metadata.perShotVariations?.some((entry) => entry?.trim())) {
+      return "Custom per shot"
+    }
+    return metadata.customVariation?.trim() ? "Custom" : "Custom"
+  }
+
+  return metadata.variationStrength.charAt(0).toUpperCase() + metadata.variationStrength.slice(1)
+}
+
+function getShotGridClasses(shotCount: number, generationMode: ReturnType<typeof getCarouselGenerationMode>) {
+  if (generationMode === "fast" && shotCount === 9) {
+    return {
+      cols: "grid-cols-3 lg:grid-cols-3",
+      rows: "grid-rows-3",
+    }
+  }
+
+  if (generationMode === "fast" && shotCount === 4) {
+    return {
+      cols: "grid-cols-2 lg:grid-cols-2",
+      rows: "grid-rows-2",
+    }
+  }
+
+  if (shotCount <= 4) {
+    return { cols: "grid-cols-2 lg:grid-cols-2", rows: "" }
+  }
+
+  if (shotCount <= 9) {
+    return { cols: "grid-cols-3 lg:grid-cols-3", rows: "" }
+  }
+
+  return { cols: "grid-cols-4 lg:grid-cols-4", rows: "" }
 }
 
 type CarouselShotsGenerationCardProps = {
@@ -53,8 +94,9 @@ export function CarouselShotsGenerationCard({
   const { models: upscaleModels } = useModels("upscale")
 
   const shots = metadata?.shots ?? []
-  const gridSize = metadata?.gridSize ?? 4
-  const gridCols = gridSize === 9 ? "grid-cols-3 lg:grid-cols-3" : "grid-cols-2 lg:grid-cols-2"
+  const shotCount = metadata ? getCarouselShotCount(metadata) : 4
+  const generationMode = metadata ? getCarouselGenerationMode(metadata) : "fast"
+  const gridLayout = getShotGridClasses(shotCount, generationMode)
   const isCardLayout = layout === "card"
   const animateShader = !prefersReducedMotion
   const fastShader = !prefersReducedMotion
@@ -156,8 +198,8 @@ export function CarouselShotsGenerationCard({
 
       {metadata ? (
         <p className="shrink-0 text-sm text-muted-foreground">
-          {metadata.shots.length} shots · {metadata.aspectRatio} ·{" "}
-          {metadata.variationStrength.charAt(0).toUpperCase() + metadata.variationStrength.slice(1)}
+          {metadata.shots.length} shots · {generationMode === "hd" ? "HD" : "Fast"} ·{" "}
+          {metadata.aspectRatio} · {formatVariationLabel(metadata)}
         </p>
       ) : null}
 
@@ -212,13 +254,13 @@ export function CarouselShotsGenerationCard({
         <div
           className={cn(
             "grid h-full w-full min-h-0 gap-2 transition-transform duration-200 sm:gap-3",
-            gridCols,
-            gridSize === 9 ? "grid-rows-3" : "grid-rows-2",
+            gridLayout.cols,
+            gridLayout.rows,
             selectMode && "origin-top scale-[0.94] translate-y-12",
           )}
         >
           {isGenerating
-            ? Array.from({ length: gridSize }).map((_, index) => (
+            ? Array.from({ length: shotCount }).map((_, index) => (
                 <div
                   key={`skeleton-${index}`}
                   className="relative h-full min-h-0 overflow-hidden rounded-xl border bg-muted/30"

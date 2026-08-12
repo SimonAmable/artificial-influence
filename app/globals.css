@@ -450,6 +450,83 @@ body::-webkit-scrollbar-button:horizontal,
   display: none;
 }
 
+/*
+ * Horizontal overlay scrollbar for control strips (e.g. model selector row).
+ * Mobile / touch: hidden. Desktop with hover: slim thumb appears on hover only,
+ * overlaid so it does not reserve layout space.
+ */
+@media (max-width: 1023px), (hover: none) {
+  .overlay-scrollbar-x {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    scrollbar-color: transparent transparent;
+  }
+
+  .overlay-scrollbar-x::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) and (hover: hover) {
+  *:not(html):not(body).overlay-scrollbar-x,
+  .overlay-scrollbar-x {
+    -ms-overflow-style: auto;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    /* Overlay the thumb over content instead of growing the row */
+    margin-bottom: -6px;
+    padding-bottom: 6px;
+  }
+
+  *:not(html):not(body).overlay-scrollbar-x:hover,
+  *:not(html):not(body).overlay-scrollbar-x:focus-within,
+  .overlay-scrollbar-x:hover,
+  .overlay-scrollbar-x:focus-within {
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 55%, transparent)
+      transparent;
+  }
+
+  *:not(html):not(body).overlay-scrollbar-x::-webkit-scrollbar,
+  .overlay-scrollbar-x::-webkit-scrollbar {
+    width: auto;
+    height: 6px;
+    display: block;
+  }
+
+  *:not(html):not(body).overlay-scrollbar-x::-webkit-scrollbar-track,
+  .overlay-scrollbar-x::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *:not(html):not(body).overlay-scrollbar-x::-webkit-scrollbar-thumb,
+  .overlay-scrollbar-x::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.15s ease;
+  }
+
+  *:not(html):not(body).overlay-scrollbar-x:hover::-webkit-scrollbar-thumb,
+  *:not(html):not(body).overlay-scrollbar-x:focus-within::-webkit-scrollbar-thumb,
+  .overlay-scrollbar-x:hover::-webkit-scrollbar-thumb,
+  .overlay-scrollbar-x:focus-within::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklch, var(--muted-foreground) 55%, transparent);
+  }
+
+  *:not(html):not(body).overlay-scrollbar-x:hover::-webkit-scrollbar-thumb:hover,
+  .overlay-scrollbar-x:hover::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklch, var(--muted-foreground) 75%, transparent);
+  }
+
+  *:not(html):not(body).overlay-scrollbar-x::-webkit-scrollbar-button,
+  .overlay-scrollbar-x::-webkit-scrollbar-button {
+    display: none;
+  }
+}
+
 /* Shadow Utility Classes - Can be used with Tailwind */
 .shadow-s,
 .shadow-depth-s {

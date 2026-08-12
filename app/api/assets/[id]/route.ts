@@ -27,6 +27,67 @@ export async function PATCH(
     const siteOrigin = request.nextUrl.origin
     const storageClient = createServiceRoleClient() ?? supabase
 
+    if (body.patch === "coverImage") {
+      const sourceGenerationId = String(body.sourceGenerationId || "").trim()
+      const url = String(body.url || "").trim()
+      if (!sourceGenerationId || !url) {
+        return NextResponse.json(
+          { error: "Cover image and source generation are required" },
+          { status: 400 },
+        )
+      }
+
+      const [{ data: asset }, { data: generation }] = await Promise.all([
+        supabase
+          .from("assets")
+          .select("id, source_generation_id")
+          .eq("id", assetId)
+          .eq("user_id", user.id)
+          .eq("category", "character")
+          .maybeSingle(),
+        supabase
+          .from("generations")
+          .select("id, character_asset_id, supabase_storage_path")
+          .eq("id", sourceGenerationId)
+          .eq("user_id", user.id)
+          .maybeSingle(),
+      ])
+
+      const generationBelongsToCharacter =
+        generation?.character_asset_id === assetId || asset?.source_generation_id === sourceGenerationId
+      if (!asset || !generation || !generationBelongsToCharacter) {
+        return NextResponse.json({ error: "Character image not found" }, { status: 404 })
+      }
+
+      const { data, error } = await supabase
+        .from("assets")
+        .update({
+          asset_url: url,
+          supabase_storage_path:
+            generation.supabase_storage_path || inferStoragePathFromUrl(url),
+          source_generation_id: sourceGenerationId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", assetId)
+        .eq("user_id", user.id)
+        .select("*")
+        .single()
+
+      if (error || !data) {
+        console.error("[assets] PATCH cover image failed:", error)
+        return NextResponse.json(
+          { error: "Failed to update cover image", message: error?.message },
+          { status: 500 },
+        )
+      }
+
+      return NextResponse.json({
+        asset: await mapAssetRowWithFreshUrl(storageClient, data as Record<string, unknown>, {
+          siteOrigin,
+        }),
+      })
+    }
+
     if (body.patch === "privateVoice" || body.patch === "voice") {
       const resolved = await resolveVoiceAttachmentUpdate(supabase, user.id, {
         voiceId:

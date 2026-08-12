@@ -51,7 +51,12 @@ function normalizeSource(source: string | undefined) {
   return source && source.trim().length > 0 ? source.trim() : "uploads"
 }
 
-async function getAuthenticatedUser() {
+export type UploadAuthContext = {
+  supabase: SupabaseClient
+  userId: string
+}
+
+async function getAuthenticatedUser(): Promise<UploadAuthContext> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -62,7 +67,12 @@ async function getAuthenticatedUser() {
     throw new Error("Unauthorized")
   }
 
-  return { supabase, user }
+  return { supabase, userId: user.id }
+}
+
+async function resolveUploadAuth(auth?: UploadAuthContext): Promise<UploadAuthContext> {
+  if (auth) return auth
+  return getAuthenticatedUser()
 }
 
 async function storageObjectExists(
@@ -143,16 +153,17 @@ function buildDeterministicStoragePath(
 
 export async function prepareDirectUpload(
   input: RegisterUploadRequest,
+  auth?: UploadAuthContext,
 ): Promise<RegisterUploadResponse> {
-  const { supabase, user } = await getAuthenticatedUser()
+  const { supabase, userId } = await resolveUploadAuth(auth)
   const bucket = normalizeBucket(input.bucket)
-  const reusable = await getReusableUpload(supabase, user.id, bucket, input.contentHash)
+  const reusable = await getReusableUpload(supabase, userId, bucket, input.contentHash)
   if (reusable) {
     return { status: "existing", upload: reusable }
   }
 
   const storagePath = buildDeterministicStoragePath(
-    user.id,
+    userId,
     input.contentHash,
     input.fileName,
     input.mimeType,
@@ -162,15 +173,18 @@ export async function prepareDirectUpload(
   const alreadyExists = await storageObjectExists(storageClient, bucket, storagePath)
 
   if (alreadyExists) {
-    const finalized = await finalizeUploadedObject({
-      bucket,
-      source: input.source,
-      contentHash: input.contentHash,
-      storagePath,
-      fileName: input.fileName,
-      mimeType: input.mimeType,
-      sizeBytes: input.sizeBytes,
-    })
+    const finalized = await finalizeUploadedObject(
+      {
+        bucket,
+        source: input.source,
+        contentHash: input.contentHash,
+        storagePath,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        sizeBytes: input.sizeBytes,
+      },
+      { supabase, userId },
+    )
     return { status: "existing", upload: { ...finalized, deduped: true } }
   }
 
@@ -192,10 +206,11 @@ export async function prepareDirectUpload(
 
 export async function finalizeUploadedObject(
   input: FinalizeUploadRequest,
+  auth?: UploadAuthContext,
 ): Promise<UploadResponsePayload> {
-  const { supabase, user } = await getAuthenticatedUser()
+  const { supabase, userId } = await resolveUploadAuth(auth)
   const bucket = normalizeBucket(input.bucket)
-  const reusable = await getReusableUpload(supabase, user.id, bucket, input.contentHash)
+  const reusable = await getReusableUpload(supabase, userId, bucket, input.contentHash)
   if (reusable) {
     return reusable
   }
@@ -212,7 +227,7 @@ export async function finalizeUploadedObject(
   const { data, error } = await supabase
     .from("uploads")
     .insert({
-      user_id: user.id,
+      user_id: userId,
       source: normalizeSource(input.source),
       bucket,
       storage_path: input.storagePath,
@@ -232,7 +247,7 @@ export async function finalizeUploadedObject(
       throw new Error(error.message)
     }
 
-    const existing = await findUploadByHash(supabase, user.id, bucket, input.contentHash)
+    const existing = await findUploadByHash(supabase, userId, bucket, input.contentHash)
     if (!existing) {
       throw new Error("Upload already exists but could not be loaded")
     }
@@ -257,24 +272,30 @@ export async function finalizeUploadedObject(
   }
 }
 
-export async function storeUploadedFileFromServer(input: {
-  bucket?: UploadBucket
-  source?: string
-  fileName: string
-  mimeType: string
-  bytes: ArrayBuffer
-}) {
-  const { supabase, user } = await getAuthenticatedUser()
+export async function storeUploadedFileFromServer(
+  input: {
+    bucket?: UploadBucket
+    source?: string
+    fileName: string
+    mimeType: string
+    bytes: ArrayBuffer
+  },
+  auth?: Pick<UploadAuthContext, "userId"> & Partial<Pick<UploadAuthContext, "supabase">>,
+) {
+  const resolvedAuth = auth?.supabase && auth.userId
+    ? { supabase: auth.supabase, userId: auth.userId }
+    : await getAuthenticatedUser()
+  const { supabase, userId } = resolvedAuth
   const bucket = normalizeBucket(input.bucket)
   const buffer = Buffer.from(input.bytes)
   const contentHash = createHash("sha256").update(buffer).digest("hex")
 
-  const reusable = await getReusableUpload(supabase, user.id, bucket, contentHash)
+  const reusable = await getReusableUpload(supabase, userId, bucket, contentHash)
   if (reusable) {
     return reusable
   }
 
-  const storagePath = buildDeterministicStoragePath(user.id, contentHash, input.fileName, input.mimeType)
+  const storagePath = buildDeterministicStoragePath(userId, contentHash, input.fileName, input.mimeType)
   const storageClient = createServiceRoleClient() ?? supabase
   const exists = await storageObjectExists(storageClient, bucket, storagePath)
 
@@ -290,13 +311,16 @@ export async function storeUploadedFileFromServer(input: {
     }
   }
 
-  return finalizeUploadedObject({
-    bucket,
-    source: input.source,
-    contentHash,
-    storagePath,
-    fileName: input.fileName,
-    mimeType: input.mimeType,
-    sizeBytes: buffer.byteLength,
-  })
+  return finalizeUploadedObject(
+    {
+      bucket,
+      source: input.source,
+      contentHash,
+      storagePath,
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      sizeBytes: buffer.byteLength,
+    },
+    { supabase, userId },
+  )
 }

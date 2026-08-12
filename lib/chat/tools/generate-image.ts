@@ -417,7 +417,11 @@ export function createGenerateImageTool({
         .min(1)
         .max(32)
         .optional()
-        .describe("Optional output resolution when the selected model exposes a resolution option in listModels, for example `1k` or `2k` for xai/grok-imagine-image-quality."),
+        .describe("Optional output resolution when the selected model exposes a resolution option in listModels, for example `1k` or `2k` for Grok Image 2."),
+      quality: z
+        .enum(["low", "medium", "high"])
+        .optional()
+        .describe("Optional image quality. Grok Image 2 uses low for a 2-credit draft; medium and high use 4 credits."),
       variantCount: z
         .number()
         .int()
@@ -463,6 +467,7 @@ export function createGenerateImageTool({
       enhancePrompt: shouldEnhance = false,
       modelIdentifier = DEFAULT_IMAGE_MODEL,
       prompt,
+      quality,
       mediaIds = [],
       rawPrompt = false,
       referenceIds = [],
@@ -551,9 +556,9 @@ export function createGenerateImageTool({
               ? replicateInputDefaults.resolution
               : null),
           quality:
-            typeof replicateInputDefaults.quality === "string"
+            quality ?? (typeof replicateInputDefaults.quality === "string"
               ? replicateInputDefaults.quality
-              : null,
+              : null),
           size:
             typeof replicateInputDefaults.size === "string" ? replicateInputDefaults.size : null,
         }),
@@ -561,6 +566,87 @@ export function createGenerateImageTool({
       })
       const requiredCredits = pricingQuote.quotedCredits
       const pricingSnapshot = pricingQuote.pricingSnapshot
+
+      if (provider === "gateway") {
+        const hasCredits = await checkUserHasCredits(userId, requiredCredits, supabase)
+        if (!hasCredits) {
+          throw new Error(`Insufficient credits. This generation requires ${requiredCredits} credits.`)
+        }
+
+        const gatewayReferenceUrls = referenceImageUrls.slice(0, 3)
+        const resolvedQuality =
+          quality ??
+          (typeof replicateInputDefaults.quality === "string" &&
+          ["low", "medium", "high"].includes(replicateInputDefaults.quality)
+            ? (replicateInputDefaults.quality as "low" | "medium" | "high")
+            : "low")
+        const resolvedResolution =
+          resolution === "1k" || resolution === "2k"
+            ? resolution
+            : replicateInputDefaults.resolution === "2k"
+              ? "2k"
+              : "1k"
+
+        const result = await generateImage({
+          model: modelIdentifier,
+          prompt:
+            gatewayReferenceUrls.length > 0
+              ? { text: finalPrompt, images: gatewayReferenceUrls }
+              : finalPrompt,
+          ...(aspectRatio && /^\d+:\d+$/.test(aspectRatio)
+            ? { aspectRatio: aspectRatio as `${number}:${number}` }
+            : {}),
+          ...(effectiveVariantCount > 1 ? { n: effectiveVariantCount } : {}),
+          providerOptions: {
+            xai: {
+              quality: resolvedQuality,
+              resolution: resolvedResolution,
+            },
+          },
+        })
+
+        const base64Images = result.images?.length
+          ? result.images.map((image) => image.base64)
+          : result.image?.base64
+            ? [result.image.base64]
+            : []
+
+        if (base64Images.length === 0) {
+          throw new Error("AI Gateway returned no images.")
+        }
+
+        const persisted = await persistGeneratedBase64Images({
+          aspectRatio: aspectRatio ?? null,
+          base64Images,
+          modelIdentifier,
+          prompt: finalPrompt,
+          referenceImageStoragePaths: referenceImageStoragePaths.slice(0, 3),
+          requiredCredits,
+          supabase,
+          tool: "chat-generate-image",
+          userId,
+        })
+
+        return {
+          aspectRatio: aspectRatio ?? null,
+          creditsUsed: persisted.creditsUsed,
+          images: persisted.images.map((image) => ({
+            mimeType: image.mimeType,
+            storagePath: image.storagePath,
+            url: image.url,
+          })),
+          message:
+            persisted.images.length === 1
+              ? `Generated 1 image with ${modelIdentifier}.`
+              : `Generated ${persisted.images.length} images with ${modelIdentifier}.`,
+          model: modelIdentifier,
+          status: "completed" as const,
+          usedReferenceCount: gatewayReferenceUrls.length,
+          referenceImageUrls: gatewayReferenceUrls,
+          variantCount: persisted.images.length,
+          ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
+        }
+      }
 
       if (provider === "xai") {
         const hasCredits = await checkUserHasCredits(userId, requiredCredits, supabase)

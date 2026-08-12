@@ -7,7 +7,6 @@ import {
   PauseIcon,
   PencilSimple,
   PlayIcon,
-  Plus,
   X,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
@@ -36,6 +35,13 @@ import {
 } from "@/lib/assets/character-voice-value"
 import { type AudioProvider, type AudioVoice } from "@/lib/constants/audio"
 import { cn } from "@/lib/utils"
+
+export const overlayActionButtonClass =
+  "size-12 shrink-0 rounded-full border border-white/55 bg-white text-neutral-950 shadow-lg hover:bg-neutral-100 focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+export const overlayActionButtonMutedClass =
+  "size-12 shrink-0 rounded-full border border-white/60 bg-neutral-950/80 text-white shadow-lg backdrop-blur-md hover:bg-neutral-950 focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+export const overlayVoiceSelectTriggerClass =
+  "h-12 min-w-[9.5rem] max-w-[12rem] shrink-0 gap-2 rounded-full border border-white/55 bg-white px-3.5 text-sm font-medium text-neutral-950 shadow-lg hover:bg-neutral-100 focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 data-[state=open]:bg-neutral-100 [&_svg]:shrink-0 [&_svg:last-child]:text-neutral-700"
 
 export type { CharacterVoiceValue }
 
@@ -115,33 +121,50 @@ function VoicePickerSelect({
   disabled,
   isLoading,
   isOverlay,
+  compact = false,
+  showNoVoiceOption = false,
+  compactLabel,
   placeholder,
   triggerClassName,
   onPick,
   onCreate,
+  onClear,
 }: {
   voices: AudioVoice[]
   value?: string
   disabled?: boolean
   isLoading?: boolean
   isOverlay?: boolean
+  compact?: boolean
+  showNoVoiceOption?: boolean
+  compactLabel?: string
   placeholder: string
   triggerClassName?: string
   onPick: (voice: AudioVoice) => void
   onCreate: () => void
+  onClear?: () => void
 }) {
+  const [open, setOpen] = React.useState(false)
   const grouped = React.useMemo(
     () => groupAttachableCharacterVoices(voices),
     [voices],
   )
+  const resolvedValue = value ?? (showNoVoiceOption ? "__none__" : undefined)
 
   return (
     <Select
-      value={value}
-      disabled={disabled || isLoading}
+      open={open}
+      onOpenChange={setOpen}
+      value={resolvedValue}
+      disabled={disabled}
       onValueChange={(nextValue) => {
         if (nextValue === "__create__") {
+          setOpen(false)
           onCreate()
+          return
+        }
+        if (nextValue === "__none__") {
+          onClear?.()
           return
         }
         const next = findVoiceBySelectValue(voices, nextValue)
@@ -149,16 +172,66 @@ function VoicePickerSelect({
       }}
     >
       <SelectTrigger
+        size="default"
         className={cn(
-          "h-8 text-xs",
-          isOverlay &&
+          compact
+            ? cn(
+                overlayVoiceSelectTriggerClass,
+                resolvedValue &&
+                  resolvedValue !== "__none__" &&
+                  "border-primary/70 ring-1 ring-primary/35",
+              )
+            : "h-8 text-xs",
+          !compact &&
+            isOverlay &&
             "rounded-full border-white/15 bg-white/10 text-white hover:bg-white/15",
           triggerClassName,
         )}
+        aria-label={
+          compact
+            ? `Character voice: ${compactLabel ?? placeholder}. Open menu to choose a voice.`
+            : undefined
+        }
       >
-        <SelectValue placeholder={placeholder} />
+        {compact ? (
+          <>
+            {isLoading ? (
+              <CircleNotch className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Microphone
+                className="size-4"
+                weight={
+                  resolvedValue && resolvedValue !== "__none__" ? "fill" : "regular"
+                }
+                aria-hidden="true"
+              />
+            )}
+            <span className="min-w-0 flex-1 truncate text-left">
+              {compactLabel ?? placeholder}
+            </span>
+            <SelectValue className="sr-only" />
+          </>
+        ) : (
+          <SelectValue placeholder={placeholder} />
+        )}
       </SelectTrigger>
-      <SelectContent className="max-h-72">
+      <SelectContent
+        position="popper"
+        side={compact ? "top" : "bottom"}
+        align={compact ? "start" : "center"}
+        sideOffset={compact ? 10 : 4}
+        className={cn("max-h-72", compact && "z-[500] min-w-[var(--radix-select-trigger-width)]")}
+      >
+        {showNoVoiceOption ? (
+          <SelectGroup>
+            <SelectItem value="__none__">No voice</SelectItem>
+            <SelectItem value="__create__">Create new voice…</SelectItem>
+          </SelectGroup>
+        ) : (
+          <SelectGroup>
+            <SelectItem value="__create__">Create new voice…</SelectItem>
+          </SelectGroup>
+        )}
         {grouped.privateVoices.length > 0 ? (
           <SelectGroup>
             <SelectLabel>My voices</SelectLabel>
@@ -179,7 +252,6 @@ function VoicePickerSelect({
             ))}
           </SelectGroup>
         ))}
-        <SelectItem value="__create__">Create new voice…</SelectItem>
       </SelectContent>
     </Select>
   )
@@ -190,6 +262,7 @@ type CharacterVoiceFieldProps = {
   onChange: (next: CharacterVoiceValue) => void
   disabled?: boolean
   appearance?: "form" | "overlay"
+  layout?: "default" | "compact"
   onUseVoice?: () => void
   className?: string
 }
@@ -199,6 +272,7 @@ export function CharacterVoiceField({
   onChange,
   disabled = false,
   appearance = "form",
+  layout = "default",
   onUseVoice,
   className,
 }: CharacterVoiceFieldProps) {
@@ -288,6 +362,74 @@ export function CharacterVoiceField({
   }
 
   const isOverlay = appearance === "overlay"
+  const isCompact = layout === "compact"
+
+  const clearVoice = () => onChange(emptyCharacterVoice())
+
+  if (isCompact) {
+    return (
+      <>
+        <div className={cn("relative z-20", className)}>
+          <VoicePickerSelect
+            voices={voices}
+            value={hasVoice ? selectedSelectValue : "__none__"}
+            disabled={disabled}
+            isLoading={isLoadingVoices}
+            isOverlay={isOverlay}
+            compact
+            showNoVoiceOption
+            compactLabel={hasVoice ? displayName : "No voice"}
+            placeholder={hasVoice ? displayName : "No voice"}
+            onPick={applyVoice}
+            onCreate={openCreate}
+            onClear={clearVoice}
+          />
+        </div>
+        {hasVoice && previewUrl ? (
+          <VoicePreviewButton
+            src={previewUrl}
+            label={displayName}
+            className={overlayActionButtonClass}
+          />
+        ) : null}
+        {hasVoice && isPrivate ? (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            disabled={disabled}
+            className={overlayActionButtonMutedClass}
+            aria-label="Edit voice"
+            onClick={openEdit}
+          >
+            <PencilSimple className="size-[18px]" />
+          </Button>
+        ) : null}
+
+        <PrivateVoiceDialog
+          open={dialogOpen}
+          onOpenChange={(open) => {
+            setDialogOpen(open)
+            if (!open) setEditingVoice(null)
+          }}
+          provider={dialogProvider}
+          voice={editingVoice}
+          onCreated={(voice) => {
+            applyVoice(voice)
+            void refreshVoices()
+            setDialogOpen(false)
+            setEditingVoice(null)
+          }}
+          onUpdated={(voice) => {
+            applyVoice(voice)
+            void refreshVoices()
+            setDialogOpen(false)
+            setEditingVoice(null)
+          }}
+        />
+      </>
+    )
+  }
 
   return (
     <div className={cn(className)}>
@@ -322,25 +464,13 @@ export function CharacterVoiceField({
               disabled={disabled}
               isLoading={isLoadingVoices}
               isOverlay={isOverlay}
+              showNoVoiceOption
               placeholder="Choose"
               triggerClassName="w-[8.5rem]"
               onPick={applyVoice}
               onCreate={openCreate}
+              onClear={clearVoice}
             />
-            <Button
-              type="button"
-              size="sm"
-              variant={isOverlay ? "secondary" : "outline"}
-              disabled={disabled}
-              className={cn(
-                "h-8 gap-1.5 rounded-full",
-                isOverlay && "border-white/10 bg-white/15 text-white hover:bg-white/20",
-              )}
-              onClick={openCreate}
-            >
-              <Plus className="size-3.5" weight="bold" />
-              Create
-            </Button>
           </div>
         </div>
       ) : (
@@ -384,10 +514,12 @@ export function CharacterVoiceField({
             disabled={disabled}
             isLoading={isLoadingVoices}
             isOverlay={isOverlay}
+            showNoVoiceOption
             placeholder="Change"
             triggerClassName="w-[7.5rem] shrink-0"
             onPick={applyVoice}
             onCreate={openCreate}
+            onClear={clearVoice}
           />
           {previewUrl ? (
             <VoicePreviewButton

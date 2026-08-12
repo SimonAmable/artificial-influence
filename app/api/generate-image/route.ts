@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
           { status: 500 },
         );
       }
-    } else if (modelProvider !== 'xai') {
+    } else if (modelProvider !== 'xai' && modelProvider !== 'gateway') {
       if (!process.env.REPLICATE_API_TOKEN) {
         console.error('[generate-image] REPLICATE_API_TOKEN not set');
         return NextResponse.json(
@@ -267,6 +267,18 @@ export async function POST(request: NextRequest) {
       console.log(`[generate-image] Clamped n from ${n} to ${effectiveN} (model max_images=${maxImages})`);
     }
 
+    const replicateInputDefaults = parseReplicateInputDefaults(modelData.parameters);
+    const effectiveQuality =
+      quality ??
+      (typeof replicateInputDefaults.quality === 'string'
+        ? replicateInputDefaults.quality.toLowerCase()
+        : null);
+    const effectiveResolution =
+      resolution ??
+      (typeof replicateInputDefaults.resolution === 'string'
+        ? replicateInputDefaults.resolution.toLowerCase()
+        : null);
+
     // Compute required credits from quality-aware pricing and image count
     const imageCount = effectiveN;
     const pricingQuote = resolveGenerationPricingQuote({
@@ -277,8 +289,8 @@ export async function POST(request: NextRequest) {
         pricing_config: modelData.pricing_config,
       },
       parameters: buildImagePricingParameters({
-        quality,
-        resolution,
+        quality: effectiveQuality,
+        resolution: effectiveResolution,
         size,
         outputQuality: output_quality,
         resolutionPreset: size || resolution,
@@ -598,7 +610,6 @@ export async function POST(request: NextRequest) {
     // Prepare generateImage options
     console.log('[generate-image] Preparing generation options...');
     const isNanoBananaFamily = ['google/nano-banana', 'google/nano-banana-pro', 'google/nano-banana-2'].includes(modelIdentifier);
-    const replicateInputDefaults = parseReplicateInputDefaults(modelData.parameters);
     const replicateReferenceImageInput = buildReplicateReferenceImageInput(modelIdentifier, referenceImageUrls);
     const replicateReferenceImageStoragePaths = isQwenImageEditPlusLoraModel(modelIdentifier)
       ? referenceImageStoragePaths.slice(0, 1)
@@ -621,7 +632,12 @@ export async function POST(request: NextRequest) {
     let imageModel;
     const provider = modelProvider;
     
-    if (provider === 'xai') {
+    if (provider === 'gateway') {
+      // A provider/model string routes through Vercel AI Gateway and uses
+      // AI_GATEWAY_API_KEY or the deployment's VERCEL_OIDC_TOKEN.
+      imageModel = modelIdentifier;
+      console.log('[generate-image] Using Vercel AI Gateway with model:', modelIdentifier);
+    } else if (provider === 'xai') {
       // xAI Grok model
       const modelIdentifierOnly = modelIdentifier.replace('xai/', '');
       imageModel = xai.image(modelIdentifierOnly);
@@ -647,7 +663,13 @@ export async function POST(request: NextRequest) {
     // Use the selected model identifier
     const generateOptions: Parameters<typeof generateImage>[0] = {
       model: imageModel,
-      prompt: finalPrompt,
+      prompt:
+        provider === 'gateway' && referenceImageUrls.length > 0
+          ? {
+              text: finalPrompt,
+              images: referenceImageUrls.slice(0, 3),
+            }
+          : finalPrompt,
     };
 
     // Add optional parameters if provided
@@ -674,11 +696,16 @@ export async function POST(request: NextRequest) {
     // Add provider-specific options
     generateOptions.providerOptions = {};
     
-    if (provider === 'xai') {
+    if (provider === 'xai' || provider === 'gateway') {
       // xAI/Grok provider options
       console.log('[generate-image] Setting up xAI provider options');
       generateOptions.providerOptions.xai = {
-        // Add xAI-specific parameters
+        ...(effectiveQuality && ['low', 'medium', 'high'].includes(effectiveQuality) && {
+          quality: effectiveQuality,
+        }),
+        ...(effectiveResolution && ['1k', '2k'].includes(effectiveResolution) && {
+          resolution: effectiveResolution,
+        }),
         ...(seed && { seed }),
       };
     } else {
@@ -837,7 +864,7 @@ export async function POST(request: NextRequest) {
           outputBase64Images.length > 1
             ? { images: outputBase64Images.map((base64) => ({ base64 })), warnings: [] }
             : { image: { base64: outputBase64Images[0] }, warnings: [] };
-      } else if (provider === 'xai') {
+      } else if (provider === 'xai' || provider === 'gateway') {
         result = await generateImage(generateOptions);
       } else {
         const replicateClient = new Replicate({
@@ -1142,7 +1169,9 @@ export async function POST(request: NextRequest) {
         imageStoragePaths.map((storagePath) =>
           saveGenerationToDatabase(
             storagePath,
-            provider === 'xai' ? referenceImageStoragePaths : replicateReferenceImageStoragePaths,
+            provider === 'xai' || provider === 'gateway'
+              ? referenceImageStoragePaths.slice(0, provider === 'gateway' ? 3 : undefined)
+              : replicateReferenceImageStoragePaths,
           )
         )
       );
@@ -1171,7 +1200,9 @@ export async function POST(request: NextRequest) {
       // Save generation to database
       const savedGeneration = await saveGenerationToDatabase(
         imageStoragePath,
-        provider === 'xai' ? referenceImageStoragePaths : replicateReferenceImageStoragePaths,
+        provider === 'xai' || provider === 'gateway'
+          ? referenceImageStoragePaths.slice(0, provider === 'gateway' ? 3 : undefined)
+          : replicateReferenceImageStoragePaths,
       );
 
       const totalUploadTime = Date.now() - uploadStartTime;

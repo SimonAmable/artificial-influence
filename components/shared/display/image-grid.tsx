@@ -55,7 +55,7 @@ interface ImageData {
 
 export type GridItem =
   | { type: "image"; data: ImageData }
-  | { type: "generating"; id: string; model?: string | null; prompt?: string | null; tool?: string | null }
+  | { type: "generating"; id: string; phase?: "pending" | "generating"; model?: string | null; prompt?: string | null; tool?: string | null }
   | { type: "failed"; id: string; model?: string | null; prompt?: string | null; tool?: string | null; error?: string | null }
 
 interface ImageGridProps {
@@ -704,7 +704,7 @@ export function ImageGrid({
                   )} />
                   <div className="absolute inset-x-2 bottom-2 z-10 text-left text-[10px] text-white/90 drop-shadow-md">
                     <p className="truncate font-semibold">{item.type === "failed" ? "Generation failed · Credit refunded" : shouldHideGenerationDetails(item.tool) ? getGenerationToolDisplayName(item.tool) ?? "Generating..." : item.model ?? "Generating..."}</p>
-                    <p className="truncate text-white/60">{item.type === "failed" ? "Sorry for the issue. We refunded your credits so you can try again." : (shouldHideGenerationDetails(item.tool) ? null : item.prompt) ?? "Generating..."}</p>
+                    <p className="truncate text-white/60">{item.type === "failed" ? "Sorry for the issue. We refunded your credits so you can try again." : item.phase === "pending" ? "Pending..." : "Generating..."}</p>
                   </div>
                 </div>
               ) : (

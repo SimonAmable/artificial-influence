@@ -61,13 +61,19 @@ import {
 import { AnimatePresence, LayoutGroup } from "framer-motion"
 import { brandRefsOnly, getImageAssetUrlsFromRefChips } from "@/lib/commands/ref-image-pipeline"
 
+export interface InfluencerInputSnapshot {
+  prompt: string
+  attachedRefs: AttachedRef[]
+  referenceImages: ImageUpload[]
+}
+
 interface InfluencerInputBoxProps {
   className?: string
   /**
    * The optional prompt argument keeps Enter-to-generate in sync with the
    * textarea when React has not yet committed the parent-controlled value.
    */
-  onGenerate?: (prompt?: string) => void
+  onGenerate?: (prompt?: string, inputSnapshot?: InfluencerInputSnapshot) => void
   promptValue?: string
   onPromptChange?: (value: string) => void
   referenceImage?: ImageUpload | null
@@ -136,6 +142,8 @@ interface InfluencerInputBoxProps {
   allowedAssetTypes?: AssetType[]
   /** Optional: parent tracks pending generation slots for layout/UX */
   activeGenerationSlotCount?: number
+  /** When generating, show only a spinner on the generate button */
+  generatingSpinnerOnly?: boolean
   modelParameters?: ModelInputValues
   onModelParametersChange?: (params: ModelInputValues) => void
 }
@@ -188,6 +196,7 @@ export function InfluencerInputBox({
   onAttachedRefsChange,
   allowedAssetTypes,
   activeGenerationSlotCount = 0,
+  generatingSpinnerOnly = false,
   modelParameters,
   onModelParametersChange,
 }: InfluencerInputBoxProps) {
@@ -379,17 +388,47 @@ export function InfluencerInputBox({
     []
   )
 
+  const getCurrentInputSnapshot = React.useCallback((): InfluencerInputSnapshot => {
+    const currentReferenceImages =
+      onReferenceImagesChange || referenceImages !== undefined
+        ? localReferenceImages
+        : localReferenceImage
+          ? [localReferenceImage]
+          : []
+
+    return {
+      prompt: localPrompt,
+      attachedRefs,
+      referenceImages: currentReferenceImages,
+    }
+  }, [
+    attachedRefs,
+    localPrompt,
+    localReferenceImage,
+    localReferenceImages,
+    onReferenceImagesChange,
+    referenceImages,
+  ])
+
+  const generateFromCurrentInput = React.useCallback(() => {
+    if (!onGenerate) return
+
+    const snapshot = getCurrentInputSnapshot()
+    const hasInput =
+      buildPromptWithRefs(snapshot.prompt, brandRefsOnly(snapshot.attachedRefs)).trim().length > 0 ||
+      getImageAssetUrlsFromRefChips(snapshot.attachedRefs).length > 0 ||
+      snapshot.referenceImages.length > 0
+
+    if (hasInput) {
+      onGenerate(snapshot.prompt, snapshot)
+    }
+  }, [getCurrentInputSnapshot, onGenerate])
+
   const handleTextInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // If Enter is pressed without Shift, trigger generate
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      if (
-        (buildPromptWithRefs(localPrompt, brandRefsOnly(attachedRefs)).trim().length > 0 ||
-          getImageAssetUrlsFromRefChips(attachedRefs).length > 0) &&
-        onGenerate
-      ) {
-        onGenerate(localPrompt)
-      }
+      generateFromCurrentInput()
     }
   }
 
@@ -563,7 +602,8 @@ export function InfluencerInputBox({
       isReady={isReady}
       isGenerating={isGenerating}
       allowConcurrent={allowConcurrent}
-      onGenerate={onGenerate}
+      generatingSpinnerOnly={generatingSpinnerOnly}
+      onGenerate={generateFromCurrentInput}
       creditCost={estimatedCredits ?? "-"}
       activeSlotCount={activeGenerationSlotCount}
     />
@@ -750,7 +790,7 @@ export function InfluencerInputBox({
         {/* Controls: Add Reference Image, Model Selector, Enhance Prompt */}
         <LayoutGroup id="influencer-controls">
           <div className="flex min-w-0 items-center gap-1">
-            <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-fade-x no-scrollbar [-webkit-overflow-scrolling:touch]">
+            <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-fade-x overlay-scrollbar-x [-webkit-overflow-scrolling:touch]">
             {!hideAddReferenceButton ? (
             <AnimatedControlItem>
               <DropdownMenu>
@@ -919,7 +959,11 @@ export function InfluencerInputBox({
                   <SelectTrigger id={param.name} hideChevron className={influencerControlPillClassName}>
                     <SelectValue placeholder={param.label}>
                       <AnimatedSelectLabel
-                        value={formatQualityOptionLabel(param.name, String(value))}
+                        value={formatQualityOptionLabel(
+                          param.name,
+                          String(value),
+                          selectedModelObject?.identifier,
+                        )}
                       />
                     </SelectValue>
                   </SelectTrigger>
@@ -927,7 +971,11 @@ export function InfluencerInputBox({
                     <PromptControlMenuGroup label={param.label}>
                       {param.enum.map((option) => {
                         const optionValue = String(option)
-                        const label = formatQualityOptionLabel(param.name, optionValue)
+                        const label = formatQualityOptionLabel(
+                          param.name,
+                          optionValue,
+                          selectedModelObject?.identifier,
+                        )
                         const qualityDescription =
                           param.name === "quality" ? getQualityOptionDescription(optionValue) : undefined
                         const credits = resolveCreditsForParameterOption(

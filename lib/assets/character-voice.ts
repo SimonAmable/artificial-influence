@@ -64,6 +64,7 @@ export async function ensureCharacterAsset(input: {
 }
 
 export async function attachVoiceToCharacter(input: {
+  assetId?: string | null
   title: string
   url: string
   sourceGenerationId: string
@@ -74,6 +75,14 @@ export async function attachVoiceToCharacter(input: {
   tags?: string[]
   model?: string | null
 }): Promise<AssetRecord> {
+  if (input.assetId) {
+    return setAssetVoice(input.assetId, {
+      voiceId: input.voiceId,
+      voiceProvider: input.voiceProvider,
+      privateVoiceId: input.privateVoiceId ?? null,
+    })
+  }
+
   const listResponse = await fetch(`/api/assets?category=character&limit=100`)
   if (!listResponse.ok) {
     throw new Error("Failed to load character assets")
