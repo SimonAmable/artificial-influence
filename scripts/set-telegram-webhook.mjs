@@ -32,7 +32,7 @@ loadEnv(resolve(".env"))
 const token = process.env.TELEGRAM_BOT_TOKEN?.trim()
 const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim()
 const webhookUrl =
-  process.argv[2]?.trim() || "https://unican.ai/api/telegram/webhook"
+  process.argv[2]?.trim() || "https://www.unican.ai/api/telegram/webhook"
 
 if (!token) {
   console.error("Missing TELEGRAM_BOT_TOKEN in .env.local")

@@ -16,6 +16,7 @@ import { GenerationTasksProvider } from "@/components/generation-companion/gener
 import { BloopCompanion } from "@/components/generation-companion/bloop-companion"
 import { fontBrand } from "@/lib/fonts/brand"
 import { currentProduct } from "@/lib/product/current"
+import { getCurrentTermsDocument } from "@/lib/legal/terms-acceptance"
 
 const siteBase = getSiteBaseUrl()
 
@@ -48,6 +49,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const currentTermsVersion = getCurrentTermsDocument().version
+
   return (
     <html
       lang="en"
@@ -76,7 +79,7 @@ export default function RootLayout({
               </LayoutModeProviderWrapper>
               <Toaster />
               <PricingUpsellController />
-               <TermsAcceptanceGate />
+               <TermsAcceptanceGate currentTermsVersion={currentTermsVersion} />
                <BloopCompanion />
             </AIChatProvider>
             </GenerationTasksProvider>

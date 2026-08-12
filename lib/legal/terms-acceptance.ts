@@ -101,6 +101,17 @@ export function getCurrentTermsDocument(): CurrentTermsDocument {
   return cachedCurrentTerms
 }
 
+export function getCurrentTermsClientPayload() {
+  const currentTerms = getCurrentTermsDocument()
+  return {
+    title: currentTerms.title,
+    version: currentTerms.version,
+    lastUpdated: currentTerms.lastUpdated,
+    content: currentTerms.content,
+    contentPreview: previewTerms(currentTerms.content),
+  }
+}
+
 export async function getTermsAcceptanceStatus(
   supabase: SupabaseClient,
   userId: string
