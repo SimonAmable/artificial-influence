@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
+import { AutoStripImageMetadataSwitch } from "@/components/settings/auto-strip-image-metadata-switch"
 import { AnimatedSelectLabel } from "@/components/tools/influencer/animated-control-item"
 import { SYNTH_ID_SCRUB_CREDITS_COST } from "@/lib/constants/metadata-remover"
 import {
@@ -98,7 +99,15 @@ function AnimatedCreditBadge({ cost, visible }: { cost: number; visible: boolean
   )
 }
 
-export function MetadataRemoverTool() {
+export type MetadataRemoverToolProps = {
+  autoStripImageMetadata?: boolean
+  isSignedIn?: boolean
+}
+
+export function MetadataRemoverTool({
+  autoStripImageMetadata = false,
+  isSignedIn = false,
+}: MetadataRemoverToolProps) {
   const [selectedImage, setSelectedImage] = React.useState<SelectedImage | null>(null)
   const [cleanResult, setCleanResult] = React.useState<StrippedImageResult | null>(null)
   const [scrubSynthId, setScrubSynthId] = React.useState(false)
@@ -285,27 +294,36 @@ export function MetadataRemoverTool() {
   return (
     <div className="min-h-screen bg-background px-4 pb-12 pt-24 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <Badge variant="secondary" className="mb-3 w-fit gap-1.5">
-              <ShieldCheck className="size-3.5" weight="regular" />
-              Free local tool
-            </Badge>
-            <h1 className="text-3xl font-bold leading-tight sm:text-5xl">
-              Metadata Remover
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">
-              Strip metadata for free. Add SynthID scrub for Google AI images.
-            </p>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <Badge variant="secondary" className="mb-3 w-fit gap-1.5">
+                <ShieldCheck className="size-3.5" weight="regular" />
+                Free local tool
+              </Badge>
+              <h1 className="text-3xl font-bold leading-tight sm:text-5xl">
+                Metadata Remover
+              </h1>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">
+                Strip metadata for free. Add SynthID scrub for Google AI images.
+              </p>
+            </div>
+            {showAllToolsLink ? (
+              <Button variant="outline" asChild>
+                <Link href="/free-tools">
+                  All tools
+                  <ArrowRight className="ml-2 size-4" />
+                </Link>
+              </Button>
+            ) : null}
           </div>
-          {showAllToolsLink ? (
-            <Button variant="outline" asChild>
-              <Link href="/free-tools">
-                All tools
-                <ArrowRight className="ml-2 size-4" />
-              </Link>
-            </Button>
-          ) : null}
+          <AutoStripImageMetadataSwitch
+            enabled={autoStripImageMetadata}
+            isSignedIn={isSignedIn}
+            signInNextPath="/free-tools/metadata-remover"
+            variant="standalone"
+            className="w-full"
+          />
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">

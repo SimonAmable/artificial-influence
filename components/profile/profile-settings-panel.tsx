@@ -6,14 +6,12 @@ import { useRouter } from "next/navigation"
 import { Coin } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
-import {
-  updateAutoStripImageMetadata,
-  updateDefaultEnhancePrompt,
-} from "@/app/profile/actions"
+import { updateDefaultEnhancePrompt } from "@/app/profile/actions"
 import { EditableDisplayName } from "@/components/profile/editable-display-name"
 import { ProfileLogoutButton } from "@/components/profile/profile-logout-button"
 import { RestartOnboardingButton } from "@/components/profile/restart-onboarding-button"
 import { TelegramAlertsSettings } from "@/components/profile/telegram-alerts-settings"
+import { AutoStripImageMetadataSwitch } from "@/components/settings/auto-strip-image-metadata-switch"
 import { LayoutModeToggleGroup } from "@/components/settings/layout-mode-toggle-group"
 import { ThemeToggleGroup } from "@/components/settings/theme-toggle-group"
 import { LayoutMode } from "@/components/shared/layout/layout-toggle"
@@ -74,9 +72,6 @@ export function ProfileSettingsPanel({
   const isModal = variant === "modal"
   const nameSize = isModal ? "compact" : "page"
   const showLayout = layoutMode !== undefined && onLayoutModeChange !== undefined
-  const [stripMetadata, setStripMetadata] = React.useState(autoStripImageMetadata)
-  const [stripMetadataPending, startStripMetadataTransition] = React.useTransition()
-  const stripMetadataSwitchId = React.useId()
   const [enhanceByDefault, setEnhanceByDefault] = React.useState(defaultEnhancePrompt)
   const [enhanceByDefaultPending, startEnhanceByDefaultTransition] = React.useTransition()
   const enhanceByDefaultSwitchId = React.useId()
@@ -86,37 +81,12 @@ export function ProfileSettingsPanel({
   const [deleteLoading, setDeleteLoading] = React.useState(false)
 
   React.useEffect(() => {
-    setStripMetadata(autoStripImageMetadata)
-  }, [autoStripImageMetadata])
-
-  React.useEffect(() => {
     setEnhanceByDefault(defaultEnhancePrompt)
   }, [defaultEnhancePrompt])
-
-  const stripMetadataDescription = stripMetadata
-    ? "On — removes hidden file data and AI watermarks like Synth ID before images are saved to your library."
-    : "Off — images save as generated, including hidden file data and AI watermarks like Synth ID."
 
   const enhanceByDefaultDescription = enhanceByDefault
     ? "On — Enhance Prompt starts enabled on image tools so your ideas get polished before you generate."
     : "Off — you turn on Enhance Prompt only when you want it."
-
-  function handleStripMetadataChange(checked: boolean) {
-    const previous = stripMetadata
-    setStripMetadata(checked)
-    onAutoStripImageMetadataChange?.(checked)
-
-    startStripMetadataTransition(() => {
-      void (async () => {
-        const result = await updateAutoStripImageMetadata(checked)
-        if (!result.ok) {
-          setStripMetadata(previous)
-          onAutoStripImageMetadataChange?.(previous)
-          toast.error(result.error)
-        }
-      })()
-    })
-  }
 
   function handleEnhanceByDefaultChange(checked: boolean) {
     const previous = enhanceByDefault
@@ -261,24 +231,10 @@ export function ProfileSettingsPanel({
               aria-label="Enhance prompts by default"
             />
           </label>
-          <label
-            htmlFor={stripMetadataSwitchId}
-            className="flex min-h-[52px] cursor-pointer items-center justify-between gap-4 border-b border-border/60 py-3 last:border-b-0"
-          >
-            <div className="min-w-0 flex-1">
-              <p className="text-sm text-foreground">Strip image metadata</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {stripMetadataDescription}
-              </p>
-            </div>
-            <Switch
-              id={stripMetadataSwitchId}
-              checked={stripMetadata}
-              onCheckedChange={handleStripMetadataChange}
-              disabled={stripMetadataPending}
-              aria-label="Strip image metadata"
-            />
-          </label>
+          <AutoStripImageMetadataSwitch
+            enabled={autoStripImageMetadata}
+            onEnabledChange={onAutoStripImageMetadataChange}
+          />
         </div>
       </div>
 
