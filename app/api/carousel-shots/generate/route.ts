@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
 
     if (generationMode === "hd" && shotCountRaw == null) {
       return NextResponse.json(
-        { error: "shotCount must be between 2 and 12 for HD mode" },
+        { error: "shotCount must be between 1 and 12 for HD mode" },
         { status: 400 },
       )
     }

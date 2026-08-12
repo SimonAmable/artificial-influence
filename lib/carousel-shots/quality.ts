@@ -22,13 +22,13 @@ export function getCarouselFastQualityParams(
   }
 }
 
-/** Lower-cost tier for HD (per-shot) mode. Uses each model's min or med setting. */
+/** Lowest tier for HD (per-shot) mode — each shot is a separate generation. */
 export function getCarouselHdQualityParams(model: CarouselShotsModelId): Record<string, unknown> {
   switch (model) {
     case "openai/gpt-image-2":
-      return { quality: "medium" }
+      return { quality: "low" }
     case "google/nano-banana-2":
-      return { resolution: "1K" }
+      return { resolution: "1k" }
     case "bytedance/seedream-4.5":
       return { resolutionPreset: "2K" }
     case "bytedance/seedream-5-lite":

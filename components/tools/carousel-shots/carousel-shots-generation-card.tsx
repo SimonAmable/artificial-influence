@@ -57,6 +57,10 @@ function getShotGridClasses(shotCount: number, generationMode: ReturnType<typeof
     }
   }
 
+  if (shotCount === 1) {
+    return { cols: "grid-cols-1 lg:grid-cols-1", rows: "" }
+  }
+
   if (shotCount <= 4) {
     return { cols: "grid-cols-2 lg:grid-cols-2", rows: "" }
   }

@@ -23,11 +23,23 @@ runTest("fast mode uses highest quality per model", () => {
   assert.deepEqual(getCarouselFastQualityParams("bytedance/seedream-4.5"), {
     resolutionPreset: "4K",
   })
+  assert.deepEqual(getCarouselFastQualityParams("bytedance/seedream-5-lite"), {
+    resolutionPreset: "3K",
+  })
+  assert.deepEqual(getCarouselFastQualityParams("bytedance/seedream-5-pro"), {
+    resolutionPreset: "2K",
+  })
 })
 
-runTest("hd mode uses lower-cost quality per model", () => {
-  assert.deepEqual(getCarouselHdQualityParams("openai/gpt-image-2"), { quality: "medium" })
-  assert.deepEqual(getCarouselHdQualityParams("google/nano-banana-2"), { resolution: "1K" })
+runTest("hd mode uses lowest quality per model", () => {
+  assert.deepEqual(getCarouselHdQualityParams("openai/gpt-image-2"), { quality: "low" })
+  assert.deepEqual(getCarouselHdQualityParams("google/nano-banana-2"), { resolution: "1k" })
+  assert.deepEqual(getCarouselHdQualityParams("bytedance/seedream-4.5"), {
+    resolutionPreset: "2K",
+  })
+  assert.deepEqual(getCarouselHdQualityParams("bytedance/seedream-5-lite"), {
+    resolutionPreset: "2K",
+  })
   assert.deepEqual(getCarouselHdQualityParams("bytedance/seedream-5-pro"), {
     resolutionPreset: "1K",
   })
@@ -40,7 +52,7 @@ runTest("generation mode selects the correct quality profile", () => {
   )
   assert.deepEqual(
     getCarouselGenerationQualityParams("hd", "openai/gpt-image-2"),
-    { quality: "medium" },
+    { quality: "low" },
   )
 })
 

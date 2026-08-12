@@ -73,11 +73,18 @@ function getCustomVariationScopeDescription(options: {
   generationMode: CarouselGenerationMode
 }): string {
   if (options.perShotEnabled) {
+    if (options.shotCount === 1) {
+      return "Describe how the shot should differ from the reference."
+    }
     return `Describe how each of the ${options.shotCount} shots should differ from the reference. Leave a shot blank to use a default variation.`
   }
 
   if (options.generationMode === "fast") {
     return `One instruction for all ${options.shotCount} panels on the contact sheet.`
+  }
+
+  if (options.shotCount === 1) {
+    return "One instruction applied to the shot."
   }
 
   return `One instruction applied to all ${options.shotCount} shots.`
