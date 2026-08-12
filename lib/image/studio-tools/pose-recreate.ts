@@ -11,6 +11,7 @@ export const POSE_RECREATE_TOOL: ImageStudioToolDefinition = {
     "Pose recreation using two reference images. The first image is the character to preserve. " +
     "The second image is the pose reference. Repose the character from the first image to precisely match the second image's body position, limb placement, hand positioning, head direction, weight distribution, gesture, and stance. " +
     "Preserve the first image's facial identity, hairstyle, skin tone, body appearance and proportions, clothing, outfit details, and accessories. " +
+    "Strictly preserve the second image's facial expression, mouth shape, and emotion on the reposed character. " +
     "Do not transfer the second image's identity, face, hair, body appearance, clothing, or background. " +
     "Compose the result naturally around the recreated pose with anatomically correct hands and limbs, believable balance, consistent perspective, and realistic lighting.",
   generation: {

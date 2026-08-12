@@ -11,9 +11,10 @@ export const FACE_SWAP_TOOL: ImageStudioToolDefinition = {
     "Identity-only face transfer using two reference images. First image is the identity source (face to transfer). " +
     "Second image is the reference person/scene (clothes, pose, body, and setting to keep). " +
     "Transfer ONLY the facial identity from the first image onto the person in the second image. " +
-    "From the first image preserve ONLY: face shape, eyes, nose, mouth, bone structure, and facial features; nothing else. " +
-    "From the second image preserve: the exact clothing, outfit, and accessories; body proportions and pose; hairstyle and hair; skin tone; scene composition; camera angle; environment; and lighting. " +
-    "The result must show the person from image two wearing their own clothes in their own pose and setting, but with the face from image one. " +
+    "From the first image preserve ONLY: face shape, eye structure, nose structure, bone structure, and facial identity features; nothing else. " +
+    "Do not copy facial expression, mouth shape, smile, frown, or emotion from the first image. " +
+    "From the second image preserve: the exact facial expression, mouth shape, and emotion; clothing, outfit, and accessories; body proportions and pose; hairstyle and hair; skin tone; scene composition; camera angle; environment; and lighting. " +
+    "The result must show the person from image two wearing their own clothes in their own pose and setting with their own expression, but with the facial identity from image one. " +
     "Adjust the transferred face to match the reference's lighting direction, color temperature, perspective, and scale. Blend seamlessly with no visible seams.",
   generation: {
     aspectRatio: "match_input_image",
