@@ -291,13 +291,15 @@ export function ImageEditorProvider({
       options?: { saveHistory?: boolean }
     ) => {
       if (!state.canvas) return
-      applyBaseImageFilters(state.canvas, settings)
       dispatch({ type: "SET_FILTER_SETTINGS", settings })
-      if (options?.saveHistory) {
+      void applyBaseImageFilters(state.canvas, settings, {
+        immediate: Boolean(options?.saveHistory),
+      }).then(() => {
+        if (!options?.saveHistory || !state.canvas) return
         setRememberedFilterSettings(settings)
         const serialized = serializeCanvas(state.canvas)
         dispatch({ type: "PUSH_HISTORY", state: serialized })
-      }
+      })
     },
     [state.canvas]
   )
@@ -305,13 +307,15 @@ export function ImageEditorProvider({
   const resetFilterSettings = React.useCallback(
     (options?: { saveHistory?: boolean }) => {
       if (!state.canvas) return
-      applyBaseImageFilters(state.canvas, DEFAULT_IMAGE_FILTER_SETTINGS)
       dispatch({ type: "RESET_FILTER_SETTINGS" })
-      if (options?.saveHistory) {
+      void applyBaseImageFilters(state.canvas, DEFAULT_IMAGE_FILTER_SETTINGS, {
+        immediate: Boolean(options?.saveHistory),
+      }).then(() => {
+        if (!options?.saveHistory || !state.canvas) return
         setRememberedFilterSettings(DEFAULT_IMAGE_FILTER_SETTINGS)
         const serialized = serializeCanvas(state.canvas)
         dispatch({ type: "PUSH_HISTORY", state: serialized })
-      }
+      })
     },
     [state.canvas]
   )
@@ -366,7 +370,7 @@ export function ImageEditorProvider({
 
       const remembered = getRememberedFilterSettings()
       dispatch({ type: "LOAD_IMAGE", url, filterSettings: remembered })
-      applyBaseImageFilters(canvas, remembered)
+      await applyBaseImageFilters(canvas, remembered, { immediate: true })
 
       // Save initial state to history
       const serialized = serializeCanvas(canvas)
@@ -395,7 +399,7 @@ export function ImageEditorProvider({
       const nextFilters = state.filterSettings
       dispatch({ type: "LOAD_IMAGE", url: result.url, filterSettings: nextFilters })
       dispatch({ type: "SET_CANVAS_ASPECT_RATIO", aspectRatio: null })
-      applyBaseImageFilters(canvas, nextFilters)
+      await applyBaseImageFilters(canvas, nextFilters, { immediate: true })
       const serialized = serializeCanvas(canvas)
       dispatch({ type: "PUSH_HISTORY", state: serialized })
       return true

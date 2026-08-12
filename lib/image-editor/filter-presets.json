@@ -1,0 +1,168 @@
+{
+  "sourceImage": "/docs/new/influencer/base.png",
+  "previewDir": "/docs/new/influencer/filter-presets",
+  "presets": [
+    {
+      "id": "none",
+      "label": "None",
+      "settings": {
+        "grain": 0,
+        "brightness": 0,
+        "contrast": 0,
+        "saturation": 0,
+        "warmth": 0
+      }
+    },
+    {
+      "id": "subtle-film",
+      "label": "Subtle film",
+      "settings": {
+        "grain": 5,
+        "brightness": 3,
+        "contrast": 8,
+        "saturation": -6,
+        "warmth": 5
+      },
+      "minigl": {
+        "insta": { "type": "MTX", "mtx": "vintage", "mix": 0.52 },
+        "adjustments": { "vignette": 0.15, "clarity": 0.05 },
+        "highlightsShadows": [0.03, 0.08]
+      }
+    },
+    {
+      "id": "warm-vintage",
+      "label": "Warm vintage",
+      "settings": {
+        "grain": 7,
+        "brightness": 2,
+        "contrast": 6,
+        "saturation": -12,
+        "warmth": 18
+      },
+      "minigl": {
+        "insta": { "type": "MTX", "mtx": "browni", "mix": 0.62 },
+        "adjustments": { "temperature": 0.12, "vignette": 0.2, "gamma": -0.04 },
+        "highlightsShadows": [0.02, 0.1]
+      }
+    },
+    {
+      "id": "cool-chrome",
+      "label": "Cool chrome",
+      "settings": {
+        "grain": 4,
+        "brightness": 1,
+        "contrast": 12,
+        "saturation": -4,
+        "warmth": -20
+      },
+      "minigl": {
+        "insta": { "type": "MTX", "mtx": "kodachrome", "mix": 0.58 },
+        "adjustments": { "temperature": -0.14, "clarity": 0.07, "contrast": 0.04 },
+        "highlightsShadows": [0.06, -0.04]
+      }
+    },
+    {
+      "id": "vivid",
+      "label": "Vivid",
+      "settings": {
+        "grain": 2,
+        "brightness": 4,
+        "contrast": 14,
+        "saturation": 20,
+        "warmth": 3
+      },
+      "minigl": {
+        "adjustments": {
+          "vibrance": 0.32,
+          "saturation": 0.18,
+          "contrast": 0.08,
+          "exposure": 0.06
+        },
+        "highlightsShadows": [0.08, 0.02]
+      }
+    },
+    {
+      "id": "soft-fade",
+      "label": "Soft fade",
+      "settings": {
+        "grain": 6,
+        "brightness": 8,
+        "contrast": -10,
+        "saturation": -14,
+        "warmth": 6
+      },
+      "minigl": {
+        "insta": { "type": "MTX", "mtx": "polaroid", "mix": 0.48 },
+        "adjustments": {
+          "vignette": 0.28,
+          "contrast": -0.08,
+          "brightness": 0.06,
+          "gamma": 0.05
+        },
+        "highlightsShadows": [-0.02, 0.12]
+      }
+    },
+    {
+      "id": "mono",
+      "label": "Mono",
+      "settings": {
+        "grain": 8,
+        "brightness": 0,
+        "contrast": 10,
+        "saturation": -50,
+        "warmth": 0
+      },
+      "minigl": {
+        "adjustments": {
+          "saturation": -1,
+          "contrast": 0.06,
+          "sepia": 0.08,
+          "gamma": 0.03
+        },
+        "highlightsShadows": [0.04, 0.05]
+      }
+    },
+    {
+      "id": "golden-glow",
+      "label": "Golden glow",
+      "settings": {
+        "grain": 5,
+        "brightness": 6,
+        "contrast": 8,
+        "saturation": 8,
+        "warmth": 15
+      },
+      "minigl": {
+        "insta": { "type": "MTX", "mtx": "vintage", "mix": 0.38 },
+        "adjustments": {
+          "exposure": 0.08,
+          "vibrance": 0.22,
+          "temperature": 0.1,
+          "vignette": 0.12
+        },
+        "highlightsShadows": [0.06, 0.04]
+      }
+    },
+    {
+      "id": "cinematic",
+      "label": "Cinematic",
+      "settings": {
+        "grain": 10,
+        "brightness": -2,
+        "contrast": 16,
+        "saturation": -8,
+        "warmth": -8
+      },
+      "minigl": {
+        "insta": { "type": "MTX", "mtx": "kodachrome", "mix": 0.45 },
+        "adjustments": {
+          "clarity": 0.1,
+          "vignette": 0.24,
+          "contrast": 0.06,
+          "temperature": -0.06
+        },
+        "highlightsShadows": [0.1, -0.06]
+      }
+    }
+  ]
+}

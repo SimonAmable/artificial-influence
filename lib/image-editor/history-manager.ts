@@ -38,6 +38,7 @@ export function serializeCanvas(canvas: FabricCanvas): string {
       "editorTextBarPaddingY",
       "editorTextBarFullWidth",
       "editorFilterSettings",
+      "editorSourceImageUrl",
     ])
   )
 }
@@ -73,9 +74,12 @@ export async function deserializeCanvas(
           applyTextStrokeAppearance(t, logical, color)
         })
         const filterSettings = readFilterSettingsFromCanvas(canvas)
-        applyBaseImageFilters(canvas, filterSettings)
-        canvas.renderAll()
-        resolve()
+        void applyBaseImageFilters(canvas, filterSettings, { immediate: true })
+          .then(() => {
+            canvas.renderAll()
+            resolve()
+          })
+          .catch(reject)
       }).catch(reject)
     } catch (error) {
       reject(error)

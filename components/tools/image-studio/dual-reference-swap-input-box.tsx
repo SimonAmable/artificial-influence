@@ -66,7 +66,7 @@ function StudioToolAdditionalInstructionsField({
       value={value}
       onChange={(event) => onChange(event.target.value)}
       rows={1}
-      placeholder="Additional instructions (e.g. smiling with messy hair)"
+      placeholder="Optional additional instructions (e.g. smiling with messy hair)"
       className="w-full resize-none overflow-y-auto border-none bg-transparent p-0 text-sm outline-none placeholder:text-muted-foreground max-h-20"
     />
   )

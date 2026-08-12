@@ -1,5 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from "next/server"
+
+import { getHistoryFeedItemByGenerationId } from "@/lib/library/history-feed"
+import { createClient } from "@/lib/supabase/server"
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 })
+    }
+
+    const resolvedParams = await Promise.resolve(params)
+    const generationId = resolvedParams.id?.trim()
+    if (!generationId) {
+      return NextResponse.json({ error: "Missing generation id." }, { status: 400 })
+    }
+
+    const generation = await getHistoryFeedItemByGenerationId(supabase, user.id, generationId)
+    if (!generation) {
+      return NextResponse.json({ error: "Generation not found." }, { status: 404 })
+    }
+
+    return NextResponse.json({ generation })
+  } catch (error) {
+    console.error("[generations] GET error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
 
 export async function DELETE(
   request: NextRequest,

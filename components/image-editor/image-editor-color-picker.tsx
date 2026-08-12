@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { CaretDown, CaretUp, CornersOut } from "@phosphor-icons/react"
+import { CaretDown, CaretUp } from "@phosphor-icons/react"
 import { Ghost } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
@@ -134,13 +134,12 @@ function TextAlignPreview({ kind }: { kind: EditorTextAlign }) {
 }
 
 export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProps) {
-  const { state, setBrushColor, setBrushSize, setCanvasAspectRatio, dispatch, saveToHistory } =
+  const { state, setBrushColor, setBrushSize, dispatch, saveToHistory } =
     useImageEditor()
-  const { activeTool, brushSettings, textSettings, shapeSettings, canvasAspectRatio, canvas } =
+  const { activeTool, brushSettings, textSettings, shapeSettings, canvas } =
     state
   const [customColor, setCustomColor] = React.useState(brushSettings.color)
   const [isPropertiesOpen, setIsPropertiesOpen] = React.useState(false)
-  const [isCanvasRatioOpen, setIsCanvasRatioOpen] = React.useState(false)
   const [selectedKind, setSelectedKind] = React.useState<SelectedKind>(null)
   const [activeTextFontFamily, setActiveTextFontFamily] =
     React.useState<string | null>(null)
@@ -396,19 +395,6 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
   const handleCustomColorInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleColorChange(e.target.value)
   }
-
-  const aspectRatioOptions = [
-    { label: "Auto", ratio: null as number | null },
-    { label: "1:1", ratio: 1 },
-    { label: "4:3", ratio: 4 / 3 },
-    { label: "3:2", ratio: 3 / 2 },
-    { label: "16:9", ratio: 16 / 9 },
-    { label: "9:16", ratio: 9 / 16 },
-  ]
-
-  const activeAspectRatioLabel =
-    aspectRatioOptions.find((option) => option.ratio === canvasAspectRatio)?.label ||
-    "Auto"
 
   /** Colors at the top apply to brush and shapes; hidden for text- and image-focused panels. */
   const showTopColorPickers =
@@ -1017,49 +1003,6 @@ export function ImageEditorColorPicker({ className }: ImageEditorColorPickerProp
                 options.
               </p>
             )}
-          </div>
-        )}
-      </div>
-
-      <div className="relative h-8 shrink-0">
-        <button
-          type="button"
-          className="flex h-8 min-w-0 max-w-[8.5rem] items-center justify-between gap-1.5 rounded-lg border border-white/10 bg-zinc-900/90 px-2 text-zinc-100 backdrop-blur-md sm:max-w-[10rem]"
-          onClick={() => setIsCanvasRatioOpen((prev) => !prev)}
-          aria-expanded={isCanvasRatioOpen}
-        >
-          <span className="flex min-w-0 items-center gap-1">
-            <CornersOut
-              size={14}
-              className="shrink-0 text-zinc-400"
-              aria-hidden
-            />
-            <span className="truncate text-sm font-medium text-zinc-100">
-              {activeAspectRatioLabel}
-            </span>
-          </span>
-          {isCanvasRatioOpen ? <CaretUp size={12} /> : <CaretDown size={12} />}
-        </button>
-
-        {isCanvasRatioOpen && (
-          <div className="absolute left-0 top-[calc(100%+6px)] z-40 flex min-w-full flex-col gap-1 rounded-lg border border-white/10 bg-zinc-900/95 p-1.5 shadow-xl backdrop-blur-md">
-            {aspectRatioOptions.map((option) => {
-              const isActive = option.ratio === canvasAspectRatio
-              return (
-                <button
-                  key={option.label}
-                  className={cn(
-                    "h-7 whitespace-nowrap px-2 rounded-md text-xs text-left transition-colors",
-                    isActive
-                      ? "bg-primary/20 text-primary border border-primary/40"
-                      : "bg-zinc-800 text-zinc-300 border border-white/5 hover:bg-zinc-700"
-                  )}
-                  onClick={() => setCanvasAspectRatio(option.ratio)}
-                >
-                  {option.label}
-                </button>
-              )
-            })}
           </div>
         )}
       </div>

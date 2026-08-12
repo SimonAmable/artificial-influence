@@ -1,4 +1,5 @@
 import { DEFAULT_IMAGE_FILTER_SETTINGS } from "./constants"
+import { MAX_FILTER_GRAIN } from "./minigl-params"
 import type { ImageFilterSettings } from "./types"
 
 const LAST_USED_FILTER_SETTINGS_KEY = "image-editor:v1:last-filter-settings"
@@ -26,7 +27,7 @@ export function normalizeImageFilterSettings(
   }
 
   return {
-    grain: clamp(candidate.grain!, 0, 100),
+    grain: clamp(candidate.grain!, 0, MAX_FILTER_GRAIN),
     brightness: clamp(candidate.brightness!, -50, 50),
     contrast: clamp(candidate.contrast!, -50, 50),
     saturation: clamp(candidate.saturation!, -50, 50),

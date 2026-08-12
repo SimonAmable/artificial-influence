@@ -7,6 +7,7 @@ import { Sparkle } from "@phosphor-icons/react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { TelegramAlertsSettings } from "@/components/profile/telegram-alerts-settings"
 import {
   DEFAULT_PRODUCT_UPDATE_FALLBACK_IMAGE,
   SORTED_PRODUCT_UPDATES,
@@ -153,6 +154,8 @@ export function NotificationsSettingsPanel({
 
   return (
     <div className={cn("w-full min-w-0 space-y-6", isModal && "min-w-0")}>
+      <TelegramAlertsSettings variant={variant} />
+
       <p className="text-base font-semibold text-foreground">
         Product updates and new features
       </p>

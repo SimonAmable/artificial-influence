@@ -49,7 +49,16 @@ export interface ImageFilterSettings {
   warmth: number
 }
 
-export type ImageFilterPresetId = "none" | "subtle-film" | "warm-vintage"
+export type ImageFilterPresetId =
+  | "none"
+  | "subtle-film"
+  | "warm-vintage"
+  | "cool-chrome"
+  | "vivid"
+  | "soft-fade"
+  | "mono"
+  | "golden-glow"
+  | "cinematic"
 
 // Layer definition
 export interface EditorLayer {

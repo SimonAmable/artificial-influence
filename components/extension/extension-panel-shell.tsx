@@ -1,8 +1,8 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
 
+import { UnicanLogo } from "@/components/shared/icons/unican-logo"
 import { cn } from "@/lib/utils"
 
 type ExtensionPanelShellProps = {
@@ -19,7 +19,7 @@ export function ExtensionPanelShell({ children, className }: ExtensionPanelShell
       )}
     >
       <header className="flex items-center gap-3 px-4 pt-4 pb-1">
-        <Image src="/logo.svg" alt="" width={28} height={28} className="shrink-0" />
+        <UnicanLogo size={28} className="text-foreground" />
         <div className="min-w-0">
           <p className="font-display text-sm font-bold uppercase tracking-tight text-foreground">
             UniCan

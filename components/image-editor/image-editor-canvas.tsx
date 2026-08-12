@@ -557,17 +557,16 @@ export function ImageEditorCanvas({ className, initialImage }: ImageEditorCanvas
     // Load initial image if provided
     if (initialImage && !hasLoadedInitialImage.current) {
       loadImageOntoCanvas(canvas, initialImage)
-        .then(() => {
+        .then(async () => {
           hasLoadedInitialImage.current = true
           const remembered = getRememberedFilterSettings()
-          applyBaseImageFilters(canvas, remembered)
+          await applyBaseImageFilters(canvas, remembered, { immediate: true })
           dispatch({
             type: "LOAD_IMAGE",
             url: initialImage,
             filterSettings: remembered,
           })
           resizeCanvasToContainer()
-          // Save initial state to history
           const serialized = serializeCanvas(canvas)
           dispatch({ type: "CLEAR_HISTORY" })
           dispatch({ type: "PUSH_HISTORY", state: serialized })

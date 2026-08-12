@@ -122,11 +122,13 @@ export async function loadImageOntoCanvas(
     lockMovementY: true,
   })
 
-  // Add custom properties for layer management
-  const metaImage = img as FabricImage & BaseAwareObject
+  const metaImage = img as FabricImage & BaseAwareObject & {
+    editorSourceImageUrl?: string
+  }
   metaImage.id = `image-${Date.now()}`
   metaImage.name = "Background Image"
   metaImage.layerId = "base"
+  metaImage.editorSourceImageUrl = imageUrl
 
   canvas.add(img)
   canvas.sendObjectToBack(img)

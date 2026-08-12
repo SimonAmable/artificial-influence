@@ -16,7 +16,8 @@ import { ImageEditorGoogleFontsLink } from "./image-editor-google-fonts-link"
 import { ImageEditorCropOverlay, type ImageEditorCropOverlayHandle } from "./image-editor-crop-overlay"
 import { ImageEditorCropBar } from "./image-editor-crop-bar"
 import { ImageEditorFiltersPopover } from "./image-editor-filters-popover"
-import { DownloadSimple } from "@phosphor-icons/react"
+import { DownloadSimple, XIcon } from "@phosphor-icons/react"
+import { Button } from "@/components/ui/button"
 import { downloadCanvas, uploadEditedImage } from "@/lib/image-editor/export-utils"
 import { KEYBOARD_SHORTCUTS } from "@/lib/image-editor/constants"
 import type { ImageEditorProps, EditorTool } from "@/lib/image-editor/types"
@@ -70,6 +71,7 @@ function ImageEditorInner({
 
   const showColorLayersStrip =
     (fullEditorSurface || inpaintMaskSurface) && !isCropMode
+  const showColorPicker = fullEditorSurface && !isCropMode
 
   const showInpaintTabBrushBar =
     variant === "inpaint" &&
@@ -394,6 +396,8 @@ function ImageEditorInner({
 
   const saveDownloadsLocally = variant === "inpaint" && mode === "page"
   const showPageSave = mode === "page" && hasImage && (Boolean(onSave) || saveDownloadsLocally)
+  const showModalSave = mode === "modal" && Boolean(onSave) && hasImage
+  const showHeaderSave = showPageSave || showModalSave
 
   const handleSave = async () => {
     if (!canvas || isSaving) return
@@ -417,20 +421,22 @@ function ImageEditorInner({
     }
   }
 
-  const pageSaveButton = showPageSave ? (
+  const headerSaveButton = showHeaderSave ? (
     <button
       type="button"
       onClick={() => void handleSave()}
       disabled={!canvas || isSaving}
-      title="Download image"
-      aria-label="Download image"
+      title={showPageSave ? "Download image" : "Save changes"}
+      aria-label={showPageSave ? "Download image" : "Save changes"}
       className={cn(
         "flex h-8 min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary px-3 text-sm font-semibold text-primary-foreground backdrop-blur-md transition-colors",
         "hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
       )}
     >
-      <DownloadSimple size={16} weight="bold" aria-hidden />
-      {isSaving ? "Saving…" : "Save"}
+      {showPageSave ? (
+        <DownloadSimple size={16} weight="bold" aria-hidden />
+      ) : null}
+      {isSaving ? "Saving…" : showPageSave ? "Save" : "Save Changes"}
     </button>
   ) : null
 
@@ -451,7 +457,8 @@ function ImageEditorInner({
         )}
       >
         {splitInpaintPage && (
-          <div className="mb-3 flex w-full shrink-0 justify-center">
+          <div className="mb-3 grid w-full shrink-0 grid-cols-[1fr_auto_1fr] items-center">
+            <div />
             <Tabs
               value={surfaceTab}
               onValueChange={(v) => setSurfaceTab(v as EditorSurfaceTab)}
@@ -481,22 +488,47 @@ function ImageEditorInner({
                 </TabsTrigger>
               </TabsList>
             </Tabs>
+            <div className="flex justify-end">
+              {mode === "modal" && onClose ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={onClose}
+                  aria-label="Close editor"
+                >
+                  <XIcon className="size-4" />
+                </Button>
+              ) : null}
+            </div>
           </div>
         )}
 
-        {/* Color + layers: full editor, or inpaint mask surface (mask colors / brush tuning) */}
+        {/* Color + layers: full editor tools, or inpaint chrome (layers / save / hints) */}
         {showColorLayersStrip && (
           <div className="mb-2 flex w-full min-w-0 shrink-0 flex-col items-stretch gap-1.5">
             <div className="flex min-h-8 w-full min-w-0 flex-col gap-2 sm:h-8 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-              <div className="flex min-h-8 min-w-0 flex-1 flex-col gap-1 sm:max-w-[min(100%,calc(100%-12rem))]">
+              <div
+                className={cn(
+                  "flex min-h-8 min-w-0 flex-col gap-1",
+                  showColorPicker && "flex-1 sm:max-w-[min(100%,calc(100%-12rem))]"
+                )}
+              >
                 <div className="flex min-h-8 w-full min-w-0 flex-row items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <ImageEditorColorPicker />
-                  </div>
-                  {(showLayers || showPageSave) && (
-                    <div className="flex shrink-0 items-center gap-2 md:hidden">
+                  {showColorPicker ? (
+                    <div className="min-w-0 flex-1">
+                      <ImageEditorColorPicker />
+                    </div>
+                  ) : null}
+                  {(showLayers || showHeaderSave) && (
+                    <div
+                      className={cn(
+                        "flex shrink-0 items-center gap-2 md:hidden",
+                        !showColorPicker && "ml-auto"
+                      )}
+                    >
                       {showLayers ? <ImageEditorLayers variant="sheet" /> : null}
-                      {pageSaveButton}
+                      {headerSaveButton}
                     </div>
                   )}
                 </div>
@@ -506,10 +538,10 @@ function ImageEditorInner({
                   </p>
                 ) : null}
               </div>
-              {(showLayers || showPageSave) && (
+              {(showLayers || showHeaderSave) && (
                 <div className="hidden shrink-0 items-center justify-end gap-2 md:flex">
                   {showLayers ? <ImageEditorLayers variant="dropdown" /> : null}
-                  {pageSaveButton}
+                  {headerSaveButton}
                 </div>
               )}
             </div>
@@ -646,24 +678,6 @@ function ImageEditorInner({
         )}
       </div>
 
-      {/* Save button (modal mode) */}
-      {mode === "modal" && onSave && hasImage && (
-        <div className="absolute top-4 right-56 z-20">
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={!canvas || isSaving}
-            className={cn(
-              "px-4 py-2 rounded-lg",
-              "bg-primary hover:bg-primary/90",
-              "text-primary-foreground text-sm font-medium",
-              "transition-colors disabled:pointer-events-none disabled:opacity-50"
-            )}
-          >
-            {isSaving ? "Saving…" : "Save Changes"}
-          </button>
-        </div>
-      )}
     </div>
   )
 }

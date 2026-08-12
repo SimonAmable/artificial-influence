@@ -1,24 +1,20 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import { Faders } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { useImageEditor } from "./image-editor-provider"
 import {
   detectFilterPreset,
   hasActiveFilters,
+  IMAGE_FILTER_PRESET_LIST,
   IMAGE_FILTER_PRESETS,
+  isExactFilterPreset,
 } from "@/lib/image-editor/filter-utils"
 import type { ImageFilterPresetId, ImageFilterSettings } from "@/lib/image-editor/types"
 
@@ -35,7 +31,7 @@ const FILTER_CONTROLS: {
   min: number
   max: number
 }[] = [
-  { key: "grain", label: "Grain", min: 0, max: 100 },
+  { key: "grain", label: "Grain", min: 0, max: 30 },
   { key: "brightness", label: "Brightness", min: -50, max: 50 },
   { key: "contrast", label: "Contrast", min: -50, max: 50 },
   { key: "saturation", label: "Saturation", min: -50, max: 50 },
@@ -76,6 +72,52 @@ function FilterSliderRow({
   )
 }
 
+function FilterPresetMediaButton({
+  id,
+  label,
+  previewSrc,
+  selected,
+  onSelect,
+}: {
+  id: ImageFilterPresetId
+  label: string
+  previewSrc: string
+  selected: boolean
+  onSelect: (id: ImageFilterPresetId) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(id)}
+      aria-pressed={selected}
+      aria-label={`${label} filter preset`}
+      className={cn(
+        "group relative aspect-video w-full overflow-hidden rounded-md border text-left transition-all",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-popover",
+        selected
+          ? "border-primary ring-2 ring-primary/40"
+          : "border-border/60 hover:border-border"
+      )}
+    >
+      <Image
+        src={previewSrc}
+        alt=""
+        fill
+        sizes="72px"
+        className="object-cover transition-transform duration-300 group-hover:scale-105"
+        unoptimized
+      />
+      <div
+        className="absolute inset-0 bg-linear-to-t from-black/85 via-black/25 to-transparent"
+        aria-hidden
+      />
+      <span className="absolute inset-x-0 bottom-0 z-10 px-1 pb-0.5 text-[9px] font-medium leading-tight text-white drop-shadow-sm">
+        {label}
+      </span>
+    </button>
+  )
+}
+
 export function ImageEditorFiltersPopover({
   className,
   disabled = false,
@@ -112,6 +154,11 @@ export function ImageEditorFiltersPopover({
   }, [resetFilterSettings])
 
   const selectedPreset = detectFilterPreset(filterSettings)
+  const hasCustomMix =
+    filtersActive &&
+    !IMAGE_FILTER_PRESET_LIST.some((preset) =>
+      isExactFilterPreset(filterSettings, preset.id)
+    )
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -143,7 +190,7 @@ export function ImageEditorFiltersPopover({
       <PopoverContent
         side="top"
         align="center"
-        className="w-[min(92vw,280px)] space-y-4 p-4"
+        className="w-[min(92vw,320px)] space-y-4 p-4"
       >
         {disabled ? (
           <p className="text-sm text-muted-foreground">
@@ -152,22 +199,27 @@ export function ImageEditorFiltersPopover({
         ) : (
           <>
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Preset</Label>
-              <Select
-                value={selectedPreset}
-                onValueChange={(value) =>
-                  applyPreset(value as ImageFilterPresetId)
-                }
-              >
-                <SelectTrigger className="h-9 w-full text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="subtle-film">Subtle film</SelectItem>
-                  <SelectItem value="warm-vintage">Warm vintage</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs text-muted-foreground">Preset</Label>
+                {hasCustomMix ? (
+                  <span className="text-[10px] text-muted-foreground">Custom</span>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {IMAGE_FILTER_PRESET_LIST.map((preset) => (
+                  <FilterPresetMediaButton
+                    key={preset.id}
+                    id={preset.id}
+                    label={preset.label}
+                    previewSrc={preset.previewSrc}
+                    selected={
+                      selectedPreset === preset.id &&
+                      isExactFilterPreset(filterSettings, preset.id)
+                    }
+                    onSelect={applyPreset}
+                  />
+                ))}
+              </div>
             </div>
 
             {FILTER_CONTROLS.map((control) => (

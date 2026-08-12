@@ -34,6 +34,7 @@ import { MODEL_IDENTIFIERS } from "@/lib/constants/models"
 import { useDefaultEnhancePrompt } from "@/hooks/use-default-enhance-prompt"
 import { useModels } from "@/hooks/use-models"
 import { AspectRatioSelector } from "@/components/shared/selectors/aspect-ratio-selector"
+import { ImageEditorCanvasAspectControl } from "./image-editor-canvas-aspect-control"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import { getActiveModelMetadata, type ModelMetadata } from "@/lib/constants/model-metadata"
 import type { Model } from "@/lib/types/models"
@@ -569,6 +570,8 @@ export function ImageEditorPromptBar({
               <span className="font-medium text-foreground">Nano Banana 2</span>
               <span className="hidden sm:inline">· mask optional</span>
             </div>
+
+            <ImageEditorCanvasAspectControl disabled={isGenerating} />
           </div>
         ) : (
           <div className="flex items-center gap-1 flex-wrap">
@@ -645,6 +648,8 @@ export function ImageEditorPromptBar({
                 ))}
               </SelectContent>
             </Select>
+
+            <ImageEditorCanvasAspectControl disabled={isGenerating} />
 
             <AspectRatioSelector
               model={selectedModelObject}

@@ -3,6 +3,7 @@ import { fal } from "@fal-ai/client"
 import { createClient } from "@supabase/supabase-js"
 import { deductUserCreditsUpTo } from "@/lib/credits"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
+import { notifyGenerationCompleteTelegram } from "@/lib/server/notify-generation-complete"
 import { configureFal } from "./fal-image"
 
 const supabaseAdmin = createClient(
@@ -186,6 +187,11 @@ export async function completeFalPendingVideoAdmin(
 
   await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
   await deductUserCreditsUpTo(row.user_id, requiredCredits, supabaseAdmin)
+
+  void notifyGenerationCompleteTelegram(supabaseAdmin, {
+    userId: row.user_id,
+    generationId: row.id,
+  })
 
   return { status: "completed" }
 }

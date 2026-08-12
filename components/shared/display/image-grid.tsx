@@ -712,7 +712,7 @@ export function ImageGrid({
               key={getImageItemKey(item.data)}
               className={cn(
                 "group relative flex w-full min-w-0 cursor-pointer items-center justify-center bg-background",
-                isOneColumn ? "aspect-auto" : "aspect-square min-h-0"
+                isOneColumn ? "aspect-auto" : "aspect-square min-h-0 overflow-hidden"
               )}
               onClick={() => {
                 if (failedUrls[item.data.url]) return
@@ -757,8 +757,10 @@ export function ImageGrid({
                   src={item.data.url}
                   alt={`Generated image ${index + 1}`}
                   className={cn(
-                    "w-auto h-auto object-contain pointer-events-none",
-                    isOneColumn ? "max-h-[50vh] max-w-full" : "max-w-full max-h-full"
+                    "pointer-events-none object-contain",
+                    isOneColumn
+                      ? "h-auto w-auto max-h-[50vh] max-w-full"
+                      : "absolute inset-0 h-full w-full"
                   )}
                   loading="lazy"
                   draggable={false}
@@ -799,7 +801,7 @@ export function ImageGrid({
                       type="button"
                       variant="secondary"
                       size="icon"
-                      className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+                      className="hidden h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75 lg:inline-flex"
                       onClick={(event) => {
                         event.stopPropagation()
                         setFullscreenImage(item.data)
@@ -819,7 +821,7 @@ export function ImageGrid({
                       type="button"
                       variant="secondary"
                       size="icon"
-                      className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+                      className="hidden h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75 lg:inline-flex"
                       onClick={(event) => {
                         event.stopPropagation()
                         void handleDownload(item.data.url)
@@ -841,7 +843,7 @@ export function ImageGrid({
                         type="button"
                         variant="secondary"
                         size="icon"
-                        className="h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+                        className="hidden h-7 w-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75 lg:inline-flex"
                         onClick={(event) => {
                           event.stopPropagation()
                           void handleCopy(item.data.url)
@@ -868,7 +870,7 @@ export function ImageGrid({
                         type="button"
                         variant="secondary"
                         size="icon"
-                        className="h-7 w-7 rounded-full border border-primary/40 bg-primary/70 text-black shadow-sm shadow-primary/25 hover:bg-primary/85"
+                        className="hidden h-7 w-7 rounded-full border border-primary/40 bg-primary/70 text-black shadow-sm shadow-primary/25 hover:bg-primary/85 lg:inline-flex"
                         onClick={(event) => {
                           event.stopPropagation()
                           runShotVariationsAction(item.data)
@@ -910,8 +912,8 @@ export function ImageGrid({
                 </DropdownMenu>
               </div>
 
-              {/* Bottom bar: prompt (left) + buttons (right) - no overlap */}
-              <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-1 px-2 pb-2 pt-6 opacity-100 transition-opacity duration-200 lg:gap-2 lg:opacity-0 lg:group-hover:opacity-100">
+              {/* Bottom bar: prompt (left) + buttons (right) - desktop hover only */}
+              <div className="absolute inset-x-0 bottom-0 z-10 hidden items-end justify-between gap-1 px-2 pb-2 pt-6 transition-opacity duration-200 lg:flex lg:gap-2 lg:opacity-0 lg:group-hover:opacity-100">
                 <div className="min-w-0 flex-1 overflow-hidden pr-1 sm:pr-2">
                   {(getGenerationToolDisplayName(item.data.tool) || (item.data.model && !shouldHideGenerationDetails(item.data.tool))) && (
                     <p className="truncate text-[10px] font-semibold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">

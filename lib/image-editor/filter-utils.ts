@@ -1,42 +1,33 @@
 import type { Canvas as FabricCanvas, FabricImage } from "fabric"
-import { filters } from "fabric"
 import { DEFAULT_IMAGE_FILTER_SETTINGS } from "./constants"
+import { gradeImage } from "./apply-minigl-browser"
+import { resolveImageUrlForFabric } from "./canvas-image-url"
+import {
+  IMAGE_FILTER_PRESET_LIST,
+  IMAGE_FILTER_PRESETS,
+  resolveMiniGlPipelineForSettings,
+} from "./filter-presets"
 import type { ImageFilterPresetId, ImageFilterSettings } from "./types"
+
+export {
+  FILTER_PRESET_PREVIEW_DIR,
+  FILTER_PRESET_SOURCE_IMAGE,
+  getFilterPresetMeta,
+  IMAGE_FILTER_PRESET_LIST,
+  IMAGE_FILTER_PRESETS,
+} from "./filter-presets"
+export type { ImageFilterPresetMeta } from "./filter-presets"
+export { MAX_FILTER_GRAIN, MAX_PRESET_GRAIN } from "./minigl-params"
 
 type BaseAwareImage = FabricImage & {
   layerId?: string
   name?: string
   editorFilterSettings?: ImageFilterSettings
+  editorSourceImageUrl?: string
 }
 
-export const IMAGE_FILTER_PRESETS: Record<
-  ImageFilterPresetId,
-  ImageFilterSettings
-> = {
-  none: DEFAULT_IMAGE_FILTER_SETTINGS,
-  "subtle-film": {
-    grain: 25,
-    brightness: 0,
-    contrast: 10,
-    saturation: -8,
-    warmth: 0,
-  },
-  "warm-vintage": {
-    grain: 35,
-    brightness: 0,
-    contrast: 5,
-    saturation: -15,
-    warmth: 12,
-  },
-}
-
-function sliderToUnit(value: number): number {
-  return value / 100
-}
-
-function grainToNoise(grain: number): number {
-  return Math.round((grain / 100) * 250)
-}
+let filterApplyToken = 0
+let debouncedFilterTimer: ReturnType<typeof setTimeout> | null = null
 
 export function getBaseImage(canvas: FabricCanvas): BaseAwareImage | null {
   const match = canvas.getObjects().find((obj) => {
@@ -49,54 +40,58 @@ export function getBaseImage(canvas: FabricCanvas): BaseAwareImage | null {
   return (match as BaseAwareImage | undefined) ?? null
 }
 
-export function buildFiltersFromSettings(settings: ImageFilterSettings) {
-  const built: NonNullable<BaseAwareImage["filters"]> = []
-
-  if (settings.grain > 0) {
-    built.push(new filters.Noise({ noise: grainToNoise(settings.grain) }))
+export function getBaseImageSourceUrl(img: BaseAwareImage): string {
+  if (img.editorSourceImageUrl) {
+    return resolveImageUrlForFabric(img.editorSourceImageUrl)
   }
-
-  if (settings.brightness !== 0) {
-    built.push(
-      new filters.Brightness({ brightness: sliderToUnit(settings.brightness) })
-    )
-  }
-
-  if (settings.contrast !== 0) {
-    built.push(
-      new filters.Contrast({ contrast: sliderToUnit(settings.contrast) })
-    )
-  }
-
-  if (settings.saturation !== 0) {
-    built.push(
-      new filters.Saturation({ saturation: sliderToUnit(settings.saturation) })
-    )
-  }
-
-  if (settings.warmth !== 0) {
-    const warmth = sliderToUnit(settings.warmth)
-    built.push(
-      new filters.Gamma({
-        gamma: [1 + warmth * 0.15, 1, 1 - warmth * 0.15],
-      })
-    )
-  }
-
-  return built
+  const element = img.getElement() as HTMLImageElement | undefined
+  if (element?.src) return element.src
+  return img.getSrc()
 }
 
-export function applyBaseImageFilters(
+export async function applyBaseImageFilters(
   canvas: FabricCanvas,
-  settings: ImageFilterSettings
-): boolean {
+  settings: ImageFilterSettings,
+  options?: { immediate?: boolean }
+): Promise<boolean> {
   const img = getBaseImage(canvas)
   if (!img) return false
 
-  img.filters = buildFiltersFromSettings(settings)
+  const run = async () => {
+    const token = ++filterApplyToken
+    const sourceUrl = getBaseImageSourceUrl(img)
+    const pipeline = resolveMiniGlPipelineForSettings(settings, isExactFilterPreset)
+
+    try {
+      const gradedUrl = await gradeImage(sourceUrl, pipeline)
+      if (token !== filterApplyToken) return
+
+      img.filters = []
+      await img.setSrc(gradedUrl, { crossOrigin: "anonymous" })
+      img.editorFilterSettings = { ...settings }
+      img.set({ dirty: true })
+      canvas.requestRenderAll()
+    } catch (error) {
+      console.error("Failed to apply image filters:", error)
+    }
+  }
+
+  if (options?.immediate) {
+    if (debouncedFilterTimer) {
+      clearTimeout(debouncedFilterTimer)
+      debouncedFilterTimer = null
+    }
+    await run()
+    return true
+  }
+
+  if (debouncedFilterTimer) clearTimeout(debouncedFilterTimer)
+  debouncedFilterTimer = setTimeout(() => {
+    debouncedFilterTimer = null
+    void run()
+  }, 48)
+
   img.editorFilterSettings = { ...settings }
-  img.applyFilters()
-  canvas.requestRenderAll()
   return true
 }
 
@@ -123,12 +118,25 @@ export function hasActiveFilters(settings: ImageFilterSettings): boolean {
 export function detectFilterPreset(
   settings: ImageFilterSettings
 ): ImageFilterPresetId {
-  for (const id of ["subtle-film", "warm-vintage"] as const) {
-    const preset = IMAGE_FILTER_PRESETS[id]
-    const matches = (Object.keys(preset) as (keyof ImageFilterSettings)[]).every(
-      (key) => preset[key] === settings[key]
-    )
-    if (matches) return id
+  for (const preset of IMAGE_FILTER_PRESET_LIST) {
+    if (preset.id === "none") continue
+    const matches = (
+      Object.keys(preset.settings) as (keyof ImageFilterSettings)[]
+    ).every((key) => preset.settings[key] === settings[key])
+    if (matches) return preset.id
   }
+
+  if (!hasActiveFilters(settings)) return "none"
   return "none"
+}
+
+export function isExactFilterPreset(
+  settings: ImageFilterSettings,
+  presetId: ImageFilterPresetId
+): boolean {
+  const preset = IMAGE_FILTER_PRESETS[presetId]
+  if (!preset) return false
+  return (Object.keys(preset) as (keyof ImageFilterSettings)[]).every(
+    (key) => preset[key] === settings[key]
+  )
 }

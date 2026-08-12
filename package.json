@@ -17,7 +17,8 @@
     "check:product-logo": "node scripts/check-product-logo.mjs",
     "check:ffmpeg-ass": "node --experimental-strip-types scripts/check-ffmpeg-ass.mjs",
     "snapshot:ffmpeg": "node scripts/create-ffmpeg-sandbox-snapshot.mjs",
-    "security:apply-credit-lockdown": "node scripts/apply-credit-security-lockdown.mjs"
+    "security:apply-credit-lockdown": "node scripts/apply-credit-security-lockdown.mjs",
+    "generate:filter-previews": "npx tsx scripts/generate-filter-preset-previews.ts"
   },
   "dependencies": {
     "@ai-sdk/devtools": "^0.0.15",
@@ -60,6 +61,7 @@
     "@vercel/analytics": "^1.6.1",
     "@vercel/functions": "^3.4.6",
     "@vercel/sandbox": "^1.10.0",
+    "@xdadda/mini-gl": "^0.1.19",
     "@xyflow/react": "^12.10.0",
     "ai": "^6.0.142",
     "cheerio": "^1.2.0",

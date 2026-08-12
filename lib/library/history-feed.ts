@@ -383,3 +383,26 @@ export async function listHistoryFeed(supabase: SupabaseClient, options: ListHis
     },
   }
 }
+
+export async function getHistoryFeedItemByGenerationId(
+  supabase: SupabaseClient,
+  userId: string,
+  generationId: string,
+): Promise<HistoryFeedItem | null> {
+  const { data: generation, error } = await supabase
+    .from("generations")
+    .select(
+      "id, user_id, prompt, supabase_storage_path, type, model, tool, aspect_ratio, created_at, reference_images_supabase_storage_path, status, metadata",
+    )
+    .eq("id", generationId)
+    .eq("user_id", userId)
+    .neq("status", "pending")
+    .neq("status", "failed")
+    .maybeSingle()
+
+  if (error || !generation) {
+    return null
+  }
+
+  return mapGenerationRow(supabase, generation as GenerationRow)
+}

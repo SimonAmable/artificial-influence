@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
 import { getAutoStripImageMetadata } from "@/lib/server/auto-strip-image-metadata"
+import { notifyGenerationCompleteTelegram } from "@/lib/server/notify-generation-complete"
 import { prepareGeneratedImageForStorage } from "@/lib/server/prepare-generated-image-for-storage"
 import { configureFal } from "./fal-image"
 import { formatFalClientError } from "./fal-client-error"
@@ -256,6 +257,11 @@ export async function completeFalPendingImageAdmin(
 
   await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
   await deductUserCredits(row.user_id, requiredCredits, supabaseAdmin)
+
+  void notifyGenerationCompleteTelegram(supabaseAdmin, {
+    userId: row.user_id,
+    generationId: row.id,
+  })
 
   return { status: "completed" }
 }

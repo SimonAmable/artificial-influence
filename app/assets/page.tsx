@@ -57,6 +57,7 @@ import {
   normalizePagination,
 } from "@/components/library/history/utils"
 import { useDebouncedValue } from "@/components/library/history/use-debounced-value"
+import { useOpenGenerationFromUrl } from "@/components/library/history/use-open-generation-from-url"
 import {
   FullscreenMediaViewer,
   type FullscreenMediaViewerAction,
@@ -330,6 +331,14 @@ function LibraryPageContent() {
     },
     [router, searchParams],
   )
+
+  React.useEffect(() => {
+    const generationId = searchParams.get("generation")
+    if (!generationId || activeTab === "history") {
+      return
+    }
+    handleActiveTabChange("history")
+  }, [activeTab, handleActiveTabChange, searchParams])
 
   const handleCharacterChange = React.useCallback(
     (characterId: string | null) => {
@@ -1066,6 +1075,11 @@ function LibraryPageContent() {
       router,
     ],
   )
+
+  useOpenGenerationFromUrl({
+    enabled: activeTab === "history",
+    onOpen: openGenerationViewer,
+  })
 
   const filteredBrandKits = React.useMemo(
     () => brandKits.filter((kit) => mediaMatchesSearch(debouncedSearch, [kit.name, kit.websiteUrl, kit.tagline])),

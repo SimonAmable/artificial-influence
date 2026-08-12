@@ -4,6 +4,7 @@ import { deductUserCredits, deductUserCreditsUpTo } from "@/lib/credits"
 import { runGenerationFollowUpResume } from "@/lib/chat/generation-follow-up-resume"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
 import { getAutoStripImageMetadata } from "@/lib/server/auto-strip-image-metadata"
+import { notifyGenerationCompleteTelegram } from "@/lib/server/notify-generation-complete"
 import { prepareGeneratedImageForStorage } from "@/lib/server/prepare-generated-image-for-storage"
 
 /** Agent follow-up resume can run a full tool loop after upload (same budget as /api/chat). */
@@ -337,6 +338,11 @@ export async function POST(request: NextRequest) {
         console.error("[webhooks/replicate] generation follow-up resume failed:", followUpError)
       }
     }
+
+    void notifyGenerationCompleteTelegram(supabaseAdmin, {
+      userId: pendingGeneration.user_id,
+      generationId: pendingGeneration.id,
+    })
 
     return NextResponse.json({ received: true })
   } catch (error) {

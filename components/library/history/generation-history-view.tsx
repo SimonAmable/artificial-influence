@@ -16,6 +16,7 @@ import { HistorySearchToolbar } from "@/components/library/history/history-searc
 import type { Generation, GenerationType, HistorySource, SaveAssetDraft } from "@/components/library/history/types"
 import { useDebouncedValue } from "@/components/library/history/use-debounced-value"
 import { useGenerationHistory } from "@/components/library/history/use-generation-history"
+import { useOpenGenerationFromUrl } from "@/components/library/history/use-open-generation-from-url"
 import { historyItemDeleteUrl } from "@/components/library/history/utils"
 import {
   FullscreenMediaViewer,
@@ -129,6 +130,11 @@ export function GenerationHistoryView({
     },
     [router],
   )
+
+  useOpenGenerationFromUrl({
+    enabled,
+    onOpen: handleOpenGeneration,
+  })
 
   const copyMedia = React.useCallback(async (url: string, type: AssetType) => {
     if (type === "audio") {
