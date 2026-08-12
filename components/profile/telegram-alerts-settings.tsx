@@ -18,7 +18,7 @@ type TelegramConnectResponse = {
 }
 
 export type TelegramAlertsSettingsProps = {
-  variant?: "modal"
+  variant?: "modal" | "page"
 }
 
 export function TelegramAlertsSettings({ variant = "modal" }: TelegramAlertsSettingsProps) {
@@ -90,9 +90,14 @@ export function TelegramAlertsSettings({ variant = "modal" }: TelegramAlertsSett
   }, [])
 
   return (
-    <section className={cn("space-y-4 rounded-2xl border border-border/60 bg-muted/15 p-4 sm:p-5", isModal && "min-w-0")}>
+    <section
+      className={cn(
+        "space-y-4 rounded-2xl border border-[#229ED9]/20 bg-muted/15 p-4 shadow-md sm:p-5",
+        isModal && "min-w-0",
+      )}
+    >
       <div className="flex items-start gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#229ED9] text-white shadow-md">
           <PaperPlaneTilt className="size-5" weight="fill" />
         </div>
         <div className="min-w-0 space-y-1">
@@ -135,7 +140,7 @@ export function TelegramAlertsSettings({ variant = "modal" }: TelegramAlertsSett
             <Button
               type="button"
               size="sm"
-              className="rounded-full"
+              className="rounded-full bg-[#229ED9] text-white shadow-md hover:bg-[#1b8fc7]"
               disabled={connecting}
               onClick={() => void handleConnect()}
             >

@@ -13,6 +13,7 @@ import {
 import { EditableDisplayName } from "@/components/profile/editable-display-name"
 import { ProfileLogoutButton } from "@/components/profile/profile-logout-button"
 import { RestartOnboardingButton } from "@/components/profile/restart-onboarding-button"
+import { TelegramAlertsSettings } from "@/components/profile/telegram-alerts-settings"
 import { LayoutModeToggleGroup } from "@/components/settings/layout-mode-toggle-group"
 import { ThemeToggleGroup } from "@/components/settings/theme-toggle-group"
 import { LayoutMode } from "@/components/shared/layout/layout-toggle"
@@ -280,6 +281,8 @@ export function ProfileSettingsPanel({
           </label>
         </div>
       </div>
+
+      <TelegramAlertsSettings variant={variant} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Button asChild variant="outline" className={isModal ? "rounded-full" : undefined}>
