@@ -833,7 +833,9 @@ export async function POST(request: NextRequest) {
           quality: xaiEditsQuality,
           resolution: xaiEditsResolution,
         });
-        result = toXaiGenerateImageResult(outputBase64Images);
+        result = toXaiGenerateImageResult(outputBase64Images) as unknown as Awaited<
+          ReturnType<typeof generateImage>
+        >;
       } else if (provider === 'xai' || provider === 'gateway') {
         result = await generateImage(generateOptions);
       } else {

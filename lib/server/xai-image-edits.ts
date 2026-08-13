@@ -96,14 +96,7 @@ export async function callXaiImageEdits(
 }
 
 export function toXaiGenerateImageResult(base64Images: string[]) {
-  const shared = { warnings: [] as unknown[], providerMetadata: undefined }
   return base64Images.length > 1
-    ? {
-        ...shared,
-        images: base64Images.map((base64) => ({ base64 })),
-      }
-    : {
-        ...shared,
-        image: { base64: base64Images[0]! },
-      }
+    ? { images: base64Images.map((base64) => ({ base64 })), warnings: [] as unknown[] }
+    : { image: { base64: base64Images[0]! }, warnings: [] as unknown[] }
 }

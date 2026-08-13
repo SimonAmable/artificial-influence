@@ -5,17 +5,17 @@ export const FACE_SWAP_TOOL: ImageStudioToolDefinition = {
   uiModelIdentifier: "custom/face-swap",
   baseModelIdentifier: "google/nano-banana-2",
   name: "Face Swap",
-  description: "Transfer facial identity onto a target person or scene.",
+  description: "Transfer face, head, hair, and skin onto a target person or scene.",
   historyToolTag: "face_swap",
   canonicalPrompt:
-    "Identity-only face transfer using two reference images. First image is the identity source (face to transfer). " +
+    "Face and head transfer using two reference images. First image is the reference character (face, head, hair, and skin to transfer). " +
     "Second image is the reference person/scene (clothes, pose, body, and setting to keep). " +
-    "Transfer ONLY the facial identity from the first image onto the person in the second image. " +
-    "From the first image preserve ONLY: face shape, eye structure, nose structure, bone structure, and facial identity features; nothing else. " +
+    "Transfer the facial identity, head shape, hairstyle, hair, and skin tone from the first image onto the person in the second image. " +
+    "From the first image preserve: face shape, head structure, eye structure, nose structure, bone structure, facial identity features, hairstyle, hair, and skin tone. " +
     "Do not copy facial expression, mouth shape, smile, frown, or emotion from the first image. " +
-    "From the second image preserve: the exact facial expression, mouth shape, and emotion; clothing, outfit, and accessories; body proportions and pose; hairstyle and hair; skin tone; scene composition; camera angle; environment; and lighting. " +
-    "The result must show the person from image two wearing their own clothes in their own pose and setting with their own expression, but with the facial identity from image one. " +
-    "Adjust the transferred face to match the reference's lighting direction, color temperature, perspective, and scale. Blend seamlessly with no visible seams.",
+    "From the second image preserve: the exact facial expression, mouth shape, and emotion; clothing, outfit, and accessories; body proportions and pose; scene composition; camera angle; environment; and lighting. " +
+    "The result must show the person from image two wearing their own clothes in their own pose and setting with their own expression, but with the face, head, hair, and skin from image one. " +
+    "Adjust the transferred head and face to match the reference's lighting direction, color temperature, perspective, and scale. Blend seamlessly with no visible seams.",
   generation: {
     aspectRatio: "match_input_image",
     numImages: 1,
@@ -26,7 +26,7 @@ export const FACE_SWAP_TOOL: ImageStudioToolDefinition = {
     {
       key: "source",
       label: "Identity Source",
-      description: "Upload the face to transfer",
+      description: "Upload the character face, head, hair, and skin to transfer",
     },
     {
       key: "scene",
