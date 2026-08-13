@@ -41,6 +41,11 @@ import {
   resolveFormReferenceImageUrl,
 } from '@/lib/server/form-reference-image-urls';
 import { ANGLES_TOOL, isAnglesModelId } from '@/lib/angles/constants';
+import {
+  callXaiImageEdits,
+  shouldUseDirectXaiImageEdits,
+  toXaiGenerateImageResult,
+} from '@/lib/server/xai-image-edits';
 
 const STALE_PENDING_MINUTES = 30;
 const FREE_CONCURRENCY_LIMIT = 1;
@@ -660,16 +665,24 @@ export async function POST(request: NextRequest) {
     console.log('[generate-image] Prompt type:', usingJSONPrompt ? 'JSON structured' : 'regular text');
     console.log('[generate-image] Final prompt length:', finalPrompt.length, 'characters');
 
+    const useDirectXaiEdits = shouldUseDirectXaiImageEdits(
+      provider,
+      modelIdentifier,
+      referenceImageUrls.length,
+    );
+    const xaiEditsQuality =
+      effectiveQuality && ['low', 'medium', 'high'].includes(effectiveQuality)
+        ? (effectiveQuality as 'low' | 'medium' | 'high')
+        : null;
+    const xaiEditsResolution =
+      effectiveResolution && ['1k', '2k'].includes(effectiveResolution)
+        ? (effectiveResolution as '1k' | '2k')
+        : null;
+
     // Use the selected model identifier
     const generateOptions: Parameters<typeof generateImage>[0] = {
       model: imageModel,
-      prompt:
-        provider === 'gateway' && referenceImageUrls.length > 0
-          ? {
-              text: finalPrompt,
-              images: referenceImageUrls.slice(0, 3),
-            }
-          : finalPrompt,
+      prompt: finalPrompt,
     };
 
     // Add optional parameters if provided
@@ -802,68 +815,25 @@ export async function POST(request: NextRequest) {
     const generationStartTime = Date.now();
     let result;
     try {
-      if (provider === 'xai' && referenceImageUrls.length > 0) {
-        // xAI edits API requires JSON (not multipart). Call directly since AI SDK uses multipart for edits.
-        const xaiApiKey = process.env.XAI_API_KEY;
-        if (!xaiApiKey) {
-          throw new Error('XAI_API_KEY environment variable is not set (required for Grok Imagine with reference images)');
-        }
-        const modelId = modelIdentifier.replace('xai/', '');
-        const imagePayload =
-          referenceImageUrls.length === 1
-            ? {
-                image: {
-                  url: referenceImageUrls[0],
-                  type: 'image_url' as const,
-                },
-              }
-            : {
-                images: referenceImageUrls.map((url) => ({
-                  url,
-                  type: 'image_url' as const,
-                })),
-              };
-        const editsBody = {
-          model: modelId,
-          prompt: finalPrompt,
-          ...imagePayload,
-          response_format: 'b64_json' as const,
-          n: effectiveN,
-          ...(aspectRatio && /^\d+:\d+$/.test(aspectRatio) && { aspect_ratio: aspectRatio }),
-          ...(seed && typeof seed === 'number' && { seed }),
-        };
+      if (useDirectXaiEdits) {
+        // Gateway multi-ref editing does not reliably forward all source images to xAI.
+        // Use the native /v1/images/edits endpoint with an explicit images[] payload instead.
         console.log('[generate-image] Calling xAI edits API directly:', {
-          model: modelId,
+          model: modelIdentifier,
           imageCount: referenceImageUrls.length,
           n: effectiveN,
+          provider,
         });
-        const xaiRes = await fetch('https://api.x.ai/v1/images/edits', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${xaiApiKey}`,
-          },
-          body: JSON.stringify(editsBody),
+        const outputBase64Images = await callXaiImageEdits({
+          modelIdentifier,
+          prompt: finalPrompt,
+          referenceImageUrls,
+          n: effectiveN,
+          aspectRatio: aspectRatio || aspect_ratio,
+          quality: xaiEditsQuality,
+          resolution: xaiEditsResolution,
         });
-        if (!xaiRes.ok) {
-          const errText = await xaiRes.text();
-          console.error('[generate-image] xAI edits API error:', xaiRes.status, errText);
-          throw new Error(`xAI API error: ${xaiRes.status} - ${errText}`);
-        }
-        const xaiData = (await xaiRes.json()) as { data: Array<{ b64_json?: string; url?: string }> };
-        const outputData = xaiData?.data ?? [];
-        if (outputData.length === 0) {
-          throw new Error('xAI edits API returned no images');
-        }
-        const outputBase64Images = outputData.map((item) => {
-          if (item.b64_json) return item.b64_json;
-          if (item.url) throw new Error('xAI returned URL; expected b64_json. Set response_format to b64_json.');
-          throw new Error('xAI response missing b64_json');
-        });
-        result =
-          outputBase64Images.length > 1
-            ? { images: outputBase64Images.map((base64) => ({ base64 })), warnings: [] }
-            : { image: { base64: outputBase64Images[0] }, warnings: [] };
+        result = toXaiGenerateImageResult(outputBase64Images);
       } else if (provider === 'xai' || provider === 'gateway') {
         result = await generateImage(generateOptions);
       } else {

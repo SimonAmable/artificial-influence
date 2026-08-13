@@ -115,6 +115,14 @@ export function hasActiveFilters(settings: ImageFilterSettings): boolean {
   )
 }
 
+export function isCustomFilterPreset(settings: ImageFilterSettings): boolean {
+  if (!hasActiveFilters(settings)) return false
+  return !IMAGE_FILTER_PRESET_LIST.some(
+    (preset) =>
+      preset.id !== "none" && isExactFilterPreset(settings, preset.id)
+  )
+}
+
 export function detectFilterPreset(
   settings: ImageFilterSettings
 ): ImageFilterPresetId {
@@ -126,7 +134,7 @@ export function detectFilterPreset(
     if (matches) return preset.id
   }
 
-  if (!hasActiveFilters(settings)) return "none"
+  if (isCustomFilterPreset(settings)) return "custom"
   return "none"
 }
 
@@ -134,6 +142,10 @@ export function isExactFilterPreset(
   settings: ImageFilterSettings,
   presetId: ImageFilterPresetId
 ): boolean {
+  if (presetId === "custom") {
+    return isCustomFilterPreset(settings)
+  }
+
   const preset = IMAGE_FILTER_PRESETS[presetId]
   if (!preset) return false
   return (Object.keys(preset) as (keyof ImageFilterSettings)[]).every(

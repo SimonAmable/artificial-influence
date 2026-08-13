@@ -412,9 +412,11 @@ function ImageEditorInner({
 
     setIsSaving(true)
     try {
-      const url = await uploadEditedImage(canvas)
-      if (url) {
-        onSave(url)
+      const saved = await uploadEditedImage(canvas, {
+        sourceImageUrl: currentImage,
+      })
+      if (saved) {
+        onSave(saved.url)
       }
     } finally {
       setIsSaving(false)

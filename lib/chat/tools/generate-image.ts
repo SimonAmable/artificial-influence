@@ -34,6 +34,10 @@ import {
   buildReplicateQwenImageEditPlusInput,
   isQwenImageEditPlusLoraModel,
 } from "@/lib/server/replicate-qwen-image-edit-plus"
+import {
+  callXaiImageEdits,
+  shouldUseDirectXaiImageEdits,
+} from "@/lib/server/xai-image-edits"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import {
   aspectRatioToDimensions,
@@ -587,29 +591,39 @@ export function createGenerateImageTool({
               ? "2k"
               : "1k"
 
-        const result = await generateImage({
-          model: modelIdentifier,
-          prompt:
-            gatewayReferenceUrls.length > 0
-              ? { text: finalPrompt, images: gatewayReferenceUrls }
-              : finalPrompt,
-          ...(aspectRatio && /^\d+:\d+$/.test(aspectRatio)
-            ? { aspectRatio: aspectRatio as `${number}:${number}` }
-            : {}),
-          ...(effectiveVariantCount > 1 ? { n: effectiveVariantCount } : {}),
-          providerOptions: {
-            xai: {
-              quality: resolvedQuality,
-              resolution: resolvedResolution,
+        let base64Images: string[]
+        if (shouldUseDirectXaiImageEdits(provider, modelIdentifier, gatewayReferenceUrls.length)) {
+          base64Images = await callXaiImageEdits({
+            modelIdentifier,
+            prompt: finalPrompt,
+            referenceImageUrls: gatewayReferenceUrls,
+            n: effectiveVariantCount,
+            aspectRatio,
+            quality: resolvedQuality,
+            resolution: resolvedResolution,
+          })
+        } else {
+          const result = await generateImage({
+            model: modelIdentifier,
+            prompt: finalPrompt,
+            ...(aspectRatio && /^\d+:\d+$/.test(aspectRatio)
+              ? { aspectRatio: aspectRatio as `${number}:${number}` }
+              : {}),
+            ...(effectiveVariantCount > 1 ? { n: effectiveVariantCount } : {}),
+            providerOptions: {
+              xai: {
+                quality: resolvedQuality,
+                resolution: resolvedResolution,
+              },
             },
-          },
-        })
+          })
 
-        const base64Images = result.images?.length
-          ? result.images.map((image) => image.base64)
-          : result.image?.base64
-            ? [result.image.base64]
-            : []
+          base64Images = result.images?.length
+            ? result.images.map((image) => image.base64)
+            : result.image?.base64
+              ? [result.image.base64]
+              : []
+        }
 
         if (base64Images.length === 0) {
           throw new Error("AI Gateway returned no images.")
@@ -659,53 +673,16 @@ export function createGenerateImageTool({
         }
 
         const xaiModelIdentifier = modelIdentifier.replace(/^xai\//, "")
-        const xaiAspectRatio =
-          aspectRatio && /^\d+:\d+$/.test(aspectRatio) ? aspectRatio : undefined
         let base64Images: string[]
 
         if (referenceImageUrls.length > 0) {
-          const imagePayload =
-            referenceImageUrls.length === 1
-              ? {
-                  image: {
-                    url: referenceImageUrls[0],
-                    type: "image_url" as const,
-                  },
-                }
-              : {
-                  images: referenceImageUrls.map((url) => ({
-                    url,
-                    type: "image_url" as const,
-                  })),
-                }
-
-          const response = await fetch("https://api.x.ai/v1/images/edits", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${process.env.XAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-              model: xaiModelIdentifier,
-              prompt: finalPrompt,
-              ...imagePayload,
-              response_format: "b64_json",
-              n: effectiveVariantCount,
-              ...(xaiAspectRatio ? { aspect_ratio: xaiAspectRatio } : {}),
-            }),
+          base64Images = await callXaiImageEdits({
+            modelIdentifier,
+            prompt: finalPrompt,
+            referenceImageUrls,
+            n: effectiveVariantCount,
+            aspectRatio,
           })
-
-          if (!response.ok) {
-            const errorText = await response.text()
-            throw new Error(`xAI API error: ${response.status} - ${errorText}`)
-          }
-
-          const payload = (await response.json()) as {
-            data?: Array<{ b64_json?: string }>
-          }
-          base64Images = (payload.data ?? [])
-            .map((item) => item.b64_json)
-            .filter((value): value is string => typeof value === "string" && value.length > 0)
         } else {
           const result = await generateImage({
             model: xai.image(xaiModelIdentifier),

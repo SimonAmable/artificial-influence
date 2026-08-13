@@ -30,22 +30,6 @@
       }
     },
     {
-      "id": "warm-vintage",
-      "label": "Warm vintage",
-      "settings": {
-        "grain": 7,
-        "brightness": 2,
-        "contrast": 6,
-        "saturation": -12,
-        "warmth": 18
-      },
-      "minigl": {
-        "insta": { "type": "MTX", "mtx": "browni", "mix": 0.62 },
-        "adjustments": { "temperature": 0.12, "vignette": 0.2, "gamma": -0.04 },
-        "highlightsShadows": [0.02, 0.1]
-      }
-    },
-    {
       "id": "cool-chrome",
       "label": "Cool chrome",
       "settings": {

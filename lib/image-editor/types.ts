@@ -51,8 +51,8 @@ export interface ImageFilterSettings {
 
 export type ImageFilterPresetId =
   | "none"
+  | "custom"
   | "subtle-film"
-  | "warm-vintage"
   | "cool-chrome"
   | "vivid"
   | "soft-fade"

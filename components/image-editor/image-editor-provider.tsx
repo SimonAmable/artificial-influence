@@ -27,7 +27,9 @@ import {
 import {
   getRememberedFilterSettings,
   setRememberedFilterSettings,
+  setCustomFilterSettings,
 } from "@/lib/image-editor/filter-storage"
+import { isCustomFilterPreset } from "@/lib/image-editor/filter-utils"
 import type { CroppedAreaPixels } from "@/lib/utils/crop-image"
 
 // Reducer
@@ -297,6 +299,9 @@ export function ImageEditorProvider({
       }).then(() => {
         if (!options?.saveHistory || !state.canvas) return
         setRememberedFilterSettings(settings)
+        if (isCustomFilterPreset(settings)) {
+          setCustomFilterSettings(settings)
+        }
         const serialized = serializeCanvas(state.canvas)
         dispatch({ type: "PUSH_HISTORY", state: serialized })
       })

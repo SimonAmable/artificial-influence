@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { Faders } from "@phosphor-icons/react"
+import { Faders, SlidersHorizontal } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -16,6 +16,7 @@ import {
   IMAGE_FILTER_PRESETS,
   isExactFilterPreset,
 } from "@/lib/image-editor/filter-utils"
+import { getCustomFilterSettings } from "@/lib/image-editor/filter-storage"
 import type { ImageFilterPresetId, ImageFilterSettings } from "@/lib/image-editor/types"
 
 interface ImageEditorFiltersPopoverProps {
@@ -69,6 +70,43 @@ function FilterSliderRow({
         aria-label={label}
       />
     </div>
+  )
+}
+
+function FilterCustomPresetButton({
+  selected,
+  onSelect,
+}: {
+  selected: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      aria-label="Custom filter preset, saved locally"
+      className={cn(
+        "group relative flex aspect-video w-full flex-col items-center justify-center gap-0.5 overflow-hidden rounded-md border bg-muted/40 text-left transition-all",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-popover",
+        selected
+          ? "border-primary ring-2 ring-primary/40"
+          : "border-border/60 hover:border-border"
+      )}
+    >
+      <SlidersHorizontal
+        size={18}
+        weight={selected ? "fill" : "regular"}
+        className="text-muted-foreground transition-colors group-hover:text-foreground"
+        aria-hidden
+      />
+      <span className="text-[9px] font-medium leading-tight text-foreground">
+        Custom
+      </span>
+      <span className="text-[8px] leading-tight text-muted-foreground">
+        Saved locally
+      </span>
+    </button>
   )
 }
 
@@ -143,6 +181,14 @@ export function ImageEditorFiltersPopover({
 
   const applyPreset = React.useCallback(
     (presetId: ImageFilterPresetId) => {
+      if (presetId === "custom") {
+        const custom = getCustomFilterSettings()
+        if (custom) {
+          setFilterSettings(custom, { saveHistory: true })
+        }
+        return
+      }
+
       const preset = IMAGE_FILTER_PRESETS[presetId]
       setFilterSettings(preset, { saveHistory: true })
     },
@@ -154,11 +200,7 @@ export function ImageEditorFiltersPopover({
   }, [resetFilterSettings])
 
   const selectedPreset = detectFilterPreset(filterSettings)
-  const hasCustomMix =
-    filtersActive &&
-    !IMAGE_FILTER_PRESET_LIST.some((preset) =>
-      isExactFilterPreset(filterSettings, preset.id)
-    )
+  const customSelected = isExactFilterPreset(filterSettings, "custom")
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -199,25 +241,27 @@ export function ImageEditorFiltersPopover({
         ) : (
           <>
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs text-muted-foreground">Preset</Label>
-                {hasCustomMix ? (
-                  <span className="text-[10px] text-muted-foreground">Custom</span>
-                ) : null}
-              </div>
+              <Label className="text-xs text-muted-foreground">Preset</Label>
               <div className="grid grid-cols-3 gap-1.5">
                 {IMAGE_FILTER_PRESET_LIST.map((preset) => (
-                  <FilterPresetMediaButton
-                    key={preset.id}
-                    id={preset.id}
-                    label={preset.label}
-                    previewSrc={preset.previewSrc}
-                    selected={
-                      selectedPreset === preset.id &&
-                      isExactFilterPreset(filterSettings, preset.id)
-                    }
-                    onSelect={applyPreset}
-                  />
+                  <React.Fragment key={preset.id}>
+                    <FilterPresetMediaButton
+                      id={preset.id}
+                      label={preset.label}
+                      previewSrc={preset.previewSrc}
+                      selected={
+                        selectedPreset === preset.id &&
+                        isExactFilterPreset(filterSettings, preset.id)
+                      }
+                      onSelect={applyPreset}
+                    />
+                    {preset.id === "none" ? (
+                      <FilterCustomPresetButton
+                        selected={customSelected}
+                        onSelect={() => applyPreset("custom")}
+                      />
+                    ) : null}
+                  </React.Fragment>
                 ))}
               </div>
             </div>
@@ -246,7 +290,7 @@ export function ImageEditorFiltersPopover({
             </Button>
 
             <p className="text-[10px] leading-snug text-muted-foreground">
-              Your last used settings apply to new images.
+              Custom settings are saved locally and apply to new images.
             </p>
           </>
         )}

@@ -1,9 +1,19 @@
 import type { Canvas as FabricCanvas } from "fabric"
-import { uploadBlobToSupabase } from "@/lib/canvas/upload-helpers"
 import {
   getCanvasExportMultiplier,
   withHiddenExportArtifacts,
 } from "@/lib/image-editor/export-resolution"
+
+export type SaveEditedImageOptions = {
+  format?: "png" | "jpeg"
+  sourceImageUrl?: string | null
+  prompt?: string | null
+}
+
+export type SaveEditedImageResult = {
+  url: string
+  generationId: string
+}
 
 /**
  * Export canvas to data URL
@@ -63,24 +73,54 @@ export function downloadCanvas(
 }
 
 /**
- * Upload edited canvas to Supabase and return URL
+ * Save edited canvas as an image_editing generation (history), not an upload.
  */
 export async function uploadEditedImage(
   canvas: FabricCanvas,
-  format: "png" | "jpeg" = "png"
-): Promise<string | null> {
+  options: SaveEditedImageOptions = {}
+): Promise<SaveEditedImageResult | null> {
+  const format = options.format ?? "png"
+
   try {
     const blob = await canvasToBlob(canvas, format)
-    const filename = `edited-${Date.now()}.${format}`
+    const formData = new FormData()
+    formData.append(
+      "image",
+      blob,
+      `edited-${Date.now()}.${format}`
+    )
 
-    const result = await uploadBlobToSupabase(blob, filename, "edited-images")
-
-    if (result) {
-      return result.url
+    if (options.sourceImageUrl?.trim()) {
+      formData.append("sourceImageUrl", options.sourceImageUrl.trim())
     }
-    return null
+
+    if (options.prompt?.trim()) {
+      formData.append("prompt", options.prompt.trim())
+    }
+
+    const response = await fetch("/api/image-editor/save", {
+      method: "POST",
+      body: formData,
+    })
+
+    const payload = (await response.json().catch(() => null)) as
+      | { url?: string; generationId?: string; error?: string }
+      | null
+
+    if (!response.ok || !payload?.url || !payload.generationId) {
+      console.error(
+        "Failed to save edited image:",
+        payload?.error ?? response.statusText
+      )
+      return null
+    }
+
+    return {
+      url: payload.url,
+      generationId: payload.generationId,
+    }
   } catch (error) {
-    console.error("Failed to upload edited image:", error)
+    console.error("Failed to save edited image:", error)
     return null
   }
 }

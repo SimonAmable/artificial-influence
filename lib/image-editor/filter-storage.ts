@@ -1,8 +1,10 @@
 import { DEFAULT_IMAGE_FILTER_SETTINGS } from "./constants"
+import { isCustomFilterPreset } from "./filter-utils"
 import { MAX_FILTER_GRAIN } from "./minigl-params"
 import type { ImageFilterSettings } from "./types"
 
 const LAST_USED_FILTER_SETTINGS_KEY = "image-editor:v1:last-filter-settings"
+const CUSTOM_FILTER_SETTINGS_KEY = "image-editor:v1:custom-filter-settings"
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
@@ -62,4 +64,44 @@ export function setRememberedFilterSettings(settings: ImageFilterSettings): void
   } catch {
     // Ignore storage failures; editor stays usable.
   }
+}
+
+export function getCustomFilterSettings(): ImageFilterSettings | null {
+  if (typeof window === "undefined") return null
+
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_FILTER_SETTINGS_KEY)
+    if (raw) {
+      return normalizeImageFilterSettings(JSON.parse(raw))
+    }
+
+    // One-time migration from legacy storage when last-used was a custom mix.
+    const lastUsed = getRememberedFilterSettings()
+    if (isCustomFilterPreset(lastUsed)) {
+      setCustomFilterSettings(lastUsed)
+      return { ...lastUsed }
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
+export function setCustomFilterSettings(settings: ImageFilterSettings): void {
+  if (typeof window === "undefined") return
+
+  try {
+    window.localStorage.setItem(
+      CUSTOM_FILTER_SETTINGS_KEY,
+      JSON.stringify(settings)
+    )
+  } catch {
+    // Ignore storage failures; editor stays usable.
+  }
+}
+
+export function hasSavedCustomFilterSettings(): boolean {
+  const custom = getCustomFilterSettings()
+  return custom !== null && isCustomFilterPreset(custom)
 }
