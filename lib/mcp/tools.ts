@@ -4,6 +4,10 @@ import { filterPublicCatalogModels } from "@/lib/server/model-catalog-visibility
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import type { McpAuthContext } from "@/lib/mcp/auth"
 import { awaitGenerationSnapshot } from "@/lib/mcp/generation/await-completion"
+import {
+  buildAssetPageUrl,
+  buildGenerationPageUrl,
+} from "@/lib/mcp/urls"
 import { UNICAN_MEDIA_WIDGET_URI } from "@/lib/mcp/widget"
 import { resolveAssetAccessUrl, type AssetAccessRow } from "@/lib/assets/resolve-asset-access-url"
 
@@ -78,10 +82,21 @@ export const MCP_TOOLS: ToolDefinition[] = [
   {
     name: "search_media",
     title: "Search media",
-    description: "Find the connected user's reusable library assets and completed generations. Returns stable media IDs for use as generation references.",
+    description:
+      "Search library assets and completed generations by keyword. For saved character faces, prefer list_characters (lists the full roster). Returns mediaId, previewUrl, and pageUrl.",
     scopes: ["assets:read", "generations:read"],
     inputSchema: mediaSearchSchema(),
     outputSchema: mediaSearchOutputSchema(),
+    annotations: readOnlyAnnotations(),
+  },
+  {
+    name: "list_characters",
+    title: "List characters",
+    description:
+      "List all saved character face references in the account. Most users only have a few — call with no arguments to load the full roster, then pass mediaId as referenceMedia when generating. Optional search filters by name or tag.",
+    scopes: ["assets:read"],
+    inputSchema: characterListSchema(),
+    outputSchema: characterListOutputSchema(),
     annotations: readOnlyAnnotations(),
   },
   {
@@ -115,7 +130,7 @@ export const MCP_TOOLS: ToolDefinition[] = [
     name: "generate_image",
     title: "Generate image",
     description:
-      "Create an image using an active UniCan image model (for example google/nano-banana-2-lite). For character consistency, call search_media first and pass referenceMedia. If the result is still pending after this call, use get_generation with the returned generationId.",
+      "Create an image using an active UniCan image model (for example google/nano-banana-2-lite). For a consistent face, call list_characters first (no args lists every saved character), then pass referenceMedia with the chosen mediaId. If the result is still pending after this call, use get_generation with the returned generationId.",
     scopes: ["generations:write"],
     inputSchema: generateImageSchema(),
     outputSchema: generatedMediaOutputSchema(),
@@ -179,6 +194,8 @@ export async function callMcpTool(options: {
       return listGenerations(options.auth.user.id, options.args)
     case "search_media":
       return searchMedia(options.auth.user.id, options.args)
+    case "list_characters":
+      return listCharacters(options.auth.user.id, options.args)
     case "search_generations":
       return listGenerations(options.auth.user.id, options.args)
     case "get_generation":
@@ -346,18 +363,24 @@ async function searchMedia(userId: string, args: JsonObject) {
   const search = typeof args.search === "string" ? args.search.trim().slice(0, 120) : ""
   const requestedType = isMediaType(args.type) ? args.type : null
   const source = args.source === "asset" || args.source === "generation" ? args.source : null
+  const category =
+    typeof args.category === "string" && args.category.trim() ? args.category.trim() : null
   const queryLimit = source ? limit : Math.max(1, Math.ceil(limit / 2))
+  const assetFetchLimit = search ? Math.min(120, queryLimit * 4) : queryLimit
   const media: JsonObject[] = []
 
   if (source !== "generation") {
     let query = supabase
       .from("assets")
-      .select("id, asset_type, title, description, tags, created_at")
+      .select(
+        "id, asset_type, title, description, tags, category, created_at, asset_url, visibility, upload_id, supabase_storage_path",
+      )
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
-      .limit(queryLimit)
+      .limit(assetFetchLimit)
 
     if (requestedType) query = query.eq("asset_type", requestedType)
+    if (category) query = query.eq("category", category)
     if (search) {
       const pattern = `%${escapeLike(search)}%`
       query = query.or(`title.ilike.${pattern},description.ilike.${pattern}`)
@@ -366,8 +389,11 @@ async function searchMedia(userId: string, args: JsonObject) {
     const { data, error } = await query
     if (error) throw new Error(error.message)
     for (const row of data || []) {
+      if (search && !matchesAssetSearch(row, search)) continue
       const id = String(row.id)
       const type = isMediaType(row.asset_type) ? row.asset_type : "image"
+      const rowCategory = typeof row.category === "string" ? row.category : null
+      const previewUrl = await resolveAssetAccessUrl(supabase, row as AssetAccessRow)
       media.push({
         mediaId: mediaIdFor("asset", id),
         source: "asset",
@@ -375,7 +401,10 @@ async function searchMedia(userId: string, args: JsonObject) {
         status: "ready",
         title: typeof row.title === "string" ? row.title : "Untitled asset",
         description: typeof row.description === "string" ? row.description : null,
+        category: rowCategory,
         tags: Array.isArray(row.tags) ? row.tags : [],
+        previewUrl,
+        pageUrl: buildAssetPageUrl(id, rowCategory),
         createdAt: typeof row.created_at === "string" ? row.created_at : null,
       })
     }
@@ -384,7 +413,7 @@ async function searchMedia(userId: string, args: JsonObject) {
   if (source !== "asset") {
     let query = supabase
       .from("generations")
-      .select("id, type, status, prompt, model, created_at")
+      .select("id, type, status, prompt, model, created_at, supabase_storage_path")
       .eq("user_id", userId)
       .eq("status", "completed")
       .order("created_at", { ascending: false })
@@ -402,6 +431,10 @@ async function searchMedia(userId: string, args: JsonObject) {
       const id = String(row.id)
       const type = isMediaType(row.type) ? row.type : "image"
       const prompt = typeof row.prompt === "string" ? row.prompt : null
+      const storagePath = typeof row.supabase_storage_path === "string" ? row.supabase_storage_path : null
+      const previewUrl = storagePath
+        ? supabase.storage.from("public-bucket").getPublicUrl(storagePath).data.publicUrl
+        : null
       media.push({
         mediaId: mediaIdFor("generation", id),
         source: "generation",
@@ -409,13 +442,75 @@ async function searchMedia(userId: string, args: JsonObject) {
         status: typeof row.status === "string" ? row.status : "completed",
         title: prompt || (typeof row.model === "string" ? row.model : "Generated media"),
         description: prompt,
+        category: null,
         tags: [],
+        previewUrl,
+        pageUrl: buildGenerationPageUrl(id),
         createdAt: typeof row.created_at === "string" ? row.created_at : null,
       })
     }
   }
 
   return { media: media.slice(0, limit) }
+}
+
+async function listCharacters(userId: string, args: JsonObject) {
+  const supabase = requireServiceRole()
+  const limit = clampInt(args.limit, 1, 50, 50)
+  const search = typeof args.search === "string" ? args.search.trim().slice(0, 120) : ""
+
+  const { data, error } = await supabase
+    .from("assets")
+    .select(
+      "id, asset_type, title, description, tags, category, created_at, asset_url, visibility, upload_id, supabase_storage_path",
+    )
+    .eq("user_id", userId)
+    .eq("category", "character")
+    .eq("asset_type", "image")
+    .order("title", { ascending: true, nullsFirst: false })
+    .limit(limit)
+
+  if (error) throw new Error(error.message)
+
+  const characters: JsonObject[] = []
+  for (const row of data || []) {
+    if (search && !matchesAssetSearch(row, search)) continue
+    const id = String(row.id)
+    const rowCategory = typeof row.category === "string" ? row.category : "character"
+    const previewUrl = await resolveAssetAccessUrl(supabase, row as AssetAccessRow)
+    characters.push({
+      mediaId: mediaIdFor("asset", id),
+      source: "asset",
+      type: "image",
+      status: "ready",
+      title: typeof row.title === "string" ? row.title : "Untitled character",
+      description: typeof row.description === "string" ? row.description : null,
+      category: rowCategory,
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      previewUrl,
+      pageUrl: buildAssetPageUrl(id, rowCategory),
+      createdAt: typeof row.created_at === "string" ? row.created_at : null,
+    })
+  }
+
+  return {
+    characters,
+    total: characters.length,
+    media: characters,
+  }
+}
+
+function matchesAssetSearch(row: Record<string, unknown>, search: string) {
+  const query = search.toLowerCase()
+  const title = typeof row.title === "string" ? row.title.toLowerCase() : ""
+  const description = typeof row.description === "string" ? row.description.toLowerCase() : ""
+  const tags = Array.isArray(row.tags)
+    ? row.tags
+        .filter((tag): tag is string => typeof tag === "string")
+        .join(" ")
+        .toLowerCase()
+    : ""
+  return title.includes(query) || description.includes(query) || tags.includes(query)
 }
 
 async function getGeneration(userId: string, generationId: string) {
@@ -641,6 +736,8 @@ function buildMediaResultFromGetGeneration(snapshot: Awaited<ReturnType<typeof g
     model,
     prompt,
     url,
+    pageUrl: generationId ? buildGenerationPageUrl(generationId) : null,
+    openUrl: generationId ? buildGenerationPageUrl(generationId) : null,
     createdAt: stringOrNull(generation.createdAt),
     error,
     settings: buildSettings(model, prompt, null, items.length || 1),
@@ -742,15 +839,19 @@ function mapGeneration(row: Record<string, unknown>) {
   const url = storagePath
     ? supabase.storage.from("public-bucket").getPublicUrl(storagePath).data.publicUrl
     : null
+  const generationId = String(row.id)
+  const pageUrl = buildGenerationPageUrl(generationId)
 
   return {
     generationId: row.id,
-    mediaId: mediaIdFor("generation", String(row.id)),
+    mediaId: mediaIdFor("generation", generationId),
     status: row.status || "completed",
     type: row.type,
     model: row.model,
     prompt: row.prompt,
     url,
+    pageUrl,
+    openUrl: pageUrl,
     storagePath,
     tool: row.tool ?? null,
     createdAt: row.created_at,
@@ -767,6 +868,10 @@ function generationToMediaItem(generation: Record<string, unknown>) {
   const url = stringOrNull(generation.url)
   const status = stringOrNull(generation.status) || (url ? "completed" : "pending")
   const generationId = stringOrNull(generation.generationId) || stringOrNull(generation.id)
+  const pageUrl =
+    stringOrNull(generation.pageUrl) ||
+    stringOrNull(generation.openUrl) ||
+    (generationId ? buildGenerationPageUrl(generationId) : null)
   return {
     id: generationId,
     generationId,
@@ -777,6 +882,8 @@ function generationToMediaItem(generation: Record<string, unknown>) {
     mediaUrl: url,
     thumbnailUrl: url,
     downloadUrl: url,
+    pageUrl,
+    openUrl: pageUrl,
     mimeType: mimeTypeForKind(kind),
     model: stringOrNull(generation.model),
     prompt: stringOrNull(generation.prompt),
@@ -847,6 +954,8 @@ function normalizeGenerationResponse(
     model,
     prompt,
     url,
+    pageUrl: generationId ? buildGenerationPageUrl(generationId) : null,
+    openUrl: generationId ? buildGenerationPageUrl(generationId) : null,
     createdAt: stringOrNull(body.createdAt),
     error: stringOrNull(body.error) || stringOrNull(body.message),
     settings: buildSettings(model, prompt, optionsFromBody(body), mediaItems.length || 1),
@@ -911,6 +1020,7 @@ function buildMediaItem(input: {
   createdAt: string | null
 }) {
   const kind = input.type || "image"
+  const pageUrl = input.id ? buildGenerationPageUrl(input.id) : null
   return {
     id: input.id,
     generationId: input.id,
@@ -921,6 +1031,8 @@ function buildMediaItem(input: {
     mediaUrl: input.url,
     thumbnailUrl: input.url,
     downloadUrl: input.url,
+    pageUrl,
+    openUrl: pageUrl,
     mimeType: mimeTypeForKind(kind),
     model: input.model,
     prompt: input.prompt,
@@ -981,11 +1093,90 @@ function mediaSearchSchema() {
   return {
     type: "object",
     properties: {
-      search: { type: "string", description: "Words from an asset title, description, generation prompt, or model." },
+      search: {
+        type: "string",
+        description: "Words from an asset title, description, tags, generation prompt, or model.",
+      },
       type: { type: "string", enum: ["image", "video", "audio"] },
       source: { type: "string", enum: ["asset", "generation"] },
+      category: {
+        type: "string",
+        description: "Asset library category filter, e.g. character for face references.",
+      },
       limit: { type: "integer", minimum: 1, maximum: 40 },
     },
+    additionalProperties: false,
+  }
+}
+
+function characterListSchema() {
+  return {
+    type: "object",
+    properties: {
+      search: {
+        type: "string",
+        description: "Optional filter by character name or tag. Omit to list every saved character.",
+      },
+      limit: {
+        type: "integer",
+        minimum: 1,
+        maximum: 50,
+        description: "Maximum characters to return. Defaults to 50.",
+      },
+    },
+    additionalProperties: false,
+  }
+}
+
+function characterMediaItemSchema() {
+  return {
+    type: "object",
+    properties: {
+      mediaId: { type: "string" },
+      source: { type: "string", enum: ["asset"] },
+      type: { type: "string", enum: ["image"] },
+      status: { type: "string" },
+      title: { type: "string" },
+      description: { type: ["string", "null"] },
+      category: { type: "string" },
+      tags: { type: "array" },
+      previewUrl: { type: ["string", "null"] },
+      pageUrl: { type: ["string", "null"] },
+      createdAt: { type: ["string", "null"] },
+    },
+    required: [
+      "mediaId",
+      "source",
+      "type",
+      "status",
+      "title",
+      "description",
+      "category",
+      "tags",
+      "previewUrl",
+      "pageUrl",
+      "createdAt",
+    ],
+    additionalProperties: false,
+  }
+}
+
+function characterListOutputSchema() {
+  return {
+    type: "object",
+    properties: {
+      characters: {
+        type: "array",
+        items: characterMediaItemSchema(),
+      },
+      total: { type: "integer" },
+      media: {
+        type: "array",
+        items: characterMediaItemSchema(),
+        description: "Alias of characters for shared media formatters.",
+      },
+    },
+    required: ["characters", "total", "media"],
     additionalProperties: false,
   }
 }
@@ -1186,10 +1377,25 @@ function mediaSearchOutputSchema() {
             status: { type: "string" },
             title: { type: "string" },
             description: { type: ["string", "null"] },
+            category: { type: ["string", "null"] },
             tags: { type: "array" },
+            previewUrl: { type: ["string", "null"] },
+            pageUrl: { type: ["string", "null"] },
             createdAt: { type: ["string", "null"] },
           },
-          required: ["mediaId", "source", "type", "status", "title", "description", "tags", "createdAt"],
+          required: [
+            "mediaId",
+            "source",
+            "type",
+            "status",
+            "title",
+            "description",
+            "category",
+            "tags",
+            "previewUrl",
+            "pageUrl",
+            "createdAt",
+          ],
           additionalProperties: false,
         },
       },
@@ -1227,6 +1433,8 @@ function generatedMediaOutputSchema() {
       model: { type: ["string", "null"] },
       prompt: { type: ["string", "null"] },
       url: { type: ["string", "null"] },
+      pageUrl: { type: ["string", "null"] },
+      openUrl: { type: ["string", "null"] },
       createdAt: { type: ["string", "null"] },
       error: { type: ["string", "null"] },
       settings: settingsSchema(),
@@ -1292,6 +1500,8 @@ function mediaItemSchema() {
       mediaUrl: { type: ["string", "null"] },
       thumbnailUrl: { type: ["string", "null"] },
       downloadUrl: { type: ["string", "null"] },
+      pageUrl: { type: ["string", "null"] },
+      openUrl: { type: ["string", "null"] },
       mimeType: { type: ["string", "null"] },
       model: { type: ["string", "null"] },
       prompt: { type: ["string", "null"] },
@@ -1308,6 +1518,8 @@ function mediaItemSchema() {
       "mediaUrl",
       "thumbnailUrl",
       "downloadUrl",
+      "pageUrl",
+      "openUrl",
       "mimeType",
       "model",
       "prompt",

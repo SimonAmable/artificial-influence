@@ -38,6 +38,7 @@ export function formatMcpToolResult(toolName: string, result: unknown): Formatte
 
   const value = result as JsonObject
   const mediaBlocks = extractMediaResourceLinks(value)
+  const catalogMedia = getCatalogMedia(value)
 
   if (Array.isArray(value.models)) {
     return {
@@ -45,10 +46,46 @@ export function formatMcpToolResult(toolName: string, result: unknown): Formatte
     }
   }
 
-  if (Array.isArray(value.media)) {
-    return {
-      content: [{ type: "text", text: formatMediaSearch(value.media) }],
+  if (catalogMedia) {
+    const blocks: McpContentBlock[] = [
+      {
+        type: "text",
+        text:
+          toolName === "list_characters"
+            ? formatCharacterList(catalogMedia)
+            : formatMediaSearch(catalogMedia),
+      },
+    ]
+
+    for (const entry of catalogMedia) {
+      if (!entry || typeof entry !== "object") continue
+      const row = entry as JsonObject
+      const title = textValue(row.title) || "Media"
+      const previewUrl = textValue(row.previewUrl)
+      const pageUrl = textValue(row.pageUrl)
+      const type = textValue(row.type)
+
+      if (previewUrl && type === "image") {
+        blocks.push({
+          type: "resource_link",
+          uri: previewUrl,
+          name: title,
+          mimeType: "image/png",
+          annotations: { audience: ["assistant"], priority: 0.85 },
+        })
+      }
+
+      if (pageUrl) {
+        blocks.push({
+          type: "resource_link",
+          uri: pageUrl,
+          name: `Open ${title} in UniCan`,
+          annotations: { audience: ["user"], priority: 0.9 },
+        })
+      }
     }
+
+    return { content: blocks }
   }
 
   if (Array.isArray(value.generations)) {
@@ -68,13 +105,21 @@ export function formatMcpToolResult(toolName: string, result: unknown): Formatte
     const type = textValue(generation.type) || "generation"
     const url = textValue(generation.url)
     const generationId = textValue(generation.generationId) || textValue(generation.id)
+    const pageUrl = textValue(generation.pageUrl) || textValue(generation.openUrl)
     const isFailed = status === "failed" || status === "error" || status === "cancelled" || status === "canceled"
 
     return {
       content: [
         {
           type: "text",
-          text: summarizeSingleGeneration({ status, type, url, generationId, error: textValue(generation.error) }),
+          text: summarizeSingleGeneration({
+            status,
+            type,
+            url,
+            generationId,
+            pageUrl,
+            error: textValue(generation.error),
+          }),
           annotations: { audience: ["assistant", "user"] },
         },
         ...mediaBlocks,
@@ -87,8 +132,8 @@ export function formatMcpToolResult(toolName: string, result: unknown): Formatte
     const status = textValue(value.status) || "ready"
     const type = textValue(value.type) || "media"
     const generationId = textValue(value.generationId)
+    const pageUrl = textValue(value.pageUrl) || textValue(value.openUrl)
     const isFailed = status === "failed" || status === "error"
-    const isPending = PENDING_STATUSES.has(status)
 
     return {
       content: [
@@ -99,6 +144,7 @@ export function formatMcpToolResult(toolName: string, result: unknown): Formatte
             status,
             type,
             generationId,
+            pageUrl,
             error: textValue(value.error),
             itemCount: value.items.length,
           }),
@@ -126,10 +172,13 @@ function summarizeSingleGeneration(input: {
   type: string
   url: string | null
   generationId: string | null
+  pageUrl: string | null
   error: string | null
 }) {
-  if (input.status === "completed" && input.url) {
-    return `Your ${input.type} is ready.`
+  if (input.status === "completed" && (input.pageUrl || input.url)) {
+    return input.pageUrl
+      ? `Your ${input.type} is ready. Open in UniCan: ${input.pageUrl}`
+      : `Your ${input.type} is ready.`
   }
   if (input.status === "failed" || input.status === "error") {
     return input.error
@@ -149,13 +198,14 @@ function summarizeMediaBatch(input: {
   status: string
   type: string
   generationId: string | null
+  pageUrl: string | null
   error: string | null
   itemCount: number
 }) {
   if (input.status === "completed") {
     const countLabel =
       input.itemCount === 1 ? `Your ${input.type} is ready.` : `${input.itemCount} ${input.type} outputs are ready.`
-    return countLabel
+    return input.pageUrl ? `${countLabel} Open in UniCan: ${input.pageUrl}` : countLabel
   }
   if (input.status === "failed") {
     return input.error
@@ -181,28 +231,56 @@ function extractMediaResourceLinks(value: JsonObject): McpResourceLinkContent[] 
     const status = textValue(item.status) || textValue(value.status) || "pending"
     if (status !== "completed") continue
 
-    const url =
+    const pageUrl =
+      textValue(item.pageUrl) ||
+      textValue(item.openUrl) ||
+      textValue(value.pageUrl) ||
+      textValue(value.openUrl)
+    const mediaUrl =
       textValue(item.mediaUrl) ||
       textValue(item.downloadUrl) ||
       textValue(item.thumbnailUrl) ||
       textValue(item.url)
-    if (!url || seen.has(url)) continue
-    seen.add(url)
+    if ((!pageUrl && !mediaUrl) || seen.has(pageUrl || mediaUrl || "")) continue
+    if (pageUrl) seen.add(pageUrl)
+    if (mediaUrl) seen.add(mediaUrl)
 
     const kind = textValue(item.type) || textValue(item.kind) || textValue(value.type) || "media"
     const prompt = textValue(item.prompt) || textValue(value.prompt)
-    links.push({
-      type: "resource_link",
-      uri: url,
-      name: prompt ? truncate(prompt, 120) : `Generated ${kind}`,
-      description: prompt ? truncate(prompt, 240) : undefined,
-      mimeType: textValue(item.mimeType) || mimeTypeForKind(kind),
-      annotations: { audience: ["user"], priority: 0.9 },
-    })
+    const label = prompt ? truncate(prompt, 120) : `Generated ${kind}`
+
+    if (pageUrl) {
+      links.push({
+        type: "resource_link",
+        uri: pageUrl,
+        name: "Open in UniCan",
+        description: label,
+        mimeType: mimeTypeForKind(kind),
+        annotations: { audience: ["user"], priority: 0.95 },
+      })
+    } else if (mediaUrl) {
+      links.push({
+        type: "resource_link",
+        uri: mediaUrl,
+        name: label,
+        mimeType: mimeTypeForKind(kind),
+        annotations: { audience: ["user"], priority: 0.9 },
+      })
+    }
   }
 
+  const directPageUrl = textValue(value.pageUrl) || textValue(value.openUrl)
   const directUrl = textValue(value.url)
-  if (directUrl && !seen.has(directUrl)) {
+  if (directPageUrl && !seen.has(directPageUrl)) {
+    const kind = textValue(value.type) || "media"
+    links.push({
+      type: "resource_link",
+      uri: directPageUrl,
+      name: "Open in UniCan",
+      mimeType: mimeTypeForKind(kind),
+      annotations: { audience: ["user"], priority: 0.95 },
+    })
+  } else if (directUrl && !seen.has(directUrl)) {
     const kind = textValue(value.type) || "media"
     links.push({
       type: "resource_link",
@@ -267,6 +345,20 @@ function formatModelCost(model: JsonObject) {
   return values.length ? values.join(" | ") : null
 }
 
+function getCatalogMedia(value: JsonObject): unknown[] | null {
+  if (Array.isArray(value.characters)) return value.characters
+  if (Array.isArray(value.media)) return value.media
+  return null
+}
+
+function formatCharacterList(characters: unknown[]) {
+  if (characters.length === 0) {
+    return "No saved characters yet. Save a face in UniCan (Library → Characters), then call list_characters again."
+  }
+
+  return `Saved characters (${characters.length}):\n${formatMediaSearch(characters)}`
+}
+
 function formatMediaSearch(media: unknown[]) {
   if (media.length === 0) return "No matching media was found."
   const rows = media.map((entry) => {
@@ -277,10 +369,13 @@ function formatMediaSearch(media: unknown[]) {
       textValue(value.type),
       textValue(value.source),
       textValue(value.status),
+      textValue(value.category),
       textValue(value.description),
     ].filter(Boolean)
     const tags = arrayValues(value.tags)
-    return `- ${title}\n  mediaId: ${mediaId}${details.length ? `\n  ${details.join(" | ")}` : ""}${tags.length ? `\n  tags: ${tags.join(", ")}` : ""}`
+    const previewUrl = textValue(value.previewUrl)
+    const pageUrl = textValue(value.pageUrl)
+    return `- ${title}\n  mediaId: ${mediaId}${details.length ? `\n  ${details.join(" | ")}` : ""}${tags.length ? `\n  tags: ${tags.join(", ")}` : ""}${previewUrl ? `\n  previewUrl: ${previewUrl}` : ""}${pageUrl ? `\n  pageUrl: ${pageUrl}` : ""}`
   })
   return `Matching UniCan media (${media.length}):\n${rows.join("\n")}`
 }

@@ -80,6 +80,8 @@ export const MCP_TOOLS_PREVIEW = [
   "list_models",
   "list_generations",
   "search_generations",
+  "search_media",
+  "list_characters",
   "get_generation",
   "generate_image",
   "generate_video",
