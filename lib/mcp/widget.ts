@@ -32,20 +32,41 @@ const WIDGET_HTML = String.raw`
       function notify(method, params) { post({ jsonrpc: "2.0", method, params }); }
       function text(value) { return value == null ? "" : String(value); }
       function object(value) { return value && typeof value === "object" && !Array.isArray(value) ? value : null; }
-      function resize() { requestAnimationFrame(() => notify("ui/notifications/size-changed", { height: document.documentElement.scrollHeight })); }
+      function resize() {
+        requestAnimationFrame(() => notify("ui/notifications/size-changed", {
+          width: document.documentElement.clientWidth,
+          height: document.documentElement.scrollHeight,
+        }));
+      }
       function titleFor(type) { return type === "video" ? "video" : type === "audio" ? "audio" : "image"; }
       function isPending(status) { return ["pending", "queued", "processing", "starting", "in_progress"].includes(text(status).toLowerCase()); }
       function isFailed(status) { return ["failed", "cancelled", "canceled", "error"].includes(text(status).toLowerCase()); }
       function resetRefresh() { if (refreshTimer) clearTimeout(refreshTimer); refreshTimer = null; refreshAttempt = 0; }
       function itemFrom(data) { const generation = object(data.generation); const raw = Array.isArray(data.items) && data.items[0] ? data.items[0] : generation || data; const item = object(raw) || {}; return { id: item.generationId || item.id || data.generationId, status: item.status || data.status || "pending", type: item.type || item.kind || data.type || "image", url: item.mediaUrl || item.url || item.downloadUrl || item.thumbnailUrl || data.url, model: item.model || data.model, prompt: item.prompt || data.prompt, error: item.error || data.error }; }
       function open(url) { request("ui/open-link", { url }); }
+      function mimeFor(kind) { return kind === "video" ? "video/mp4" : kind === "audio" ? "audio/mpeg" : "image/png"; }
+      function pushModelContext(item) {
+        if (!item.url || isPending(item.status) || isFailed(item.status)) return;
+        const kind = titleFor(text(item.type));
+        request("ui/update-model-context", {
+          content: [
+            { type: "text", text: "Generated " + kind + " is ready." },
+            {
+              type: "resource_link",
+              uri: item.url,
+              name: text(item.prompt) || ("Generated " + kind),
+              mimeType: mimeFor(kind),
+            },
+          ],
+        });
+      }
 
       function scheduleRefresh() {
         if (!currentGenerationId || refreshAttempt >= refreshDelays.length) return;
         const delay = refreshDelays[refreshAttempt++];
         refreshTimer = setTimeout(() => {
           request("tools/call", { name: "get_generation", arguments: { generationId: currentGenerationId } }, (response) => {
-            const result = response && response.structuredContent;
+            const result = response && (response.structuredContent || response);
             if (result) render(result, true);
           });
         }, delay);
@@ -72,12 +93,13 @@ const WIDGET_HTML = String.raw`
         if (item.model && !pending) { const detail = document.createElement("div"); detail.className = "detail"; detail.textContent = text(item.model); body.appendChild(detail); }
         if (item.url) { const button = document.createElement("button"); button.type = "button"; button.className = "action"; button.textContent = "Open"; button.onclick = () => open(item.url); body.appendChild(button); }
         card.appendChild(body); app.replaceChildren(card); resize();
+        if (!pending && !failed && item.url) pushModelContext(item);
         if (pending) scheduleRefresh();
       }
 
       function applyHostContext(result) { const context = result && result.hostContext; const variables = context && context.styles && context.styles.variables; if (variables && typeof variables === "object") Object.entries(variables).forEach(([key, value]) => document.documentElement.style.setProperty(key, String(value))); if (context && context.theme) document.documentElement.style.colorScheme = context.theme; }
-      window.addEventListener("message", (event) => { const message = event.data; if (!message || message.jsonrpc !== "2.0") return; if (message.id && pendingRequests.has(message.id)) { const callback = pendingRequests.get(message.id); pendingRequests.delete(message.id); callback(message.result); return; } if (message.id === 1 && message.result) { applyHostContext(message.result); notify("ui/notifications/initialized", {}); resize(); } if (message.method === "ui/notifications/tool-result") render(message.params && message.params.structuredContent, false); if (message.method === "ui/notifications/host-context-changed") applyHostContext({ hostContext: message.params }); }, { passive: true });
-      request("ui/initialize", { appInfo: { name: "unican-media-output", version: "1.1.0" }, appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] }, protocolVersion: "2026-01-26" });
+      window.addEventListener("message", (event) => { const message = event.data; if (!message || message.jsonrpc !== "2.0") return; if (message.id && pendingRequests.has(message.id)) { const callback = pendingRequests.get(message.id); pendingRequests.delete(message.id); callback(message.result); return; } if (message.id === 1 && message.result) { applyHostContext(message.result); notify("ui/notifications/initialized", {}); resize(); } if (message.method === "ui/notifications/tool-result") { const params = message.params; const result = params && (params.structuredContent || params); render(result, false); } if (message.method === "ui/notifications/host-context-changed") applyHostContext({ hostContext: message.params }); }, { passive: true });
+      request("ui/initialize", { appInfo: { name: "unican-media-output", version: "1.2.0" }, appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] }, protocolVersion: "2025-11-25" });
     </script>
   </body>
 </html>
@@ -93,7 +115,14 @@ export function getUnicanMediaWidgetResource() {
         prefersBorder: true,
         csp: {
           connectDomains: [],
-          resourceDomains: ["https://*.supabase.co", "https://replicate.delivery", "https://fal.media"],
+          resourceDomains: [
+            "https://*.supabase.co",
+            "https://replicate.delivery",
+            "https://*.replicate.delivery",
+            "https://fal.media",
+            "https://*.fal.media",
+            "https://*.public.blob.vercel-storage.com",
+          ],
         },
       },
     },

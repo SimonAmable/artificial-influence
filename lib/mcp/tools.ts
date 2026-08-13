@@ -3,6 +3,7 @@ import "server-only"
 import { filterPublicCatalogModels } from "@/lib/server/model-catalog-visibility"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import type { McpAuthContext } from "@/lib/mcp/auth"
+import { awaitGenerationSnapshot } from "@/lib/mcp/generation/await-completion"
 import { UNICAN_MEDIA_WIDGET_URI } from "@/lib/mcp/widget"
 import { resolveAssetAccessUrl, type AssetAccessRow } from "@/lib/assets/resolve-asset-access-url"
 
@@ -95,7 +96,8 @@ export const MCP_TOOLS: ToolDefinition[] = [
   {
     name: "get_generation",
     title: "Get generation",
-    description: "Refresh the status and output of an existing UniCan generation. Used by the generation card after a creation has started.",
+    description:
+      "Refresh the status and output of an existing UniCan generation by generationId. Use when a prior generate_* call returned pending or you need the latest media URL.",
     scopes: ["generations:read"],
     inputSchema: {
       type: "object",
@@ -107,12 +109,13 @@ export const MCP_TOOLS: ToolDefinition[] = [
     },
     outputSchema: generationOutputSchema(),
     annotations: readOnlyAnnotations(),
-    _meta: { ui: { visibility: ["app"] } },
+    _meta: { ui: { visibility: ["model", "app"] } },
   },
   {
     name: "generate_image",
     title: "Generate image",
-    description: "Create an image using an active Unican image model.",
+    description:
+      "Create an image using an active UniCan image model (for example google/nano-banana-2-lite). For character consistency, call search_media first and pass referenceMedia. If the result is still pending after this call, use get_generation with the returned generationId.",
     scopes: ["generations:write"],
     inputSchema: generateImageSchema(),
     outputSchema: generatedMediaOutputSchema(),
@@ -476,11 +479,13 @@ async function generateImage(options: {
     body: form,
   })
 
-  return normalizeGenerationResponse(await safeJson(response), response.status, {
+  const result = await normalizeGenerationResponse(await safeJson(response), response.status, {
     type: "image",
     model: stringOrNull(options.args.model),
     prompt: stringOrNull(options.args.prompt),
   })
+
+  return finalizeAsyncGenerationResult(options.auth.user.id, result as JsonObject)
 }
 
 async function generateVideo(options: {
@@ -542,11 +547,13 @@ async function generateVideo(options: {
     body: JSON.stringify(body),
   })
 
-  return normalizeGenerationResponse(await safeJson(response), response.status, {
+  const result = await normalizeGenerationResponse(await safeJson(response), response.status, {
     type: "video",
     model: stringOrNull(options.args.model),
     prompt: stringOrNull(options.args.prompt),
   })
+
+  return finalizeAsyncGenerationResult(options.auth.user.id, result as JsonObject)
 }
 
 async function generateAudio(options: {
@@ -576,11 +583,69 @@ async function generateAudio(options: {
     body: JSON.stringify(body),
   })
 
-  return normalizeGenerationResponse(await safeJson(response), response.status, {
+  const result = await normalizeGenerationResponse(await safeJson(response), response.status, {
     type: "audio",
     model: stringOrNull(options.args.model),
     prompt: stringOrNull(options.args.text),
   })
+
+  return finalizeAsyncGenerationResult(options.auth.user.id, result as JsonObject)
+}
+
+async function finalizeAsyncGenerationResult(userId: string, result: JsonObject) {
+  const status = stringOrNull(result.status)
+  const generationId = stringOrNull(result.generationId)
+  if (!generationId || status !== "pending") return result
+
+  await awaitGenerationSnapshot({
+    getSnapshot: async () => extractGenerationAwaitSnapshot(await getGeneration(userId, generationId)),
+  })
+
+  return buildMediaResultFromGetGeneration(await getGeneration(userId, generationId))
+}
+
+function extractGenerationAwaitSnapshot(snapshot: Awaited<ReturnType<typeof getGeneration>>) {
+  const generation =
+    snapshot.generation && typeof snapshot.generation === "object"
+      ? (snapshot.generation as JsonObject)
+      : ({} as JsonObject)
+
+  return {
+    status: stringOrNull(snapshot.status) || stringOrNull(generation.status),
+    predictionId: stringOrNull(generation.predictionId),
+    type: stringOrNull(generation.type),
+  }
+}
+
+function buildMediaResultFromGetGeneration(snapshot: Awaited<ReturnType<typeof getGeneration>>) {
+  const generation =
+    snapshot.generation && typeof snapshot.generation === "object"
+      ? (snapshot.generation as JsonObject)
+      : ({} as JsonObject)
+  const generationId = stringOrNull(generation.generationId)
+  const status = stringOrNull(snapshot.status) || stringOrNull(generation.status) || "pending"
+  const type = stringOrNull(generation.type)
+  const url = stringOrNull(generation.url)
+  const items = Array.isArray(snapshot.items) ? snapshot.items : []
+  const model = stringOrNull(snapshot.model)
+  const prompt = stringOrNull(snapshot.prompt)
+  const error = stringOrNull(generation.error)
+
+  return {
+    statusCode: status === "completed" ? 200 : status === "failed" ? 500 : 202,
+    generationId,
+    mediaId: generationId ? mediaIdFor("generation", generationId) : null,
+    generationIds: generationId ? [generationId] : [],
+    status,
+    type,
+    model,
+    prompt,
+    url,
+    createdAt: stringOrNull(generation.createdAt),
+    error,
+    settings: buildSettings(model, prompt, null, items.length || 1),
+    items,
+  }
 }
 
 async function resolveGenerationUrl(userId: string, generationId: string) {

@@ -67,6 +67,9 @@ export function getImagePricingParameters(model: Model | null): StringParameterD
 
   return parseModelParameters(model.parameters).filter((param): param is StringParameterDefinition => {
     if (param.name === 'output_quality') return false;
+    if (model.identifier === 'xai/grok-imagine-image-2.0' && param.name === 'resolution') {
+      return false;
+    }
     if (!isPricingParameter(param)) return false;
     return isStringParameter(param) && Array.isArray(param.enum) && param.enum.length > 0;
   });
