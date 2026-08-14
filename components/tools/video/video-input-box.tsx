@@ -53,6 +53,96 @@ import {
   isSupportedVideoReferenceAudioFile,
 } from "@/lib/utils/video-reference-audio"
 import { toast } from "sonner"
+
+type VideoAssetPickerTarget =
+  | "motion-copy-image"
+  | "motion-copy-video"
+  | "toolbar-input-image"
+  | "toolbar-last-frame"
+  | "toolbar-reference-video"
+  | "toolbar-reference-gallery"
+  | "toolbar-reference-audio"
+
+function assetPickerAllowedTypes(target: VideoAssetPickerTarget | null): AssetType[] {
+  if (!target) return ["image"]
+  if (target === "toolbar-reference-video" || target === "motion-copy-video") return ["video"]
+  if (target === "toolbar-reference-audio") return ["audio"]
+  return ["image"]
+}
+
+interface VideoMediaMenuRowProps {
+  onPickAsset: () => void
+  onUpload: () => void
+  uploadDisabled?: boolean
+  assetPickDisabled?: boolean
+  label: React.ReactNode
+  description?: React.ReactNode
+  leadingIcon: React.ReactNode
+  trailing?: React.ReactNode
+  variant?: "inline" | "stacked"
+}
+
+function VideoMediaMenuRow({
+  onPickAsset,
+  onUpload,
+  uploadDisabled,
+  assetPickDisabled,
+  label,
+  description,
+  leadingIcon,
+  trailing,
+  variant = "inline",
+}: VideoMediaMenuRowProps) {
+  const pickDisabled = assetPickDisabled ?? uploadDisabled
+
+  return (
+    <div className="flex items-stretch gap-0">
+      <button
+        type="button"
+        className={cn(
+          "flex w-7 shrink-0 items-center justify-center self-stretch rounded-l-xl text-xs font-semibold text-muted-foreground outline-hidden transition-colors hover:bg-accent hover:text-foreground focus-visible:bg-accent disabled:pointer-events-none disabled:opacity-40",
+          variant === "stacked" && "my-1",
+        )}
+        disabled={pickDisabled}
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onPickAsset()
+        }}
+        aria-label="Pick from assets"
+      >
+        @
+      </button>
+      <DropdownMenuItem
+        disabled={uploadDisabled}
+        onClick={onUpload}
+        className={cn(
+          "flex-1 cursor-pointer rounded-l-none pl-2 pr-3",
+          variant === "stacked" ? "flex-col items-start gap-0.5 py-2" : "items-center justify-between gap-2",
+        )}
+      >
+        {variant === "stacked" ? (
+          <>
+            <span className="flex items-center text-sm font-medium">
+              {leadingIcon}
+              {label}
+            </span>
+            {description}
+          </>
+        ) : (
+          <>
+            <span className="flex items-center">
+              {leadingIcon}
+              {label}
+            </span>
+            {trailing}
+          </>
+        )}
+      </DropdownMenuItem>
+    </div>
+  )
+}
+
 interface VideoInputBoxProps {
   className?: string
   videoModels: Model[]
@@ -151,7 +241,8 @@ export function VideoInputBox({
     title?: string
   } | null>(null)
   const [slashCreateAssetUploading, setSlashCreateAssetUploading] = React.useState(false)
-  const [customInputAssetTarget, setCustomInputAssetTarget] = React.useState<"image" | "video" | null>(null)
+  const [assetPickerTarget, setAssetPickerTarget] = React.useState<VideoAssetPickerTarget | null>(null)
+  const [mediaPlusMenuOpen, setMediaPlusMenuOpen] = React.useState(false)
 
   const inputRef = React.useRef<HTMLInputElement>(null)
   const lastFrameRef = React.useRef<HTMLInputElement>(null)
@@ -474,15 +565,71 @@ export function VideoInputBox({
 
   const handleCustomInputAssetSelect = React.useCallback(
     (pick: AssetSelectionPick) => {
-      if (customInputAssetTarget === "image") {
-        onInputImageChange({ url: pick.url })
-      } else if (customInputAssetTarget === "video") {
-        onInputVideoChange({ url: pick.url })
+      if (!assetPickerTarget) return
+
+      switch (assetPickerTarget) {
+        case "motion-copy-image":
+        case "toolbar-input-image":
+          if (pick.assetType !== "image") {
+            toast.error("Pick an image asset")
+            return
+          }
+          onInputImageChange({ url: pick.url })
+          break
+        case "motion-copy-video":
+        case "toolbar-reference-video":
+          if (pick.assetType !== "video") {
+            toast.error("Pick a video asset")
+            return
+          }
+          onInputVideoChange({ url: pick.url })
+          break
+        case "toolbar-last-frame":
+          if (pick.assetType !== "image") {
+            toast.error("Pick an image asset")
+            return
+          }
+          onLastFrameChange({ url: pick.url })
+          break
+        case "toolbar-reference-gallery":
+          if (pick.assetType !== "image") {
+            toast.error("Reference images only — pick an image asset")
+            return
+          }
+          if (onReferenceImagesChange) {
+            onReferenceImagesChange([...referenceImages, { url: pick.url }])
+          }
+          break
+        case "toolbar-reference-audio":
+          if (pick.assetType !== "audio") {
+            toast.error("Pick an audio asset")
+            return
+          }
+          onInputAudioChange({ url: pick.url })
+          break
+        default: {
+          const _exhaustive: never = assetPickerTarget
+          return _exhaustive
+        }
       }
-      setCustomInputAssetTarget(null)
+
+      setAssetPickerTarget(null)
     },
-    [customInputAssetTarget, onInputImageChange, onInputVideoChange],
+    [
+      assetPickerTarget,
+      onInputAudioChange,
+      onInputImageChange,
+      onInputVideoChange,
+      onLastFrameChange,
+      onReferenceImagesChange,
+      referenceImages,
+    ],
   )
+
+  const openAssetPicker = React.useCallback((target: VideoAssetPickerTarget) => {
+    setMediaPlusMenuOpen(false)
+    setAssetPickerTarget(target)
+  }, [])
 
   const handleTextInputKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -724,7 +871,7 @@ export function VideoInputBox({
       <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-fade-x overlay-scrollbar-x px-2 [-webkit-overflow-scrolling:touch]">
         {showMediaPlusMenu ? (
           <AnimatedControlItem>
-            <DropdownMenu>
+            <DropdownMenu open={mediaPlusMenuOpen} onOpenChange={setMediaPlusMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
@@ -738,95 +885,105 @@ export function VideoInputBox({
                   <Plus className="size-3.5" weight="bold" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
+              <DropdownMenuContent align="start" className="min-w-52 p-1">
                 {modelSupportsImage && (
-                  <DropdownMenuItem
-                    onClick={() => inputRef.current?.click()}
-                    disabled={!!inputImage || chipSlotInfo.inputSlotFromChip || falMultimodalReferenceMode}
-                    className="flex items-center justify-between gap-2"
-                  >
-                    <span className="flex items-center">
-                      <FilePlus className="size-4 mr-2 shrink-0" />
-                      {selectedModel.identifier === "minimax/hailuo-2.3-fast"
+                  <VideoMediaMenuRow
+                    onPickAsset={() => openAssetPicker("toolbar-input-image")}
+                    onUpload={() => inputRef.current?.click()}
+                    uploadDisabled={
+                      !!inputImage || chipSlotInfo.inputSlotFromChip || falMultimodalReferenceMode
+                    }
+                    label={
+                      selectedModel.identifier === "minimax/hailuo-2.3-fast"
                         ? "Upload First Frame"
                         : isFalMultimodalVideo
                           ? "Upload Start Frame"
-                        : "Upload Input Image"}
-                    </span>
-                    {(chipSlotInfo.inputSlotFromChip || inputImage) && (
-                      <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
-                    )}
-                  </DropdownMenuItem>
+                          : "Upload Input Image"
+                    }
+                    leadingIcon={<FilePlus className="size-4 mr-2 shrink-0" />}
+                    trailing={
+                      (chipSlotInfo.inputSlotFromChip || inputImage) ? (
+                        <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
+                      ) : null
+                    }
+                  />
                 )}
                 {modelSupportsLastFrame && (
-                  <DropdownMenuItem
-                    onClick={() => lastFrameRef.current?.click()}
-                    disabled={!!lastFrameImage || chipSlotInfo.lastFrameSlotFromChip || falMultimodalReferenceMode}
-                    className="flex items-center justify-between gap-2"
-                  >
-                    <span className="flex items-center">
-                      <FilePlus className="size-4 mr-2 shrink-0" />
-                      Upload Last Frame
-                    </span>
-                    {(chipSlotInfo.lastFrameSlotFromChip || lastFrameImage) && (
-                      <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
-                    )}
-                  </DropdownMenuItem>
+                  <VideoMediaMenuRow
+                    onPickAsset={() => openAssetPicker("toolbar-last-frame")}
+                    onUpload={() => lastFrameRef.current?.click()}
+                    uploadDisabled={
+                      !!lastFrameImage || chipSlotInfo.lastFrameSlotFromChip || falMultimodalReferenceMode
+                    }
+                    label="Upload Last Frame"
+                    leadingIcon={<FilePlus className="size-4 mr-2 shrink-0" />}
+                    trailing={
+                      chipSlotInfo.lastFrameSlotFromChip || lastFrameImage ? (
+                        <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
+                      ) : null
+                    }
+                  />
                 )}
                 {isReferenceVideoSupported && (
-                  <DropdownMenuItem
-                    onClick={() => videoRef.current?.click()}
-                    disabled={!!inputVideo || chipSlotInfo.referenceVideoSlotFromChip}
-                    className="flex items-center justify-between gap-2"
-                  >
-                    <span className="flex items-center">
-                      <FilePlus className="size-4 mr-2 shrink-0" />
-                      {isGeminiOmniFlash ? "Upload Video to Edit" : "Upload Reference Video"}
-                    </span>
-                    {(chipSlotInfo.referenceVideoSlotFromChip || inputVideo) && (
-                      <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
-                    )}
-                  </DropdownMenuItem>
+                  <VideoMediaMenuRow
+                    onPickAsset={() => openAssetPicker("toolbar-reference-video")}
+                    onUpload={() => videoRef.current?.click()}
+                    uploadDisabled={!!inputVideo || chipSlotInfo.referenceVideoSlotFromChip}
+                    label={
+                      isGeminiOmniFlash ? "Upload Video to Edit" : "Upload Reference Video"
+                    }
+                    leadingIcon={<FilePlus className="size-4 mr-2 shrink-0" />}
+                    trailing={
+                      chipSlotInfo.referenceVideoSlotFromChip || inputVideo ? (
+                        <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
+                      ) : null
+                    }
+                  />
                 )}
                 {usesRefImageGallery && onReferenceImagesChange && (
-                  <DropdownMenuItem
-                    disabled={!canAddReferenceImage}
-                    onClick={() => referenceImagesRef.current?.click()}
-                    className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
-                  >
-                    <span className="flex items-center text-sm font-medium">
-                      <FilePlus className="mr-2 size-4 shrink-0" />
-                        {isSeedance2 || isFalMultimodalVideo ? "Reference image" : "Add reference image"}
-                    </span>
-                    {isSeedance2 ? (
-                      <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
-                        JPEG or PNG, up to {maxReferenceImages}. Use [Image1] in your prompt.
-                      </span>
-                    ) : isMinimaxH3 ? (
-                      <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
-                        Up to {maxReferenceImages} stills. Cite them as Image 1, Image 2 in the prompt.
-                      </span>
-                    ) : null}
-                  </DropdownMenuItem>
+                  <VideoMediaMenuRow
+                    variant="stacked"
+                    onPickAsset={() => openAssetPicker("toolbar-reference-gallery")}
+                    onUpload={() => referenceImagesRef.current?.click()}
+                    uploadDisabled={!canAddReferenceImage}
+                    assetPickDisabled={!canAddReferenceImage}
+                    label={
+                      isSeedance2 || isFalMultimodalVideo ? "Reference image" : "Add reference image"
+                    }
+                    leadingIcon={<FilePlus className="mr-2 size-4 shrink-0" />}
+                    description={
+                      isSeedance2 ? (
+                        <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                          JPEG or PNG, up to {maxReferenceImages}. Use [Image1] in your prompt.
+                        </span>
+                      ) : isMinimaxH3 ? (
+                        <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                          Up to {maxReferenceImages} stills. Cite them as Image 1, Image 2 in the prompt.
+                        </span>
+                      ) : null
+                    }
+                  />
                 )}
                 {(isSeedance2 || isPrunaPVideo || isWan27 || isMinimaxH3) && (
-                  <DropdownMenuItem
-                    disabled={!canAddSeedanceReferenceAudio}
-                    onClick={() => referenceAudioRef.current?.click()}
-                    className="flex cursor-pointer flex-col items-start gap-0.5 py-2"
-                  >
-                    <span className="flex items-center text-sm font-medium">
-                      <Waveform className="mr-2 size-4 shrink-0" weight="regular" />
-                      {referenceAudioConfig?.title ?? "Optional audio"}
-                    </span>
-                    <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
-                      {referenceAudioConfig?.description ?? (isWan27
-                        ? ".wav / .mp3, optional sync audio for Wan 2.7 (3–30s per model docs)."
-                        : isPrunaPVideo
-                          ? ".wav / .mp3. Conditions motion and timing for P-Video; prompt is still required."
-                          : ".wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a frame or reference video.")}
-                    </span>
-                  </DropdownMenuItem>
+                  <VideoMediaMenuRow
+                    variant="stacked"
+                    onPickAsset={() => openAssetPicker("toolbar-reference-audio")}
+                    onUpload={() => referenceAudioRef.current?.click()}
+                    uploadDisabled={!canAddSeedanceReferenceAudio}
+                    assetPickDisabled={!canAddSeedanceReferenceAudio}
+                    label={referenceAudioConfig?.title ?? "Optional audio"}
+                    leadingIcon={<Waveform className="mr-2 size-4 shrink-0" weight="regular" />}
+                    description={
+                      <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                        {referenceAudioConfig?.description ??
+                          (isWan27
+                            ? ".wav / .mp3, optional sync audio for Wan 2.7 (3–30s per model docs)."
+                            : isPrunaPVideo
+                              ? ".wav / .mp3. Conditions motion and timing for P-Video; prompt is still required."
+                              : ".wav / .mp3 / .m4a / .aac (~15s). Use [Audio1]; requires a frame or reference video.")}
+                      </span>
+                    }
+                  />
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1196,7 +1353,7 @@ export function VideoInputBox({
                 description="Click to upload"
                 showSourceActions
                 enablePaste
-                onChooseAsset={() => setCustomInputAssetTarget("image")}
+                onChooseAsset={() => openAssetPicker("motion-copy-image")}
               />
             </div>
             <div className="flex-1">
@@ -1207,7 +1364,7 @@ export function VideoInputBox({
                 description="Click to upload"
                 maxDurationSeconds={parameters?.character_orientation === 'video' ? 30 : 10}
                 showSourceActions
-                onChooseAsset={() => setCustomInputAssetTarget("video")}
+                onChooseAsset={() => openAssetPicker("motion-copy-video")}
               />
             </div>
           </div>
@@ -1272,12 +1429,12 @@ export function VideoInputBox({
       <BrandKitNewFlowDialog open={brandKitNewFlowOpen} onOpenChange={setBrandKitNewFlowOpen} />
 
       <AssetSelectionModal
-        open={customInputAssetTarget !== null}
+        open={assetPickerTarget !== null}
         onOpenChange={(open) => {
-          if (!open) setCustomInputAssetTarget(null)
+          if (!open) setAssetPickerTarget(null)
         }}
         onSelect={handleCustomInputAssetSelect}
-        allowedAssetTypes={customInputAssetTarget === "video" ? ["video"] : ["image"]}
+        allowedAssetTypes={assetPickerAllowedTypes(assetPickerTarget)}
         defaultTab="assets"
       />
     </Card>
