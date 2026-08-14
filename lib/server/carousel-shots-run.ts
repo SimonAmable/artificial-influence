@@ -1,7 +1,5 @@
 import "server-only"
 
-import Replicate from "replicate"
-import { fal } from "@fal-ai/client"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   computeContactSheetLayout,
@@ -20,154 +18,16 @@ import type {
   CarouselVariationStrength,
 } from "@/lib/carousel-shots/types"
 import { CAROUSEL_SHOTS_TOOL } from "@/lib/carousel-shots/constants"
-import {
-  getCarouselFalQualityParams,
-  getCarouselGenerationQualityParams,
-  getCarouselReplicateResolution,
-} from "@/lib/carousel-shots/quality"
+import { getCarouselGenerationQualityParams } from "@/lib/carousel-shots/quality"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
 import {
   buildImagePricingParameters,
   resolveGenerationPricingQuote,
 } from "@/lib/generation-pricing"
 import { getAutoStripImageMetadata } from "@/lib/server/auto-strip-image-metadata"
-import { applyMinimalReplicateImageModeration } from "@/lib/server/minimal-moderation"
-import { formatFalClientError } from "@/lib/server/fal-client-error"
-import {
-  buildFalImageRequest,
-  configureFal,
-  isSupportedFalImageModel,
-  submitFalImageQueue,
-} from "@/lib/server/fal-image"
+import { generateShotsModelImageUrl } from "@/lib/server/shots-image-url"
 import { splitContactSheet } from "@/lib/server/split-contact-sheet"
 import { uploadPreparedGeneratedImage } from "@/lib/server/store-generated-image"
-import { buildReplicateReferenceImageInput } from "@/lib/utils/model-parameters"
-
-const FAL_POLL_INTERVAL_MS = 2000
-const FAL_MAX_WAIT_MS = 5 * 60 * 1000
-
-function sleep(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
-}
-
-function extractFalImageUrls(data: unknown): string[] {
-  if (!data || typeof data !== "object") return []
-  const images = (data as { images?: Array<{ url?: string }> }).images ?? []
-  return images
-    .map((image) => (typeof image?.url === "string" ? image.url : null))
-    .filter((url): url is string => Boolean(url))
-}
-
-async function waitForFalImageUrl(endpointId: string, requestId: string): Promise<string> {
-  configureFal()
-  const startedAt = Date.now()
-
-  while (Date.now() - startedAt < FAL_MAX_WAIT_MS) {
-    const queueStatus = await fal.queue.status(endpointId, { requestId })
-
-    const status = queueStatus.status as string
-
-    if (status === "IN_QUEUE" || status === "IN_PROGRESS") {
-      await sleep(FAL_POLL_INTERVAL_MS)
-      continue
-    }
-
-    if (status !== "COMPLETED") {
-      throw new Error(`Fal generation failed with status: ${status}`)
-    }
-
-    const result = await fal.queue.result(endpointId, { requestId })
-    const urls = extractFalImageUrls(result.data)
-    if (urls.length === 0) {
-      throw new Error("Fal generation returned no image URLs")
-    }
-    return urls[0]!
-  }
-
-  throw new Error("Fal generation timed out")
-}
-
-async function generateImageUrl(options: {
-  aspectRatio: string
-  generationMode: CarouselGenerationMode
-  model: CarouselShotsModelId
-  prompt: string
-  referenceImageUrls: string[]
-}): Promise<string> {
-  if (isSupportedFalImageModel(options.model)) {
-    const qualityParams = getCarouselFalQualityParams(options.generationMode, options.model)
-
-    const falRequest = buildFalImageRequest({
-      aspectRatio: options.aspectRatio,
-      enableSafetyChecker: false,
-      modelIdentifier: options.model,
-      numImages: 1,
-      outputFormat: "png",
-      prompt: options.prompt,
-      referenceImageUrls: options.referenceImageUrls,
-      ...qualityParams,
-    })
-
-    const { endpointId, requestId } = await submitFalImageQueue(
-      falRequest.endpointId,
-      falRequest.input,
-    )
-
-    try {
-      return await waitForFalImageUrl(endpointId, requestId)
-    } catch (error) {
-      throw new Error(formatFalClientError(error))
-    }
-  }
-
-  if (options.model === "google/nano-banana-2") {
-    if (!process.env.REPLICATE_API_TOKEN) {
-      throw new Error("REPLICATE_API_TOKEN is not configured.")
-    }
-
-    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
-    const referenceInput = buildReplicateReferenceImageInput(
-      options.model,
-      options.referenceImageUrls,
-    )
-
-    const replicateInput: Record<string, unknown> = {
-      prompt: options.prompt,
-      aspect_ratio: options.aspectRatio,
-      resolution: getCarouselReplicateResolution(options.generationMode, options.model),
-      output_format: "png",
-      google_search: true,
-      image_search: true,
-      ...referenceInput.input,
-    }
-    applyMinimalReplicateImageModeration(options.model, replicateInput)
-
-    const output: unknown = await replicate.run(options.model, {
-      input: replicateInput,
-      wait: { mode: "poll", interval: 2000 },
-    })
-
-    if (typeof output === "string" && output.startsWith("http")) {
-      return output
-    }
-
-    if (Array.isArray(output) && typeof output[0] === "string") {
-      return output[0]
-    }
-
-    if (output && typeof output === "object" && "url" in output) {
-      const url = (output as { url?: string | (() => string) }).url
-      if (typeof url === "function") return url()
-      if (typeof url === "string") return url
-    }
-
-    throw new Error("Replicate returned no image URL")
-  }
-
-  throw new Error(`Unsupported carousel shots model: ${options.model}`)
-}
 
 async function downloadImageBuffer(url: string): Promise<Buffer> {
   const response = await fetch(url)
@@ -265,7 +125,7 @@ async function runFastCarouselShotsGeneration(
     throw error
   }
 
-  const contactSheetRemoteUrl = await generateImageUrl({
+  const contactSheetRemoteUrl = await generateShotsModelImageUrl({
     aspectRatio: layout.aspectRatio,
     generationMode: "fast",
     model: input.model,
@@ -393,7 +253,7 @@ async function runHdCarouselShotsGeneration(
 
   for (let index = 0; index < shotCount; index += 1) {
     const prompt = prompts[index]!
-    const remoteUrl = await generateImageUrl({
+    const remoteUrl = await generateShotsModelImageUrl({
       aspectRatio: input.aspectRatio,
       generationMode: "hd",
       model: input.model,

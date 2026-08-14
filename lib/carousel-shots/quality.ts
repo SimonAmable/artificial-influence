@@ -9,6 +9,10 @@ export function getCarouselFastQualityParams(
       return { quality: "high" }
     case "google/nano-banana-2":
       return { resolution: "4k" }
+    case "google/nano-banana-2-lite":
+      return {}
+    case "xai/grok-imagine-image-2.0":
+      return { quality: "high", resolution: "2k" }
     case "bytedance/seedream-4.5":
       return { resolutionPreset: "4K" }
     case "bytedance/seedream-5-lite":
@@ -29,6 +33,10 @@ export function getCarouselHdQualityParams(model: CarouselShotsModelId): Record<
       return { quality: "low" }
     case "google/nano-banana-2":
       return { resolution: "1k" }
+    case "google/nano-banana-2-lite":
+      return {}
+    case "xai/grok-imagine-image-2.0":
+      return { quality: "low", resolution: "1k" }
     case "bytedance/seedream-4.5":
       return { resolutionPreset: "2K" }
     case "bytedance/seedream-5-lite":
@@ -68,6 +76,10 @@ export function getCarouselFalQualityParams(
 
   if (model === "openai/gpt-image-2") {
     return { quality: params.quality as "high" | "medium" | "low" }
+  }
+
+  if (model === "google/nano-banana-2-lite") {
+    return {}
   }
 
   return { resolutionPreset: params.resolutionPreset as string }

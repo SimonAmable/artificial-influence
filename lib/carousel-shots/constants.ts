@@ -12,7 +12,9 @@ export const CAROUSEL_SHOTS_MODELS: ReadonlyArray<{
   label: string
 }> = [
   { id: "google/nano-banana-2", label: "Nano Banana 2" },
+  { id: "google/nano-banana-2-lite", label: "Nano Banana 2 Lite" },
   { id: "openai/gpt-image-2", label: "GPT Image 2" },
+  { id: "xai/grok-imagine-image-2.0", label: "Grok Image 2" },
   { id: "bytedance/seedream-4.5", label: "Seedream 4.5" },
   { id: "bytedance/seedream-5-lite", label: "Seedream 5.0 Lite" },
   { id: "bytedance/seedream-5-pro", label: "Seedream 5.0 Pro" },

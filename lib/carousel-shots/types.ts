@@ -20,6 +20,10 @@ export type CarouselShotsModelId =
 
   | "google/nano-banana-2"
 
+  | "google/nano-banana-2-lite"
+
+  | "xai/grok-imagine-image-2.0"
+
   | "bytedance/seedream-4.5"
 
   | "bytedance/seedream-5-lite"

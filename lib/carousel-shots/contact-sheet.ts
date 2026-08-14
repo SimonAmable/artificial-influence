@@ -97,6 +97,8 @@ export function computeContactSheetLayout(options: {
 
 export function getTargetPanelLongEdgeForModel(model: string): number {
   if (model === "google/nano-banana-2") return 1365
+  if (model === "google/nano-banana-2-lite") return 1024
+  if (model === "xai/grok-imagine-image-2.0") return 1024
   if (model === "openai/gpt-image-2") return 1024
   // Seedream contact sheets target ~half of each model's max long edge at highest preset.
   if (model === "bytedance/seedream-4.5") return 1920
