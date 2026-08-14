@@ -42,6 +42,10 @@ import { getVideoChipSlotInfo } from "@/lib/commands/video-chip-slots"
 import { extendMentionRangeEnd } from "@/lib/commands/mention-token"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { BrandKitNewFlowDialog } from "@/components/brand-kit/brand-kit-new-flow-dialog"
+import {
+  AssetSelectionModal,
+  type AssetSelectionPick,
+} from "@/components/shared/modals/asset-selection-modal"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import type { AssetType } from "@/lib/assets/types"
 import {
@@ -147,6 +151,7 @@ export function VideoInputBox({
     title?: string
   } | null>(null)
   const [slashCreateAssetUploading, setSlashCreateAssetUploading] = React.useState(false)
+  const [customInputAssetTarget, setCustomInputAssetTarget] = React.useState<"image" | "video" | null>(null)
 
   const inputRef = React.useRef<HTMLInputElement>(null)
   const lastFrameRef = React.useRef<HTMLInputElement>(null)
@@ -464,7 +469,19 @@ export function VideoInputBox({
         setSlashCreateAssetUploading(false)
       }
     },
-    []
+    [],
+  )
+
+  const handleCustomInputAssetSelect = React.useCallback(
+    (pick: AssetSelectionPick) => {
+      if (customInputAssetTarget === "image") {
+        onInputImageChange({ url: pick.url })
+      } else if (customInputAssetTarget === "video") {
+        onInputVideoChange({ url: pick.url })
+      }
+      setCustomInputAssetTarget(null)
+    },
+    [customInputAssetTarget, onInputImageChange, onInputVideoChange],
   )
 
   const handleTextInputKeyDown = React.useCallback(
@@ -1177,6 +1194,9 @@ export function VideoInputBox({
                 onChange={onInputImageChange}
                 title="Upload Image"
                 description="Click to upload"
+                showSourceActions
+                enablePaste
+                onChooseAsset={() => setCustomInputAssetTarget("image")}
               />
             </div>
             <div className="flex-1">
@@ -1186,6 +1206,8 @@ export function VideoInputBox({
                 title={isMotionCopyModel ? "Background source" : "Upload Video"}
                 description="Click to upload"
                 maxDurationSeconds={parameters?.character_orientation === 'video' ? 30 : 10}
+                showSourceActions
+                onChooseAsset={() => setCustomInputAssetTarget("video")}
               />
             </div>
           </div>
@@ -1248,6 +1270,16 @@ export function VideoInputBox({
       ) : null}
 
       <BrandKitNewFlowDialog open={brandKitNewFlowOpen} onOpenChange={setBrandKitNewFlowOpen} />
+
+      <AssetSelectionModal
+        open={customInputAssetTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setCustomInputAssetTarget(null)
+        }}
+        onSelect={handleCustomInputAssetSelect}
+        allowedAssetTypes={customInputAssetTarget === "video" ? ["video"] : ["image"]}
+        defaultTab="assets"
+      />
     </Card>
   )
 }

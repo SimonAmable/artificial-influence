@@ -46,6 +46,9 @@ import { toast } from "sonner"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { pickRetainedAspectRatio } from "@/lib/utils/aspect-ratios"
 import { consumeVideoGenerationIntent } from "@/lib/video/video-generation-intent"
+import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
+import { resolveReferenceVideoForGeneration } from "@/lib/video/resolve-reference-for-generation"
+import { getVideoDurationSeconds } from "@/lib/video-editor/media-parser"
 
 interface PendingVideoRequest {
   clientRequestId: string
@@ -683,26 +686,34 @@ function VideoPageContent() {
 
     // Validation based on model type
     if (isMotionCopy) {
-      if (!inputImage?.file) {
+      if (!inputImage?.url) {
         setError("Please upload an image")
         return
       }
-      if (!inputVideo?.file) {
+      if (!inputVideo?.url) {
         setError("Please upload a video")
         return
       }
-      // Video duration: image orientation = max 10s, video orientation = max 30s
       try {
-        const videoDuration = await getVideoDuration(inputVideo.file)
-        const characterOrientation = (parameters.character_orientation as string) || 'video'
-        const maxDuration = characterOrientation === 'video' ? 30 : 10
+        const resolvedVideo = await resolveReferenceVideoForGeneration(inputVideo)
+        if (!resolvedVideo?.url) {
+          setError("Please upload a video")
+          return
+        }
+        const characterOrientation = (parameters.character_orientation as string) || "video"
+        const maxDuration = characterOrientation === "video" ? 30 : 10
+        const videoDuration = resolvedVideo.file
+          ? await getVideoDuration(resolvedVideo.file)
+          : await getVideoDurationSeconds(resolvedVideo.url)
         if (videoDuration > maxDuration) {
-          setError(`Video must be ${maxDuration} seconds or less for ${characterOrientation} orientation. Your video is ${videoDuration.toFixed(1)} seconds.`)
+          setError(
+            `Video must be ${maxDuration} seconds or less for ${characterOrientation} orientation. Your video is ${videoDuration.toFixed(1)} seconds.`,
+          )
           return
         }
       } catch (err) {
-        console.error('Error validating video duration:', err)
-        setError('Failed to validate video duration. Please try again.')
+        console.error("Error validating video duration:", err)
+        setError("Failed to validate video duration. Please try again.")
         return
       }
     } else if (isLipsync) {
@@ -861,11 +872,33 @@ function VideoPageContent() {
       }
 
       // Handle motion copy uploads
-      if (isMotionCopy && inputImage?.file && inputVideo?.file) {
-        const imageUpload = await uploadImageToSupabase(inputImage.file, user.id, 'motion-copy-images')
-        const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'motion-copy-videos')
-        requestBody.imagePublicUrl = imageUpload.url
-        requestBody.videoPublicUrl = videoUpload.url
+      if (isMotionCopy && inputImage?.url && inputVideo?.url) {
+        const resolvedImage = await resolveReferenceImageForGeneration(inputImage)
+        const resolvedVideo = await resolveReferenceVideoForGeneration(inputVideo)
+        if (resolvedImage?.url) {
+          if (resolvedImage.file) {
+            const imageUpload = await uploadImageToSupabase(
+              resolvedImage.file,
+              user.id,
+              "motion-copy-images",
+            )
+            requestBody.imagePublicUrl = imageUpload.url
+          } else {
+            requestBody.imagePublicUrl = resolvedImage.url
+          }
+        }
+        if (resolvedVideo?.url) {
+          if (resolvedVideo.file) {
+            const videoUpload = await uploadImageToSupabase(
+              resolvedVideo.file,
+              user.id,
+              "motion-copy-videos",
+            )
+            requestBody.videoPublicUrl = videoUpload.url
+          } else {
+            requestBody.videoPublicUrl = resolvedVideo.url
+          }
+        }
       }
       
       // Handle lipsync uploads (image → veed/fabric; video → pixverse/lipsync)

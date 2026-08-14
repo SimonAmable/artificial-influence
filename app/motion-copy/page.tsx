@@ -14,6 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { generateVideoAndWait } from "@/lib/generate-video-client"
+import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
+import { resolveReferenceVideoForGeneration } from "@/lib/video/resolve-reference-for-generation"
+import { getVideoDurationSeconds } from "@/lib/video-editor/media-parser"
 
 const MOTION_COPY_MODEL = 'kwaivgi/kling-v3-motion-control' as const
 
@@ -56,12 +59,12 @@ export default function MotionCopyPage() {
 
   // Handle generation
   const handleGenerate = async () => {
-    if (!inputImage?.file) {
+    if (!inputImage?.url) {
       setError("Please upload an image")
       return
     }
 
-    if (!inputVideo?.file) {
+    if (!inputVideo?.url) {
       setError("Please upload a video")
       return
     }
@@ -70,87 +73,105 @@ export default function MotionCopyPage() {
     setError(null)
 
     try {
-      // Validate image file
-      if (!inputImage.file.type.startsWith('image/')) {
-        setError('Image must be a valid image file')
+      const resolvedImage = await resolveReferenceImageForGeneration(inputImage)
+      const resolvedVideo = await resolveReferenceVideoForGeneration(inputVideo)
+      if (!resolvedImage?.url) {
+        setError("Please upload an image")
         setIsGenerating(false)
         return
       }
-      
-      // Validate video file
-      if (!inputVideo.file.type.startsWith('video/')) {
-        setError('Video must be a valid video file')
-        setIsGenerating(false)
-        return
-      }
-      
-      // Validate file sizes (max 10MB for image, 50MB for video)
-      const maxImageSize = 10 * 1024 * 1024 // 10MB
-      const maxVideoSize = 50 * 1024 * 1024 // 50MB
-      
-      if (inputImage.file.size > maxImageSize) {
-        setError('Image is too large. Maximum size is 10MB.')
-        setIsGenerating(false)
-        return
-      }
-      
-      if (inputVideo.file.size > maxVideoSize) {
-        setError('Video is too large. Maximum size is 50MB.')
+      if (!resolvedVideo?.url) {
+        setError("Please upload a video")
         setIsGenerating(false)
         return
       }
 
-      // Validate video duration: image orientation = max 10s, video orientation = max 30s
+      if (resolvedImage.file && !resolvedImage.file.type.startsWith("image/")) {
+        setError("Image must be a valid image file")
+        setIsGenerating(false)
+        return
+      }
+
+      if (resolvedVideo.file && !resolvedVideo.file.type.startsWith("video/")) {
+        setError("Video must be a valid video file")
+        setIsGenerating(false)
+        return
+      }
+
+      const maxImageSize = 10 * 1024 * 1024
+      const maxVideoSize = 50 * 1024 * 1024
+
+      if (resolvedImage.file && resolvedImage.file.size > maxImageSize) {
+        setError("Image is too large. Maximum size is 10MB.")
+        setIsGenerating(false)
+        return
+      }
+
+      if (resolvedVideo.file && resolvedVideo.file.size > maxVideoSize) {
+        setError("Video is too large. Maximum size is 50MB.")
+        setIsGenerating(false)
+        return
+      }
+
+      const maxDuration = characterOrientation === "video" ? 30 : 10
       try {
-        const videoDuration = await getVideoDuration(inputVideo.file)
-        const maxDuration = characterOrientation === 'video' ? 30 : 10
+        const videoDuration = resolvedVideo.file
+          ? await getVideoDuration(resolvedVideo.file)
+          : await getVideoDurationSeconds(resolvedVideo.url)
 
         if (videoDuration > maxDuration) {
-          setError(`Video duration must be ${maxDuration} seconds or less for ${characterOrientation} orientation. Your video is ${videoDuration.toFixed(1)} seconds.`)
+          setError(
+            `Video duration must be ${maxDuration} seconds or less for ${characterOrientation} orientation. Your video is ${videoDuration.toFixed(1)} seconds.`,
+          )
           setIsGenerating(false)
           return
         }
       } catch (err) {
-        console.error('Error validating video duration:', err)
-        setError('Failed to validate video duration. Please try again.')
+        console.error("Error validating video duration:", err)
+        setError("Failed to validate video duration. Please try again.")
         setIsGenerating(false)
         return
       }
 
-      // Upload image to Supabase Storage
-      console.log('Uploading image to Supabase...')
-      const uploadedImage = await uploadFileToSupabase(inputImage.file, 'reference-images')
-      if (!uploadedImage) {
-        throw new Error('Failed to upload image')
+      let imagePublicUrl = resolvedImage.url
+      let imageStoragePath: string | undefined
+      if (resolvedImage.file) {
+        console.log("Uploading image to Supabase...")
+        const uploadedImage = await uploadFileToSupabase(resolvedImage.file, "reference-images")
+        if (!uploadedImage) {
+          throw new Error("Failed to upload image")
+        }
+        imageStoragePath = uploadedImage.storagePath
+        imagePublicUrl = uploadedImage.url
+        console.log("✓ Image uploaded:", imagePublicUrl)
       }
-      const imageStoragePath = uploadedImage.storagePath
-      const imagePublicUrl = uploadedImage.url
-      console.log('✓ Image uploaded:', imagePublicUrl)
 
-      // Upload video to Supabase Storage
-      console.log('Uploading video to Supabase...')
-      const uploadedVideo = await uploadFileToSupabase(inputVideo.file, 'reference-videos')
-      if (!uploadedVideo) {
-        throw new Error('Failed to upload video')
+      let videoPublicUrl = resolvedVideo.url
+      let videoStoragePath: string | undefined
+      if (resolvedVideo.file) {
+        console.log("Uploading video to Supabase...")
+        const uploadedVideo = await uploadFileToSupabase(resolvedVideo.file, "reference-videos")
+        if (!uploadedVideo) {
+          throw new Error("Failed to upload video")
+        }
+        videoStoragePath = uploadedVideo.storagePath
+        videoPublicUrl = uploadedVideo.url
+        console.log("✓ Video uploaded:", videoPublicUrl)
       }
-      const videoStoragePath = uploadedVideo.storagePath
-      const videoPublicUrl = uploadedVideo.url
-      console.log('✓ Video uploaded:', videoPublicUrl)
 
-      // Send URLs to API route
-      console.log('Sending motion copy request with image and video URLs')
-      
-      const data = await generateVideoAndWait('/api/generate-video', {
-          imageUrl: imagePublicUrl,
-          videoUrl: videoPublicUrl,
-          imageStoragePath,
-          videoStoragePath,
-          prompt: '',
-          mode: 'pro',
-          keep_original_sound: true,
-          character_orientation: characterOrientation,
-          model: MOTION_COPY_MODEL,
-          tool: 'motion_copy',
+      console.log("Sending motion copy request with image and video URLs")
+
+      const data = await generateVideoAndWait("/api/generate-video", {
+        imageUrl: imagePublicUrl,
+        videoUrl: videoPublicUrl,
+        ...(imageStoragePath ? { imageStoragePath } : {}),
+        ...(videoStoragePath ? { videoStoragePath } : {}),
+        prompt: "",
+        mode: "pro",
+        keep_original_sound: true,
+        character_orientation: characterOrientation,
+        model: MOTION_COPY_MODEL,
+        tool: "motion_copy",
       })
       
       // Handle response - extract video URL and PREPEND to existing videos

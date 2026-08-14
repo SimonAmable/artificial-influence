@@ -433,20 +433,33 @@ export function InfluencerInputBox({
   }
 
   const handleReferenceImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const url = URL.createObjectURL(file)
-      const newImage = { file, url }
-      
-      // Support both single and multiple reference images
-      if (onReferenceImagesChange) {
-        const updatedImages = [...localReferenceImages, newImage]
-        setLocalReferenceImages(updatedImages)
-        onReferenceImagesChange(updatedImages)
-      } else {
-        setLocalReferenceImage(newImage)
-        onReferenceImageChange?.(newImage)
-      }
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    const newImages: ImageUpload[] = []
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) continue
+      newImages.push({ file, url: URL.createObjectURL(file) })
+    }
+
+    if (newImages.length === 0) {
+      toast.error("Please select image files")
+      if (fileInputRef.current) fileInputRef.current.value = ""
+      return
+    }
+
+    if (onReferenceImagesChange) {
+      const updatedImages = [...localReferenceImages, ...newImages]
+      setLocalReferenceImages(updatedImages)
+      onReferenceImagesChange(updatedImages)
+    } else if (newImages.length > 0) {
+      const newImage = newImages[0]
+      setLocalReferenceImage(newImage)
+      onReferenceImageChange?.(newImage)
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
     }
   }
 
@@ -806,14 +819,14 @@ export function InfluencerInputBox({
             <DropdownMenuContent align="start">
               {uploadMenuItems ?? (
                 <>
-              <DropdownMenuItem onClick={handleUploadReferenceImage}>
-                <FilePlus className="size-4 mr-2" />
-                Upload Reference Image
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setAssetModalOpen(true)}>
-                <FolderOpen className="size-4 mr-2" />
-                Select Asset
-              </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleUploadReferenceImage}>
+                    <FilePlus className="size-4 mr-2" />
+                    Upload Reference Images
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setAssetModalOpen(true)}>
+                    <FolderOpen className="size-4 mr-2" />
+                    Select Asset
+                  </DropdownMenuItem>
                 </>
               )}
             </DropdownMenuContent>
@@ -1057,6 +1070,7 @@ export function InfluencerInputBox({
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           onChange={handleReferenceImageUpload}
           className="hidden"
         />

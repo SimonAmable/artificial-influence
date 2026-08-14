@@ -31,7 +31,6 @@ import { useDebouncedValue } from "@/components/library/history/use-debounced-va
 import { useGenerationHistory } from "@/components/library/history/use-generation-history"
 import {
   createEmptyPaginatedState,
-  formatRelativeDate,
   historyGridColsClass,
   mergeUniqueById,
   normalizePagination,
@@ -129,34 +128,27 @@ function UploadSelectCard({
   onSelect: () => void
 }) {
   return (
-    <article className="group relative aspect-square overflow-hidden rounded-2xl border border-border/70 bg-card/45 shadow-sm transition-all hover:border-primary/50 hover:shadow-md">
+    <article className="group relative aspect-square overflow-hidden rounded-xl border border-border/60 bg-muted/20">
       <button type="button" className="relative block h-full w-full overflow-hidden bg-muted text-left" onClick={onSelect}>
         <Image
           src={upload.url}
           alt={upload.title}
           fill
-          className="object-cover transition-transform duration-300 group-hover:scale-105"
+          className="object-cover"
         />
       </button>
 
-      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between bg-black/50 p-3 opacity-0 transition-opacity duration-200 sm:group-hover:opacity-100">
-        <div className="flex items-center justify-between">
-          <span className="rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white">Upload</span>
-          <span className="text-[10px] font-medium text-white/80 drop-shadow-sm">
-            {formatRelativeDate(upload.createdAt)}
-          </span>
-        </div>
-        <p className="truncate text-xs font-semibold text-white drop-shadow-sm">{upload.title}</p>
-        <div className="pointer-events-auto flex justify-end">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="h-7 rounded-full border-none bg-white px-3 text-[10px] font-semibold text-black hover:bg-white/90"
-            onClick={onSelect}
-          >
-            Select
-          </Button>
-        </div>
+      <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/35" />
+
+      <div className="absolute inset-0 z-10 hidden items-center justify-center p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:flex">
+        <Button
+          variant="secondary"
+          size="sm"
+          className="pointer-events-auto h-7 rounded-full border-none bg-white px-3 text-[10px] font-semibold text-black hover:bg-white/90"
+          onClick={onSelect}
+        >
+          Select
+        </Button>
       </div>
 
       <div className="absolute inset-x-2 bottom-2 z-10 sm:hidden">
@@ -550,24 +542,37 @@ export function AssetSelectionModal({
   }
 
   const handleUploadReferenceFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+    const files = event.target.files
     event.target.value = ""
-    if (!file) return
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file")
+    if (!files || files.length === 0) return
+
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"))
+    if (imageFiles.length === 0) {
+      toast.error("Please select image files")
       return
     }
 
     setUploadReferenceUploading(true)
     try {
-      const result = await uploadFileToSupabase(file, "reference-uploads")
-      if (!result) return
-      if (result.fileType !== "image") {
+      let uploadedCount = 0
+      for (const file of imageFiles) {
+        const result = await uploadFileToSupabase(file, "reference-uploads")
+        if (!result) continue
+        if (result.fileType !== "image") continue
+        uploadedCount += 1
+      }
+
+      if (uploadedCount === 0) {
         toast.error("Only image uploads can be used as reference images here")
         return
       }
+
       setUploadsState(createEmptyPaginatedState<UploadListItem>(UPLOADS_PAGE_LIMIT))
-      toast.success("Uploaded image ready to use")
+      toast.success(
+        uploadedCount === 1
+          ? "Uploaded image ready to use"
+          : `${uploadedCount} images uploaded`,
+      )
       void fetchUploads(false)
     } finally {
       setUploadReferenceUploading(false)
@@ -611,6 +616,7 @@ export function AssetSelectionModal({
                   ref={uploadReferenceInputRef}
                   type="file"
                   accept="image/*"
+                  multiple
                   className="sr-only"
                   aria-hidden
                   tabIndex={-1}
@@ -660,7 +666,7 @@ export function AssetSelectionModal({
                     onClick={() => uploadReferenceInputRef.current?.click()}
                   >
                     <UploadSimple className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    Upload image
+                    Upload images
                   </Button>
                 ) : null}
 

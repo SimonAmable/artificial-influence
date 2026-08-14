@@ -76,6 +76,10 @@ import {
 } from "@/lib/utils/video-reference-audio"
 import { toast } from "sonner"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
+import {
+  AssetSelectionModal,
+  type AssetSelectionPick,
+} from "@/components/shared/modals/asset-selection-modal"
 import { useFlowMultiSelectActive } from "@/hooks/use-flow-multi-select-active"
 import { useNodeErrorToast } from "@/hooks/use-node-error-toast"
 import { toUserFacingGenerationError } from "@/lib/content-moderation-toast"
@@ -134,6 +138,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   } | null>(null)
   const [slashCreateAssetUploading, setSlashCreateAssetUploading] = React.useState(false)
   const [brandKitNewFlowOpen, setBrandKitNewFlowOpen] = React.useState(false)
+  const [customInputAssetTarget, setCustomInputAssetTarget] = React.useState<"image" | "video" | null>(null)
 
   // Helper function to get video duration
   const getVideoDuration = (url: string): Promise<number> => {
@@ -744,6 +749,18 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       error: null,
     })
   }
+
+  const handleCustomInputAssetSelect = React.useCallback(
+    (pick: AssetSelectionPick) => {
+      if (customInputAssetTarget === "image") {
+        handleCustomImageChange({ url: pick.url })
+      } else if (customInputAssetTarget === "video") {
+        handleCustomVideoChange({ url: pick.url })
+      }
+      setCustomInputAssetTarget(null)
+    },
+    [customInputAssetTarget, handleCustomImageChange, handleCustomVideoChange],
+  )
 
   const handleGenerate = async () => {
     if (!selectedModel) {
@@ -1543,6 +1560,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                   onChange={handleCustomImageChange}
                   title="Upload Image"
                   description="Click to upload"
+                  showSourceActions
+                  enablePaste
+                  onChooseAsset={() => setCustomInputAssetTarget("image")}
                 />
               </div>
               {isMotionCopyModel && (
@@ -1559,6 +1579,8 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                     maxDurationSeconds={
                       (nodeData.parameters?.character_orientation ?? "video") === "video" ? 30 : 10
                     }
+                    showSourceActions
+                    onChooseAsset={() => setCustomInputAssetTarget("video")}
                   />
                 </div>
               )}
@@ -1782,6 +1804,16 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     ) : null}
 
     <BrandKitNewFlowDialog open={brandKitNewFlowOpen} onOpenChange={setBrandKitNewFlowOpen} />
+
+    <AssetSelectionModal
+      open={customInputAssetTarget !== null}
+      onOpenChange={(open) => {
+        if (!open) setCustomInputAssetTarget(null)
+      }}
+      onSelect={handleCustomInputAssetSelect}
+      allowedAssetTypes={customInputAssetTarget === "video" ? ["video"] : ["image"]}
+      defaultTab="assets"
+    />
 
     <input
       ref={slashCreateAssetFileRef}

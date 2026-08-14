@@ -60,7 +60,7 @@ export function AssetCard({
 
   if (mode === "select") {
     return (
-      <article className="group relative aspect-square overflow-hidden rounded-2xl border border-border/70 bg-card/45 shadow-sm transition-all hover:border-primary/50 hover:shadow-md">
+      <article className="group relative aspect-square overflow-hidden rounded-xl border border-border/60 bg-muted/20">
         <MediaPreview
           type={asset.assetType}
           url={asset.thumbnailUrl || asset.url}
@@ -69,37 +69,17 @@ export function AssetCard({
           onOpen={asset.assetType === "audio" ? undefined : handlePrimary}
         />
 
-        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between bg-black/50 p-3 opacity-0 transition-opacity duration-200 sm:group-hover:opacity-100">
-          <div className="flex items-center justify-between">
-            <Badge
-              variant="secondary"
-              className="gap-1 rounded-full border-none bg-black/60 px-2 py-0.5 text-[10px] capitalize text-white"
-            >
-              <MediaTypeIcon type={asset.assetType} className="h-2.5 w-2.5" />
-              {asset.assetType}
-            </Badge>
-            <span className="text-[10px] font-medium text-white/80 drop-shadow-sm">
-              {formatRelativeDate(asset.createdAt)}
-            </span>
-          </div>
+        <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/35" />
 
-          <div className="pr-1 text-left select-none">
-            <p className="truncate text-xs font-semibold text-white drop-shadow-sm">{asset.title}</p>
-            <p className="mt-0.5 text-[10px] font-medium text-white/85 drop-shadow-sm">
-              {ASSET_CATEGORY_LABELS[asset.category]}
-            </p>
-          </div>
-
-          <div className="pointer-events-auto flex justify-end">
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-7 rounded-full border-none bg-white px-3 text-[10px] font-semibold text-black hover:bg-white/90"
-              onClick={handlePrimary}
-            >
-              Select
-            </Button>
-          </div>
+        <div className="absolute inset-0 z-10 hidden items-center justify-center p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:flex">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="pointer-events-auto h-7 rounded-full border-none bg-white px-3 text-[10px] font-semibold text-black hover:bg-white/90"
+            onClick={handlePrimary}
+          >
+            Select
+          </Button>
         </div>
 
         <div className="absolute inset-x-2 bottom-2 z-10 sm:hidden">

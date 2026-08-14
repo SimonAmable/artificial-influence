@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { X, Play, Plus } from "@phosphor-icons/react"
+import { Button } from "@/components/ui/button"
+import { X, Play, Plus, UploadSimple, FolderOpen } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { ImageUpload } from "./photo-upload"
 import { toast } from "sonner"
@@ -18,6 +19,9 @@ export interface VideoUploadProps {
   minHeight?: string
   /** Max allowed duration in seconds. Default 10. Use 30 for motion control with video orientation. */
   maxDurationSeconds?: number
+  /** Show clear upload and asset-library actions in the empty state. */
+  showSourceActions?: boolean
+  onChooseAsset?: () => void
 }
 
 export function VideoUpload({
@@ -30,45 +34,15 @@ export function VideoUpload({
   maxHeight = "max-h-[45px]",
   minHeight = "min-h-[50px] sm:min-h-[55px]",
   maxDurationSeconds = 10,
+  showSourceActions = false,
+  onChooseAsset,
 }: VideoUploadProps) {
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+
   const handleRemove = () => {
     onChange?.(null)
   }
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      // Validate video duration
-      try {
-        const duration = await getVideoDuration(file)
-        if (duration > maxDurationSeconds) {
-          toast.error(
-            "Video duration too long",
-            {
-              description: `Video duration must be ${maxDurationSeconds} seconds or less. Your video is ${duration.toFixed(1)} seconds.`,
-            }
-          )
-          e.target.value = '' // Clear the input
-          return
-        }
-        
-        const url = URL.createObjectURL(file)
-        const newVideo = { file, url }
-        onChange?.(newVideo)
-      } catch (error) {
-        console.error('Error validating video duration:', error)
-        toast.error(
-          "Validation failed",
-          {
-            description: "Failed to validate video. Please try again.",
-          }
-        )
-        e.target.value = '' // Clear the input
-      }
-    }
-  }
-
-  // Helper function to get video duration
   const getVideoDuration = (file: File): Promise<number> => {
     return new Promise((resolve, reject) => {
       const video = document.createElement('video')
@@ -86,6 +60,32 @@ export function VideoUpload({
       
       video.src = URL.createObjectURL(file)
     })
+  }
+
+  const handleFileUpload = async (file?: File) => {
+    if (!file) return
+    try {
+      const duration = await getVideoDuration(file)
+      if (duration > maxDurationSeconds) {
+        toast.error("Video duration too long", {
+          description: `Video duration must be ${maxDurationSeconds} seconds or less. Your video is ${duration.toFixed(1)} seconds.`,
+        })
+        return
+      }
+
+      const url = URL.createObjectURL(file)
+      onChange?.({ file, url })
+    } catch (error) {
+      console.error("Error validating video duration:", error)
+      toast.error("Validation failed", {
+        description: "Failed to validate video. Please try again.",
+      })
+    }
+  }
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    await handleFileUpload(e.target.files?.[0])
+    e.target.value = ""
   }
 
   return (
@@ -113,8 +113,20 @@ export function VideoUpload({
             </button>
           </div>
         ) : (
-          <label className="flex flex-col items-center justify-center gap-0.5 cursor-pointer w-full h-full">
+          <div
+            role="button"
+            tabIndex={0}
+            className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-0.5"
+            onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault()
+                fileInputRef.current?.click()
+              }
+            }}
+          >
             <input
+              ref={fileInputRef}
               type="file"
               accept={accept}
               onChange={handleUpload}
@@ -128,7 +140,37 @@ export function VideoUpload({
               <div className="text-foreground font-bold text-[9px] sm:text-[10px]">{title}</div>
               <div className="text-muted-foreground text-[8px] sm:text-[9px] text-center px-1">{description}</div>
             </div>
-          </label>
+            {showSourceActions ? (
+              <div className="mt-1.5 grid w-full max-w-[15rem] grid-cols-2 gap-1.5 px-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-[10px]"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    fileInputRef.current?.click()
+                  }}
+                >
+                  <UploadSimple className="size-3.5" weight="bold" />
+                  Upload
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-[10px]"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onChooseAsset?.()
+                  }}
+                >
+                  <FolderOpen className="size-3.5" weight="bold" />
+                  Asset
+                </Button>
+              </div>
+            ) : null}
+          </div>
         )}
       </CardContent>
     </Card>

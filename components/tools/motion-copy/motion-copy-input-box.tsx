@@ -7,6 +7,10 @@ import { PhotoUpload, ImageUpload } from "@/components/shared/upload/photo-uploa
 import { VideoUpload } from "@/components/shared/upload/video-upload"
 import { CircleNotch } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
+import {
+  AssetSelectionModal,
+  type AssetSelectionPick,
+} from "@/components/shared/modals/asset-selection-modal"
 
 export interface MotionCopyInputBoxProps {
   className?: string
@@ -56,6 +60,9 @@ export function MotionCopyInputBox({
 }: MotionCopyInputBoxProps) {
   const [inputImage, setInputImage] = React.useState<ImageUpload | null>(defaultImage || null)
   const [inputVideo, setInputVideo] = React.useState<ImageUpload | null>(defaultVideo || null)
+  const [assetTarget, setAssetTarget] = React.useState<"image" | "video" | null>(null)
+
+  const maxVideoDurationSeconds = videoUploadProps?.maxDurationSeconds ?? 10
 
   // Sync with external changes
   React.useEffect(() => {
@@ -80,15 +87,31 @@ export function MotionCopyInputBox({
     onVideoChange?.(video)
   }
 
+  const handleAssetSelect = React.useCallback(
+    (pick: AssetSelectionPick) => {
+      if (assetTarget === "image") {
+        const image = { url: pick.url }
+        setInputImage(image)
+        onImageChange?.(image)
+      } else if (assetTarget === "video") {
+        const video = { url: pick.url }
+        setInputVideo(video)
+        onVideoChange?.(video)
+      }
+      setAssetTarget(null)
+    },
+    [assetTarget, onImageChange, onVideoChange],
+  )
+
   const handleGenerate = () => {
-    if (onGenerate && inputImage && inputVideo) {
+    if (onGenerate && inputImage?.url && inputVideo?.url) {
       onGenerate()
     }
   }
 
   // Determine if button is ready (both image and video are required)
   const isReady = React.useMemo(() => {
-    return !!(inputImage?.file && inputVideo?.file)
+    return !!(inputImage?.url && inputVideo?.url)
   }, [inputImage, inputVideo])
 
   return (
@@ -109,6 +132,9 @@ export function MotionCopyInputBox({
             description={photoUploadProps?.description || "Click to upload image"}
             maxHeight={photoUploadProps?.maxHeight ?? MOTION_COPY_PREVIEW.maxHeight}
             minHeight={photoUploadProps?.minHeight ?? MOTION_COPY_PREVIEW.minHeight}
+            showSourceActions
+            enablePaste
+            onChooseAsset={() => setAssetTarget("image")}
           />
         </div>
 
@@ -121,9 +147,11 @@ export function MotionCopyInputBox({
             onChange={handleVideoChange}
             title={videoUploadProps?.title || "Upload Video"}
             description={videoUploadProps?.description || "Click to upload video"}
-            maxDurationSeconds={videoUploadProps?.maxDurationSeconds ?? 10}
+            maxDurationSeconds={maxVideoDurationSeconds}
             maxHeight={videoUploadProps?.maxHeight ?? MOTION_COPY_PREVIEW.maxHeight}
             minHeight={videoUploadProps?.minHeight ?? MOTION_COPY_PREVIEW.minHeight}
+            showSourceActions
+            onChooseAsset={() => setAssetTarget("video")}
           />
         </div>
 
@@ -158,6 +186,16 @@ export function MotionCopyInputBox({
           </Button>
         </div>
       </CardContent>
+
+      <AssetSelectionModal
+        open={assetTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setAssetTarget(null)
+        }}
+        onSelect={handleAssetSelect}
+        allowedAssetTypes={assetTarget === "video" ? ["video"] : ["image"]}
+        defaultTab="assets"
+      />
     </Card>
   )
 }
