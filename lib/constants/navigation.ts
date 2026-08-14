@@ -89,6 +89,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/inpaint", label: "Image Editing" },
   { path: "/angles", label: "Angles" },
   { path: "/carousel-shots", label: "Carousel Shots" },
+  { path: "/photodump", label: "Photodump" },
   { path: "/image?model=custom/character-swap", label: "Character Swap" },
   { path: "/image?model=custom/face-swap", label: "Face Swap" },
   { path: "/ai-influencer", label: "AI Influencer" },
@@ -233,6 +234,22 @@ const baseMegaNavGroups: MegaNavGroup[] = [
               "multi-shot",
               "panel",
               "angles",
+            ],
+          },
+          {
+            path: "/photodump",
+            label: "Photodump",
+            description: "One selfie, many aesthetics — preset photodumps",
+            badge: "new",
+            iconPhosphor: "images",
+            searchKeywords: [
+              "instadump",
+              "photodump",
+              "preset",
+              "dump",
+              "aesthetic",
+              "cool girl",
+              "selfie",
             ],
           },
           {
@@ -412,6 +429,13 @@ const baseMegaNavGroups: MegaNavGroup[] = [
         title: "Models",
         items: [
           {
+            path: "/video?model=minimax/h3",
+            label: "MiniMax H3",
+            description: "2K video from text, first/last frame, or references",
+            badge: "new",
+            iconSrc: "/ai_icons/minimax.svg",
+          },
+          {
             path: "/video?model=alibaba/happy-horse/v1.1",
             label: "Happy Horse 1.1",
             description: "Unified text, image, and reference-to-video generation",
@@ -432,10 +456,17 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             iconSrc: "/ai_icons/gemini-color.svg",
           },
           {
+            path: "/video?model=bytedance/seedance-2.5",
+            label: "Seedance 2.5",
+            description: "Native 30s multimodal video with synced audio",
+            badge: "new",
+            iconSrc: "/ai_icons/bytedance-color.svg",
+            modelIdentifier: "bytedance/seedance-2.5",
+          },
+          {
             path: "/video?model=bytedance/seedance-2.0",
             label: "Seedance 2.0",
             description: "Multimodal video with reference audio and frames",
-            badge: "new",
             iconSrc: "/ai_icons/bytedance-color.svg",
             modelIdentifier: "bytedance/seedance-2.0",
           },
@@ -786,6 +817,12 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     href: "/carousel-shots",
     icon: "squares-four",
     hint: "Generate consistent carousel panels from one reference image.",
+  },
+  {
+    label: "Photodump",
+    href: "/photodump",
+    icon: "images",
+    hint: "Turn one selfie into a full preset photodump — different scenes, same star.",
   },
   {
     label: "Character Swap",

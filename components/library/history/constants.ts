@@ -21,6 +21,7 @@ export const HISTORY_TOOLS = [
   { value: "ai_influencer", label: "AI Influencer" },
   { value: "angles", label: "Angles" },
   { value: "carousel_shots", label: "Carousel Shots" },
+  { value: "photodump", label: "Photodump" },
   { value: "remove-background", label: "Background Remover" },
   { value: "upscale", label: "Upscale" },
   { value: "chat-generation", label: "AI Chat Agent" },

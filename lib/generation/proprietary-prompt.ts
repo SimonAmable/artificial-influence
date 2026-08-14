@@ -2,6 +2,7 @@
 const HIDDEN_DETAIL_TOOLS = new Set([
   "ai_influencer",
   "carousel_shots",
+  "photodump",
   "character_swap",
   "face_swap",
   "outfit_swap",
@@ -13,6 +14,7 @@ const HIDDEN_DETAIL_TOOLS = new Set([
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   ai_influencer: "AI Influencer",
   carousel_shots: "Carousel Shots",
+  photodump: "Photodump",
   character_swap: "Character Swap",
   face_swap: "Face Swap",
   outfit_swap: "Outfit Swap",

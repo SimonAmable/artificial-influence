@@ -762,6 +762,40 @@ export const SEEDANCE_2_0_META: ModelMetadata = {
   ],
 };
 
+export const SEEDANCE_2_5_META: ModelMetadata = {
+  id: 'seedance-2.5-meta',
+  identifier: 'bytedance/seedance-2.5',
+  name: 'Seedance 2.5',
+  description:
+    'ByteDance flagship multimodal video with native 30s clips and synced audio. Text and image-to-video on Replicate; video references route to Fal.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 90,
+  supports_reference_image: true,
+  supports_reference_video: true,
+  supports_reference_audio: true,
+  aspect_ratios: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive'],
+  supports_first_frame: true,
+  supports_last_frame: true,
+  customParameters: [
+    {
+      name: 'resolution',
+      label: 'Resolution',
+      options: ['480p', '720p'],
+      default: '720p',
+      description: 'Output resolution',
+    },
+    {
+      name: 'generate_audio',
+      label: 'Generate Audio',
+      options: ['true', 'false'],
+      default: 'true',
+      description: 'Synchronized dialogue, SFX, and music',
+    },
+  ],
+};
+
 export const HAPPY_HORSE_META: ModelMetadata = {
   id: 'happy-horse-v1.1-meta',
   identifier: 'alibaba/happy-horse/v1.1',
@@ -822,6 +856,40 @@ export const GEMINI_OMNI_FLASH_META: ModelMetadata = {
       options: ['3', '4', '5', '6', '7', '8', '9', '10'],
       default: '8',
       description: 'Video duration in seconds',
+    },
+  ],
+};
+
+export const MINIMAX_H3_META: ModelMetadata = {
+  id: 'minimax-h3-meta',
+  identifier: 'minimax/h3',
+  name: 'MiniMax H3',
+  description:
+    'MiniMax H3 on fal: text-to-video, first/last frame, or reference-to-video with images, clips, and audio at up to 4K.',
+  type: 'video',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 65,
+  supports_reference_image: true,
+  supports_reference_video: true,
+  supports_reference_audio: true,
+  aspect_ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', 'adaptive'],
+  supports_first_frame: true,
+  supports_last_frame: true,
+  customParameters: [
+    {
+      name: 'resolution',
+      label: 'Resolution',
+      options: ['480P', '768P', '2K', '4K'],
+      default: '2K',
+      description: '480P and 768P are native; 2K and 4K upscale a 768P base',
+    },
+    {
+      name: 'aspect_ratio',
+      label: 'Aspect Ratio',
+      options: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', 'adaptive'],
+      default: '16:9',
+      description: 'Used for text-to-video and reference-to-video',
     },
   ],
 };
@@ -928,8 +996,10 @@ export const VIDEO_MODELS_METADATA: ModelMetadata[] = [
   KLING_V2_6_PRO_META,
   HAILUO_2_3_FAST_META,
   SEEDANCE_2_0_META,
+  SEEDANCE_2_5_META,
   HAPPY_HORSE_META,
   GEMINI_OMNI_FLASH_META,
+  MINIMAX_H3_META,
   P_VIDEO_META,
 ];
 
@@ -983,10 +1053,11 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     KLING_V2_6_PRO_META,
     HAILUO_2_3_FAST_META,
     SEEDANCE_2_0_META,
+    SEEDANCE_2_5_META,
     P_VIDEO_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
-  fal: [WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, SEEDREAM_5_PRO_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META],
+  fal: [WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, SEEDREAM_5_PRO_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META, MINIMAX_H3_META],
   xai: [GROK_IMAGINE_META],
 };
 

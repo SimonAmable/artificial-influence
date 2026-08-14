@@ -29,6 +29,9 @@ import { LayoutGroup } from "framer-motion"
 import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
 import {
   isGeminiOmniFlashModelIdentifier,
+  isMinimaxH3ModelIdentifier,
+  isSeedanceVideoModelIdentifier,
+  getSeedanceMaxReferenceImages,
   usesFalMultimodalVideoInputs,
 } from "@/lib/constants/models"
 import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
@@ -167,7 +170,7 @@ export function VideoInputBox({
     isGeminiOmniFlashModelIdentifier(selectedModel.identifier) ||
     selectedModel.identifier === 'xai/grok-imagine-video' ||
     selectedModel.identifier === 'kwaivgi/kling-v3-omni-video' ||
-    selectedModel.identifier === 'bytedance/seedance-2.0'
+    isSeedanceVideoModelIdentifier(selectedModel.identifier)
 
   // Check if model supports image/last frame based on parameters
   const modelSupportsImage = React.useMemo(() => {
@@ -193,15 +196,22 @@ export function VideoInputBox({
 
   const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
   const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
-  const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
+  const isSeedance2 = isSeedanceVideoModelIdentifier(selectedModel.identifier)
   const isPrunaPVideo = selectedModel.identifier === 'prunaai/p-video'
   const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
   const isFalMultimodalVideo = usesFalMultimodalVideoInputs(selectedModel.identifier)
   const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(selectedModel.identifier)
+  const isMinimaxH3 = isMinimaxH3ModelIdentifier(selectedModel.identifier)
   const isKlingV3OrOmni = isKlingV3 || isKlingV3Omni
   const usesRefImageGallery = isKlingV3Omni || isSeedance2 || isFalMultimodalVideo
   const totalDuration = Number(parameters.duration) || 5
-  const maxReferenceImages = isSeedance2 || isFalMultimodalVideo ? 9 : inputVideo ? 4 : 7
+  const maxReferenceImages = isSeedance2
+    ? getSeedanceMaxReferenceImages(selectedModel.identifier)
+    : isFalMultimodalVideo
+      ? 9
+      : inputVideo
+        ? 4
+        : 7
 
   // Determine if we need prompt
   const needsPrompt = !isMotionCopyModel && !isLipsyncModel
@@ -238,9 +248,10 @@ export function VideoInputBox({
     (referenceImages.length > 0 || chipSlotInfo.omniStyleImageChipUrls.length > 0)
 
   React.useEffect(() => {
-    if (!falMultimodalReferenceMode || !inputImage) return
-    onInputImageChange(null)
-  }, [falMultimodalReferenceMode, inputImage, onInputImageChange])
+    if (!falMultimodalReferenceMode) return
+    if (inputImage) onInputImageChange(null)
+    if (isMinimaxH3 && lastFrameImage) onLastFrameChange(null)
+  }, [falMultimodalReferenceMode, inputImage, isMinimaxH3, lastFrameImage, onInputImageChange, onLastFrameChange])
 
   const removeAttachedRef = React.useCallback(
     (ref: AttachedRef) => {
@@ -273,9 +284,9 @@ export function VideoInputBox({
   ])
 
   const canAddSeedanceReferenceAudio = React.useMemo(() => {
-    if (!isSeedance2 && !isPrunaPVideo && !isWan27) return false
+    if (!isSeedance2 && !isPrunaPVideo && !isWan27 && !isMinimaxH3) return false
     return !(inputAudio?.file || inputAudio?.url)
-  }, [inputAudio, isPrunaPVideo, isSeedance2, isWan27])
+  }, [inputAudio, isMinimaxH3, isPrunaPVideo, isSeedance2, isWan27])
 
   const referenceAudioConfig = React.useMemo(
     () => getVideoReferenceAudioConfig(selectedModel.identifier),
@@ -365,7 +376,7 @@ export function VideoInputBox({
       return mergedPromptForReady.length > 0 || !!inputImage || hasRefChips
     }
     if (isFalMultimodalVideo) {
-      if (falMultimodalReferenceMode) {
+      if (falMultimodalReferenceMode || isMinimaxH3) {
         return mergedPromptForReady.length > 0
       }
       return mergedPromptForReady.length > 0 || !!inputImage
@@ -407,6 +418,7 @@ export function VideoInputBox({
     lastFrameImage,
     isFalMultimodalVideo,
     falMultimodalReferenceMode,
+    isMinimaxH3,
     isPrunaPVideo,
     isSeedance2,
     isWan27,
@@ -480,7 +492,9 @@ export function VideoInputBox({
 
     if (isFalMultimodalVideo) {
       if (falMultimodalReferenceMode) return "reference"
-      return "input"
+      if (!inputImage) return "input"
+      if (modelSupportsLastFrame && !lastFrameImage) return "lastFrame"
+      return null
     }
 
     if (!modelSupportsImage && !modelSupportsLastFrame) return null
@@ -699,7 +713,7 @@ export function VideoInputBox({
                   variant="outline"
                   className={influencerControlIconButtonClassName}
                   aria-label={
-                    isSeedance2
+                    isSeedance2 || isMinimaxH3
                       ? "Add image, video, or reference (image/audio)"
                       : "Add image or video"
                   }
@@ -730,7 +744,7 @@ export function VideoInputBox({
                 {modelSupportsLastFrame && (
                   <DropdownMenuItem
                     onClick={() => lastFrameRef.current?.click()}
-                    disabled={!!lastFrameImage || chipSlotInfo.lastFrameSlotFromChip}
+                    disabled={!!lastFrameImage || chipSlotInfo.lastFrameSlotFromChip || falMultimodalReferenceMode}
                     className="flex items-center justify-between gap-2"
                   >
                     <span className="flex items-center">
@@ -771,10 +785,14 @@ export function VideoInputBox({
                       <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
                         JPEG or PNG, up to {maxReferenceImages}. Use [Image1] in your prompt.
                       </span>
+                    ) : isMinimaxH3 ? (
+                      <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                        Up to {maxReferenceImages} stills. Cite them as Image 1, Image 2 in the prompt.
+                      </span>
                     ) : null}
                   </DropdownMenuItem>
                 )}
-                {(isSeedance2 || isPrunaPVideo || isWan27) && (
+                {(isSeedance2 || isPrunaPVideo || isWan27 || isMinimaxH3) && (
                   <DropdownMenuItem
                     disabled={!canAddSeedanceReferenceAudio}
                     onClick={() => referenceAudioRef.current?.click()}

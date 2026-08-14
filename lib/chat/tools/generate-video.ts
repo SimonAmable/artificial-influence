@@ -8,6 +8,17 @@ import { applyMinimalReplicateVideoModeration } from "@/lib/server/minimal-moder
 import { checkUserHasCredits } from "@/lib/credits"
 import { validateExternalReferenceUrl } from "@/lib/server/external-reference-url"
 import { resolveVideoPricingQuote } from "@/lib/video-pricing"
+import {
+  isMinimaxH3ModelIdentifier,
+  isSeedanceVideoModelIdentifier,
+} from "@/lib/constants/models"
+import {
+  buildFalVideoRequest,
+  isSupportedFalVideoModel,
+  normalizeFalVideoModelIdentifier,
+  shouldRouteSeedance25ToFal,
+  submitFalVideoQueue,
+} from "@/lib/server/fal-video"
 import type {
   AvailableChatImageReference,
   ChatImageReference,
@@ -19,9 +30,9 @@ import { resolveToolVideoReferences } from "@/lib/chat/resolve-tool-video-refere
 
 const DEFAULT_TEXT_TO_VIDEO_MODEL = "prunaai/p-video" as const
 const DEFAULT_MOTION_COPY_MODEL = "kwaivgi/kling-v3-motion-control" as const
-const MAX_REFERENCE_IMAGES = 4
-const MAX_REFERENCE_VIDEOS = 2
-const MAX_REFERENCE_AUDIOS = 3
+const MAX_REFERENCE_IMAGES = 30
+const MAX_REFERENCE_VIDEOS = 10
+const MAX_REFERENCE_AUDIOS = 10
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
 export interface ChatVideoReference {
@@ -254,7 +265,7 @@ export function createGenerateVideoTool({
     inputSchema: z.object({
       prompt: z
         .string()
-        .max(2000)
+        .max(7000)
         .optional()
         .describe(
           "Video prompt. When the user gave detailed/explicit wording or asked for exact/literal use, pass it verbatim. May be empty for motion-copy models that use an image and a video reference.",
@@ -270,7 +281,7 @@ export function createGenerateVideoTool({
         .max(6)
         .optional()
         .describe(
-          "Saved asset UUIDs from searchAssets. Mixed image, video, and audio assets are allowed (e.g. reference audio for Seedance 2.0). Do not pass URLs or storage paths here.",
+          "Saved asset UUIDs from searchAssets. Mixed image, video, and audio assets are allowed (e.g. reference audio for Seedance). Do not pass URLs or storage paths here.",
         ),
       referenceIds: z
         .array(z.string().min(1))
@@ -299,7 +310,7 @@ export function createGenerateVideoTool({
         .optional()
         .describe("Deprecated alias for referenceIds."),
       aspectRatio: z.string().min(1).max(32).optional(),
-      duration: z.number().int().min(1).max(15).optional(),
+      duration: z.number().int().min(1).max(30).optional(),
       resolution: z.string().min(1).max(32).optional(),
       draft: z.boolean().optional(),
       negativePrompt: z.string().max(1000).optional(),
@@ -371,10 +382,6 @@ export function createGenerateVideoTool({
           : { references: [] as ChatAudioReference[], warnings: [] as string[] }
 
       const referenceWarnings = [...imageRefWarnings, ...videoRefWarnings, ...audioRefWarnings]
-
-      if (!process.env.REPLICATE_API_TOKEN) {
-        throw new Error("REPLICATE_API_TOKEN is not configured.")
-      }
 
       const assetReferences = await loadAssetReferences(assetIds, supabase, userId)
       const characterAssetId =
@@ -455,12 +462,20 @@ export function createGenerateVideoTool({
       const primaryVideo = uploadedVideos[0]?.url
       const referenceAudioUrls = uploadedAudios.map((item) => item.url).filter((url) => typeof url === "string" && url.length > 0)
       const normalizedPrompt = prompt.trim()
-      const resolvedModel =
+      const requestedModel =
         modelIdentifier ??
         (primaryImage && primaryVideo ? DEFAULT_MOTION_COPY_MODEL : DEFAULT_TEXT_TO_VIDEO_MODEL)
+      const resolvedModel = normalizeFalVideoModelIdentifier(requestedModel) ?? requestedModel
       const isMotionCopy =
         resolvedModel === "kwaivgi/kling-v2.6-motion-control" ||
         resolvedModel === "kwaivgi/kling-v3-motion-control"
+      const isFalVideo = isSupportedFalVideoModel(resolvedModel)
+      const isMinimaxH3 = isMinimaxH3ModelIdentifier(resolvedModel)
+      const isSeedance = isSeedanceVideoModelIdentifier(resolvedModel)
+      const seedance25UsesFal = shouldRouteSeedance25ToFal({
+        hasReferenceVideo: Boolean(primaryVideo),
+        modelIdentifier: resolvedModel,
+      })
 
       if (isMotionCopy && (!primaryImage || !primaryVideo)) {
         throw new Error("Motion-copy video generation requires both an image and a video reference.")
@@ -477,13 +492,15 @@ export function createGenerateVideoTool({
       }
 
       if (
-        resolvedModel === "bytedance/seedance-2.0" &&
+        (isSeedance || isMinimaxH3) &&
         referenceAudioUrls.length > 0 &&
         uploadedImages.length === 0 &&
         uploadedVideos.length === 0
       ) {
         throw new Error(
-          "Seedance 2.0 reference audio requires at least one reference image, reference video, or first-frame image. Attach an image or video (or use saved image/video assets) alongside the audio.",
+          isMinimaxH3
+            ? "MiniMax H3 reference audio requires at least one reference image or video."
+            : "Seedance reference audio requires at least one reference image, reference video, or first-frame image. Attach an image or video (or use saved image/video assets) alongside the audio.",
         )
       }
 
@@ -518,6 +535,104 @@ export function createGenerateVideoTool({
       const hasCredits = await checkUserHasCredits(userId, requiredCredits, supabase)
       if (!hasCredits) {
         throw new Error(`Insufficient credits. This video generation requires ${requiredCredits} credits.`)
+      }
+
+      const referenceImageStoragePaths = uploadedImages
+        .map((item) => item.storagePath)
+        .filter((value): value is string => Boolean(value))
+      const referenceVideoStoragePaths = uploadedVideos
+        .map((item) => item.storagePath)
+        .filter((value): value is string => Boolean(value))
+
+      if (isFalVideo || seedance25UsesFal) {
+        const allImageUrls = uploadedImages
+          .map((item) => item.url)
+          .filter((url): url is string => typeof url === "string" && url.length > 0)
+        const allVideoUrls = uploadedVideos
+          .map((item) => item.url)
+          .filter((url): url is string => typeof url === "string" && url.length > 0)
+        const useMinimaxReferenceMode =
+          isMinimaxH3 &&
+          (additionalImages.length > 0 || allVideoUrls.length > 0 || referenceAudioUrls.length > 0)
+        const useGenericFalReferenceMode = !isMinimaxH3 && !seedance25UsesFal && allImageUrls.length > 1
+
+        const falRequest = buildFalVideoRequest({
+          aspectRatio: aspectRatio ?? null,
+          duration: duration ?? null,
+          endImageUrl:
+            (isMinimaxH3 && !useMinimaxReferenceMode) || seedance25UsesFal
+              ? secondaryImage ?? null
+              : null,
+          generateAudio: typeof generateAudio === "boolean" ? generateAudio : null,
+          imageUrl:
+            useMinimaxReferenceMode || useGenericFalReferenceMode
+              ? null
+              : primaryImage ?? null,
+          modelIdentifier: resolvedModel,
+          prompt: normalizedPrompt,
+          referenceAudioUrls: isMinimaxH3 || seedance25UsesFal ? referenceAudioUrls : [],
+          referenceImageUrls:
+            useMinimaxReferenceMode || useGenericFalReferenceMode || seedance25UsesFal
+              ? allImageUrls
+              : [],
+          referenceVideoUrls: isMinimaxH3 || seedance25UsesFal ? allVideoUrls : [],
+          resolution: resolution ?? null,
+          videoUrl: primaryVideo ?? null,
+        })
+        const { requestId, endpointId: falEndpoint } = await submitFalVideoQueue(
+          falRequest.endpointId,
+          falRequest.input,
+        )
+
+        const { data: pendingGeneration, error: saveError } = await supabase
+          .from("generations")
+          .insert({
+            user_id: userId,
+            prompt: normalizedPrompt || null,
+            supabase_storage_path: null,
+            reference_images_supabase_storage_path:
+              referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+            reference_videos_supabase_storage_path:
+              referenceVideoStoragePaths.length > 0 ? referenceVideoStoragePaths : null,
+            model: resolvedModel,
+            type: "video",
+            is_public: true,
+            tool: "chat-generate-video",
+            status: "pending",
+            replicate_prediction_id: requestId,
+            fal_request_id: requestId,
+            fal_endpoint_id: falEndpoint,
+            quoted_credits: requiredCredits,
+            predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
+            character_asset_id: characterAssetId,
+            ...(threadId ? { chat_thread_id: threadId } : {}),
+          })
+          .select("id")
+          .single()
+
+        if (saveError || !pendingGeneration) {
+          console.error("[chat/generate-video] Failed to save Fal generation row:", saveError)
+          throw new Error("Failed to create pending video generation.")
+        }
+
+        return {
+          generationId: pendingGeneration.id,
+          message: `Started a video generation with ${resolvedModel}. If no later tool or automatic follow-up in this workflow needs the finished video, stop here and let the UI update asynchronously.`,
+          model: resolvedModel,
+          nextStepHint:
+            "Only call awaitGeneration for short same-turn dependency chains, or scheduleGenerationFollowUp for long video chains that truly require a later automatic step. Otherwise reply to the user and stop.",
+          predictionId: requestId,
+          creditsQuoted: requiredCredits,
+          status: "pending" as const,
+          usedImageReferenceCount: uploadedImages.length,
+          usedVideoReferenceCount: uploadedVideos.length,
+          usedAudioReferenceCount: uploadedAudios.length,
+          ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
+        }
+      }
+
+      if (!process.env.REPLICATE_API_TOKEN) {
+        throw new Error("REPLICATE_API_TOKEN is not configured.")
       }
 
       const webhookBase = process.env.REPLICATE_WEBHOOK_BASE_URL?.replace(/\/$/, "")
@@ -603,7 +718,8 @@ export function createGenerateVideoTool({
           if (keepOriginalSound !== undefined) replicateInput.keep_original_sound = keepOriginalSound
           if (negativePrompt) replicateInput.negative_prompt = negativePrompt
           break
-        case "bytedance/seedance-2.0": {
+        case "bytedance/seedance-2.0":
+        case "bytedance/seedance-2.5": {
           const refMode = Boolean(primaryVideo) || additionalImages.length > 0
           if (duration != null) replicateInput.duration = duration
           if (aspectRatio) replicateInput.aspect_ratio = aspectRatio
@@ -678,13 +794,6 @@ export function createGenerateVideoTool({
               webhook_events_filter: ["completed"],
             },
       )
-
-      const referenceImageStoragePaths = uploadedImages
-        .map((item) => item.storagePath)
-        .filter((value): value is string => Boolean(value))
-      const referenceVideoStoragePaths = uploadedVideos
-        .map((item) => item.storagePath)
-        .filter((value): value is string => Boolean(value))
 
       const { data: pendingGeneration, error: saveError } = await supabase
         .from("generations")

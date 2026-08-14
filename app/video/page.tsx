@@ -36,6 +36,8 @@ import { resolveVideoPricingQuote } from "@/lib/video-pricing"
 import {
   isHappyHorseModelIdentifier,
   isGeminiOmniFlashModelIdentifier,
+  isMinimaxH3ModelIdentifier,
+  isSeedanceVideoModelIdentifier,
   MODEL_IDENTIFIERS,
   usesFalMultimodalVideoInputs,
 } from "@/lib/constants/models"
@@ -111,6 +113,8 @@ const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
   "kling-v3-video": "kwaivgi/kling-v3-video",
   "seedance-2": "bytedance/seedance-2.0",
   "seedance-2.0": "bytedance/seedance-2.0",
+  "seedance-2.5": "bytedance/seedance-2.5",
+  seedance: "bytedance/seedance-2.5",
   "wan-2.7": "wan-video/wan-2.7",
   "wan2.7": "wan-video/wan-2.7",
   "wan-27": "wan-video/wan-2.7",
@@ -119,6 +123,14 @@ const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
   "happy-horse-video": MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE,
   "happy-horse-v1.1": MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE,
   [MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE_LEGACY]: MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE,
+  h3: MODEL_IDENTIFIERS.MINIMAX_H3,
+  "minimax-h3": MODEL_IDENTIFIERS.MINIMAX_H3,
+  "minimax/h3": MODEL_IDENTIFIERS.MINIMAX_H3,
+  "minimax/h3/text-to-video": MODEL_IDENTIFIERS.MINIMAX_H3,
+  "minimax/h3/image-to-video": MODEL_IDENTIFIERS.MINIMAX_H3,
+  "minimax/h3/reference-to-video": MODEL_IDENTIFIERS.MINIMAX_H3,
+  "hailuo-03": MODEL_IDENTIFIERS.MINIMAX_H3,
+  hailuo03: MODEL_IDENTIFIERS.MINIMAX_H3,
 }
 
 function VideoPageContent() {
@@ -352,8 +364,8 @@ function VideoPageContent() {
   // Kling Omni / Seedance: when reference video is added, cap extra reference images
   React.useEffect(() => {
     const id = selectedModel?.identifier
-    if (id !== 'kwaivgi/kling-v3-omni-video' && id !== 'bytedance/seedance-2.0') return
-    const maxWithVideo = id === 'bytedance/seedance-2.0' ? 9 : 4
+    if (id !== 'kwaivgi/kling-v3-omni-video' && !isSeedanceVideoModelIdentifier(id)) return
+    const maxWithVideo = isSeedanceVideoModelIdentifier(id) ? (id === 'bytedance/seedance-2.5' ? 30 : 9) : 4
     if (inputVideo && referenceImages.length > maxWithVideo) {
       setReferenceImages((prev) => prev.slice(0, maxWithVideo))
     }
@@ -628,11 +640,12 @@ function VideoPageContent() {
     const isMotionCopy = selectedModel.identifier === 'kwaivgi/kling-v2.6-motion-control' || selectedModel.identifier === 'kwaivgi/kling-v3-motion-control'
     const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
     const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
-    const isSeedance2 = selectedModel.identifier === 'bytedance/seedance-2.0'
+    const isSeedance2 = isSeedanceVideoModelIdentifier(selectedModel.identifier)
     const isPrunaPVideo = selectedModel.identifier === 'prunaai/p-video'
     const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
     const isHappyHorse = isHappyHorseModelIdentifier(selectedModel.identifier)
     const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(selectedModel.identifier)
+    const isMinimaxH3 = isMinimaxH3ModelIdentifier(selectedModel.identifier)
     const isFalMultimodalVideo = usesFalMultimodalVideoInputs(selectedModel.identifier)
     const isLipsync =
       selectedModel.identifier.includes('lipsync') ||
@@ -765,6 +778,7 @@ function VideoPageContent() {
       isWan27,
       isHappyHorse,
       isGeminiOmniFlash,
+      isMinimaxH3,
       isFalMultimodalVideo,
       falMultimodalReferenceMode,
       isLipsync,
@@ -805,6 +819,7 @@ function VideoPageContent() {
       const isWan27 = capture.isWan27
       const isHappyHorse = capture.isHappyHorse
       const isGeminiOmniFlash = capture.isGeminiOmniFlash
+      const isMinimaxH3 = capture.isMinimaxH3
       const isFalMultimodalVideo = capture.isFalMultimodalVideo
       const falMultimodalReferenceMode = capture.falMultimodalReferenceMode
       const isLipsync = capture.isLipsync
@@ -933,17 +948,18 @@ function VideoPageContent() {
           isKlingV3Omni ||
           isSeedance2 ||
           isPrunaPVideo ||
-          isWan27)
+          isWan27 ||
+          isMinimaxH3)
       ) {
         const lastFrameUpload = await uploadImageToSupabase(lastFrameImage.file, user.id, 'video-gen-last-frames')
         requestBody.last_frame = lastFrameUpload.url
-        if (isSeedance2 || isPrunaPVideo) requestBody.last_frame_image = lastFrameUpload.url
+        if (isSeedance2 || isPrunaPVideo || isMinimaxH3) requestBody.last_frame_image = lastFrameUpload.url
         if (isKlingV3 || isKlingV3Omni) requestBody.end_image = lastFrameUpload.url
       }
       if (!lastFrameImage?.file && lastFrameImage?.url && (isKlingV3 || isKlingV3Omni)) {
         requestBody.end_image = lastFrameImage.url
       }
-      if (!lastFrameImage?.file && lastFrameImage?.url && (isSeedance2 || isPrunaPVideo)) {
+      if (!lastFrameImage?.file && lastFrameImage?.url && (isSeedance2 || isPrunaPVideo || isMinimaxH3)) {
         requestBody.last_frame_image = lastFrameImage.url
       }
       if (lastFrameImage?.url && isWan27 && !requestBody.last_frame) {
@@ -962,10 +978,11 @@ function VideoPageContent() {
           isKlingV3Omni ||
           isSeedance2 ||
           isPrunaPVideo ||
-          isWan27)
+          isWan27 ||
+          isMinimaxH3)
       ) {
         requestBody.last_frame = chipSlots.lastFrameChipUrl
-        if (isSeedance2 || isPrunaPVideo) requestBody.last_frame_image = chipSlots.lastFrameChipUrl
+        if (isSeedance2 || isPrunaPVideo || isMinimaxH3) requestBody.last_frame_image = chipSlots.lastFrameChipUrl
         if (isKlingV3 || isKlingV3Omni) requestBody.end_image = chipSlots.lastFrameChipUrl
       }
 
@@ -1006,11 +1023,22 @@ function VideoPageContent() {
         requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
       }
 
-      if (isSeedance2 && inputAudio?.file) {
+      if (isMinimaxH3 && inputVideo?.file) {
+        const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'video-gen-reference-videos')
+        requestBody.reference_videos = [videoUpload.url]
+      }
+      if (!inputVideo?.file && isMinimaxH3 && inputVideo?.url) {
+        requestBody.reference_videos = [inputVideo.url]
+      }
+      if (isMinimaxH3 && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
+        requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
+      }
+
+      if ((isSeedance2 || isMinimaxH3) && inputAudio?.file) {
         const audioUpload = await uploadImageToSupabase(inputAudio.file, user.id, 'video-gen-reference-audios')
         requestBody.reference_audios = [audioUpload.url]
       }
-      if (!inputAudio?.file && isSeedance2 && inputAudio?.url) {
+      if (!inputAudio?.file && (isSeedance2 || isMinimaxH3) && inputAudio?.url) {
         requestBody.reference_audios = [inputAudio.url]
       }
 

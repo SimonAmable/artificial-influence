@@ -42,6 +42,7 @@ export function resolveVideoPricingQuote(input: VideoPricingQuoteInput): VideoPr
       generate_audio: input.generateAudio,
       duration: input.duration,
       character_orientation: input.characterOrientation,
+      has_reference_video: Boolean(input.hasInputVideo || input.hasReferenceVideo),
     },
     durationSeconds: input.duration,
     sourceDurationSeconds: input.sourceDurationSeconds,

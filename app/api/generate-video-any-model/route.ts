@@ -8,6 +8,7 @@ import {
   buildFalVideoRequest,
   isSupportedFalVideoModel,
   normalizeFalVideoModelIdentifier,
+  shouldRouteSeedance25ToFal,
   submitFalVideoQueue,
 } from '@/lib/server/fal-video';
 import { resolveWan27Replicate } from '@/lib/server/wan-2.7-replicate';
@@ -131,15 +132,29 @@ export async function POST(request: NextRequest) {
     const hasReferenceVideo =
       typeof body.reference_video === 'string' ||
       (Array.isArray(body.reference_videos) && body.reference_videos.some((value: unknown) => typeof value === 'string'));
-    const falReferenceVideo =
-      typeof body.reference_video === 'string'
-        ? body.reference_video
-        : Array.isArray(body.reference_videos)
-          ? body.reference_videos.find(
-              (value: unknown): value is string => typeof value === 'string' && value.length > 0,
-            ) ?? null
-          : null;
+    const falReferenceVideos = [
+      ...(Array.isArray(body.reference_videos) ? body.reference_videos : []),
+      typeof body.reference_video === 'string' ? body.reference_video : null,
+      typeof body.video === 'string' ? body.video : null,
+      typeof body.videoPublicUrl === 'string' ? body.videoPublicUrl : null,
+    ].filter((value: unknown): value is string => typeof value === 'string' && value.length > 0);
+    const falReferenceVideo = falReferenceVideos[0] ?? null;
+    const falReferenceAudios = [
+      ...(Array.isArray(body.reference_audios) ? body.reference_audios : []),
+      typeof otherParams.audio === 'string' ? otherParams.audio : null,
+    ].filter((value: unknown): value is string => typeof value === 'string' && value.length > 0);
+    const falEndImageUrl = [
+      typeof last_frame === 'string' ? last_frame : null,
+      typeof body.last_frame_image === 'string' ? body.last_frame_image : null,
+      typeof otherParams.last_frame_image === 'string' ? otherParams.last_frame_image : null,
+      typeof otherParams.end_image === 'string' ? otherParams.end_image : null,
+    ].find((value): value is string => typeof value === 'string' && value.length > 0) ?? null;
     const isFalMultimodalVideo = usesFalMultimodalVideoInputs(catalogModelIdentifier);
+    const seedance25UsesFal = shouldRouteSeedance25ToFal({
+      hasReferenceVideo: falReferenceVideos.length > 0,
+      modelIdentifier: catalogModelIdentifier,
+    });
+    const useFalReferenceBundle = isFalMultimodalVideo || seedance25UsesFal;
     const isHappyHorse = isHappyHorseModelIdentifier(catalogModelIdentifier);
     const falMultimodalReferenceImages = Array.isArray(body.reference_images)
       ? body.reference_images.filter(
@@ -228,23 +243,43 @@ export async function POST(request: NextRequest) {
 
     const modelProvider = typeof modelData.provider === 'string' ? modelData.provider : null;
 
-    if (modelProvider === 'fal' && isSupportedFalVideoModel(catalogModelIdentifier)) {
+    if (
+      (modelProvider === 'fal' && isSupportedFalVideoModel(catalogModelIdentifier)) ||
+      seedance25UsesFal
+    ) {
       const referenceImageStoragePaths = collectStoragePaths([
         image,
         first_frame_image,
+        last_frame,
+        body.last_frame_image,
         body.reference_images,
       ]);
       const referenceVideoStoragePaths = collectStoragePaths([
         body.reference_video,
         body.reference_videos,
+        body.video,
+        body.videoPublicUrl,
       ]);
-      const falRequest = buildFalVideoRequest({
+      let falRequest: ReturnType<typeof buildFalVideoRequest>
+      try {
+        falRequest = buildFalVideoRequest({
         aspectRatio:
           typeof otherParams.aspect_ratio === 'string' ? otherParams.aspect_ratio : null,
         duration:
           typeof otherParams.duration === 'number' || typeof otherParams.duration === 'string'
             ? otherParams.duration
             : null,
+        enablePromptExpansion:
+          typeof otherParams.enable_prompt_expansion === 'boolean'
+            ? otherParams.enable_prompt_expansion
+            : null,
+        enableSafetyChecker:
+          typeof otherParams.enable_safety_checker === 'boolean'
+            ? otherParams.enable_safety_checker
+            : null,
+        endImageUrl: falEndImageUrl,
+        generateAudio:
+          typeof otherParams.generate_audio === 'boolean' ? otherParams.generate_audio : null,
         imageUrl:
           typeof image === 'string'
             ? image
@@ -253,15 +288,23 @@ export async function POST(request: NextRequest) {
               : null,
         modelIdentifier: catalogModelIdentifier,
         prompt: typeof prompt === 'string' ? prompt : null,
-        referenceImageUrls: isFalMultimodalVideo ? falMultimodalReferenceImages : [],
+        referenceAudioUrls: useFalReferenceBundle ? falReferenceAudios : [],
+        referenceImageUrls: useFalReferenceBundle ? falMultimodalReferenceImages : [],
+        referenceVideoUrls: useFalReferenceBundle ? falReferenceVideos : [],
         resolution:
           typeof otherParams.resolution === 'string' ? otherParams.resolution : null,
         seed:
           otherParams.seed !== null && otherParams.seed !== undefined
             ? (otherParams.seed as number | string)
             : null,
-        videoUrl: isFalMultimodalVideo ? falReferenceVideo : null,
-      });
+        videoUrl: useFalReferenceBundle ? falReferenceVideo : null,
+        })
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : 'Invalid Fal video request' },
+          { status: 400 },
+        )
+      }
       const { requestId, endpointId: falEndpoint } = await submitFalVideoQueue(
         falRequest.endpointId,
         falRequest.input,
@@ -462,7 +505,8 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case 'bytedance/seedance-2.0': {
+      case 'bytedance/seedance-2.0':
+      case 'bytedance/seedance-2.5': {
         const refVideosRaw = [
           ...(Array.isArray(body.reference_videos) ? body.reference_videos : []),
           body.video,

@@ -38,7 +38,9 @@ import {
   DEFAULT_MOTION_COPY_MODEL_IDENTIFIER,
   isHappyHorseModelIdentifier,
   isGeminiOmniFlashModelIdentifier,
+  isMinimaxH3ModelIdentifier,
   isMotionCopyModelIdentifier,
+  isSeedanceVideoModelIdentifier,
   normalizeMotionCopyModelIdentifier,
   usesFalMultimodalVideoInputs,
 } from "@/lib/constants/models"
@@ -769,10 +771,11 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     )
     const isKlingV3 = modelIdentifier === "kwaivgi/kling-v3-video"
     const isKlingV3Omni = modelIdentifier === "kwaivgi/kling-v3-omni-video"
-    const isSeedance2 = modelIdentifier === "bytedance/seedance-2.0"
+    const isSeedance2 = isSeedanceVideoModelIdentifier(modelIdentifier)
     const isPrunaPVideo = modelIdentifier === "prunaai/p-video"
     const isWan27 = modelIdentifier === "wan-video/wan-2.7"
     const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(modelIdentifier)
+    const isMinimaxH3 = isMinimaxH3ModelIdentifier(modelIdentifier)
     const isFalMultimodalVideo = usesFalMultimodalVideoInputs(modelIdentifier)
 
     if (isMotionCopy && (!finalImageUrl || !finalVideoUrl)) {
@@ -819,10 +822,16 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
       !isLipsync &&
       modelSupportsLastFrame &&
       !isPrunaPVideo &&
+      !isFalMultimodalVideo &&
       !finalLastFrameUrl &&
       !chipSlots.lastFrameChipUrl
     ) {
       nodeData.onDataChange?.(id, { error: "Last frame image is required" })
+      return
+    }
+
+    if (isMinimaxH3 && !fullPrompt) {
+      nodeData.onDataChange?.(id, { error: "Prompt is required" })
       return
     }
 
@@ -1026,14 +1035,14 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         }
         if (lastFrameUpload?.url) {
           requestBody.last_frame = lastFrameUpload.url
-          if (isSeedance2 || isPrunaPVideo) requestBody.last_frame_image = lastFrameUpload.url
+          if (isSeedance2 || isPrunaPVideo || isMinimaxH3) requestBody.last_frame_image = lastFrameUpload.url
           if (isKlingV3 || isKlingV3Omni) {
             requestBody.end_image = lastFrameUpload.url
           }
         }
         if (!requestBody.last_frame && chipSlots.lastFrameChipUrl && modelSupportsLastFrame) {
           requestBody.last_frame = chipSlots.lastFrameChipUrl
-          if (isSeedance2 || isPrunaPVideo) requestBody.last_frame_image = chipSlots.lastFrameChipUrl
+          if (isSeedance2 || isPrunaPVideo || isMinimaxH3) requestBody.last_frame_image = chipSlots.lastFrameChipUrl
           if (isKlingV3 || isKlingV3Omni) {
             requestBody.end_image = chipSlots.lastFrameChipUrl
           }
@@ -1062,7 +1071,13 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
         if (isSeedance2 && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
           requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
         }
-        if (isSeedance2 && audioUpload?.url) {
+        if (isMinimaxH3 && videoUpload?.url) {
+          requestBody.reference_videos = [videoUpload.url]
+        }
+        if (isMinimaxH3 && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
+          requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
+        }
+        if ((isSeedance2 || isMinimaxH3) && audioUpload?.url) {
           requestBody.reference_audios = [audioUpload.url]
         }
         if (isPrunaPVideo && audioUpload?.url) {
@@ -1135,10 +1150,11 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     (param) => param.name === "last_frame" || param.name === "last_frame_image",
   )
 
-  const isSeedance2Node = selectedModel?.identifier === "bytedance/seedance-2.0"
+  const isSeedance2Node = isSeedanceVideoModelIdentifier(selectedModel?.identifier)
   const isPrunaPVideoNode = selectedModel?.identifier === "prunaai/p-video"
   const isWan27Node = selectedModel?.identifier === "wan-video/wan-2.7"
   const isGeminiOmniFlashNode = isGeminiOmniFlashModelIdentifier(selectedModel?.identifier)
+  const isMinimaxH3Node = isMinimaxH3ModelIdentifier(selectedModel?.identifier)
   const referenceAudioConfig = selectedModel
     ? getVideoReferenceAudioConfig(selectedModel.identifier)
     : null
@@ -1147,8 +1163,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     !!isMotionCopyModel ||
     isSeedance2Node ||
     isGeminiOmniFlashNode ||
+    isMinimaxH3Node ||
     selectedModel?.supports_reference_video === true
-  const showAudioUpload = !!isLipsyncModel || isSeedance2Node || isPrunaPVideoNode || isWan27Node
+  const showAudioUpload = !!isLipsyncModel || isSeedance2Node || isPrunaPVideoNode || isWan27Node || isMinimaxH3Node
   const showLastFrameUpload = !!modelSupportsLastFrame
   const hasUploadOptions = showImageUpload || showVideoUpload || showAudioUpload || showLastFrameUpload
   const showDualFrameHandles =

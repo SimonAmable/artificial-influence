@@ -42,10 +42,12 @@ export const MODEL_IDENTIFIERS = {
   MINIMAX_HAILUO_2_3_FAST: 'minimax/hailuo-2.3-fast',
   GOOGLE_VEO_3_1_FAST: 'google/veo-3.1-fast',
   BYTEDANCE_SEEDANCE_2_0: 'bytedance/seedance-2.0',
+  BYTEDANCE_SEEDANCE_2_5: 'bytedance/seedance-2.5',
   ALIBABA_HAPPY_HORSE: 'alibaba/happy-horse/v1.1',
   ALIBABA_HAPPY_HORSE_LEGACY: 'alibaba/happy-horse',
   GOOGLE_GEMINI_OMNI_FLASH: 'google/gemini-omni-flash',
   GOOGLE_NANO_BANANA_2_LITE: 'google/nano-banana-2-lite',
+  MINIMAX_H3: 'minimax/h3',
   PRUNAAI_P_VIDEO: 'prunaai/p-video',
   XAI_GROK_IMAGINE_VIDEO: 'xai/grok-imagine-video',
   XAI_GROK_IMAGINE_VIDEO_1_5: 'xai/grok-imagine-video-1.5',
@@ -77,9 +79,37 @@ export function isGeminiOmniFlashModelIdentifier(identifier: string | null | und
   return identifier === MODEL_IDENTIFIERS.GOOGLE_GEMINI_OMNI_FLASH;
 }
 
+export function isMinimaxH3ModelIdentifier(identifier: string | null | undefined): boolean {
+  return (
+    identifier === MODEL_IDENTIFIERS.MINIMAX_H3 ||
+    identifier === 'minimax/h3/text-to-video' ||
+    identifier === 'minimax/h3/image-to-video' ||
+    identifier === 'minimax/h3/reference-to-video'
+  );
+}
+
+export function isSeedance25ModelIdentifier(identifier: string | null | undefined): boolean {
+  return identifier === MODEL_IDENTIFIERS.BYTEDANCE_SEEDANCE_2_5;
+}
+
+export function isSeedanceVideoModelIdentifier(identifier: string | null | undefined): boolean {
+  return (
+    identifier === MODEL_IDENTIFIERS.BYTEDANCE_SEEDANCE_2_0 ||
+    isSeedance25ModelIdentifier(identifier)
+  );
+}
+
+export function getSeedanceMaxReferenceImages(identifier: string | null | undefined): number {
+  return isSeedance25ModelIdentifier(identifier) ? 30 : 9;
+}
+
 /** Fal unified video models that route t2v / i2v / reference-to-video from one catalog id. */
 export function usesFalMultimodalVideoInputs(identifier: string | null | undefined): boolean {
-  return isHappyHorseModelIdentifier(identifier) || isGeminiOmniFlashModelIdentifier(identifier);
+  return (
+    isHappyHorseModelIdentifier(identifier) ||
+    isGeminiOmniFlashModelIdentifier(identifier) ||
+    isMinimaxH3ModelIdentifier(identifier)
+  );
 }
 
 export function normalizeMotionCopyModelIdentifier(
@@ -589,6 +619,84 @@ const SEEDANCE_2_0_VIDEO_PARAMS: ParameterDefinition[] = [
   },
 ];
 
+const SEEDANCE_2_5_VIDEO_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'image',
+    type: 'string',
+    label: 'First Frame',
+    description: 'Optional first frame (not used with reference_images mode)',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
+    name: 'last_frame_image',
+    type: 'string',
+    label: 'Last Frame',
+    description: 'Optional last frame (requires first frame; not used with reference_images)',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
+    name: 'duration',
+    type: 'number',
+    label: 'Duration',
+    description: '4–30 seconds, or -1 for model-chosen length',
+    required: false,
+    default: 5,
+    min: -1,
+    max: 30,
+    ui_type: 'number',
+  },
+  {
+    name: 'resolution',
+    type: 'string',
+    label: 'Resolution',
+    required: false,
+    default: '720p',
+    enum: ['480p', '720p'],
+    ui_type: 'select',
+  },
+  {
+    name: 'aspect_ratio',
+    type: 'string',
+    label: 'Aspect Ratio',
+    required: false,
+    default: '16:9',
+    enum: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive'],
+    ui_type: 'select',
+  },
+  {
+    name: 'generate_audio',
+    type: 'boolean',
+    label: 'Generate Audio',
+    required: false,
+    default: true,
+    ui_type: 'switch',
+  },
+  {
+    name: 'reference_audios',
+    type: 'string',
+    label: 'Reference audios',
+    description:
+      'Optional: up to 10 HTTPS URLs (wav/mp3). Label in prompt as [Audio1]; requires a reference image/video or first-frame image.',
+    required: false,
+    default: null,
+    ui_type: 'textarea',
+  },
+  {
+    name: 'seed',
+    type: 'number',
+    label: 'Seed',
+    required: false,
+    default: null,
+    min: 0,
+    max: 2147483647,
+    ui_type: 'number',
+  },
+];
+
 const HAPPY_HORSE_VIDEO_PARAMS: ParameterDefinition[] = [
   {
     name: 'enable_safety_checker',
@@ -636,6 +744,86 @@ const HAPPY_HORSE_VIDEO_PARAMS: ParameterDefinition[] = [
     required: false,
     default: '16:9',
     enum: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21', '5:4', '4:5'],
+    ui_type: 'select',
+  },
+  {
+    name: 'seed',
+    type: 'number',
+    label: 'Seed',
+    required: false,
+    default: null,
+    min: 0,
+    max: 2147483647,
+    ui_type: 'number',
+  },
+];
+
+const MINIMAX_H3_VIDEO_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'enable_prompt_expansion',
+    type: 'boolean',
+    label: 'Prompt expansion',
+    description: 'Expand the prompt with a vision language model before generation',
+    required: false,
+    default: true,
+    ui_type: 'switch',
+  },
+  {
+    name: 'enable_safety_checker',
+    type: 'boolean',
+    label: 'Safety checker',
+    description: 'Enable content moderation for input and output',
+    required: false,
+    default: false,
+    ui_type: 'switch',
+  },
+  {
+    name: 'image',
+    type: 'string',
+    label: 'Start Frame',
+    description: 'Optional first frame for image-to-video. Disabled when reference images are attached.',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
+    name: 'last_frame_image',
+    type: 'string',
+    label: 'Last Frame',
+    description: 'Optional last frame for first-to-last generation. Ignored in reference-to-video mode.',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
+    name: 'duration',
+    type: 'number',
+    label: 'Duration',
+    description: 'Video duration in seconds',
+    required: false,
+    default: 5,
+    enum: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    ui_type: 'select',
+  },
+  {
+    name: 'resolution',
+    type: 'string',
+    label: 'Resolution',
+    description: '480P and 768P are native; 2K and 4K upscale a 768P base. Used for all MiniMax H3 modes.',
+    required: false,
+    default: '2K',
+    enum: ['480P', '768P', '2K', '4K'],
+    ui_type: 'select',
+    affects_pricing: true,
+  },
+  {
+    name: 'aspect_ratio',
+    type: 'string',
+    label: 'Aspect Ratio',
+    description: 'Used for text-to-video and reference-to-video. Image-to-video follows the start frame.',
+    required: false,
+    default: '16:9',
+    enum: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', 'adaptive'],
     ui_type: 'select',
   },
   {
@@ -1766,6 +1954,29 @@ export const SEEDANCE_2_0_VIDEO_MODEL: Model = {
   updated_at: new Date().toISOString(),
 };
 
+export const SEEDANCE_2_5_VIDEO_MODEL: Model = {
+  id: 'model-bytedance-seedance-2.5',
+  identifier: MODEL_IDENTIFIERS.BYTEDANCE_SEEDANCE_2_5,
+  name: 'Seedance 2.5',
+  description:
+    'ByteDance Seedance 2.5: up to 30s multimodal video with native audio. Text/image on Replicate; video references via Fal.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 90,
+  model_cost_per_second: 18,
+  parameters: {
+    parameters: SEEDANCE_2_5_VIDEO_PARAMS,
+  },
+  supports_reference_image: true,
+  supports_reference_video: true,
+  supports_reference_audio: true,
+  supports_first_frame: true,
+  supports_last_frame: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 export const HAPPY_HORSE_VIDEO_MODEL: Model = {
   id: 'model-happy-horse-v1.1',
   identifier: MODEL_IDENTIFIERS.ALIBABA_HAPPY_HORSE,
@@ -1897,6 +2108,33 @@ export const NANO_BANANA_2_LITE_MODEL: Model = {
   default_aspect_ratio: 'auto',
   supports_reference_image: true,
   max_images: 4,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+export const MINIMAX_H3_VIDEO_MODEL: Model = {
+  id: 'model-minimax-h3',
+  identifier: MODEL_IDENTIFIERS.MINIMAX_H3,
+  name: 'MiniMax H3',
+  description:
+    'MiniMax H3 on fal: text-to-video, first/last frame, or reference-to-video with images, clips, and audio at up to 4K.',
+  type: 'video',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 65,
+  model_cost_per_second: 13,
+  parameters: {
+    parameters: MINIMAX_H3_VIDEO_PARAMS,
+  },
+  aspect_ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', 'adaptive'],
+  default_aspect_ratio: '16:9',
+  supports_reference_image: true,
+  supports_reference_video: true,
+  supports_reference_audio: true,
+  supports_first_frame: true,
+  supports_last_frame: true,
+  duration_options: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+  max_images: 9,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -2209,8 +2447,10 @@ export const VIDEO_MODELS = [
   HAILUO_2_3_FAST_MODEL,
   VEO_3_1_FAST_MODEL,
   SEEDANCE_2_0_VIDEO_MODEL,
+  SEEDANCE_2_5_VIDEO_MODEL,
   HAPPY_HORSE_VIDEO_MODEL,
   GEMINI_OMNI_FLASH_VIDEO_MODEL,
+  MINIMAX_H3_VIDEO_MODEL,
   P_VIDEO_MODEL,
 ] as const;
 
@@ -2253,8 +2493,10 @@ const VIDEO_MODELS_FIXED = [
   HAILUO_2_3_FAST_MODEL,
   VEO_3_1_FAST_MODEL,
   SEEDANCE_2_0_VIDEO_MODEL,
+  SEEDANCE_2_5_VIDEO_MODEL,
   HAPPY_HORSE_VIDEO_MODEL,
   GEMINI_OMNI_FLASH_VIDEO_MODEL,
+  MINIMAX_H3_VIDEO_MODEL,
   P_VIDEO_MODEL,
 ] as const;
 

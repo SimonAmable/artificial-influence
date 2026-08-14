@@ -1,5 +1,5 @@
 import type { Model } from "@/lib/types/models"
-import { usesFalMultimodalVideoInputs } from "@/lib/constants/models"
+import { isSeedanceVideoModelIdentifier, usesFalMultimodalVideoInputs } from "@/lib/constants/models"
 import type { AttachedRef } from "./types"
 
 function imageAssetRefs(refs: AttachedRef[]): AttachedRef[] {
@@ -31,7 +31,7 @@ export function getVideoChipSlotInfo(model: Model, attachedRefs: AttachedRef[], 
   const imgs = imageAssetRefs(attachedRefs)
   const vids = videoAssetRefs(attachedRefs)
   const isOmni = id === "kwaivgi/kling-v3-omni-video"
-  const isSeedance = id === "bytedance/seedance-2.0"
+  const isSeedance = isSeedanceVideoModelIdentifier(id)
   const isFalMultimodalVideo = usesFalMultimodalVideoInputs(id)
   const useOmniStyleChips = isOmni || (isSeedance && opts.hasReferenceVideo) || isFalMultimodalVideo
 

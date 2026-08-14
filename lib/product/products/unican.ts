@@ -44,6 +44,7 @@ export const unicanProduct: ProductConfig = {
     "/image?model=custom/character-swap",
     "/angles",
     "/carousel-shots",
+    "/photodump",
     "/image?model=custom/face-swap",
     "/ai-influencer",
     "/canvases",

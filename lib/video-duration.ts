@@ -35,12 +35,14 @@ function getDefaultDurationSeconds(modelIdentifier: string): number {
     case "kwaivgi/kling-v3-video":
     case "kwaivgi/kling-v3-omni-video":
     case "bytedance/seedance-2.0":
+    case "bytedance/seedance-2.5":
     case "wan-video/wan-2.7":
     case "xai/grok-imagine-video":
     case "xai/grok-imagine-video-1.5":
     case "alibaba/happy-horse":
     case "alibaba/happy-horse/v1.1":
     case "google/gemini-omni-flash":
+    case "minimax/h3":
     case "veed/fabric-1.0":
     default:
       return 5
@@ -58,6 +60,14 @@ export function resolvePredictedDurationSeconds(input: VideoDurationInput): numb
       }
       if (sourceDuration != null && sourceDuration > 0 && input.hasReferenceVideo) {
         return roundDuration(sourceDuration, 1, 15)
+      }
+      return 5
+    case "bytedance/seedance-2.5":
+      if (explicitDuration != null && explicitDuration > 0) {
+        return roundDuration(explicitDuration, 4, 30)
+      }
+      if (sourceDuration != null && sourceDuration > 0 && input.hasReferenceVideo) {
+        return roundDuration(sourceDuration, 4, 30)
       }
       return 5
     case "kwaivgi/kling-v2.6-motion-control":
@@ -139,6 +149,11 @@ export function resolvePredictedDurationSeconds(input: VideoDurationInput): numb
         return roundDuration(explicitDuration, 3, 10)
       }
       return 8
+    case "minimax/h3":
+      if (explicitDuration != null && explicitDuration > 0) {
+        return roundDuration(explicitDuration, 5, 15)
+      }
+      return 5
     default:
       if (explicitDuration != null && explicitDuration > 0) {
         return Math.max(1, Math.round(explicitDuration))

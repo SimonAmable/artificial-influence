@@ -1,5 +1,5 @@
 import type { AssetType } from "@/lib/assets/types"
-import { isGeminiOmniFlashModelIdentifier, usesFalMultimodalVideoInputs } from "@/lib/constants/models"
+import { isGeminiOmniFlashModelIdentifier, isSeedanceVideoModelIdentifier, usesFalMultimodalVideoInputs } from "@/lib/constants/models"
 import type { Model } from "@/lib/types/models"
 
 /**
@@ -42,7 +42,7 @@ export function allowedAssetTypesForVideoModel(model: Model): AssetType[] {
     model.supports_reference_video === true ||
     isGeminiOmniFlashModelIdentifier(id) ||
     isKlingOmni ||
-    id === "bytedance/seedance-2.0" ||
+    isSeedanceVideoModelIdentifier(id) ||
     id === "xai/grok-imagine-video"
   ) {
     types.add("video")

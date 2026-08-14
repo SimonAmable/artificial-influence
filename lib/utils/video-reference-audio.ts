@@ -16,6 +16,24 @@ const VIDEO_REFERENCE_AUDIO_CONFIGS: Record<string, VideoReferenceAudioConfig> =
     title: "Reference audio",
     validationMessage: "Use a supported audio file (.wav, .mp3, .m4a, or .aac).",
   },
+  "bytedance/seedance-2.5": {
+    accept:
+      "audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac",
+    allowedExtensions: ["wav", "mp3", "m4a", "aac"],
+    description:
+      ".wav / .mp3 / .m4a / .aac (up to ~30s). Use [Audio1] in prompt; needs a frame or reference video.",
+    title: "Reference audio",
+    validationMessage: "Use a supported audio file (.wav, .mp3, .m4a, or .aac).",
+  },
+  "minimax/h3": {
+    accept:
+      "audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac",
+    allowedExtensions: ["wav", "mp3", "m4a", "aac"],
+    description:
+      ".wav / .mp3 / .m4a / .aac (2–15s, 15s total). Cite as Audio 1 in the prompt; needs an image or video.",
+    title: "Reference audio",
+    validationMessage: "Use a supported audio file (.wav, .mp3, .m4a, or .aac).",
+  },
   "prunaai/p-video": {
     accept: "audio/wav,audio/x-wav,audio/mpeg,audio/mp3,.wav,.mp3",
     allowedExtensions: ["wav", "mp3"],

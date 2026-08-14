@@ -256,6 +256,15 @@ function legacyResolveCreditsPerSecond(
       return resolution === '720p' ? 6 : 12;
     case 'google/gemini-omni-flash':
       return 10;
+    case 'minimax/h3':
+    case 'minimax/h3/text-to-video':
+    case 'minimax/h3/image-to-video':
+    case 'minimax/h3/reference-to-video': {
+      if (resolution === '480p') return 5;
+      if (resolution === '768p') return 8;
+      if (resolution === '4k') return 16;
+      return 13;
+    }
     case 'veed/fabric-1.0':
       return resolution === '480p' ? 4 : 6;
     case 'xai/grok-imagine-video':
