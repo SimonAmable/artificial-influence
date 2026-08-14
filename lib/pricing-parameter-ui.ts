@@ -186,22 +186,6 @@ export function formatVideoPricingOptionLabel(
     characterOrientation?: string | null;
   },
 ): string {
-  const currentCreditsPerSecond = resolveGenerationPricingQuote({
-    model: {
-      identifier: model.identifier,
-      type: 'video',
-      model_cost: model.model_cost,
-      model_cost_per_second: model.model_cost_per_second,
-      pricing_config: model.pricing_config,
-    },
-    parameters: buildPricingParametersFromRecord(parameters),
-    durationSeconds: 1,
-    sourceDurationSeconds: options?.sourceDurationSeconds ?? null,
-    hasInputVideo: options?.hasInputVideo,
-    hasReferenceVideo: options?.hasReferenceVideo,
-    characterOrientation: options?.characterOrientation ?? null,
-  }).creditsPerUnit;
-
   const optionCreditsPerSecond = resolveGenerationPricingQuote({
     model: {
       identifier: model.identifier,
@@ -220,16 +204,6 @@ export function formatVideoPricingOptionLabel(
     hasReferenceVideo: options?.hasReferenceVideo,
     characterOrientation: options?.characterOrientation ?? null,
   }).creditsPerUnit;
-
-  if (
-    currentCreditsPerSecond != null &&
-    optionCreditsPerSecond != null &&
-    optionCreditsPerSecond !== currentCreditsPerSecond
-  ) {
-    const delta = optionCreditsPerSecond - currentCreditsPerSecond;
-    const sign = delta > 0 ? '+' : '';
-    return `${option} (${sign}${delta} cr/s)`;
-  }
 
   if (optionCreditsPerSecond != null) {
     return `${option} (${optionCreditsPerSecond} cr/s)`;
