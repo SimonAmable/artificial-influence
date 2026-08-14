@@ -56,7 +56,18 @@ interface ImageData {
 export type GridItem =
   | { type: "image"; data: ImageData }
   | { type: "generating"; id: string; phase?: "pending" | "generating"; model?: string | null; prompt?: string | null; tool?: string | null }
-  | { type: "failed"; id: string; model?: string | null; prompt?: string | null; tool?: string | null; error?: string | null }
+  | {
+      type: "failed"
+      id: string
+      model?: string | null
+      prompt?: string | null
+      tool?: string | null
+      error?: string | null
+      referenceImageUrls?: string[]
+      aspectRatio?: string | null
+      numImages?: number | null
+      modelParameters?: Record<string, unknown>
+    }
 
 interface ImageGridProps {
   /** Unified list of items (images + generating slots). When provided, takes precedence over images/isGenerating/generatingCount. */
@@ -71,6 +82,7 @@ interface ImageGridProps {
   /** When set, Edit opens this handler instead of navigating to /inpaint */
   onEdit?: (imageUrl: string, index: number) => void
   onRecreate?: (image: ImageData) => void
+  onReuseFailed?: (item: Extract<GridItem, { type: "failed" }>) => void
   onCreateAsset?: (imageUrl: string, index: number) => void
   onSaveExample?: (imageUrl: string, index: number) => void
   onUpscale?: (imageUrl: string, index: number) => void
@@ -127,6 +139,7 @@ export function ImageGrid({
   onUseAsReference,
   onEdit,
   onRecreate,
+  onReuseFailed,
   onCreateAsset,
   onSaveExample,
   onUpscale,
@@ -702,6 +715,30 @@ export function ImageGrid({
                       ? "bg-gradient-to-t from-black/80 via-black/20 to-black/10"
                       : "bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30"
                   )} />
+                  {item.type === "failed" && onReuseFailed ? (
+                    <div className="absolute right-2 top-2 z-20">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              onReuseFailed(item)
+                            }}
+                          >
+                            <ArrowsClockwise className="mr-1 size-3" />
+                            Reuse
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" sideOffset={8}>
+                          Restore prompt and settings
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  ) : null}
                   <div className="absolute inset-x-2 bottom-2 z-10 text-left text-[10px] text-white/90 drop-shadow-md">
                     <p className="truncate font-semibold">{item.type === "failed" ? "Generation failed · Credit refunded" : shouldHideGenerationDetails(item.tool) ? getGenerationToolDisplayName(item.tool) ?? "Generating..." : item.model ?? "Generating..."}</p>
                     <p className="truncate text-white/60">{item.type === "failed" ? "Sorry for the issue. We refunded your credits so you can try again." : item.phase === "pending" ? "Pending..." : "Generating..."}</p>

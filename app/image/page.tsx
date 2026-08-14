@@ -1103,6 +1103,38 @@ function ImagePageContent() {
     toast.success("Prompt and references copied to input")
   }, [])
 
+  const handleReuseFailed = React.useCallback((item: Extract<GridItem, { type: "failed" }>) => {
+    if (item.prompt?.trim()) {
+      setPrompt(item.prompt)
+      setAttachedCommandRefs([])
+    }
+
+    setReferenceImage(null)
+    if (item.referenceImageUrls && item.referenceImageUrls.length > 0) {
+      setReferenceImages(item.referenceImageUrls.map((url) => ({ url })))
+    } else {
+      setReferenceImages([])
+    }
+
+    if (item.model) {
+      setSelectedModel(item.model)
+    }
+
+    if (item.aspectRatio) {
+      setSelectedAspectRatio(item.aspectRatio)
+    }
+
+    if (typeof item.numImages === "number" && Number.isFinite(item.numImages)) {
+      setSelectedNumImages(Math.max(1, Math.floor(item.numImages)))
+    }
+
+    if (item.modelParameters && typeof item.modelParameters === "object" && !Array.isArray(item.modelParameters)) {
+      setSelectedModelParameters(item.modelParameters as ModelInputValues)
+    }
+
+    toast.success("Settings restored — edit and generate when ready")
+  }, [])
+
   const handleUseSavedExample = React.useCallback((
     example: SavedExample,
     promptOverride: string,
@@ -1410,7 +1442,18 @@ function ImagePageContent() {
       .filter((task) => !historyIds.has(task.id))
       .filter((task) => !(task.url != null && historyUrls.has(task.url)))
       .map((task) => ({ createdAt: task.createdAt, item: task.status === "failed"
-        ? { type: "failed" as const, id: task.id, model: task.model, prompt: task.prompt, tool: task.tool, error: task.errorMessage }
+        ? {
+            type: "failed" as const,
+            id: task.id,
+            model: task.model,
+            prompt: task.prompt,
+            tool: task.tool,
+            error: task.errorMessage,
+            referenceImageUrls: task.referenceImageUrls,
+            aspectRatio: task.aspectRatio,
+            numImages: task.numImages,
+            modelParameters: task.modelParameters,
+          }
         : { type: "generating" as const, id: task.id, phase: "generating" as const, model: task.model, prompt: task.prompt, tool: task.tool } }))
     const completed = historyImages.map((img) => ({ createdAt: img.createdAt, item: { type: "image" as const, data: toImageData(img) } }))
     return [...generating, ...persisted, ...completed]
@@ -1452,6 +1495,7 @@ function ImagePageContent() {
             setImageEditorOpen(true)
           }}
           onRecreate={handleRecreate}
+          onReuseFailed={handleReuseFailed}
           onCreateAsset={handleCreateAsset}
           onUpscale={handleUpscale}
           onRemoveBackground={handleRemoveBackground}

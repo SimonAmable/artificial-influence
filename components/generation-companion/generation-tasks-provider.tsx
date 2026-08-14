@@ -13,6 +13,9 @@ export type GenerationTask = {
   errorMessage: string | null
   url: string | null
   referenceImageUrls: string[]
+  aspectRatio: string | null
+  numImages: number | null
+  modelParameters: Record<string, unknown>
   isRecentCompletion: boolean
 }
 
@@ -25,8 +28,32 @@ type GenerationTasksContextValue = {
 
 const GenerationTasksContext = React.createContext<GenerationTasksContextValue | null>(null)
 
+function normalizePricingSnapshotFields(
+  pricingSnapshot: unknown,
+): { numImages: number | null; modelParameters: Record<string, unknown> } {
+  if (!pricingSnapshot || typeof pricingSnapshot !== "object" || Array.isArray(pricingSnapshot)) {
+    return { numImages: null, modelParameters: {} }
+  }
+
+  const snapshot = pricingSnapshot as Record<string, unknown>
+  const rawOutputCount = snapshot.outputCount
+  const numImages =
+    typeof rawOutputCount === "number" && Number.isFinite(rawOutputCount)
+      ? Math.max(1, Math.floor(rawOutputCount))
+      : null
+
+  const rawParameters = snapshot.parameters
+  const modelParameters =
+    rawParameters && typeof rawParameters === "object" && !Array.isArray(rawParameters)
+      ? (rawParameters as Record<string, unknown>)
+      : {}
+
+  return { numImages, modelParameters }
+}
+
 function normalizeTask(row: Record<string, unknown>): GenerationTask | null {
   if (typeof row.id !== "string") return null
+  const { numImages, modelParameters } = normalizePricingSnapshotFields(row.pricing_snapshot)
   return {
     id: row.id,
     type: typeof row.type === "string" ? row.type : "image",
@@ -40,6 +67,9 @@ function normalizeTask(row: Record<string, unknown>): GenerationTask | null {
     referenceImageUrls: Array.isArray(row.reference_image_urls)
       ? row.reference_image_urls.filter((value): value is string => typeof value === "string")
       : [],
+    aspectRatio: typeof row.aspect_ratio === "string" ? row.aspect_ratio : null,
+    numImages,
+    modelParameters,
     isRecentCompletion:
       row.status === "completed" &&
       typeof row.created_at === "string" &&
