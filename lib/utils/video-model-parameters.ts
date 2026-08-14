@@ -123,5 +123,11 @@ export function buildVideoModelParameters(input: VideoParamsInput): ParameterDef
     return params.filter((p) => p.name !== "guidance_scale");
   }
 
+  if (input.identifier === "minimax/h3") {
+    return params.filter(
+      (param) => param.name !== "enable_safety_checker" && param.name !== "seed",
+    );
+  }
+
   return params;
 }

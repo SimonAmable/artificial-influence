@@ -994,7 +994,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           // Apply node prompt after parameters spread so it is never overwritten by parameters.prompt (model default can be null)
           prompt: fullPrompt,
         }
-        if (isHappyHorseModelIdentifier(modelIdentifier)) {
+        if (isHappyHorseModelIdentifier(modelIdentifier) || isMinimaxH3) {
           requestBody.enable_safety_checker = false
         }
 

@@ -477,12 +477,7 @@ function buildMinimaxH3FalVideoRequest(
     duration: normalizeMinimaxH3Duration(options.duration),
     resolution: normalizeMinimaxH3Resolution(options.resolution),
     enable_prompt_expansion: pickBoolean(options.enablePromptExpansion, true),
-    enable_safety_checker: pickBoolean(options.enableSafetyChecker, false),
-  }
-
-  const seed = normalizeSeed(options.seed)
-  if (seed !== undefined) {
-    baseInput.seed = seed
+    enable_safety_checker: false,
   }
 
   if (hasReferenceInputs) {

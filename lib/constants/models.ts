@@ -769,15 +769,6 @@ const MINIMAX_H3_VIDEO_PARAMS: ParameterDefinition[] = [
     ui_type: 'switch',
   },
   {
-    name: 'enable_safety_checker',
-    type: 'boolean',
-    label: 'Safety checker',
-    description: 'Enable content moderation for input and output',
-    required: false,
-    default: false,
-    ui_type: 'switch',
-  },
-  {
     name: 'image',
     type: 'string',
     label: 'Start Frame',
@@ -825,16 +816,6 @@ const MINIMAX_H3_VIDEO_PARAMS: ParameterDefinition[] = [
     default: '16:9',
     enum: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', 'adaptive'],
     ui_type: 'select',
-  },
-  {
-    name: 'seed',
-    type: 'number',
-    label: 'Seed',
-    required: false,
-    default: null,
-    min: 0,
-    max: 2147483647,
-    ui_type: 'number',
   },
 ];
 

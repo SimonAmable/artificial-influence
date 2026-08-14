@@ -42,6 +42,7 @@ export function getSitemapEntries(): SitemapEntry[] {
     { path: "/free-tools/tiktok-trend-search", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
     { path: "/free-tools/tiktok-video-fixer", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
     { path: "/free-tools/video-compressor", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
+    { path: "/free-tools/video-frame-extractor", lastModified: DEFAULT_LAST, changeFrequency: "weekly", priority: 0.8 },
     {
       path: "/canvases",
       lastModified: new Date(canvasesLanding.lastUpdated),

@@ -16,6 +16,7 @@ import {
   FileArrowDown,
   FilmStrip,
   Folder,
+  FrameCorners,
   Image as ImageIcon,
   Images,
   MagnifyingGlass,
@@ -62,6 +63,7 @@ export type NavIconKey =
   | "magnifying-glass"
   | "wrench"
   | "file-arrow-down"
+  | "frame-corners"
   | "folder"
   | "clock-counter-clockwise"
   | "newspaper"
@@ -98,6 +100,7 @@ export const NAV_ICON_MAP: Record<NavIconKey, NavIconComponent> = {
   "magnifying-glass": MagnifyingGlass,
   wrench: Wrench,
   "file-arrow-down": FileArrowDown,
+  "frame-corners": FrameCorners,
   folder: Folder,
   "clock-counter-clockwise": ClockCounterClockwise,
   newspaper: Newspaper,

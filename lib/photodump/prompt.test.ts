@@ -39,3 +39,31 @@ runTest("shot prompt preserves identity lock language", () => {
   assert.match(prompt, /Preserve the same person identity/)
   assert.match(prompt, /aesthetic reference images/)
 })
+
+runTest("influencer packs prepend candid iPhone camera anchor", () => {
+  const briefs = getPhotodumpShotBriefs(
+    {
+      id: "cool-girl-dump",
+      name: "Cool Girl Dump",
+      description: "Test",
+      styleLine: "Cool girl dump aesthetic",
+      influencerCandid: true,
+      fallbackClassName: "from-pink-200 to-rose-200",
+    },
+    2,
+  )
+  assert.match(briefs[0]!, /Candid, amateur image, badly framed, low light, grainy, iPhone 12 camera quality, unposed, slightly blurry/)
+  assert.match(briefs[1]!, /a little blurry/)
+})
+
+runTest("influencer candid prompt avoids sharp studio polish language", () => {
+  const prompt = buildPhotodumpShotPrompt({
+    shotBrief: "Cool girl dump. Scene: mirror selfie.",
+    shotIndex: 0,
+    shotCount: 6,
+    usesAestheticReferences: false,
+    influencerCandid: true,
+  })
+  assert.match(prompt, /phone-camera photodump/)
+  assert.doesNotMatch(prompt, /Instagram-ready photodump quality/)
+})

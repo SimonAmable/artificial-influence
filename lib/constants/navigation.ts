@@ -423,6 +423,13 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             badge: "new",
             iconPhosphor: "file-arrow-down",
           },
+          {
+            path: "/free-tools/video-frame-extractor",
+            label: "Video Frame Extractor",
+            description: "Save first or last frame as PNG",
+            badge: "new",
+            iconPhosphor: "frame-corners",
+          },
         ],
       },
       {
@@ -598,6 +605,13 @@ const baseMegaNavGroups: MegaNavGroup[] = [
         description: "Create smaller WebM clips locally",
         badge: "new",
         iconPhosphor: "file-arrow-down",
+      },
+      {
+        path: "/free-tools/video-frame-extractor",
+        label: "Video Frame Extractor",
+        description: "Extract first or last frame as PNG",
+        badge: "new",
+        iconPhosphor: "frame-corners",
       },
     ],
   },

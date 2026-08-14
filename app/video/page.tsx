@@ -847,7 +847,7 @@ function VideoPageContent() {
       if (characterAssetId) requestBody.characterAssetId = characterAssetId
       const sourceGenerationId = searchParams.get("sourceGenerationId")
       if (sourceGenerationId) requestBody.sourceGenerationId = sourceGenerationId
-      if (isHappyHorse) {
+      if (isHappyHorse || isMinimaxH3) {
         requestBody.enable_safety_checker = false
       }
       const sourceDurationSeconds =

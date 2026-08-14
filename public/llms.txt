@@ -13,7 +13,7 @@
 - [AI Influencer](https://unican.app/ai-influencer): Create, save, and generate custom AI characters and influencers.
 - [Canvas](https://unican.app/canvases): Node-based workflows you can rerun.
 - [Autopost](https://unican.app/autopost): Connect Instagram and publish on schedule.
-- [Free tools](https://unican.app/free-tools): Utilities for metadata removal, compression, TikTok repair, TikTok scrape-to-MP4, and TikTok discovery search (sign-in tools use Apify on the server).
+- [Free tools](https://unican.app/free-tools): Utilities for metadata removal, compression, video frame extraction, TikTok repair, TikTok scrape-to-MP4, and TikTok discovery search (sign-in tools use Apify on the server).
 - [Pricing](https://unican.app/pricing): Plans and limits.
 
 ## About

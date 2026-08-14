@@ -51,6 +51,12 @@ const freeTools = [
     description: "Create smaller WebM versions of short clips locally.",
     tags: ["Free", "Local"],
   },
+  {
+    href: "/free-tools/video-frame-extractor",
+    label: "Video Frame Extractor",
+    description: "Save the first or last frame from a clip as a PNG still.",
+    tags: ["Free", "Local"],
+  },
 ]
 
 export default function FreeToolsPage() {

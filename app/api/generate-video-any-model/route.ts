@@ -273,10 +273,7 @@ export async function POST(request: NextRequest) {
           typeof otherParams.enable_prompt_expansion === 'boolean'
             ? otherParams.enable_prompt_expansion
             : null,
-        enableSafetyChecker:
-          typeof otherParams.enable_safety_checker === 'boolean'
-            ? otherParams.enable_safety_checker
-            : null,
+        enableSafetyChecker: false,
         endImageUrl: falEndImageUrl,
         generateAudio:
           typeof otherParams.generate_audio === 'boolean' ? otherParams.generate_audio : null,

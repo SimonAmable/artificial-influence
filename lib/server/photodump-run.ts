@@ -100,6 +100,7 @@ export async function runPhotodumpGeneration(
       shotCount: input.shotCount,
       note: input.note,
       usesAestheticReferences: input.usesAestheticReferences,
+      influencerCandid: pack.influencerCandid === true,
     }),
   )
   const combinedPrompt = prompts.join("\n\n")
