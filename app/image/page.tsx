@@ -871,7 +871,25 @@ function ImagePageContent() {
         .filter((u) => !manualUrlSet.has(u))
         .map((url) => ({ url }))
       const imagesToUpload = [...baseRefImages, ...extraFromAssetChips]
-      appendImageReferencesToFormData(formData, imagesToUpload)
+
+      let resolvedImagesToUpload: ImageUpload[]
+      try {
+        resolvedImagesToUpload = (
+          await Promise.all(imagesToUpload.map((img) => resolveReferenceImageForGeneration(img)))
+        ).filter((img): img is ImageUpload => img != null)
+      } catch (resolveError) {
+        setPendingRequests((currentRequests) =>
+          removeSlotByClientId(currentRequests, clientRequestId)
+        )
+        reportImageInputError(
+          resolveError instanceof Error
+            ? resolveError.message
+            : "Could not prepare reference images",
+        )
+        return
+      }
+
+      appendImageReferencesToFormData(formData, resolvedImagesToUpload)
       
       // Add number of images when > 1
       if (!studioToolPayload && selectedNumImages > 1) {
@@ -881,7 +899,7 @@ function ImagePageContent() {
       const selectedTool = studioToolPayload ? studioToolPayload.tool : 'image'
       formData.append('tool', selectedTool)
 
-      const totalRefImages = imagesToUpload.length
+      const totalRefImages = resolvedImagesToUpload.length
       console.log('Sending request with reference images:', totalRefImages, 'numImages:', selectedNumImages)
       
       const { generateImageAndWait } = await import('@/lib/generate-image-client')

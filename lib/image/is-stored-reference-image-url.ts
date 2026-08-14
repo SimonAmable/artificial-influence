@@ -3,6 +3,15 @@ import { validateStoredReferenceImageUrl } from "@/lib/image/stored-reference-ur
 
 /** True when a URL is already persisted in this app's storage (not blob/data/external). */
 export function isStoredReferenceImageUrl(url: string): boolean {
+  const trimmed = url.trim()
+  if (
+    trimmed.startsWith("blob:") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("file:")
+  ) {
+    return false
+  }
+
   try {
     validateStoredReferenceImageUrl(absolutizeAssetUrl(url))
     return true

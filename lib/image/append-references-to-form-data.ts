@@ -8,13 +8,14 @@ export function appendImageReferencesToFormData(
   images: ImageUpload[],
 ): void {
   for (const image of images) {
-    if (image.url && isStoredReferenceImageUrl(image.url)) {
-      formData.append("referenceImageUrls", absolutizeAssetUrl(image.url))
+    // Local uploads must win over preview URLs (blob/data or stale signed URLs).
+    if (image.file) {
+      formData.append("referenceImages", image.file)
       continue
     }
 
-    if (image.file) {
-      formData.append("referenceImages", image.file)
+    if (image.url && isStoredReferenceImageUrl(image.url)) {
+      formData.append("referenceImageUrls", absolutizeAssetUrl(image.url))
     }
   }
 }

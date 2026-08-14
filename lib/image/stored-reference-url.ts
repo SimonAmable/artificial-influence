@@ -24,8 +24,13 @@ function isAllowedSupabaseStoragePath(pathname: string): boolean {
  * Accepts public, signed, and render URLs; relative same-origin paths are absolutized first.
  */
 export function validateStoredReferenceImageUrl(url: string): void {
-  if (url.startsWith("data:")) {
-    return
+  const trimmed = url.trim()
+  if (
+    trimmed.startsWith("blob:") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("file:")
+  ) {
+    throw new Error("Reference image URLs must come from this app's stored assets.")
   }
 
   const absolute = absolutizeAssetUrl(url)
@@ -37,6 +42,7 @@ export function validateStoredReferenceImageUrl(url: string): void {
     throw new Error("Reference image URL is invalid.")
   }
 
+  const storageRef = extractStorageObjectRef(absolute)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const appUrl = process.env.NEXT_PUBLIC_APP_URL
 
@@ -47,15 +53,14 @@ export function validateStoredReferenceImageUrl(url: string): void {
       const parsedSupabaseUrl = new URL(supabaseUrl)
       if (parsedUrl.origin !== parsedSupabaseUrl.origin) return false
       if (isAllowedSupabaseStoragePath(parsedUrl.pathname)) return true
-      // Also accept any URL we can map back to a storage object
-      return extractStorageObjectRef(absolute) !== null
+      return storageRef !== null
     } catch {
       return false
     }
   })()
 
   const isAllowedAppUrl = (() => {
-    if (!appUrl) return false
+    if (!appUrl || !storageRef) return false
 
     try {
       const parsedAppUrl = new URL(appUrl)
