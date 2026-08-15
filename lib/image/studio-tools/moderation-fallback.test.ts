@@ -35,7 +35,7 @@ test("studio fallback chain starts with lowest-quality model", () => {
 
 test("studio tool quality params use the lowest tier per model", () => {
   assert.deepEqual(getStudioToolFalQualityParams("google/nano-banana-2-lite"), {})
-  assert.deepEqual(getStudioToolFalQualityParams("openai/gpt-image-2"), { quality: "low" })
+  assert.deepEqual(getStudioToolFalQualityParams("openai/gpt-image-2"), { quality: "medium" })
   assert.deepEqual(getStudioToolFalQualityParams("bytedance/seedream-5-lite"), {
     resolutionPreset: "2K",
   })

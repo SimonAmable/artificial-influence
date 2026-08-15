@@ -36,7 +36,7 @@ export function getStudioToolFalQualityParams(
     case "google/nano-banana-2-lite":
       return {}
     case "openai/gpt-image-2":
-      return { quality: "low" as const }
+      return { quality: "medium" as const }
     case "bytedance/seedream-5-lite":
       return { resolutionPreset: "2K" }
     default: {
