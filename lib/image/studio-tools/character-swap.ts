@@ -3,7 +3,7 @@ import type { ImageStudioToolDefinition } from "./types"
 export const CHARACTER_SWAP_TOOL: ImageStudioToolDefinition = {
   id: "character_swap",
   uiModelIdentifier: "custom/character-swap",
-  baseModelIdentifier: "google/nano-banana-2",
+  baseModelIdentifier: "google/nano-banana-2-lite",
   name: "Character Swap",
   description: "Swap a character into a scene using two references.",
   historyToolTag: "character_swap",
@@ -19,7 +19,6 @@ export const CHARACTER_SWAP_TOOL: ImageStudioToolDefinition = {
     aspectRatio: "match_input_image",
     numImages: 1,
     enhancePrompt: false,
-    resolution: "2K",
   },
   referenceSlots: [
     {

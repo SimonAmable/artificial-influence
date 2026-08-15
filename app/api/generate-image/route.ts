@@ -46,6 +46,13 @@ import {
   shouldUseDirectXaiImageEdits,
   toXaiGenerateImageResult,
 } from '@/lib/server/xai-image-edits';
+import {
+  generateStudioToolImageWithFallback,
+  isModerationGenerationFailure,
+  isStudioImageToolTag,
+  resolveStudioToolMaxQuotedCredits,
+  resolveStudioToolPricingQuote,
+} from '@/lib/server/studio-tool-image-generation';
 
 const STALE_PENDING_MINUTES = 30;
 const FREE_CONCURRENCY_LIMIT = 1;
@@ -304,13 +311,17 @@ export async function POST(request: NextRequest) {
     });
     const requiredCredits = pricingQuote.quotedCredits;
     const pricingSnapshot = pricingQuote.pricingSnapshot;
+    const studioImageToolRequest = isStudioImageToolTag(tool);
+    const creditsToReserve = studioImageToolRequest
+      ? await resolveStudioToolMaxQuotedCredits(supabase)
+      : requiredCredits;
 
-    const hasCredits = await checkUserHasCredits(user.id, requiredCredits, supabase);
+    const hasCredits = await checkUserHasCredits(user.id, creditsToReserve, supabase);
     if (!hasCredits) {
       return NextResponse.json(
         {
           error: 'Insufficient credits.',
-          message: `This generation requires ${requiredCredits} credits (${modelData.name}${imageCount > 1 ? ` × ${imageCount} images` : ''}).`,
+          message: `This generation requires ${creditsToReserve} credits (${modelData.name}${imageCount > 1 ? ` × ${imageCount} images` : ''}).`,
         },
         { status: 402 }
       );
@@ -534,6 +545,110 @@ export async function POST(request: NextRequest) {
       }
     } else {
       console.log('[generate-image] Prompt enhancement skipped');
+    }
+
+    if (studioImageToolRequest) {
+      const studioAspectRatio = aspect_ratio || aspectRatio || 'match_input_image';
+
+      try {
+        const studioResult = await generateStudioToolImageWithFallback({
+          aspectRatio: studioAspectRatio,
+          prompt: finalPrompt,
+          referenceImageUrls,
+          supabase,
+          userId: user.id,
+        });
+
+        const deliveredPricingQuote = await resolveStudioToolPricingQuote(
+          supabase,
+          studioResult.deliveredModel,
+        );
+        const deliveredCredits = deliveredPricingQuote.quotedCredits;
+        const autoStrip = await getAutoStripImageMetadata(supabase, user.id);
+        const stored = await uploadPreparedGeneratedImage({
+          autoStrip,
+          index: 0,
+          mimeType: 'image/png',
+          modelIdentifier: studioResult.deliveredModel,
+          remoteUrl: studioResult.imageUrl,
+          supabase,
+          userId: user.id,
+        });
+
+        const studioMetadata = {
+          studioToolFallback: {
+            deliveredModel: studioResult.deliveredModel,
+            fallbackReason: studioResult.fallbackReason ?? null,
+            fallbackUsed: studioResult.fallbackUsed,
+            requestedModel: studioResult.requestedModel,
+          },
+        };
+
+        const { data: savedGeneration, error: saveError } = await supabase
+          .from('generations')
+          .insert({
+            user_id: user.id,
+            prompt: finalPrompt,
+            supabase_storage_path: stored.storagePath,
+            reference_images_supabase_storage_path:
+              referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+            aspect_ratio: studioAspectRatio,
+            model: studioResult.deliveredModel,
+            type: 'image',
+            is_public: true,
+            tool,
+            status: 'completed',
+            metadata: studioMetadata,
+            quoted_credits: deliveredCredits,
+            pricing_snapshot: deliveredPricingQuote.pricingSnapshot,
+            character_asset_id: characterAssetId,
+            finished_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single();
+
+        if (saveError) {
+          console.error('[generate-image] Failed to save studio tool generation:', saveError);
+        }
+
+        await deductUserCredits(user.id, deliveredCredits, supabase);
+
+        const totalTime = Date.now() - requestStartTime;
+        console.log(
+          '[generate-image] ✓ Studio tool generation completed in',
+          totalTime,
+          'ms',
+          studioResult.fallbackUsed
+            ? `(fallback: ${studioResult.requestedModel} -> ${studioResult.deliveredModel})`
+            : '',
+        );
+
+        return NextResponse.json({
+          image: {
+            url: stored.url,
+            mimeType: stored.mimeType,
+          },
+          warnings: [],
+          creditsUsed: deliveredCredits,
+          generationId: savedGeneration?.id ?? null,
+        });
+      } catch (studioError) {
+        if (isModerationGenerationFailure(studioError)) {
+          const message =
+            studioError instanceof Error ? studioError.message : 'Content moderation';
+          return NextResponse.json(
+            {
+              error: 'Content moderation',
+              message,
+              details:
+                'The AI model flagged this request. Try different inputs or reference images.',
+            },
+            { status: 400 },
+          );
+        }
+
+        throw studioError;
+      }
     }
 
     if (modelProvider === 'fal' && isSupportedFalImageModel(modelIdentifier)) {
