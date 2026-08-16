@@ -3,7 +3,7 @@ import type { ImageStudioToolDefinition } from "./types"
 export const POSE_RECREATE_TOOL: ImageStudioToolDefinition = {
   id: "pose_recreate",
   uiModelIdentifier: "custom/pose-recreate",
-  baseModelIdentifier: "google/nano-banana-2-lite",
+  baseModelIdentifier: "openai/gpt-image-2",
   name: "Pose Recreate",
   description: "Recreate a reference pose with your character.",
   historyToolTag: "pose_recreate",

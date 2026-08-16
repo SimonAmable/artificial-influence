@@ -3,7 +3,7 @@ import type { ImageStudioToolDefinition } from "./types"
 export const OUTFIT_SWAP_TOOL: ImageStudioToolDefinition = {
   id: "outfit_swap",
   uiModelIdentifier: "custom/outfit-swap",
-  baseModelIdentifier: "google/nano-banana-2-lite",
+  baseModelIdentifier: "openai/gpt-image-2",
   name: "Outfit Swap",
   description: "Dress your character in an outfit from a reference image.",
   historyToolTag: "outfit_swap",

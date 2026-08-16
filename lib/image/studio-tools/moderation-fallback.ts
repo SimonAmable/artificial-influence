@@ -1,10 +1,10 @@
 import { IMAGE_STUDIO_TOOLS } from "@/lib/image/studio-tools/registry"
 import { isContentModerationMessage } from "@/lib/generate-image-client"
 
-/** Lowest-quality rescue ladder for proprietary studio tools. */
+/** Moderation rescue ladder for proprietary studio tools. */
 export const STUDIO_IMAGE_FALLBACK_CHAIN = [
-  "google/nano-banana-2-lite",
   "openai/gpt-image-2",
+  "google/nano-banana-2-lite",
   "bytedance/seedream-5-lite",
 ] as const
 

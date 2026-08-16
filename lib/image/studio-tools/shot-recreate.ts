@@ -3,7 +3,7 @@ import type { ImageStudioToolDefinition } from "./types"
 export const SHOT_RECREATE_TOOL: ImageStudioToolDefinition = {
   id: "shot_recreate",
   uiModelIdentifier: "custom/shot-recreate",
-  baseModelIdentifier: "google/nano-banana-2-lite",
+  baseModelIdentifier: "openai/gpt-image-2",
   name: "Shot Recreate",
   description: "Recreate a reference shot with your character.",
   historyToolTag: "shot_recreate",

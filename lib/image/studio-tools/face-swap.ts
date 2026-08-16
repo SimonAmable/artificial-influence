@@ -3,7 +3,7 @@ import type { ImageStudioToolDefinition } from "./types"
 export const FACE_SWAP_TOOL: ImageStudioToolDefinition = {
   id: "face_swap",
   uiModelIdentifier: "custom/face-swap",
-  baseModelIdentifier: "google/nano-banana-2-lite",
+  baseModelIdentifier: "openai/gpt-image-2",
   name: "Face Swap",
   description: "Transfer face, head, hair, and skin onto a target person or scene.",
   historyToolTag: "face_swap",

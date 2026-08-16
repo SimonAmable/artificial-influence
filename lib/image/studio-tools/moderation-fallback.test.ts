@@ -25,10 +25,10 @@ test("isModerationGenerationFailure only matches moderation-like errors", () => 
   assert.equal(isModerationGenerationFailure(new Error("Insufficient credits")), false)
 })
 
-test("studio fallback chain starts with lowest-quality model", () => {
+test("studio fallback chain starts with gpt image 2", () => {
   assert.deepEqual(STUDIO_IMAGE_FALLBACK_CHAIN, [
-    "google/nano-banana-2-lite",
     "openai/gpt-image-2",
+    "google/nano-banana-2-lite",
     "bytedance/seedream-5-lite",
   ])
 })
