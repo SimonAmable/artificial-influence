@@ -6,6 +6,8 @@ import {
   uploadPreparedGeneratedImage,
 } from "@/lib/server/store-generated-image"
 import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
+import { studioBoardFieldsForIndex } from "@/lib/studio/form-data"
+import type { StudioBoardFields } from "@/lib/studio/types"
 
 export type { StoredGeneratedImage } from "@/lib/server/store-generated-image"
 
@@ -26,6 +28,7 @@ interface FinalizeGeneratedImagesOptions {
   prompt: string
   referenceImageStoragePaths?: string[]
   requiredCredits: number
+  studioBoardFields?: StudioBoardFields | null
   supabase: SupabaseClient
   tool?: string | null
   userId: string
@@ -39,6 +42,7 @@ interface RunReplicatePollingImageGenerationOptions {
   replicateInput: Record<string, unknown>
   requiredCredits: number
   skipCreditCheck?: boolean
+  studioBoardFields?: StudioBoardFields | null
   supabase: SupabaseClient
   tool?: string | null
   userId: string
@@ -130,6 +134,7 @@ async function saveCompletedGenerations({
   modelIdentifier,
   prompt,
   referenceImageStoragePaths,
+  studioBoardFields = null,
   supabase,
   tool,
   userId,
@@ -139,6 +144,7 @@ async function saveCompletedGenerations({
   modelIdentifier: string
   prompt: string
   referenceImageStoragePaths?: string[]
+  studioBoardFields?: StudioBoardFields | null
   supabase: SupabaseClient
   tool?: string | null
   userId: string
@@ -147,7 +153,7 @@ async function saveCompletedGenerations({
     return
   }
 
-  const rows = images.map((image) => ({
+  const rows = images.map((image, index) => ({
     user_id: userId,
     prompt,
     supabase_storage_path: image.storagePath,
@@ -162,6 +168,7 @@ async function saveCompletedGenerations({
     tool: tool ?? null,
     status: "completed",
     error_message: null,
+    ...studioBoardFieldsForIndex(studioBoardFields, index),
   }))
 
   const { error } = await supabase.from("generations").insert(rows)
@@ -178,6 +185,7 @@ export async function finalizeGeneratedImages({
   prompt,
   referenceImageStoragePaths,
   requiredCredits,
+  studioBoardFields = null,
   supabase,
   tool,
   userId,
@@ -191,6 +199,7 @@ export async function finalizeGeneratedImages({
     modelIdentifier,
     prompt,
     referenceImageStoragePaths,
+    studioBoardFields,
     supabase,
     tool,
     userId,
@@ -218,6 +227,7 @@ export async function persistGeneratedBase64Images({
   prompt,
   referenceImageStoragePaths = [],
   requiredCredits,
+  studioBoardFields = null,
   supabase,
   tool,
   userId,
@@ -229,6 +239,7 @@ export async function persistGeneratedBase64Images({
   prompt: string
   referenceImageStoragePaths?: string[]
   requiredCredits: number
+  studioBoardFields?: StudioBoardFields | null
   supabase: SupabaseClient
   tool?: string | null
   userId: string
@@ -258,6 +269,7 @@ export async function persistGeneratedBase64Images({
     prompt,
     referenceImageStoragePaths,
     requiredCredits,
+    studioBoardFields,
     supabase,
     tool,
     userId,
@@ -272,6 +284,7 @@ export async function runReplicatePollingImageGeneration({
   replicateInput,
   requiredCredits,
   skipCreditCheck = false,
+  studioBoardFields = null,
   supabase,
   tool,
   userId,
@@ -326,6 +339,7 @@ export async function runReplicatePollingImageGeneration({
     prompt,
     referenceImageStoragePaths,
     requiredCredits,
+    studioBoardFields,
     supabase,
     tool,
     userId,

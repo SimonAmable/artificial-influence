@@ -81,6 +81,7 @@ const baseNavigationItems: NavigationItem[] = [
   { path: "/content", label: "Content", products: ["presence-studio"] },
   { path: "/autopost", label: "Autopost", hiddenFor: ["presence-studio"] },
   { path: "/image", label: "Image" },
+  { path: "/studio", label: "Studio" },
   { path: "/video", label: "Video" },
   { path: "/audio", label: "Audio" },
   { path: "/assets?tab=brands", label: "Brand", hiddenFor: ["presence-studio"] },
@@ -542,6 +543,29 @@ const baseMegaNavGroups: MegaNavGroup[] = [
     hiddenFor: ["presence-studio"],
   },
   {
+    label: "Studio",
+    path: "/studio",
+    badge: "new",
+    iconPhosphor: "squares-four",
+    simpleItems: [
+      {
+        path: "/studio",
+        label: "Studio",
+        description: "Project-based image generation on an infinite canvas",
+        badge: "new",
+        iconPhosphor: "squares-four",
+        searchKeywords: [
+          "studio",
+          "board",
+          "canvas",
+          "infinite",
+          "project",
+          "moodboard",
+        ],
+      },
+    ],
+  },
+  {
     label: "Canvas",
     path: "/canvases",
     simpleItems: [
@@ -782,6 +806,12 @@ export const dashboardToolNavItems: DashboardToolNavItem[] = [
     href: "/image",
     icon: "image",
     hint: "Generate images from text and references.",
+  },
+  {
+    label: "Studio",
+    href: "/studio",
+    icon: "squares-four",
+    hint: "Project boards with infinite-canvas image generation.",
   },
   {
     label: "Video Studio",

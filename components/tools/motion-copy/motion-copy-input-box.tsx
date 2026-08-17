@@ -11,6 +11,7 @@ import {
   AssetSelectionModal,
   type AssetSelectionPick,
 } from "@/components/shared/modals/asset-selection-modal"
+import { MotionCopyPromptField } from "@/components/tools/motion-copy/motion-copy-prompt-field"
 
 export interface MotionCopyInputBoxProps {
   className?: string
@@ -37,6 +38,8 @@ export interface MotionCopyInputBoxProps {
     minHeight?: string
   }
   extraControls?: React.ReactNode
+  promptValue?: string
+  onPromptChange?: (value: string) => void
 }
 
 /** Old shared upload default was max-h-[45px]; motion copy uses a modest bump only (+27..+31px). */
@@ -57,6 +60,8 @@ export function MotionCopyInputBox({
   photoUploadProps,
   videoUploadProps,
   extraControls,
+  promptValue = "",
+  onPromptChange,
 }: MotionCopyInputBoxProps) {
   const [inputImage, setInputImage] = React.useState<ImageUpload | null>(defaultImage || null)
   const [inputVideo, setInputVideo] = React.useState<ImageUpload | null>(defaultVideo || null)
@@ -118,8 +123,7 @@ export function MotionCopyInputBox({
     <Card className={cn("w-full max-w-sm sm:max-w-lg lg:max-w-4xl relative", className)}>
       <CardContent className={cn(
         "pt-1.5 pb-1.5 flex gap-1.5 sm:gap-2 px-4 sm:px-6",
-        forceRowLayout ? "flex-row items-stretch" : "flex-col",
-        extraControls && "flex-wrap"
+        forceRowLayout ? "flex-row items-stretch flex-wrap" : "flex-col",
       )}>
         {/* Image Upload */}
         <div className={cn(
@@ -152,6 +156,15 @@ export function MotionCopyInputBox({
             minHeight={videoUploadProps?.minHeight ?? MOTION_COPY_PREVIEW.minHeight}
             showSourceActions
             onChooseAsset={() => setAssetTarget("video")}
+          />
+        </div>
+
+        <div className="w-full px-0.5 pt-0.5">
+          <MotionCopyPromptField
+            value={promptValue}
+            onChange={(value) => onPromptChange?.(value)}
+            onGenerate={handleGenerate}
+            disabled={isGenerating}
           />
         </div>
 

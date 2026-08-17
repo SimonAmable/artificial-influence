@@ -34,6 +34,7 @@ export const presenceStudioProduct: ProductConfig = {
     "/content",
     "/autopost",
     "/image",
+    "/studio",
     "/audio",
     "/angles",
     "/carousel-shots",

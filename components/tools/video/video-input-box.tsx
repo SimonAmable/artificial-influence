@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
+import { MotionCopyPromptField } from "@/components/tools/motion-copy/motion-copy-prompt-field"
 import { VideoModelParameterControls } from "@/components/tools/video/video-model-parameter-controls"
 import { MultiShotEditor, type MultiShotItem } from "@/components/tools/video/multi-shot-editor"
 import { GenerateShaderButton } from "@/components/tools/influencer/generate-shader-button"
@@ -1367,6 +1368,17 @@ export function VideoInputBox({
                 onChooseAsset={() => openAssetPicker("motion-copy-video")}
               />
             </div>
+          </div>
+        )}
+
+        {isMotionCopyModel && (
+          <div className="px-2 pt-1">
+            <MotionCopyPromptField
+              value={promptValue}
+              onChange={onPromptChange}
+              onGenerate={onGenerate}
+              disabled={!allowOptionsDuringGeneration && isGenerating}
+            />
           </div>
         )}
 

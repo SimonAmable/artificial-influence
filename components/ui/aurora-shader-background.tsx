@@ -292,11 +292,42 @@ function AuroraShaderBackgroundComponent({
   const fastRef = React.useRef(fast)
   const targetRefRef = React.useRef(targetRef)
   const syncAnimationRef = React.useRef<(() => void) | null>(null)
+  const [glReady, setGlReady] = React.useState(false)
   targetRefRef.current = targetRef
   animateRef.current = animate
   fastRef.current = fast
 
   React.useEffect(() => {
+    if (glReady) return
+
+    let cancelled = false
+    const enable = () => {
+      if (!cancelled) setGlReady(true)
+    }
+
+    if (animate) {
+      enable()
+      return
+    }
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(enable, { timeout: 500 })
+      return () => {
+        cancelled = true
+        window.cancelIdleCallback(idleId)
+      }
+    }
+
+    const timeoutId = window.setTimeout(enable, 1)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [animate, glReady])
+
+  React.useEffect(() => {
+    if (!glReady) return
+
     const root = rootRef.current
     const canvas = canvasRef.current
     if (!root || !canvas) return
@@ -541,7 +572,7 @@ function AuroraShaderBackgroundComponent({
       gl.deleteBuffer(buffer)
       gl.deleteProgram(program)
     }
-  }, [variant])
+  }, [glReady, variant])
 
   React.useEffect(() => {
     syncAnimationRef.current?.()

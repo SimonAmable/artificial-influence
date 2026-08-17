@@ -45,6 +45,7 @@ import {
   usesFalMultimodalVideoInputs,
 } from "@/lib/constants/models"
 import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
+import { MotionCopyPromptField } from "@/components/tools/motion-copy/motion-copy-prompt-field"
 import { VideoModelParameterControls } from "@/components/tools/video/video-model-parameter-controls"
 import { PhotoUpload, type ImageUpload } from "@/components/shared/upload/photo-upload"
 import { VideoUpload } from "@/components/shared/upload/video-upload"
@@ -1599,6 +1600,15 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
                 </div>
               )}
             </div>
+          )}
+
+          {isMotionCopyModel && (
+            <MotionCopyPromptField
+              value={nodeData.prompt || ""}
+              onChange={(value) => nodeData.onDataChange?.(id, { prompt: value })}
+              onGenerate={handleGenerate}
+              disabled={nodeData.isGenerating}
+            />
           )}
 
           {needsPrompt && (

@@ -33,6 +33,7 @@ export default function MotionCopyPage() {
   const [inputImage, setInputImage] = React.useState<ImageUpload | null>(null)
   const [inputVideo, setInputVideo] = React.useState<ImageUpload | null>(null)
   const [characterOrientation, setCharacterOrientation] = React.useState<string>("video")
+  const [prompt, setPrompt] = React.useState("")
   const [generatedVideos, setGeneratedVideos] = React.useState<string[]>([])
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -166,7 +167,7 @@ export default function MotionCopyPage() {
         videoUrl: videoPublicUrl,
         ...(imageStoragePath ? { imageStoragePath } : {}),
         ...(videoStoragePath ? { videoStoragePath } : {}),
-        prompt: "",
+        prompt: prompt.trim(),
         mode: "pro",
         keep_original_sound: true,
         character_orientation: characterOrientation,
@@ -321,6 +322,8 @@ export default function MotionCopyPage() {
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
                     extraControls={controlsRow}
+                    promptValue={prompt}
+                    onPromptChange={setPrompt}
                   />
                 </div>
               </div>
@@ -352,6 +355,8 @@ export default function MotionCopyPage() {
                         isGenerating={isGenerating}
                         onGenerate={handleGenerate}
                         extraControls={controlsRow}
+                        promptValue={prompt}
+                        onPromptChange={setPrompt}
                       />
                     </div>
                   </div>
@@ -384,6 +389,8 @@ export default function MotionCopyPage() {
                     isGenerating={isGenerating}
                     onGenerate={handleGenerate}
                     extraControls={controlsRow}
+                    promptValue={prompt}
+                    onPromptChange={setPrompt}
                   />
                 </div>
               </div>

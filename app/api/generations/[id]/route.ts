@@ -3,6 +3,65 @@ import { NextRequest, NextResponse } from "next/server"
 import { getHistoryFeedItemByGenerationId } from "@/lib/library/history-feed"
 import { createClient } from "@/lib/supabase/server"
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 })
+    }
+
+    const resolvedParams = await Promise.resolve(params)
+    const generationId = resolvedParams.id?.trim()
+    if (!generationId) {
+      return NextResponse.json({ error: "Missing generation id." }, { status: 400 })
+    }
+
+    const body = (await request.json().catch(() => ({}))) as {
+      studio_x?: number
+      studio_y?: number
+      studio_width?: number
+      studio_height?: number
+    }
+
+    const patch: Record<string, number> = {}
+    for (const key of ["studio_x", "studio_y", "studio_width", "studio_height"] as const) {
+      const value = body[key]
+      if (typeof value === "number" && Number.isFinite(value)) {
+        patch[key] = value
+      }
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json({ error: "No valid studio layout fields provided." }, { status: 400 })
+    }
+
+    const { data, error } = await supabase
+      .from("generations")
+      .update(patch)
+      .eq("id", generationId)
+      .eq("user_id", user.id)
+      .select("id, studio_x, studio_y, studio_width, studio_height")
+      .single()
+
+    if (error || !data) {
+      return NextResponse.json({ error: "Generation not found or unauthorized" }, { status: 404 })
+    }
+
+    return NextResponse.json({ generation: data })
+  } catch (error) {
+    console.error("[generations] PATCH error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },

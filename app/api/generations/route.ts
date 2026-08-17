@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') as 'image' | 'video' | 'audio' | null;
     const tool = searchParams.get('tool');
     const characterAssetId = searchParams.get('characterAssetId');
+    const studioProjectId = searchParams.get('studioProjectId');
     const hasCharacter = searchParams.get('hasCharacter') === 'true';
     const limit = parseLimit(searchParams.get('limit'));
     const offset = parseOffset(searchParams.get('offset'));
@@ -87,6 +88,9 @@ export async function GET(request: NextRequest) {
       query = query.eq('character_asset_id', characterAssetId);
     } else if (hasCharacter) {
       query = query.not('character_asset_id', 'is', null);
+    }
+    if (studioProjectId) {
+      query = query.eq('studio_project_id', studioProjectId);
     }
 
     query = applySearchFilter(query, search);
@@ -127,6 +131,9 @@ export async function GET(request: NextRequest) {
       countQuery = countQuery.eq('character_asset_id', characterAssetId);
     } else if (hasCharacter) {
       countQuery = countQuery.not('character_asset_id', 'is', null);
+    }
+    if (studioProjectId) {
+      countQuery = countQuery.eq('studio_project_id', studioProjectId);
     }
 
     countQuery = applySearchFilter(countQuery, search);

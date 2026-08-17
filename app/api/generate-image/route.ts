@@ -47,6 +47,11 @@ import {
   toXaiGenerateImageResult,
 } from '@/lib/server/xai-image-edits';
 import {
+  parseStudioBoardFieldsFromFormData,
+  studioBoardFieldsForIndex,
+} from '@/lib/studio/form-data';
+import { assertStudioProjectOwned } from '@/lib/studio/database-server';
+import {
   generateStudioToolImageWithFallback,
   isModerationGenerationFailure,
   isStudioImageToolTag,
@@ -194,6 +199,17 @@ export async function POST(request: NextRequest) {
     const tool = formData.get('tool') as string | null;
     const requestedCharacterAssetId = formData.get('characterAssetId') as string | null;
     const sourceGenerationId = formData.get('sourceGenerationId') as string | null;
+    const studioBoardFields = parseStudioBoardFieldsFromFormData(formData);
+    if (studioBoardFields) {
+      const ownsProject = await assertStudioProjectOwned(
+        supabase,
+        user.id,
+        studioBoardFields.studio_project_id,
+      );
+      if (!ownsProject) {
+        return NextResponse.json({ error: 'Studio project not found' }, { status: 400 });
+      }
+    }
     let characterAssetId: string | null = null;
     if (requestedCharacterAssetId) {
       const { data: character } = await supabase
@@ -603,6 +619,7 @@ export async function POST(request: NextRequest) {
             pricing_snapshot: deliveredPricingQuote.pricingSnapshot,
             character_asset_id: characterAssetId,
             finished_at: new Date().toISOString(),
+            ...studioBoardFieldsForIndex(studioBoardFields, 0),
           })
           .select('id')
           .single();
@@ -700,6 +717,7 @@ export async function POST(request: NextRequest) {
           quoted_credits: requiredCredits,
           pricing_snapshot: pricingSnapshot,
           character_asset_id: characterAssetId,
+          ...studioBoardFieldsForIndex(studioBoardFields, 0),
         })
         .select('id')
         .single();
@@ -1043,6 +1061,7 @@ export async function POST(request: NextRequest) {
               replicate_prediction_id: prediction.id,
               quoted_credits: requiredCredits,
               pricing_snapshot: pricingSnapshot,
+              ...studioBoardFieldsForIndex(studioBoardFields, 0),
             })
             .select('id')
             .single();
@@ -1076,6 +1095,7 @@ export async function POST(request: NextRequest) {
           replicateInput,
           requiredCredits,
           skipCreditCheck: true,
+          studioBoardFields,
           supabase,
           tool: tool || null,
           userId: user.id,
@@ -1195,7 +1215,11 @@ export async function POST(request: NextRequest) {
     };
 
     // Helper function to save generation data to database
-    const saveGenerationToDatabase = async (storagePath: string, referenceStoragePaths?: string[]) => {
+    const saveGenerationToDatabase = async (
+      storagePath: string,
+      referenceStoragePaths?: string[],
+      imageIndex = 0,
+    ) => {
       try {
         console.log('[generate-image] Saving generation to database...');
         
@@ -1214,6 +1238,7 @@ export async function POST(request: NextRequest) {
           quoted_credits: requiredCredits,
           pricing_snapshot: pricingSnapshot,
           character_asset_id: characterAssetId,
+          ...studioBoardFieldsForIndex(studioBoardFields, imageIndex),
         };
 
         const { data: savedData, error: saveError } = await supabase
@@ -1253,12 +1278,13 @@ export async function POST(request: NextRequest) {
 
       // Save each generation to database
       const savedGenerations = await Promise.all(
-        imageStoragePaths.map((storagePath) =>
+        imageStoragePaths.map((storagePath, imageIndex) =>
           saveGenerationToDatabase(
             storagePath,
             provider === 'xai' || provider === 'gateway'
               ? referenceImageStoragePaths.slice(0, provider === 'gateway' ? 3 : undefined)
               : replicateReferenceImageStoragePaths,
+            imageIndex,
           )
         )
       );

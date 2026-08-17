@@ -182,14 +182,15 @@ function GenerateShaderButtonComponent({
             !isReady && "cursor-not-allowed opacity-50",
           )}
         >
-          {showShader ? (
-            <AuroraShaderBackground
-              className="rounded-[inherit]"
-              targetRef={buttonShellRef}
-              animate={animateShader}
-              fast={fastShader}
-            />
-          ) : null}
+          <AuroraShaderBackground
+            className={cn(
+              "rounded-[inherit] transition-opacity duration-300",
+              showShader ? "opacity-100" : "opacity-0",
+            )}
+            targetRef={buttonShellRef}
+            animate={animateShader}
+            fast={fastShader}
+          />
           <motion.div
             layout
             transition={layoutTransition}

@@ -33,6 +33,7 @@ export const unicanProduct: ProductConfig = {
     "/automations",
     "/autopost",
     "/image",
+    "/studio",
     "/video",
     "/audio",
     "/assets",
