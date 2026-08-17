@@ -182,7 +182,7 @@ export interface ImageEditorProps {
   /** Mode: page for standalone, modal for dialog usage */
   mode?: "page" | "modal"
   /** Callback when image is saved */
-  onSave?: (imageUrl: string) => void
+  onSave?: (imageUrl: string, details?: { generationId?: string }) => void
   /** Callback when editor is closed (modal mode) */
   onClose?: () => void
   /** Custom class name */
@@ -196,7 +196,7 @@ export interface ImageEditorDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialImage?: string
-  onSave?: (imageUrl: string) => void
+  onSave?: (imageUrl: string, details?: { generationId?: string }) => void
   /** Defaults to `inpaint` (mask + Nano Banana 2). Use `full` only for legacy flows. */
   variant?: ImageEditorVariant
 }

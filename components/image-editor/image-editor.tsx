@@ -416,7 +416,7 @@ function ImageEditorInner({
         sourceImageUrl: currentImage,
       })
       if (saved) {
-        onSave(saved.url)
+        onSave(saved.url, { generationId: saved.generationId })
       }
     } finally {
       setIsSaving(false)

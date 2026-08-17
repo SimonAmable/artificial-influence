@@ -64,6 +64,7 @@ export async function updateGenerationStudioLayout(options: {
   y: number
   width?: number
   height?: number
+  projectId?: string
 }): Promise<void> {
   const response = await fetch(`/api/generations/${options.generationId}`, {
     method: "PATCH",
@@ -73,6 +74,7 @@ export async function updateGenerationStudioLayout(options: {
       studio_y: options.y,
       ...(typeof options.width === "number" ? { studio_width: options.width } : {}),
       ...(typeof options.height === "number" ? { studio_height: options.height } : {}),
+      ...(options.projectId ? { studio_project_id: options.projectId } : {}),
     }),
   })
   if (!response.ok) {

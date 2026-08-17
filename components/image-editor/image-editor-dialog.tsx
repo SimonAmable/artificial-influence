@@ -16,8 +16,8 @@ export function ImageEditorDialog({
   onSave,
   variant = "inpaint",
 }: ImageEditorDialogProps) {
-  const handleSave = (url: string) => {
-    onSave?.(url)
+  const handleSave = (url: string, details?: { generationId?: string }) => {
+    onSave?.(url, details)
     onOpenChange(false)
   }
 

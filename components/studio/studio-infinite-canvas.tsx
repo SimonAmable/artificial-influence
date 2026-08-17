@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import type { StudioViewport } from "@/lib/studio/types"
+import { STUDIO_MAX_ZOOM, STUDIO_MIN_ZOOM, type StudioViewport } from "@/lib/studio/types"
 
 export interface StudioInfiniteCanvasHandle {
   getSize: () => { width: number; height: number }
@@ -16,8 +16,8 @@ interface StudioInfiniteCanvasProps {
   children: React.ReactNode
 }
 
-const MIN_ZOOM = 0.2
-const MAX_ZOOM = 3
+const MIN_ZOOM = STUDIO_MIN_ZOOM
+const MAX_ZOOM = STUDIO_MAX_ZOOM
 const CLICK_MOVE_THRESHOLD = 4
 
 export const StudioInfiniteCanvas = React.forwardRef<

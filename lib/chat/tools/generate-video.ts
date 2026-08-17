@@ -27,6 +27,8 @@ import { mediaIdStringSchema } from "@/lib/chat/media-id"
 import { resolveToolAudioReferences } from "@/lib/chat/resolve-tool-audio-references"
 import { resolveToolImageReferences } from "@/lib/chat/resolve-tool-references"
 import { resolveToolVideoReferences } from "@/lib/chat/resolve-tool-video-references"
+import { studioBoardFieldsForIndex } from "@/lib/studio/form-data"
+import type { StudioBoardFields } from "@/lib/studio/types"
 
 const DEFAULT_TEXT_TO_VIDEO_MODEL = "prunaai/p-video" as const
 const DEFAULT_MOTION_COPY_MODEL = "kwaivgi/kling-v3-motion-control" as const
@@ -64,6 +66,7 @@ interface CreateGenerateVideoToolOptions {
   supabase: SupabaseClient
   threadId?: string
   userId: string
+  studioBoardFields?: StudioBoardFields | null
 }
 
 interface StoredMediaAsset {
@@ -248,6 +251,7 @@ export function createGenerateVideoTool({
   supabase,
   threadId,
   userId,
+  studioBoardFields = null,
 }: CreateGenerateVideoToolOptions) {
   const availableReferenceMap = new Map(
     availableReferences.map((reference) => [reference.id, reference] as const),
@@ -606,6 +610,7 @@ export function createGenerateVideoTool({
             predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
             character_asset_id: characterAssetId,
             ...(threadId ? { chat_thread_id: threadId } : {}),
+            ...studioBoardFieldsForIndex(studioBoardFields, 0),
           })
           .select("id")
           .single()
@@ -815,6 +820,7 @@ export function createGenerateVideoTool({
           predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
           character_asset_id: characterAssetId,
           ...(threadId ? { chat_thread_id: threadId } : {}),
+          ...studioBoardFieldsForIndex(studioBoardFields, 0),
         })
         .select("id")
         .single()

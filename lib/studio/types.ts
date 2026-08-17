@@ -27,6 +27,7 @@ export interface StudioTile {
   clientKey: string
   generationId: string | null
   url: string | null
+  kind: "image" | "video"
   status: "pending" | "completed" | "failed"
   prompt: string | null
   model: string | null
@@ -58,3 +59,5 @@ export const DEFAULT_STUDIO_VIEWPORT: StudioViewport = {
 
 export const DEFAULT_STUDIO_TILE_HEIGHT = 280
 export const DEFAULT_STUDIO_TILE_GAP = 24
+export const STUDIO_MIN_ZOOM = 0.2
+export const STUDIO_MAX_ZOOM = 3

@@ -2,9 +2,9 @@
 
 import * as React from "react"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
-import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { DashboardAgentPromptBox } from "@/components/dashboard/dashboard-agent-prompt-box"
+import { HeroToolTabs, type HeroToolTabId } from "@/components/dashboard/hero-tool-tabs"
 import { ShineBorder } from "@/components/ui/shine-border"
 import { InfluencerInputBox } from "@/components/tools/influencer"
 import type { AudioUploadValue } from "@/components/shared/upload/audio-upload"
@@ -45,17 +45,7 @@ import type {
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
-type DashboardHeroMode = "video" | "image" | "agent"
-
-const HERO_TABS: Array<{
-  id: DashboardHeroMode
-  label: string
-  iconSrc: string
-}> = [
-  { id: "agent", label: "Agent", iconSrc: "/3d_icons/agent.png" },
-  { id: "image", label: "Image", iconSrc: "/3d_icons/image.png" },
-  { id: "video", label: "Video", iconSrc: "/3d_icons/video.png" },
-]
+type DashboardHeroMode = HeroToolTabId
 
 const HERO_TAB_INDEX: Record<DashboardHeroMode, number> = {
   agent: 0,
@@ -427,54 +417,11 @@ export function DashboardHeroSection({ className }: { className?: string }) {
           </h1>
         </div>
 
-        <div
-          className={cn(
-            "relative z-20 inline-flex flex-wrap items-center justify-center gap-1 rounded-full border p-[3px] backdrop-blur",
-            "border-border/65 bg-muted/95",
-            "shadow-[inset_0_2px_6px_rgba(0,0,0,0.10),inset_0_1px_2px_rgba(0,0,0,0.06),inset_0_-1px_1px_rgba(255,255,255,0.35)]",
-            "dark:border-border/45 dark:bg-muted/55",
-            "dark:shadow-[inset_0_2px_12px_rgba(0,0,0,0.55),inset_0_1px_2px_rgba(0,0,0,0.45),inset_0_-1px_0_rgba(255,255,255,0.04)]"
-          )}
-          role="tablist"
+        <HeroToolTabs
+          value={activeTab}
+          onChange={handleTabChange}
           aria-label="Dashboard hero tools"
-        >
-          {HERO_TABS.map((tab) => {
-            const isActive = activeTab === tab.id
-
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => handleTabChange(tab.id)}
-                role="tab"
-                aria-selected={isActive}
-                className={cn(
-                  "inline-flex min-h-8 min-w-[6.5rem] shrink-0 items-center justify-center gap-1.5 rounded-full border border-transparent px-3 py-1 text-center text-sm font-medium transition-[color,box-shadow,border-color,background-color]",
-                  isActive
-                    ? "border-border/80 bg-background text-foreground shadow-sm dark:border-border/60 dark:bg-card/90"
-                    : "text-muted-foreground hover:bg-background/40 hover:text-foreground"
-                )}
-              >
-                <span
-                  className={cn(
-                    "relative flex size-5 items-center justify-center transition-transform duration-300 ease-out",
-                    isActive ? "scale-[2]" : "scale-100"
-                  )}
-                >
-                  <Image
-                    src={tab.iconSrc}
-                    alt=""
-                    width={20}
-                    height={20}
-                    className="h-5 w-5 object-contain"
-                    aria-hidden
-                  />
-                </span>
-                <span>{tab.label}</span>
-              </button>
-            )
-          })}
-        </div>
+        />
 
         <div className="w-full">
           <AnimatePresence initial={false} mode="wait" custom={tabDirection}>

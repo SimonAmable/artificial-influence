@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { getHistoryFeedItemByGenerationId } from "@/lib/library/history-feed"
+import { assertStudioProjectOwned } from "@/lib/studio/database-server"
 import { createClient } from "@/lib/supabase/server"
 
 export async function PATCH(
@@ -29,14 +30,23 @@ export async function PATCH(
       studio_y?: number
       studio_width?: number
       studio_height?: number
+      studio_project_id?: string
     }
 
-    const patch: Record<string, number> = {}
+    const patch: Record<string, number | string> = {}
     for (const key of ["studio_x", "studio_y", "studio_width", "studio_height"] as const) {
       const value = body[key]
       if (typeof value === "number" && Number.isFinite(value)) {
         patch[key] = value
       }
+    }
+    if (typeof body.studio_project_id === "string" && body.studio_project_id.trim()) {
+      const studioProjectId = body.studio_project_id.trim()
+      const owned = await assertStudioProjectOwned(supabase, user.id, studioProjectId)
+      if (!owned) {
+        return NextResponse.json({ error: "Studio project not found or unauthorized" }, { status: 404 })
+      }
+      patch.studio_project_id = studioProjectId
     }
 
     if (Object.keys(patch).length === 0) {
@@ -48,7 +58,7 @@ export async function PATCH(
       .update(patch)
       .eq("id", generationId)
       .eq("user_id", user.id)
-      .select("id, studio_x, studio_y, studio_width, studio_height")
+      .select("id, studio_x, studio_y, studio_width, studio_height, studio_project_id")
       .single()
 
     if (error || !data) {

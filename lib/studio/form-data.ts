@@ -44,6 +44,41 @@ export function parseStudioBoardFieldsFromFormData(
   }
 }
 
+export function parseStudioBoardFieldsFromJson(
+  body: Record<string, unknown>,
+): StudioBoardFields | null {
+  const projectId = body.studioProjectId
+  if (typeof projectId !== "string" || !projectId.trim()) {
+    return null
+  }
+
+  const studioX = typeof body.studioX === "number" && Number.isFinite(body.studioX) ? body.studioX : null
+  const studioY = typeof body.studioY === "number" && Number.isFinite(body.studioY) ? body.studioY : null
+  const studioWidth =
+    typeof body.studioWidth === "number" && Number.isFinite(body.studioWidth) ? body.studioWidth : null
+  const studioHeight =
+    typeof body.studioHeight === "number" && Number.isFinite(body.studioHeight) ? body.studioHeight : null
+
+  if (
+    studioX == null ||
+    studioY == null ||
+    studioWidth == null ||
+    studioHeight == null ||
+    studioWidth <= 0 ||
+    studioHeight <= 0
+  ) {
+    return null
+  }
+
+  return {
+    studio_project_id: projectId.trim(),
+    studio_x: studioX,
+    studio_y: studioY,
+    studio_width: studioWidth,
+    studio_height: studioHeight,
+  }
+}
+
 export function studioBoardFieldsForIndex(
   base: StudioBoardFields | null,
   index: number,

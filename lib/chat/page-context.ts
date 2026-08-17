@@ -1,4 +1,5 @@
 import { getGuideArticleBySlug } from "@/lib/guides/content"
+import { parseStudioProjectIdFromPagePath } from "@/lib/studio/page-path"
 
 export type GuidePageContext = {
   kind: "guide"
@@ -104,5 +105,8 @@ export function resolveAppPageContext(pagePath: string): AppPageContext {
 /** One-line runtime hint — never dumps guide bodies. */
 export function formatPagePathRuntimeHint(pagePath: string | undefined): string {
   if (!pagePath) return ""
+  if (parseStudioProjectIdFromPagePath(pagePath)) {
+    return `User viewing: ${pagePath}. They are on a Studio board. Image and video generations from tools are placed on this board automatically.`
+  }
   return `User viewing: ${pagePath}`
 }

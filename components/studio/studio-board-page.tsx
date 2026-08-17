@@ -8,19 +8,32 @@ import {
   InfluencerInputBox,
   type InfluencerInputSnapshot,
 } from "@/components/tools/influencer"
+import { ImageStudioToolInput } from "@/components/tools/image-studio"
 import { StudioInfiniteCanvas, type StudioInfiniteCanvasHandle } from "@/components/studio/studio-infinite-canvas"
 import { StudioTileCard } from "@/components/studio/studio-tile-card"
+import { ImageEditorDialog } from "@/components/image-editor/image-editor-dialog"
 import {
   FullscreenMediaViewer,
   type FullscreenMediaViewerAction,
 } from "@/components/shared/display/fullscreen-media-viewer"
 import { copyMediaToClipboard, downloadMediaFile } from "@/components/shared/display/media-viewer-utils"
-import { ArrowsClockwise, Copy, DownloadSimple, ImageSquare, Trash } from "@phosphor-icons/react"
+import { ArrowsClockwise, Copy, DotsThree, DownloadSimple, ImageSquare, PencilSimple, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { useDefaultEnhancePrompt } from "@/hooks/use-default-enhance-prompt"
-import { useEffectiveImageModels } from "@/lib/image/studio-tools"
+import {
+  buildStudioToolGenerationRequest,
+  getStudioToolByUiModel,
+  useEffectiveImageModels,
+  validateDualReferenceSwapState,
+} from "@/lib/image/studio-tools"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { appendImageReferencesToFormData } from "@/lib/image/append-references-to-form-data"
 import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
@@ -31,12 +44,20 @@ import {
   updateStudioProjectClient,
 } from "@/lib/studio/database"
 import {
+  findNeighborPlacement,
   findOpenPlacement,
+  packStudioTiles,
   tileFromGeneration,
   tileSizeForAspectRatio,
   tileSizeFromPixelRatio,
 } from "@/lib/studio/placement"
-import { animateViewport, boundingRect, viewportToCenterRect } from "@/lib/studio/camera"
+import {
+  animateViewport,
+  boundingRect,
+  viewportToCenterRect,
+  viewportToFitRect,
+  viewportToResetZoom,
+} from "@/lib/studio/camera"
 import type { StudioProject, StudioTile, StudioViewport } from "@/lib/studio/types"
 import {
   generateImageAndWait,
@@ -73,6 +94,21 @@ function createClientRequestId() {
   return `pending-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
+function measureImagePixelSize(url: string): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const image = new window.Image()
+    image.onload = () => {
+      if (!image.naturalWidth || !image.naturalHeight) {
+        resolve(null)
+        return
+      }
+      resolve({ width: image.naturalWidth, height: image.naturalHeight })
+    }
+    image.onerror = () => resolve(null)
+    image.src = url
+  })
+}
+
 interface StudioBoardPageProps {
   projectId: string
 }
@@ -102,8 +138,13 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const [selectedNumImages, setSelectedNumImages] = React.useState(1)
   const [selectedModelParameters, setSelectedModelParameters] =
     React.useState<ModelInputValues>({})
+  const [studioToolSourceImage, setStudioToolSourceImage] = React.useState<ImageUpload | null>(null)
+  const [studioToolSceneImage, setStudioToolSceneImage] = React.useState<ImageUpload | null>(null)
+  const [studioToolAdditionalInstructions, setStudioToolAdditionalInstructions] =
+    React.useState("")
   const [pendingCount, setPendingCount] = React.useState(0)
   const [fullscreenTile, setFullscreenTile] = React.useState<StudioTile | null>(null)
+  const [editorTile, setEditorTile] = React.useState<StudioTile | null>(null)
   const [copiedPromptKey, setCopiedPromptKey] = React.useState<string | null>(null)
   const enhanceSeededRef = React.useRef(false)
   const viewportSaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -111,15 +152,26 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const cameraAnimCancelRef = React.useRef<(() => void) | null>(null)
   const skipViewportPersistRef = React.useRef(false)
   const viewportRef = React.useRef(viewport)
+  const tilesRef = React.useRef(tiles)
+  const editorTileRef = React.useRef<StudioTile | null>(null)
   const hasLoadedRef = React.useRef(false)
+  const previousStudioModeRef = React.useRef(false)
 
   React.useEffect(() => {
     viewportRef.current = viewport
   }, [viewport])
 
+  React.useEffect(() => {
+    tilesRef.current = tiles
+  }, [tiles])
+
   const selectedModelObject = React.useMemo(
     () => effectiveImageModels.find((model) => model.identifier === selectedModel) ?? null,
     [effectiveImageModels, selectedModel],
+  )
+  const selectedStudioTool = React.useMemo(
+    () => getStudioToolByUiModel(selectedModel),
+    [selectedModel],
   )
 
   const selectedTiles = React.useMemo(
@@ -130,6 +182,32 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
     [selectedTileIds, tiles],
   )
   const selectedTile = selectedTiles[selectedTiles.length - 1] ?? null
+
+  React.useEffect(() => {
+    const isStudioMode = Boolean(selectedStudioTool)
+    const wasStudioMode = previousStudioModeRef.current
+
+    if (isStudioMode && !wasStudioMode) {
+      const incoming = [...referenceImages]
+      if (incoming.length > 0) {
+        setStudioToolSourceImage(incoming[0] ?? null)
+        setStudioToolSceneImage(incoming[1] ?? null)
+        setReferenceImages(incoming.slice(2))
+      }
+    } else if (!isStudioMode && wasStudioMode) {
+      const outgoing = [studioToolSourceImage, studioToolSceneImage].filter(
+        (image): image is ImageUpload => Boolean(image),
+      )
+      if (outgoing.length > 0) {
+        setReferenceImages((current) => [...outgoing, ...current])
+      }
+      setStudioToolSourceImage(null)
+      setStudioToolSceneImage(null)
+      setStudioToolAdditionalInstructions("")
+    }
+
+    previousStudioModeRef.current = isStudioMode
+  }, [referenceImages, selectedStudioTool, studioToolSceneImage, studioToolSourceImage])
 
   React.useEffect(() => {
     if (!defaultEnhancePromptReady || enhanceSeededRef.current) return
@@ -232,19 +310,18 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
     [projectId],
   )
 
-  const panToTiles = React.useCallback(
-    (targets: Array<{ x: number; y: number; width: number; height: number }>) => {
-      const bounds = boundingRect(targets)
-      const size = canvasRef.current?.getSize()
-      if (!bounds || !size || size.width < 8 || size.height < 8) return
+  const cameraInset = React.useMemo(
+    () => ({
+      top: 112,
+      bottom: 220,
+      right: typeof chatDockInsetRight === "number" ? chatDockInsetRight : 0,
+    }),
+    [chatDockInsetRight],
+  )
 
+  const flyToViewport = React.useCallback(
+    (to: StudioViewport) => {
       const from = viewportRef.current
-      const to = viewportToCenterRect(bounds, size, from.zoom, {
-        top: 112,
-        bottom: 220,
-        right: typeof chatDockInsetRight === "number" ? chatDockInsetRight : 0,
-      })
-
       cameraAnimCancelRef.current?.()
       skipViewportPersistRef.current = true
       cameraAnimCancelRef.current = animateViewport(from, to, 420, setViewport, () => {
@@ -253,8 +330,67 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         void updateStudioProjectClient(projectId, { viewport: to }).catch(() => undefined)
       })
     },
-    [chatDockInsetRight, projectId],
+    [projectId],
   )
+
+  const panToTiles = React.useCallback(
+    (targets: Array<{ x: number; y: number; width: number; height: number }>) => {
+      const bounds = boundingRect(targets)
+      const size = canvasRef.current?.getSize()
+      if (!bounds || !size || size.width < 8 || size.height < 8) return
+      flyToViewport(viewportToCenterRect(bounds, size, viewportRef.current.zoom, cameraInset))
+    },
+    [cameraInset, flyToViewport],
+  )
+
+  const handleFitAll = React.useCallback(() => {
+    const bounds = boundingRect(tiles)
+    const size = canvasRef.current?.getSize()
+    if (!bounds || !size || size.width < 8 || size.height < 8) return
+    flyToViewport(viewportToFitRect(bounds, size, cameraInset))
+  }, [cameraInset, flyToViewport, tiles])
+
+  const handleResetZoom = React.useCallback(() => {
+    const size = canvasRef.current?.getSize()
+    if (!size || size.width < 8 || size.height < 8) return
+    flyToViewport(viewportToResetZoom(viewportRef.current, size, cameraInset))
+  }, [cameraInset, flyToViewport])
+
+  const handleOrganize = React.useCallback(() => {
+    if (tiles.length === 0) return
+    const size = canvasRef.current?.getSize()
+    const viewWidth = size
+      ? Math.max(1, size.width - cameraInset.right - 96)
+      : 1200
+    const organized = packStudioTiles(tiles, {
+      maxRowWidth: Math.max(640, viewWidth),
+    })
+    setTiles(organized)
+    for (const tile of organized) {
+      if (!tile.generationId) continue
+      const previous = tiles.find((item) => item.id === tile.id)
+      if (
+        previous &&
+        Math.abs(previous.x - tile.x) < 0.5 &&
+        Math.abs(previous.y - tile.y) < 0.5
+      ) {
+        continue
+      }
+      void updateGenerationStudioLayout({
+        generationId: tile.generationId,
+        x: tile.x,
+        y: tile.y,
+        width: tile.width,
+        height: tile.height,
+      }).catch((error) => {
+        console.error("Failed to persist organized tile", error)
+      })
+    }
+    const bounds = boundingRect(organized)
+    if (bounds && size && size.width >= 8 && size.height >= 8) {
+      flyToViewport(viewportToFitRect(bounds, size, cameraInset))
+    }
+  }, [cameraInset, flyToViewport, tiles])
 
   const handleRename = React.useCallback(async () => {
     const nextName = projectName.trim() || "Untitled Studio"
@@ -287,6 +423,78 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
     if (!tile.url || tile.status !== "completed") return
     setFullscreenTile(tile)
   }, [])
+
+  const handleEditTile = React.useCallback((tile: StudioTile) => {
+    if (!tile.url || tile.status !== "completed") return
+    setFullscreenTile(null)
+    editorTileRef.current = tile
+    setEditorTile(tile)
+  }, [])
+
+  const handleSaveEditedImage = React.useCallback(
+    async (imageUrl: string, details?: { generationId?: string }) => {
+      const source = editorTileRef.current
+      editorTileRef.current = null
+      setEditorTile(null)
+      if (!imageUrl || !source) return
+
+      const pixelSize = await measureImagePixelSize(imageUrl)
+      const size = pixelSize
+        ? tileSizeFromPixelRatio(pixelSize.width / pixelSize.height)
+        : { width: source.width, height: source.height }
+      const placement = findNeighborPlacement({
+        existing: tilesRef.current.map((tile) => ({
+          x: tile.x,
+          y: tile.y,
+          width: tile.width,
+          height: tile.height,
+        })),
+        width: size.width,
+        height: size.height,
+        source,
+      })
+
+      const generationId = details?.generationId ?? null
+      const newTile: StudioTile = {
+        id: generationId ?? `edit-${Date.now()}`,
+        clientKey: generationId ?? `edit-${Date.now()}`,
+        generationId,
+        url: imageUrl,
+        status: "completed",
+        prompt: source.prompt ?? "Edited image",
+        model: source.model,
+        aspectRatio: source.aspectRatio,
+        referenceImageUrls: source.url ? [source.url] : [],
+        x: placement.x,
+        y: placement.y,
+        width: size.width,
+        height: size.height,
+        createdAt: new Date().toISOString(),
+      }
+
+      setTiles((prev) => [newTile, ...prev])
+      panToTiles([newTile])
+      toast.success("Edit saved to the board")
+
+      if (generationId) {
+        void updateGenerationStudioLayout({
+          generationId,
+          x: placement.x,
+          y: placement.y,
+          width: size.width,
+          height: size.height,
+          projectId,
+        }).catch((error) => {
+          console.error("Failed to attach edited image to studio project", error)
+        })
+      }
+
+      void updateStudioProjectClient(projectId, {
+        thumbnail_url: imageUrl,
+      }).catch(() => undefined)
+    },
+    [panToTiles, projectId],
+  )
 
   const handleRecreateTile = React.useCallback((tile: StudioTile) => {
     if (tile.prompt?.trim()) {
@@ -367,15 +575,41 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const tileActions = React.useMemo(
     () => ({
       onOpen: handleOpenTile,
+      onEdit: handleEditTile,
       onRecreate: handleRecreateTile,
       onCopyImage: handleCopyImage,
       onDownload: handleDownloadTile,
       onDelete: handleDeleteTile,
     }),
-    [handleCopyImage, handleDeleteTile, handleDownloadTile, handleOpenTile, handleRecreateTile],
+    [
+      handleCopyImage,
+      handleDeleteTile,
+      handleDownloadTile,
+      handleEditTile,
+      handleOpenTile,
+      handleRecreateTile,
+    ],
   )
 
   const handleSelectTile = React.useCallback((tile: StudioTile) => {
+    if (selectedStudioTool && tile.url && tile.status === "completed") {
+      setSelectedTileIds((currentIds) => {
+        if (currentIds.includes(tile.id)) {
+          return currentIds.filter((id) => id !== tile.id)
+        }
+        return [...currentIds, tile.id]
+      })
+      setStudioToolSourceImage((source) => {
+        if (!source?.url) return { url: tile.url as string }
+        setStudioToolSceneImage((scene) => {
+          if (!scene?.url) return { url: tile.url as string }
+          return scene
+        })
+        return source
+      })
+      return
+    }
+
     setSelectedTileIds((currentIds) => {
       if (currentIds.includes(tile.id)) {
         if (tile.url) {
@@ -390,7 +624,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       }
       return [...currentIds, tile.id]
     })
-  }, [])
+  }, [selectedStudioTool])
 
   React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -453,7 +687,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       const referenceImagesForRequest =
         inputSnapshot?.referenceImages ?? referenceImages
 
-      if (hasVideoOrAudioAssetRefs(attachedRefsForRequest)) {
+      if (!selectedStudioTool && hasVideoOrAudioAssetRefs(attachedRefsForRequest)) {
         toast.error("Video and audio assets can't be used as references for image generation.")
         return
       }
@@ -464,19 +698,68 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         brandRefsOnly(attachedRefsForRequest),
       )
       const chipImageUrls = getImageAssetUrlsFromRefChips(attachedRefsForRequest)
-      if (!mergedPrompt.trim() && chipImageUrls.length === 0 && referenceImagesForRequest.length === 0) {
+
+      let studioToolPayload: ReturnType<typeof buildStudioToolGenerationRequest> | null = null
+      let resolvedStudioSceneImage = studioToolSceneImage
+
+      if (selectedStudioTool) {
+        let resolvedStudioSourceImage = studioToolSourceImage
+        try {
+          resolvedStudioSourceImage = await resolveReferenceImageForGeneration(studioToolSourceImage)
+          resolvedStudioSceneImage = await resolveReferenceImageForGeneration(studioToolSceneImage)
+        } catch (resolveError) {
+          toast.error(
+            resolveError instanceof Error
+              ? resolveError.message
+              : "Could not prepare reference images",
+          )
+          return
+        }
+
+        const validationError = validateDualReferenceSwapState(selectedStudioTool, {
+          sourceImage: resolvedStudioSourceImage,
+          sceneImage: resolvedStudioSceneImage,
+        })
+        if (validationError) {
+          toast.error(validationError.message)
+          return
+        }
+
+        studioToolPayload = buildStudioToolGenerationRequest(selectedStudioTool, {
+          sourceImage: resolvedStudioSourceImage,
+          sceneImage: resolvedStudioSceneImage,
+          additionalInstructions: studioToolAdditionalInstructions,
+        })
+      } else if (!mergedPrompt.trim() && chipImageUrls.length === 0 && referenceImagesForRequest.length === 0) {
         toast.error("Please enter a prompt")
         return
       }
 
-      const capturedAspectRatio = resolveAspectRatioForRequest({
-        model: selectedModelObject,
-        selectedAspectRatio,
-        hasReferenceImages:
-          referenceImagesForRequest.length > 0 || chipImageUrls.length > 0,
-      })
+      const capturedPrompt = studioToolPayload
+        ? studioToolPayload.prompt
+        : mergedPrompt.trim()
+      const capturedModel = studioToolPayload?.model ?? selectedModel
+      const capturedTool = studioToolPayload?.tool ?? "image"
+      const capturedRefUrls = studioToolPayload
+        ? studioToolPayload.referenceImages
+            .map((image) => image.url)
+            .filter((url): url is string => Boolean(url))
+        : ([
+            ...referenceImagesForRequest.map((image) => image.url).filter(Boolean),
+            ...chipImageUrls,
+          ] as string[])
+      const capturedAspectRatio = studioToolPayload
+        ? studioToolPayload.aspectRatio
+        : resolveAspectRatioForRequest({
+            model: selectedModelObject,
+            selectedAspectRatio,
+            hasReferenceImages:
+              referenceImagesForRequest.length > 0 || chipImageUrls.length > 0,
+          })
       const size = tileSizeForAspectRatio(capturedAspectRatio)
-      const numImages = Math.max(1, selectedNumImages)
+      const numImages = studioToolPayload
+        ? Math.max(1, studioToolPayload.numImages)
+        : Math.max(1, selectedNumImages)
       const placements = findOpenPlacement({
         existing: tiles.map((tile) => ({
           x: tile.x,
@@ -497,13 +780,10 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         generationId: null,
         url: null,
         status: "pending",
-        prompt: mergedPrompt.trim() || null,
+        prompt: capturedPrompt || null,
         model: selectedModel,
         aspectRatio: capturedAspectRatio,
-        referenceImageUrls: [
-          ...referenceImagesForRequest.map((image) => image.url).filter(Boolean),
-          ...chipImageUrls,
-        ] as string[],
+        referenceImageUrls: capturedRefUrls,
         x: placement.x,
         y: placement.y,
         width: size.width,
@@ -516,27 +796,62 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       panToTiles(optimisticTiles)
 
       try {
+        if (selectedStudioTool?.requiresReferenceAnalysis && studioToolPayload && resolvedStudioSceneImage) {
+          const analysisData = new FormData()
+          if (resolvedStudioSceneImage.file) {
+            analysisData.append("reference", resolvedStudioSceneImage.file)
+          } else if (resolvedStudioSceneImage.url) {
+            analysisData.append("referenceUrl", resolvedStudioSceneImage.url)
+          }
+
+          const analysisResponse = await fetch("/api/image/shot-recreate-analysis", {
+            method: "POST",
+            body: analysisData,
+          })
+          const analysisResult = (await analysisResponse.json()) as {
+            shotRecipe?: Record<string, string>
+            error?: string
+          }
+          if (!analysisResponse.ok || !analysisResult.shotRecipe) {
+            throw new Error(analysisResult.error || "Could not analyze this shot")
+          }
+          studioToolPayload.prompt =
+            `${studioToolPayload.prompt} Structured shot recipe JSON: ` +
+            JSON.stringify(analysisResult.shotRecipe)
+        }
+
+        const baseRefImages = studioToolPayload
+          ? studioToolPayload.referenceImages
+          : referenceImagesForRequest
         const manualUrlSet = new Set(
-          referenceImagesForRequest
+          baseRefImages
             .map((image) => image.url)
             .filter((url): url is string => Boolean(url)),
         )
-        const extraFromAssetChips: ImageUpload[] = chipImageUrls
-          .filter((url) => !manualUrlSet.has(url))
-          .map((url) => ({ url }))
-        const imagesToUpload = [...referenceImagesForRequest, ...extraFromAssetChips]
+        const extraFromAssetChips: ImageUpload[] = studioToolPayload
+          ? []
+          : chipImageUrls
+              .filter((url) => !manualUrlSet.has(url))
+              .map((url) => ({ url }))
+        const imagesToUpload = [...baseRefImages, ...extraFromAssetChips]
         const resolvedRefs = (
           await Promise.all(imagesToUpload.map((image) => resolveReferenceImageForGeneration(image)))
         ).filter((image): image is ImageUpload => image != null)
 
         const formData = new FormData()
-        formData.append("prompt", mergedPrompt)
-        formData.append("model", selectedModel)
-        formData.append("tool", "image")
-        formData.append("enhancePrompt", String(enhancePrompt))
+        formData.append("prompt", studioToolPayload ? studioToolPayload.prompt : mergedPrompt)
+        formData.append("model", capturedModel)
+        formData.append("tool", capturedTool)
+        formData.append(
+          "enhancePrompt",
+          String(studioToolPayload ? studioToolPayload.enhancePrompt : enhancePrompt),
+        )
         formData.append("aspectRatio", capturedAspectRatio)
         formData.append("aspect_ratio", capturedAspectRatio)
         formData.append("n", String(numImages))
+        if (studioToolPayload?.resolution) {
+          formData.set("resolution", studioToolPayload.resolution)
+        }
         for (const [key, value] of Object.entries(selectedModelParameters)) {
           if (value == null || value === "") continue
           formData.append(key, String(value))
@@ -584,10 +899,10 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
               generationId: null,
               url,
               status: "completed" as const,
-              prompt: mergedPrompt.trim() || null,
+              prompt: (studioToolPayload ? studioToolPayload.prompt : mergedPrompt).trim() || null,
               model: selectedModel,
               aspectRatio: capturedAspectRatio,
-              referenceImageUrls: optimisticTiles[0]?.referenceImageUrls ?? [],
+              referenceImageUrls: capturedRefUrls,
               x: placement?.x ?? 0,
               y: placement?.y ?? 0,
               width: size.width,
@@ -648,7 +963,11 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       selectedModelObject,
       selectedModelParameters,
       selectedNumImages,
+      selectedStudioTool,
       selectedTile,
+      studioToolAdditionalInstructions,
+      studioToolSceneImage,
+      studioToolSourceImage,
       tiles,
     ],
   )
@@ -674,7 +993,10 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-background">
-      <div className="pointer-events-none absolute inset-x-0 top-13 z-20 flex items-center justify-between gap-3 p-3">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-13 z-20 flex items-center justify-between gap-3 p-3"
+        style={promptPanelStyle}
+      >
         <div className="pointer-events-auto flex min-w-0 max-w-[min(100%,20rem)] items-center gap-2 rounded-xl border border-border/70 bg-background/90 p-1.5 shadow-sm backdrop-blur">
           <Button asChild variant="ghost" size="icon" className="shrink-0">
             <Link href="/studio">
@@ -692,6 +1014,30 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
             }}
             className="h-9 min-w-0 border-0 bg-transparent shadow-none focus-visible:ring-0"
           />
+        </div>
+        <div className="pointer-events-auto shrink-0 rounded-xl border border-border/70 bg-background/90 shadow-sm backdrop-blur">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-9"
+                aria-label="Board controls"
+              >
+                <DotsThree className="size-5" weight="bold" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-auto min-w-40">
+              <DropdownMenuItem onSelect={handleFitAll} disabled={tiles.length === 0}>
+                Fit all
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleResetZoom}>100%</DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleOrganize} disabled={tiles.length === 0}>
+                Organize
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -735,37 +1081,73 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         style={promptPanelStyle}
       >
         <div className="pointer-events-auto w-full max-w-sm sm:max-w-lg lg:max-w-4xl">
-          <InfluencerInputBox
-            generateButtonLayout="bar"
-            showGenerateInBottomRow
-            promptValue={prompt}
-            onPromptChange={setPrompt}
-            onAttachedRefsChange={setAttachedCommandRefs}
-            referenceImages={referenceImages}
-            onReferenceImagesChange={setReferenceImages}
-            enhancePrompt={enhancePrompt}
-            onEnhancePromptChange={setEnhancePrompt}
-            isGenerating={pendingCount > 0}
-            activeGenerationSlotCount={pendingCount}
-            onGenerate={handleGenerate}
-            allowConcurrent
-            allowOptionsDuringGeneration
-            selectedModel={selectedModel}
-            onModelChange={setSelectedModel}
-            showModelSelector
-            imageModels={effectiveImageModels}
-            selectedAspectRatio={selectedAspectRatio}
-            onAspectRatioChange={setSelectedAspectRatio}
-            showAspectRatioSelector
-            selectedNumImages={selectedNumImages}
-            onNumImagesChange={setSelectedNumImages}
-            showNumImagesSelector
-            modelParameters={selectedModelParameters}
-            onModelParametersChange={setSelectedModelParameters}
-            allowedAssetTypes={["image"]}
-          />
+          {selectedStudioTool ? (
+            <ImageStudioToolInput
+              tool={selectedStudioTool}
+              sourceImage={studioToolSourceImage}
+              sceneImage={studioToolSceneImage}
+              additionalInstructions={studioToolAdditionalInstructions}
+              onAdditionalInstructionsChange={setStudioToolAdditionalInstructions}
+              onSourceImageChange={setStudioToolSourceImage}
+              onSceneImageChange={setStudioToolSceneImage}
+              onGenerate={() => {
+                void handleGenerate()
+              }}
+              isGenerating={pendingCount > 0}
+              allowConcurrent
+              allowOptionsDuringGeneration
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
+              models={effectiveImageModels}
+              showModelSelector
+            />
+          ) : (
+            <InfluencerInputBox
+              generateButtonLayout="bar"
+              showGenerateInBottomRow
+              promptValue={prompt}
+              onPromptChange={setPrompt}
+              onAttachedRefsChange={setAttachedCommandRefs}
+              referenceImages={referenceImages}
+              onReferenceImagesChange={setReferenceImages}
+              enhancePrompt={enhancePrompt}
+              onEnhancePromptChange={setEnhancePrompt}
+              isGenerating={pendingCount > 0}
+              activeGenerationSlotCount={pendingCount}
+              onGenerate={handleGenerate}
+              allowConcurrent
+              allowOptionsDuringGeneration
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
+              showModelSelector
+              imageModels={effectiveImageModels}
+              selectedAspectRatio={selectedAspectRatio}
+              onAspectRatioChange={setSelectedAspectRatio}
+              showAspectRatioSelector
+              selectedNumImages={selectedNumImages}
+              onNumImagesChange={setSelectedNumImages}
+              showNumImagesSelector
+              modelParameters={selectedModelParameters}
+              onModelParametersChange={setSelectedModelParameters}
+              allowedAssetTypes={["image"]}
+            />
+          )}
         </div>
       </div>
+
+      <ImageEditorDialog
+        open={Boolean(editorTile?.url)}
+        onOpenChange={(open) => {
+          if (!open) {
+            editorTileRef.current = null
+            setEditorTile(null)
+          }
+        }}
+        initialImage={editorTile?.url ?? undefined}
+        onSave={(imageUrl, details) => {
+          void handleSaveEditedImage(imageUrl, details)
+        }}
+      />
 
       {fullscreenTile?.url ? (
         <FullscreenMediaViewer
@@ -802,13 +1184,29 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
               onClick: () => {
                 if (tile.url) {
                   setSelectedTileIds((ids) => (ids.includes(tile.id) ? ids : [...ids, tile.id]))
-                  setReferenceImages((current) =>
-                    current.some((image) => image.url === tile.url)
-                      ? current
-                      : [...current, { url: tile.url }],
-                  )
+                  if (selectedStudioTool) {
+                    setStudioToolSourceImage((source) => {
+                      if (!source?.url) return { url: tile.url as string }
+                      setStudioToolSceneImage((scene) => scene ?? { url: tile.url as string })
+                      return source
+                    })
+                  } else {
+                    setReferenceImages((current) =>
+                      current.some((image) => image.url === tile.url)
+                        ? current
+                        : [...current, { url: tile.url }],
+                    )
+                  }
                 }
                 setFullscreenTile(null)
+              },
+            })
+            actions.push({
+              id: "edit",
+              label: "Edit image",
+              icon: <PencilSimple className="size-4" />,
+              onClick: () => {
+                handleEditTile(tile)
               },
             })
             actions.push({

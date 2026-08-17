@@ -43,6 +43,7 @@ import {
 } from "@/lib/chat/tools/web-research"
 import type { AttachedRef } from "@/lib/commands/types"
 import type { GenerationApprovalMode } from "@/lib/chat/generation-approval"
+import { studioBoardFieldsFromPagePath } from "@/lib/studio/page-path"
 
 interface CreateCreativeChatToolsOptions {
   availableReferences: AvailableChatImageReference[]
@@ -150,6 +151,7 @@ export function createCreativeChatTools({
       supabase,
       threadId,
       userId,
+      studioBoardFields: studioBoardFieldsFromPagePath(pagePath, "image"),
     }),
     upscaleImage: createUpscaleImageTool({
       availableReferences,
@@ -165,6 +167,7 @@ export function createCreativeChatTools({
       supabase,
       threadId,
       userId,
+      studioBoardFields: studioBoardFieldsFromPagePath(pagePath, "video"),
     }),
     falMediaOps: createFalMediaOpsTool({
       supabase,

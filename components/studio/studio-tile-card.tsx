@@ -7,6 +7,7 @@ import {
   ArrowsOutSimple,
   Copy,
   DownloadSimple,
+  PencilSimple,
   Trash,
 } from "@phosphor-icons/react"
 import { Loader2 } from "lucide-react"
@@ -15,6 +16,7 @@ import type { StudioTile } from "@/lib/studio/types"
 
 export interface StudioTileActions {
   onOpen?: (tile: StudioTile) => void
+  onEdit?: (tile: StudioTile) => void
   onRecreate?: (tile: StudioTile) => void
   onCopyImage?: (tile: StudioTile) => void
   onDownload?: (tile: StudioTile) => void
@@ -165,7 +167,14 @@ export function StudioTileCard({
         if (canAct) actions?.onOpen?.(tile)
       }}
     >
-      {tile.status === "pending" || !tile.url ? (
+      {tile.status === "failed" ? (
+        <div className="relative flex h-full w-full flex-col items-center justify-center gap-2 overflow-hidden bg-muted/40 p-4 text-center">
+          <p className="relative text-xs font-medium text-destructive">Generation failed</p>
+          {tile.prompt?.trim() ? (
+            <p className="relative text-xs text-muted-foreground line-clamp-3">{tile.prompt}</p>
+          ) : null}
+        </div>
+      ) : tile.status === "pending" || !tile.url ? (
         <div className="relative flex h-full w-full flex-col items-center justify-center gap-2 overflow-hidden bg-muted/40 p-4 text-center">
           <div className="absolute inset-0 animate-pulse bg-linear-to-br from-muted/80 via-muted/30 to-muted/80" />
           <Loader2 className="relative h-6 w-6 animate-spin text-muted-foreground" />
@@ -173,6 +182,25 @@ export function StudioTileCard({
             {tile.prompt?.trim() || "Generating…"}
           </p>
         </div>
+      ) : tile.kind === "video" ? (
+        <video
+          src={tile.url}
+          className="h-full w-full object-cover pointer-events-none"
+          muted
+          loop
+          playsInline
+          autoPlay
+          onLoadedMetadata={(event) => {
+            if (measuredRef.current) return
+            const video = event.currentTarget
+            if (!video.videoWidth || !video.videoHeight) return
+            measuredRef.current = true
+            onNaturalSize?.(tile, {
+              width: video.videoWidth,
+              height: video.videoHeight,
+            })
+          }}
+        />
       ) : (
         <Image
           src={tile.url}
@@ -193,11 +221,6 @@ export function StudioTileCard({
           }}
         />
       )}
-      {tile.status === "failed" ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-destructive/20 p-3 text-center text-xs text-destructive">
-          Generation failed
-        </div>
-      ) : null}
       {canAct ? (
         <div
           className={cn(
@@ -213,10 +236,18 @@ export function StudioTileCard({
           <ActionButton label="Full screen" onClick={() => actions?.onOpen?.(tile)}>
             <ArrowsOutSimple className="size-3.5" />
           </ActionButton>
+          {actions?.onEdit && tile.kind === "image" ? (
+            <ActionButton label="Edit image" onClick={() => actions.onEdit?.(tile)}>
+              <PencilSimple className="size-3.5" />
+            </ActionButton>
+          ) : null}
           <ActionButton label="Recreate" onClick={() => actions?.onRecreate?.(tile)}>
             <ArrowsClockwise className="size-3.5" />
           </ActionButton>
-          <ActionButton label="Copy image" onClick={() => actions?.onCopyImage?.(tile)}>
+          <ActionButton
+            label={tile.kind === "video" ? "Copy video" : "Copy image"}
+            onClick={() => actions?.onCopyImage?.(tile)}
+          >
             <Copy className="size-3.5" />
           </ActionButton>
           <ActionButton label="Download" onClick={() => actions?.onDownload?.(tile)}>

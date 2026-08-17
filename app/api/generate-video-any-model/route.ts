@@ -24,6 +24,11 @@ import {
   getVideoReferenceAudioConfig,
   isSupportedVideoReferenceAudioUrl,
 } from '@/lib/utils/video-reference-audio';
+import { assertStudioProjectOwned } from '@/lib/studio/database-server';
+import {
+  parseStudioBoardFieldsFromJson,
+  studioBoardFieldsForIndex,
+} from '@/lib/studio/form-data';
 
 function collectStoragePaths(values: unknown[]): string[] {
   const paths = values.flatMap((value) => {
@@ -72,6 +77,24 @@ export async function POST(request: NextRequest) {
       sourceGenerationId,
       ...otherParams
     } = body;
+
+    const studioBoardFields = parseStudioBoardFieldsFromJson(body as Record<string, unknown>);
+    delete otherParams.studioProjectId;
+    delete otherParams.studioX;
+    delete otherParams.studioY;
+    delete otherParams.studioWidth;
+    delete otherParams.studioHeight;
+
+    if (studioBoardFields) {
+      const ownsProject = await assertStudioProjectOwned(
+        supabase,
+        user.id,
+        studioBoardFields.studio_project_id,
+      );
+      if (!ownsProject) {
+        return NextResponse.json({ error: 'Studio project not found' }, { status: 400 });
+      }
+    }
 
     let characterAssetId: string | null = null;
     if (typeof requestedCharacterAssetId === 'string' && requestedCharacterAssetId.length > 0) {
@@ -328,6 +351,7 @@ export async function POST(request: NextRequest) {
           quoted_credits: quotedCredits,
           predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
           character_asset_id: characterAssetId,
+          ...studioBoardFieldsForIndex(studioBoardFields, 0),
         })
         .select('id')
         .single();
@@ -694,6 +718,7 @@ export async function POST(request: NextRequest) {
           quoted_credits: quotedCredits,
           predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
           character_asset_id: characterAssetId,
+          ...studioBoardFieldsForIndex(studioBoardFields, 0),
         })
         .select('id')
         .single();
@@ -837,6 +862,7 @@ export async function POST(request: NextRequest) {
           tool,
           quoted_credits: quotedCredits,
           predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
+          ...studioBoardFieldsForIndex(studioBoardFields, 0),
         };
 
         const { data: savedData, error: saveError } = await supabase

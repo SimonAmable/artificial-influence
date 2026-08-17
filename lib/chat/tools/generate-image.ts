@@ -53,6 +53,8 @@ import type {
 } from "@/lib/chat/tools/image-reference-types"
 import { mediaIdStringSchema } from "@/lib/chat/media-id"
 import { resolveToolImageReferences } from "@/lib/chat/resolve-tool-references"
+import { studioBoardFieldsForIndex } from "@/lib/studio/form-data"
+import type { StudioBoardFields } from "@/lib/studio/types"
 
 const DEFAULT_IMAGE_MODEL = DEFAULT_IMAGE_MODEL_IDENTIFIER
 const MAX_REFERENCE_IMAGES = 4
@@ -71,6 +73,7 @@ interface CreateGenerateImageToolOptions {
   supabase: SupabaseClient
   threadId?: string
   userId: string
+  studioBoardFields?: StudioBoardFields | null
 }
 
 interface StoredAsset {
@@ -388,6 +391,7 @@ export function createGenerateImageTool({
   supabase,
   threadId,
   userId,
+  studioBoardFields = null,
 }: CreateGenerateImageToolOptions) {
   const availableReferenceMap = new Map(
     availableReferences.map((reference) => [reference.id, reference] as const),
@@ -636,6 +640,7 @@ export function createGenerateImageTool({
           prompt: finalPrompt,
           referenceImageStoragePaths: referenceImageStoragePaths.slice(0, 3),
           requiredCredits,
+          studioBoardFields,
           supabase,
           tool: "chat-generate-image",
           userId,
@@ -711,6 +716,7 @@ export function createGenerateImageTool({
           prompt: finalPrompt,
           referenceImageStoragePaths,
           requiredCredits,
+          studioBoardFields,
           supabase,
           tool: "chat-generate-image",
           userId,
@@ -782,6 +788,7 @@ export function createGenerateImageTool({
             pricing_snapshot: pricingSnapshot,
             character_asset_id: characterAssetId,
             ...(threadId ? { chat_thread_id: threadId } : {}),
+            ...studioBoardFieldsForIndex(studioBoardFields, 0),
           })
           .select("id")
           .single()
@@ -918,6 +925,7 @@ export function createGenerateImageTool({
             quoted_credits: requiredCredits,
             pricing_snapshot: pricingSnapshot,
             ...(threadId ? { chat_thread_id: threadId } : {}),
+            ...studioBoardFieldsForIndex(studioBoardFields, 0),
           })
           .select("id")
           .single()
@@ -949,6 +957,7 @@ export function createGenerateImageTool({
         referenceImageStoragePaths: replicateReferenceImageStoragePaths,
         replicateInput,
         requiredCredits,
+        studioBoardFields,
         supabase,
         tool: "chat-generate-image",
         userId,
