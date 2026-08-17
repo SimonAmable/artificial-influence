@@ -51,7 +51,7 @@ function ActionButton({
       title={label}
       aria-label={label}
       className={cn(
-        "flex size-7 items-center justify-center rounded-md bg-black/70 text-white/90 shadow-sm backdrop-blur-sm transition-colors",
+        "pointer-events-auto flex size-7 items-center justify-center rounded-md bg-black/70 text-white/90 shadow-sm backdrop-blur-sm transition-colors",
         destructive ? "hover:bg-destructive hover:text-white" : "hover:bg-white/20",
       )}
       onPointerDown={(event) => {
@@ -91,6 +91,7 @@ export function StudioTileCard({
 
   const x = draftPosition?.x ?? tile.x
   const y = draftPosition?.y ?? tile.y
+  const inverseZoom = 1 / Math.max(zoom, 0.01)
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
@@ -145,7 +146,7 @@ export function StudioTileCard({
     <div
       data-studio-tile
       className={cn(
-        "group/tile absolute overflow-hidden rounded-xl border bg-card shadow-sm transition-[box-shadow,border-color] duration-200",
+        "group/tile absolute overflow-visible rounded-xl border bg-card shadow-sm transition-[box-shadow,border-color] duration-200",
         selected
           ? "z-10 border-primary ring-2 ring-primary/50"
           : "border-border/70 hover:border-border hover:shadow-md",
@@ -167,67 +168,75 @@ export function StudioTileCard({
         if (canAct) actions?.onOpen?.(tile)
       }}
     >
-      {tile.status === "failed" ? (
-        <div className="relative flex h-full w-full flex-col items-center justify-center gap-2 overflow-hidden bg-muted/40 p-4 text-center">
-          <p className="relative text-xs font-medium text-destructive">Generation failed</p>
-          {tile.prompt?.trim() ? (
-            <p className="relative text-xs text-muted-foreground line-clamp-3">{tile.prompt}</p>
-          ) : null}
-        </div>
-      ) : tile.status === "pending" || !tile.url ? (
-        <div className="relative flex h-full w-full flex-col items-center justify-center gap-2 overflow-hidden bg-muted/40 p-4 text-center">
-          <div className="absolute inset-0 animate-pulse bg-linear-to-br from-muted/80 via-muted/30 to-muted/80" />
-          <Loader2 className="relative h-6 w-6 animate-spin text-muted-foreground" />
-          <p className="relative text-xs text-muted-foreground line-clamp-3">
-            {tile.prompt?.trim() || "Generating…"}
-          </p>
-        </div>
-      ) : tile.kind === "video" ? (
-        <video
-          src={tile.url}
-          className="h-full w-full object-cover pointer-events-none"
-          muted
-          loop
-          playsInline
-          autoPlay
-          onLoadedMetadata={(event) => {
-            if (measuredRef.current) return
-            const video = event.currentTarget
-            if (!video.videoWidth || !video.videoHeight) return
-            measuredRef.current = true
-            onNaturalSize?.(tile, {
-              width: video.videoWidth,
-              height: video.videoHeight,
-            })
-          }}
-        />
-      ) : (
-        <Image
-          src={tile.url}
-          alt={tile.prompt || "Studio generation"}
-          fill
-          unoptimized
-          className="object-cover pointer-events-none"
-          sizes={`${Math.round(tile.width)}px`}
-          onLoad={(event) => {
-            if (measuredRef.current) return
-            const image = event.currentTarget
-            if (!image.naturalWidth || !image.naturalHeight) return
-            measuredRef.current = true
-            onNaturalSize?.(tile, {
-              width: image.naturalWidth,
-              height: image.naturalHeight,
-            })
-          }}
-        />
-      )}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
+        {tile.status === "failed" ? (
+          <div className="relative flex h-full w-full flex-col items-center justify-center gap-2 bg-muted/40 p-4 text-center">
+            <p className="relative text-xs font-medium text-destructive">Generation failed</p>
+            {tile.prompt?.trim() ? (
+              <p className="relative text-xs text-muted-foreground line-clamp-3">{tile.prompt}</p>
+            ) : null}
+          </div>
+        ) : tile.status === "pending" || !tile.url ? (
+          <div className="relative flex h-full w-full flex-col items-center justify-center gap-2 bg-muted/40 p-4 text-center">
+            <div className="absolute inset-0 animate-pulse bg-linear-to-br from-muted/80 via-muted/30 to-muted/80" />
+            <Loader2 className="relative h-6 w-6 animate-spin text-muted-foreground" />
+            <p className="relative text-xs text-muted-foreground line-clamp-3">
+              {tile.prompt?.trim() || "Generating…"}
+            </p>
+          </div>
+        ) : tile.kind === "video" ? (
+          <video
+            src={tile.url}
+            className="h-full w-full object-cover"
+            muted
+            loop
+            playsInline
+            autoPlay
+            onLoadedMetadata={(event) => {
+              if (measuredRef.current) return
+              const video = event.currentTarget
+              if (!video.videoWidth || !video.videoHeight) return
+              measuredRef.current = true
+              onNaturalSize?.(tile, {
+                width: video.videoWidth,
+                height: video.videoHeight,
+              })
+            }}
+          />
+        ) : (
+          <Image
+            src={tile.url}
+            alt={tile.prompt || "Studio generation"}
+            fill
+            unoptimized
+            className="object-cover"
+            sizes={`${Math.round(tile.width)}px`}
+            onLoad={(event) => {
+              if (measuredRef.current) return
+              const image = event.currentTarget
+              if (!image.naturalWidth || !image.naturalHeight) return
+              measuredRef.current = true
+              onNaturalSize?.(tile, {
+                width: image.naturalWidth,
+                height: image.naturalHeight,
+              })
+            }}
+          />
+        )}
+      </div>
       {canAct ? (
         <div
           className={cn(
-            "pointer-events-none absolute top-2 right-2 z-20 flex flex-col gap-1",
+            "pointer-events-none absolute z-20 flex flex-col gap-1",
             "opacity-0 transition-opacity group-hover/tile:opacity-100 group-focus-within/tile:opacity-100",
             selected && "opacity-100",
           )}
+          style={{
+            top: 8 * inverseZoom,
+            right: 8 * inverseZoom,
+            transform: `scale(${inverseZoom})`,
+            transformOrigin: "top right",
+          }}
         >
           <ActionButton label="Full screen" onClick={() => actions?.onOpen?.(tile)}>
             <ArrowsOutSimple className="size-3.5" />

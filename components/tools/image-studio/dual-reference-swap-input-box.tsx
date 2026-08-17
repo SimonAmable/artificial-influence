@@ -181,7 +181,7 @@ export function DualReferenceSwapInputBox({
       )}
     >
       <CardContent className="flex min-w-0 flex-col gap-1.5 p-2">
-        <div className="relative grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="relative grid grid-cols-2 gap-2">
           <PhotoUpload
             value={sourceImage}
             onChange={onSourceImageChange}
@@ -212,7 +212,7 @@ export function DualReferenceSwapInputBox({
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.85, y: 4 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="pointer-events-none absolute left-1/2 top-1/2 z-20 hidden -translate-x-1/2 -translate-y-1/2 sm:block"
+                className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2"
               >
                 <Button
                   type="button"
@@ -229,30 +229,6 @@ export function DualReferenceSwapInputBox({
             )}
           </AnimatePresence>
         </div>
-
-        <AnimatePresence>
-          {hasBothImages && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.85, y: -2 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.85, y: -2 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="flex justify-center sm:hidden"
-            >
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={handleSwapImages}
-                className="h-8 w-8 rounded-full border-border/80 bg-background/90 shadow-sm backdrop-blur hover:bg-background"
-                aria-label="Swap reference images"
-                title="Swap images"
-              >
-                <ArrowsClockwise className="size-4" weight="bold" />
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <StudioToolAdditionalInstructionsField
           value={additionalInstructions}
