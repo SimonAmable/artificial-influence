@@ -51,7 +51,7 @@ function ActionButton({
       title={label}
       aria-label={label}
       className={cn(
-        "flex size-7 items-center justify-center rounded-md text-white/90 transition-colors",
+        "flex size-7 items-center justify-center rounded-md bg-black/70 text-white/90 shadow-sm backdrop-blur-sm transition-colors",
         destructive ? "hover:bg-destructive hover:text-white" : "hover:bg-white/20",
       )}
       onPointerDown={(event) => {
@@ -109,7 +109,7 @@ export function StudioTileCard({
     if (!dragRef.current) return
     const dx = (event.clientX - dragRef.current.startX) / Math.max(zoom, 0.01)
     const dy = (event.clientY - dragRef.current.startY) / Math.max(zoom, 0.01)
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
       dragRef.current.moved = true
     }
     if (!dragRef.current.moved) return
@@ -224,14 +224,10 @@ export function StudioTileCard({
       {canAct ? (
         <div
           className={cn(
-            "absolute top-2 right-2 z-20 flex flex-col gap-0.5 rounded-lg bg-black/70 p-0.5 shadow-sm backdrop-blur-sm",
+            "pointer-events-none absolute top-2 right-2 z-20 flex flex-col gap-1",
             "opacity-0 transition-opacity group-hover/tile:opacity-100 group-focus-within/tile:opacity-100",
             selected && "opacity-100",
           )}
-          style={{
-            transform: `scale(${1 / Math.max(zoom, 0.35)})`,
-            transformOrigin: "top right",
-          }}
         >
           <ActionButton label="Full screen" onClick={() => actions?.onOpen?.(tile)}>
             <ArrowsOutSimple className="size-3.5" />

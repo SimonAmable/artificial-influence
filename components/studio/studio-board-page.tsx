@@ -9,6 +9,9 @@ import {
   type InfluencerInputSnapshot,
 } from "@/components/tools/influencer"
 import { ImageStudioToolInput } from "@/components/tools/image-studio"
+import { VideoInputBox } from "@/components/tools/video/video-input-box"
+import type { MultiShotItem } from "@/components/tools/video/multi-shot-editor"
+import { HeroToolTabs, type HeroToolTabId } from "@/components/dashboard/hero-tool-tabs"
 import { StudioInfiniteCanvas, type StudioInfiniteCanvasHandle } from "@/components/studio/studio-infinite-canvas"
 import { StudioTileCard } from "@/components/studio/studio-tile-card"
 import { ImageEditorDialog } from "@/components/image-editor/image-editor-dialog"
@@ -27,14 +30,16 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { ImageUpload } from "@/components/shared/upload/photo-upload"
+import type { AudioUploadValue } from "@/components/shared/upload/audio-upload"
 import { useDefaultEnhancePrompt } from "@/hooks/use-default-enhance-prompt"
+import { useModels } from "@/hooks/use-models"
 import {
   buildStudioToolGenerationRequest,
   getStudioToolByUiModel,
   useEffectiveImageModels,
   validateDualReferenceSwapState,
 } from "@/lib/image/studio-tools"
-import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
+import { DEFAULT_IMAGE_MODEL_IDENTIFIER, isSeedanceVideoModelIdentifier, usesFalMultimodalVideoInputs } from "@/lib/constants/models"
 import { appendImageReferencesToFormData } from "@/lib/image/append-references-to-form-data"
 import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
 import { appendStudioBoardFieldsToFormData } from "@/lib/studio/form-data"
@@ -47,10 +52,12 @@ import {
   findNeighborPlacement,
   findOpenPlacement,
   packStudioTiles,
+  relayoutOriginStackedTiles,
   tileFromGeneration,
   tileSizeForAspectRatio,
   tileSizeFromPixelRatio,
 } from "@/lib/studio/placement"
+import { buildStudioVideoGenerationBody } from "@/lib/studio/build-video-generation-body"
 import {
   animateViewport,
   boundingRect,
@@ -65,6 +72,7 @@ import {
   isInsufficientCreditsMessage,
   type GenerateImageAcceptedPayload,
 } from "@/lib/generate-image-client"
+import { generateVideoAndWait } from "@/lib/generate-video-client"
 import {
   toUserFacingGenerationError,
   tryShowContentModerationToast,
@@ -76,6 +84,7 @@ import {
   getImageAssetUrlsFromRefChips,
   hasVideoOrAudioAssetRefs,
 } from "@/lib/commands/ref-image-pipeline"
+import { validateVideoAttachedRefs } from "@/lib/commands/validate-video-refs"
 import type { AttachedRef } from "@/lib/commands/types"
 import {
   getDefaultAspectRatioForModel,
@@ -84,14 +93,48 @@ import {
   resolveAspectRatioForRequest,
 } from "@/lib/utils/aspect-ratios"
 import { getDefaultImageModelParameters } from "@/lib/pricing-parameter-ui"
-import type { ModelInputValues } from "@/lib/types/models"
+import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
+import { resolveVideoPricingQuote } from "@/lib/video-pricing"
+import type { Model, ModelInputValues, ParameterDefinition, StringParameterDefinition } from "@/lib/types/models"
 import { useAIChatDockInsetRight } from "@/components/ai-chat"
+import { dispatchChatAddAsset, dispatchChatRemoveAsset } from "@/lib/chat/chat-add-asset"
 
 function createClientRequestId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID()
   }
   return `pending-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function mapStudioGenerationRow(generation: Record<string, unknown>): StudioTile {
+  return tileFromGeneration({
+    id: String(generation.id),
+    url: typeof generation.url === "string" ? generation.url : null,
+    prompt: typeof generation.prompt === "string" ? generation.prompt : null,
+    model: typeof generation.model === "string" ? generation.model : null,
+    type: typeof generation.type === "string" ? generation.type : null,
+    aspect_ratio:
+      typeof generation.aspect_ratio === "string" ? generation.aspect_ratio : null,
+    status: typeof generation.status === "string" ? generation.status : null,
+    reference_image_urls: Array.isArray(generation.reference_image_urls)
+      ? (generation.reference_image_urls as string[])
+      : [],
+    studio_x: typeof generation.studio_x === "number" ? generation.studio_x : null,
+    studio_y: typeof generation.studio_y === "number" ? generation.studio_y : null,
+    studio_width:
+      typeof generation.studio_width === "number" ? generation.studio_width : null,
+    studio_height:
+      typeof generation.studio_height === "number" ? generation.studio_height : null,
+    created_at:
+      typeof generation.created_at === "string" ? generation.created_at : null,
+  })
+}
+
+const STUDIO_CHROME =
+  "rounded-full border border-border/70 bg-background/90 shadow-sm backdrop-blur"
+
+function tileMatchesSelection(tile: StudioTile, selectedIds: string[]) {
+  return selectedIds.includes(tile.id) || Boolean(tile.generationId && selectedIds.includes(tile.generationId))
 }
 
 function measureImagePixelSize(url: string): Promise<{ width: number; height: number } | null> {
@@ -115,6 +158,7 @@ interface StudioBoardPageProps {
 
 export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const { models: effectiveImageModels } = useEffectiveImageModels()
+  const { models: videoModels, isLoading: videoModelsLoading } = useModels("video")
   const { defaultEnhancePrompt, isReady: defaultEnhancePromptReady } = useDefaultEnhancePrompt()
   const chatDockInsetRight = useAIChatDockInsetRight()
   const promptPanelStyle = React.useMemo(
@@ -129,6 +173,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const [selectedTileIds, setSelectedTileIds] = React.useState<string[]>([])
   const [viewport, setViewport] = React.useState<StudioViewport>({ x: 0, y: 0, zoom: 1 })
   const [projectName, setProjectName] = React.useState("")
+  const [studioMode, setStudioMode] = React.useState<HeroToolTabId>("image")
   const [prompt, setPrompt] = React.useState("")
   const [attachedCommandRefs, setAttachedCommandRefs] = React.useState<AttachedRef[]>([])
   const [referenceImages, setReferenceImages] = React.useState<ImageUpload[]>([])
@@ -146,7 +191,22 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const [fullscreenTile, setFullscreenTile] = React.useState<StudioTile | null>(null)
   const [editorTile, setEditorTile] = React.useState<StudioTile | null>(null)
   const [copiedPromptKey, setCopiedPromptKey] = React.useState<string | null>(null)
+  const [videoPrompt, setVideoPrompt] = React.useState("")
+  const [videoNegativePrompt, setVideoNegativePrompt] = React.useState("")
+  const [selectedVideoModel, setSelectedVideoModel] = React.useState<Model | null>(null)
+  const [videoInputImage, setVideoInputImage] = React.useState<ImageUpload | null>(null)
+  const [videoLastFrameImage, setVideoLastFrameImage] = React.useState<ImageUpload | null>(null)
+  const [videoInputVideo, setVideoInputVideo] = React.useState<ImageUpload | null>(null)
+  const [videoInputAudio, setVideoInputAudio] = React.useState<AudioUploadValue | null>(null)
+  const [videoParameters, setVideoParameters] = React.useState<Record<string, unknown>>({})
+  const [videoMultiShotMode, setVideoMultiShotMode] = React.useState(false)
+  const [videoMultiShotShots, setVideoMultiShotShots] = React.useState<MultiShotItem[]>([])
+  const [videoReferenceImages, setVideoReferenceImages] = React.useState<ImageUpload[]>([])
+  const [videoAttachedRefs, setVideoAttachedRefs] = React.useState<AttachedRef[]>([])
   const enhanceSeededRef = React.useRef(false)
+  const prevVideoModelIdForParamsRef = React.useRef<string | null>(null)
+  const boardOpenedAtRef = React.useRef(Date.now() - 5000)
+  const inferredGenerationIdsRef = React.useRef(new Set<string>())
   const viewportSaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const canvasRef = React.useRef<StudioInfiniteCanvasHandle>(null)
   const cameraAnimCancelRef = React.useRef<(() => void) | null>(null)
@@ -177,7 +237,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const selectedTiles = React.useMemo(
     () =>
       selectedTileIds
-        .map((id) => tiles.find((tile) => tile.id === id))
+        .map((id) => tiles.find((tile) => tile.id === id || tile.generationId === id))
         .filter((tile): tile is StudioTile => Boolean(tile)),
     [selectedTileIds, tiles],
   )
@@ -235,9 +295,172 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
     setSelectedModelParameters(getDefaultImageModelParameters(selectedModelObject))
   }, [selectedModelObject])
 
+  React.useEffect(() => {
+    if (videoModels.length === 0 || selectedVideoModel) return
+    const first = videoModels[0]
+    setSelectedVideoModel({
+      ...first,
+      parameters: { parameters: buildVideoModelParameters(first) },
+    })
+  }, [selectedVideoModel, videoModels])
+
+  React.useEffect(() => {
+    if (!selectedVideoModel) return
+    const modelId = selectedVideoModel.identifier
+    const prevModelId = prevVideoModelIdForParamsRef.current
+    prevVideoModelIdForParamsRef.current = modelId
+    const paramList = selectedVideoModel.parameters.parameters
+
+    setVideoParameters((prev) => {
+      const next: Record<string, unknown> = {}
+      paramList.forEach((param: ParameterDefinition) => {
+        next[param.name] = param.default
+      })
+
+      const aspectParam = paramList.find(
+        (param): param is StringParameterDefinition =>
+          (param.name === "aspect_ratio" || param.name === "aspectRatio") &&
+          param.type === "string" &&
+          Array.isArray(param.enum) &&
+          param.enum.length > 0,
+      )
+
+      if (!aspectParam?.enum?.length || prevModelId === null) {
+        return next
+      }
+
+      const supported = aspectParam.enum.map(String)
+      const prevAspectRaw = prev.aspect_ratio ?? prev.aspectRatio
+      if (prevAspectRaw === undefined || prevAspectRaw === null) {
+        return next
+      }
+
+      const kept = pickRetainedAspectRatio(String(prevAspectRaw), supported)
+      if (kept) {
+        next[aspectParam.name] = kept
+      }
+
+      return next
+    })
+  }, [selectedVideoModel])
+
+  const videoModelSupportsImage = React.useMemo(() => {
+    return (
+      selectedVideoModel?.parameters.parameters?.some(
+        (param) =>
+          param.name === "image" ||
+          param.name === "first_frame_image" ||
+          param.name === "start_image",
+      ) ?? false
+    )
+  }, [selectedVideoModel])
+
+  const videoModelSupportsLastFrame = React.useMemo(() => {
+    return (
+      selectedVideoModel?.parameters.parameters?.some(
+        (param) => param.name === "last_frame" || param.name === "last_frame_image",
+      ) ?? false
+    )
+  }, [selectedVideoModel])
+
+  const videoModelSupportsExtraImageRefs = React.useMemo(() => {
+    if (!selectedVideoModel) return false
+    return (
+      selectedVideoModel.identifier === "kwaivgi/kling-v3-omni-video" ||
+      isSeedanceVideoModelIdentifier(selectedVideoModel.identifier) ||
+      usesFalMultimodalVideoInputs(selectedVideoModel.identifier)
+    )
+  }, [selectedVideoModel])
+
+  const applyVideoRefsFromTiles = React.useCallback(
+    (incoming: StudioTile[], options?: { toggle?: boolean }) => {
+      const toggle = options?.toggle ?? false
+      let start = videoInputImage
+      let last = videoLastFrameImage
+      let video = videoInputVideo
+      let extras = [...videoReferenceImages]
+
+      const imageAlreadyUsed = (url: string) =>
+        start?.url === url || last?.url === url || extras.some((image) => image.url === url)
+
+      for (const tile of incoming) {
+        if (!tile.url || tile.status !== "completed") continue
+        const url = tile.url
+
+        if (tile.kind === "video") {
+          if (toggle && video?.url === url) {
+            video = null
+            continue
+          }
+          if (!toggle && video?.url === url) continue
+          video = { url }
+          continue
+        }
+
+        if (toggle && imageAlreadyUsed(url)) {
+          if (start?.url === url) start = null
+          else if (last?.url === url) last = null
+          else extras = extras.filter((image) => image.url !== url)
+          continue
+        }
+
+        if (imageAlreadyUsed(url)) continue
+
+        if (videoModelSupportsImage && !start) {
+          start = { url }
+        } else if (videoModelSupportsLastFrame && !last) {
+          last = { url }
+        } else if (videoModelSupportsExtraImageRefs) {
+          extras = [...extras, { url }]
+        } else if (videoModelSupportsImage) {
+          start = { url }
+        } else {
+          extras = [...extras, { url }]
+        }
+      }
+
+      setVideoInputImage(start)
+      setVideoLastFrameImage(last)
+      setVideoInputVideo(video)
+      setVideoReferenceImages(extras)
+    },
+    [
+      videoInputImage,
+      videoInputVideo,
+      videoLastFrameImage,
+      videoModelSupportsExtraImageRefs,
+      videoModelSupportsImage,
+      videoModelSupportsLastFrame,
+      videoReferenceImages,
+    ],
+  )
+
+  const previousStudioTabRef = React.useRef(studioMode)
+
+  React.useEffect(() => {
+    const previousTab = previousStudioTabRef.current
+    previousStudioTabRef.current = studioMode
+
+    if (studioMode === "agent") {
+      window.dispatchEvent(new CustomEvent("chat-open"))
+      if (previousTab !== "agent") {
+        for (const tile of selectedTiles) {
+          if (tile.url && (tile.kind === "image" || tile.kind === "video")) {
+            dispatchChatAddAsset(tile.url, tile.kind)
+          }
+        }
+      }
+      return
+    }
+
+    if (studioMode === "video" && previousTab !== "video") {
+      applyVideoRefsFromTiles(selectedTiles)
+    }
+  }, [applyVideoRefsFromTiles, selectedTiles, studioMode])
+
   const fetchProjectTiles = React.useCallback(async () => {
     const response = await fetch(
-      `/api/generations?type=image&studioProjectId=${encodeURIComponent(projectId)}&includePending=true&excludeFailed=false&limit=100`,
+      `/api/generations?studioProjectId=${encodeURIComponent(projectId)}&includePending=true&excludeFailed=false&limit=100`,
     )
     if (!response.ok) {
       throw new Error("Failed to load studio generations")
@@ -245,28 +468,9 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
     const payload = (await response.json()) as {
       generations: Array<Record<string, unknown>>
     }
-    return (payload.generations ?? []).map((generation) =>
-      tileFromGeneration({
-        id: String(generation.id),
-        url: typeof generation.url === "string" ? generation.url : null,
-        prompt: typeof generation.prompt === "string" ? generation.prompt : null,
-        model: typeof generation.model === "string" ? generation.model : null,
-        aspect_ratio:
-          typeof generation.aspect_ratio === "string" ? generation.aspect_ratio : null,
-        status: typeof generation.status === "string" ? generation.status : null,
-        reference_image_urls: Array.isArray(generation.reference_image_urls)
-          ? (generation.reference_image_urls as string[])
-          : [],
-        studio_x: typeof generation.studio_x === "number" ? generation.studio_x : null,
-        studio_y: typeof generation.studio_y === "number" ? generation.studio_y : null,
-        studio_width:
-          typeof generation.studio_width === "number" ? generation.studio_width : null,
-        studio_height:
-          typeof generation.studio_height === "number" ? generation.studio_height : null,
-        created_at:
-          typeof generation.created_at === "string" ? generation.created_at : null,
-      }),
-    )
+    return (payload.generations ?? [])
+      .filter((generation) => generation.type !== "audio")
+      .map(mapStudioGenerationRow)
   }, [projectId])
 
   const loadBoard = React.useCallback(async () => {
@@ -313,10 +517,10 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const cameraInset = React.useMemo(
     () => ({
       top: 112,
-      bottom: 220,
+      bottom: studioMode === "agent" ? 140 : 280,
       right: typeof chatDockInsetRight === "number" ? chatDockInsetRight : 0,
     }),
-    [chatDockInsetRight],
+    [chatDockInsetRight, studioMode],
   )
 
   const flyToViewport = React.useCallback(
@@ -342,6 +546,137 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
     },
     [cameraInset, flyToViewport],
   )
+
+  const mergeServerTiles = React.useCallback(
+    (serverTiles: StudioTile[], options?: { panToNew?: boolean }) => {
+      const previousIds = new Set(tilesRef.current.map((tile) => tile.generationId ?? tile.id))
+      const { tiles: laidOut, moved } = relayoutOriginStackedTiles(serverTiles, {
+        createdAfter: boardOpenedAtRef.current,
+      })
+
+      for (const tile of moved) {
+        if (!tile.generationId) continue
+        void updateGenerationStudioLayout({
+          generationId: tile.generationId,
+          x: tile.x,
+          y: tile.y,
+          width: tile.width,
+          height: tile.height,
+          projectId,
+        }).catch(() => undefined)
+      }
+
+      setTiles((prev) => {
+        const inFlight = prev.filter(
+          (tile) =>
+            tile.status === "pending" &&
+            !laidOut.some(
+              (server) => server.id === tile.generationId || server.id === tile.id,
+            ),
+        )
+        return [...inFlight, ...laidOut]
+      })
+
+      setSelectedTileIds((current) => {
+        if (current.length === 0) return current
+        const previous = tilesRef.current
+        return current.map((id) => {
+          const fromServer = laidOut.find((tile) => tile.id === id || tile.generationId === id)
+          if (fromServer) return fromServer.id
+          const fromPrevious = previous.find((tile) => tile.id === id || tile.generationId === id)
+          if (fromPrevious?.url) {
+            const byUrl = laidOut.find((tile) => tile.url === fromPrevious.url)
+            if (byUrl) return byUrl.id
+          }
+          return id
+        })
+      })
+
+      if (!options?.panToNew) return
+      const newcomers = laidOut.filter((tile) => !previousIds.has(tile.generationId ?? tile.id))
+      if (newcomers.length > 0) {
+        panToTiles(newcomers)
+      }
+    },
+    [panToTiles, projectId],
+  )
+
+  const inferUnattachedAgentGenerations = React.useCallback(async () => {
+    const response = await fetch(
+      `/api/generations?includePending=true&excludeFailed=false&limit=30`,
+    )
+    if (!response.ok) return
+    const payload = (await response.json()) as {
+      generations: Array<Record<string, unknown>>
+    }
+    const openedAt = boardOpenedAtRef.current
+    const candidates = (payload.generations ?? []).filter((generation) => {
+      const id = typeof generation.id === "string" ? generation.id : null
+      const tool = typeof generation.tool === "string" ? generation.tool : ""
+      const type = typeof generation.type === "string" ? generation.type : "image"
+      const createdAt =
+        typeof generation.created_at === "string" ? Date.parse(generation.created_at) : 0
+      if (!id || inferredGenerationIdsRef.current.has(id)) return false
+      if (generation.studio_project_id) return false
+      if (!tool.startsWith("chat-")) return false
+      if (type === "audio") return false
+      if (!Number.isFinite(createdAt) || createdAt < openedAt) return false
+      return true
+    })
+
+    if (candidates.length === 0) return
+
+    const occupied = tilesRef.current.map((item) => ({
+      x: item.x,
+      y: item.y,
+      width: item.width,
+      height: item.height,
+    }))
+
+    for (const generation of candidates) {
+      const id = String(generation.id)
+      inferredGenerationIdsRef.current.add(id)
+      const tile = mapStudioGenerationRow(generation)
+      const [placement] = findOpenPlacement({
+        existing: occupied,
+        width: tile.width,
+        height: tile.height,
+      })
+      const x = placement?.x ?? 0
+      const y = placement?.y ?? 0
+      occupied.push({
+        x,
+        y,
+        width: tile.width,
+        height: tile.height,
+      })
+      await updateGenerationStudioLayout({
+        generationId: id,
+        x,
+        y,
+        width: tile.width,
+        height: tile.height,
+        projectId,
+      }).catch(() => undefined)
+    }
+  }, [projectId])
+
+  const syncBoardTiles = React.useCallback(async () => {
+    try {
+      await inferUnattachedAgentGenerations()
+      const serverTiles = await fetchProjectTiles()
+      mergeServerTiles(serverTiles, { panToNew: true })
+    } catch (error) {
+      console.error("Failed to sync studio board", error)
+    }
+  }, [fetchProjectTiles, inferUnattachedAgentGenerations, mergeServerTiles])
+
+  React.useEffect(() => {
+    const timer = window.setInterval(() => {
+      void syncBoardTiles()
+    }, 2500)
+    return () => window.clearInterval(timer)
+  }, [syncBoardTiles])
 
   const handleFitAll = React.useCallback(() => {
     const bounds = boundingRect(tiles)
@@ -407,13 +742,21 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const handleDeselect = React.useCallback(() => {
     setSelectedTileIds((currentIds) => {
       if (currentIds.length === 0) return currentIds
+      const selected = tiles.filter((tile) => tileMatchesSelection(tile, currentIds))
       const selectedUrls = new Set(
-        tiles
-          .filter((tile) => currentIds.includes(tile.id) && tile.url)
-          .map((tile) => tile.url as string),
+        selected.map((tile) => tile.url).filter((url): url is string => Boolean(url)),
       )
       if (selectedUrls.size > 0) {
         setReferenceImages((current) => current.filter((image) => !image.url || !selectedUrls.has(image.url)))
+        setVideoInputImage((current) => (current?.url && selectedUrls.has(current.url) ? null : current))
+        setVideoLastFrameImage((current) => (current?.url && selectedUrls.has(current.url) ? null : current))
+        setVideoInputVideo((current) => (current?.url && selectedUrls.has(current.url) ? null : current))
+        setVideoReferenceImages((current) =>
+          current.filter((image) => !image.url || !selectedUrls.has(image.url)),
+        )
+        for (const tile of selected) {
+          if (tile.url) dispatchChatRemoveAsset(tile.url)
+        }
       }
       return []
     })
@@ -425,7 +768,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   }, [])
 
   const handleEditTile = React.useCallback((tile: StudioTile) => {
-    if (!tile.url || tile.status !== "completed") return
+    if (tile.kind !== "image" || !tile.url || tile.status !== "completed") return
     setFullscreenTile(null)
     editorTileRef.current = tile
     setEditorTile(tile)
@@ -460,6 +803,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         clientKey: generationId ?? `edit-${Date.now()}`,
         generationId,
         url: imageUrl,
+        kind: "image",
         status: "completed",
         prompt: source.prompt ?? "Edited image",
         model: source.model,
@@ -473,6 +817,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       }
 
       setTiles((prev) => [newTile, ...prev])
+      tilesRef.current = [newTile, ...tilesRef.current]
       panToTiles([newTile])
       toast.success("Edit saved to the board")
 
@@ -497,6 +842,21 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   )
 
   const handleRecreateTile = React.useCallback((tile: StudioTile) => {
+    if (tile.kind === "video") {
+      setStudioMode("video")
+      if (tile.prompt?.trim()) {
+        setVideoPrompt(tile.prompt)
+        setVideoAttachedRefs([])
+      }
+      const startUrl = tile.referenceImageUrls[0] ?? null
+      if (startUrl) {
+        setVideoInputImage({ url: startUrl })
+      }
+      toast.success("Prompt copied to video input")
+      return
+    }
+
+    setStudioMode("image")
     if (tile.prompt?.trim()) {
       setPrompt(tile.prompt)
       setAttachedCommandRefs([])
@@ -517,10 +877,18 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const handleCopyImage = React.useCallback(async (tile: StudioTile) => {
     if (!tile.url) return
     try {
-      const result = await copyMediaToClipboard({ url: tile.url, kind: "image" })
-      toast.success(result === "url" ? "Image URL copied" : "Image copied")
+      const result = await copyMediaToClipboard({ url: tile.url, kind: tile.kind })
+      toast.success(
+        result === "url"
+          ? tile.kind === "video"
+            ? "Video URL copied"
+            : "Image URL copied"
+          : tile.kind === "video"
+            ? "Video copied"
+            : "Image copied",
+      )
     } catch {
-      toast.error("Could not copy image")
+      toast.error(tile.kind === "video" ? "Could not copy video" : "Could not copy image")
     }
   }, [])
 
@@ -540,9 +908,13 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const handleDownloadTile = React.useCallback(async (tile: StudioTile) => {
     if (!tile.url) return
     try {
-      await downloadMediaFile({ url: tile.url, kind: "image", filenamePrefix: "studio-image" })
+      await downloadMediaFile({
+        url: tile.url,
+        kind: tile.kind,
+        filenamePrefix: tile.kind === "video" ? "studio-video" : "studio-image",
+      })
     } catch {
-      toast.error("Could not download image")
+      toast.error(tile.kind === "video" ? "Could not download video" : "Could not download image")
     }
   }, [])
 
@@ -566,9 +938,9 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         setReferenceImages((current) => current.filter((image) => image.url !== tile.url))
       }
       if (fullscreenTile?.id === tile.id) setFullscreenTile(null)
-      toast.success("Image deleted")
+      toast.success(tile.kind === "video" ? "Video deleted" : "Image deleted")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete image")
+      toast.error(error instanceof Error ? error.message : "Failed to delete")
     }
   }, [fullscreenTile?.id])
 
@@ -592,13 +964,33 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   )
 
   const handleSelectTile = React.useCallback((tile: StudioTile) => {
-    if (selectedStudioTool && tile.url && tile.status === "completed") {
-      setSelectedTileIds((currentIds) => {
-        if (currentIds.includes(tile.id)) {
-          return currentIds.filter((id) => id !== tile.id)
-        }
-        return [...currentIds, tile.id]
-      })
+    const alreadySelected = tileMatchesSelection(tile, selectedTileIds)
+    const nextSelected = alreadySelected
+      ? selectedTileIds.filter((id) => id !== tile.id && id !== tile.generationId)
+      : [...selectedTileIds, tile.id]
+
+    setSelectedTileIds(nextSelected)
+
+    if (tile.status !== "completed" || !tile.url) return
+
+    if (studioMode === "agent") {
+      if (alreadySelected) {
+        dispatchChatRemoveAsset(tile.url)
+      } else {
+        dispatchChatAddAsset(tile.url, tile.kind)
+      }
+      return
+    }
+
+    if (studioMode === "video") {
+      applyVideoRefsFromTiles([tile], { toggle: true })
+      return
+    }
+
+    if (tile.kind !== "image") return
+
+    if (selectedStudioTool) {
+      if (alreadySelected) return
       setStudioToolSourceImage((source) => {
         if (!source?.url) return { url: tile.url as string }
         setStudioToolSceneImage((scene) => {
@@ -610,21 +1002,15 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       return
     }
 
-    setSelectedTileIds((currentIds) => {
-      if (currentIds.includes(tile.id)) {
-        if (tile.url) {
-          setReferenceImages((current) => current.filter((image) => image.url !== tile.url))
-        }
-        return currentIds.filter((id) => id !== tile.id)
+    setReferenceImages((current) => {
+      if (alreadySelected) {
+        return current.filter((image) => image.url !== tile.url)
       }
-      if (tile.url) {
-        setReferenceImages((current) =>
-          current.some((image) => image.url === tile.url) ? current : [...current, { url: tile.url }],
-        )
-      }
-      return [...currentIds, tile.id]
+      return current.some((image) => image.url === tile.url)
+        ? current
+        : [...current, { url: tile.url }]
     })
-  }, [selectedStudioTool])
+  }, [applyVideoRefsFromTiles, selectedStudioTool, selectedTileIds, studioMode])
 
   React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -761,7 +1147,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         ? Math.max(1, studioToolPayload.numImages)
         : Math.max(1, selectedNumImages)
       const placements = findOpenPlacement({
-        existing: tiles.map((tile) => ({
+        existing: tilesRef.current.map((tile) => ({
           x: tile.x,
           y: tile.y,
           width: tile.width,
@@ -779,6 +1165,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         clientKey: `${clientRequestId}-${index}`,
         generationId: null,
         url: null,
+        kind: "image",
         status: "pending",
         prompt: capturedPrompt || null,
         model: selectedModel,
@@ -792,6 +1179,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       }))
 
       setTiles((prev) => [...optimisticTiles, ...prev])
+      tilesRef.current = [...optimisticTiles, ...tilesRef.current]
       setPendingCount((count) => count + 1)
       panToTiles(optimisticTiles)
 
@@ -898,6 +1286,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
               clientKey: `${clientRequestId}-done-${index}`,
               generationId: null,
               url,
+              kind: "image" as const,
               status: "completed" as const,
               prompt: (studioToolPayload ? studioToolPayload.prompt : mergedPrompt).trim() || null,
               model: selectedModel,
@@ -921,14 +1310,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
 
         void fetchProjectTiles()
           .then((serverTiles) => {
-            setTiles((prev) => {
-              const inFlight = prev.filter(
-                (tile) =>
-                  tile.status === "pending" &&
-                  !serverTiles.some((server) => server.id === tile.generationId || server.id === tile.id),
-              )
-              return [...inFlight, ...serverTiles]
-            })
+            mergeServerTiles(serverTiles)
           })
           .catch(() => undefined)
       } catch (error) {
@@ -954,6 +1336,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       attachedCommandRefs,
       enhancePrompt,
       fetchProjectTiles,
+      mergeServerTiles,
       panToTiles,
       projectId,
       prompt,
@@ -968,9 +1351,192 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       studioToolAdditionalInstructions,
       studioToolSceneImage,
       studioToolSourceImage,
-      tiles,
     ],
   )
+
+  const estimatedVideoCredits = React.useMemo(() => {
+    if (!selectedVideoModel) return null
+    return resolveVideoPricingQuote({
+      modelIdentifier: selectedVideoModel.identifier,
+      modelCost: selectedVideoModel.model_cost,
+      modelCostPerSecond: selectedVideoModel.model_cost_per_second,
+      pricingConfig: selectedVideoModel.pricing_config,
+      duration: videoParameters.duration as number | string | undefined,
+      resolution: typeof videoParameters.resolution === "string" ? videoParameters.resolution : null,
+      draft: videoParameters.draft as boolean | undefined,
+      mode: typeof videoParameters.mode === "string" ? videoParameters.mode : null,
+      generateAudio:
+        typeof videoParameters.generate_audio === "boolean"
+          ? videoParameters.generate_audio
+          : typeof videoParameters.generateAudio === "boolean"
+            ? videoParameters.generateAudio
+            : null,
+      characterOrientation:
+        typeof videoParameters.character_orientation === "string"
+          ? videoParameters.character_orientation
+          : null,
+      hasInputVideo: Boolean(videoInputVideo),
+      hasReferenceVideo: Boolean(videoInputVideo),
+    }).quotedCredits
+  }, [selectedVideoModel, videoInputVideo, videoParameters])
+
+  const handleGenerateVideo = React.useCallback(async () => {
+    if (!selectedVideoModel) {
+      toast.error("Select a video model")
+      return
+    }
+
+    const refError = validateVideoAttachedRefs(videoAttachedRefs, selectedVideoModel)
+    if (refError) {
+      toast.error(refError)
+      return
+    }
+
+    const mergedPrompt = buildPromptWithRefs(videoPrompt, brandRefsOnly(videoAttachedRefs))
+    const selectedStartImage = selectedTiles.find((tile) => tile.kind === "image" && tile.url)
+    const startImage =
+      videoInputImage ??
+      (selectedStartImage?.url ? { url: selectedStartImage.url } : null)
+
+    if (!mergedPrompt.trim() && !startImage && !videoInputVideo) {
+      toast.error("Please enter a prompt or add a start frame")
+      return
+    }
+
+    const aspectRatio =
+      typeof videoParameters.aspect_ratio === "string"
+        ? videoParameters.aspect_ratio
+        : typeof videoParameters.aspectRatio === "string"
+          ? videoParameters.aspectRatio
+          : "16:9"
+    const size = tileSizeForAspectRatio(aspectRatio)
+    const [placement] = findOpenPlacement({
+      existing: tilesRef.current.map((tile) => ({
+        x: tile.x,
+        y: tile.y,
+        width: tile.width,
+        height: tile.height,
+      })),
+      width: size.width,
+      height: size.height,
+      anchor: selectedTile,
+    })
+    const clientRequestId = createClientRequestId()
+    const optimisticTile: StudioTile = {
+      id: clientRequestId,
+      clientKey: clientRequestId,
+      generationId: null,
+      url: null,
+      kind: "video",
+      status: "pending",
+      prompt: mergedPrompt.trim() || null,
+      model: selectedVideoModel.identifier,
+      aspectRatio,
+      referenceImageUrls: startImage?.url ? [startImage.url] : [],
+      x: placement?.x ?? 0,
+      y: placement?.y ?? 0,
+      width: size.width,
+      height: size.height,
+      createdAt: new Date().toISOString(),
+    }
+
+    setTiles((prev) => [optimisticTile, ...prev])
+    tilesRef.current = [optimisticTile, ...tilesRef.current]
+    setPendingCount((count) => count + 1)
+    panToTiles([optimisticTile])
+
+    try {
+      const extraRefs = selectedTiles
+        .filter(
+          (tile) =>
+            tile.kind === "image" &&
+            tile.url &&
+            tile.url !== startImage?.url,
+        )
+        .map((tile) => ({ url: tile.url as string }))
+      const requestBody = await buildStudioVideoGenerationBody({
+        modelIdentifier: selectedVideoModel.identifier,
+        prompt: mergedPrompt,
+        negativePrompt: videoNegativePrompt,
+        parameters: videoParameters,
+        inputImage: startImage,
+        lastFrameImage: videoLastFrameImage,
+        inputVideo: videoInputVideo,
+        inputAudio: videoInputAudio,
+        referenceImages: [...videoReferenceImages, ...extraRefs],
+        studio: {
+          studio_project_id: projectId,
+          studio_x: placement?.x ?? 0,
+          studio_y: placement?.y ?? 0,
+          studio_width: size.width,
+          studio_height: size.height,
+        },
+      })
+
+      const result = await generateVideoAndWait("/api/generate-video-any-model", requestBody, {
+        onAccepted: ({ generationId }) => {
+          if (!generationId) return
+          setTiles((prev) =>
+            prev.map((tile) =>
+              tile.clientKey === clientRequestId
+                ? { ...tile, generationId, id: generationId }
+                : tile,
+            ),
+          )
+        },
+      })
+
+      const videoUrl =
+        typeof result.video?.url === "string" ? result.video.url : null
+      if (videoUrl) {
+        setTiles((prev) =>
+          prev.map((tile) =>
+            tile.clientKey === clientRequestId
+              ? { ...tile, url: videoUrl, status: "completed" }
+              : tile,
+          ),
+        )
+        void updateStudioProjectClient(projectId, { thumbnail_url: videoUrl }).catch(
+          () => undefined,
+        )
+      }
+
+      void fetchProjectTiles()
+        .then((serverTiles) => mergeServerTiles(serverTiles))
+        .catch(() => undefined)
+    } catch (error) {
+      setTiles((prev) =>
+        prev.map((tile) =>
+          tile.clientKey === clientRequestId ? { ...tile, status: "failed" } : tile,
+        ),
+      )
+      const message = error instanceof Error ? error.message : "Video generation failed"
+      if (isInsufficientCreditsError(error) || isInsufficientCreditsMessage(message)) {
+        showCreditsUpsellToast(message)
+      } else if (!tryShowContentModerationToast(message)) {
+        toast.error(toUserFacingGenerationError(message))
+      }
+    } finally {
+      setPendingCount((count) => Math.max(0, count - 1))
+    }
+  }, [
+    fetchProjectTiles,
+    mergeServerTiles,
+    panToTiles,
+    projectId,
+    selectedTile,
+    selectedTiles,
+    selectedVideoModel,
+    videoAttachedRefs,
+    videoInputAudio,
+    videoInputImage,
+    videoInputVideo,
+    videoLastFrameImage,
+    videoNegativePrompt,
+    videoParameters,
+    videoPrompt,
+    videoReferenceImages,
+  ])
 
   if (loading) {
     return (
@@ -994,11 +1560,11 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-background">
       <div
-        className="pointer-events-none absolute inset-x-0 top-13 z-20 flex items-center justify-between gap-3 p-3"
+        className="pointer-events-none absolute inset-x-0 top-13 z-20 flex items-center gap-3 p-3"
         style={promptPanelStyle}
       >
-        <div className="pointer-events-auto flex min-w-0 max-w-[min(100%,20rem)] items-center gap-2 rounded-xl border border-border/70 bg-background/90 p-1.5 shadow-sm backdrop-blur">
-          <Button asChild variant="ghost" size="icon" className="shrink-0">
+        <div className="pointer-events-auto flex min-w-0 items-center gap-2">
+          <Button asChild variant="ghost" size="icon-sm" className={STUDIO_CHROME} aria-label="Back to Studio">
             <Link href="/studio">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -1012,23 +1578,22 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
                 event.currentTarget.blur()
               }
             }}
-            className="h-9 min-w-0 border-0 bg-transparent shadow-none focus-visible:ring-0"
+            aria-label="Project name"
+            className={`${STUDIO_CHROME} h-8 w-38 min-w-0 px-3 text-sm shadow-sm sm:w-48 focus-visible:border-border/70 focus-visible:ring-0`}
           />
-        </div>
-        <div className="pointer-events-auto shrink-0 rounded-xl border border-border/70 bg-background/90 shadow-sm backdrop-blur">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 type="button"
                 variant="ghost"
-                size="icon"
-                className="size-9"
+                size="icon-sm"
+                className={STUDIO_CHROME}
                 aria-label="Board controls"
               >
                 <DotsThree className="size-5" weight="bold" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-auto min-w-40">
+            <DropdownMenuContent align="start" className="w-auto min-w-40">
               <DropdownMenuItem onSelect={handleFitAll} disabled={tiles.length === 0}>
                 Fit all
               </DropdownMenuItem>
@@ -1052,9 +1617,11 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
           <StudioTileCard
             key={tile.clientKey}
             tile={tile}
-            selected={selectedTileIds.includes(tile.id)}
+            selected={tileMatchesSelection(tile, selectedTileIds)}
             selectionIndex={
-              selectedTileIds.includes(tile.id) ? selectedTileIds.indexOf(tile.id) + 1 : null
+              tileMatchesSelection(tile, selectedTileIds)
+                ? selectedTileIds.findIndex((id) => id === tile.id || id === tile.generationId) + 1
+                : null
             }
             zoom={viewport.zoom}
             onSelect={handleSelectTile}
@@ -1068,7 +1635,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       {tiles.length === 0 ? (
         <div className="pointer-events-none absolute inset-x-0 top-13 bottom-36 z-10 flex items-center justify-center px-6">
           <p className="max-w-sm text-center text-sm text-muted-foreground">
-            Generate to place images on the board.
+            Generate images, videos, or use the agent — they land on this board.
             <span className="mt-1 block text-xs">
               Click images to add them as references. Click the canvas to clear.
             </span>
@@ -1080,8 +1647,61 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         className="pointer-events-none absolute bottom-0 left-0 z-20 flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4"
         style={promptPanelStyle}
       >
-        <div className="pointer-events-auto w-full max-w-sm sm:max-w-lg lg:max-w-4xl">
-          {selectedStudioTool ? (
+        <div className="pointer-events-auto flex w-full max-w-sm flex-col items-center gap-2 sm:max-w-lg lg:max-w-4xl">
+          <HeroToolTabs
+            value={studioMode}
+            onChange={setStudioMode}
+            aria-label="Studio creation tools"
+          />
+          {studioMode === "agent" ? (
+            <p className="rounded-full border border-border/70 bg-background/90 px-3 py-1.5 text-center text-xs text-muted-foreground shadow-sm backdrop-blur">
+              Click tiles to attach them to the agent. Generations land on this board.
+            </p>
+          ) : studioMode === "video" ? (
+            selectedVideoModel ? (
+              <VideoInputBox
+                className="w-full"
+                videoModels={videoModels}
+                promptValue={videoPrompt}
+                onPromptChange={setVideoPrompt}
+                negativePromptValue={videoNegativePrompt}
+                onNegativePromptChange={setVideoNegativePrompt}
+                selectedModel={selectedVideoModel}
+                onModelChange={setSelectedVideoModel}
+                inputImage={videoInputImage}
+                onInputImageChange={setVideoInputImage}
+                lastFrameImage={videoLastFrameImage}
+                onLastFrameChange={setVideoLastFrameImage}
+                inputVideo={videoInputVideo}
+                onInputVideoChange={setVideoInputVideo}
+                inputAudio={videoInputAudio}
+                onInputAudioChange={setVideoInputAudio}
+                parameters={videoParameters}
+                onParametersChange={setVideoParameters}
+                estimatedCredits={estimatedVideoCredits}
+                isGenerating={pendingCount > 0 || videoModelsLoading}
+                activeGenerationCount={pendingCount}
+                onGenerate={() => {
+                  void handleGenerateVideo()
+                }}
+                allowConcurrent
+                allowOptionsDuringGeneration
+                multiShotMode={videoMultiShotMode}
+                onMultiShotModeChange={setVideoMultiShotMode}
+                multiShotShots={videoMultiShotShots}
+                onMultiShotShotsChange={setVideoMultiShotShots}
+                referenceImages={videoReferenceImages}
+                onReferenceImagesChange={setVideoReferenceImages}
+                attachedRefs={videoAttachedRefs}
+                onAttachedRefsChange={setVideoAttachedRefs}
+              />
+            ) : (
+              <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-4 py-3 text-sm text-muted-foreground shadow-sm backdrop-blur">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading video tools…
+              </div>
+            )
+          ) : selectedStudioTool ? (
             <ImageStudioToolInput
               tool={selectedStudioTool}
               sourceImage={studioToolSourceImage}
@@ -1151,15 +1771,15 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
 
       {fullscreenTile?.url ? (
         <FullscreenMediaViewer
-          kind="image"
+          kind={fullscreenTile.kind}
           url={fullscreenTile.url}
           metadata={{
             id: fullscreenTile.generationId ?? fullscreenTile.id,
             model: fullscreenTile.model,
             prompt: fullscreenTile.prompt,
-            tool: "image",
+            tool: fullscreenTile.kind,
             aspectRatio: fullscreenTile.aspectRatio,
-            type: "image",
+            type: fullscreenTile.kind,
             createdAt: fullscreenTile.createdAt,
           }}
           referenceImages={fullscreenTile.referenceImageUrls.map((imageUrl) => ({ imageUrl }))}
@@ -1177,38 +1797,42 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
                 },
               })
             }
-            actions.push({
-              id: "reference",
-              label: "Use as Reference",
-              icon: <ImageSquare className="size-4" />,
-              onClick: () => {
-                if (tile.url) {
-                  setSelectedTileIds((ids) => (ids.includes(tile.id) ? ids : [...ids, tile.id]))
-                  if (selectedStudioTool) {
-                    setStudioToolSourceImage((source) => {
-                      if (!source?.url) return { url: tile.url as string }
-                      setStudioToolSceneImage((scene) => scene ?? { url: tile.url as string })
-                      return source
-                    })
-                  } else {
-                    setReferenceImages((current) =>
-                      current.some((image) => image.url === tile.url)
-                        ? current
-                        : [...current, { url: tile.url }],
-                    )
+            if (tile.kind === "image") {
+              actions.push({
+                id: "reference",
+                label: "Use as Reference",
+                icon: <ImageSquare className="size-4" />,
+                onClick: () => {
+                  if (tile.url) {
+                    setSelectedTileIds((ids) => (ids.includes(tile.id) ? ids : [...ids, tile.id]))
+                    if (studioMode === "video") {
+                      setVideoInputImage({ url: tile.url })
+                    } else if (selectedStudioTool) {
+                      setStudioToolSourceImage((source) => {
+                        if (!source?.url) return { url: tile.url as string }
+                        setStudioToolSceneImage((scene) => scene ?? { url: tile.url as string })
+                        return source
+                      })
+                    } else {
+                      setReferenceImages((current) =>
+                        current.some((image) => image.url === tile.url)
+                          ? current
+                          : [...current, { url: tile.url }],
+                      )
+                    }
                   }
-                }
-                setFullscreenTile(null)
-              },
-            })
-            actions.push({
-              id: "edit",
-              label: "Edit image",
-              icon: <PencilSimple className="size-4" />,
-              onClick: () => {
-                handleEditTile(tile)
-              },
-            })
+                  setFullscreenTile(null)
+                },
+              })
+              actions.push({
+                id: "edit",
+                label: "Edit image",
+                icon: <PencilSimple className="size-4" />,
+                onClick: () => {
+                  handleEditTile(tile)
+                },
+              })
+            }
             actions.push({
               id: "recreate",
               label: "Recreate",
@@ -1220,7 +1844,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
             })
             actions.push({
               id: "copy",
-              label: "Copy Image",
+              label: tile.kind === "video" ? "Copy Video" : "Copy Image",
               icon: <Copy className="size-4" />,
               onClick: () => {
                 void handleCopyImage(tile)

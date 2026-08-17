@@ -30,6 +30,7 @@ export type VideoGenerationPollResult = {
 
 type UseGenerationStatusOptions<T> = {
   enabled: boolean
+  generationId?: string | null
   predictionId?: string | null
   statusEndpoint: string
   mapCompleted: (data: Record<string, unknown>) => T | null
@@ -99,6 +100,7 @@ function mapVideoFailed(data: Record<string, unknown>): VideoGenerationPollResul
 
 export function useGenerationStatus<T>({
   enabled,
+  generationId,
   predictionId,
   statusEndpoint,
   mapCompleted,
@@ -107,15 +109,18 @@ export function useGenerationStatus<T>({
   fetchErrorMessage,
 }: UseGenerationStatusOptions<T>) {
   const [polledState, setPolledState] = React.useState<T | null>(null)
+  const resolvedGenerationId = generationId?.trim() || undefined
+  const resolvedPredictionId = predictionId?.trim() || undefined
 
   React.useEffect(() => {
-    if (!enabled || !predictionId) {
+    if (!enabled || (!resolvedPredictionId && !resolvedGenerationId)) {
       return
     }
 
     return subscribeGenerationStatus(
       {
-        predictionId,
+        generationId: resolvedGenerationId,
+        predictionId: resolvedPredictionId,
         statusEndpoint,
         mapCompleted,
         mapFailed,
@@ -126,7 +131,8 @@ export function useGenerationStatus<T>({
     )
   }, [
     enabled,
-    predictionId,
+    resolvedGenerationId,
+    resolvedPredictionId,
     statusEndpoint,
     mapCompleted,
     mapFailed,
@@ -137,13 +143,15 @@ export function useGenerationStatus<T>({
   return polledState
 }
 
-export function useImageGenerationPoll(
-  predictionId: string | undefined,
-  enabled: boolean,
-) {
+export function useImageGenerationPoll(options: {
+  enabled: boolean
+  generationId?: string | null
+  predictionId?: string | null
+}) {
   return useGenerationStatus<ImageGenerationPollResult>({
-    enabled,
-    predictionId,
+    enabled: options.enabled,
+    generationId: options.generationId,
+    predictionId: options.predictionId,
     statusEndpoint: "/api/generate-image/status",
     mapCompleted: mapImageCompleted,
     mapFailed: mapImageFailed,
@@ -152,13 +160,15 @@ export function useImageGenerationPoll(
   })
 }
 
-export function useVideoGenerationPoll(
-  predictionId: string | undefined,
-  enabled: boolean,
-) {
+export function useVideoGenerationPoll(options: {
+  enabled: boolean
+  generationId?: string | null
+  predictionId?: string | null
+}) {
   return useGenerationStatus<VideoGenerationPollResult>({
-    enabled,
-    predictionId,
+    enabled: options.enabled,
+    generationId: options.generationId,
+    predictionId: options.predictionId,
     statusEndpoint: "/api/generate-video/status",
     mapCompleted: mapVideoCompleted,
     mapFailed: mapVideoFailed,

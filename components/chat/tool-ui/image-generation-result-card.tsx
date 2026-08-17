@@ -46,9 +46,13 @@ export function ImageGenerationResultCard({
   const pollEnabled =
     part.state === "output-available" &&
     part.output?.status === "pending" &&
-    Boolean(part.output?.predictionId)
+    Boolean(part.output?.predictionId || part.output?.generationId)
 
-  const polledState = useImageGenerationPoll(part.output?.predictionId, pollEnabled)
+  const polledState = useImageGenerationPoll({
+    enabled: pollEnabled,
+    generationId: part.output?.generationId,
+    predictionId: part.output?.predictionId,
+  })
 
   if (part.state === "input-streaming") {
     return (

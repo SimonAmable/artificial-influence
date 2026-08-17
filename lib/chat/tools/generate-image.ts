@@ -783,6 +783,7 @@ export function createGenerateImageTool({
             tool: "chat-generate-image",
             status: "pending",
             replicate_prediction_id: requestId,
+            fal_request_id: requestId,
             fal_endpoint_id: falEndpoint,
             quoted_credits: requiredCredits,
             pricing_snapshot: pricingSnapshot,

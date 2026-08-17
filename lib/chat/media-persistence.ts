@@ -37,7 +37,7 @@ type PendingMediaToolPart =
 type MediaBinding = {
   generationId?: string | null
   messageId: string
-  predictionId: string
+  predictionId?: string
   toolCallId: string
 }
 
@@ -75,18 +75,19 @@ function collectPendingMediaBindings(messages: UIMessage[]) {
 
       const toolPart = part as unknown as PendingMediaToolPart
       const predictionId = toolPart.output?.predictionId?.trim()
+      const generationId = toolPart.output?.generationId?.trim() || null
 
       if (
         toolPart.state !== "output-available" ||
         toolPart.output?.status !== "pending" ||
-        !predictionId ||
+        (!predictionId && !generationId) ||
         !toolPart.toolCallId
       ) {
         continue
       }
 
       bindings.push({
-        generationId: toolPart.output?.generationId ?? null,
+        generationId,
         messageId: message.id,
         predictionId,
         toolCallId: toolPart.toolCallId,
@@ -167,9 +168,8 @@ function patchMessagesForGenerationResult({
           : {}
 
       if (failedGeneration) {
-        const { output: _ignoredOutput, ...partWithoutOutput } = part as typeof part & {
-          output?: unknown
-        }
+        const partWithoutOutput = { ...(part as typeof part & { output?: unknown }) }
+        delete partWithoutOutput.output
 
         return {
           ...partWithoutOutput,
@@ -242,7 +242,69 @@ function patchMessagesForGenerationResult({
   }
 }
 
+async function loadGenerationRowsForChatSync({
+  generationId,
+  predictionId,
+  supabase,
+  userId,
+}: {
+  generationId?: string | null
+  predictionId?: string
+  supabase: SupabaseClient
+  userId?: string
+}) {
+  const columns =
+    "chat_message_id, chat_thread_id, chat_tool_call_id, created_at, error_message, id, replicate_prediction_id, status, supabase_storage_path, tool, type, user_id"
+
+  if (generationId) {
+    let byIdQuery = supabase.from("generations").select(columns).eq("id", generationId)
+    if (userId) {
+      byIdQuery = byIdQuery.eq("user_id", userId)
+    }
+    const { data, error } = await byIdQuery.maybeSingle()
+    if (error) {
+      throw new Error(`Failed to load generation result for chat sync: ${error.message}`)
+    }
+    return data ? ([data] as StoredGenerationRow[]) : []
+  }
+
+  if (!predictionId) {
+    return []
+  }
+
+  let byReplicateQuery = supabase
+    .from("generations")
+    .select(columns)
+    .eq("replicate_prediction_id", predictionId)
+    .order("created_at", { ascending: true })
+  if (userId) {
+    byReplicateQuery = byReplicateQuery.eq("user_id", userId)
+  }
+  const byReplicate = await byReplicateQuery
+  if (byReplicate.error) {
+    throw new Error(`Failed to load generation result for chat sync: ${byReplicate.error.message}`)
+  }
+  if ((byReplicate.data ?? []).length > 0) {
+    return (byReplicate.data ?? []) as StoredGenerationRow[]
+  }
+
+  let byFalQuery = supabase
+    .from("generations")
+    .select(columns)
+    .eq("fal_request_id", predictionId)
+    .order("created_at", { ascending: true })
+  if (userId) {
+    byFalQuery = byFalQuery.eq("user_id", userId)
+  }
+  const byFal = await byFalQuery
+  if (byFal.error) {
+    throw new Error(`Failed to load generation result for chat sync: ${byFal.error.message}`)
+  }
+  return (byFal.data ?? []) as StoredGenerationRow[]
+}
+
 async function syncCompletedGenerationToChat({
+  generationId,
   messageId,
   predictionId,
   supabase,
@@ -250,27 +312,20 @@ async function syncCompletedGenerationToChat({
   toolCallId,
   userId,
 }: {
+  generationId?: string | null
   messageId: string
-  predictionId: string
+  predictionId?: string
   supabase: SupabaseClient
   threadId: string
   toolCallId: string
   userId: string
 }) {
-  const { data: generationRows, error: generationsError } = await supabase
-    .from("generations")
-    .select(
-      "chat_message_id, chat_thread_id, chat_tool_call_id, created_at, error_message, id, replicate_prediction_id, status, supabase_storage_path, tool, type, user_id",
-    )
-    .eq("user_id", userId)
-    .eq("replicate_prediction_id", predictionId)
-    .order("created_at", { ascending: true })
-
-  if (generationsError) {
-    throw new Error(`Failed to load generation result for chat sync: ${generationsError.message}`)
-  }
-
-  const rows = (generationRows ?? []) as StoredGenerationRow[]
+  const rows = await loadGenerationRowsForChatSync({
+    generationId,
+    predictionId,
+    supabase,
+    userId,
+  })
   const hasTerminalState = rows.some((row) => row.status === "completed" || row.status === "failed")
 
   if (!hasTerminalState) {
@@ -319,7 +374,7 @@ export async function bindPendingGenerationsToChatMessages({
   const bindings = collectPendingMediaBindings(messages)
 
   for (const binding of bindings) {
-    const { error } = await supabase
+    let bindQuery = supabase
       .from("generations")
       .update({
         chat_message_id: binding.messageId,
@@ -327,13 +382,23 @@ export async function bindPendingGenerationsToChatMessages({
         chat_tool_call_id: binding.toolCallId,
       })
       .eq("user_id", userId)
-      .eq("replicate_prediction_id", binding.predictionId)
+
+    if (binding.generationId) {
+      bindQuery = bindQuery.eq("id", binding.generationId)
+    } else if (binding.predictionId) {
+      bindQuery = bindQuery.eq("replicate_prediction_id", binding.predictionId)
+    } else {
+      continue
+    }
+
+    const { error } = await bindQuery
 
     if (error) {
       throw new Error(`Failed to bind chat media generation: ${error.message}`)
     }
 
     await syncCompletedGenerationToChat({
+      generationId: binding.generationId,
       messageId: binding.messageId,
       predictionId: binding.predictionId,
       supabase,
@@ -341,7 +406,6 @@ export async function bindPendingGenerationsToChatMessages({
       toolCallId: binding.toolCallId,
       userId,
     })
-
   }
 }
 
@@ -352,19 +416,10 @@ export async function syncGenerationResultToPersistedChat({
   predictionId: string
   supabase: SupabaseClient
 }) {
-  const { data: generationRows, error } = await supabase
-    .from("generations")
-    .select(
-      "chat_message_id, chat_thread_id, chat_tool_call_id, created_at, error_message, id, replicate_prediction_id, status, supabase_storage_path, tool, type, user_id",
-    )
-    .eq("replicate_prediction_id", predictionId)
-    .order("created_at", { ascending: true })
-
-  if (error) {
-    throw new Error(`Failed to load generation rows for chat sync: ${error.message}`)
-  }
-
-  const rows = (generationRows ?? []) as StoredGenerationRow[]
+  const rows = await loadGenerationRowsForChatSync({
+    predictionId,
+    supabase,
+  })
   const primaryRow = rows[0]
 
   if (!primaryRow?.chat_thread_id || !primaryRow.chat_message_id || !primaryRow.chat_tool_call_id) {

@@ -160,9 +160,13 @@ export function VideoGenerationResultCard({
   const pollEnabled =
     part.state === "output-available" &&
     part.output?.status === "pending" &&
-    Boolean(part.output?.predictionId)
+    Boolean(part.output?.predictionId || part.output?.generationId)
 
-  const polledState = useVideoGenerationPoll(part.output?.predictionId, pollEnabled)
+  const polledState = useVideoGenerationPoll({
+    enabled: pollEnabled,
+    generationId: part.output?.generationId,
+    predictionId: part.output?.predictionId,
+  })
 
   if (part.state === "input-streaming") {
     return (

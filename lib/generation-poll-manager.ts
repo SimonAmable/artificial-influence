@@ -1,12 +1,13 @@
 /**
  * Shared client-side poller for async generation status endpoints.
- * Deduplicates requests per predictionId, backs off over time, and pauses in background tabs.
+ * Deduplicates requests per prediction/generation id, backs off over time, and pauses in background tabs.
  */
 
 export type GenerationPollStatus = "pending" | "completed" | "failed"
 
 export type PollGenerationStatusOptions<T> = {
-  predictionId: string
+  generationId?: string
+  predictionId?: string
   statusEndpoint: string
   mapCompleted: (data: Record<string, unknown>) => T | null
   mapFailed: (data: Record<string, unknown>) => T
@@ -38,8 +39,24 @@ type SharedPollState<T> = {
 
 const sharedPolls = new Map<PollKey, SharedPollState<unknown>>()
 
-function buildPollKey(statusEndpoint: string, predictionId: string): PollKey {
-  return `${statusEndpoint}::${predictionId}`
+function buildPollKey(
+  statusEndpoint: string,
+  predictionId?: string,
+  generationId?: string,
+): PollKey {
+  return `${statusEndpoint}::${predictionId ?? ""}::${generationId ?? ""}`
+}
+
+function buildStatusUrl(
+  statusEndpoint: string,
+  predictionId?: string,
+  generationId?: string,
+): string {
+  const params = new URLSearchParams()
+  if (predictionId) params.set("predictionId", predictionId)
+  if (generationId) params.set("generationId", generationId)
+  const query = params.toString()
+  return query ? `${statusEndpoint}?${query}` : statusEndpoint
 }
 
 function isDocumentHidden(): boolean {
@@ -93,6 +110,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 
 async function runPollLoop<T>(options: PollGenerationStatusOptions<T>): Promise<T> {
   const {
+    generationId,
     predictionId,
     statusEndpoint,
     mapCompleted,
@@ -104,6 +122,10 @@ async function runPollLoop<T>(options: PollGenerationStatusOptions<T>): Promise<
     maxIntervalMs = DEFAULT_MAX_INTERVAL_MS,
     signal,
   } = options
+
+  if (!predictionId && !generationId) {
+    return mapFailed({ error: fetchErrorMessage })
+  }
 
   const abortSignal = signal ?? new AbortController().signal
   let intervalMs = initialIntervalMs
@@ -120,7 +142,7 @@ async function runPollLoop<T>(options: PollGenerationStatusOptions<T>): Promise<
 
     try {
       const response = await fetch(
-        `${statusEndpoint}?predictionId=${encodeURIComponent(predictionId)}`,
+        buildStatusUrl(statusEndpoint, predictionId, generationId),
         { cache: "no-store", signal: abortSignal },
       )
 
@@ -167,7 +189,7 @@ async function runPollLoop<T>(options: PollGenerationStatusOptions<T>): Promise<
 }
 
 function getOrCreateSharedPoll<T>(options: PollGenerationStatusOptions<T>): SharedPollState<T> {
-  const key = buildPollKey(options.statusEndpoint, options.predictionId)
+  const key = buildPollKey(options.statusEndpoint, options.predictionId, options.generationId)
   const existing = sharedPolls.get(key) as SharedPollState<T> | undefined
   if (existing) {
     return existing

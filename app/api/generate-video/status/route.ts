@@ -20,18 +20,54 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const predictionId = request.nextUrl.searchParams.get("predictionId")
-    if (!predictionId) {
-      return NextResponse.json({ error: "predictionId is required" }, { status: 400 })
+    const predictionId = request.nextUrl.searchParams.get("predictionId")?.trim() || null
+    const generationId = request.nextUrl.searchParams.get("generationId")?.trim() || null
+    if (!predictionId && !generationId) {
+      return NextResponse.json({ error: "predictionId or generationId is required" }, { status: 400 })
     }
 
-    const { data: generation, error } = await supabase
-      .from("generations")
-      .select("id, status, supabase_storage_path, error_message")
-      .eq("replicate_prediction_id", predictionId)
-      .eq("user_id", user.id)
-      .eq("type", "video")
-      .maybeSingle()
+    const statusColumns = "id, status, supabase_storage_path, error_message"
+    let generation: {
+      id: string
+      status: string | null
+      supabase_storage_path: string | null
+      error_message: string | null
+    } | null = null
+    let error: { message?: string } | null = null
+
+    if (generationId) {
+      const byId = await supabase
+        .from("generations")
+        .select(statusColumns)
+        .eq("id", generationId)
+        .eq("user_id", user.id)
+        .eq("type", "video")
+        .maybeSingle()
+      error = byId.error
+      generation = byId.data
+    } else if (predictionId) {
+      const byReplicate = await supabase
+        .from("generations")
+        .select(statusColumns)
+        .eq("replicate_prediction_id", predictionId)
+        .eq("user_id", user.id)
+        .eq("type", "video")
+        .maybeSingle()
+      error = byReplicate.error
+      generation = byReplicate.data
+
+      if (!error && !generation) {
+        const byFal = await supabase
+          .from("generations")
+          .select(statusColumns)
+          .eq("fal_request_id", predictionId)
+          .eq("user_id", user.id)
+          .eq("type", "video")
+          .maybeSingle()
+        error = byFal.error
+        generation = byFal.data
+      }
+    }
 
     if (error) {
       console.error("[generate-video/status]", error)

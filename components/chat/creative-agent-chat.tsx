@@ -108,6 +108,11 @@ import {
   AGENT_COMPOSER_SEED_EVENT,
   consumeAgentComposerSeed,
 } from "@/lib/chat/composer-seed"
+import {
+  CHAT_ADD_ASSET_EVENT,
+  CHAT_REMOVE_ASSET_EVENT,
+  type ChatAddAssetDetail,
+} from "@/lib/chat/chat-add-asset"
 import { consumePendingTemplateHandoff } from "@/lib/templates/handoff"
 import { buildActivateSkillPrompt, buildSkillSlashCommands, normalizeLeadingSkillSlashPrompt } from "@/lib/chat/skills/slash-skill-prompt"
 import type { SkillPickerEntry } from "@/lib/chat/skills/catalog"
@@ -843,10 +848,17 @@ export function CreativeAgentChat({
       return
     }
 
+    // A newly created sidebar thread reports its id back through the parent.
+    // That must not wipe the in-flight user message and stream.
+    if ((initialMessages?.length ?? 0) === 0 && messages.length > 0) {
+      syncedInitialThreadIdRef.current = initialThreadId
+      return
+    }
+
     syncedInitialThreadIdRef.current = initialThreadId
     templateHandoffCompletedRef.current = false
     setMessages(initialMessages)
-  }, [enablePersistence, initialMessages, initialThreadId, setMessages])
+  }, [enablePersistence, initialMessages, initialThreadId, messages.length, setMessages])
 
   React.useEffect(() => {
     const handleOpenSkillPicker = () => {
@@ -1223,6 +1235,9 @@ export function CreativeAgentChat({
 
         threadIdRef.current = nextThreadId
         setThreadId(nextThreadId)
+        // Parent `initialThreadId` updates after create. Mark this id as already
+        // synced so the hydrate effect does not replace live messages with [].
+        syncedInitialThreadIdRef.current = nextThreadId
         onThreadIdChange?.(nextThreadId)
         storeChatBootstrapId(nextThreadId, resolvedUiChatBootstrapId)
 
@@ -1265,6 +1280,32 @@ export function CreativeAgentChat({
     window.addEventListener(AGENT_COMPOSER_SEED_EVENT, onSeed as EventListener)
     return () => {
       window.removeEventListener(AGENT_COMPOSER_SEED_EVENT, onSeed as EventListener)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    const onAdd = (event: Event) => {
+      const detail = (event as CustomEvent<ChatAddAssetDetail>).detail
+      const url = typeof detail?.url === "string" ? detail.url.trim() : ""
+      const type = detail?.type
+      if (!url || (type !== "image" && type !== "video" && type !== "audio")) return
+      setAttachedRefs((prev) => {
+        if (prev.some((ref) => ref.assetUrl === url)) return prev
+        return [...prev, attachedRefFromDroppedMediaUrl(url, type)]
+      })
+    }
+
+    const onRemove = (event: Event) => {
+      const url = (event as CustomEvent<{ url?: string }>).detail?.url?.trim()
+      if (!url) return
+      setAttachedRefs((prev) => prev.filter((ref) => ref.assetUrl !== url))
+    }
+
+    window.addEventListener(CHAT_ADD_ASSET_EVENT, onAdd as EventListener)
+    window.addEventListener(CHAT_REMOVE_ASSET_EVENT, onRemove as EventListener)
+    return () => {
+      window.removeEventListener(CHAT_ADD_ASSET_EVENT, onAdd as EventListener)
+      window.removeEventListener(CHAT_REMOVE_ASSET_EVENT, onRemove as EventListener)
     }
   }, [])
 
