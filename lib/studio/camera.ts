@@ -7,6 +7,38 @@ export interface WorldRect {
   height: number
 }
 
+export function screenToWorld(
+  clientX: number,
+  clientY: number,
+  container: DOMRect,
+  viewport: StudioViewport,
+): { x: number; y: number } {
+  const zoom = Math.max(viewport.zoom, 0.01)
+  return {
+    x: (clientX - container.left - viewport.x) / zoom,
+    y: (clientY - container.top - viewport.y) / zoom,
+  }
+}
+
+export function viewportCenterWorld(
+  container: { width: number; height: number },
+  viewport: StudioViewport,
+  inset: { top: number; bottom: number; left?: number; right?: number } = {
+    top: 112,
+    bottom: 200,
+  },
+): { x: number; y: number } {
+  const left = inset.left ?? 0
+  const right = inset.right ?? 0
+  const viewWidth = Math.max(1, container.width - left - right)
+  const viewHeight = Math.max(1, container.height - inset.top - inset.bottom)
+  const zoom = Math.max(viewport.zoom, 0.01)
+  return {
+    x: (left + viewWidth / 2 - viewport.x) / zoom,
+    y: (inset.top + viewHeight / 2 - viewport.y) / zoom,
+  }
+}
+
 export function boundingRect(items: WorldRect[]): WorldRect | null {
   if (items.length === 0) return null
 

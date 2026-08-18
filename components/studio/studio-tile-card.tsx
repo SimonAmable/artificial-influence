@@ -31,6 +31,7 @@ interface StudioTileCardProps {
   onSelect: (tile: StudioTile) => void
   onMoveEnd?: (tile: StudioTile, next: { x: number; y: number }) => void
   onNaturalSize?: (tile: StudioTile, size: { width: number; height: number }) => void
+  onContextMenu?: (tile: StudioTile, event: React.MouseEvent<HTMLDivElement>) => void
   actions?: StudioTileActions
 }
 
@@ -51,7 +52,7 @@ function ActionButton({
       title={label}
       aria-label={label}
       className={cn(
-        "pointer-events-auto flex size-7 items-center justify-center rounded-md bg-black/70 text-white/90 shadow-sm backdrop-blur-sm transition-colors",
+        "pointer-events-auto flex size-5 items-center justify-center rounded-md bg-black/70 text-white/90 shadow-sm backdrop-blur-sm transition-colors",
         destructive ? "hover:bg-destructive hover:text-white" : "hover:bg-white/20",
       )}
       onPointerDown={(event) => {
@@ -76,6 +77,7 @@ export function StudioTileCard({
   onSelect,
   onMoveEnd,
   onNaturalSize,
+  onContextMenu,
   actions,
 }: StudioTileCardProps) {
   const dragRef = React.useRef<{
@@ -163,6 +165,11 @@ export function StudioTileCard({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onContextMenu?.(tile, event)
+      }}
       onDoubleClick={(event) => {
         event.stopPropagation()
         if (canAct) actions?.onOpen?.(tile)
@@ -227,7 +234,7 @@ export function StudioTileCard({
       {canAct ? (
         <div
           className={cn(
-            "pointer-events-none absolute z-20 flex flex-col gap-1",
+            "pointer-events-none absolute z-20 flex flex-col gap-0.5",
             "opacity-0 transition-opacity group-hover/tile:opacity-100 group-focus-within/tile:opacity-100",
             selected && "opacity-100",
           )}
@@ -239,28 +246,28 @@ export function StudioTileCard({
           }}
         >
           <ActionButton label="Full screen" onClick={() => actions?.onOpen?.(tile)}>
-            <ArrowsOutSimple className="size-3.5" />
+            <ArrowsOutSimple className="size-3" />
           </ActionButton>
           {actions?.onEdit && tile.kind === "image" ? (
             <ActionButton label="Edit image" onClick={() => actions.onEdit?.(tile)}>
-              <PencilSimple className="size-3.5" />
+              <PencilSimple className="size-3" />
             </ActionButton>
           ) : null}
           <ActionButton label="Recreate" onClick={() => actions?.onRecreate?.(tile)}>
-            <ArrowsClockwise className="size-3.5" />
+            <ArrowsClockwise className="size-3" />
           </ActionButton>
           <ActionButton
             label={tile.kind === "video" ? "Copy video" : "Copy image"}
             onClick={() => actions?.onCopyImage?.(tile)}
           >
-            <Copy className="size-3.5" />
+            <Copy className="size-3" />
           </ActionButton>
           <ActionButton label="Download" onClick={() => actions?.onDownload?.(tile)}>
-            <DownloadSimple className="size-3.5" />
+            <DownloadSimple className="size-3" />
           </ActionButton>
           {tile.generationId || tile.id ? (
             <ActionButton label="Delete" destructive onClick={() => actions?.onDelete?.(tile)}>
-              <Trash className="size-3.5" />
+              <Trash className="size-3" />
             </ActionButton>
           ) : null}
         </div>

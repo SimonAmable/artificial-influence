@@ -1,6 +1,9 @@
 import type {
+  CreateStudioBoardItemInput,
   CreateStudioProjectInput,
+  StudioBoardItem,
   StudioProject,
+  UpdateStudioBoardItemInput,
   UpdateStudioProjectInput,
 } from "@/lib/studio/types"
 
@@ -55,6 +58,55 @@ export async function deleteStudioProjectClient(projectId: string): Promise<void
   })
   if (!response.ok) {
     throw new Error("Failed to delete studio project")
+  }
+}
+
+export async function fetchStudioBoardItems(projectId: string): Promise<StudioBoardItem[]> {
+  const response = await fetch(`/api/studio/projects/${projectId}/items`)
+  if (!response.ok) {
+    throw new Error("Failed to fetch studio board items")
+  }
+  return response.json()
+}
+
+export async function createStudioBoardItemsClient(
+  projectId: string,
+  items: CreateStudioBoardItemInput[],
+): Promise<StudioBoardItem[]> {
+  const response = await fetch(`/api/studio/projects/${projectId}/items`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  })
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string }
+    throw new Error(payload.error || "Failed to add media to the board")
+  }
+  return response.json()
+}
+
+export async function updateStudioBoardItemClient(
+  projectId: string,
+  itemId: string,
+  input: UpdateStudioBoardItemInput,
+): Promise<StudioBoardItem> {
+  const response = await fetch(`/api/studio/projects/${projectId}/items/${itemId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) {
+    throw new Error("Failed to update board item")
+  }
+  return response.json()
+}
+
+export async function deleteStudioBoardItemClient(projectId: string, itemId: string): Promise<void> {
+  const response = await fetch(`/api/studio/projects/${projectId}/items/${itemId}`, {
+    method: "DELETE",
+  })
+  if (!response.ok) {
+    throw new Error("Failed to delete board item")
   }
 }
 

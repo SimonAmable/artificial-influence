@@ -308,6 +308,41 @@ export function tileFromGeneration(generation: {
     width,
     height,
     createdAt: generation.created_at ?? new Date().toISOString(),
+    source: "generation",
+  }
+}
+
+export function tileFromBoardItem(item: {
+  id: string
+  url: string
+  kind?: string | null
+  prompt?: string | null
+  source?: string | null
+  x?: number | null
+  y?: number | null
+  width?: number | null
+  height?: number | null
+  created_at?: string | null
+}): StudioTile {
+  const kind = item.kind === "video" ? "video" : "image"
+  const size = tileSizeForAspectRatio(kind === "video" ? "16:9" : "1:1")
+  return {
+    id: item.id,
+    clientKey: item.id,
+    generationId: null,
+    url: item.url,
+    kind,
+    status: "completed",
+    prompt: item.prompt ?? null,
+    model: null,
+    aspectRatio: null,
+    referenceImageUrls: [],
+    x: typeof item.x === "number" ? item.x : 0,
+    y: typeof item.y === "number" ? item.y : 0,
+    width: typeof item.width === "number" && item.width > 0 ? item.width : size.width,
+    height: typeof item.height === "number" && item.height > 0 ? item.height : size.height,
+    createdAt: item.created_at ?? new Date().toISOString(),
+    source: "import",
   }
 }
 

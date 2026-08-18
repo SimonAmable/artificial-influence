@@ -20,7 +20,7 @@ import {
   type FullscreenMediaViewerAction,
 } from "@/components/shared/display/fullscreen-media-viewer"
 import { copyMediaToClipboard, downloadMediaFile } from "@/components/shared/display/media-viewer-utils"
-import { ArrowsClockwise, Copy, DotsThree, DownloadSimple, ImageSquare, PencilSimple, Trash } from "@phosphor-icons/react"
+import { ArrowsClockwise, Copy, DotsThree, DownloadSimple, FolderOpen, ImageSquare, PencilSimple, Plus, Trash, UploadSimple } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -31,6 +31,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import type { AudioUploadValue } from "@/components/shared/upload/audio-upload"
+import {
+  AssetSelectionModal,
+  type AssetSelectionPick,
+} from "@/components/shared/modals/asset-selection-modal"
+import { StudioBoardContextMenu, type StudioBoardMenuState } from "@/components/studio/studio-board-context-menu"
 import { useDefaultEnhancePrompt } from "@/hooks/use-default-enhance-prompt"
 import { useModels } from "@/hooks/use-models"
 import {
@@ -44,8 +49,12 @@ import { appendImageReferencesToFormData } from "@/lib/image/append-references-t
 import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
 import { appendStudioBoardFieldsToFormData } from "@/lib/studio/form-data"
 import {
+  fetchStudioBoardItems,
   fetchStudioProject,
+  createStudioBoardItemsClient,
+  deleteStudioBoardItemClient,
   updateGenerationStudioLayout,
+  updateStudioBoardItemClient,
   updateStudioProjectClient,
 } from "@/lib/studio/database"
 import {
@@ -53,6 +62,7 @@ import {
   findOpenPlacement,
   packStudioTiles,
   relayoutOriginStackedTiles,
+  tileFromBoardItem,
   tileFromGeneration,
   tileSizeForAspectRatio,
   tileSizeFromPixelRatio,
@@ -61,11 +71,12 @@ import { buildStudioVideoGenerationBody } from "@/lib/studio/build-video-generat
 import {
   animateViewport,
   boundingRect,
+  viewportCenterWorld,
   viewportToCenterRect,
   viewportToFitRect,
   viewportToResetZoom,
 } from "@/lib/studio/camera"
-import type { StudioProject, StudioTile, StudioViewport } from "@/lib/studio/types"
+import type { CreateStudioBoardItemInput, StudioBoardItemSource, StudioProject, StudioTile, StudioViewport } from "@/lib/studio/types"
 import {
   generateImageAndWait,
   isInsufficientCreditsError,
@@ -98,6 +109,17 @@ import { resolveVideoPricingQuote } from "@/lib/video-pricing"
 import type { Model, ModelInputValues, ParameterDefinition, StringParameterDefinition } from "@/lib/types/models"
 import { useAIChatDockInsetRight } from "@/components/ai-chat"
 import { dispatchChatAddAsset, dispatchChatRemoveAsset } from "@/lib/chat/chat-add-asset"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import {
+  collectClipboardMediaFiles,
+  defaultImportTileSize,
+  isStudioMediaFile,
+  maxBytesForStudioMedia,
+  measureMediaPixelSize,
+  originForCenteredTile,
+  rowPlacementForIndex,
+  studioMediaKind,
+} from "@/lib/studio/media-import"
 
 function createClientRequestId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -135,21 +157,6 @@ const STUDIO_CHROME =
 
 function tileMatchesSelection(tile: StudioTile, selectedIds: string[]) {
   return selectedIds.includes(tile.id) || Boolean(tile.generationId && selectedIds.includes(tile.generationId))
-}
-
-function measureImagePixelSize(url: string): Promise<{ width: number; height: number } | null> {
-  return new Promise((resolve) => {
-    const image = new window.Image()
-    image.onload = () => {
-      if (!image.naturalWidth || !image.naturalHeight) {
-        resolve(null)
-        return
-      }
-      resolve({ width: image.naturalWidth, height: image.naturalHeight })
-    }
-    image.onerror = () => resolve(null)
-    image.src = url
-  })
 }
 
 interface StudioBoardPageProps {
@@ -203,6 +210,8 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const [videoMultiShotShots, setVideoMultiShotShots] = React.useState<MultiShotItem[]>([])
   const [videoReferenceImages, setVideoReferenceImages] = React.useState<ImageUpload[]>([])
   const [videoAttachedRefs, setVideoAttachedRefs] = React.useState<AttachedRef[]>([])
+  const [libraryOpen, setLibraryOpen] = React.useState(false)
+  const [boardMenu, setBoardMenu] = React.useState<StudioBoardMenuState | null>(null)
   const enhanceSeededRef = React.useRef(false)
   const prevVideoModelIdForParamsRef = React.useRef<string | null>(null)
   const boardOpenedAtRef = React.useRef(Date.now() - 5000)
@@ -215,7 +224,10 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   const tilesRef = React.useRef(tiles)
   const editorTileRef = React.useRef<StudioTile | null>(null)
   const hasLoadedRef = React.useRef(false)
+  const didFitOnOpenRef = React.useRef(false)
   const previousStudioModeRef = React.useRef(false)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const placePointRef = React.useRef<{ x: number; y: number } | null>(null)
 
   React.useEffect(() => {
     viewportRef.current = viewport
@@ -459,32 +471,42 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   }, [applyVideoRefsFromTiles, selectedTiles, studioMode])
 
   const fetchProjectTiles = React.useCallback(async () => {
-    const response = await fetch(
-      `/api/generations?studioProjectId=${encodeURIComponent(projectId)}&includePending=true&excludeFailed=false&limit=100`,
-    )
-    if (!response.ok) {
-      throw new Error("Failed to load studio generations")
-    }
-    const payload = (await response.json()) as {
-      generations: Array<Record<string, unknown>>
-    }
-    return (payload.generations ?? [])
+    const [generationPayload, boardItems] = await Promise.all([
+      fetch(
+        `/api/generations?studioProjectId=${encodeURIComponent(projectId)}&includePending=true&excludeFailed=false&limit=100`,
+      ).then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Failed to load studio generations")
+        }
+        return response.json() as Promise<{ generations: Array<Record<string, unknown>> }>
+      }),
+      fetchStudioBoardItems(projectId).catch(() => []),
+    ])
+
+    const generationTiles = (generationPayload.generations ?? [])
       .filter((generation) => generation.type !== "audio")
       .map(mapStudioGenerationRow)
+    const importTiles = boardItems.map((item) => tileFromBoardItem(item))
+    return [...importTiles, ...generationTiles]
   }, [projectId])
 
   const loadBoard = React.useCallback(async () => {
     try {
       setLoading(true)
       setLoadError(null)
+      didFitOnOpenRef.current = false
+      hasLoadedRef.current = false
       const loaded = await fetchStudioProject(projectId)
       setProject(loaded)
       setProjectName(loaded.name)
+      const loadedTiles = await fetchProjectTiles()
       if (!hasLoadedRef.current) {
-        setViewport(loaded.viewport)
         hasLoadedRef.current = true
+        if (loadedTiles.length === 0) {
+          setViewport(loaded.viewport)
+        }
       }
-      setTiles(await fetchProjectTiles())
+      setTiles(loadedTiles)
     } catch (error) {
       console.error(error)
       setLoadError(error instanceof Error ? error.message : "Could not load studio project")
@@ -523,6 +545,35 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
     [chatDockInsetRight, studioMode],
   )
 
+  React.useLayoutEffect(() => {
+    if (loading || didFitOnOpenRef.current) return
+    if (tiles.length === 0) {
+      didFitOnOpenRef.current = true
+      return
+    }
+
+    const applyFit = () => {
+      if (didFitOnOpenRef.current) return true
+      const size = canvasRef.current?.getSize()
+      const bounds = boundingRect(tiles)
+      if (!bounds || !size || size.width < 8 || size.height < 8) return false
+      didFitOnOpenRef.current = true
+      const next = viewportToFitRect(bounds, size, cameraInset)
+      skipViewportPersistRef.current = true
+      setViewport(next)
+      viewportRef.current = next
+      skipViewportPersistRef.current = false
+      void updateStudioProjectClient(projectId, { viewport: next }).catch(() => undefined)
+      return true
+    }
+
+    if (applyFit()) return
+    const frame = requestAnimationFrame(() => {
+      applyFit()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [cameraInset, loading, projectId, tiles])
+
   const flyToViewport = React.useCallback(
     (to: StudioViewport) => {
       const from = viewportRef.current
@@ -547,6 +598,40 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
     [cameraInset, flyToViewport],
   )
 
+  const persistTileLayout = React.useCallback(
+    (tile: StudioTile, next: { x: number; y: number; width: number; height: number }) => {
+      if (tile.generationId) {
+        void updateGenerationStudioLayout({
+          generationId: tile.generationId,
+          x: next.x,
+          y: next.y,
+          width: next.width,
+          height: next.height,
+          projectId,
+        }).catch(() => undefined)
+        return
+      }
+      if (tile.source === "import") {
+        if (tile.status !== "completed") return
+        void updateStudioBoardItemClient(projectId, tile.id, next).catch(() => undefined)
+      }
+    },
+    [projectId],
+  )
+
+  const getPlacementPoint = React.useCallback(
+    (explicit?: { x: number; y: number } | null) => {
+      if (explicit) return explicit
+      if (placePointRef.current) return placePointRef.current
+      const fromPointer = canvasRef.current?.getLastPointerWorld()
+      if (fromPointer) return fromPointer
+      const size = canvasRef.current?.getSize()
+      if (!size || size.width < 8 || size.height < 8) return { x: 0, y: 0 }
+      return viewportCenterWorld(size, viewportRef.current, cameraInset)
+    },
+    [cameraInset],
+  )
+
   const mergeServerTiles = React.useCallback(
     (serverTiles: StudioTile[], options?: { panToNew?: boolean }) => {
       const previousIds = new Set(tilesRef.current.map((tile) => tile.generationId ?? tile.id))
@@ -555,15 +640,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       })
 
       for (const tile of moved) {
-        if (!tile.generationId) continue
-        void updateGenerationStudioLayout({
-          generationId: tile.generationId,
-          x: tile.x,
-          y: tile.y,
-          width: tile.width,
-          height: tile.height,
-          projectId,
-        }).catch(() => undefined)
+        persistTileLayout(tile, { x: tile.x, y: tile.y, width: tile.width, height: tile.height })
       }
 
       setTiles((prev) => {
@@ -598,7 +675,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         panToTiles(newcomers)
       }
     },
-    [panToTiles, projectId],
+    [panToTiles, persistTileLayout],
   )
 
   const inferUnattachedAgentGenerations = React.useCallback(async () => {
@@ -702,7 +779,6 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
     })
     setTiles(organized)
     for (const tile of organized) {
-      if (!tile.generationId) continue
       const previous = tiles.find((item) => item.id === tile.id)
       if (
         previous &&
@@ -711,21 +787,18 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       ) {
         continue
       }
-      void updateGenerationStudioLayout({
-        generationId: tile.generationId,
+      persistTileLayout(tile, {
         x: tile.x,
         y: tile.y,
         width: tile.width,
         height: tile.height,
-      }).catch((error) => {
-        console.error("Failed to persist organized tile", error)
       })
     }
     const bounds = boundingRect(organized)
     if (bounds && size && size.width >= 8 && size.height >= 8) {
       flyToViewport(viewportToFitRect(bounds, size, cameraInset))
     }
-  }, [cameraInset, flyToViewport, tiles])
+  }, [cameraInset, flyToViewport, persistTileLayout, tiles])
 
   const handleRename = React.useCallback(async () => {
     const nextName = projectName.trim() || "Untitled Studio"
@@ -781,7 +854,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       setEditorTile(null)
       if (!imageUrl || !source) return
 
-      const pixelSize = await measureImagePixelSize(imageUrl)
+      const pixelSize = await measureMediaPixelSize(imageUrl, "image")
       const size = pixelSize
         ? tileSizeFromPixelRatio(pixelSize.width / pixelSize.height)
         : { width: source.width, height: source.height }
@@ -919,11 +992,33 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
   }, [])
 
   const handleDeleteTile = React.useCallback(async (tile: StudioTile) => {
+    const removeLocal = () => {
+      setTiles((prev) => prev.filter((item) => item.clientKey !== tile.clientKey && item.id !== tile.id))
+      setSelectedTileIds((ids) => ids.filter((id) => id !== tile.id && id !== tile.generationId))
+      if (fullscreenTile?.id === tile.id) setFullscreenTile(null)
+      if (tile.url) {
+        setReferenceImages((current) => current.filter((image) => image.url !== tile.url))
+      }
+    }
+
+    if (tile.source === "import") {
+      if (tile.status === "pending") {
+        removeLocal()
+        return
+      }
+      try {
+        await deleteStudioBoardItemClient(projectId, tile.id)
+        removeLocal()
+        toast.success(tile.kind === "video" ? "Video removed" : "Image removed")
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to delete")
+      }
+      return
+    }
+
     const generationId = tile.generationId ?? (tile.id.includes("-") ? null : tile.id)
     if (!generationId) {
-      setTiles((prev) => prev.filter((item) => item.clientKey !== tile.clientKey))
-      setSelectedTileIds((ids) => ids.filter((id) => id !== tile.id))
-      if (fullscreenTile?.id === tile.id) setFullscreenTile(null)
+      removeLocal()
       return
     }
     try {
@@ -932,17 +1027,12 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       if (!response.ok) {
         throw new Error(data.error || data.message || "Failed to delete image")
       }
-      setTiles((prev) => prev.filter((item) => item.id !== tile.id && item.generationId !== generationId))
-      setSelectedTileIds((ids) => ids.filter((id) => id !== tile.id))
-      if (tile.url) {
-        setReferenceImages((current) => current.filter((image) => image.url !== tile.url))
-      }
-      if (fullscreenTile?.id === tile.id) setFullscreenTile(null)
+      removeLocal()
       toast.success(tile.kind === "video" ? "Video deleted" : "Image deleted")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete")
     }
-  }, [fullscreenTile?.id])
+  }, [fullscreenTile?.id, projectId])
 
   const tileActions = React.useMemo(
     () => ({
@@ -963,6 +1053,251 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
     ],
   )
 
+  const addImportedMedia = React.useCallback(
+    async (
+      entries: Array<{
+        url: string
+        kind: "image" | "video"
+        source: StudioBoardItemSource
+        sourceId?: string | null
+        prompt?: string | null
+      }>,
+      world?: { x: number; y: number } | null,
+    ) => {
+      if (entries.length === 0) return
+      const originPoint = getPlacementPoint(world)
+      const inputs: CreateStudioBoardItemInput[] = []
+
+      for (const [index, entry] of entries.entries()) {
+        const measured = await measureMediaPixelSize(entry.url, entry.kind)
+        const size = measured
+          ? tileSizeFromPixelRatio(measured.width / measured.height)
+          : defaultImportTileSize(entry.kind)
+        const centered = originForCenteredTile(originPoint, size)
+        const placement = rowPlacementForIndex(centered, index, size.width)
+        inputs.push({
+          kind: entry.kind,
+          url: entry.url,
+          source: entry.source,
+          source_id: entry.sourceId ?? null,
+          prompt: entry.prompt ?? null,
+          x: placement.x,
+          y: placement.y,
+          width: size.width,
+          height: size.height,
+        })
+      }
+
+      try {
+        const created = await createStudioBoardItemsClient(projectId, inputs)
+        const nextTiles = created.map((item) => tileFromBoardItem(item))
+        setTiles((prev) => [...nextTiles, ...prev])
+        tilesRef.current = [...nextTiles, ...tilesRef.current]
+        panToTiles(nextTiles)
+        if (created[0]?.url) {
+          void updateStudioProjectClient(projectId, { thumbnail_url: created[0].url }).catch(() => undefined)
+        }
+        toast.success(created.length === 1 ? "Added to board" : `Added ${created.length} items`)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not add media to the board")
+      } finally {
+        placePointRef.current = null
+      }
+    },
+    [getPlacementPoint, panToTiles, projectId],
+  )
+
+  const addFilesToBoard = React.useCallback(
+    async (
+      files: File[],
+      world?: { x: number; y: number } | null,
+      source: StudioBoardItemSource = "upload",
+    ) => {
+      const mediaFiles = files.filter(isStudioMediaFile)
+      if (mediaFiles.length === 0) {
+        if (files.length > 0) {
+          toast.error("Only images and videos can be added to the board")
+        }
+        return
+      }
+
+      const originPoint = getPlacementPoint(world)
+      const pendingTiles: StudioTile[] = mediaFiles.map((file, index) => {
+        const kind = studioMediaKind(file) ?? "image"
+        const size = defaultImportTileSize(kind)
+        const centered = originForCenteredTile(originPoint, size)
+        const placement = rowPlacementForIndex(centered, index, size.width)
+        const id = createClientRequestId()
+        return {
+          id,
+          clientKey: id,
+          generationId: null,
+          url: null,
+          kind,
+          status: "pending",
+          prompt: "Uploading…",
+          model: null,
+          aspectRatio: null,
+          referenceImageUrls: [],
+          x: placement.x,
+          y: placement.y,
+          width: size.width,
+          height: size.height,
+          createdAt: new Date().toISOString(),
+          source: "import",
+        }
+      })
+
+      setTiles((prev) => [...pendingTiles, ...prev])
+      tilesRef.current = [...pendingTiles, ...tilesRef.current]
+      panToTiles(pendingTiles)
+
+      const inputs: CreateStudioBoardItemInput[] = []
+
+      for (const [index, file] of mediaFiles.entries()) {
+        const pending = pendingTiles[index]
+        const kind = studioMediaKind(file) ?? "image"
+        const uploaded = await uploadFileToSupabase(file, "studio-board", {
+          maxSizeBytes: maxBytesForStudioMedia(kind),
+        })
+        if (!uploaded || !pending) {
+          setTiles((prev) => prev.filter((tile) => tile.clientKey !== pending?.clientKey))
+          continue
+        }
+        const measured = await measureMediaPixelSize(uploaded.url, kind)
+        const size = measured
+          ? tileSizeFromPixelRatio(measured.width / measured.height)
+          : { width: pending.width, height: pending.height }
+        inputs.push({
+          kind,
+          url: uploaded.url,
+          source,
+          prompt: file.name || null,
+          x: pending.x,
+          y: pending.y,
+          width: size.width,
+          height: size.height,
+        })
+      }
+
+      if (inputs.length === 0) {
+        placePointRef.current = null
+        return
+      }
+
+      try {
+        const created = await createStudioBoardItemsClient(projectId, inputs)
+        const nextTiles = created.map((item) => tileFromBoardItem(item))
+        const pendingKeys = new Set(pendingTiles.map((tile) => tile.clientKey))
+        setTiles((prev) => [...nextTiles, ...prev.filter((tile) => !pendingKeys.has(tile.clientKey))])
+        tilesRef.current = [
+          ...nextTiles,
+          ...tilesRef.current.filter((tile) => !pendingKeys.has(tile.clientKey)),
+        ]
+        panToTiles(nextTiles)
+        if (created[0]?.url) {
+          void updateStudioProjectClient(projectId, { thumbnail_url: created[0].url }).catch(() => undefined)
+        }
+        toast.success(created.length === 1 ? "Added to board" : `Added ${created.length} items`)
+      } catch (error) {
+        const pendingKeys = new Set(pendingTiles.map((tile) => tile.clientKey))
+        setTiles((prev) => prev.filter((tile) => !pendingKeys.has(tile.clientKey)))
+        toast.error(error instanceof Error ? error.message : "Could not add media to the board")
+      } finally {
+        placePointRef.current = null
+      }
+    },
+    [getPlacementPoint, panToTiles, projectId],
+  )
+
+  const openFilePicker = React.useCallback(
+    (world?: { x: number; y: number } | null) => {
+      placePointRef.current = world ?? getPlacementPoint()
+      fileInputRef.current?.click()
+    },
+    [getPlacementPoint],
+  )
+
+  const openLibrary = React.useCallback(
+    (world?: { x: number; y: number } | null) => {
+      placePointRef.current = world ?? getPlacementPoint()
+      setLibraryOpen(true)
+    },
+    [getPlacementPoint],
+  )
+
+  const handleLibrarySelect = React.useCallback(
+    (pick: AssetSelectionPick) => {
+      if (pick.assetType === "audio") {
+        toast.error("Audio can't be added to the board")
+        return
+      }
+      const source: StudioBoardItemSource =
+        pick.source === "history" ? "history" : pick.source === "upload" ? "upload" : "asset"
+      setLibraryOpen(false)
+      void addImportedMedia(
+        [
+          {
+            url: pick.url,
+            kind: pick.assetType === "video" ? "video" : "image",
+            source,
+            sourceId: pick.id ?? null,
+            prompt: pick.title ?? null,
+          },
+        ],
+        placePointRef.current,
+      )
+    },
+    [addImportedMedia],
+  )
+
+  const handlePasteToBoard = React.useCallback(
+    async (world?: { x: number; y: number } | null, data?: DataTransfer | null) => {
+      const fromEvent = collectClipboardMediaFiles(data ?? null)
+      if (fromEvent.length > 0) {
+        void addFilesToBoard(fromEvent, world, "paste")
+        return
+      }
+
+      try {
+        if (navigator.clipboard && "read" in navigator.clipboard) {
+          const items = await navigator.clipboard.read()
+          const files: File[] = []
+          for (const item of items) {
+            for (const type of item.types) {
+              if (!type.startsWith("image/") && !type.startsWith("video/")) continue
+              const blob = await item.getType(type)
+              const ext = type.split("/")[1] || "png"
+              files.push(new File([blob], `paste.${ext}`, { type }))
+            }
+          }
+          if (files.length > 0) {
+            void addFilesToBoard(files, world, "paste")
+            return
+          }
+        }
+      } catch {
+        // Permissions or empty clipboard — fall through to the toast.
+      }
+
+      toast.error("Clipboard has no image or video")
+    },
+    [addFilesToBoard],
+  )
+
+  React.useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest("input, textarea, [contenteditable='true']")) return
+      const files = collectClipboardMediaFiles(event.clipboardData)
+      if (files.length === 0) return
+      event.preventDefault()
+      void addFilesToBoard(files, getPlacementPoint(), "paste")
+    }
+    window.addEventListener("paste", onPaste)
+    return () => window.removeEventListener("paste", onPaste)
+  }, [addFilesToBoard, getPlacementPoint])
+
   const handleSelectTile = React.useCallback((tile: StudioTile) => {
     const alreadySelected = tileMatchesSelection(tile, selectedTileIds)
     const nextSelected = alreadySelected
@@ -972,12 +1307,13 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
     setSelectedTileIds(nextSelected)
 
     if (tile.status !== "completed" || !tile.url) return
+    const tileUrl = tile.url
 
     if (studioMode === "agent") {
       if (alreadySelected) {
-        dispatchChatRemoveAsset(tile.url)
+        dispatchChatRemoveAsset(tileUrl)
       } else {
-        dispatchChatAddAsset(tile.url, tile.kind)
+        dispatchChatAddAsset(tileUrl, tile.kind)
       }
       return
     }
@@ -992,9 +1328,9 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
     if (selectedStudioTool) {
       if (alreadySelected) return
       setStudioToolSourceImage((source) => {
-        if (!source?.url) return { url: tile.url as string }
+        if (!source?.url) return { url: tileUrl }
         setStudioToolSceneImage((scene) => {
-          if (!scene?.url) return { url: tile.url as string }
+          if (!scene?.url) return { url: tileUrl }
           return scene
         })
         return source
@@ -1004,11 +1340,11 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
 
     setReferenceImages((current) => {
       if (alreadySelected) {
-        return current.filter((image) => image.url !== tile.url)
+        return current.filter((image) => image.url !== tileUrl)
       }
-      return current.some((image) => image.url === tile.url)
+      return current.some((image) => image.url === tileUrl)
         ? current
-        : [...current, { url: tile.url }]
+        : [...current, { url: tileUrl }]
     })
   }, [applyVideoRefsFromTiles, selectedStudioTool, selectedTileIds, studioMode])
 
@@ -1034,18 +1370,14 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
           item.id === tile.id ? { ...item, x: next.x, y: next.y } : item,
         ),
       )
-      if (!tile.generationId) return
-      void updateGenerationStudioLayout({
-        generationId: tile.generationId,
+      persistTileLayout(tile, {
         x: next.x,
         y: next.y,
         width: tile.width,
         height: tile.height,
-      }).catch((error) => {
-        console.error("Failed to persist tile position", error)
       })
     },
-    [],
+    [persistTileLayout],
   )
 
   const handleNaturalSize = React.useCallback((tile: StudioTile, pixels: { width: number; height: number }) => {
@@ -1057,15 +1389,13 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         item.id === tile.id ? { ...item, width: next.width, height: next.height } : item,
       ),
     )
-    if (!tile.generationId) return
-    void updateGenerationStudioLayout({
-      generationId: tile.generationId,
+    persistTileLayout(tile, {
       x: tile.x,
       y: tile.y,
       width: next.width,
       height: next.height,
-    }).catch(() => undefined)
-  }, [])
+    })
+  }, [persistTileLayout])
 
   const handleGenerate = React.useCallback(
     async (promptOverride?: string, inputSnapshot?: InfluencerInputSnapshot) => {
@@ -1324,7 +1654,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         const message =
           error instanceof Error ? error.message : "Image generation failed"
         if (isInsufficientCreditsError(error) || isInsufficientCreditsMessage(message)) {
-          showCreditsUpsellToast(message)
+          showCreditsUpsellToast({ message })
         } else if (!tryShowContentModerationToast(message)) {
           toast.error(toUserFacingGenerationError(message))
         }
@@ -1512,7 +1842,7 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       )
       const message = error instanceof Error ? error.message : "Video generation failed"
       if (isInsufficientCreditsError(error) || isInsufficientCreditsMessage(message)) {
-        showCreditsUpsellToast(message)
+        showCreditsUpsellToast({ message })
       } else if (!tryShowContentModerationToast(message)) {
         toast.error(toUserFacingGenerationError(message))
       }
@@ -1603,6 +1933,29 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className={STUDIO_CHROME}
+                aria-label="Add to board"
+              >
+                <Plus className="size-5" weight="bold" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-auto min-w-40">
+              <DropdownMenuItem onSelect={() => openFilePicker()}>
+                <UploadSimple className="size-4" />
+                Upload
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => openLibrary()}>
+                <FolderOpen className="size-4" />
+                From library
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -1611,6 +1964,17 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         viewport={viewport}
         onViewportChange={persistViewport}
         onBackgroundClick={handleDeselect}
+        onBackgroundContextMenu={(_event, world) => {
+          setBoardMenu({
+            type: "board",
+            screenX: _event.clientX,
+            screenY: _event.clientY,
+            world,
+          })
+        }}
+        onFilesDrop={(files, world) => {
+          void addFilesToBoard(files, world, "upload")
+        }}
         className="absolute inset-0"
       >
         {tiles.map((tile) => (
@@ -1627,6 +1991,14 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
             onSelect={handleSelectTile}
             onMoveEnd={handleMoveEnd}
             onNaturalSize={handleNaturalSize}
+            onContextMenu={(nextTile, event) => {
+              setBoardMenu({
+                type: "tile",
+                screenX: event.clientX,
+                screenY: event.clientY,
+                tile: nextTile,
+              })
+            }}
             actions={tileActions}
           />
         ))}
@@ -1634,12 +2006,36 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
 
       {tiles.length === 0 ? (
         <div className="pointer-events-none absolute inset-x-0 top-13 bottom-36 z-10 flex items-center justify-center px-6">
-          <p className="max-w-sm text-center text-sm text-muted-foreground">
-            Generate images, videos, or use the agent — they land on this board.
-            <span className="mt-1 block text-xs">
-              Click images to add them as references. Click the canvas to clear.
-            </span>
-          </p>
+          <div className="flex max-w-sm flex-col items-center gap-3 text-center">
+            <p className="text-sm text-muted-foreground">
+              Generate images, videos, or use the agent — they land on this board.
+              <span className="mt-1 block text-xs">
+                Drop files, paste, or add from your library. Click tiles to use them as references.
+              </span>
+            </p>
+            <div className="pointer-events-auto flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={STUDIO_CHROME}
+                onClick={() => openFilePicker()}
+              >
+                <UploadSimple className="size-4" />
+                Upload
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={STUDIO_CHROME}
+                onClick={() => openLibrary()}
+              >
+                <FolderOpen className="size-4" />
+                From library
+              </Button>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -1803,21 +2199,22 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
                 label: "Use as Reference",
                 icon: <ImageSquare className="size-4" />,
                 onClick: () => {
-                  if (tile.url) {
+                  const mediaUrl = tile.url
+                  if (mediaUrl) {
                     setSelectedTileIds((ids) => (ids.includes(tile.id) ? ids : [...ids, tile.id]))
                     if (studioMode === "video") {
-                      setVideoInputImage({ url: tile.url })
+                      setVideoInputImage({ url: mediaUrl })
                     } else if (selectedStudioTool) {
                       setStudioToolSourceImage((source) => {
-                        if (!source?.url) return { url: tile.url as string }
-                        setStudioToolSceneImage((scene) => scene ?? { url: tile.url as string })
+                        if (!source?.url) return { url: mediaUrl }
+                        setStudioToolSceneImage((scene) => scene ?? { url: mediaUrl })
                         return source
                       })
                     } else {
                       setReferenceImages((current) =>
-                        current.some((image) => image.url === tile.url)
+                        current.some((image) => image.url === mediaUrl)
                           ? current
-                          : [...current, { url: tile.url }],
+                          : [...current, { url: mediaUrl }],
                       )
                     }
                   }
@@ -1871,6 +2268,50 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
           }}
         />
       ) : null}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const files = Array.from(event.currentTarget.files ?? [])
+          event.currentTarget.value = ""
+          if (files.length === 0) return
+          void addFilesToBoard(files, placePointRef.current, "upload")
+        }}
+      />
+
+      <AssetSelectionModal
+        open={libraryOpen}
+        onOpenChange={setLibraryOpen}
+        onSelect={handleLibrarySelect}
+        allowedAssetTypes={["image", "video"]}
+        defaultTab="assets"
+      />
+
+      <StudioBoardContextMenu
+        menu={boardMenu}
+        onClose={() => setBoardMenu(null)}
+        onUpload={() => openFilePicker(boardMenu?.type === "board" ? boardMenu.world : null)}
+        onAddFromLibrary={() => openLibrary(boardMenu?.type === "board" ? boardMenu.world : null)}
+        onPaste={() => {
+          void handlePasteToBoard(boardMenu?.type === "board" ? boardMenu.world : null)
+        }}
+        onOpenTile={handleOpenTile}
+        onEditTile={handleEditTile}
+        onRecreateTile={handleRecreateTile}
+        onCopyTile={(tile) => {
+          void handleCopyImage(tile)
+        }}
+        onDownloadTile={(tile) => {
+          void handleDownloadTile(tile)
+        }}
+        onDeleteTile={(tile) => {
+          void handleDeleteTile(tile)
+        }}
+      />
     </div>
   )
 }

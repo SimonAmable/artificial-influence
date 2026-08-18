@@ -22,6 +22,45 @@ export interface StudioBoardFields {
   studio_height: number
 }
 
+export type StudioBoardItemSource = "upload" | "asset" | "history" | "paste"
+
+export interface StudioBoardItem {
+  id: string
+  studio_project_id: string
+  user_id: string
+  kind: "image" | "video"
+  url: string
+  source: StudioBoardItemSource
+  source_id: string | null
+  prompt: string | null
+  x: number
+  y: number
+  width: number
+  height: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateStudioBoardItemInput {
+  kind: "image" | "video"
+  url: string
+  source?: StudioBoardItemSource
+  source_id?: string | null
+  prompt?: string | null
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface UpdateStudioBoardItemInput {
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  prompt?: string | null
+}
+
 export interface StudioTile {
   id: string
   clientKey: string
@@ -38,6 +77,7 @@ export interface StudioTile {
   width: number
   height: number
   createdAt: string
+  source?: "generation" | "import"
 }
 
 export interface CreateStudioProjectInput {
