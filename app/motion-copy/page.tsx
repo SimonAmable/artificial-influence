@@ -17,6 +17,16 @@ import { generateVideoAndWait } from "@/lib/generate-video-client"
 import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
 import { resolveReferenceVideoForGeneration } from "@/lib/video/resolve-reference-for-generation"
 import { getVideoDurationSeconds } from "@/lib/video-editor/media-parser"
+import { MotionCopyFaceLockControl } from "@/components/tools/motion-copy/motion-copy-face-lock-control"
+import {
+  AssetSelectionModal,
+  type AssetSelectionPick,
+} from "@/components/shared/modals/asset-selection-modal"
+import {
+  isFaceLockActive,
+  parseFaceLockMode,
+  type FaceLockMode,
+} from "@/lib/motion-copy/face-lock"
 
 const MOTION_COPY_MODEL = 'kwaivgi/kling-v3-motion-control' as const
 
@@ -33,6 +43,9 @@ export default function MotionCopyPage() {
   const [inputImage, setInputImage] = React.useState<ImageUpload | null>(null)
   const [inputVideo, setInputVideo] = React.useState<ImageUpload | null>(null)
   const [characterOrientation, setCharacterOrientation] = React.useState<string>("video")
+  const [faceLockMode, setFaceLockMode] = React.useState<FaceLockMode>("off")
+  const [faceLockCustomImage, setFaceLockCustomImage] = React.useState<ImageUpload | null>(null)
+  const [faceLockAssetPickerOpen, setFaceLockAssetPickerOpen] = React.useState(false)
   const [prompt, setPrompt] = React.useState("")
   const [generatedVideos, setGeneratedVideos] = React.useState<string[]>([])
   const [isGenerating, setIsGenerating] = React.useState(false)
@@ -134,6 +147,19 @@ export default function MotionCopyPage() {
         return
       }
 
+      if (isFaceLockActive(faceLockMode)) {
+        if (characterOrientation !== "video") {
+          setError("Face lock requires video orientation.")
+          setIsGenerating(false)
+          return
+        }
+        if (faceLockMode === "custom" && !faceLockCustomImage?.url) {
+          setError("Choose a custom face image for face lock.")
+          setIsGenerating(false)
+          return
+        }
+      }
+
       let imagePublicUrl = resolvedImage.url
       let imageStoragePath: string | undefined
       if (resolvedImage.file) {
@@ -162,6 +188,20 @@ export default function MotionCopyPage() {
 
       console.log("Sending motion copy request with image and video URLs")
 
+      let faceLockImagePublicUrl: string | undefined
+      if (faceLockMode === "custom" && faceLockCustomImage?.url) {
+        const resolvedFace = await resolveReferenceImageForGeneration(faceLockCustomImage)
+        if (resolvedFace?.file) {
+          const uploadedFace = await uploadFileToSupabase(resolvedFace.file, "motion-copy-face-lock")
+          if (!uploadedFace) {
+            throw new Error("Failed to upload face lock image")
+          }
+          faceLockImagePublicUrl = uploadedFace.url
+        } else if (resolvedFace?.url) {
+          faceLockImagePublicUrl = resolvedFace.url
+        }
+      }
+
       const data = await generateVideoAndWait("/api/generate-video", {
         imageUrl: imagePublicUrl,
         videoUrl: videoPublicUrl,
@@ -171,6 +211,8 @@ export default function MotionCopyPage() {
         mode: "pro",
         keep_original_sound: true,
         character_orientation: characterOrientation,
+        face_lock: faceLockMode,
+        ...(faceLockImagePublicUrl ? { face_lock_image_url: faceLockImagePublicUrl } : {}),
         model: MOTION_COPY_MODEL,
         tool: "motion_copy",
       })
@@ -263,7 +305,13 @@ export default function MotionCopyPage() {
         </Label>
         <Select
           value={characterOrientation}
-          onValueChange={setCharacterOrientation}
+          onValueChange={(value) => {
+            setCharacterOrientation(value)
+            if (value === "image" && isFaceLockActive(faceLockMode)) {
+              setFaceLockMode("off")
+              setFaceLockCustomImage(null)
+            }
+          }}
         >
           <SelectTrigger id="character-orientation" className="h-7 text-xs w-fit min-w-[72px]">
             <SelectValue placeholder="Select">{characterOrientationTriggerLabel}</SelectValue>
@@ -280,8 +328,33 @@ export default function MotionCopyPage() {
           </SelectContent>
         </Select>
       </div>
+      <MotionCopyFaceLockControl
+        value={faceLockMode}
+        onValueChange={(mode) => {
+          setFaceLockMode(mode)
+          if (mode !== "off") {
+            setCharacterOrientation("video")
+          }
+          if (mode !== "custom") {
+            setFaceLockCustomImage(null)
+          }
+        }}
+        referenceImageUrl={inputImage?.url}
+        customFaceImageUrl={faceLockCustomImage?.url}
+        characterOrientation={characterOrientation}
+        disabled={isGenerating}
+        onRequestCustomPick={() => setFaceLockAssetPickerOpen(true)}
+      />
     </div>
   )
+
+  const handleFaceLockAssetSelect = React.useCallback((pick: AssetSelectionPick) => {
+    if (pick.assetType !== "image") return
+    setFaceLockCustomImage({ url: pick.url })
+    setFaceLockMode("custom")
+    setCharacterOrientation("video")
+    setFaceLockAssetPickerOpen(false)
+  }, [])
 
   return (
     <div className={cn(
@@ -398,6 +471,14 @@ export default function MotionCopyPage() {
           )}
         </GeneratorLayout>
       </div>
+
+      <AssetSelectionModal
+        open={faceLockAssetPickerOpen}
+        onOpenChange={setFaceLockAssetPickerOpen}
+        onSelect={handleFaceLockAssetSelect}
+        allowedAssetTypes={["image"]}
+        defaultTab="assets"
+      />
     </div>
   )
 }

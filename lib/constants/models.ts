@@ -256,6 +256,16 @@ const KLING_V3_MOTION_PARAMS: ParameterDefinition[] = [
     enum: ['image', 'video'],
     ui_type: 'select',
   },
+  {
+    name: 'face_lock',
+    type: 'string',
+    label: 'Face Lock',
+    description: 'Enhanced facial identity lock (uses premium backend)',
+    required: false,
+    default: 'off',
+    enum: ['off', 'reference', 'custom'],
+    ui_type: 'select',
+  },
 ];
 
 // Veed Fabric 1.0 parameters

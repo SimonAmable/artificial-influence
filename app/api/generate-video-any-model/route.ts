@@ -5,12 +5,18 @@ import { authContextFailureResponse } from '@/lib/server/require-active-user';
 import { checkUserHasCredits, deductUserCreditsUpTo } from '@/lib/credits';
 import { inferStoragePathFromUrl } from '@/lib/assets/library';
 import {
+  buildFalKlingMotionControlRequest,
   buildFalVideoRequest,
   isSupportedFalVideoModel,
   normalizeFalVideoModelIdentifier,
   shouldRouteSeedance25ToFal,
   submitFalVideoQueue,
 } from '@/lib/server/fal-video';
+import {
+  parseFaceLockMode,
+  resolveFaceLockImageUrl,
+  shouldRouteMotionCopyToFal,
+} from '@/lib/motion-copy/face-lock';
 import { resolveWan27Replicate } from '@/lib/server/wan-2.7-replicate';
 import { applyMinimalReplicateVideoModeration } from '@/lib/server/minimal-moderation';
 import {
@@ -236,6 +242,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const faceLockMode = parseFaceLockMode(otherParams.face_lock);
+    const faceLockCustomImageUrl =
+      typeof body.face_lock_image_url === 'string'
+        ? body.face_lock_image_url
+        : typeof otherParams.face_lock_image_url === 'string'
+          ? otherParams.face_lock_image_url
+          : null;
+    const motionCopyUsesFalFaceLock =
+      isMotionCopy && hasMotionCopyInputs && shouldRouteMotionCopyToFal(faceLockMode);
+
     const pricingQuote = resolveVideoPricingQuote({
       modelIdentifier: catalogModelIdentifier,
       modelCost: modelData.model_cost,
@@ -251,6 +267,7 @@ export async function POST(request: NextRequest) {
         typeof otherParams.character_orientation === 'string'
           ? otherParams.character_orientation
           : null,
+      faceLock: faceLockMode,
       hasInputVideo,
       hasReferenceVideo,
       sourceDurationSeconds,
@@ -265,6 +282,108 @@ export async function POST(request: NextRequest) {
     }
 
     const modelProvider = typeof modelData.provider === 'string' ? modelData.provider : null;
+
+    if (motionCopyUsesFalFaceLock) {
+      const characterOrientation =
+        typeof otherParams.character_orientation === 'string'
+          ? otherParams.character_orientation
+          : 'video';
+
+      if (characterOrientation !== 'video') {
+        return NextResponse.json(
+          { error: 'Face lock requires video orientation.' },
+          { status: 400 },
+        );
+      }
+
+      const faceImageUrl = resolveFaceLockImageUrl({
+        faceLock: faceLockMode,
+        referenceImageUrl: typeof motionCopyImage === 'string' ? motionCopyImage : null,
+        customFaceImageUrl: faceLockCustomImageUrl,
+      });
+
+      if (!faceImageUrl) {
+        return NextResponse.json(
+          { error: 'Face lock requires a face reference image.' },
+          { status: 400 },
+        );
+      }
+
+      let falMotionRequest: ReturnType<typeof buildFalKlingMotionControlRequest>
+      try {
+        falMotionRequest = buildFalKlingMotionControlRequest({
+          characterImageUrl: String(motionCopyImage),
+          motionVideoUrl: String(motionCopyVideo),
+          faceImageUrl,
+          prompt: typeof prompt === 'string' ? prompt : '',
+          keepOriginalSound:
+            typeof otherParams.keep_original_sound === 'boolean'
+              ? otherParams.keep_original_sound
+              : null,
+          mode: typeof otherParams.mode === 'string' ? otherParams.mode : null,
+        });
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : 'Invalid face lock request' },
+          { status: 400 },
+        );
+      }
+
+      const referenceImageStoragePaths = collectStoragePaths([
+        motionCopyImage,
+        faceLockCustomImageUrl,
+      ]);
+      const referenceVideoStoragePaths = collectStoragePaths([motionCopyVideo]);
+
+      const { requestId, endpointId: falEndpoint } = await submitFalVideoQueue(
+        falMotionRequest.endpointId,
+        falMotionRequest.input,
+      );
+
+      const { data: pendingGeneration, error: insertError } = await supabase
+        .from('generations')
+        .insert({
+          user_id: user.id,
+          prompt: typeof prompt === 'string' ? prompt : null,
+          supabase_storage_path: null,
+          reference_images_supabase_storage_path:
+            referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+          reference_videos_supabase_storage_path:
+            referenceVideoStoragePaths.length > 0 ? referenceVideoStoragePaths : null,
+          model: catalogModelIdentifier,
+          type: 'video',
+          is_public: true,
+          tool: typeof body.tool === 'string' ? body.tool : null,
+          status: 'pending',
+          replicate_prediction_id: requestId,
+          fal_request_id: requestId,
+          fal_endpoint_id: falEndpoint,
+          quoted_credits: quotedCredits,
+          predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
+          character_asset_id: characterAssetId,
+          ...studioBoardFieldsForIndex(studioBoardFields, 0),
+        })
+        .select('id')
+        .single();
+
+      if (insertError || !pendingGeneration) {
+        console.error(
+          '[generate-video-any-model] Failed to insert pending Fal motion-copy generation:',
+          insertError,
+        );
+        throw new Error('Failed to create pending generation');
+      }
+
+      return NextResponse.json(
+        {
+          generationId: pendingGeneration.id,
+          predictionId: requestId,
+          status: 'pending',
+          creditsQuoted: quotedCredits,
+        },
+        { status: 202 },
+      );
+    }
 
     if (
       (modelProvider === 'fal' && isSupportedFalVideoModel(catalogModelIdentifier)) ||

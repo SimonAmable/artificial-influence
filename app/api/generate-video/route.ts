@@ -8,6 +8,15 @@ import {
   normalizeMotionCopyModelIdentifier,
 } from '@/lib/constants/models';
 import { resolveVideoPricingQuote } from '@/lib/video-pricing';
+import {
+  buildFalKlingMotionControlRequest,
+  submitFalVideoQueue,
+} from '@/lib/server/fal-video';
+import {
+  parseFaceLockMode,
+  resolveFaceLockImageUrl,
+  shouldRouteMotionCopyToFal,
+} from '@/lib/motion-copy/face-lock';
 
 export async function POST(request: NextRequest) {
   const requestStartTime = Date.now();
@@ -105,6 +114,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const faceLockMode = parseFaceLockMode(body.face_lock);
+    const faceLockCustomImageUrl =
+      typeof body.face_lock_image_url === 'string' ? body.face_lock_image_url : null;
+    const motionCopyUsesFalFaceLock = shouldRouteMotionCopyToFal(faceLockMode);
+
     const pricingQuote = resolveVideoPricingQuote({
       modelIdentifier: model,
       modelCost: modelData.model_cost,
@@ -112,6 +126,7 @@ export async function POST(request: NextRequest) {
       pricingConfig: modelData.pricing_config,
       mode,
       characterOrientation,
+      faceLock: faceLockMode,
       hasInputVideo: true,
       hasReferenceVideo: true,
       sourceDurationSeconds,
@@ -122,6 +137,88 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: `Insufficient credits. Video generation requires ${quotedCredits} credits.` },
         { status: 402 }
+      );
+    }
+
+    if (motionCopyUsesFalFaceLock) {
+      if (characterOrientation !== 'video') {
+        return NextResponse.json(
+          { error: 'Face lock requires video orientation.' },
+          { status: 400 },
+        );
+      }
+
+      const faceImageUrl = resolveFaceLockImageUrl({
+        faceLock: faceLockMode,
+        referenceImageUrl: imagePublicUrl,
+        customFaceImageUrl: faceLockCustomImageUrl,
+      });
+
+      if (!faceImageUrl) {
+        return NextResponse.json(
+          { error: 'Face lock requires a face reference image.' },
+          { status: 400 },
+        );
+      }
+
+      let falMotionRequest: ReturnType<typeof buildFalKlingMotionControlRequest>;
+      try {
+        falMotionRequest = buildFalKlingMotionControlRequest({
+          characterImageUrl: imagePublicUrl,
+          motionVideoUrl: videoPublicUrl,
+          faceImageUrl,
+          prompt,
+          keepOriginalSound,
+          mode,
+        });
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : 'Invalid face lock request' },
+          { status: 400 },
+        );
+      }
+
+      const { requestId, endpointId: falEndpoint } = await submitFalVideoQueue(
+        falMotionRequest.endpointId,
+        falMotionRequest.input,
+      );
+
+      const { data: pendingGeneration, error: insertError } = await supabase
+        .from('generations')
+        .insert({
+          user_id: user.id,
+          prompt: prompt || null,
+          supabase_storage_path: null,
+          reference_images_supabase_storage_path: imageStoragePath ? [imageStoragePath] : null,
+          reference_videos_supabase_storage_path: videoStoragePath ? [videoStoragePath] : null,
+          model,
+          type: 'video',
+          is_public: true,
+          tool: tool || null,
+          status: 'pending',
+          replicate_prediction_id: requestId,
+          fal_request_id: requestId,
+          fal_endpoint_id: falEndpoint,
+          quoted_credits: quotedCredits,
+          predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
+        })
+        .select('id')
+        .single();
+
+      if (insertError || !pendingGeneration) {
+        console.error('[generate-video] Failed to insert pending Fal generation:', insertError);
+        throw new Error('Failed to create pending generation');
+      }
+
+      return NextResponse.json(
+        {
+          status: 'pending',
+          predictionId: requestId,
+          generationId: pendingGeneration.id,
+          creditsQuoted: quotedCredits,
+          message: `Video generation started. Poll GET /api/generate-video/status?predictionId=${requestId}`,
+        },
+        { status: 202 },
       );
     }
 

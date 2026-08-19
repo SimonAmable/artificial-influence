@@ -15,6 +15,7 @@ export interface VideoPricingQuoteInput {
   mode?: string | null
   generateAudio?: boolean | null
   characterOrientation?: string | null
+  faceLock?: string | null
   hasInputVideo?: boolean
   hasReferenceVideo?: boolean
   sourceDurationSeconds?: number | null
@@ -42,6 +43,7 @@ export function resolveVideoPricingQuote(input: VideoPricingQuoteInput): VideoPr
       generate_audio: input.generateAudio,
       duration: input.duration,
       character_orientation: input.characterOrientation,
+      face_lock: input.faceLock,
       has_reference_video: Boolean(input.hasInputVideo || input.hasReferenceVideo),
     },
     durationSeconds: input.duration,

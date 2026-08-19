@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
 import { MotionCopyPromptField } from "@/components/tools/motion-copy/motion-copy-prompt-field"
+import { MotionCopyFaceLockControl } from "@/components/tools/motion-copy/motion-copy-face-lock-control"
 import { VideoModelParameterControls } from "@/components/tools/video/video-model-parameter-controls"
 import { MultiShotEditor, type MultiShotItem } from "@/components/tools/video/multi-shot-editor"
 import { GenerateShaderButton } from "@/components/tools/influencer/generate-shader-button"
@@ -54,10 +55,12 @@ import {
   isSupportedVideoReferenceAudioFile,
 } from "@/lib/utils/video-reference-audio"
 import { toast } from "sonner"
+import { parseFaceLockMode, type FaceLockMode } from "@/lib/motion-copy/face-lock"
 
 type VideoAssetPickerTarget =
   | "motion-copy-image"
   | "motion-copy-video"
+  | "motion-copy-face-lock"
   | "toolbar-input-image"
   | "toolbar-last-frame"
   | "toolbar-reference-video"
@@ -184,6 +187,8 @@ interface VideoInputBoxProps {
   /** Lift @ / command refs to parent for generate merge */
   attachedRefs?: AttachedRef[]
   onAttachedRefsChange?: (refs: AttachedRef[]) => void
+  faceLockCustomImage?: ImageUpload | null
+  onFaceLockCustomImageChange?: (image: ImageUpload | null) => void
 }
 
 export function VideoInputBox({
@@ -220,6 +225,8 @@ export function VideoInputBox({
   onReferenceImagesChange,
   attachedRefs: attachedRefsProp,
   onAttachedRefsChange,
+  faceLockCustomImage = null,
+  onFaceLockCustomImageChange,
 }: VideoInputBoxProps) {
   const [attachedRefsLocal, setAttachedRefsLocal] = React.useState<AttachedRef[]>([])
   const attachedRefs = attachedRefsProp ?? attachedRefsLocal
@@ -585,6 +592,18 @@ export function VideoInputBox({
           }
           onInputVideoChange({ url: pick.url })
           break
+        case "motion-copy-face-lock":
+          if (pick.assetType !== "image") {
+            toast.error("Pick an image asset")
+            return
+          }
+          onFaceLockCustomImageChange?.({ url: pick.url })
+          onParametersChange({
+            ...parameters,
+            face_lock: "custom",
+            character_orientation: "video",
+          })
+          break
         case "toolbar-last-frame":
           if (pick.assetType !== "image") {
             toast.error("Pick an image asset")
@@ -618,13 +637,30 @@ export function VideoInputBox({
     },
     [
       assetPickerTarget,
+      onFaceLockCustomImageChange,
       onInputAudioChange,
       onInputImageChange,
       onInputVideoChange,
       onLastFrameChange,
+      onParametersChange,
       onReferenceImagesChange,
+      parameters,
       referenceImages,
     ],
+  )
+
+  const handleFaceLockChange = React.useCallback(
+    (mode: FaceLockMode) => {
+      onParametersChange({
+        ...parameters,
+        face_lock: mode,
+        ...(mode !== "off" ? { character_orientation: "video" } : {}),
+      })
+      if (mode !== "custom") {
+        onFaceLockCustomImageChange?.(null)
+      }
+    },
+    [onFaceLockCustomImageChange, onParametersChange, parameters],
   )
 
   const openAssetPicker = React.useCallback((target: VideoAssetPickerTarget) => {
@@ -1040,6 +1076,24 @@ export function VideoInputBox({
         variant="image"
         referenceVideoProvided={!!inputVideo || chipSlotInfo.referenceVideoSlotFromChip}
         />
+
+        {isMotionCopyModel ? (
+          <AnimatedControlItem>
+            <MotionCopyFaceLockControl
+              value={parseFaceLockMode(parameters.face_lock)}
+              onValueChange={handleFaceLockChange}
+              referenceImageUrl={inputImage?.url}
+              customFaceImageUrl={faceLockCustomImage?.url}
+              characterOrientation={
+                typeof parameters.character_orientation === "string"
+                  ? parameters.character_orientation
+                  : "video"
+              }
+              disabled={!allowOptionsDuringGeneration && isGenerating}
+              onRequestCustomPick={() => openAssetPicker("motion-copy-face-lock")}
+            />
+          </AnimatedControlItem>
+        ) : null}
 
       </div>
     </LayoutGroup>

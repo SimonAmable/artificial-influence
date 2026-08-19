@@ -583,6 +583,13 @@ export function VideoModelParameterControls({
       ) {
         return false
       }
+      if (
+        (selectedModel.identifier === "kwaivgi/kling-v2.6-motion-control" ||
+          selectedModel.identifier === "kwaivgi/kling-v3-motion-control") &&
+        param.name === "face_lock"
+      ) {
+        return false
+      }
       return true
     }) ?? []
 

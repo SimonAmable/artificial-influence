@@ -1,4 +1,11 @@
 import { fal } from "@fal-ai/client"
+import {
+  buildFalKlingMotionControlElement,
+  FAL_KLING_V3_PRO_MOTION_CONTROL,
+  FAL_KLING_V3_STD_MOTION_CONTROL,
+  resolveFalKlingMotionControlEndpoint,
+  type FalKlingMotionControlEndpoint,
+} from "@/lib/motion-copy/face-lock"
 import { getFalWebhookUrl } from "@/lib/server/fal-webhook-url"
 
 export const HAPPY_HORSE_CANONICAL_ID = "alibaba/happy-horse/v1.1" as const
@@ -676,10 +683,54 @@ export function buildFalVideoRequest(options: FalVideoRequestOptions): {
   }
 }
 
+export type FalQueueEndpoint = FalVideoEndpoint | FalKlingMotionControlEndpoint
+
+export interface FalKlingMotionControlRequestOptions {
+  characterImageUrl: string
+  motionVideoUrl: string
+  faceImageUrl: string
+  prompt?: string | null
+  keepOriginalSound?: boolean | null
+  mode?: string | null
+}
+
+export function buildFalKlingMotionControlRequest(
+  options: FalKlingMotionControlRequestOptions,
+): {
+  endpointId: FalKlingMotionControlEndpoint
+  input: Record<string, unknown>
+} {
+  const characterImageUrl = pickString(options.characterImageUrl)
+  const motionVideoUrl = pickString(options.motionVideoUrl)
+  const faceImageUrl = pickString(options.faceImageUrl)
+
+  if (!characterImageUrl) {
+    throw new Error("Motion copy requires a character image.")
+  }
+  if (!motionVideoUrl) {
+    throw new Error("Motion copy requires a motion reference video.")
+  }
+  if (!faceImageUrl) {
+    throw new Error("Face lock requires a face reference image.")
+  }
+
+  return {
+    endpointId: resolveFalKlingMotionControlEndpoint(options.mode),
+    input: {
+      image_url: characterImageUrl,
+      video_url: motionVideoUrl,
+      prompt: pickString(options.prompt) ?? "",
+      keep_original_sound: pickBoolean(options.keepOriginalSound, true),
+      character_orientation: "video",
+      elements: [buildFalKlingMotionControlElement(faceImageUrl)],
+    },
+  }
+}
+
 export async function submitFalVideoQueue(
-  endpointId: FalVideoEndpoint,
+  endpointId: FalQueueEndpoint,
   input: Record<string, unknown>,
-): Promise<{ requestId: string; endpointId: FalVideoEndpoint }> {
+): Promise<{ requestId: string; endpointId: FalQueueEndpoint }> {
   configureFal()
   const webhookUrl = getFalWebhookUrl()
   const submitted = await fal.queue.submit(endpointId, {
@@ -693,3 +744,5 @@ export async function submitFalVideoQueue(
 
   return { requestId, endpointId }
 }
+
+export { FAL_KLING_V3_PRO_MOTION_CONTROL, FAL_KLING_V3_STD_MOTION_CONTROL }

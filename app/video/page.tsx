@@ -48,6 +48,8 @@ import { pickRetainedAspectRatio } from "@/lib/utils/aspect-ratios"
 import { consumeVideoGenerationIntent } from "@/lib/video/video-generation-intent"
 import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
 import { resolveReferenceVideoForGeneration } from "@/lib/video/resolve-reference-for-generation"
+import { isFaceLockActive, parseFaceLockMode } from "@/lib/motion-copy/face-lock"
+import { isFaceLockActive, parseFaceLockMode } from "@/lib/motion-copy/face-lock"
 import { getVideoDurationSeconds } from "@/lib/video-editor/media-parser"
 
 interface PendingVideoRequest {
@@ -194,6 +196,7 @@ function VideoPageContent() {
   const [prompt, setPrompt] = React.useState("")
   const [negativePrompt, setNegativePrompt] = React.useState("")
   const [inputImage, setInputImage] = React.useState<ImageUpload | null>(null)
+  const [faceLockCustomImage, setFaceLockCustomImage] = React.useState<ImageUpload | null>(null)
   const [lastFrameImage, setLastFrameImage] = React.useState<ImageUpload | null>(null)
   const [inputVideo, setInputVideo] = React.useState<ImageUpload | null>(null)
   const [inputAudio, setInputAudio] = React.useState<AudioUploadValue | null>(null)
@@ -476,11 +479,19 @@ function VideoPageContent() {
         typeof parameters.character_orientation === "string"
           ? parameters.character_orientation
           : null,
+      faceLock: typeof parameters.face_lock === "string" ? parameters.face_lock : null,
       hasInputVideo: Boolean(inputVideo?.file || inputVideo?.url),
       hasReferenceVideo: Boolean(inputVideo?.file || inputVideo?.url),
       sourceDurationSeconds,
     }).quotedCredits
   }, [inputAudioDurationSeconds, inputVideo?.file, inputVideo?.url, inputVideoDurationSeconds, parameters, selectedModel])
+
+  React.useEffect(() => {
+    if (parameters.character_orientation !== "image") return
+    if (!isFaceLockActive(parseFaceLockMode(parameters.face_lock))) return
+    setParameters((prev) => ({ ...prev, face_lock: "off" }))
+    setFaceLockCustomImage(null)
+  }, [parameters.character_orientation, parameters.face_lock])
 
   // Upload image to Supabase
   const uploadImageToSupabase = async (
@@ -694,13 +705,13 @@ function VideoPageContent() {
         setError("Please upload a video")
         return
       }
+      const characterOrientation = (parameters.character_orientation as string) || "video"
       try {
         const resolvedVideo = await resolveReferenceVideoForGeneration(inputVideo)
         if (!resolvedVideo?.url) {
           setError("Please upload a video")
           return
         }
-        const characterOrientation = (parameters.character_orientation as string) || "video"
         const maxDuration = characterOrientation === "video" ? 30 : 10
         const videoDuration = resolvedVideo.file
           ? await getVideoDuration(resolvedVideo.file)
@@ -715,6 +726,18 @@ function VideoPageContent() {
         console.error("Error validating video duration:", err)
         setError("Failed to validate video duration. Please try again.")
         return
+      }
+
+      const faceLockMode = parseFaceLockMode(parameters.face_lock)
+      if (isFaceLockActive(faceLockMode)) {
+        if (characterOrientation !== "video") {
+          setError("Face lock requires video orientation.")
+          return
+        }
+        if (faceLockMode === "custom" && !faceLockCustomImage?.url) {
+          setError("Choose a custom face image for face lock.")
+          return
+        }
       }
     } else if (isLipsync) {
       if (!inputImage?.file) {
@@ -772,6 +795,7 @@ function VideoPageContent() {
       parameters: { ...parameters },
       negativePrompt,
       inputImage,
+      faceLockCustomImage,
       lastFrameImage,
       inputVideo,
       inputAudio,
@@ -813,6 +837,7 @@ function VideoPageContent() {
       const parameters = capture.parameters
       const negativePrompt = capture.negativePrompt
       const inputImage = capture.inputImage
+      const faceLockCustomImage = capture.faceLockCustomImage
       const lastFrameImage = capture.lastFrameImage
       const inputVideo = capture.inputVideo
       const inputAudio = capture.inputAudio
@@ -897,6 +922,23 @@ function VideoPageContent() {
             requestBody.videoPublicUrl = videoUpload.url
           } else {
             requestBody.videoPublicUrl = resolvedVideo.url
+          }
+        }
+
+        const faceLockMode = parseFaceLockMode(parameters.face_lock)
+        if (faceLockMode === "custom" && faceLockCustomImage?.url) {
+          const resolvedFace = await resolveReferenceImageForGeneration(faceLockCustomImage)
+          if (resolvedFace?.url) {
+            if (resolvedFace.file) {
+              const faceUpload = await uploadImageToSupabase(
+                resolvedFace.file,
+                user.id,
+                "motion-copy-face-lock",
+              )
+              requestBody.face_lock_image_url = faceUpload.url
+            } else {
+              requestBody.face_lock_image_url = resolvedFace.url
+            }
           }
         }
       }
@@ -1366,6 +1408,8 @@ function VideoPageContent() {
                     onModelChange={setSelectedModel}
                     inputImage={inputImage}
                     onInputImageChange={setInputImage}
+                    faceLockCustomImage={faceLockCustomImage}
+                    onFaceLockCustomImageChange={setFaceLockCustomImage}
                     lastFrameImage={lastFrameImage}
                     onLastFrameChange={setLastFrameImage}
                     inputVideo={inputVideo}
@@ -1459,6 +1503,8 @@ function VideoPageContent() {
                     onModelChange={setSelectedModel}
                     inputImage={inputImage}
                     onInputImageChange={setInputImage}
+                    faceLockCustomImage={faceLockCustomImage}
+                    onFaceLockCustomImageChange={setFaceLockCustomImage}
                     lastFrameImage={lastFrameImage}
                     onLastFrameChange={setLastFrameImage}
                     inputVideo={inputVideo}

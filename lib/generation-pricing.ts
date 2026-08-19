@@ -241,8 +241,13 @@ function legacyResolveCreditsPerSecond(
       return generateAudio ? 6 : 3;
     case 'kwaivgi/kling-v2.6-motion-control':
       return mode === 'std' ? 3 : 5;
-    case 'kwaivgi/kling-v3-motion-control':
+    case 'kwaivgi/kling-v3-motion-control': {
+      const faceLock = normalizeEnumKey(getParameterValue(parameters, 'face_lock'));
+      if (faceLock === 'reference' || faceLock === 'custom') {
+        return mode === 'std' ? 8 : 10;
+      }
       return mode === 'std' ? 6 : 7;
+    }
     case 'kwaivgi/kling-v3-video':
     case 'kwaivgi/kling-v3-omni-video': {
       const isStandard = mode === 'standard';
