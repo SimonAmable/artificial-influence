@@ -49,7 +49,6 @@ import { consumeVideoGenerationIntent } from "@/lib/video/video-generation-inten
 import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
 import { resolveReferenceVideoForGeneration } from "@/lib/video/resolve-reference-for-generation"
 import { isFaceLockActive, parseFaceLockMode } from "@/lib/motion-copy/face-lock"
-import { isFaceLockActive, parseFaceLockMode } from "@/lib/motion-copy/face-lock"
 import { getVideoDurationSeconds } from "@/lib/video-editor/media-parser"
 
 interface PendingVideoRequest {
