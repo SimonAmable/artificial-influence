@@ -3,6 +3,7 @@ import test from "node:test"
 
 import {
   appendCharacterSwapVisionHints,
+  buildCharacterSwapAnalysisPayload,
   type CharacterSwapVisionHints,
 } from "./character-swap-analysis.ts"
 
@@ -21,4 +22,23 @@ test("appendCharacterSwapVisionHints keeps canonical prompt and adds vision hint
   assert.match(result, /Red jacket/)
   assert.match(result, /outdoor cafe/)
   assert.match(result, /contact shadow/)
+})
+
+test("buildCharacterSwapAnalysisPayload sends URLs instead of image files", () => {
+  const payload = buildCharacterSwapAnalysisPayload(
+    "https://example.supabase.co/storage/v1/object/public/public-bucket/character.png",
+    "https://example.supabase.co/storage/v1/object/public/public-bucket/scene.png",
+  )
+
+  assert.deepEqual(payload, {
+    characterUrl: "https://example.supabase.co/storage/v1/object/public/public-bucket/character.png",
+    sceneUrl: "https://example.supabase.co/storage/v1/object/public/public-bucket/scene.png",
+  })
+})
+
+test("buildCharacterSwapAnalysisPayload rejects missing URLs", () => {
+  assert.throws(
+    () => buildCharacterSwapAnalysisPayload("https://example.com/character.png", " "),
+    /required/,
+  )
 })

@@ -48,6 +48,7 @@ import {
 } from "@/lib/image/studio-tools"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER, isSeedanceVideoModelIdentifier, usesFalMultimodalVideoInputs } from "@/lib/constants/models"
 import { appendImageReferencesToFormData } from "@/lib/image/append-references-to-form-data"
+import { resolveAndStoreReferenceImage } from "@/lib/image/ensure-stored-reference-image"
 import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
 import { appendStudioBoardFieldsToFormData } from "@/lib/studio/form-data"
 import {
@@ -1418,13 +1419,13 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       const chipImageUrls = getImageAssetUrlsFromRefChips(attachedRefsForRequest)
 
       let studioToolPayload: ReturnType<typeof buildStudioToolGenerationRequest> | null = null
+      let resolvedStudioSourceImage = studioToolSourceImage
       let resolvedStudioSceneImage = studioToolSceneImage
 
       if (selectedStudioTool) {
-        let resolvedStudioSourceImage = studioToolSourceImage
         try {
-          resolvedStudioSourceImage = await resolveReferenceImageForGeneration(studioToolSourceImage)
-          resolvedStudioSceneImage = await resolveReferenceImageForGeneration(studioToolSceneImage)
+          resolvedStudioSourceImage = await resolveAndStoreReferenceImage(studioToolSourceImage)
+          resolvedStudioSceneImage = await resolveAndStoreReferenceImage(studioToolSceneImage)
         } catch (resolveError) {
           toast.error(
             resolveError instanceof Error

@@ -1,40 +1,63 @@
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
-import type { CharacterSwapVisionHints } from "@/lib/image/studio-tools/character-swap-analysis"
+import { ensureStoredReferenceImage } from "@/lib/image/ensure-stored-reference-image"
+import {
+  buildCharacterSwapAnalysisPayload,
+  type CharacterSwapVisionHints,
+} from "@/lib/image/studio-tools/character-swap-analysis"
 
-export function buildCharacterSwapAnalysisFormData(
-  characterImage: ImageUpload,
-  sceneImage: ImageUpload,
-): FormData {
-  const formData = new FormData()
+const PAYLOAD_TOO_LARGE_MESSAGE =
+  "Could not analyze character swap references. Please try again."
 
-  if (characterImage.file) {
-    formData.append("character", characterImage.file)
-  } else if (characterImage.url) {
-    formData.append("characterUrl", characterImage.url)
+function isPayloadTooLargeResponse(status: number, body: string): boolean {
+  if (status === 413) return true
+  const haystack = body.toLowerCase()
+  return (
+    haystack.includes("request entity too large") ||
+    haystack.includes("function_payload_too_large") ||
+    haystack.includes("payload too large")
+  )
+}
+
+async function readCharacterSwapAnalysisResponse(
+  response: Response,
+): Promise<{ hints?: CharacterSwapVisionHints; error?: string }> {
+  const text = await response.text()
+  if (!text.trim()) {
+    if (isPayloadTooLargeResponse(response.status, text)) {
+      return { error: PAYLOAD_TOO_LARGE_MESSAGE }
+    }
+    return {}
   }
 
-  if (sceneImage.file) {
-    formData.append("scene", sceneImage.file)
-  } else if (sceneImage.url) {
-    formData.append("sceneUrl", sceneImage.url)
+  try {
+    return JSON.parse(text) as { hints?: CharacterSwapVisionHints; error?: string }
+  } catch {
+    if (isPayloadTooLargeResponse(response.status, text)) {
+      return { error: PAYLOAD_TOO_LARGE_MESSAGE }
+    }
+    return { error: text }
   }
-
-  return formData
 }
 
 export async function fetchCharacterSwapVisionHints(
   characterImage: ImageUpload,
   sceneImage: ImageUpload,
 ): Promise<CharacterSwapVisionHints> {
+  const storedCharacter = await ensureStoredReferenceImage(characterImage)
+  const storedScene = await ensureStoredReferenceImage(sceneImage)
+  if (!storedCharacter || !storedScene) {
+    throw new Error("Character and scene reference images are required")
+  }
+
   const response = await fetch("/api/image/character-swap-analysis", {
     method: "POST",
-    body: buildCharacterSwapAnalysisFormData(characterImage, sceneImage),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      buildCharacterSwapAnalysisPayload(storedCharacter.url, storedScene.url),
+    ),
   })
 
-  const result = (await response.json()) as {
-    hints?: CharacterSwapVisionHints
-    error?: string
-  }
+  const result = await readCharacterSwapAnalysisResponse(response)
 
   if (!response.ok || !result.hints) {
     throw new Error(result.error || "Could not analyze character swap references")

@@ -8,14 +8,16 @@ export function appendImageReferencesToFormData(
   images: ImageUpload[],
 ): void {
   for (const image of images) {
-    // Local uploads must win over preview URLs (blob/data or stale signed URLs).
-    if (image.file) {
-      formData.append("referenceImages", image.file)
+    // Stored URLs must win over local File blobs so multi-MB photos never
+    // hit Vercel FUNCTION_PAYLOAD_TOO_LARGE. Blob/data preview URLs still
+    // fall through to the File path.
+    if (image.url && isStoredReferenceImageUrl(image.url)) {
+      formData.append("referenceImageUrls", absolutizeAssetUrl(image.url))
       continue
     }
 
-    if (image.url && isStoredReferenceImageUrl(image.url)) {
-      formData.append("referenceImageUrls", absolutizeAssetUrl(image.url))
+    if (image.file) {
+      formData.append("referenceImages", image.file)
     }
   }
 }

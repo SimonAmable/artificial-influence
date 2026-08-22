@@ -3,6 +3,7 @@ import { extractFirstFrame } from "@/lib/canvas/frame-extraction"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { generateImageAndWait } from "@/lib/generate-image-client"
 import { appendImageReferencesToFormData } from "@/lib/image/append-references-to-form-data"
+import { resolveAndStoreReferenceImage } from "@/lib/image/ensure-stored-reference-image"
 import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
 import { resolveReferenceVideoForGeneration } from "@/lib/video/resolve-reference-for-generation"
 import { CHARACTER_SWAP_TOOL } from "@/lib/image/studio-tools/character-swap"
@@ -48,8 +49,8 @@ export async function runSwapForMotionCopy(input: {
 }): Promise<MotionCopySwapResult> {
   const studioTool = swapToolForMode(input.swapMode)
 
-  const resolvedCharacter = await resolveReferenceImageForGeneration(input.characterImage)
-  if (!resolvedCharacter?.url && !resolvedCharacter?.file) {
+  const resolvedCharacter = await resolveAndStoreReferenceImage(input.characterImage)
+  if (!resolvedCharacter?.url) {
     throw new Error("Please upload a character image")
   }
 
@@ -70,7 +71,6 @@ export async function runSwapForMotionCopy(input: {
 
   const sceneImage: ImageUpload = {
     url: uploadedFrame.url,
-    file: frameFile,
   }
 
   const studioRequest = buildStudioToolGenerationRequest(studioTool, {

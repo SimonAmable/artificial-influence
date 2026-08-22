@@ -40,3 +40,15 @@ export function appendCharacterSwapVisionHints(
 
   return parts.filter((part) => part.length > 0).join(" ")
 }
+
+export function buildCharacterSwapAnalysisPayload(
+  characterUrl: string | undefined,
+  sceneUrl: string | undefined,
+): { characterUrl: string; sceneUrl: string } {
+  const trimmedCharacterUrl = characterUrl?.trim() ?? ""
+  const trimmedSceneUrl = sceneUrl?.trim() ?? ""
+  if (!trimmedCharacterUrl || !trimmedSceneUrl) {
+    throw new Error("Character and scene reference images are required")
+  }
+  return { characterUrl: trimmedCharacterUrl, sceneUrl: trimmedSceneUrl }
+}

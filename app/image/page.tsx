@@ -31,6 +31,7 @@ import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import { useRouter, useSearchParams } from "next/navigation"
 import { consumeImageGenerationIntent } from "@/lib/image/image-generation-intent"
 import { appendImageReferencesToFormData } from "@/lib/image/append-references-to-form-data"
+import { resolveAndStoreReferenceImage } from "@/lib/image/ensure-stored-reference-image"
 import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
 import { CreateAssetDialog } from "@/components/canvas/create-asset-dialog"
 import { SaveExampleDialog, type SaveExampleSnapshot } from "@/components/image/save-example-dialog"
@@ -685,8 +686,8 @@ function ImagePageContent() {
 
     if (selectedStudioTool) {
       try {
-        resolvedStudioSourceImage = await resolveReferenceImageForGeneration(studioToolSourceImage)
-        resolvedStudioSceneImage = await resolveReferenceImageForGeneration(studioToolSceneImage)
+        resolvedStudioSourceImage = await resolveAndStoreReferenceImage(studioToolSourceImage)
+        resolvedStudioSceneImage = await resolveAndStoreReferenceImage(studioToolSceneImage)
       } catch (resolveError) {
         reportImageInputError(
           resolveError instanceof Error

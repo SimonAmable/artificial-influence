@@ -20,9 +20,44 @@ type ImagePart =
   | { type: "image"; image: Uint8Array; mediaType: string }
   | { type: "image"; image: URL }
 
+type AnalysisUrlBody = {
+  characterUrl?: unknown
+  sceneUrl?: unknown
+}
+
+function asTrimmedUrl(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
+async function readAnalysisInputs(request: NextRequest): Promise<{
+  characterFile: FormDataEntryValue | null
+  characterUrl: string
+  sceneFile: FormDataEntryValue | null
+  sceneUrl: string
+}> {
+  const contentType = request.headers.get("content-type") ?? ""
+  if (contentType.includes("application/json")) {
+    const body = (await request.json()) as AnalysisUrlBody
+    return {
+      characterFile: null,
+      characterUrl: asTrimmedUrl(body.characterUrl),
+      sceneFile: null,
+      sceneUrl: asTrimmedUrl(body.sceneUrl),
+    }
+  }
+
+  const formData = await request.formData()
+  return {
+    characterFile: formData.get("character"),
+    characterUrl: asTrimmedUrl(formData.get("characterUrl")),
+    sceneFile: formData.get("scene"),
+    sceneUrl: asTrimmedUrl(formData.get("sceneUrl")),
+  }
+}
+
 async function resolveImagePart(
   file: FormDataEntryValue | null,
-  urlValue: FormDataEntryValue | null,
+  urlValue: string,
   label: string,
 ): Promise<ImagePart> {
   if (file instanceof File) {
@@ -39,10 +74,9 @@ async function resolveImagePart(
     }
   }
 
-  const url = typeof urlValue === "string" ? urlValue.trim() : ""
-  if (url) {
+  if (urlValue) {
     const safeUrl = await validateExternalReferenceUrl({
-      url,
+      url: urlValue,
       expectedKind: "image",
       maxContentLengthBytes: MAX_IMAGE_BYTES,
     })
@@ -67,15 +101,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const formData = await request.formData()
+    const inputs = await readAnalysisInputs(request)
     const characterPart = await resolveImagePart(
-      formData.get("character"),
-      formData.get("characterUrl"),
+      inputs.characterFile,
+      inputs.characterUrl,
       "Character reference",
     )
     const scenePart = await resolveImagePart(
-      formData.get("scene"),
-      formData.get("sceneUrl"),
+      inputs.sceneFile,
+      inputs.sceneUrl,
       "Scene reference",
     )
 
