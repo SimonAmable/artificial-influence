@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { flushSync } from "react-dom"
 import Link from "next/link"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { toast } from "sonner"
@@ -1423,21 +1424,9 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       let resolvedStudioSceneImage = studioToolSceneImage
 
       if (selectedStudioTool) {
-        try {
-          resolvedStudioSourceImage = await resolveAndStoreReferenceImage(studioToolSourceImage)
-          resolvedStudioSceneImage = await resolveAndStoreReferenceImage(studioToolSceneImage)
-        } catch (resolveError) {
-          toast.error(
-            resolveError instanceof Error
-              ? resolveError.message
-              : "Could not prepare reference images",
-          )
-          return
-        }
-
         const validationError = validateDualReferenceSwapState(selectedStudioTool, {
-          sourceImage: resolvedStudioSourceImage,
-          sceneImage: resolvedStudioSceneImage,
+          sourceImage: studioToolSourceImage,
+          sceneImage: studioToolSceneImage,
         })
         if (validationError) {
           toast.error(validationError.message)
@@ -1445,8 +1434,8 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         }
 
         studioToolPayload = buildStudioToolGenerationRequest(selectedStudioTool, {
-          sourceImage: resolvedStudioSourceImage,
-          sceneImage: resolvedStudioSceneImage,
+          sourceImage: studioToolSourceImage,
+          sceneImage: studioToolSceneImage,
           additionalInstructions: studioToolAdditionalInstructions,
         })
       } else if (!mergedPrompt.trim() && chipImageUrls.length === 0 && referenceImagesForRequest.length === 0) {
@@ -1511,12 +1500,37 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
         createdAt: new Date().toISOString(),
       }))
 
-      setTiles((prev) => [...optimisticTiles, ...prev])
-      tilesRef.current = [...optimisticTiles, ...tilesRef.current]
-      setPendingCount((count) => count + 1)
+      flushSync(() => {
+        setTiles((prev) => [...optimisticTiles, ...prev])
+        tilesRef.current = [...optimisticTiles, ...tilesRef.current]
+        setPendingCount((count) => count + 1)
+      })
       panToTiles(optimisticTiles)
 
       try {
+        if (selectedStudioTool) {
+          const [storedSource, storedScene] = await Promise.all([
+            resolveAndStoreReferenceImage(studioToolSourceImage),
+            resolveAndStoreReferenceImage(studioToolSceneImage),
+          ])
+          resolvedStudioSourceImage = storedSource
+          resolvedStudioSceneImage = storedScene
+
+          const storedValidationError = validateDualReferenceSwapState(selectedStudioTool, {
+            sourceImage: resolvedStudioSourceImage,
+            sceneImage: resolvedStudioSceneImage,
+          })
+          if (storedValidationError) {
+            throw new Error(storedValidationError.message)
+          }
+
+          studioToolPayload = buildStudioToolGenerationRequest(selectedStudioTool, {
+            sourceImage: resolvedStudioSourceImage,
+            sceneImage: resolvedStudioSceneImage,
+            additionalInstructions: studioToolAdditionalInstructions,
+          })
+        }
+
         if (
           selectedStudioTool?.requiresCharacterSwapAnalysis &&
           studioToolPayload &&

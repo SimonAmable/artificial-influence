@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { flushSync } from "react-dom"
 import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
 import {
   InfluencerInputBox,
@@ -685,21 +686,9 @@ function ImagePageContent() {
     let resolvedStudioSceneImage = studioToolSceneImage
 
     if (selectedStudioTool) {
-      try {
-        resolvedStudioSourceImage = await resolveAndStoreReferenceImage(studioToolSourceImage)
-        resolvedStudioSceneImage = await resolveAndStoreReferenceImage(studioToolSceneImage)
-      } catch (resolveError) {
-        reportImageInputError(
-          resolveError instanceof Error
-            ? resolveError.message
-            : "Could not prepare reference images",
-        )
-        return
-      }
-
       const validationError = validateDualReferenceSwapState(selectedStudioTool, {
-        sourceImage: resolvedStudioSourceImage,
-        sceneImage: resolvedStudioSceneImage,
+        sourceImage: studioToolSourceImage,
+        sceneImage: studioToolSceneImage,
       })
       if (validationError) {
         reportImageInputError(validationError.message)
@@ -707,8 +696,8 @@ function ImagePageContent() {
       }
 
       studioToolPayload = buildStudioToolGenerationRequest(selectedStudioTool, {
-        sourceImage: resolvedStudioSourceImage,
-        sceneImage: resolvedStudioSceneImage,
+        sourceImage: studioToolSourceImage,
+        sceneImage: studioToolSceneImage,
         additionalInstructions: studioToolAdditionalInstructions,
       })
     }
@@ -771,8 +760,49 @@ function ImagePageContent() {
     }
     const capturedModelParameters = { ...selectedModelParameters }
 
-    setPendingRequests((prev) => [optimisticPendingRequest, ...prev])
-    setLibraryTab("history")
+    flushSync(() => {
+      setPendingRequests((prev) => [optimisticPendingRequest, ...prev])
+      setLibraryTab("history")
+    })
+
+    if (selectedStudioTool) {
+      try {
+        const [storedSource, storedScene] = await Promise.all([
+          resolveAndStoreReferenceImage(studioToolSourceImage),
+          resolveAndStoreReferenceImage(studioToolSceneImage),
+        ])
+        resolvedStudioSourceImage = storedSource
+        resolvedStudioSceneImage = storedScene
+      } catch (resolveError) {
+        setPendingRequests((currentRequests) =>
+          removeSlotByClientId(currentRequests, clientRequestId),
+        )
+        reportImageInputError(
+          resolveError instanceof Error
+            ? resolveError.message
+            : "Could not prepare reference images",
+        )
+        return
+      }
+
+      const storedValidationError = validateDualReferenceSwapState(selectedStudioTool, {
+        sourceImage: resolvedStudioSourceImage,
+        sceneImage: resolvedStudioSceneImage,
+      })
+      if (storedValidationError) {
+        setPendingRequests((currentRequests) =>
+          removeSlotByClientId(currentRequests, clientRequestId),
+        )
+        reportImageInputError(storedValidationError.message)
+        return
+      }
+
+      studioToolPayload = buildStudioToolGenerationRequest(selectedStudioTool, {
+        sourceImage: resolvedStudioSourceImage,
+        sceneImage: resolvedStudioSceneImage,
+        additionalInstructions: studioToolAdditionalInstructions,
+      })
+    }
 
     if (
       selectedStudioTool?.requiresCharacterSwapAnalysis &&
