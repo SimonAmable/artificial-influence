@@ -34,6 +34,7 @@ import { carouselShotsHrefFromImage } from "@/lib/carousel-shots/constants"
 import {
   getGenerationToolDisplayName,
   shouldHideGenerationDetails,
+  shouldHideGenerationPrompt,
 } from "@/lib/generation/proprietary-prompt"
 import { FullscreenMediaViewer, type FullscreenMediaViewerAction } from "./fullscreen-media-viewer"
 import { copyMediaToClipboard, downloadMediaFile } from "./media-viewer-utils"
@@ -373,7 +374,7 @@ export function ImageGrid({
             </>
           )}
         </DropdownMenuItem>
-        {data.prompt && !shouldHideGenerationDetails(data.tool) && (
+        {data.prompt && !shouldHideGenerationPrompt(data.tool) && (
           <DropdownMenuItem
             onClick={(event) => {
               event.stopPropagation()
@@ -957,7 +958,7 @@ export function ImageGrid({
                       {getGenerationToolDisplayName(item.data.tool) ?? normalizeModelName(item.data.model ?? "")}
                     </p>
                   )}
-                  {item.data.prompt && !shouldHideGenerationDetails(item.data.tool) && (
+                  {item.data.prompt && !shouldHideGenerationPrompt(item.data.tool) && (
                     <button
                       type="button"
                       className="truncate w-full text-left text-[10px] leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-white/95"
@@ -973,7 +974,7 @@ export function ImageGrid({
                 </div>
                 {showExtendedActions && !isCondensed ? (
                   <div className="hidden shrink-0 flex-col items-end gap-1 lg:flex">
-                    {item.data.prompt?.trim() && !shouldHideGenerationDetails(item.data.tool) ? (
+                    {item.data.prompt?.trim() && !shouldHideGenerationPrompt(item.data.tool) ? (
                       <Button
                         type="button"
                         variant="secondary"
@@ -1160,7 +1161,7 @@ export function ImageGrid({
             model: shouldHideGenerationDetails(fullscreenImage.tool)
               ? getGenerationToolDisplayName(fullscreenImage.tool)
               : fullscreenImage.model ?? null,
-            prompt: shouldHideGenerationDetails(fullscreenImage.tool) ? null : fullscreenImage.prompt ?? null,
+            prompt: shouldHideGenerationPrompt(fullscreenImage.tool) ? null : fullscreenImage.prompt ?? null,
             tool: fullscreenImage.tool ?? null,
             aspectRatio: fullscreenImage.aspectRatio ?? null,
             type: fullscreenImage.type ?? null,

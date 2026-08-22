@@ -1004,7 +1004,7 @@ export function InfluencerInputBox({
                             key={optionValue}
                             value={optionValue}
                             icon={
-                              param.name === "quality" ? (
+                              param.name === "quality" || param.name === "resolution" ? (
                                 <QualityOptionIcon label={label} />
                               ) : undefined
                             }

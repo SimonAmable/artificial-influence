@@ -9,7 +9,7 @@ import {
   sendTelegramVideo,
 } from "@/lib/telegram/bot-api"
 
-type GenerationNotificationRow = {
+type ClaimedGenerationRow = {
   id: string
   type: "image" | "video" | "audio" | string
   supabase_storage_path: string | null
@@ -20,7 +20,7 @@ type TelegramProfileRow = {
   telegram_chat_id: number | null
 }
 
-function mediaLabel(type: GenerationNotificationRow["type"]): string {
+function mediaLabel(type: ClaimedGenerationRow["type"]): string {
   switch (type) {
     case "image":
       return "image"
@@ -60,35 +60,81 @@ async function downloadGenerationFile(
   }
 }
 
-async function sendPreviewMessage(
+async function sendSingleGenerationAlert(
   chatId: number,
   input: {
-    type: GenerationNotificationRow["type"]
+    type: ClaimedGenerationRow["type"]
     publicUrl: string
     caption: string
     replyMarkup: ReturnType<typeof buildOpenButton>
+    file: { buffer: Buffer; filename: string } | null
   },
-): Promise<number | null> {
+): Promise<boolean> {
   if (input.type === "image") {
-    return sendTelegramPhoto(chatId, {
+    const photoMessageId = await sendTelegramPhoto(chatId, {
       photoUrl: input.publicUrl,
       caption: input.caption,
       replyMarkup: input.replyMarkup,
     })
-  }
-
-  if (input.type === "video") {
-    return sendTelegramVideo(chatId, {
+    if (photoMessageId !== null) {
+      return true
+    }
+  } else if (input.type === "video") {
+    const videoMessageId = await sendTelegramVideo(chatId, {
       videoUrl: input.publicUrl,
       caption: input.caption,
       replyMarkup: input.replyMarkup,
     })
+    if (videoMessageId !== null) {
+      return true
+    }
   }
 
-  return sendTelegramMessage(chatId, {
+  if (input.file) {
+    const documentMessageId = await sendTelegramDocument(chatId, {
+      buffer: input.file.buffer,
+      filename: input.file.filename,
+      caption: input.caption,
+      replyMarkup: input.replyMarkup,
+    })
+    if (documentMessageId !== null) {
+      return true
+    }
+  }
+
+  const textMessageId = await sendTelegramMessage(chatId, {
     text: input.caption,
     replyMarkup: input.replyMarkup,
   })
+
+  return textMessageId !== null
+}
+
+async function claimGenerationTelegramNotification(
+  supabaseAdmin: SupabaseClient,
+  input: {
+    userId: string
+    generationId: string
+  },
+): Promise<ClaimedGenerationRow | null> {
+  const notifiedAt = new Date().toISOString()
+
+  const { data, error } = await supabaseAdmin
+    .from("generations")
+    .update({ telegram_notified_at: notifiedAt })
+    .eq("id", input.generationId)
+    .eq("user_id", input.userId)
+    .eq("status", "completed")
+    .is("telegram_notified_at", null)
+    .select("id, type, supabase_storage_path, prompt")
+    .maybeSingle()
+
+  if (error) {
+    console.error("[notify-generation-complete] claim failed:", error)
+    return null
+  }
+
+  return (data as ClaimedGenerationRow | null) ?? null
 }
 
 export async function notifyGenerationCompleteTelegram(
@@ -107,20 +153,27 @@ export async function notifyGenerationCompleteTelegram(
         .maybeSingle(),
       supabaseAdmin
         .from("generations")
-        .select("id, type, supabase_storage_path, prompt")
+        .select("id, type, supabase_storage_path, prompt, status, telegram_notified_at")
         .eq("id", input.generationId)
         .eq("user_id", input.userId)
         .maybeSingle(),
     ])
 
     const telegramProfile = profile as TelegramProfileRow | null
-    const generationRow = generation as GenerationNotificationRow | null
+    const generationRow = generation as (ClaimedGenerationRow & {
+      status?: string
+      telegram_notified_at?: string | null
+    }) | null
 
     if (typeof telegramProfile?.telegram_chat_id !== "number") {
       return
     }
 
-    if (!generationRow?.supabase_storage_path) {
+    if (
+      !generationRow?.supabase_storage_path ||
+      generationRow.status !== "completed" ||
+      generationRow.telegram_notified_at
+    ) {
       return
     }
 
@@ -128,46 +181,32 @@ export async function notifyGenerationCompleteTelegram(
       return
     }
 
+    const claimedRow = await claimGenerationTelegramNotification(supabaseAdmin, input)
+    if (!claimedRow?.supabase_storage_path) {
+      return
+    }
+
     const chatId = telegramProfile.telegram_chat_id
-    const label = mediaLabel(generationRow.type)
-    const deepLink = buildGenerationHistoryDeepLink(generationRow.id, getAppBaseUrl())
-    const caption = `Your ${label} is ready! Tap the file below for full resolution.`
+    const label = mediaLabel(claimedRow.type)
+    const deepLink = buildGenerationHistoryDeepLink(claimedRow.id, getAppBaseUrl())
+    const caption = `Your ${label} is ready!`
     const replyMarkup = buildOpenButton(deepLink)
 
     const { data: urlData } = supabaseAdmin.storage
       .from("public-bucket")
-      .getPublicUrl(generationRow.supabase_storage_path)
+      .getPublicUrl(claimedRow.supabase_storage_path)
 
-    const previewMessageId = await sendPreviewMessage(chatId, {
-      type: generationRow.type,
+    const file = await downloadGenerationFile(supabaseAdmin, claimedRow.supabase_storage_path)
+    const sent = await sendSingleGenerationAlert(chatId, {
+      type: claimedRow.type,
       publicUrl: urlData.publicUrl,
       caption,
       replyMarkup,
+      file,
     })
 
-    const file = await downloadGenerationFile(supabaseAdmin, generationRow.supabase_storage_path)
-    if (!file) {
-      if (previewMessageId === null) {
-        await sendTelegramMessage(chatId, {
-          text: `${caption}\n\n${deepLink}`,
-          replyMarkup,
-        })
-      }
-      return
-    }
-
-    const documentMessageId = await sendTelegramDocument(chatId, {
-      buffer: file.buffer,
-      filename: file.filename,
-      caption: "Full resolution",
-      replyToMessageId: previewMessageId ?? undefined,
-    })
-
-    if (previewMessageId === null && documentMessageId === null) {
-      await sendTelegramMessage(chatId, {
-        text: `${caption}\n\n${deepLink}`,
-        replyMarkup,
-      })
+    if (!sent) {
+      console.error("[notify-generation-complete] all Telegram delivery attempts failed:", input.generationId)
     }
   } catch (error) {
     console.error("[notify-generation-complete] telegram failed:", error)

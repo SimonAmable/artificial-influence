@@ -22,7 +22,7 @@ runTest("fast mode uses highest quality per model", () => {
   assert.deepEqual(getCarouselFastQualityParams("google/nano-banana-2"), { resolution: "4k" })
   assert.deepEqual(getCarouselFastQualityParams("google/nano-banana-2-lite"), {})
   assert.deepEqual(getCarouselFastQualityParams("xai/grok-imagine-image-2.0"), {
-    quality: "high",
+    quality: "medium",
     resolution: "2k",
   })
   assert.deepEqual(getCarouselFastQualityParams("bytedance/seedream-4.5"), {

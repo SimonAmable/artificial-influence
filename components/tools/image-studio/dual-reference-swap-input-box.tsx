@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/select"
 import type { Model } from "@/lib/types/models"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
+import { estimateStudioToolCredits } from "@/lib/image/studio-tools/estimate-credits"
+import { getStudioToolByUiModel } from "@/lib/image/studio-tools/registry"
 import type { ImageStudioReferenceSlot } from "@/lib/image/studio-tools/types"
 import { GenerateShaderButton } from "@/components/tools/influencer/generate-shader-button"
 import {
@@ -139,6 +141,15 @@ export function DualReferenceSwapInputBox({
     () => models.find((m) => m.identifier === selectedModel) ?? null,
     [models, selectedModel],
   )
+  const estimatedCredits = React.useMemo(() => {
+    if (!selectedModelObject) return null
+    const tool = selectedModel ? getStudioToolByUiModel(selectedModel) : null
+    return estimateStudioToolCredits({
+      baseModelIdentifier: tool?.baseModelIdentifier ?? selectedModelObject.identifier,
+      model_cost: selectedModelObject.model_cost,
+      pricing_config: selectedModelObject.pricing_config,
+    })
+  }, [selectedModel, selectedModelObject])
 
   const handleQuickUpload = React.useCallback(
     (target: "source" | "scene", file?: File) => {
@@ -338,7 +349,7 @@ export function DualReferenceSwapInputBox({
                 isGenerating={isGenerating}
                 allowConcurrent={allowConcurrent}
                 onGenerate={onGenerate}
-                creditCost={selectedModelObject?.model_cost ?? "-"}
+                creditCost={estimatedCredits ?? "-"}
               />
             </div>
           </div>

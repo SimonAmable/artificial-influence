@@ -40,6 +40,11 @@ import {
 } from "@/lib/server/xai-image-edits"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import {
+  isGrokImage2Identifier,
+  normalizeGrokImage2Quality,
+  normalizeGrokImage2Resolution,
+} from "@/lib/grok-image-2"
+import {
   aspectRatioToDimensions,
   buildReplicateReferenceImageInput,
   modelUsesDimensions,
@@ -425,11 +430,11 @@ export function createGenerateImageTool({
         .min(1)
         .max(32)
         .optional()
-        .describe("Optional output resolution when the selected model exposes a resolution option in listModels, for example `1k` or `2k` for Grok Image 2."),
+        .describe("Optional output quality/resolution when the selected model exposes a resolution option in listModels. For Grok Image 2 this is Quality: `1k` or `2k`."),
       quality: z
         .enum(["low", "medium", "high"])
         .optional()
-        .describe("Optional image quality. Grok Image 2 uses low for a 2-credit draft; medium and high use 4 credits."),
+        .describe("Optional image quality. For Grok Image 2 this is Thinking: `low` is off (2 credits) and `medium` is on (4 credits); `high` is treated as `medium`. For GPT Image 2 use low, medium, or high."),
       variantCount: z
         .number()
         .int()
@@ -582,14 +587,26 @@ export function createGenerateImageTool({
         }
 
         const gatewayReferenceUrls = referenceImageUrls.slice(0, 3)
-        const resolvedQuality =
-          quality ??
-          (typeof replicateInputDefaults.quality === "string" &&
-          ["low", "medium", "high"].includes(replicateInputDefaults.quality)
-            ? (replicateInputDefaults.quality as "low" | "medium" | "high")
-            : "low")
-        const resolvedResolution =
-          resolution === "1k" || resolution === "2k"
+        const resolvedQuality = isGrokImage2Identifier(modelIdentifier)
+          ? normalizeGrokImage2Quality(
+              quality ??
+                (typeof replicateInputDefaults.quality === "string"
+                  ? replicateInputDefaults.quality
+                  : null),
+            )
+          : quality ??
+            (typeof replicateInputDefaults.quality === "string" &&
+            ["low", "medium", "high"].includes(replicateInputDefaults.quality)
+              ? (replicateInputDefaults.quality as "low" | "medium" | "high")
+              : "low")
+        const resolvedResolution = isGrokImage2Identifier(modelIdentifier)
+          ? normalizeGrokImage2Resolution(
+              resolution ??
+                (typeof replicateInputDefaults.resolution === "string"
+                  ? replicateInputDefaults.resolution
+                  : null),
+            )
+          : resolution === "1k" || resolution === "2k"
             ? resolution
             : replicateInputDefaults.resolution === "2k"
               ? "2k"

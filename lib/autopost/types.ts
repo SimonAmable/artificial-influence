@@ -61,6 +61,13 @@ export type FanvuePublishOptions = {
   thumbnailUrl?: string | null
 }
 
+export type TelegramPublishOptions = {
+  /** Optional hint shown in the reminder (e.g. "Instagram", "TikTok"). */
+  targetPlatform?: string | null
+  telegramMessageId?: number | null
+  sentAt?: string | null
+}
+
 export type AutopostJobMetadata = {
   carouselItems?: AutopostCarouselItem[]
   /** Required when media_type is story. */
@@ -68,6 +75,7 @@ export type AutopostJobMetadata = {
   publishOptions?: AutopostPublishOptions
   tiktok?: TikTokPublishOptions
   fanvue?: FanvuePublishOptions
+  telegram?: TelegramPublishOptions
 }
 
 export type AutopostMediaType =
@@ -81,3 +89,4 @@ export type AutopostMediaType =
   | "tiktok_photo_upload"
   | "tiktok_photo_direct"
   | "fanvue_post"
+  | "telegram_reminder"

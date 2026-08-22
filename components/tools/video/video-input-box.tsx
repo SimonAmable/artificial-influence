@@ -19,6 +19,9 @@ import {
 import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
 import { MotionCopyPromptField } from "@/components/tools/motion-copy/motion-copy-prompt-field"
 import { MotionCopyFaceLockControl } from "@/components/tools/motion-copy/motion-copy-face-lock-control"
+import { MotionCopySwapModeControl } from "@/components/tools/motion-copy/motion-copy-swap-mode-control"
+import type { MotionCopySwapMode } from "@/lib/motion-copy/swap-mode"
+import { isMotionCopySwapActive } from "@/lib/motion-copy/swap-mode"
 import { VideoModelParameterControls } from "@/components/tools/video/video-model-parameter-controls"
 import { MultiShotEditor, type MultiShotItem } from "@/components/tools/video/multi-shot-editor"
 import { GenerateShaderButton } from "@/components/tools/influencer/generate-shader-button"
@@ -189,6 +192,9 @@ interface VideoInputBoxProps {
   onAttachedRefsChange?: (refs: AttachedRef[]) => void
   faceLockCustomImage?: ImageUpload | null
   onFaceLockCustomImageChange?: (image: ImageUpload | null) => void
+  motionSwapMode?: MotionCopySwapMode
+  onMotionSwapModeChange?: (mode: MotionCopySwapMode) => void
+  estimatedSwapCredits?: number | null
 }
 
 export function VideoInputBox({
@@ -227,6 +233,9 @@ export function VideoInputBox({
   onAttachedRefsChange,
   faceLockCustomImage = null,
   onFaceLockCustomImageChange,
+  motionSwapMode = "off",
+  onMotionSwapModeChange,
+  estimatedSwapCredits = null,
 }: VideoInputBoxProps) {
   const [attachedRefsLocal, setAttachedRefsLocal] = React.useState<AttachedRef[]>([])
   const attachedRefs = attachedRefsProp ?? attachedRefsLocal
@@ -893,7 +902,13 @@ export function VideoInputBox({
       isGenerating={isGenerating}
       allowConcurrent={allowConcurrent}
       onGenerate={onGenerate}
-      creditCost={estimatedCredits != null ? estimatedCredits : selectedModel.model_cost ?? "-"}
+      creditCost={
+        isMotionCopyModel && isMotionCopySwapActive(motionSwapMode) && estimatedSwapCredits != null
+          ? estimatedSwapCredits
+          : estimatedCredits != null
+            ? estimatedCredits
+            : selectedModel.model_cost ?? "-"
+      }
       activeSlotCount={displayGenerationSlotCount}
     />
   )
@@ -1078,21 +1093,31 @@ export function VideoInputBox({
         />
 
         {isMotionCopyModel ? (
-          <AnimatedControlItem>
-            <MotionCopyFaceLockControl
-              value={parseFaceLockMode(parameters.face_lock)}
-              onValueChange={handleFaceLockChange}
-              referenceImageUrl={inputImage?.url}
-              customFaceImageUrl={faceLockCustomImage?.url}
-              characterOrientation={
-                typeof parameters.character_orientation === "string"
-                  ? parameters.character_orientation
-                  : "video"
-              }
-              disabled={!allowOptionsDuringGeneration && isGenerating}
-              onRequestCustomPick={() => openAssetPicker("motion-copy-face-lock")}
-            />
-          </AnimatedControlItem>
+          <>
+            <AnimatedControlItem>
+              <MotionCopySwapModeControl
+                value={motionSwapMode}
+                onValueChange={(mode) => onMotionSwapModeChange?.(mode)}
+                disabled={!allowOptionsDuringGeneration && isGenerating}
+                estimatedSwapCredits={estimatedSwapCredits}
+              />
+            </AnimatedControlItem>
+            <AnimatedControlItem>
+              <MotionCopyFaceLockControl
+                value={parseFaceLockMode(parameters.face_lock)}
+                onValueChange={handleFaceLockChange}
+                referenceImageUrl={inputImage?.url}
+                customFaceImageUrl={faceLockCustomImage?.url}
+                characterOrientation={
+                  typeof parameters.character_orientation === "string"
+                    ? parameters.character_orientation
+                    : "video"
+                }
+                disabled={!allowOptionsDuringGeneration && isGenerating}
+                onRequestCustomPick={() => openAssetPicker("motion-copy-face-lock")}
+              />
+            </AnimatedControlItem>
+          </>
         ) : null}
 
       </div>

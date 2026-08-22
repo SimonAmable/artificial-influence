@@ -26,7 +26,7 @@ import { brandRefsOnly } from "@/lib/commands/ref-image-pipeline"
 import { validateVideoAttachedRefs } from "@/lib/commands/validate-video-refs"
 import { getVideoChipSlotInfo } from "@/lib/commands/video-chip-slots"
 import { generateVideoAndWait } from "@/lib/generate-video-client"
-import { isInsufficientCreditsMessage } from "@/lib/generate-image-client"
+import { isInsufficientCreditsError, isInsufficientCreditsMessage } from "@/lib/generate-image-client"
 import {
   toUserFacingGenerationError,
   tryShowContentModerationToast,
@@ -49,7 +49,21 @@ import { consumeVideoGenerationIntent } from "@/lib/video/video-generation-inten
 import { resolveReferenceImageForGeneration } from "@/lib/image/resolve-reference-for-generation"
 import { resolveReferenceVideoForGeneration } from "@/lib/video/resolve-reference-for-generation"
 import { isFaceLockActive, parseFaceLockMode } from "@/lib/motion-copy/face-lock"
+import {
+  isMotionCopySwapActive,
+  motionCopySwapHistoryToolTag,
+  motionCopySwapModeLabel,
+  type MotionCopySwapMode,
+} from "@/lib/motion-copy/swap-mode"
+import { estimateMotionSwapCredits } from "@/lib/motion-copy/estimate-motion-swap-credits"
+import { runSwapForMotionCopy } from "@/lib/motion-copy/run-swap-for-motion"
 import { getVideoDurationSeconds } from "@/lib/video-editor/media-parser"
+import { usePersistedSwapPreviewSlots } from "@/hooks/use-persisted-swap-preview-slots"
+import {
+  resolveSwapPreviewImageUpload,
+  resolveSwapPreviewVideoUpload,
+  type MotionSwapPreviewSlot,
+} from "@/lib/motion-copy/swap-preview-storage"
 
 interface PendingVideoRequest {
   clientRequestId: string
@@ -206,6 +220,15 @@ function VideoPageContent() {
   const [error, setError] = React.useState<string | null>(null)
   const [historyVideos, setHistoryVideos] = React.useState<VideoHistoryItem[]>([])
   const [pendingRequests, setPendingRequests] = React.useState<PendingVideoRequest[]>([])
+  const [motionSwapMode, setMotionSwapMode] = React.useState<MotionCopySwapMode>("off")
+  const {
+    slots: swapPreviewSlots,
+    setSlots: setSwapPreviewSlots,
+    removeSlot: removeSwapSlot,
+    updateSlot: updateSwapSlot,
+  } = usePersistedSwapPreviewSlots("video")
+  const motionContinueImageRef = React.useRef<ImageUpload | null>(null)
+  const motionContinueVideoRef = React.useRef<ImageUpload | null>(null)
   const [isHistoryLoading, setIsHistoryLoading] = React.useState(false)
   const [, setHistoryError] = React.useState<string | null>(null)
   const [attachedCommandRefs, setAttachedCommandRefs] = React.useState<AttachedRef[]>([])
@@ -220,7 +243,9 @@ function VideoPageContent() {
   const autoGenerateHandoffConsumedRef = React.useRef(false)
   const pendingAutoGenerateModelRef = React.useRef<string | null>(null)
   const pendingIntentParametersRef = React.useRef<Record<string, unknown> | null>(null)
-  const isGenerating = pendingRequests.length > 0
+  const isGenerating =
+    pendingRequests.length > 0 ||
+    swapPreviewSlots.some((slot) => slot.status === "pending")
   const lastLoadedReferenceImageUrlRef = React.useRef<string | null>(null)
 
   // Handle pre-loaded start frame from URL parameter (only load once)
@@ -485,6 +510,11 @@ function VideoPageContent() {
     }).quotedCredits
   }, [inputAudioDurationSeconds, inputVideo?.file, inputVideo?.url, inputVideoDurationSeconds, parameters, selectedModel])
 
+  const estimatedSwapCredits = React.useMemo(() => {
+    if (!isMotionCopySwapActive(motionSwapMode)) return null
+    return estimateMotionSwapCredits(motionSwapMode)
+  }, [motionSwapMode])
+
   React.useEffect(() => {
     if (parameters.character_orientation !== "image") return
     if (!isFaceLockActive(parseFaceLockMode(parameters.face_lock))) return
@@ -623,6 +653,29 @@ function VideoPageContent() {
         .map((video) => video.url)
         .filter((url): url is string => typeof url === "string" && url.length > 0),
     )
+    const swapItems = swapPreviewSlots.map((slot) => ({
+      createdAt: slot.startedAt,
+      item: {
+        type: "swap-preview" as const,
+        id: slot.clientRequestId,
+        status: slot.status,
+        beforeUrl: slot.beforeUrl,
+        afterUrl: slot.afterUrl,
+        model: motionCopySwapModeLabel(slot.swapMode),
+        tool: isMotionCopySwapActive(slot.swapMode)
+          ? motionCopySwapHistoryToolTag(slot.swapMode)
+          : "character_swap",
+        prompt:
+          slot.status === "pending"
+            ? `Extracting frame and running ${motionCopySwapModeLabel(slot.swapMode).toLowerCase()}…`
+            : slot.status === "failed"
+              ? slot.error
+              : "Review swap before motion video",
+        error: slot.error,
+        swapCredits: slot.swapCredits,
+        videoCredits: slot.videoCredits,
+      },
+    }))
     const generating = pendingRequests.map((request) => ({
       createdAt: request.startedAt,
       item: { type: "generating" as const, id: `slot-${request.clientRequestId}`, model: request.modelDisplayName || request.model, prompt: request.prompt },
@@ -638,10 +691,115 @@ function VideoPageContent() {
     const completed = historyVideos
       .filter((v) => v.url)
       .map((v) => ({ createdAt: v.createdAt, item: { type: "video" as const, data: v } }))
-    return [...generating, ...persisted, ...completed]
+    return [...swapItems, ...generating, ...persisted, ...completed]
       .sort((a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? ""))
       .map((entry) => entry.item)
-  }, [historyVideos, pendingRequests, persistedTasks])
+  }, [historyVideos, pendingRequests, persistedTasks, swapPreviewSlots])
+
+  const runMotionSwapPreview = React.useCallback(
+    async (clientRequestId?: string) => {
+      const slotId = clientRequestId ?? createClientRequestId()
+      const existing = clientRequestId
+        ? swapPreviewSlots.find((slot) => slot.clientRequestId === clientRequestId)
+        : null
+
+      const characterImage = existing
+        ? resolveSwapPreviewImageUpload(existing, inputImage)
+        : inputImage?.url
+          ? inputImage
+          : null
+      const drivingVideo = existing
+        ? resolveSwapPreviewVideoUpload(existing, inputVideo)
+        : inputVideo?.url
+          ? inputVideo
+          : null
+
+      if (!characterImage?.url) {
+        setError("Please upload an image")
+        return
+      }
+      if (!drivingVideo?.url) {
+        setError("Please upload a video")
+        return
+      }
+
+      const activeSwapMode = existing?.swapMode ?? motionSwapMode
+      if (!isMotionCopySwapActive(activeSwapMode)) {
+        setError("Select a swap mode")
+        return
+      }
+      const swapCredits = estimateMotionSwapCredits(activeSwapMode)
+      const swapLabel = motionCopySwapModeLabel(activeSwapMode)
+
+      if (!existing) {
+        setSwapPreviewSlots((prev) => [
+          {
+            clientRequestId: slotId,
+            startedAt: new Date().toISOString(),
+            swapMode: activeSwapMode,
+            status: "pending",
+            swapCredits,
+            videoCredits: estimatedVideoCredits,
+            characterImageUrl: characterImage.url,
+            drivingVideoUrl: drivingVideo.url,
+          },
+          ...prev,
+        ])
+      } else {
+        updateSwapSlot(slotId, {
+          status: "pending",
+          error: null,
+          afterUrl: null,
+          characterImageUrl: characterImage.url,
+          drivingVideoUrl: drivingVideo.url,
+        })
+      }
+
+      setError(null)
+
+      try {
+        const result = await runSwapForMotionCopy({
+          swapMode: activeSwapMode,
+          characterImage,
+          drivingVideo,
+        })
+        updateSwapSlot(slotId, {
+          status: "ready",
+          beforeUrl: result.anchorFrameUrl,
+          afterUrl: result.swappedImageUrl,
+          error: null,
+          swapCredits,
+          videoCredits: estimatedVideoCredits,
+          characterImageUrl: characterImage.url,
+          drivingVideoUrl: drivingVideo.url,
+        })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : `${swapLabel} failed`
+        if (isInsufficientCreditsError(err) || isInsufficientCreditsMessage(message)) {
+          showCreditsUpsellToast({
+            message,
+            description: "Upgrade your plan to continue swap preview",
+            toastId: "video-motion-swap-credits-upsell",
+          })
+        }
+        updateSwapSlot(slotId, {
+          status: "failed",
+          error: message,
+          characterImageUrl: characterImage.url,
+          drivingVideoUrl: drivingVideo.url,
+        })
+      }
+    },
+    [
+      estimatedVideoCredits,
+      inputImage,
+      inputVideo,
+      motionSwapMode,
+      swapPreviewSlots,
+      setSwapPreviewSlots,
+      updateSwapSlot,
+    ],
+  )
 
   // Handle generation
   const handleGenerate = async () => {
@@ -651,6 +809,23 @@ function VideoPageContent() {
     }
 
     const isMotionCopy = selectedModel.identifier === 'kwaivgi/kling-v2.6-motion-control' || selectedModel.identifier === 'kwaivgi/kling-v3-motion-control'
+    const continueOverrideImage = motionContinueImageRef.current
+    const continueOverrideVideo = motionContinueVideoRef.current
+    if (
+      isMotionCopy &&
+      isMotionCopySwapActive(motionSwapMode) &&
+      !continueOverrideImage
+    ) {
+      void runMotionSwapPreview()
+      return
+    }
+    if (continueOverrideImage) {
+      motionContinueImageRef.current = null
+    }
+    if (continueOverrideVideo) {
+      motionContinueVideoRef.current = null
+    }
+
     const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
     const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
     const isSeedance2 = isSeedanceVideoModelIdentifier(selectedModel.identifier)
@@ -793,10 +968,10 @@ function VideoPageContent() {
       mergedPrompt,
       parameters: { ...parameters },
       negativePrompt,
-      inputImage,
+      inputImage: continueOverrideImage ?? inputImage,
       faceLockCustomImage,
       lastFrameImage,
-      inputVideo,
+      inputVideo: continueOverrideVideo ?? inputVideo,
       inputAudio,
       referenceImages: [...referenceImages],
       attachedCommandRefs: [...attachedCommandRefs],
@@ -1305,6 +1480,33 @@ function VideoPageContent() {
     }
   }, [])
 
+  const handleSwapPreviewContinue = React.useCallback(
+    (id: string) => {
+      const slot = swapPreviewSlots.find((entry) => entry.clientRequestId === id)
+      const drivingVideo = slot ? resolveSwapPreviewVideoUpload(slot, inputVideo) : null
+      if (!slot?.afterUrl || !drivingVideo?.url) return
+      motionContinueImageRef.current = { url: slot.afterUrl }
+      motionContinueVideoRef.current = drivingVideo
+      removeSwapSlot(id)
+      void handleGenerateRef.current()
+    },
+    [inputVideo, removeSwapSlot, swapPreviewSlots],
+  )
+
+  const handleSwapPreviewRetry = React.useCallback(
+    (id: string) => {
+      void runMotionSwapPreview(id)
+    },
+    [runMotionSwapPreview],
+  )
+
+  const handleSwapPreviewCancel = React.useCallback(
+    (id: string) => {
+      removeSwapSlot(id)
+    },
+    [removeSwapSlot],
+  )
+
   // Render showcase
   const renderShowcase = () => {
     const hasItems = gridItems.length > 0
@@ -1320,6 +1522,9 @@ function VideoPageContent() {
           onUseVideoAsReference={handleUseVideoAsReference}
           onSaveVideoAsAsset={handleSaveVideoAsAsset}
           onDelete={handleDeleteVideo}
+          onSwapPreviewContinue={handleSwapPreviewContinue}
+          onSwapPreviewRetry={handleSwapPreviewRetry}
+          onSwapPreviewCancel={handleSwapPreviewCancel}
         />
       )
     }
@@ -1418,6 +1623,9 @@ function VideoPageContent() {
                     parameters={parameters}
                     onParametersChange={setParameters}
                     estimatedCredits={estimatedVideoCredits}
+                    motionSwapMode={motionSwapMode}
+                    onMotionSwapModeChange={setMotionSwapMode}
+                    estimatedSwapCredits={estimatedSwapCredits}
                     isGenerating={isGenerating}
                     activeGenerationCount={pendingRequests.length}
                     onGenerate={handleGenerate}
@@ -1455,6 +1663,8 @@ function VideoPageContent() {
                         onModelChange={setSelectedModel}
                         inputImage={inputImage}
                         onInputImageChange={setInputImage}
+                        faceLockCustomImage={faceLockCustomImage}
+                        onFaceLockCustomImageChange={setFaceLockCustomImage}
                         lastFrameImage={lastFrameImage}
                         onLastFrameChange={setLastFrameImage}
                         inputVideo={inputVideo}
@@ -1464,6 +1674,9 @@ function VideoPageContent() {
                         parameters={parameters}
                         onParametersChange={setParameters}
                         estimatedCredits={estimatedVideoCredits}
+                        motionSwapMode={motionSwapMode}
+                        onMotionSwapModeChange={setMotionSwapMode}
+                        estimatedSwapCredits={estimatedSwapCredits}
                         isGenerating={isGenerating}
                         activeGenerationCount={pendingRequests.length}
                         onGenerate={handleGenerate}
@@ -1513,6 +1726,9 @@ function VideoPageContent() {
                     parameters={parameters}
                     onParametersChange={setParameters}
                     estimatedCredits={estimatedVideoCredits}
+                    motionSwapMode={motionSwapMode}
+                    onMotionSwapModeChange={setMotionSwapMode}
+                    estimatedSwapCredits={estimatedSwapCredits}
                     isGenerating={isGenerating}
                     activeGenerationCount={pendingRequests.length}
                     onGenerate={handleGenerate}

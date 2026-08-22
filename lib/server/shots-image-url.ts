@@ -18,6 +18,10 @@ import {
 } from "@/lib/server/fal-image"
 import { callXaiImageEdits } from "@/lib/server/xai-image-edits"
 import { buildReplicateReferenceImageInput } from "@/lib/utils/model-parameters"
+import {
+  normalizeGrokImage2Quality,
+  normalizeGrokImage2Resolution,
+} from "@/lib/grok-image-2"
 
 const FAL_POLL_INTERVAL_MS = 2000
 const FAL_MAX_WAIT_MS = 5 * 60 * 1000
@@ -68,16 +72,16 @@ async function waitForFalImageUrl(endpointId: string, requestId: string): Promis
 }
 
 function parseGrokQualityParams(params: Record<string, unknown>): {
-  quality?: "low" | "medium" | "high"
-  resolution?: "1k" | "2k"
+  quality: "low" | "medium"
+  resolution: "1k" | "2k"
 } {
   return {
-    ...(typeof params.quality === "string"
-      ? { quality: params.quality as "low" | "medium" | "high" }
-      : {}),
-    ...(typeof params.resolution === "string"
-      ? { resolution: params.resolution as "1k" | "2k" }
-      : {}),
+    quality: normalizeGrokImage2Quality(
+      typeof params.quality === "string" ? params.quality : null,
+    ),
+    resolution: normalizeGrokImage2Resolution(
+      typeof params.resolution === "string" ? params.resolution : null,
+    ),
   }
 }
 

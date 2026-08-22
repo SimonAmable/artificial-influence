@@ -3,12 +3,15 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 
 import { parseSavedProfileFromMetadata } from "@/lib/instagram/profile"
+import { TELEGRAM_POST_CONNECTION_ID } from "@/lib/autopost/send-telegram-post-reminder"
 import { parseSocialMetadata, readStringMetadata, type SocialProvider } from "@/lib/social-connections"
 import { parseTikTokSavedProfile } from "@/lib/tiktok/profile"
 
+export type SocialConnectionToolProvider = SocialProvider | "telegram"
+
 export type SocialConnectionToolSummary = {
   id: string
-  provider: SocialProvider
+  provider: SocialConnectionToolProvider
   displayName: string | null
   username: string | null
   scopes: string[]
@@ -65,10 +68,43 @@ export async function listSocialConnections({
   supabase,
   userId,
 }: {
-  provider?: SocialProvider
+  provider?: SocialConnectionToolProvider
   supabase: SupabaseClient
   userId: string
 }) {
+  if (provider === "telegram") {
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("telegram_chat_id")
+      .eq("id", userId)
+      .maybeSingle()
+
+    if (error) {
+      throw new Error(`Failed to load Telegram connection: ${error.message}`)
+    }
+
+    if (typeof profile?.telegram_chat_id !== "number") {
+      return []
+    }
+
+    return [
+      {
+        accountType: null,
+        displayName: "Telegram reminders",
+        id: TELEGRAM_POST_CONNECTION_ID,
+        instagramConnectionId: null,
+        instagramUserId: null,
+        profileFetchedAt: null,
+        provider: "telegram" as const,
+        scopes: [],
+        status: "connected",
+        tokenExpiresAt: null,
+        updatedAt: new Date().toISOString(),
+        username: null,
+      },
+    ]
+  }
+
   let query = supabase
     .from("social_connections")
     .select(
@@ -87,7 +123,43 @@ export async function listSocialConnections({
     throw new Error(`Failed to load social connections: ${error.message}`)
   }
 
-  return ((data ?? []) as SocialConnectionRow[]).map(toToolSummary)
+  const connections = ((data ?? []) as SocialConnectionRow[]).map(toToolSummary)
+
+  if (provider) {
+    return connections
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("telegram_chat_id")
+    .eq("id", userId)
+    .maybeSingle()
+
+  if (profileError) {
+    throw new Error(`Failed to load Telegram connection: ${profileError.message}`)
+  }
+
+  if (typeof profile?.telegram_chat_id !== "number") {
+    return connections
+  }
+
+  return [
+    ...connections,
+    {
+      accountType: null,
+      displayName: "Telegram reminders",
+      id: TELEGRAM_POST_CONNECTION_ID,
+      instagramConnectionId: null,
+      instagramUserId: null,
+      profileFetchedAt: null,
+      provider: "telegram" as const,
+      scopes: [],
+      status: "connected",
+      tokenExpiresAt: null,
+      updatedAt: new Date().toISOString(),
+      username: null,
+    },
+  ]
 }
 
 export function createListSocialConnectionsTool({
@@ -96,9 +168,9 @@ export function createListSocialConnectionsTool({
 }: CreateListSocialConnectionsToolOptions) {
   return tool({
     description:
-      "List the user's connected social posting accounts. Use this before preparing an Instagram or TikTok post whenever the exact account is missing or ambiguous. Do not guess between multiple connected accounts.",
+      "List the user's connected social posting accounts. Use this before preparing an Instagram, TikTok, or Telegram post reminder whenever the exact account is missing or ambiguous. Do not guess between multiple connected accounts.",
     inputSchema: z.object({
-      provider: z.enum(["instagram", "tiktok"]).optional().describe("Optional provider filter."),
+      provider: z.enum(["instagram", "tiktok", "telegram"]).optional().describe("Optional provider filter."),
     }),
     strict: true,
     execute: async (input) => {
@@ -109,7 +181,13 @@ export function createListSocialConnectionsTool({
       })
 
       const providerLabel =
-        input.provider === "instagram" ? "Instagram" : input.provider === "tiktok" ? "TikTok" : "social"
+        input.provider === "instagram"
+          ? "Instagram"
+          : input.provider === "tiktok"
+            ? "TikTok"
+            : input.provider === "telegram"
+              ? "Telegram"
+              : "social"
 
       return {
         connections,

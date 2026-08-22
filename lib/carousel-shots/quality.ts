@@ -12,7 +12,7 @@ export function getCarouselFastQualityParams(
     case "google/nano-banana-2-lite":
       return {}
     case "xai/grok-imagine-image-2.0":
-      return { quality: "high", resolution: "2k" }
+      return { quality: "medium", resolution: "2k" }
     case "bytedance/seedream-4.5":
       return { resolutionPreset: "4K" }
     case "bytedance/seedream-5-lite":

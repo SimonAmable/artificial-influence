@@ -6,6 +6,11 @@ import {
   buildImagePricingParameters,
 } from '@/lib/generation-pricing';
 import {
+  formatGrokImage2QualityLabel,
+  formatGrokImage2ThinkingLabel,
+  isGrokImage2Identifier,
+} from '@/lib/grok-image-2';
+import {
   getParameterDefault,
   isStringParameter,
   parseModelParameters,
@@ -21,11 +26,15 @@ export function formatQualityOptionLabel(
   option: string,
   modelIdentifier?: string,
 ): string {
-  if (paramName !== 'quality') return option;
-
-  if (modelIdentifier === 'xai/grok-imagine-image-2.0') {
-    return option.charAt(0).toUpperCase() + option.slice(1);
+  if (isGrokImage2Identifier(modelIdentifier) && paramName === 'quality') {
+    return formatGrokImage2ThinkingLabel(option);
   }
+
+  if (isGrokImage2Identifier(modelIdentifier) && paramName === 'resolution') {
+    return formatGrokImage2QualityLabel(option);
+  }
+
+  if (paramName !== 'quality') return option;
 
   switch (option) {
     case 'low':
@@ -67,20 +76,17 @@ export function getImagePricingParameters(model: Model | null): StringParameterD
 
   return parseModelParameters(model.parameters).filter((param): param is StringParameterDefinition => {
     if (param.name === 'output_quality') return false;
-    if (model.identifier === 'xai/grok-imagine-image-2.0' && param.name === 'resolution') {
-      return false;
-    }
     if (!isPricingParameter(param)) return false;
     return isStringParameter(param) && Array.isArray(param.enum) && param.enum.length > 0;
   });
 }
 
 export function formatPricingOptionLabel(
-  model: Pick<Model, 'model_cost' | 'pricing_config'>,
+  model: Pick<Model, 'identifier' | 'model_cost' | 'pricing_config'>,
   paramName: string,
   option: string,
 ): string {
-  const baseLabel = formatQualityOptionLabel(paramName, option);
+  const baseLabel = formatQualityOptionLabel(paramName, option, model.identifier);
   const credits = resolveCreditsForParameterOption(model, paramName, option);
   if (credits == null) return baseLabel;
   return `${baseLabel} (${credits} cr)`;

@@ -9,7 +9,9 @@ import {
 } from "@/components/tools/influencer"
 import { ImageStudioToolInput } from "@/components/tools/image-studio"
 import {
+  appendCharacterSwapVisionHints,
   buildStudioToolGenerationRequest,
+  fetchCharacterSwapVisionHints,
   getStudioToolByUiModel,
   useEffectiveImageModels,
   validateDualReferenceSwapState,
@@ -770,6 +772,42 @@ function ImagePageContent() {
 
     setPendingRequests((prev) => [optimisticPendingRequest, ...prev])
     setLibraryTab("history")
+
+    if (
+      selectedStudioTool?.requiresCharacterSwapAnalysis &&
+      studioToolPayload &&
+      resolvedStudioSourceImage &&
+      resolvedStudioSceneImage
+    ) {
+      try {
+        const hints = await fetchCharacterSwapVisionHints(
+          resolvedStudioSourceImage,
+          resolvedStudioSceneImage,
+        )
+        studioToolPayload.prompt = appendCharacterSwapVisionHints(
+          studioToolPayload.prompt,
+          hints,
+        )
+        capturedPrompt = studioToolPayload.prompt
+        setPendingRequests((prev) =>
+          prev.map((request) =>
+            request.clientRequestId === clientRequestId
+              ? { ...request, prompt: capturedPrompt || null }
+              : request,
+          ),
+        )
+      } catch (analysisError) {
+        const message =
+          analysisError instanceof Error
+            ? analysisError.message
+            : "Could not analyze character swap references"
+        setPendingRequests((currentRequests) =>
+          removeSlotByClientId(currentRequests, clientRequestId),
+        )
+        reportImageInputError(message)
+        return
+      }
+    }
 
     if (selectedStudioTool?.requiresReferenceAnalysis && studioToolPayload && resolvedStudioSceneImage) {
       try {

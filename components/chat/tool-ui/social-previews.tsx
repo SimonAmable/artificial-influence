@@ -19,7 +19,13 @@ export function formatInstagramSchedule(value?: string | null) {
 }
 
 export function socialProviderLabel(provider?: SocialProvider | null) {
-  return provider === "tiktok" ? "TikTok" : "Instagram"
+  if (provider === "tiktok") {
+    return "TikTok"
+  }
+  if (provider === "telegram") {
+    return "Telegram"
+  }
+  return "Instagram"
 }
 
 export function socialAccountLabel(
@@ -98,6 +104,12 @@ export function SocialPostMediaPreview({
         : input.mediaUrl
           ? [{ kind: input.mediaType === "image" ? "image" : "video", url: input.mediaUrl }]
           : []
+      : input.provider === "telegram"
+        ? (input.carouselItems ?? []).length > 0
+          ? (input.carouselItems ?? [])
+          : input.mediaUrl
+            ? [{ kind: input.assetKind === "video" ? "video" : "image", url: input.mediaUrl }]
+            : []
       : input.postType === "photo"
         ? (input.photoItems ?? []).map((url) => ({ kind: "image" as const, url }))
         : input.mediaUrl

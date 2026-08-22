@@ -3,7 +3,17 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
-import { ArrowsOutSimple, Copy, DownloadSimple, FilmStrip, Plus, Trash } from "@phosphor-icons/react"
+import {
+  ArrowsClockwise,
+  ArrowsOutSimple,
+  Copy,
+  DownloadSimple,
+  FilmStrip,
+  Plus,
+  Trash,
+  X,
+} from "@phosphor-icons/react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import {
@@ -33,10 +43,27 @@ export interface VideoHistoryItem {
   referenceImageUrls?: string[]
 }
 
+export type VideoGridSwapPreviewStatus = "pending" | "ready" | "failed"
+
 export type VideoGridItem =
   | { type: "generating"; id: string; model?: string | null; prompt?: string | null }
   | { type: "failed"; id: string; model?: string | null; prompt?: string | null; error?: string | null }
   | { type: "video"; data: VideoHistoryItem }
+  | {
+      type: "swap-preview"
+      id: string
+      status: VideoGridSwapPreviewStatus
+      beforeUrl?: string | null
+      afterUrl?: string | null
+      model?: string | null
+      tool?: string | null
+      prompt?: string | null
+      error?: string | null
+      /** Credits already charged (or about to charge) for the swap still. */
+      swapCredits?: number | null
+      /** Credits that will be charged if the user continues to motion video. */
+      videoCredits?: number | null
+    }
 
 /** Legacy shape for backward compatibility. */
 interface LegacyGeneratedVideo {
@@ -62,6 +89,9 @@ interface VideoGridProps {
   onUseVideoAsReference?: (videoUrl: string, index: number) => void
   onSaveVideoAsAsset?: (videoUrl: string, index: number) => void
   onDelete?: (id: string, videoUrl: string, index: number) => void | Promise<void>
+  onSwapPreviewContinue?: (id: string) => void
+  onSwapPreviewRetry?: (id: string) => void
+  onSwapPreviewCancel?: (id: string) => void
 }
 
 function displayTime(item: VideoHistoryItem): number {
@@ -213,6 +243,153 @@ function GeneratingCell({ item }: { item: Extract<VideoGridItem, { type: "genera
   )
 }
 
+function SwapPreviewCell({
+  item,
+  onContinue,
+  onRetry,
+  onCancel,
+  onViewFullscreen,
+}: {
+  item: Extract<VideoGridItem, { type: "swap-preview" }>
+  onContinue?: (id: string) => void
+  onRetry?: (id: string) => void
+  onCancel?: (id: string) => void
+  onViewFullscreen?: (item: Extract<VideoGridItem, { type: "swap-preview" }>) => void
+}) {
+  const isPending = item.status === "pending"
+  const isReady = item.status === "ready"
+  const isFailed = item.status === "failed"
+  const canFullscreen = Boolean(item.afterUrl || item.beforeUrl)
+
+  return (
+    <div className="relative isolate flex aspect-square w-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-zinc-900">
+      {isPending ? (
+        <div
+          className="absolute inset-y-0 left-0 bg-gradient-to-r from-zinc-800 to-zinc-700"
+          style={{
+            width: "0%",
+            animation: "fillProgress 60s linear infinite",
+            boxShadow: "2px 0 8px 0 rgba(255, 255, 255, 0.4)",
+          }}
+        />
+      ) : null}
+
+      <div className="relative z-10 grid min-h-0 flex-1 grid-cols-2 gap-px bg-white/10">
+        <div className="relative min-h-0 bg-zinc-950">
+          {item.beforeUrl ? (
+            <Image
+              src={item.beforeUrl}
+              alt="Scene frame"
+              fill
+              className="object-contain"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center px-2 text-center text-[10px] text-white/50">
+              Scene frame
+            </div>
+          )}
+          <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white/90">
+            Scene
+          </span>
+        </div>
+        <div className="relative min-h-0 bg-zinc-950">
+          {item.afterUrl ? (
+            <Image
+              src={item.afterUrl}
+              alt="Swapped character"
+              fill
+              className="object-contain"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center px-2 text-center text-[10px] text-white/50">
+              {isPending ? "Swapping…" : "Swap result"}
+            </div>
+          )}
+          <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white/90">
+            Swap
+          </span>
+        </div>
+      </div>
+
+      <div className="relative z-20 space-y-1.5 border-t border-white/10 bg-black/70 p-2">
+        <div className="min-w-0 text-left text-[10px] text-white/90">
+          <p className="truncate font-semibold">
+            {isFailed
+              ? `${item.model ?? "Swap"} failed`
+              : isPending
+                ? item.model ?? "Swapping…"
+                : "Swap preview"}
+          </p>
+          <p className="truncate text-white/60">
+            {isFailed
+              ? item.error || "Retry the swap before making a video."
+              : isPending
+                ? item.prompt ?? "Extracting frame and running swap…"
+                : [
+                    item.swapCredits != null ? `Swap ${item.swapCredits} cr` : null,
+                    item.videoCredits != null ? `Video ~${item.videoCredits} cr` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "Review before continuing to motion video"}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1">
+          {canFullscreen ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-7 gap-1 px-2 text-[10px]"
+              onClick={() => onViewFullscreen?.(item)}
+            >
+              <ArrowsOutSimple className="size-3" />
+              Fullscreen
+            </Button>
+          ) : null}
+          {isReady ? (
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 px-2 text-[10px]"
+              onClick={() => onContinue?.(item.id)}
+            >
+              {item.videoCredits != null ? `Continue · ${item.videoCredits} cr` : "Continue"}
+            </Button>
+          ) : null}
+          {(isReady || isFailed) && onRetry ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 border-white/20 bg-transparent px-2 text-[10px] text-white hover:bg-white/10"
+              onClick={() => onRetry(item.id)}
+            >
+              <ArrowsClockwise className="size-3" />
+              {item.swapCredits != null ? `Retry · ${item.swapCredits} cr` : "Retry"}
+            </Button>
+          ) : null}
+          {onCancel ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 gap-1 px-2 text-[10px] text-white/80 hover:bg-white/10 hover:text-white"
+              onClick={() => onCancel(item.id)}
+              disabled={isPending}
+            >
+              <X className="size-3" />
+              Cancel
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function VideoGrid({
   items: itemsProp,
   videos = [],
@@ -224,6 +401,9 @@ export function VideoGrid({
   onUseVideoAsReference,
   onSaveVideoAsAsset,
   onDelete,
+  onSwapPreviewContinue,
+  onSwapPreviewRetry,
+  onSwapPreviewCancel,
 }: VideoGridProps) {
   const [columnCount, setColumnCount] = React.useState(initialColumnCount)
 
@@ -246,6 +426,10 @@ export function VideoGrid({
     item: VideoHistoryItem
     index: number
   } | null>(null)
+  const [fullscreenSwapPreview, setFullscreenSwapPreview] = React.useState<Extract<
+    VideoGridItem,
+    { type: "swap-preview" }
+  > | null>(null)
   const [copiedVideoUrl, setCopiedVideoUrl] = React.useState<string | null>(null)
   const [deletingVideoId, setDeletingVideoId] = React.useState<string | null>(null)
   const [pendingDeleteVideo, setPendingDeleteVideo] = React.useState<{
@@ -371,12 +555,33 @@ export function VideoGrid({
             ))}
 
           {!showSkeletonOnly &&
-            items.map((item, index) =>
-              item.type === "generating" || item.type === "failed" ? (
-                <div key={item.id} className="min-w-0 shrink-0">
-                  <GeneratingCell item={item} />
-                </div>
-              ) : (
+            items.map((item, index) => {
+              if (item.type === "generating" || item.type === "failed") {
+                return (
+                  <div key={item.id} className="min-w-0 shrink-0">
+                    <GeneratingCell item={item} />
+                  </div>
+                )
+              }
+
+              if (item.type === "swap-preview") {
+                return (
+                  <div key={item.id} className="min-w-0 shrink-0">
+                    <SwapPreviewCell
+                      item={item}
+                      onContinue={onSwapPreviewContinue}
+                      onRetry={onSwapPreviewRetry}
+                      onCancel={onSwapPreviewCancel}
+                      onViewFullscreen={(preview) => {
+                        setFullscreenVideo(null)
+                        setFullscreenSwapPreview(preview)
+                      }}
+                    />
+                  </div>
+                )
+              }
+
+              return (
                 <div
                   key={item.data.id ?? `video-${item.data.url}-${displayTime(item.data)}`}
                   className="min-w-0 shrink-0"
@@ -385,17 +590,51 @@ export function VideoGrid({
                     item={item.data}
                     index={index}
                     showNativeControlsOnHoverOnly={showNativeControlsOnHoverOnly}
-                    onViewFullscreen={(video, videoIndex) =>
+                    onViewFullscreen={(video, videoIndex) => {
+                      setFullscreenSwapPreview(null)
                       setFullscreenVideo({ item: video, index: videoIndex })
-                    }
+                    }}
                     onUseVideoAsReference={onUseVideoAsReference}
                     onSaveVideoAsAsset={onSaveVideoAsAsset}
                   />
                 </div>
-              ),
-            )}
+              )
+            })}
         </div>
       </div>
+
+      {fullscreenSwapPreview && (fullscreenSwapPreview.afterUrl || fullscreenSwapPreview.beforeUrl) ? (
+        <FullscreenMediaViewer
+          kind="image"
+          url={(fullscreenSwapPreview.afterUrl || fullscreenSwapPreview.beforeUrl)!}
+          title={`${fullscreenSwapPreview.model ?? "Swap"} preview`}
+          metadata={{
+            id: fullscreenSwapPreview.id,
+            model: fullscreenSwapPreview.model ?? "Swap",
+            prompt: fullscreenSwapPreview.prompt ?? null,
+            tool: fullscreenSwapPreview.tool ?? "character_swap",
+            type: "image",
+          }}
+          referenceImages={[
+            ...(fullscreenSwapPreview.beforeUrl
+              ? [{ imageUrl: fullscreenSwapPreview.beforeUrl }]
+              : []),
+            ...(fullscreenSwapPreview.afterUrl &&
+            fullscreenSwapPreview.afterUrl !== fullscreenSwapPreview.beforeUrl
+              ? [{ imageUrl: fullscreenSwapPreview.afterUrl }]
+              : []),
+          ]}
+          onClose={() => setFullscreenSwapPreview(null)}
+          actions={({ url }): FullscreenMediaViewerAction[] => [
+            {
+              id: "download",
+              label: "Download",
+              icon: <DownloadSimple className="size-4" />,
+              onClick: () => void downloadMediaFile({ url, kind: "image" }),
+            },
+          ]}
+        />
+      ) : null}
 
       {fullscreenVideo && (
         <FullscreenMediaViewer

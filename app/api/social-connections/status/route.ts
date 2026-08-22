@@ -69,6 +69,16 @@ export async function GET() {
       .in("status", ["connected", "error", "expired"])
       .order("updated_at", { ascending: false })
 
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("telegram_chat_id")
+      .eq("id", user.id)
+      .maybeSingle()
+
+    if (profileError) {
+      console.error("[social-connections/status] telegram profile lookup failed:", profileError)
+    }
+
     if (error) {
       console.error("[social-connections/status] query failed:", error)
       return NextResponse.json({ error: "Failed to fetch social connection status." }, { status: 500 })
@@ -78,6 +88,7 @@ export async function GET() {
     const instagram = connections.filter((connection) => connection.provider === "instagram")
     const tiktok = connections.filter((connection) => connection.provider === "tiktok")
     const fanvue = connections.filter((connection) => connection.provider === "fanvue")
+    const telegramConnected = typeof profile?.telegram_chat_id === "number"
 
     return NextResponse.json({
       providers: {
@@ -93,6 +104,32 @@ export async function GET() {
           connected: fanvue.some((connection) => connection.status === "connected"),
           connections: fanvue,
         },
+        telegram: {
+          connected: telegramConnected,
+          connections: telegramConnected
+            ? [
+                {
+                  id: "telegram",
+                  provider: "telegram",
+                  providerAccountId: String(profile.telegram_chat_id),
+                  username: null,
+                  displayName: "Telegram reminders",
+                  avatarUrl: null,
+                  status: "connected",
+                  scopes: [],
+                  tokenExpiresAt: null,
+                  refreshTokenExpiresAt: null,
+                  updatedAt: new Date().toISOString(),
+                  metadata: {},
+                  profile: null,
+                  instagramConnectionId: null,
+                  instagramUserId: null,
+                  instagramUsername: null,
+                  accountType: null,
+                },
+              ]
+            : [],
+        },
       },
       instagram: {
         connected: instagram.some((connection) => connection.status === "connected"),
@@ -105,6 +142,32 @@ export async function GET() {
       fanvue: {
         connected: fanvue.some((connection) => connection.status === "connected"),
         connections: fanvue,
+      },
+      telegram: {
+        connected: telegramConnected,
+        connections: telegramConnected
+          ? [
+              {
+                id: "telegram",
+                provider: "telegram",
+                providerAccountId: String(profile?.telegram_chat_id),
+                username: null,
+                displayName: "Telegram reminders",
+                avatarUrl: null,
+                status: "connected",
+                scopes: [],
+                tokenExpiresAt: null,
+                refreshTokenExpiresAt: null,
+                updatedAt: new Date().toISOString(),
+                metadata: {},
+                profile: null,
+                instagramConnectionId: null,
+                instagramUserId: null,
+                instagramUsername: null,
+                accountType: null,
+              },
+            ]
+          : [],
       },
     })
   } catch (error) {

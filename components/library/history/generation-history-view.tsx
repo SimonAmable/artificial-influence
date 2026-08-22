@@ -28,7 +28,10 @@ import type { AssetType } from "@/lib/assets/types"
 import { anglesHrefFromImage } from "@/lib/angles/constants"
 import { carouselShotsHrefFromImage } from "@/lib/carousel-shots/constants"
 import { isCarouselShotsGeneration } from "@/lib/carousel-shots/library-summary"
-import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
+import {
+  shouldHideGenerationDetails,
+  shouldHideGenerationPrompt,
+} from "@/lib/generation/proprietary-prompt"
 import { cn } from "@/lib/utils"
 
 const COLUMN_COUNT_STORAGE_KEY = "unican-content-media-column-count"
@@ -309,14 +312,14 @@ export function GenerationHistoryView({
           kind={viewerGeneration.type}
           url={viewerGeneration.url}
           title={
-            shouldHideGenerationDetails(viewerGeneration.tool)
+            shouldHideGenerationPrompt(viewerGeneration.tool)
               ? "Generated media"
               : viewerGeneration.prompt || "Generated media"
           }
           metadata={{
             id: viewerGeneration.id,
             model: shouldHideGenerationDetails(viewerGeneration.tool) ? null : viewerGeneration.model,
-            prompt: shouldHideGenerationDetails(viewerGeneration.tool) ? null : viewerGeneration.prompt,
+            prompt: shouldHideGenerationPrompt(viewerGeneration.tool) ? null : viewerGeneration.prompt,
             tool: viewerGeneration.tool,
             aspectRatio: viewerGeneration.aspect_ratio,
             type: viewerGeneration.type,

@@ -19,7 +19,7 @@ import type {
 import { formatRelativeDate } from "@/components/library/history/utils"
 import type { AssetType } from "@/lib/assets/types"
 import { isCarouselShotsGeneration } from "@/lib/carousel-shots/library-summary"
-import { shouldHideGenerationDetails } from "@/lib/generation/proprietary-prompt"
+import { shouldHideGenerationPrompt } from "@/lib/generation/proprietary-prompt"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
@@ -105,7 +105,7 @@ export function GenerationCard({
             </span>
           </div>
 
-          {generation.prompt && !shouldHideGenerationDetails(generation.tool) ? (
+          {generation.prompt && !shouldHideGenerationPrompt(generation.tool) ? (
             <p className="truncate select-none text-left text-[10px] font-medium leading-tight text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
               {generation.prompt}
             </p>
@@ -267,7 +267,7 @@ export function GenerationCard({
           </div>
         </div>
 
-        {generation.prompt && !shouldHideGenerationDetails(generation.tool) ? (
+        {generation.prompt && !shouldHideGenerationPrompt(generation.tool) ? (
           <p className="truncate select-none text-left text-[10px] font-medium leading-tight text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
             {generation.prompt}
           </p>

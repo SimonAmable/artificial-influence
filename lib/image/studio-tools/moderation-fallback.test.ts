@@ -4,6 +4,7 @@ import {
   STUDIO_IMAGE_FALLBACK_CHAIN,
   getStudioToolFalQualityParams,
   isModerationGenerationFailure,
+  isStudioImageFallbackModel,
   isStudioImageToolTag,
 } from "@/lib/image/studio-tools/moderation-fallback"
 
@@ -33,7 +34,12 @@ test("studio fallback chain starts with gpt image 2", () => {
   ])
 })
 
-test("studio tool quality params use the lowest tier per model", () => {
+test("isStudioImageFallbackModel matches the rescue ladder", () => {
+  assert.equal(isStudioImageFallbackModel("openai/gpt-image-2"), true)
+  assert.equal(isStudioImageFallbackModel("custom/character-swap"), false)
+})
+
+test("studio tool quality params use the locked generation tier per model", () => {
   assert.deepEqual(getStudioToolFalQualityParams("google/nano-banana-2-lite"), {})
   assert.deepEqual(getStudioToolFalQualityParams("openai/gpt-image-2"), { quality: "medium" })
   assert.deepEqual(getStudioToolFalQualityParams("bytedance/seedream-5-lite"), {

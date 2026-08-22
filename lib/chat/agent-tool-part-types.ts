@@ -838,7 +838,7 @@ export type InstagramConnectionToolSummary = {
   updatedAt: string
 }
 
-export type SocialProvider = "instagram" | "tiktok"
+export type SocialProvider = "instagram" | "tiktok" | "telegram"
 
 export type SocialConnectionToolSummary = {
   accountType?: string | null
@@ -998,6 +998,20 @@ export type PrepareSocialPostToolInput =
       postType?: "video" | "photo"
       privacyLevel?: string
       scheduledAt?: string
+    }
+  | {
+      provider: "telegram"
+      action: "draft" | "publish" | "schedule"
+      assetKind?: "image" | "video"
+      caption?: string
+      carouselItems?: Array<{
+        kind: "image" | "video"
+        url: string
+      }>
+      connectionId: string
+      mediaUrl?: string
+      scheduledAt?: string
+      targetPlatform?: string
     }
 
 export type PrepareSocialPostToolPart = {

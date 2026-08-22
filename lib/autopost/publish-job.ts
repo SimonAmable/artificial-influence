@@ -18,11 +18,12 @@ import { getValidTikTokAccessToken } from "@/lib/tiktok/token-service"
 import { getValidFanvueAccessToken } from "@/lib/fanvue/token-service"
 import { createFanvuePost } from "@/lib/fanvue/posts"
 import { FanvueApiError } from "@/lib/fanvue/client"
+import { sendTelegramPostReminder } from "@/lib/autopost/send-telegram-post-reminder"
 
 export type PublishAutopostJobResult =
   | {
       ok: true
-      provider: "instagram" | "tiktok" | "fanvue"
+      provider: "instagram" | "tiktok" | "fanvue" | "telegram"
       instagramMediaId?: string
       containerId?: string
       publishId?: string
@@ -568,6 +569,100 @@ async function publishFanvueAutopostJob(
   }
 }
 
+async function publishTelegramAutopostJob(
+  supabase: SupabaseClient,
+  row: AutopostJobRow,
+  jobId: string,
+): Promise<PublishAutopostJobResult> {
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("telegram_chat_id")
+    .eq("id", row.user_id)
+    .maybeSingle()
+
+  if (profileError) {
+    console.error("[autopost/publish-job] telegram profile lookup failed:", profileError)
+    return { ok: false, error: "Failed to verify Telegram connection.", statusCode: 500 }
+  }
+
+  if (typeof profile?.telegram_chat_id !== "number") {
+    return {
+      ok: false,
+      error: "Connect Telegram in Settings before sending post reminders.",
+      statusCode: 400,
+    }
+  }
+
+  const claimError = await claimJobForProcessing(supabase, row, jobId)
+  if (claimError) {
+    return claimError
+  }
+
+  const metadata = parseMetadata(row.metadata)
+
+  try {
+    const { messageId } = await sendTelegramPostReminder({
+      chatId: profile.telegram_chat_id,
+      caption: row.caption,
+      mediaUrl: row.media_url,
+      metadata,
+      scheduledAt: row.scheduled_at,
+    })
+
+    if (messageId === null) {
+      throw new Error("Telegram did not accept the reminder message.")
+    }
+
+    const publishedAt = new Date().toISOString()
+    const nextMetadata: AutopostJobMetadata = {
+      ...metadata,
+      telegram: {
+        ...(metadata.telegram ?? {}),
+        telegramMessageId: messageId,
+        sentAt: publishedAt,
+      },
+    }
+
+    const { error: successUpdateError } = await supabase
+      .from("autopost_jobs")
+      .update({
+        status: "published",
+        published_at: publishedAt,
+        provider_publish_id: String(messageId),
+        last_error: null,
+        metadata: nextMetadata,
+        updated_at: publishedAt,
+      })
+      .eq("id", jobId)
+      .eq("user_id", row.user_id)
+
+    if (successUpdateError) {
+      console.error("[autopost/publish-job] Telegram success update failed:", successUpdateError)
+    }
+
+    return { ok: true, provider: "telegram", publishId: String(messageId), status: "published" }
+  } catch (publishError) {
+    const message =
+      publishError instanceof Error ? publishError.message : "Telegram reminder delivery failed."
+
+    const { error: failUpdateError } = await supabase
+      .from("autopost_jobs")
+      .update({
+        status: "failed",
+        last_error: message.slice(0, 2000),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", jobId)
+      .eq("user_id", row.user_id)
+
+    if (failUpdateError) {
+      console.error("[autopost/publish-job] Telegram fail update failed:", failUpdateError)
+    }
+
+    return { ok: false, error: message, statusCode: 502 }
+  }
+}
+
 /**
  * Loads the job, validates status, publishes to Instagram, and updates the row.
  * Works with the user-scoped server client (RLS) or the service role client.
@@ -624,6 +719,10 @@ export async function publishAutopostJob(
 
   if ((row.provider ?? "instagram") === "fanvue") {
     return publishFanvueAutopostJob(supabase, row, jobId, { forceQueuedBeforeDue })
+  }
+
+  if ((row.provider ?? "instagram") === "telegram") {
+    return publishTelegramAutopostJob(supabase, row, jobId)
   }
 
   if ((row.provider ?? "instagram") === "tiktok") {

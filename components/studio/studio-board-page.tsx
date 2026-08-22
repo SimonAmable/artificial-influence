@@ -39,7 +39,9 @@ import { StudioBoardContextMenu, type StudioBoardMenuState } from "@/components/
 import { useDefaultEnhancePrompt } from "@/hooks/use-default-enhance-prompt"
 import { useModels } from "@/hooks/use-models"
 import {
+  appendCharacterSwapVisionHints,
   buildStudioToolGenerationRequest,
+  fetchCharacterSwapVisionHints,
   getStudioToolByUiModel,
   useEffectiveImageModels,
   validateDualReferenceSwapState,
@@ -1514,6 +1516,22 @@ export function StudioBoardPage({ projectId }: StudioBoardPageProps) {
       panToTiles(optimisticTiles)
 
       try {
+        if (
+          selectedStudioTool?.requiresCharacterSwapAnalysis &&
+          studioToolPayload &&
+          resolvedStudioSourceImage &&
+          resolvedStudioSceneImage
+        ) {
+          const hints = await fetchCharacterSwapVisionHints(
+            resolvedStudioSourceImage,
+            resolvedStudioSceneImage,
+          )
+          studioToolPayload.prompt = appendCharacterSwapVisionHints(
+            studioToolPayload.prompt,
+            hints,
+          )
+        }
+
         if (selectedStudioTool?.requiresReferenceAnalysis && studioToolPayload && resolvedStudioSceneImage) {
           const analysisData = new FormData()
           if (resolvedStudioSceneImage.file) {

@@ -22,6 +22,9 @@ export interface MotionCopyInputBoxProps {
   defaultVideo?: ImageUpload | null
   isGenerating?: boolean
   forceRowLayout?: boolean
+  /** Override generate button label (e.g. Preview swap · 4 cr). */
+  generateLabel?: string
+  generatingLabel?: string
   photoUploadProps?: {
     title?: string
     description?: string
@@ -57,6 +60,8 @@ export function MotionCopyInputBox({
   defaultVideo,
   isGenerating = false,
   forceRowLayout = false,
+  generateLabel = "Generate",
+  generatingLabel = "Generating...",
   photoUploadProps,
   videoUploadProps,
   extraControls,
@@ -191,10 +196,10 @@ export function MotionCopyInputBox({
             {isGenerating ? (
               <>
                 <CircleNotch className="size-4 mr-2 animate-spin" />
-                Generating...
+                {generatingLabel}
               </>
             ) : (
-              "Generate"
+              generateLabel
             )}
           </Button>
         </div>

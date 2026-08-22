@@ -1,3 +1,5 @@
+import { isGrokImage2Identifier, normalizeGrokImage2Quality } from "@/lib/grok-image-2"
+
 const MAX_XAI_REFERENCE_IMAGES = 3
 
 export interface XaiImageEditsRequest {
@@ -71,7 +73,13 @@ export async function callXaiImageEdits(
       response_format: "b64_json",
       ...(request.n != null && request.n > 1 ? { n: request.n } : {}),
       ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
-      ...(request.quality ? { quality: request.quality } : {}),
+      ...(request.quality
+        ? {
+            quality: isGrokImage2Identifier(request.modelIdentifier)
+              ? normalizeGrokImage2Quality(request.quality)
+              : request.quality,
+          }
+        : {}),
       ...(request.resolution ? { resolution: request.resolution } : {}),
     }),
   })

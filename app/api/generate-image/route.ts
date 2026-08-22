@@ -58,6 +58,7 @@ import {
   resolveStudioToolMaxQuotedCredits,
   resolveStudioToolPricingQuote,
 } from '@/lib/server/studio-tool-image-generation';
+import { resolveXaiImageQuality } from '@/lib/grok-image-2';
 
 const STALE_PENDING_MINUTES = 30;
 const FREE_CONCURRENCY_LIMIT = 1;
@@ -803,10 +804,7 @@ export async function POST(request: NextRequest) {
       modelIdentifier,
       referenceImageUrls.length,
     );
-    const xaiEditsQuality =
-      effectiveQuality && ['low', 'medium', 'high'].includes(effectiveQuality)
-        ? (effectiveQuality as 'low' | 'medium' | 'high')
-        : null;
+    const xaiEditsQuality = resolveXaiImageQuality(modelIdentifier, effectiveQuality);
     const xaiEditsResolution =
       effectiveResolution && ['1k', '2k'].includes(effectiveResolution)
         ? (effectiveResolution as '1k' | '2k')
@@ -846,12 +844,8 @@ export async function POST(request: NextRequest) {
       // xAI/Grok provider options
       console.log('[generate-image] Setting up xAI provider options');
       generateOptions.providerOptions.xai = {
-        ...(effectiveQuality && ['low', 'medium', 'high'].includes(effectiveQuality) && {
-          quality: effectiveQuality,
-        }),
-        ...(effectiveResolution && ['1k', '2k'].includes(effectiveResolution) && {
-          resolution: effectiveResolution,
-        }),
+        ...(xaiEditsQuality && { quality: xaiEditsQuality }),
+        ...(xaiEditsResolution && { resolution: xaiEditsResolution }),
         ...(seed && { seed }),
       };
     } else {

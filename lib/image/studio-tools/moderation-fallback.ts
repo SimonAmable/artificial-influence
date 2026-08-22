@@ -22,6 +22,12 @@ export function isStudioImageToolTag(tool: string | null | undefined): boolean {
   return IMAGE_STUDIO_TOOLS.some((entry) => entry.historyToolTag === tool)
 }
 
+export function isStudioImageFallbackModel(
+  model: string,
+): model is StudioImageFallbackModelId {
+  return (STUDIO_IMAGE_FALLBACK_CHAIN as readonly string[]).includes(model)
+}
+
 export function isModerationGenerationFailure(error: unknown): boolean {
   if (error instanceof Error) {
     return isContentModerationMessage(error.message)

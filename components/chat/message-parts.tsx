@@ -583,9 +583,11 @@ export function MessageParts({
           const mediaTypeLabel =
             toolPart.input?.provider === "instagram"
               ? toolPart.input.mediaType
-              : toolPart.input?.postType === "photo"
-                ? "photo"
-                : "video"
+              : toolPart.input?.provider === "telegram"
+                ? "reminder"
+                : toolPart.input?.postType === "photo"
+                  ? "photo"
+                  : "video"
 
           if (toolPart.state === "input-streaming" || toolPart.state === "input-available") {
             return (
@@ -618,9 +620,13 @@ export function MessageParts({
                     </p>
                     <p className="text-muted-foreground">
                       {toolPart.input?.action === "schedule"
-                        ? `Schedule this ${providerLabel} post${scheduleLabel ? ` for ${scheduleLabel}` : ""}?`
+                        ? toolPart.input.provider === "telegram"
+                          ? `Schedule this Telegram post reminder${scheduleLabel ? ` for ${scheduleLabel}` : ""}?`
+                          : `Schedule this ${providerLabel} post${scheduleLabel ? ` for ${scheduleLabel}` : ""}?`
                         : toolPart.input?.action === "publish"
-                          ? toolPart.input.provider === "tiktok"
+                          ? toolPart.input.provider === "telegram"
+                            ? "Send this post reminder to Telegram now?"
+                            : toolPart.input.provider === "tiktok"
                             ? toolPart.input.mode === "upload"
                               ? "Send this post to TikTok inbox now?"
                               : "Submit this post to TikTok now?"

@@ -24,7 +24,10 @@ export interface ImageStudioToolDefinition {
   }
   referenceSlots: ImageStudioReferenceSlot[]
   inputKind: ImageStudioToolInputKind
+  /** Shot Recreate: analyze scene image and append structured JSON to the prompt. */
   requiresReferenceAnalysis?: boolean
+  /** Character Swap: analyze both references and append short vision hints to the prompt. */
+  requiresCharacterSwapAnalysis?: boolean
   includeSceneReferenceInGeneration?: boolean
   icon?: "product" | string
 }

@@ -2,19 +2,58 @@ import { NextResponse } from "next/server"
 
 import { createInstagramPostJob, type PrepareInstagramPostInput } from "@/lib/autopost/create-instagram-post-job"
 import { createTikTokPostJob, type PrepareTikTokPostInput } from "@/lib/autopost/create-tiktok-post-job"
+import { createTelegramPostJob, type PrepareTelegramPostInput } from "@/lib/autopost/create-telegram-post-job"
 import { createClient } from "@/lib/supabase/server"
 
 type MediaType = "image" | "reel" | "feed_video" | "carousel" | "story"
 
 function parseBody(
   body: unknown,
-): PrepareInstagramPostInput | PrepareTikTokPostInput | "invalid_body" {
+): PrepareInstagramPostInput | PrepareTikTokPostInput | PrepareTelegramPostInput | "invalid_body" {
   if (!body || typeof body !== "object") {
     return "invalid_body"
   }
   const record = body as Record<string, unknown>
-  const provider = record.provider === "tiktok" ? "tiktok" : "instagram"
+  const provider =
+    record.provider === "tiktok"
+      ? "tiktok"
+      : record.provider === "telegram"
+        ? "telegram"
+        : "instagram"
   const caption = typeof record.caption === "string" ? record.caption : ""
+
+  if (provider === "telegram") {
+    const mediaUrl = typeof record.mediaUrl === "string" ? record.mediaUrl.trim() : ""
+    const carouselItems = Array.isArray(record.carouselItems)
+      ? record.carouselItems
+          .filter((item): item is { url: string; kind: "image" | "video" } => {
+            if (!item || typeof item !== "object") return false
+            const candidate = item as Record<string, unknown>
+            return (
+              typeof candidate.url === "string" &&
+              (candidate.kind === "image" || candidate.kind === "video")
+            )
+          })
+          .map((item) => ({
+            kind: item.kind,
+            url: item.url.trim(),
+          }))
+      : undefined
+
+    if (!mediaUrl && (!carouselItems || carouselItems.length === 0)) {
+      return "invalid_body"
+    }
+
+    return {
+      action: "draft",
+      assetKind: record.assetKind === "video" ? "video" : record.assetKind === "image" ? "image" : undefined,
+      caption,
+      carouselItems,
+      mediaUrl: mediaUrl || undefined,
+      scheduledAt: typeof record.scheduledAt === "string" ? record.scheduledAt.trim() : undefined,
+      targetPlatform: typeof record.targetPlatform === "string" ? record.targetPlatform.trim() : undefined,
+    }
+  }
 
   if (provider === "tiktok") {
     const tiktokConnectionId =
@@ -114,8 +153,16 @@ function parseBody(
   }
 }
 
-function isTikTokInput(input: PrepareInstagramPostInput | PrepareTikTokPostInput): input is PrepareTikTokPostInput {
+function isTikTokInput(
+  input: PrepareInstagramPostInput | PrepareTikTokPostInput | PrepareTelegramPostInput,
+): input is PrepareTikTokPostInput {
   return "tiktokConnectionId" in input
+}
+
+function isTelegramInput(
+  input: PrepareInstagramPostInput | PrepareTikTokPostInput | PrepareTelegramPostInput,
+): input is PrepareTelegramPostInput {
+  return !("instagramConnectionId" in input) && !("tiktokConnectionId" in input)
 }
 
 export async function POST(request: Request) {
@@ -164,7 +211,18 @@ export async function POST(request: Request) {
 
     const scheduleLater = hasScheduledAt && scheduledAtMs > Date.now()
 
-    const result = isTikTokInput(parsed)
+    const result = isTelegramInput(parsed)
+      ? await createTelegramPostJob({
+          input: {
+            ...parsed,
+            action: scheduleLater ? "schedule" : "draft",
+            scheduledAt: scheduleLater ? parsed.scheduledAt : undefined,
+          },
+          supabase,
+          supabaseUrl,
+          userId: user.id,
+        })
+      : isTikTokInput(parsed)
       ? await createTikTokPostJob({
           input: {
             ...parsed,

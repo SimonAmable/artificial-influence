@@ -17,6 +17,7 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  Send,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -198,6 +199,9 @@ function scheduledVsPublishedNote(job: AutopostJobRow): string | null {
 
 /** Label for which IG account a job targets (shown prominently in the list). */
 function jobAccountLabel(job: AutopostJobRow): string {
+  if (job.provider === "telegram") {
+    return "Telegram reminders"
+  }
   if (job.provider === "tiktok") {
     return job.social_display_name || job.social_username || "TikTok"
   }
@@ -233,6 +237,8 @@ function mediaTypeLabel(mediaType: string): string {
       return "TikTok photo inbox upload"
     case "tiktok_photo_direct":
       return "TikTok photo Direct Post"
+    case "telegram_reminder":
+      return "Telegram reminder"
     default:
       return mediaType
   }
@@ -253,6 +259,9 @@ function jobListThumbnailIsVideo(job: AutopostJobRow): boolean {
   }
   if (t === "carousel") {
     return job.metadata?.carouselItems?.[0]?.kind === "video"
+  }
+  if (t === "telegram_reminder") {
+    return job.metadata?.assetKind === "video" || job.metadata?.carouselItems?.[0]?.kind === "video"
   }
   return false
 }
@@ -545,7 +554,7 @@ function targetMatchesComposer(
   )
 }
 
-type SocialProvider = "instagram" | "tiktok"
+type SocialProvider = "instagram" | "tiktok" | "telegram"
 
 type SocialConnectionItem = {
   id: string
@@ -576,9 +585,11 @@ type SocialConnectionsStatus = {
   providers?: {
     instagram?: SocialProviderStatus
     tiktok?: SocialProviderStatus
+    telegram?: SocialProviderStatus
   }
   instagram?: SocialProviderStatus
   tiktok?: SocialProviderStatus
+  telegram?: SocialProviderStatus
 }
 
 type TikTokSavedProfile = {
@@ -594,7 +605,7 @@ type DisconnectTarget = {
   label: string
 }
 
-type ComposerProvider = "instagram" | "tiktok"
+type ComposerProvider = "instagram" | "tiktok" | "telegram"
 type TikTokMode = "upload" | "direct"
 type TikTokPostType = "video" | "photo"
 type RepurposeIntent = "copy" | "move"
@@ -669,6 +680,9 @@ function inferredComposerPostTypeLabel(
   postFormat: PostFormat,
   tiktokPostType: TikTokPostType,
 ): string {
+  if (provider === "telegram") {
+    return "Telegram reminder"
+  }
   if (provider === "tiktok") {
     return tiktokPostType === "photo" ? "Photo post" : "Video"
   }
@@ -800,14 +814,30 @@ function statusBadgeClass(status: string) {
 }
 
 function providerLabel(provider: SocialProvider) {
-  return provider === "tiktok" ? "TikTok" : "Instagram"
+  if (provider === "tiktok") {
+    return "TikTok"
+  }
+  if (provider === "telegram") {
+    return "Telegram"
+  }
+  return "Instagram"
 }
 
 function providerIconSrc(provider: SocialProvider) {
-  return provider === "tiktok" ? "/brand_icons/tiktok-icon.svg" : "/brand_icons/instagram-icon.svg"
+  if (provider === "tiktok") {
+    return "/brand_icons/tiktok-icon.svg"
+  }
+  if (provider === "telegram") {
+    return ""
+  }
+  return "/brand_icons/instagram-icon.svg"
 }
 
 function BrandIcon({ provider, className }: { provider: SocialProvider; className?: string }) {
+  if (provider === "telegram") {
+    return <Send aria-hidden className={cn("text-sky-500", className)} />
+  }
+
   return (
     <Image
       alt=""
@@ -976,16 +1006,19 @@ export function AutopostPage() {
       const payload = data as SocialConnectionsStatus
       const instagram = payload.providers?.instagram ?? payload.instagram ?? { connected: false, connections: [] }
       const tiktok = payload.providers?.tiktok ?? payload.tiktok ?? { connected: false, connections: [] }
+      const telegram = payload.providers?.telegram ?? payload.telegram ?? { connected: false, connections: [] }
       setStatus({
-        providers: { instagram, tiktok },
+        providers: { instagram, tiktok, telegram },
         instagram,
         tiktok,
+        telegram,
       })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load social connection status")
       const emptyStatus = {
         instagram: { connected: false, connections: [] },
         tiktok: { connected: false, connections: [] },
+        telegram: { connected: false, connections: [] },
       }
       setStatus({ providers: emptyStatus, ...emptyStatus })
     } finally {
@@ -1361,6 +1394,25 @@ export function AutopostPage() {
     window.location.href = "/api/tiktok/connect"
   }
 
+  const handleConnectTelegram = async () => {
+    try {
+      const response = await fetch("/api/telegram/connect", { cache: "no-store" })
+      const data = (await response.json()) as { deepLink?: string; error?: string }
+      if (!response.ok || !data.deepLink) {
+        throw new Error(data.error || "Could not start Telegram linking.")
+      }
+      window.open(data.deepLink, "_blank", "noopener,noreferrer")
+      toast.message("Finish linking in Telegram", {
+        description: "Tap Start in the bot chat, then return here.",
+      })
+      window.setTimeout(() => {
+        void fetchStatus()
+      }, 4000)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not start Telegram linking.")
+    }
+  }
+
   const handleDisconnect = async () => {
     if (!disconnectTarget) {
       return
@@ -1507,6 +1559,57 @@ export function AutopostPage() {
     if (sourceMediaItems.length === 0) {
       toast.error("Choose media first.")
       return null
+    }
+
+    if (composerProvider === "telegram") {
+      if (!status?.telegram?.connected) {
+        toast.error("Connect Telegram in Settings before scheduling reminders.")
+        return null
+      }
+
+      const body: Record<string, unknown> = {
+        provider: "telegram",
+        caption,
+      }
+      if (scheduledAtIso) {
+        body.scheduledAt = scheduledAtIso
+      }
+
+      if (sourceMediaItems.length >= 2) {
+        if (sourceMediaItems.length > 10) {
+          toast.error("Telegram reminders support up to 10 media items.")
+          return null
+        }
+        body.carouselItems = sourceMediaItems.map((item) => ({
+          url: item.url,
+          kind: item.kind,
+        }))
+      } else if (sourceMediaItems.length === 1) {
+        const single = sourceMediaItems[0]
+        body.mediaUrl = single.url
+        body.assetKind = single.kind
+      } else {
+        toast.error("Add one or more media files for the Telegram reminder.")
+        return null
+      }
+
+      const draftResponse = await fetch("/api/autopost/drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+
+      const draftData = (await draftResponse.json()) as { error?: string; draft?: { id: string } }
+      if (!draftResponse.ok) {
+        throw new Error(draftData.error || "Failed to save Telegram reminder.")
+      }
+
+      const jobId = draftData.draft?.id
+      if (!jobId) {
+        throw new Error("Draft saved but missing job id.")
+      }
+
+      return { jobId, mediaType: "telegram_reminder" }
     }
 
     if (composerProvider === "tiktok") {
@@ -1792,6 +1895,10 @@ export function AutopostPage() {
               ? "TikTok will notify the account to finish this draft in-app."
               : "TikTok will process this Direct Post asynchronously.",
         })
+      } else if (mediaType === "telegram_reminder") {
+        toast.message("Sending Telegram reminder...", {
+          description: "Your caption and media will arrive in your linked Telegram chat.",
+        })
       } else if (mediaType === "reel" || mediaType === "feed_video" || mediaType === "carousel") {
         toast.message("Publishing...", {
           description: "Instagram may take a few minutes to process video or multi-slide posts.",
@@ -1817,7 +1924,9 @@ export function AutopostPage() {
         moveWarning = error instanceof Error ? error.message : "Repurpose succeeded, but the original draft could not be removed."
       }
       toast.success(
-        publishData.provider === "tiktok"
+        publishData.provider === "telegram"
+          ? "Telegram reminder sent."
+          : publishData.provider === "tiktok"
           ? tiktokMode === "upload"
             ? "Sent to TikTok inbox."
             : tiktokPostType === "photo"
@@ -1862,7 +1971,9 @@ export function AutopostPage() {
         moveWarning = error instanceof Error ? error.message : "Repurpose succeeded, but the original draft could not be removed."
       }
       toast.success(
-        composerProvider === "tiktok"
+        composerProvider === "telegram"
+          ? "Telegram reminder scheduled. It will send automatically when due."
+          : composerProvider === "tiktok"
           ? "TikTok post scheduled. It will submit automatically when due."
           : "Post scheduled. It will publish automatically when due."
       )
@@ -2150,6 +2261,7 @@ export function AutopostPage() {
   const instagramComposerAvatarSrc = socialConnectionAvatarSrc(selectedInstagramConnection)
   const tiktokComposerAvatarSrc = socialConnectionAvatarSrc(selectedTikTokConnection)
   const isTikTokConnected = tiktokConnections.some((connection) => connection.status === "connected")
+  const isTelegramConnected = status?.telegram?.connected === true
   const tikTokRequiredScope = tiktokMode === "direct" ? "video.publish" : "video.upload"
   const repurposeTargetsForInstagram = repurposeSource?.allowedTargets.filter((target) => target.provider === "instagram") ?? []
   const repurposeTargetsForTikTok = repurposeSource?.allowedTargets.filter((target) => target.provider === "tiktok") ?? []
@@ -2168,7 +2280,11 @@ export function AutopostPage() {
     (tiktokMode === "upload" || Boolean(tiktokPrivacyLevel))
 
   const composerReady =
-    composerProvider === "tiktok"
+    composerProvider === "telegram"
+      ? isTelegramConnected &&
+        (composerMediaItems.length === 1 ||
+          (composerMediaItems.length >= 2 && composerMediaItems.length <= 10))
+      : composerProvider === "tiktok"
       ? tiktokReady
       : postFormat === "carousel"
         ? composerMediaItems.length >= 2 && composerMediaItems.length <= 10
@@ -2239,7 +2355,12 @@ export function AutopostPage() {
 
     const { job } = activeViewerJob
     const busy = actionJobId === job.id
-    const canPublishThisJob = job.provider === "tiktok" ? isTikTokConnected : isConnected
+    const canPublishThisJob =
+      job.provider === "telegram"
+        ? isTelegramConnected
+        : job.provider === "tiktok"
+          ? isTikTokConnected
+          : isConnected
     const actions: AutopostViewerAction[] = [
       {
         id: "repurpose",
@@ -2285,7 +2406,7 @@ export function AutopostPage() {
         id: "retry",
         label: "Retry",
         variant: "secondary",
-        disabled: busy || (job.provider === "tiktok" ? !isTikTokConnected : !isConnected),
+        disabled: busy || (job.provider === "telegram" ? !isTelegramConnected : job.provider === "tiktok" ? !isTikTokConnected : !isConnected),
         onClick: () => {
           setActiveViewerJob(null)
           void handleRetryFailed(job.id)
@@ -2451,7 +2572,9 @@ export function AutopostPage() {
                     {repurposeSource ? "Upload new files any time to replace the repurposed media. " : ""}
                     {composerProvider === "instagram"
                       ? "Pick one image, one video, or 2–10 files for a carousel. The post type below updates from your selection."
-                      : "Pick one video, or 1–35 images for a photo post (not both in one upload). The post type below updates from your selection."}{" "}
+                      : composerProvider === "telegram"
+                        ? "Pick one image or video, or 2–10 images for a multi-media reminder."
+                        : "Pick one video, or 1–35 images for a photo post (not both in one upload). The post type below updates from your selection."}{" "}
                     {composerProvider === "instagram" ? (
                       <>
                         PNG/WebP/GIF are converted to JPEG where needed (
@@ -2553,6 +2676,12 @@ export function AutopostPage() {
                         <SelectItem value="tiktok" disabled={repurposeSource ? !repurposeAllowedProviders.has("tiktok") : false}>
                           TikTok
                         </SelectItem>
+                        <SelectItem
+                          value="telegram"
+                          disabled={repurposeSource ? !repurposeAllowedProviders.has("telegram") : false}
+                        >
+                          Telegram reminder
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -2603,6 +2732,29 @@ export function AutopostPage() {
                             ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                  ) : composerProvider === "telegram" ? (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Telegram destination</Label>
+                      <div className="flex min-h-11 items-center gap-2.5 rounded-md border border-border/70 bg-muted/20 px-3 py-2">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                          <Send className="h-4 w-4 text-sky-500" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">Telegram reminders</p>
+                          <p className="text-xs text-muted-foreground">
+                            Sends your caption and media to your linked Telegram chat when due.
+                          </p>
+                        </div>
+                      </div>
+                      {!isTelegramConnected ? (
+                        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-950 dark:text-amber-100">
+                          Link Telegram in Settings to receive scheduled post reminders.
+                          <Button type="button" size="sm" className="mt-2 w-full" onClick={() => void handleConnectTelegram()}>
+                            Connect Telegram
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -2724,6 +2876,10 @@ export function AutopostPage() {
                       {tiktokPostType === "photo"
                         ? "TikTok photo posts support a title plus an optional description. Inbox drafts can still be edited in TikTok."
                         : "TikTok captions are sent as the video title for Direct Post. Inbox drafts can still be edited in TikTok."}
+                    </p>
+                  ) : composerProvider === "telegram" ? (
+                    <p className="text-xs text-muted-foreground">
+                      Telegram reminders include your caption and attached media so you can copy them when it is time to post.
                     </p>
                   ) : null}
                 </div>
@@ -2931,7 +3087,9 @@ export function AutopostPage() {
                       isPostingDraft ||
                       (composerProvider === "instagram"
                         ? !isConnected || !selectedComposerConnectionId
-                        : !isTikTokConnected || !selectedTikTokConnectionId)
+                        : composerProvider === "telegram"
+                          ? !isTelegramConnected
+                          : !isTikTokConnected || !selectedTikTokConnectionId)
                     }
                   >
                     {isPostingDraft && composerTab === "now" ? (
@@ -2942,7 +3100,9 @@ export function AutopostPage() {
                     ) : (
                       <>
                         <Upload className="mr-2 h-4 w-4" />
-                        {composerProvider === "tiktok"
+                        {composerProvider === "telegram"
+                          ? "Send Telegram reminder"
+                          : composerProvider === "tiktok"
                           ? tiktokMode === "upload"
                             ? "Send to TikTok inbox"
                             : tiktokPostType === "photo"
@@ -3078,7 +3238,9 @@ export function AutopostPage() {
                       isPostingDraft ||
                       (composerProvider === "instagram"
                         ? !isConnected || !selectedComposerConnectionId
-                        : !isTikTokConnected || !selectedTikTokConnectionId)
+                        : composerProvider === "telegram"
+                          ? !isTelegramConnected
+                          : !isTikTokConnected || !selectedTikTokConnectionId)
                     }
                   >
                     {isPostingDraft && composerTab === "schedule" ? (
@@ -3089,7 +3251,11 @@ export function AutopostPage() {
                     ) : (
                       <>
                         <CalendarClock className="mr-2 h-4 w-4" />
-                        {composerProvider === "tiktok" ? "Schedule TikTok" : "Schedule post"}
+                        {composerProvider === "telegram"
+                          ? "Schedule Telegram reminder"
+                          : composerProvider === "tiktok"
+                            ? "Schedule TikTok"
+                            : "Schedule post"}
                       </>
                     )}
                   </Button>
@@ -3215,7 +3381,12 @@ export function AutopostPage() {
                             ? job.metadata?.tiktok?.photoItems?.length
                             : undefined
                       const scheduleNote = scheduledVsPublishedNote(job)
-                      const canPublishThisJob = job.provider === "tiktok" ? isTikTokConnected : isConnected
+                      const canPublishThisJob =
+                        job.provider === "telegram"
+                          ? isTelegramConnected
+                          : job.provider === "tiktok"
+                            ? isTikTokConnected
+                            : isConnected
                       const repurposeTargets = getRepurposeTargets(job, instagramConnections, tiktokConnections)
                       const viewerIcon = getJobViewerIcon(job)
                       return (

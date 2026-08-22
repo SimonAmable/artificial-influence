@@ -33,5 +33,6 @@ export const CHARACTER_SWAP_TOOL: ImageStudioToolDefinition = {
     },
   ],
   inputKind: "dual-reference-swap",
+  requiresCharacterSwapAnalysis: true,
   icon: "product",
 }

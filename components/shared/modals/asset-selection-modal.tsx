@@ -213,6 +213,7 @@ export function AssetSelectionModal({
   const uploadReferenceInputRef = React.useRef<HTMLInputElement>(null)
   const uploadsLoadMoreSentinelRef = React.useRef<HTMLDivElement | null>(null)
   const uploadsStateRef = React.useRef(uploadsState)
+  const wasOpenRef = React.useRef(false)
 
   React.useEffect(() => {
     uploadsStateRef.current = uploadsState
@@ -233,7 +234,14 @@ export function AssetSelectionModal({
   }, [])
 
   React.useEffect(() => {
-    if (!open) return
+    if (!open) {
+      wasOpenRef.current = false
+      return
+    }
+
+    if (wasOpenRef.current) return
+    wasOpenRef.current = true
+
     setActiveTab(defaultTab)
     setAssetCategory(presetCategory ?? "all")
     setHistoryType(resolveDefaultHistoryType(allowedAssetTypes))

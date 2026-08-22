@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { Select, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectTrigger } from "@/components/ui/select"
 import { UserFocus } from "@phosphor-icons/react"
 import {
   PromptControlMenuContent,
@@ -76,7 +76,7 @@ export function MotionCopyFaceLockControl({
           "h-8 gap-1.5 px-2 text-xs font-medium",
           mode !== "off" && "border-primary/40",
         )}
-        aria-label="Face lock"
+        aria-label={`Face lock: ${faceLockLabel(mode)}`}
       >
         {thumbUrl ? (
           <span className="relative size-5 shrink-0 overflow-hidden rounded-full border border-border">
@@ -98,26 +98,16 @@ export function MotionCopyFaceLockControl({
         <span className="max-w-[5.5rem] truncate">
           {mode === "off" ? "Face lock" : faceLockLabel(mode)}
         </span>
-        <SelectValue className="sr-only" />
       </SelectTrigger>
       <PromptControlMenuContent align="start">
         <PromptControlMenuGroup label="Face lock">
-          <PromptControlMenuItem
-            value="off"
-            label="Off"
-            description="Standard motion copy"
-          />
+          <PromptControlMenuItem value="off" label="Off" />
           <PromptControlMenuItem
             value="reference"
             label="From reference"
-            description="Use face from character image"
             disabled={!referenceImageUrl}
           />
-          <PromptControlMenuItem
-            value="custom"
-            label="Custom face…"
-            description="Upload or pick a face asset"
-          />
+          <PromptControlMenuItem value="custom" label="Custom face…" />
         </PromptControlMenuGroup>
       </PromptControlMenuContent>
     </Select>

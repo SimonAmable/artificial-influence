@@ -11,6 +11,12 @@ import {
   createTikTokPostJob,
   type PrepareTikTokPostInput,
 } from "@/lib/autopost/create-tiktok-post-job"
+import {
+  createTelegramPostJob,
+  isTelegramPostConnectionId,
+  type PrepareTelegramPostInput,
+} from "@/lib/autopost/create-telegram-post-job"
+import { TELEGRAM_POST_CONNECTION_ID } from "@/lib/autopost/send-telegram-post-reminder"
 import { publishAutopostJob } from "@/lib/autopost/publish-job"
 import type { AutopostJobMetadata } from "@/lib/autopost/types"
 import { listSocialConnections, type SocialConnectionToolSummary } from "@/lib/chat/tools/list-social-connections"
@@ -58,6 +64,20 @@ export type PrepareSocialPostInput =
       brandOrganicToggle?: boolean
       brandContentToggle?: boolean
     }
+  | {
+      provider: "telegram"
+      action: PrepareSocialPostAction
+      connectionId: string
+      caption?: string
+      scheduledAt?: string
+      mediaUrl?: string
+      carouselItems?: Array<{
+        url: string
+        kind: "image" | "video"
+      }>
+      assetKind?: "image" | "video"
+      targetPlatform?: string
+    }
 
 export type PreparedSocialPost = {
   id: string
@@ -73,7 +93,7 @@ export type PreparedSocialPost = {
 }
 
 export type PrepareSocialPostResult = {
-  provider: "instagram" | "tiktok"
+  provider: "instagram" | "tiktok" | "telegram"
   action: PrepareSocialPostAction
   account: SocialConnectionToolSummary
   message: string
@@ -159,12 +179,42 @@ const tiktokInputSchema = z.object({
   brandContentToggle: z.boolean().optional(),
 })
 
+const telegramInputSchema = z.object({
+  provider: z.literal("telegram"),
+  action: z.enum(["draft", "publish", "schedule"]),
+  connectionId: z
+    .literal(TELEGRAM_POST_CONNECTION_ID)
+    .describe("Use the Telegram connection id from listSocialConnections."),
+  caption: z.string().max(2200).optional().describe("Optional caption to include in the reminder."),
+  scheduledAt: z
+    .string()
+    .optional()
+    .describe("Required when action is schedule. Must be a future ISO 8601 date-time string."),
+  mediaUrl: z.string().url().optional().describe("Single public media URL for the reminder."),
+  carouselItems: z
+    .array(
+      z.object({
+        url: z.string().url(),
+        kind: z.enum(["image", "video"]),
+      }),
+    )
+    .min(2)
+    .max(10)
+    .optional()
+    .describe("Optional multi-media reminder with 2 to 10 items."),
+  assetKind: z.enum(["image", "video"]).optional().describe("Required when mediaUrl is a video."),
+  targetPlatform: z
+    .string()
+    .optional()
+    .describe("Optional hint such as Instagram or TikTok to show in the reminder."),
+})
+
 /**
  * Flat object schema for tool registration. xAI Grok rejects `oneOf` / `anyOf` tool
  * schemas (from discriminated unions); provider-specific rules are enforced in execute.
  */
 const prepareSocialPostInputSchema = z.object({
-  provider: z.enum(["instagram", "tiktok"]).describe("Target social network."),
+  provider: z.enum(["instagram", "tiktok", "telegram"]).describe("Target social network or Telegram reminder."),
   action: z.enum(["draft", "publish", "schedule"]),
   connectionId: z.string().min(1).describe("The exact connected social connection id to use."),
   caption: z.string().max(2200).optional().describe("Optional caption or title."),
@@ -221,6 +271,8 @@ const prepareSocialPostInputSchema = z.object({
   autoAddMusic: z.boolean().optional(),
   brandOrganicToggle: z.boolean().optional(),
   brandContentToggle: z.boolean().optional(),
+  assetKind: z.enum(["image", "video"]).optional().describe("Telegram reminder only: image or video."),
+  targetPlatform: z.string().optional().describe("Telegram reminder only: optional target platform hint."),
 })
 
 function parsePrepareSocialPostToolInput(
@@ -228,6 +280,10 @@ function parsePrepareSocialPostToolInput(
 ): PrepareSocialPostInput {
   if (input.provider === "instagram") {
     return instagramInputSchema.parse(input)
+  }
+
+  if (input.provider === "telegram") {
+    return telegramInputSchema.parse(input)
   }
 
   return tiktokInputSchema.parse(input)
@@ -375,6 +431,64 @@ async function runInstagramPreparation({
   }
 }
 
+async function runTelegramPreparation({
+  account,
+  input,
+  supabase,
+  userId,
+}: {
+  account: SocialConnectionToolSummary
+  input: PrepareTelegramPostInput & { connectionId: string }
+  supabase: SupabaseClient
+  userId: string
+}): Promise<PrepareSocialPostResult> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!supabaseUrl) {
+    throw new Error("Server configuration error.")
+  }
+
+  const result = await createTelegramPostJob({
+    input: {
+      action: input.action,
+      assetKind: input.assetKind,
+      caption: input.caption,
+      carouselItems: input.carouselItems,
+      mediaUrl: input.mediaUrl,
+      scheduledAt: input.scheduledAt,
+      targetPlatform: input.targetPlatform,
+    },
+    supabase,
+    supabaseUrl,
+    userId,
+  })
+
+  if (!result.ok) {
+    throw new Error(result.message)
+  }
+
+  return {
+    action: input.action,
+    account,
+    message:
+      input.action === "schedule"
+        ? "Telegram post reminder approved and scheduled."
+        : input.action === "publish"
+          ? "Telegram post reminder approved and sent."
+          : "Telegram post reminder approved and saved as a draft.",
+    post: {
+      caption: result.job.caption,
+      createdAt: result.job.created_at,
+      id: result.job.id,
+      mediaType: result.job.media_type,
+      mediaUrl: result.job.media_url,
+      metadata: result.job.metadata,
+      scheduledAt: result.job.scheduled_at,
+      status: result.job.status,
+    },
+    provider: "telegram",
+  }
+}
+
 async function runTikTokPreparation({
   account,
   input,
@@ -503,6 +617,40 @@ export async function prepareSocialPost({
     })
   }
 
+  if (input.provider === "telegram") {
+    if (!isTelegramPostConnectionId(input.connectionId)) {
+      throw new Error("Invalid Telegram destination. Use the connected Telegram account from listSocialConnections.")
+    }
+
+    const account = (
+      await listSocialConnections({
+        provider: "telegram",
+        supabase,
+        userId,
+      })
+    ).find((connection) => connection.id === input.connectionId)
+
+    if (!account) {
+      throw new Error("Telegram is not connected. Link Telegram in Settings before scheduling reminders.")
+    }
+
+    return runTelegramPreparation({
+      account,
+      input: {
+        action: input.action,
+        assetKind: input.assetKind,
+        caption: input.caption,
+        carouselItems: input.carouselItems,
+        connectionId: input.connectionId,
+        mediaUrl: input.mediaUrl,
+        scheduledAt: input.scheduledAt,
+        targetPlatform: input.targetPlatform,
+      },
+      supabase,
+      userId,
+    })
+  }
+
   const account = (
     await listSocialConnections({
       provider: "tiktok",
@@ -572,7 +720,7 @@ export function createPrepareSocialPostTool({
 }: CreatePrepareSocialPostToolOptions) {
   return tool({
     description:
-      "Create an Instagram or TikTok post as a draft, publish it immediately, or schedule it for later. This tool requires explicit user approval in the tool UI before writing or publishing any post in normal chat.",
+      "Create an Instagram or TikTok post as a draft, publish it immediately, or schedule it for later. You can also schedule Telegram post reminders that send the caption and media to the user's linked Telegram chat when due. This tool requires explicit user approval in the tool UI before writing or publishing any post in normal chat.",
     inputSchema: prepareSocialPostInputSchema,
     strict: true,
     needsApproval: requireApproval,

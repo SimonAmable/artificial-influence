@@ -317,17 +317,17 @@ export const GROK_IMAGINE_IMAGE_2_META: ModelMetadata = {
   customParameters: [
     {
       name: 'quality',
-      label: 'Quality',
-      options: ['low', 'medium', 'high'],
+      label: 'Thinking',
+      options: ['low', 'medium'],
       default: 'low',
-      description: 'Low uses 2 credits; medium and high use 4 credits',
+      description: 'Off uses 2 credits; On uses 4 credits',
     },
     {
       name: 'resolution',
-      label: 'Resolution',
+      label: 'Quality',
       options: ['1k', '2k'],
       default: '1k',
-      description: 'Output resolution tier',
+      description: 'Output resolution. 1K is faster; 2K is sharper',
     },
   ],
 };
