@@ -203,6 +203,45 @@ export const SEEDREAM_4_5_META: ModelMetadata = {
   ],
 };
 
+/** Inactive Replicate standby for Seedream 4.5 — activate later to switch off fal. */
+export const SEEDREAM_4_5_REPLICATE_META: ModelMetadata = {
+  id: 'seedream-4.5-replicate-meta',
+  identifier: 'bytedance/seedream-4.5',
+  name: 'Seedream 4.5',
+  description:
+    'Seedream 4.5 on Replicate: text-to-image and multi-reference image editing with up to 4K output',
+  type: 'image',
+  provider: 'replicate',
+  is_active: false,
+  model_cost: 4.0,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['match_input_image', '1:1', '4:3', '3:4', '16:9', '9:16', '3:2', '2:3', '21:9'],
+  customParameters: [
+    {
+      name: 'size',
+      label: 'Size',
+      options: ['2K', '4K', 'custom'],
+      default: '2K',
+      description: 'Image resolution preset',
+    },
+    {
+      name: 'sequential_image_generation',
+      label: 'Sequential Image Generation',
+      options: ['disabled', 'auto'],
+      default: 'disabled',
+      description: 'Generate related multi-image sets',
+    },
+    {
+      name: 'enhance_prompt',
+      label: 'Enhance Prompt',
+      options: ['true', 'false'],
+      default: 'true',
+      description: 'Apply prompt enhancement for higher quality',
+    },
+  ],
+};
+
 export const SEEDREAM_5_LITE_META: ModelMetadata = {
   id: 'seedream-5-lite-meta',
   identifier: 'bytedance/seedream-5-lite',
@@ -1022,6 +1061,7 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
   NANO_BANANA_2_META,
   NANO_BANANA_2_LITE_META,
   SEEDREAM_4_5_META,
+  SEEDREAM_4_5_REPLICATE_META,
   SEEDREAM_5_LITE_META,
   SEEDREAM_5_PRO_META,
   GROK_IMAGINE_IMAGE_2_META,
@@ -1090,7 +1130,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     GOOGLE_NANO_BANANA_META,
     NANO_BANANA_PRO_META,
     NANO_BANANA_2_META,
-    SEEDREAM_4_5_META,
+    SEEDREAM_4_5_REPLICATE_META,
     SEEDREAM_5_LITE_META,
     GPT_IMAGE_1_5_META,
     GPT_IMAGE_2_META,
@@ -1110,7 +1150,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     P_VIDEO_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
-  fal: [WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, SEEDREAM_5_PRO_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META, MINIMAX_H3_META],
+  fal: [WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, SEEDREAM_4_5_META, SEEDREAM_5_PRO_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META, MINIMAX_H3_META],
   xai: [GROK_IMAGINE_META],
 };
 
@@ -1132,12 +1172,13 @@ export function getActiveModelMetadata(type?: ModelType): ModelMetadata[] {
 }
 
 /**
- * Get model metadata by identifier
+ * Get model metadata by identifier (prefers the active provider row when duplicates exist)
  */
 export function getModelMetadataByIdentifier(
   identifier: string
 ): ModelMetadata | undefined {
-  return ALL_MODELS_METADATA.find((model) => model.identifier === identifier);
+  const matches = ALL_MODELS_METADATA.filter((model) => model.identifier === identifier);
+  return matches.find((model) => model.is_active) ?? matches[0];
 }
 
 /**

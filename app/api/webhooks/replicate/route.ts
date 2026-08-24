@@ -253,7 +253,9 @@ export async function POST(request: NextRequest) {
       .select("model_cost")
       .eq("identifier", pendingGeneration.model)
       .eq("type", pendingGeneration.type)
-      .single()
+      .order("is_active", { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     const defaultCost = pendingGeneration.type === "video" ? 10 : 2
     const costPerOutput = Math.max(

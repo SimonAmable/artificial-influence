@@ -140,7 +140,10 @@ export async function completeFalPendingImageAdmin(
     .select("model_cost")
     .eq("identifier", row.model)
     .eq("type", "image")
-    .single()
+    .eq("provider", "fal")
+    .order("is_active", { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   const costPerOutput = Math.max(1, Number((modelRow.data as { model_cost?: number } | null)?.model_cost ?? 2) || 2)
   const requiredCredits = Math.max(

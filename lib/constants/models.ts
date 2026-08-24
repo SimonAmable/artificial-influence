@@ -1305,33 +1305,33 @@ const GPT_IMAGE_1_5_PARAMS: ParameterDefinition[] = [
   },
 ];
 
-// Seedream 4.5 parameters
-const SEEDREAM_4_5_PARAMS: ParameterDefinition[] = [
+// Seedream 4.5 parameters (Replicate bytedance/seedream-4.5)
+const SEEDREAM_4_5_REPLICATE_PARAMS: ParameterDefinition[] = [
   {
     name: 'size',
     type: 'string',
     label: 'Size',
-    description: 'Pre-set image resolution',
+    description: 'Image resolution: 2K (2048px), 4K (4096px), or custom for specific dimensions.',
     required: false,
     default: '2K',
-    enum: ['2K', '4K'],
+    enum: ['2K', '4K', 'custom'],
     ui_type: 'select',
   },
   {
     name: 'aspect_ratio',
     type: 'string',
     label: 'Aspect Ratio',
-    description: 'Aspect ratio when size is not custom',
+    description: 'Aspect ratio when size is not custom. Use match_input_image to match a reference.',
     required: false,
     default: 'match_input_image',
-    enum: ['match_input_image', '1:1', '16:9', '9:16', '4:3', '3:4'],
+    enum: ['match_input_image', '1:1', '4:3', '3:4', '16:9', '9:16', '3:2', '2:3', '21:9'],
     ui_type: 'select',
   },
   {
     name: 'width',
     type: 'number',
     label: 'Width',
-    description: 'Custom width when size is custom. Typically 1024-4096 px',
+    description: 'Custom width when size is custom. Range 1024-4096 px.',
     required: false,
     default: null,
     min: 1024,
@@ -1342,7 +1342,7 @@ const SEEDREAM_4_5_PARAMS: ParameterDefinition[] = [
     name: 'height',
     type: 'number',
     label: 'Height',
-    description: 'Custom height when size is custom. Typically 1024-4096 px',
+    description: 'Custom height when size is custom. Range 1024-4096 px.',
     required: false,
     default: null,
     min: 1024,
@@ -1353,7 +1353,7 @@ const SEEDREAM_4_5_PARAMS: ParameterDefinition[] = [
     name: 'sequential_image_generation',
     type: 'string',
     label: 'Sequential Image Generation',
-    description: 'Controls multi-image set or sequential generation',
+    description: 'disabled generates one image; auto may produce related multi-image sets.',
     required: false,
     default: 'disabled',
     enum: ['disabled', 'auto'],
@@ -1363,7 +1363,7 @@ const SEEDREAM_4_5_PARAMS: ParameterDefinition[] = [
     name: 'max_images',
     type: 'number',
     label: 'Max Images',
-    description: 'Max images when sequential mode enabled. Limits like 15 total (including inputs)',
+    description: 'Max images when sequential mode is auto. Total input + generated cannot exceed 15.',
     required: false,
     default: 1,
     min: 1,
@@ -1371,52 +1371,12 @@ const SEEDREAM_4_5_PARAMS: ParameterDefinition[] = [
     ui_type: 'number',
   },
   {
-    name: 'num_images',
-    type: 'number',
-    label: 'Number of Images',
-    description: 'Number of separate generations',
-    required: false,
-    default: 1,
-    min: 1,
-    max: 10,
-    ui_type: 'number',
-  },
-  {
     name: 'enhance_prompt',
     type: 'boolean',
     label: 'Enhance Prompt',
-    description: 'Whether to apply prompt enhancement for improved quality. Takes more generation time',
+    description: 'Apply prompt enhancement for higher quality (slower).',
     required: false,
     default: true,
-    ui_type: 'switch',
-  },
-  {
-    name: 'seed',
-    type: 'number',
-    label: 'Seed',
-    description: 'Random seed to reproduce results with same prompt/model/version',
-    required: false,
-    default: null,
-    min: 0,
-    max: 2147483647,
-    ui_type: 'number',
-  },
-  {
-    name: 'watermark',
-    type: 'boolean',
-    label: 'Watermark',
-    description: 'Optionally add an invisible watermark to outputs',
-    required: false,
-    default: false,
-    ui_type: 'switch',
-  },
-  {
-    name: 'enable_safety_checker',
-    type: 'boolean',
-    label: 'Enable Safety Checker',
-    description: 'Whether safety filters are applied to content',
-    required: false,
-    default: false,
     ui_type: 'switch',
   },
 ];
@@ -2351,7 +2311,7 @@ export const FAL_WAN_27_PRO_IMAGE_MODEL: Model = {
 };
 
 /**
- * Seedream 4.5 - Upgraded Bytedance image model
+ * Seedream 4.5 - Upgraded Bytedance image model (fal, live)
  */
 export const SEEDREAM_4_5_MODEL: Model = {
   id: 'model-seedream-4.5',
@@ -2365,6 +2325,27 @@ export const SEEDREAM_4_5_MODEL: Model = {
   model_cost: 4,
   parameters: {
     parameters: FAL_SEEDREAM_IMAGE_PARAMS,
+  },
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+/**
+ * Seedream 4.5 on Replicate — inactive standby; activate later to switch off fal.
+ * https://replicate.com/bytedance/seedream-4.5
+ */
+export const SEEDREAM_4_5_REPLICATE_MODEL: Model = {
+  id: 'model-seedream-4.5-replicate',
+  identifier: MODEL_IDENTIFIERS.BYTEDANCE_SEEDREAM_4_5,
+  name: 'Seedream 4.5',
+  description:
+    'Seedream 4.5 on Replicate: text-to-image and multi-reference image editing with up to 4K output.',
+  type: 'image',
+  provider: 'replicate',
+  is_active: false,
+  model_cost: 4,
+  parameters: {
+    parameters: SEEDREAM_4_5_REPLICATE_PARAMS,
   },
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
@@ -2461,6 +2442,7 @@ export const IMAGE_MODELS = [
   FAL_WAN_27_IMAGE_MODEL,
   FAL_WAN_27_PRO_IMAGE_MODEL,
   SEEDREAM_4_5_MODEL,
+  SEEDREAM_4_5_REPLICATE_MODEL,
   SEEDREAM_5_LITE_MODEL,
   SEEDREAM_5_PRO_MODEL,
   Z_IMAGE_TURBO_MODEL,
@@ -2508,6 +2490,7 @@ const IMAGE_MODELS_FIXED = [
   FAL_WAN_27_IMAGE_MODEL,
   FAL_WAN_27_PRO_IMAGE_MODEL,
   SEEDREAM_4_5_MODEL,
+  SEEDREAM_4_5_REPLICATE_MODEL,
   SEEDREAM_5_LITE_MODEL,
   SEEDREAM_5_PRO_MODEL,
   Z_IMAGE_TURBO_MODEL,
@@ -2551,10 +2534,11 @@ export { ALL_MODELS_FIXED as ALL_MODELS_LIST };
 // ============================================================================
 
 /**
- * Get a model by its identifier
+ * Get a model by its identifier (prefers the active provider row when duplicates exist)
  */
 export function getModelByIdentifier(identifier: string): Model | undefined {
-  return ALL_MODELS_FIXED.find((model: Model) => model.identifier === identifier);
+  const matches = ALL_MODELS_FIXED.filter((model: Model) => model.identifier === identifier);
+  return matches.find((model) => model.is_active) ?? matches[0];
 }
 
 /**
