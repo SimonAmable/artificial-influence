@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, NumberParameterDefinition, ParameterDefinition } from "@/lib/types/models"
-import { isHappyHorseModelIdentifier } from "@/lib/constants/models"
+import { isHappyHorseModelIdentifier, isSeedanceVideoModelIdentifier } from "@/lib/constants/models"
 import { formatVideoPricingOptionLabel } from "@/lib/pricing-parameter-ui"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import {
@@ -580,6 +580,12 @@ export function VideoModelParameterControls({
       if (
         selectedModel.identifier === "prunaai/p-video" &&
         ["fps", "seed", "prompt_upsampling"].includes(param.name)
+      ) {
+        return false
+      }
+      if (
+        isSeedanceVideoModelIdentifier(selectedModel.identifier) &&
+        param.name === "seed"
       ) {
         return false
       }

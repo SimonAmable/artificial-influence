@@ -14,6 +14,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { VideoPromptFields } from "@/components/tools/video/video-prompt-fields"
@@ -130,9 +132,12 @@ function VideoMediaMenuRow({
       >
         {variant === "stacked" ? (
           <>
-            <span className="flex items-center text-sm font-medium">
-              {leadingIcon}
-              {label}
+            <span className="flex w-full items-center justify-between gap-2 text-sm font-medium">
+              <span className="flex items-center">
+                {leadingIcon}
+                {label}
+              </span>
+              {trailing}
             </span>
             {description}
           </>
@@ -356,6 +361,57 @@ export function VideoInputBox({
     [selectedModel, attachedRefs, inputImage, lastFrameImage, inputVideo]
   )
 
+  const seedanceHasReferenceVideo = React.useMemo(
+    () =>
+      isSeedance2 &&
+      !!(inputVideo?.file || inputVideo?.url || chipSlotInfo.referenceVideoSlotFromChip),
+    [chipSlotInfo.referenceVideoSlotFromChip, inputVideo, isSeedance2]
+  )
+
+  const seedanceGalleryChipCount = React.useMemo(
+    () => (isSeedance2 && seedanceHasReferenceVideo ? chipSlotInfo.omniStyleImageChipUrls.length : 0),
+    [chipSlotInfo.omniStyleImageChipUrls.length, isSeedance2, seedanceHasReferenceVideo]
+  )
+
+  const seedanceGalleryRefCount = React.useMemo(
+    () => (isSeedance2 ? referenceImages.length + seedanceGalleryChipCount : 0),
+    [isSeedance2, referenceImages.length, seedanceGalleryChipCount]
+  )
+
+  const seedanceHasGalleryRefs = seedanceGalleryRefCount > 0
+
+  const seedanceReferenceMode = React.useMemo(
+    () => isSeedance2 && (seedanceHasGalleryRefs || seedanceHasReferenceVideo),
+    [isSeedance2, seedanceHasGalleryRefs, seedanceHasReferenceVideo]
+  )
+
+  const seedanceHasFirstFrame = React.useMemo(
+    () =>
+      isSeedance2 &&
+      !!(inputImage?.file || inputImage?.url || chipSlotInfo.startImageChipUrl),
+    [chipSlotInfo.startImageChipUrl, inputImage, isSeedance2]
+  )
+
+  const seedanceFrameMode = React.useMemo(
+    () =>
+      isSeedance2 &&
+      !seedanceReferenceMode &&
+      (seedanceHasFirstFrame ||
+        !!(lastFrameImage?.file || lastFrameImage?.url || chipSlotInfo.lastFrameSlotFromChip)),
+    [
+      chipSlotInfo.lastFrameSlotFromChip,
+      isSeedance2,
+      lastFrameImage,
+      seedanceHasFirstFrame,
+      seedanceReferenceMode,
+    ]
+  )
+
+  const seedanceFirstFrameBlocked = isSeedance2 && seedanceHasGalleryRefs
+  const seedanceLastFrameBlocked =
+    isSeedance2 && (seedanceReferenceMode || !seedanceHasFirstFrame)
+  const seedanceReferenceVideoBlocked = isSeedance2 && !!lastFrameImage
+
   const falMultimodalReferenceMode =
     isFalMultimodalVideo &&
     (referenceImages.length > 0 || chipSlotInfo.omniStyleImageChipUrls.length > 0)
@@ -365,6 +421,20 @@ export function VideoInputBox({
     if (inputImage) onInputImageChange(null)
     if (isMinimaxH3 && lastFrameImage) onLastFrameChange(null)
   }, [falMultimodalReferenceMode, inputImage, isMinimaxH3, lastFrameImage, onInputImageChange, onLastFrameChange])
+
+  React.useEffect(() => {
+    if (!isSeedance2) return
+    if (seedanceHasGalleryRefs && inputImage) onInputImageChange(null)
+    if (seedanceReferenceMode && lastFrameImage) onLastFrameChange(null)
+  }, [
+    isSeedance2,
+    inputImage,
+    lastFrameImage,
+    onInputImageChange,
+    onLastFrameChange,
+    seedanceHasGalleryRefs,
+    seedanceReferenceMode,
+  ])
 
   const removeAttachedRef = React.useCallback(
     (ref: AttachedRef) => {
@@ -387,13 +457,18 @@ export function VideoInputBox({
 
   const canAddReferenceImage = React.useMemo(() => {
     if (!usesRefImageGallery) return false
-    const nChipStyle = chipSlotInfo.omniStyleImageChipUrls.length
+    if (isSeedance2 && seedanceFrameMode) return false
+    const nChipStyle =
+      isSeedance2 && seedanceHasReferenceVideo ? chipSlotInfo.omniStyleImageChipUrls.length : 0
     return referenceImages.length + nChipStyle < maxReferenceImages
   }, [
-    usesRefImageGallery,
-    referenceImages.length,
     chipSlotInfo.omniStyleImageChipUrls.length,
+    isSeedance2,
     maxReferenceImages,
+    referenceImages.length,
+    seedanceFrameMode,
+    seedanceHasReferenceVideo,
+    usesRefImageGallery,
   ])
 
   const canAddSeedanceReferenceAudio = React.useMemo(() => {
@@ -417,20 +492,28 @@ export function VideoInputBox({
         url: URL.createObjectURL(file)
       }
       if (type === 'input') {
+        if (isSeedance2 && seedanceFirstFrameBlocked) return
         onInputImageChange(imageUpload)
       } else {
+        if (isSeedance2 && seedanceLastFrameBlocked) return
         onLastFrameChange(imageUpload)
       }
     }
+    e.target.value = ''
   }
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file && file.type.startsWith('video/')) {
+      if (isSeedance2 && seedanceReferenceVideoBlocked) {
+        e.target.value = ''
+        return
+      }
       const videoUpload: ImageUpload = {
         file,
         url: URL.createObjectURL(file)
       }
+      if (isSeedance2 && lastFrameImage) onLastFrameChange(null)
       onInputVideoChange(videoUpload)
     }
     e.target.value = ''
@@ -446,6 +529,10 @@ export function VideoInputBox({
       return
     if (isFalMultimodalVideo && inputImage) {
       onInputImageChange(null)
+    }
+    if (isSeedance2) {
+      if (inputImage) onInputImageChange(null)
+      if (lastFrameImage) onLastFrameChange(null)
     }
     const next: ImageUpload = { file, url: URL.createObjectURL(file) }
     onReferenceImagesChange([...referenceImages, next])
@@ -501,16 +588,22 @@ export function VideoInputBox({
       return (
         mergedPromptForReady.length > 0 ||
         !!inputImage ||
+        chipSlotInfo.startImageChipUrl ||
         !!lastFrameImage ||
+        chipSlotInfo.lastFrameChipUrl ||
         (!!inputVideo && isSeedance2) ||
+        chipSlotInfo.referenceVideoSlotFromChip ||
         !!inputAudio ||
         referenceImages.length > 0 ||
         hasRefChips
       )
     }
     if (modelSupportsImage || modelSupportsLastFrame) {
-      if (modelSupportsImage && !inputImage) return false
-      if (modelSupportsLastFrame && !lastFrameImage) return false
+      if (modelSupportsImage && !inputImage && !chipSlotInfo.startImageChipUrl && !hasRefChips) {
+        return false
+      }
+      // Last frame is optional when the model also supports a first frame (e.g. Seedance).
+      if (modelSupportsLastFrame && !lastFrameImage && !modelSupportsImage) return false
       return true
     }
     return mergedPromptForReady.length > 0 || hasRefChips
@@ -536,6 +629,9 @@ export function VideoInputBox({
     isSeedance2,
     isWan27,
     referenceImages.length,
+    chipSlotInfo.startImageChipUrl,
+    chipSlotInfo.lastFrameChipUrl,
+    chipSlotInfo.referenceVideoSlotFromChip,
   ])
 
   const handleSlashUiAction = React.useCallback((action: SlashCommandUiAction) => {
@@ -591,6 +687,10 @@ export function VideoInputBox({
             toast.error("Pick an image asset")
             return
           }
+          if (isSeedance2 && seedanceFirstFrameBlocked) {
+            toast.error("Remove reference images before setting a first frame")
+            return
+          }
           onInputImageChange({ url: pick.url })
           break
         case "motion-copy-video":
@@ -599,6 +699,11 @@ export function VideoInputBox({
             toast.error("Pick a video asset")
             return
           }
+          if (isSeedance2 && seedanceReferenceVideoBlocked) {
+            toast.error("Remove the last frame before adding a reference video")
+            return
+          }
+          if (isSeedance2 && lastFrameImage) onLastFrameChange(null)
           onInputVideoChange({ url: pick.url })
           break
         case "motion-copy-face-lock":
@@ -618,6 +723,14 @@ export function VideoInputBox({
             toast.error("Pick an image asset")
             return
           }
+          if (isSeedance2 && seedanceLastFrameBlocked) {
+            toast.error(
+              seedanceReferenceMode
+                ? "Last frame is not used with reference images or video"
+                : "Add a first frame before setting the last frame",
+            )
+            return
+          }
           onLastFrameChange({ url: pick.url })
           break
         case "toolbar-reference-gallery":
@@ -625,7 +738,15 @@ export function VideoInputBox({
             toast.error("Reference images only — pick an image asset")
             return
           }
+          if (isSeedance2 && seedanceFrameMode) {
+            toast.error("Remove first/last frame images before adding reference images")
+            return
+          }
           if (onReferenceImagesChange) {
+            if (isSeedance2) {
+              if (inputImage) onInputImageChange(null)
+              if (lastFrameImage) onLastFrameChange(null)
+            }
             onReferenceImagesChange([...referenceImages, { url: pick.url }])
           }
           break
@@ -655,6 +776,15 @@ export function VideoInputBox({
       onReferenceImagesChange,
       parameters,
       referenceImages,
+      seedanceFirstFrameBlocked,
+      seedanceFrameMode,
+      seedanceLastFrameBlocked,
+      seedanceReferenceMode,
+      seedanceReferenceVideoBlocked,
+      isSeedance2,
+      lastFrameImage,
+      onLastFrameChange,
+      onInputImageChange,
     ],
   )
 
@@ -707,6 +837,23 @@ export function VideoInputBox({
       return null
     }
 
+    if (isSeedance2) {
+      if (!seedanceHasGalleryRefs) {
+        if (modelSupportsImage && !inputImage && !chipSlotInfo.startImageChipUrl) return "input"
+        if (
+          modelSupportsLastFrame &&
+          !lastFrameImage &&
+          !chipSlotInfo.lastFrameSlotFromChip &&
+          seedanceHasFirstFrame &&
+          !seedanceReferenceMode
+        ) {
+          return "lastFrame"
+        }
+      }
+      if (canAddReferenceImage) return "reference"
+      return null
+    }
+
     if (!modelSupportsImage && !modelSupportsLastFrame) return null
 
     if (modelSupportsImage && !inputImage) return "input"
@@ -716,28 +863,35 @@ export function VideoInputBox({
     if (modelSupportsLastFrame) return "lastFrame"
     return null
   }, [
+    canAddReferenceImage,
+    chipSlotInfo.lastFrameSlotFromChip,
+    chipSlotInfo.startImageChipUrl,
     inputImage,
     isFalMultimodalVideo,
     falMultimodalReferenceMode,
     isLipsyncModel,
     isMotionCopyModel,
+    isSeedance2,
     lastFrameImage,
     modelSupportsImage,
     modelSupportsLastFrame,
+    seedanceHasFirstFrame,
+    seedanceHasGalleryRefs,
+    seedanceReferenceMode,
   ])
 
   const nextImageDropLabel = React.useMemo(() => {
     if (nextImageDropSlot === "reference") return "Reference Image"
     if (nextImageDropSlot === "lastFrame") return isKlingV3OrOmni ? "End Frame" : "Last Frame"
     if (nextImageDropSlot === "input") {
-      if (selectedModel.identifier === "minimax/hailuo-2.3-fast") return "First Frame"
+      if (selectedModel.identifier === "minimax/hailuo-2.3-fast" || isSeedance2) return "First Frame"
       if (isFalMultimodalVideo) return "Start Frame"
       if (isKlingV3OrOmni) return "Start Frame"
       if (isMotionCopyModel || isLipsyncModel) return "Reference Image"
       return "Input Image"
     }
     return "Reference Image"
-  }, [isFalMultimodalVideo, isKlingV3OrOmni, isLipsyncModel, isMotionCopyModel, nextImageDropSlot, selectedModel.identifier])
+  }, [isFalMultimodalVideo, isKlingV3OrOmni, isLipsyncModel, isMotionCopyModel, isSeedance2, nextImageDropSlot, selectedModel.identifier])
 
   const canAcceptImageDrop = nextImageDropSlot !== null
   const canAcceptPromptDrop = needsPrompt && (canAcceptImageDrop || canDropReferenceVideo)
@@ -938,23 +1092,47 @@ export function VideoInputBox({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-52 p-1">
+                {isSeedance2 && modelSupportsImage ? (
+                  <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    First & last frame
+                  </DropdownMenuLabel>
+                ) : null}
                 {modelSupportsImage && (
                   <VideoMediaMenuRow
+                    variant={isSeedance2 ? "stacked" : "inline"}
                     onPickAsset={() => openAssetPicker("toolbar-input-image")}
                     onUpload={() => inputRef.current?.click()}
                     uploadDisabled={
-                      !!inputImage || chipSlotInfo.inputSlotFromChip || falMultimodalReferenceMode
+                      !!inputImage ||
+                      chipSlotInfo.inputSlotFromChip ||
+                      falMultimodalReferenceMode ||
+                      seedanceFirstFrameBlocked
+                    }
+                    assetPickDisabled={
+                      !!inputImage ||
+                      chipSlotInfo.inputSlotFromChip ||
+                      falMultimodalReferenceMode ||
+                      seedanceFirstFrameBlocked
                     }
                     label={
-                      selectedModel.identifier === "minimax/hailuo-2.3-fast"
-                        ? "Upload First Frame"
-                        : isFalMultimodalVideo
-                          ? "Upload Start Frame"
-                          : "Upload Input Image"
+                      selectedModel.identifier === "minimax/hailuo-2.3-fast" || isSeedance2
+                        ? "First frame"
+                        : isFalMultimodalVideo || isKlingV3OrOmni
+                          ? "Start frame"
+                          : "Input image"
+                    }
+                    description={
+                      isSeedance2 ? (
+                        <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                          {seedanceFirstFrameBlocked
+                            ? "Remove reference images to use first/last frame mode."
+                            : "Animate from a start image. Not combined with reference images."}
+                        </span>
+                      ) : null
                     }
                     leadingIcon={<FilePlus className="size-4 mr-2 shrink-0" />}
                     trailing={
-                      (chipSlotInfo.inputSlotFromChip || inputImage) ? (
+                      chipSlotInfo.inputSlotFromChip || inputImage ? (
                         <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
                       ) : null
                     }
@@ -962,12 +1140,33 @@ export function VideoInputBox({
                 )}
                 {modelSupportsLastFrame && (
                   <VideoMediaMenuRow
+                    variant={isSeedance2 ? "stacked" : "inline"}
                     onPickAsset={() => openAssetPicker("toolbar-last-frame")}
                     onUpload={() => lastFrameRef.current?.click()}
                     uploadDisabled={
-                      !!lastFrameImage || chipSlotInfo.lastFrameSlotFromChip || falMultimodalReferenceMode
+                      !!lastFrameImage ||
+                      chipSlotInfo.lastFrameSlotFromChip ||
+                      falMultimodalReferenceMode ||
+                      seedanceLastFrameBlocked
                     }
-                    label="Upload Last Frame"
+                    assetPickDisabled={
+                      !!lastFrameImage ||
+                      chipSlotInfo.lastFrameSlotFromChip ||
+                      falMultimodalReferenceMode ||
+                      seedanceLastFrameBlocked
+                    }
+                    label={isKlingV3OrOmni ? "End frame" : "Last frame"}
+                    description={
+                      isSeedance2 ? (
+                        <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                          {seedanceReferenceMode
+                            ? "Not used with reference images or video."
+                            : !seedanceHasFirstFrame
+                              ? "Requires a first frame."
+                              : "Optional ending frame for first-to-last animation."}
+                        </span>
+                      ) : null
+                    }
                     leadingIcon={<FilePlus className="size-4 mr-2 shrink-0" />}
                     trailing={
                       chipSlotInfo.lastFrameSlotFromChip || lastFrameImage ? (
@@ -976,13 +1175,40 @@ export function VideoInputBox({
                     }
                   />
                 )}
+                {isSeedance2 && (isReferenceVideoSupported || usesRefImageGallery) ? (
+                  <>
+                    <DropdownMenuSeparator className="my-1" />
+                    <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      References · cite as [Image1], [Video1]
+                    </DropdownMenuLabel>
+                  </>
+                ) : null}
                 {isReferenceVideoSupported && (
                   <VideoMediaMenuRow
+                    variant={isSeedance2 ? "stacked" : "inline"}
                     onPickAsset={() => openAssetPicker("toolbar-reference-video")}
                     onUpload={() => videoRef.current?.click()}
-                    uploadDisabled={!!inputVideo || chipSlotInfo.referenceVideoSlotFromChip}
+                    uploadDisabled={
+                      !!inputVideo ||
+                      chipSlotInfo.referenceVideoSlotFromChip ||
+                      seedanceReferenceVideoBlocked
+                    }
+                    assetPickDisabled={
+                      !!inputVideo ||
+                      chipSlotInfo.referenceVideoSlotFromChip ||
+                      seedanceReferenceVideoBlocked
+                    }
                     label={
-                      isGeminiOmniFlash ? "Upload Video to Edit" : "Upload Reference Video"
+                      isGeminiOmniFlash ? "Video to edit" : "Reference video"
+                    }
+                    description={
+                      isSeedance2 ? (
+                        <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                          {seedanceReferenceVideoBlocked
+                            ? "Remove the last frame before adding reference video."
+                            : "Edit, extend, or borrow motion. Last frame is disabled in this mode."}
+                        </span>
+                      ) : null
                     }
                     leadingIcon={<FilePlus className="size-4 mr-2 shrink-0" />}
                     trailing={
@@ -1000,18 +1226,25 @@ export function VideoInputBox({
                     uploadDisabled={!canAddReferenceImage}
                     assetPickDisabled={!canAddReferenceImage}
                     label={
-                      isSeedance2 || isFalMultimodalVideo ? "Reference image" : "Add reference image"
+                      isSeedance2 || isFalMultimodalVideo ? "Reference images" : "Add reference image"
                     }
                     leadingIcon={<FilePlus className="mr-2 size-4 shrink-0" />}
                     description={
                       isSeedance2 ? (
                         <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
-                          JPEG or PNG, up to {maxReferenceImages}. Use [Image1] in your prompt.
+                          {seedanceFrameMode
+                            ? "Remove first/last frame to add reference images."
+                            : `Up to ${maxReferenceImages} stills for identity and style. Mutually exclusive with first/last frame.`}
                         </span>
                       ) : isMinimaxH3 ? (
                         <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
                           Up to {maxReferenceImages} stills. Cite them as Image 1, Image 2 in the prompt.
                         </span>
+                      ) : null
+                    }
+                    trailing={
+                      isSeedance2 && seedanceHasGalleryRefs ? (
+                        <Check className="size-4 text-primary shrink-0" weight="bold" aria-hidden />
                       ) : null
                     }
                   />
@@ -1176,14 +1409,16 @@ export function VideoInputBox({
                 </button>
                 <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-medium border border-border">
                   {inputImage?.url
-                    ? selectedModel.identifier === "minimax/hailuo-2.3-fast"
+                    ? selectedModel.identifier === "minimax/hailuo-2.3-fast" || isSeedance2
                       ? "First Frame"
                       : isFalMultimodalVideo
                         ? "Start Frame"
-                      : isKlingV3OrOmni
-                        ? "Start Frame"
-                        : "Input"
-                    : "@ Library · start"}
+                        : isKlingV3OrOmni
+                          ? "Start Frame"
+                          : "Input"
+                    : isSeedance2
+                      ? "@ Library · first"
+                      : "@ Library · start"}
                 </div>
               </div>
             )}
@@ -1238,7 +1473,9 @@ export function VideoInputBox({
                       ? "Background source"
                       : isGeminiOmniFlash
                         ? "Video to Edit"
-                        : "Reference Video"
+                        : isSeedance2
+                          ? "[Video1]"
+                          : "Reference Video"
                     : "@ Library · video"}
                 </div>
               </div>
@@ -1263,7 +1500,7 @@ export function VideoInputBox({
                       <X className="size-2.5" weight="bold" />
                     </button>
                     <div className="absolute bottom-0.5 left-0.5 bg-background/80 backdrop-blur-sm px-1 py-0.5 rounded text-[9px] font-medium border border-border">
-                      Ref {index + 1}
+                      {isSeedance2 ? `[Image${index + 1}]` : `Ref ${index + 1}`}
                     </div>
                   </div>
                 ) : null
@@ -1287,7 +1524,9 @@ export function VideoInputBox({
                     <X className="size-2.5" weight="bold" />
                   </button>
                   <div className="absolute bottom-0.5 left-0.5 bg-background/80 backdrop-blur-sm px-1 py-0.5 rounded text-[9px] font-medium border border-border">
-                    @ Style {i + 1}
+                    {isSeedance2 && seedanceHasReferenceVideo
+                      ? `[Image${referenceImages.length + i + 1}]`
+                      : `@ Style ${i + 1}`}
                   </div>
                 </div>
               ))}
