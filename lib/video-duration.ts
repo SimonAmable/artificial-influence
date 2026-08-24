@@ -35,6 +35,7 @@ function getDefaultDurationSeconds(modelIdentifier: string): number {
     case "kwaivgi/kling-v3-video":
     case "kwaivgi/kling-v3-omni-video":
     case "bytedance/seedance-2.0":
+    case "bytedance/seedance-2.0-mini":
     case "bytedance/seedance-2.5":
     case "wan-video/wan-2.7":
     case "xai/grok-imagine-video":
@@ -55,6 +56,7 @@ export function resolvePredictedDurationSeconds(input: VideoDurationInput): numb
 
   switch (input.modelIdentifier) {
     case "bytedance/seedance-2.0":
+    case "bytedance/seedance-2.0-mini":
       if (explicitDuration != null && explicitDuration > 0) {
         return roundDuration(explicitDuration, 1, 15)
       }

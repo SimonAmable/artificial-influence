@@ -16,6 +16,15 @@ const VIDEO_REFERENCE_AUDIO_CONFIGS: Record<string, VideoReferenceAudioConfig> =
     title: "Reference audio",
     validationMessage: "Use a supported audio file (.wav, .mp3, .m4a, or .aac).",
   },
+  "bytedance/seedance-2.0-mini": {
+    accept:
+      "audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac",
+    allowedExtensions: ["wav", "mp3", "m4a", "aac"],
+    description:
+      ".wav / .mp3 / .m4a / .aac (~15s). Use [Audio1] in prompt; needs a frame or reference video.",
+    title: "Reference audio",
+    validationMessage: "Use a supported audio file (.wav, .mp3, .m4a, or .aac).",
+  },
   "bytedance/seedance-2.5": {
     accept:
       "audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac",

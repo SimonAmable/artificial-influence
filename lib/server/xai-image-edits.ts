@@ -1,4 +1,5 @@
 import { isGrokImage2Identifier, normalizeGrokImage2Quality } from "@/lib/grok-image-2"
+import { resolveXaiAspectRatio } from "@/lib/server/xai-aspect-ratio"
 
 const MAX_XAI_REFERENCE_IMAGES = 3
 
@@ -55,10 +56,7 @@ export async function callXaiImageEdits(
           })),
         }
 
-  const aspectRatio =
-    request.aspectRatio && /^\d+:\d+$/.test(request.aspectRatio)
-      ? request.aspectRatio
-      : undefined
+  const aspectRatio = resolveXaiAspectRatio(request.aspectRatio)
 
   const response = await fetch("https://api.x.ai/v1/images/edits", {
     method: "POST",

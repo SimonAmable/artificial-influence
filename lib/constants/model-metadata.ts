@@ -313,7 +313,24 @@ export const GROK_IMAGINE_IMAGE_2_META: ModelMetadata = {
   model_cost: 4,
   supports_reference_image: true,
   supports_reference_video: false,
-  aspect_ratios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '2:1', '1:2', '20:9', '9:20'],
+  aspect_ratios: [
+    'auto',
+    '1:1',
+    '16:9',
+    '9:16',
+    '4:3',
+    '3:4',
+    '3:2',
+    '2:3',
+    '2:1',
+    '1:2',
+    '21:9',
+    '5:2',
+    '20:9',
+    '9:20',
+    '19.5:9',
+    '9:19.5',
+  ],
   customParameters: [
     {
       name: 'quality',
@@ -762,6 +779,40 @@ export const SEEDANCE_2_0_META: ModelMetadata = {
   ],
 };
 
+export const SEEDANCE_2_0_MINI_META: ModelMetadata = {
+  id: 'seedance-2.0-mini-meta',
+  identifier: 'bytedance/seedance-2.0-mini',
+  name: 'Seedance 2.0 Mini',
+  description:
+    'Lower-cost Seedance 2.0 for high-volume 480p/720p video with native synced audio, first/last frame, and multimodal image/video/audio references.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 30,
+  supports_reference_image: true,
+  supports_reference_video: true,
+  supports_reference_audio: true,
+  aspect_ratios: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive'],
+  supports_first_frame: true,
+  supports_last_frame: true,
+  customParameters: [
+    {
+      name: 'resolution',
+      label: 'Resolution',
+      options: ['480p', '720p'],
+      default: '720p',
+      description: 'Output resolution',
+    },
+    {
+      name: 'generate_audio',
+      label: 'Generate Audio',
+      options: ['true', 'false'],
+      default: 'true',
+      description: 'Synchronized dialogue, SFX, and music',
+    },
+  ],
+};
+
 export const SEEDANCE_2_5_META: ModelMetadata = {
   id: 'seedance-2.5-meta',
   identifier: 'bytedance/seedance-2.5',
@@ -996,6 +1047,7 @@ export const VIDEO_MODELS_METADATA: ModelMetadata[] = [
   KLING_V2_6_PRO_META,
   HAILUO_2_3_FAST_META,
   SEEDANCE_2_0_META,
+  SEEDANCE_2_0_MINI_META,
   SEEDANCE_2_5_META,
   HAPPY_HORSE_META,
   GEMINI_OMNI_FLASH_META,
@@ -1053,6 +1105,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     KLING_V2_6_PRO_META,
     HAILUO_2_3_FAST_META,
     SEEDANCE_2_0_META,
+    SEEDANCE_2_0_MINI_META,
     SEEDANCE_2_5_META,
     P_VIDEO_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,

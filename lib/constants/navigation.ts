@@ -472,6 +472,14 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             modelIdentifier: "bytedance/seedance-2.5",
           },
           {
+            path: "/video?model=bytedance/seedance-2.0-mini",
+            label: "Seedance 2.0 Mini",
+            description: "Cheaper 720p Seedance with synced audio",
+            badge: "new",
+            iconSrc: "/ai_icons/bytedance-color.svg",
+            modelIdentifier: "bytedance/seedance-2.0-mini",
+          },
+          {
             path: "/video?model=bytedance/seedance-2.0",
             label: "Seedance 2.0",
             description: "Multimodal video with reference audio and frames",

@@ -38,6 +38,7 @@ import {
   callXaiImageEdits,
   shouldUseDirectXaiImageEdits,
 } from "@/lib/server/xai-image-edits"
+import { resolveXaiAspectRatio } from "@/lib/server/xai-aspect-ratio"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
 import {
   isGrokImage2Identifier,
@@ -624,11 +625,12 @@ export function createGenerateImageTool({
             resolution: resolvedResolution,
           })
         } else {
+          const resolvedXaiAspectRatio = resolveXaiAspectRatio(aspectRatio)
           const result = await generateImage({
             model: modelIdentifier,
             prompt: finalPrompt,
-            ...(aspectRatio && /^\d+:\d+$/.test(aspectRatio)
-              ? { aspectRatio: aspectRatio as `${number}:${number}` }
+            ...(resolvedXaiAspectRatio && resolvedXaiAspectRatio !== "auto"
+              ? { aspectRatio: resolvedXaiAspectRatio as `${number}:${number}` }
               : {}),
             ...(effectiveVariantCount > 1 ? { n: effectiveVariantCount } : {}),
             providerOptions: {
@@ -706,11 +708,12 @@ export function createGenerateImageTool({
             aspectRatio,
           })
         } else {
+          const resolvedXaiAspectRatio = resolveXaiAspectRatio(aspectRatio)
           const result = await generateImage({
             model: xai.image(xaiModelIdentifier),
             prompt: finalPrompt,
-            ...(aspectRatio && /^\d+:\d+$/.test(aspectRatio)
-              ? { aspectRatio: aspectRatio as `${number}:${number}` }
+            ...(resolvedXaiAspectRatio && resolvedXaiAspectRatio !== "auto"
+              ? { aspectRatio: resolvedXaiAspectRatio as `${number}:${number}` }
               : {}),
             ...(effectiveVariantCount > 1 ? { n: effectiveVariantCount } : {}),
           })

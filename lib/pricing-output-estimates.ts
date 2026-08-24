@@ -68,6 +68,12 @@ export const PRICING_ESTIMATE_MODELS = [
     unit: 'second',
   },
   {
+    id: 'seedance-2.0-mini',
+    name: 'Seedance 2.0 Mini',
+    creditsPerUnit: 6,
+    unit: 'second',
+  },
+  {
     id: 'seedance-2.0',
     name: 'Seedance 2.0',
     creditsPerUnit: 10,

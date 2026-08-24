@@ -646,6 +646,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'bytedance/seedance-2.0':
+      case 'bytedance/seedance-2.0-mini':
       case 'bytedance/seedance-2.5': {
         const refVideosRaw = [
           ...(Array.isArray(body.reference_videos) ? body.reference_videos : []),

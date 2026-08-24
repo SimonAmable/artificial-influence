@@ -42,6 +42,7 @@ export const MODEL_IDENTIFIERS = {
   MINIMAX_HAILUO_2_3_FAST: 'minimax/hailuo-2.3-fast',
   GOOGLE_VEO_3_1_FAST: 'google/veo-3.1-fast',
   BYTEDANCE_SEEDANCE_2_0: 'bytedance/seedance-2.0',
+  BYTEDANCE_SEEDANCE_2_0_MINI: 'bytedance/seedance-2.0-mini',
   BYTEDANCE_SEEDANCE_2_5: 'bytedance/seedance-2.5',
   ALIBABA_HAPPY_HORSE: 'alibaba/happy-horse/v1.1',
   ALIBABA_HAPPY_HORSE_LEGACY: 'alibaba/happy-horse',
@@ -95,6 +96,7 @@ export function isSeedance25ModelIdentifier(identifier: string | null | undefine
 export function isSeedanceVideoModelIdentifier(identifier: string | null | undefined): boolean {
   return (
     identifier === MODEL_IDENTIFIERS.BYTEDANCE_SEEDANCE_2_0 ||
+    identifier === MODEL_IDENTIFIERS.BYTEDANCE_SEEDANCE_2_0_MINI ||
     isSeedance25ModelIdentifier(identifier)
   );
 }
@@ -1945,6 +1947,29 @@ export const SEEDANCE_2_0_VIDEO_MODEL: Model = {
   updated_at: new Date().toISOString(),
 };
 
+export const SEEDANCE_2_0_MINI_VIDEO_MODEL: Model = {
+  id: 'model-bytedance-seedance-2.0-mini',
+  identifier: MODEL_IDENTIFIERS.BYTEDANCE_SEEDANCE_2_0_MINI,
+  name: 'Seedance 2.0 Mini',
+  description:
+    'Lower-cost Seedance 2.0 for high-volume 480p/720p video with native audio, first/last frame, and multimodal references.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 30,
+  model_cost_per_second: 6,
+  parameters: {
+    parameters: SEEDANCE_2_0_VIDEO_PARAMS,
+  },
+  supports_reference_image: true,
+  supports_reference_video: true,
+  supports_reference_audio: true,
+  supports_first_frame: true,
+  supports_last_frame: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 export const SEEDANCE_2_5_VIDEO_MODEL: Model = {
   id: 'model-bytedance-seedance-2.5',
   identifier: MODEL_IDENTIFIERS.BYTEDANCE_SEEDANCE_2_5,
@@ -2211,7 +2236,24 @@ export const GROK_IMAGINE_IMAGE_2_MODEL: Model = {
   parameters: {
     parameters: GROK_IMAGINE_IMAGE_2_PARAMS,
   },
-  aspect_ratios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '2:1', '1:2', '20:9', '9:20'],
+  aspect_ratios: [
+    'auto',
+    '1:1',
+    '16:9',
+    '9:16',
+    '4:3',
+    '3:4',
+    '3:2',
+    '2:3',
+    '2:1',
+    '1:2',
+    '21:9',
+    '5:2',
+    '20:9',
+    '9:20',
+    '19.5:9',
+    '9:19.5',
+  ],
   default_aspect_ratio: '1:1',
   supports_reference_image: true,
   max_images: 4,
@@ -2438,6 +2480,7 @@ export const VIDEO_MODELS = [
   HAILUO_2_3_FAST_MODEL,
   VEO_3_1_FAST_MODEL,
   SEEDANCE_2_0_VIDEO_MODEL,
+  SEEDANCE_2_0_MINI_VIDEO_MODEL,
   SEEDANCE_2_5_VIDEO_MODEL,
   HAPPY_HORSE_VIDEO_MODEL,
   GEMINI_OMNI_FLASH_VIDEO_MODEL,
@@ -2484,6 +2527,7 @@ const VIDEO_MODELS_FIXED = [
   HAILUO_2_3_FAST_MODEL,
   VEO_3_1_FAST_MODEL,
   SEEDANCE_2_0_VIDEO_MODEL,
+  SEEDANCE_2_0_MINI_VIDEO_MODEL,
   SEEDANCE_2_5_VIDEO_MODEL,
   HAPPY_HORSE_VIDEO_MODEL,
   GEMINI_OMNI_FLASH_VIDEO_MODEL,

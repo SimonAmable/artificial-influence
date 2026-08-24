@@ -46,6 +46,7 @@ import {
   shouldUseDirectXaiImageEdits,
   toXaiGenerateImageResult,
 } from '@/lib/server/xai-image-edits';
+import { resolveXaiAspectRatio } from '@/lib/server/xai-aspect-ratio';
 import {
   parseStudioBoardFieldsFromFormData,
   studioBoardFieldsForIndex,
@@ -817,7 +818,16 @@ export async function POST(request: NextRequest) {
     };
 
     // Add optional parameters if provided
-    if (aspectRatio && /^\d+:\d+$/.test(aspectRatio)) {
+    const isXaiImageProvider = provider === 'xai' || provider === 'gateway';
+    if (isXaiImageProvider) {
+      const resolvedXaiAspectRatio = resolveXaiAspectRatio(aspectRatio || aspect_ratio);
+      if (resolvedXaiAspectRatio && resolvedXaiAspectRatio !== 'auto') {
+        generateOptions.aspectRatio = resolvedXaiAspectRatio as `${number}:${number}`;
+        console.log('[generate-image] xAI aspect ratio set:', resolvedXaiAspectRatio, '(from', aspectRatio || aspect_ratio, ')');
+      } else if (resolvedXaiAspectRatio === 'auto') {
+        console.log('[generate-image] xAI aspect ratio omitted (auto)');
+      }
+    } else if (aspectRatio && /^\d+:\d+$/.test(aspectRatio)) {
       generateOptions.aspectRatio = aspectRatio as `${number}:${number}`;
       console.log('[generate-image] Aspect ratio set:', aspectRatio);
     }

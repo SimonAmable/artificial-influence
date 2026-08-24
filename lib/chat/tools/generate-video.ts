@@ -724,10 +724,12 @@ export function createGenerateVideoTool({
           if (negativePrompt) replicateInput.negative_prompt = negativePrompt
           break
         case "bytedance/seedance-2.0":
+        case "bytedance/seedance-2.0-mini":
         case "bytedance/seedance-2.5": {
           const refMode = Boolean(primaryVideo) || additionalImages.length > 0
           if (duration != null) replicateInput.duration = duration
           if (aspectRatio) replicateInput.aspect_ratio = aspectRatio
+          if (resolution) replicateInput.resolution = resolution
           if (generateAudio !== undefined) replicateInput.generate_audio = generateAudio
           if (refMode) {
             const refImages = [primaryImage, secondaryImage, ...additionalImages].filter(
