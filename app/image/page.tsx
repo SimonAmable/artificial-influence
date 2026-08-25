@@ -211,7 +211,7 @@ function ImagePageContent() {
   
   const { layoutMode } = layoutModeContext
   const chatDockInsetRight = useAIChatDockInsetRight()
-  const { tasks: persistedTasks, refresh: refreshGenerationTasks, markCompleted } = useGenerationTasks()
+  const { tasks: persistedTasks, refresh: refreshGenerationTasks, markCompleted, removeTasks } = useGenerationTasks()
   const fixedPromptPanelStyle = React.useMemo(
     () => ({ right: chatDockInsetRight }),
     [chatDockInsetRight],
@@ -1204,6 +1204,24 @@ function ImagePageContent() {
     toast.success("Settings restored — edit and generate when ready")
   }, [])
 
+  const handleHideFailed = React.useCallback(async (item: Extract<GridItem, { type: "failed" }>) => {
+    try {
+      const response = await fetch(`/api/generations/${item.id}`, {
+        method: "DELETE",
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Failed to hide generation")
+      }
+
+      removeTasks([item.id])
+      toast.success("Failed generation hidden")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to hide generation")
+    }
+  }, [removeTasks])
+
   const handleUseSavedExample = React.useCallback((
     example: SavedExample,
     promptOverride: string,
@@ -1565,6 +1583,7 @@ function ImagePageContent() {
           }}
           onRecreate={handleRecreate}
           onReuseFailed={handleReuseFailed}
+          onHideFailed={handleHideFailed}
           onCreateAsset={handleCreateAsset}
           onUpscale={handleUpscale}
           onRemoveBackground={handleRemoveBackground}

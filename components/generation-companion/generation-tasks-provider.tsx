@@ -24,6 +24,8 @@ type GenerationTasksContextValue = {
   refresh: () => Promise<void>
   /** Optimistically clear generating tiles when the active page already has the result. */
   markCompleted: (ids: string[]) => void
+  /** Optimistically drop tasks (e.g. hidden failed generations). */
+  removeTasks: (ids: string[]) => void
 }
 
 const GenerationTasksContext = React.createContext<GenerationTasksContextValue | null>(null)
@@ -109,6 +111,12 @@ export function GenerationTasksProvider({ children }: { children: React.ReactNod
     )
   }, [])
 
+  const removeTasks = React.useCallback((ids: string[]) => {
+    if (ids.length === 0) return
+    const removedIds = new Set(ids)
+    setTasks((current) => current.filter((task) => !removedIds.has(task.id)))
+  }, [])
+
   React.useEffect(() => {
     void refresh()
     const timer = window.setInterval(() => void refresh(), 10_000)
@@ -116,8 +124,8 @@ export function GenerationTasksProvider({ children }: { children: React.ReactNod
   }, [refresh])
 
   const value = React.useMemo(
-    () => ({ tasks, refresh, markCompleted }),
-    [tasks, refresh, markCompleted],
+    () => ({ tasks, refresh, markCompleted, removeTasks }),
+    [tasks, refresh, markCompleted, removeTasks],
   )
 
   return <GenerationTasksContext.Provider value={value}>{children}</GenerationTasksContext.Provider>

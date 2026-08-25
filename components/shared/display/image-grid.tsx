@@ -84,6 +84,7 @@ interface ImageGridProps {
   onEdit?: (imageUrl: string, index: number) => void
   onRecreate?: (image: ImageData) => void
   onReuseFailed?: (item: Extract<GridItem, { type: "failed" }>) => void
+  onHideFailed?: (item: Extract<GridItem, { type: "failed" }>) => void
   onCreateAsset?: (imageUrl: string, index: number) => void
   onSaveExample?: (imageUrl: string, index: number) => void
   onUpscale?: (imageUrl: string, index: number) => void
@@ -141,6 +142,7 @@ export function ImageGrid({
   onEdit,
   onRecreate,
   onReuseFailed,
+  onHideFailed,
   onCreateAsset,
   onSaveExample,
   onUpscale,
@@ -716,28 +718,52 @@ export function ImageGrid({
                       ? "bg-gradient-to-t from-black/80 via-black/20 to-black/10"
                       : "bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30"
                   )} />
-                  {item.type === "failed" && onReuseFailed ? (
-                    <div className="absolute right-2 top-2 z-20">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              onReuseFailed(item)
-                            }}
-                          >
-                            <ArrowsClockwise className="mr-1 size-3" />
-                            Reuse
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="left" sideOffset={8}>
-                          Restore prompt and settings
-                        </TooltipContent>
-                      </Tooltip>
+                  {item.type === "failed" && (onReuseFailed || onHideFailed) ? (
+                    <div className="absolute right-2 top-2 z-20 flex items-center gap-1">
+                      {onReuseFailed ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="h-7 rounded-full border border-white/20 bg-black/55 px-2.5 text-[11px] font-medium text-white hover:bg-black/75"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                onReuseFailed(item)
+                              }}
+                            >
+                              <ArrowsClockwise className="mr-1 size-3" />
+                              Reuse
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" sideOffset={8}>
+                            Restore prompt and settings
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : null}
+                      {onHideFailed ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="icon"
+                              aria-label="Hide failed generation"
+                              className="size-7 rounded-full border border-white/20 bg-black/55 text-white hover:bg-black/75"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                onHideFailed(item)
+                              }}
+                            >
+                              <Trash className="size-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" sideOffset={8}>
+                            Hide this failed generation
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : null}
                     </div>
                   ) : null}
                   <div className="absolute inset-x-2 bottom-2 z-10 text-left text-[10px] text-white/90 drop-shadow-md">
