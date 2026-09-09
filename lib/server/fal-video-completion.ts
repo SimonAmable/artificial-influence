@@ -5,6 +5,8 @@ import { deductUserCreditsUpTo } from "@/lib/credits"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
 import { notifyGenerationCompleteTelegram } from "@/lib/server/notify-generation-complete"
 import { configureFal } from "./fal-image"
+import { formatFalClientError } from "./fal-client-error"
+import { extractFalVideoUrl, isFalRequestNotFoundError } from "./fal-output"
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,7 +42,10 @@ type PendingFalVideoRow = {
 
 type CompleteFalVideoOptions = {
   fromWebhook?: boolean
+  webhookPayload?: unknown
 }
+
+const REQUEST_NOT_FOUND_GRACE_MS = 15 * 60 * 1000
 
 export async function completeFalPendingVideoAdmin(
   predictionId: string,
@@ -49,7 +54,7 @@ export async function completeFalPendingVideoAdmin(
   const { data: generation, error } = await supabaseAdmin
     .from("generations")
     .select(
-      "id, user_id, model, prompt, quoted_credits, tool, reference_images_supabase_storage_path, reference_videos_supabase_storage_path, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type",
+      "id, user_id, model, prompt, quoted_credits, tool, reference_images_supabase_storage_path, reference_videos_supabase_storage_path, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type, created_at",
     )
     .eq("replicate_prediction_id", predictionId)
     .eq("type", "video")
@@ -59,7 +64,7 @@ export async function completeFalPendingVideoAdmin(
     return { status: "pending" }
   }
 
-  const row = generation as PendingFalVideoRow
+  const row = generation as PendingFalVideoRow & { created_at?: string | null }
   if (row.status !== "pending" || !row.fal_endpoint_id || !row.replicate_prediction_id) {
     return { status: row.status === "completed" ? "completed" : row.status === "failed" ? "failed" : "pending" }
   }
@@ -68,48 +73,61 @@ export async function completeFalPendingVideoAdmin(
   const endpointId = row.fal_endpoint_id
   const requestId = row.replicate_prediction_id
 
-  if (!options.fromWebhook) {
-    let queueStatus
+  let outputUrl = extractFalVideoUrl(options.webhookPayload)
+
+  if (!outputUrl) {
+    if (!options.fromWebhook) {
+      let queueStatus
+      try {
+        queueStatus = await fal.queue.status(endpointId, { requestId })
+      } catch (e) {
+        console.error("[fal-video-completion] queue.status", e)
+        return { status: "pending" }
+      }
+
+      if (queueStatus.status === "IN_QUEUE" || queueStatus.status === "IN_PROGRESS") {
+        return { status: "pending" }
+      }
+
+      if (queueStatus.status !== "COMPLETED") {
+        await supabaseAdmin
+          .from("generations")
+          .update({
+            status: "failed",
+            error_message: `Fal queue status: ${queueStatus.status}`,
+            finished_at: new Date().toISOString(),
+          })
+          .eq("id", row.id)
+        await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
+        return { status: "failed", error: "Fal generation failed" }
+      }
+    }
+
     try {
-      queueStatus = await fal.queue.status(endpointId, { requestId })
+      const result = await fal.queue.result(endpointId, { requestId })
+      outputUrl = extractFalVideoUrl(result.data)
     } catch (e) {
-      console.error("[fal-video-completion] queue.status", e)
-      return { status: "pending" }
-    }
-
-    if (queueStatus.status === "IN_QUEUE" || queueStatus.status === "IN_PROGRESS") {
-      return { status: "pending" }
-    }
-
-    if (queueStatus.status !== "COMPLETED") {
+      const msg = formatFalClientError(e)
+      if (isFalRequestNotFoundError(msg)) {
+        const createdAtMs = row.created_at ? Date.parse(row.created_at) : Number.NaN
+        const youngEnough =
+          Number.isFinite(createdAtMs) && Date.now() - createdAtMs < REQUEST_NOT_FOUND_GRACE_MS
+        if (youngEnough || options.fromWebhook) {
+          console.warn(
+            "[fal-video-completion] queue.result Request not found; leaving pending",
+            { predictionId, endpointId, fromWebhook: Boolean(options.fromWebhook) },
+          )
+          return { status: "pending" }
+        }
+      }
       await supabaseAdmin
         .from("generations")
-        .update({
-          status: "failed",
-          error_message: `Fal queue status: ${queueStatus.status}`,
-          finished_at: new Date().toISOString(),
-        })
+        .update({ status: "failed", error_message: msg, finished_at: new Date().toISOString() })
         .eq("id", row.id)
       await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
-      return { status: "failed", error: "Fal generation failed" }
+      return { status: "failed", error: msg }
     }
   }
-
-  let result
-  try {
-    result = await fal.queue.result(endpointId, { requestId })
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Fal result error"
-    await supabaseAdmin
-      .from("generations")
-      .update({ status: "failed", error_message: msg, finished_at: new Date().toISOString() })
-      .eq("id", row.id)
-    await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
-    return { status: "failed", error: msg }
-  }
-
-  const data = result.data as { video?: { url?: string } }
-  const outputUrl = typeof data?.video?.url === "string" ? data.video.url : null
 
   if (!outputUrl) {
     await supabaseAdmin

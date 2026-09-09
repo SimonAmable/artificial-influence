@@ -20,7 +20,9 @@ const supabaseAdmin = createClient(
 
 type FalWebhookBody = {
   error?: string
+  gateway_request_id?: string
   payload?: unknown
+  payload_error?: string
   request_id?: string
   status?: "OK" | "ERROR"
 }
@@ -67,10 +69,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true })
     }
 
+    if (body.payload == null && body.payload_error) {
+      console.warn("[webhooks/fal] OK webhook missing payload:", {
+        predictionId,
+        payloadError: body.payload_error,
+        gatewayRequestId: body.gateway_request_id ?? null,
+      })
+    }
+
     if (generation.type === "video") {
-      await completeFalPendingVideoAdmin(predictionId, { fromWebhook: true })
+      await completeFalPendingVideoAdmin(predictionId, {
+        fromWebhook: true,
+        webhookPayload: body.payload,
+      })
     } else {
-      await completeFalPendingImageAdmin(predictionId, { fromWebhook: true })
+      await completeFalPendingImageAdmin(predictionId, {
+        fromWebhook: true,
+        webhookPayload: body.payload,
+      })
     }
 
     return NextResponse.json({ received: true })
