@@ -5,7 +5,7 @@ import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import type { AttachedRef, CommandItem, SlashCommandUiAction } from "@/lib/commands/types"
 import type { AssetType } from "@/lib/assets/types"
-import { useCommandInput } from "@/lib/commands/use-command-input"
+import { useCommandInput, type AttachedImageMention } from "@/lib/commands/use-command-input"
 import { prefetchBrandKits } from "@/lib/commands/cache"
 import { currentProduct } from "@/lib/product/current"
 import { CommandPalette } from "./command-palette"
@@ -35,6 +35,10 @@ export interface CommandTextareaProps {
   onSlashUiAction?: (action: SlashCommandUiAction) => void
   referenceInsertMode?: (item: AtPaletteRow["item"]) => "inline" | "external"
   textareaId?: string
+  /** Already-added reference images, cited as `@image1`. */
+  attachedImageMentions?: AttachedImageMention[]
+  /** Parent can insert `@image1` at the caret (thumbnail click). */
+  mentionInserterRef?: React.MutableRefObject<((token: string) => void) | null>
 }
 
 export function CommandTextarea({
@@ -53,6 +57,8 @@ export function CommandTextarea({
   onSlashUiAction,
   referenceInsertMode,
   textareaId,
+  attachedImageMentions,
+  mentionInserterRef,
 }: CommandTextareaProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const layerRef = React.useRef<HTMLDivElement>(null)
@@ -79,7 +85,8 @@ export function CommandTextarea({
     handleSelect,
     handleKeyDown,
     selectSlash,
-    selectAt,
+    selectAtRow,
+    insertLiteralMention,
     syncCursor,
   } = useCommandInput({
     value,
@@ -91,7 +98,16 @@ export function CommandTextarea({
     slashCommands,
     onSlashUiAction,
     referenceInsertMode,
+    attachedImageMentions,
   })
+
+  React.useEffect(() => {
+    if (!mentionInserterRef) return
+    mentionInserterRef.current = insertLiteralMention
+    return () => {
+      mentionInserterRef.current = null
+    }
+  }, [insertLiteralMention, mentionInserterRef])
 
   const measurePalettePosition = React.useCallback(() => {
     const el = textareaRef.current
@@ -228,7 +244,7 @@ export function CommandTextarea({
         activeIndex={activeIndex}
         assetsLoading={assetsLoading}
         onSelectSlash={selectSlash}
-        onSelectAt={(row: AtPaletteRow) => selectAt(row.item)}
+        onSelectAt={selectAtRow}
         listRef={listRef}
         fixedStyle={paletteFixedStyle}
         slashCommandsContext={slashCommandsContext}

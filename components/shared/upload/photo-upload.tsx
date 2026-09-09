@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils"
 export interface ImageUpload {
   url?: string
   file?: File
+  /** Stable id so prompt cites stay attached to this image across reorders. */
+  clientId?: string
 }
 
 export interface PhotoUploadProps {

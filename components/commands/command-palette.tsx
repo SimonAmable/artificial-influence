@@ -39,6 +39,15 @@ function BrandPaletteIcon({ previewUrl }: { previewUrl?: string | null }) {
   )
 }
 
+function AttachedImagePaletteIcon({ previewUrl }: { previewUrl?: string | null }) {
+  return (
+    <PreviewOrIcon
+      src={previewUrl}
+      fallback={<Image className="mt-0.5 size-9 shrink-0 text-zinc-400" weight="regular" aria-hidden />}
+    />
+  )
+}
+
 function AssetPaletteIcon({
   row,
 }: {
@@ -55,6 +64,21 @@ function AssetPaletteIcon({
       <Image className="mt-0.5 size-9 shrink-0 text-zinc-400" weight="regular" aria-hidden />
     )
   return <PreviewOrIcon src={preview} fallback={glyph} />
+}
+
+function paletteRowIcon(row: AtPaletteRow): React.ReactNode {
+  switch (row.kind) {
+    case "brand":
+      return <BrandPaletteIcon previewUrl={row.item.previewUrl} />
+    case "asset":
+      return <AssetPaletteIcon row={row} />
+    case "attached-image":
+      return <AttachedImagePaletteIcon previewUrl={row.item.previewUrl} />
+    default: {
+      const _exhaustive: never = row
+      return _exhaustive
+    }
+  }
 }
 
 export interface CommandPaletteProps {
@@ -236,35 +260,50 @@ export function CommandPalette({
               {assetsLoading ? "Loading…" : "No matching references"}
             </div>
           ) : (
-            atRows.map((row, i) => (
-              <button
-                key={`${row.kind}-${row.item.id}`}
-                type="button"
-                data-palette-index={i}
-                role="option"
-                aria-selected={i === activeIndex}
-                className={cn(
-                  "flex w-full items-start gap-2 rounded-lg border border-transparent px-2 py-2 text-left text-sm transition-[background-color,box-shadow,border-color,color]",
-                  i === activeIndex
-                    ? "bg-background text-foreground border-border/70 shadow-[0_0_0_1px_hsl(var(--border)/0.45),0_14px_30px_-18px_hsl(var(--foreground)/0.9)]"
-                    : "hover:bg-muted/80"
-                )}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => onSelectAt(row)}
-              >
-                {row.kind === "brand" ? (
-                  <BrandPaletteIcon previewUrl={row.item.previewUrl} />
-                ) : (
-                  <AssetPaletteIcon row={row} />
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{row.item.label}</span>
-                  {row.item.subtitle ? (
-                    <span className="block truncate text-xs text-muted-foreground">{row.item.subtitle}</span>
-                  ) : null}
-                </span>
-              </button>
-            ))
+            <>
+              {atRows.some((row) => row.kind === "attached-image") ? (
+                <div className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Added
+                </div>
+              ) : null}
+              {atRows.map((row, i) => {
+                const showLibraryLabel =
+                  row.kind !== "attached-image" &&
+                  atRows[i - 1]?.kind === "attached-image"
+                const icon = paletteRowIcon(row)
+                return (
+                  <React.Fragment key={`${row.kind}-${row.item.id}`}>
+                    {showLibraryLabel ? (
+                      <div className="px-2 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Library
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      data-palette-index={i}
+                      role="option"
+                      aria-selected={i === activeIndex}
+                      className={cn(
+                        "flex w-full items-start gap-2 rounded-lg border border-transparent px-2 py-2 text-left text-sm transition-[background-color,box-shadow,border-color,color]",
+                        i === activeIndex
+                          ? "bg-background text-foreground border-border/70 shadow-[0_0_0_1px_hsl(var(--border)/0.45),0_14px_30px_-18px_hsl(var(--foreground)/0.9)]"
+                          : "hover:bg-muted/80"
+                      )}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => onSelectAt(row)}
+                    >
+                      {icon}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{row.item.label}</span>
+                        {row.item.subtitle ? (
+                          <span className="block truncate text-xs text-muted-foreground">{row.item.subtitle}</span>
+                        ) : null}
+                      </span>
+                    </button>
+                  </React.Fragment>
+                )
+              })}
+            </>
           )}
         </div>
       )}

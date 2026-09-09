@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
 import type { AssetType } from "@/lib/assets/types"
 import { CommandTextarea } from "@/components/commands/command-textarea"
+import type { AttachedImageMention } from "@/lib/commands/use-command-input"
 
 export interface ImagePromptFieldsProps {
   promptValue: string
@@ -26,6 +27,9 @@ export interface ImagePromptFieldsProps {
   /** Badge to the right of each / command title (preset family label) */
   slashCommandsContext?: string | null
   onSlashUiAction?: (action: SlashCommandUiAction) => void
+  /** Already-added reference images, cited as `@image1`. */
+  attachedImageMentions?: AttachedImageMention[]
+  mentionInserterRef?: React.MutableRefObject<((token: string) => void) | null>
 }
 
 export function ImagePromptFields({
@@ -42,6 +46,8 @@ export function ImagePromptFields({
   allowedAssetTypes,
   slashCommandsContext = "Image Prompts",
   onSlashUiAction,
+  attachedImageMentions,
+  mentionInserterRef,
 }: ImagePromptFieldsProps) {
   const [isPromptExpanded, setIsPromptExpanded] = React.useState(false)
   const isToolbar = variant === "toolbar" || variant === "node"
@@ -106,6 +112,8 @@ export function ImagePromptFields({
         allowedAssetTypes={allowedAssetTypes}
         slashCommandsContext={slashCommandsContext}
         onSlashUiAction={onSlashUiAction}
+        attachedImageMentions={attachedImageMentions}
+        mentionInserterRef={mentionInserterRef}
       />
     </div>
   )

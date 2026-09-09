@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Plus, X, FilePlus, Sparkle, FolderOpen, Images } from "@phosphor-icons/react"
+import { DotsSixVertical, Plus, X, FilePlus, Sparkle, FolderOpen, Images } from "@phosphor-icons/react"
 import { ImageUpload } from "@/components/shared/upload/photo-upload"
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
@@ -60,6 +60,36 @@ import {
 } from "./prompt-control-menu"
 import { AnimatePresence, LayoutGroup } from "framer-motion"
 import { brandRefsOnly, getImageAssetUrlsFromRefChips } from "@/lib/commands/ref-image-pipeline"
+import type { AttachedImageMention } from "@/lib/commands/use-command-input"
+import {
+  mentionsAfterRemovingReference,
+  promptContainsMentionToken,
+  referenceImageMentionToken,
+  remapReferenceImageMentions,
+} from "@/lib/commands/reference-image-mentions"
+
+const PROMPT_IMAGE_SLOT_PREFIX = "prompt-image-slot:"
+
+function nextClientId(): string {
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `img-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function withClientId(image: ImageUpload): ImageUpload {
+  if (image.clientId) return image
+  return { ...image, clientId: nextClientId() }
+}
+
+type PreviewSlot = {
+  key: string
+  token: string
+  url: string
+  subtitle: string
+  uploadIndex: number | null
+  assetChipId: string | null
+  image: ImageUpload
+}
 
 export interface InfluencerInputSnapshot {
   prompt: string
@@ -217,6 +247,11 @@ export function InfluencerInputBox({
   } | null>(null)
   const [slashCreateAssetUploading, setSlashCreateAssetUploading] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const mentionInserterRef = React.useRef<((token: string) => void) | null>(null)
+  const orderedPreviewImagesRef = React.useRef<ImageUpload[]>([])
+  const [previewKeyOrder, setPreviewKeyOrder] = React.useState<string[]>([])
+  const [previewDropIndex, setPreviewDropIndex] = React.useState<number | null>(null)
+  const previewDragIndexRef = React.useRef<number | null>(null)
   const slashCreateAssetFileRef = React.useRef<HTMLInputElement>(null)
   const promptDragCounter = React.useRef(0)
   
@@ -272,7 +307,7 @@ export function InfluencerInputBox({
     if (!file || !file.type.startsWith("image/")) return
 
     const url = URL.createObjectURL(file)
-    const newImage: ImageUpload = { file, url }
+    const newImage: ImageUpload = withClientId({ file, url })
 
     if (onReferenceImagesChange) {
       const updatedImages = [...localReferenceImages, newImage]
@@ -399,7 +434,10 @@ export function InfluencerInputBox({
     return {
       prompt: localPrompt,
       attachedRefs,
-      referenceImages: currentReferenceImages,
+      referenceImages:
+        orderedPreviewImagesRef.current.length > 0
+          ? orderedPreviewImagesRef.current
+          : currentReferenceImages,
     }
   }, [
     attachedRefs,
@@ -439,7 +477,7 @@ export function InfluencerInputBox({
     const newImages: ImageUpload[] = []
     for (const file of files) {
       if (!file.type.startsWith("image/")) continue
-      newImages.push({ file, url: URL.createObjectURL(file) })
+      newImages.push(withClientId({ file, url: URL.createObjectURL(file) }))
     }
 
     if (newImages.length === 0) {
@@ -520,7 +558,7 @@ export function InfluencerInputBox({
       toast.error("Reference images only — pick an image asset")
       return
     }
-    const newImage = { url }
+    const newImage = withClientId({ url })
     
     // Support both single and multiple reference images
     if (onReferenceImagesChange) {
@@ -639,22 +677,172 @@ export function InfluencerInputBox({
   const attachedImageAssetsWithPreview = React.useMemo(
     () =>
       attachedRefs.filter((r) => {
+        if (r.id.startsWith(PROMPT_IMAGE_SLOT_PREFIX)) return false
         if (r.category !== "asset" || r.assetType !== "image") return false
-        const url = (r.assetUrl || r.previewUrl || "").trim()
+        const url = (r.assetUrl || "").trim()
         return Boolean(url)
       }),
     [attachedRefs]
   )
 
-  const previewRowCount = manualDisplayImages.length + attachedImageAssetsWithPreview.length
+  const naturalPreviewSlots = React.useMemo((): PreviewSlot[] => {
+    const uploads: PreviewSlot[] = manualDisplayImages.flatMap((image, uploadIndex) => {
+      const url = image.url?.trim()
+      if (!url) return []
+      const key = `upload:${image.clientId || url}`
+      return [{
+        key,
+        token: "",
+        url,
+        subtitle: "Added reference",
+        uploadIndex,
+        assetChipId: null,
+        image,
+      }]
+    })
+    const assets: PreviewSlot[] = attachedImageAssetsWithPreview.flatMap((ref) => {
+      const url = (ref.assetUrl || "").trim()
+      if (!url) return []
+      return [{
+        key: `asset:${ref.chipId}`,
+        token: "",
+        url,
+        subtitle: ref.label ? ref.label : "Added reference",
+        uploadIndex: null,
+        assetChipId: ref.chipId,
+        image: { url },
+      }]
+    })
+    return [...uploads, ...assets]
+  }, [attachedImageAssetsWithPreview, manualDisplayImages])
 
+  const orderedPreviewSlots = React.useMemo((): PreviewSlot[] => {
+    const byKey = new Map(naturalPreviewSlots.map((slot) => [slot.key, slot]))
+    const ordered: PreviewSlot[] = []
+    for (const key of previewKeyOrder) {
+      const slot = byKey.get(key)
+      if (!slot) continue
+      ordered.push(slot)
+      byKey.delete(key)
+    }
+    for (const slot of byKey.values()) ordered.push(slot)
+    return ordered.map((slot, index) => ({
+      ...slot,
+      token: referenceImageMentionToken(index),
+    }))
+  }, [naturalPreviewSlots, previewKeyOrder])
+
+  const previewRowCount = orderedPreviewSlots.length
   const allPreviewImageUrls = React.useMemo(
-    () => [
-      ...manualDisplayImages.map((img) => img.url),
-      ...attachedImageAssetsWithPreview.map((r) => (r.assetUrl || r.previewUrl || "").trim()),
-    ],
-    [manualDisplayImages, attachedImageAssetsWithPreview]
+    () => orderedPreviewSlots.map((slot) => slot.url),
+    [orderedPreviewSlots]
   )
+  const attachedImageMentions = React.useMemo((): AttachedImageMention[] => (
+    orderedPreviewSlots.map((slot) => ({
+      id: `${PROMPT_IMAGE_SLOT_PREFIX}${slot.key}`,
+      token: slot.token,
+      label: slot.token,
+      subtitle: slot.subtitle,
+      previewUrl: slot.url,
+    }))
+  ), [orderedPreviewSlots])
+
+  orderedPreviewImagesRef.current = orderedPreviewSlots.map((slot) => slot.image)
+
+  const commitPrompt = React.useCallback((next: string) => {
+    setLocalPrompt(next)
+    onPromptChange?.(next)
+  }, [onPromptChange])
+
+  const citeReferenceImage = React.useCallback((token: string) => {
+    mentionInserterRef.current?.(token)
+  }, [])
+
+  React.useEffect(() => {
+    const present = orderedPreviewSlots.filter((slot) => promptContainsMentionToken(localPrompt, slot.token))
+    const real = attachedRefs.filter((ref) => !ref.id.startsWith(PROMPT_IMAGE_SLOT_PREFIX))
+    const nextSynthetic: AttachedRef[] = present.map((slot) => {
+      const id = `${PROMPT_IMAGE_SLOT_PREFIX}${slot.key}`
+      const existing = attachedRefs.find((ref) => ref.id === id)
+      return {
+        id,
+        label: slot.token,
+        subtitle: slot.subtitle,
+        category: "asset",
+        assetType: "image",
+        previewUrl: slot.url,
+        serialized: "",
+        chipId: existing?.chipId ?? id,
+        mentionToken: slot.token,
+      }
+    })
+    const currentSynthetic = attachedRefs.filter((ref) => ref.id.startsWith(PROMPT_IMAGE_SLOT_PREFIX))
+    const same =
+      currentSynthetic.length === nextSynthetic.length &&
+      nextSynthetic.every((ref, index) => {
+        const previous = currentSynthetic[index]
+        return previous?.id === ref.id && previous.mentionToken === ref.mentionToken
+      })
+    if (same) return
+    handleRefsChange([...real, ...nextSynthetic])
+  }, [attachedRefs, handleRefsChange, localPrompt, orderedPreviewSlots])
+
+  const applyPreviewOrder = React.useCallback((nextKeys: string[]) => {
+    const previousTokens = new Map(orderedPreviewSlots.map((slot) => [slot.key, slot.token]))
+    const nextPrompt = remapReferenceImageMentions(localPrompt, previousTokens, nextKeys)
+    setPreviewKeyOrder(nextKeys)
+    if (nextPrompt !== localPrompt) commitPrompt(nextPrompt)
+  }, [commitPrompt, localPrompt, orderedPreviewSlots])
+
+  const reorderPreviewSlots = React.useCallback((from: number, to: number) => {
+    if (from === to || from < 0 || to < 0) return
+    const keys = orderedPreviewSlots.map((slot) => slot.key)
+    if (from >= keys.length || to >= keys.length) return
+    const next = [...keys]
+    const [moved] = next.splice(from, 1)
+    if (!moved) return
+    next.splice(to, 0, moved)
+    applyPreviewOrder(next)
+  }, [applyPreviewOrder, orderedPreviewSlots])
+
+  const removePreviewSlot = React.useCallback((index: number) => {
+    const slot = orderedPreviewSlots[index]
+    if (!slot) return
+    const nextPrompt = mentionsAfterRemovingReference(localPrompt, index, orderedPreviewSlots.length)
+    const nextKeys = orderedPreviewSlots.filter((_, slotIndex) => slotIndex !== index).map((item) => item.key)
+    setPreviewKeyOrder(nextKeys)
+    if (nextPrompt !== localPrompt) commitPrompt(nextPrompt)
+    if (slot.assetChipId) {
+      const asset = attachedRefs.find((ref) => ref.chipId === slot.assetChipId)
+      const without = attachedRefs.filter((ref) => ref.chipId !== slot.assetChipId)
+      let next = nextPrompt
+      const assetToken = asset?.mentionToken
+      if (assetToken && assetToken !== slot.token) {
+        const start = next.indexOf(assetToken)
+        if (start !== -1) {
+          const end = extendMentionRangeEnd(next, start, assetToken.length)
+          next = next.slice(0, start) + next.slice(end)
+        }
+      }
+      const pruned = without.filter(
+        (ref) => !ref.id.startsWith(PROMPT_IMAGE_SLOT_PREFIX) && (!ref.mentionToken || next.includes(ref.mentionToken))
+      )
+      commitPrompt(next)
+      handleRefsChange(pruned)
+      return
+    }
+    handleReferenceImageRemove(
+      onReferenceImagesChange || referenceImages !== undefined ? slot.uploadIndex ?? undefined : undefined
+    )
+  }, [
+    attachedRefs,
+    commitPrompt,
+    handleRefsChange,
+    localPrompt,
+    onReferenceImagesChange,
+    orderedPreviewSlots,
+    referenceImages,
+  ])
 
   const promptPlaceholderText =
     canAcceptPromptDrop && isPromptDragActive
@@ -684,27 +872,87 @@ export function InfluencerInputBox({
         {/* Image Preview - Above Text Input */}
         {showReferenceControls && previewRowCount > 0 && (
           <div className="relative w-full flex gap-2 flex-wrap">
-            {manualDisplayImages.map((image, index) => {
+            {orderedPreviewSlots.map((slot, index) => {
               const actionLabel = referenceImageActionLabel
               const handleThumbClick = () => {
-                if (onReferenceImageAction) {
-                  onReferenceImageAction(index)
+                if (onReferenceImageAction && slot.uploadIndex != null) {
+                  onReferenceImageAction(slot.uploadIndex)
                   return
                 }
                 handleImagePreviewClick(index)
               }
+              const canReorder = previewRowCount > 1
 
               return (
-              <div key={`upload-${index}`} className="group relative">
+              <div
+                key={slot.key}
+                className={cn(
+                  "group relative min-w-[4.25rem]",
+                  previewDropIndex === index && "rounded ring-2 ring-primary",
+                )}
+                onDragOver={(event) => {
+                  if (!canReorder || previewDragIndexRef.current == null) return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  event.dataTransfer.dropEffect = "move"
+                  setPreviewDropIndex(index)
+                }}
+                onDrop={(event) => {
+                  if (!canReorder || previewDragIndexRef.current == null) return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  const from = previewDragIndexRef.current
+                  previewDragIndexRef.current = null
+                  setPreviewDropIndex(null)
+                  if (from == null) return
+                  reorderPreviewSlots(from, index)
+                }}
+              >
                 <img
-                  src={image.url}
-                  alt={`Reference image ${index + 1}`}
+                  src={slot.url}
+                  alt={`${slot.token} reference`}
                   className={cn(
                     "h-[60px] w-auto max-w-full rounded object-contain border border-border cursor-pointer transition-opacity",
                     !actionLabel && "hover:opacity-80",
                   )}
                   onClick={handleThumbClick}
                 />
+                {canReorder ? (
+                  <button
+                    type="button"
+                    draggable
+                    className="absolute left-0.5 top-0.5 z-20 cursor-grab rounded bg-background/90 p-0.5 text-foreground shadow-sm border border-border active:cursor-grabbing"
+                    aria-label={`Reorder ${slot.token}`}
+                    title="Drag to reorder"
+                    onClick={(event) => event.stopPropagation()}
+                    onDragStart={(event) => {
+                      event.stopPropagation()
+                      previewDragIndexRef.current = index
+                      event.dataTransfer.effectAllowed = "move"
+                      event.dataTransfer.setData("text/plain", slot.token)
+                    }}
+                    onDragEnd={() => {
+                      previewDragIndexRef.current = null
+                      setPreviewDropIndex(null)
+                    }}
+                  >
+                    <DotsSixVertical className="size-3" weight="bold" />
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="absolute bottom-0.5 left-0.5 right-0.5 z-20 max-w-full truncate rounded bg-background/90 px-1 py-0.5 text-left text-[10px] font-medium leading-none text-foreground shadow-sm border border-border"
+                  title={`Insert ${slot.token}`}
+                  onMouseDown={(event) => {
+                    event.preventDefault()
+                  }}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    citeReferenceImage(slot.token)
+                  }}
+                >
+                  {slot.token}
+                </button>
                 {actionLabel ? (
                   <button
                     type="button"
@@ -722,40 +970,15 @@ export function InfluencerInputBox({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
-                    handleReferenceImageRemove(onReferenceImagesChange || referenceImages !== undefined ? index : undefined)
+                    removePreviewSlot(index)
                   }}
                   className="absolute -top-1 -right-1 bg-background hover:bg-destructive text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10"
-                  aria-label={`Remove reference image ${index + 1}`}
+                  aria-label={`Remove ${slot.token}`}
                 >
                   <X className="size-3" weight="bold" />
                 </button>
                 ) : null}
               </div>
-              )
-            })}
-            {attachedImageAssetsWithPreview.map((ref, assetIdx) => {
-              const url = (ref.assetUrl || ref.previewUrl || "").trim()
-              const globalIndex = manualDisplayImages.length + assetIdx
-              return (
-                <div key={`asset-${ref.chipId}`} className="relative">
-                  <img
-                    src={url}
-                    alt={ref.label ? `Asset reference: ${ref.label}` : "Attached asset reference"}
-                    className="h-[60px] w-auto max-w-full rounded object-contain border border-border cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => handleImagePreviewClick(globalIndex)}
-                  />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      removeAttachedAssetImageRef(ref)
-                    }}
-                    className="absolute -top-1 -right-1 bg-background hover:bg-destructive text-destructive-foreground rounded-full p-1 shadow-sm border border-border z-10"
-                    aria-label={`Remove ${ref.label || "attached asset"} from prompt`}
-                  >
-                    <X className="size-3" weight="bold" />
-                  </button>
-                </div>
               )
             })}
           </div>
@@ -787,6 +1010,8 @@ export function InfluencerInputBox({
               onPasteImage={canAcceptPromptDrop ? (file) => handlePromptImageFile(file) : undefined}
               allowedAssetTypes={allowedAssetTypes}
               onSlashUiAction={handleSlashUiAction}
+              attachedImageMentions={attachedImageMentions}
+              mentionInserterRef={mentionInserterRef}
             />
             )}
           </div>

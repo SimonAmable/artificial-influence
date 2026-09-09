@@ -7,6 +7,7 @@ import { getCachedAssets, getCachedBrandKits } from "./cache"
 import { assetToReferenceItem, brandKitToReferenceItem } from "./reference-items"
 import { makeMentionToken } from "./mention-token"
 import { valueToParts } from "./mention-segments"
+import { insertMentionToken, referenceImageMentionToken } from "./reference-image-mentions"
 import type { AssetRecord, AssetType } from "@/lib/assets/types"
 import type { BrandKit } from "@/lib/brand-kit/types"
 import { currentProduct } from "@/lib/product/current"
@@ -53,9 +54,19 @@ function filterCommandsList(commands: CommandItem[], filter: string): CommandIte
   )
 }
 
+/** Already attached to the prompt box — cited as `@image1`, `@image2`, … */
+export type AttachedImageMention = {
+  id: string
+  token: string
+  label: string
+  subtitle?: string
+  previewUrl?: string
+}
+
 export type AtPaletteRow =
   | { kind: "brand"; item: ReferenceItem }
   | { kind: "asset"; item: ReferenceItem }
+  | { kind: "attached-image"; item: ReferenceItem; token: string }
 
 export function useCommandInput(options: {
   value: string
@@ -74,6 +85,8 @@ export function useCommandInput(options: {
    * keeps the reference in `refs`, useful for chat attachments/pills.
    */
   referenceInsertMode?: (item: ReferenceItem) => "inline" | "external"
+  /** Reference images already on the composer, cited positionally as `@image1`. */
+  attachedImageMentions?: AttachedImageMention[]
 }) {
   const {
     value,
@@ -85,6 +98,7 @@ export function useCommandInput(options: {
     slashCommands: slashCommandsOption,
     onSlashUiAction,
     referenceInsertMode,
+    attachedImageMentions = [],
   } = options
   const slashCommandList = slashCommandsOption ?? PRESET_COMMANDS
 
@@ -119,6 +133,25 @@ export function useCommandInput(options: {
     if (trigger?.type !== "at") return []
     const f = trigger.filter
     const rows: AtPaletteRow[] = []
+    for (const mention of attachedImageMentions) {
+      const token = mention.token || referenceImageMentionToken(rows.length)
+      if (!matchesFilter(mention.label, mention.subtitle, f) && !matchesFilter(token, mention.subtitle, f)) {
+        continue
+      }
+      rows.push({
+        kind: "attached-image",
+        token,
+        item: {
+          id: mention.id,
+          label: token,
+          subtitle: mention.subtitle ?? "Added reference",
+          category: "asset",
+          assetType: "image",
+          previewUrl: mention.previewUrl,
+          serialized: "",
+        },
+      })
+    }
     if (brandMentionsEnabled && brandKits) {
       for (const kit of brandKits) {
         const item = brandKitToReferenceItem(kit)
@@ -140,7 +173,7 @@ export function useCommandInput(options: {
       }
     }
     return rows
-  }, [trigger, brandMentionsEnabled, brandKits, assets, allowedAssetTypes])
+  }, [trigger, attachedImageMentions, brandMentionsEnabled, brandKits, assets, allowedAssetTypes])
 
   React.useEffect(() => {
     if (trigger?.type !== "at") return
@@ -215,6 +248,24 @@ export function useCommandInput(options: {
     [applyValueAndCursor, cursor, onSlashUiAction, textareaRef, value]
   )
 
+  const insertLiteralMention = React.useCallback(
+    (token: string) => {
+      const el = textareaRef.current
+      const end = el?.selectionStart ?? cursor
+      const t = getTriggerState(value, end)
+      if (t?.type === "at") {
+        const { next, cursor: pos } = insertMentionToken(value, t.start, end, token)
+        applyValueAndCursor(next, pos)
+        return
+      }
+      const start = el?.selectionStart ?? value.length
+      const selectionEnd = el?.selectionEnd ?? end
+      const { next, cursor: pos } = insertMentionToken(value, start, selectionEnd, token)
+      applyValueAndCursor(next, pos)
+    },
+    [applyValueAndCursor, cursor, textareaRef, value]
+  )
+
   const selectAt = React.useCallback(
     (item: ReferenceItem) => {
       const el = textareaRef.current
@@ -252,6 +303,22 @@ export function useCommandInput(options: {
     [applyValueAndCursor, cursor, onRefsChange, referenceInsertMode, refs, textareaRef, value]
   )
 
+  const selectAtRow = React.useCallback(
+    (row: AtPaletteRow) => {
+      if (row.kind === "attached-image") {
+        insertLiteralMention(row.token)
+        return
+      }
+      if (row.kind === "brand" || row.kind === "asset") {
+        selectAt(row.item)
+        return
+      }
+      const _exhaustive: never = row
+      return _exhaustive
+    },
+    [insertLiteralMention, selectAt]
+  )
+
   const selectActive = React.useCallback(() => {
     if (!trigger) return
     if (trigger.type === "slash") {
@@ -260,8 +327,8 @@ export function useCommandInput(options: {
       return
     }
     const row = atRows[activeIndex]
-    if (row) selectAt(row.item)
-  }, [activeIndex, atRows, selectAt, selectSlash, slashItems, trigger])
+    if (row) selectAtRow(row)
+  }, [activeIndex, atRows, selectAtRow, selectSlash, slashItems, trigger])
 
   const handleChange = React.useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -374,6 +441,8 @@ export function useCommandInput(options: {
     handleKeyDown,
     selectSlash,
     selectAt,
+    selectAtRow,
+    insertLiteralMention,
     closeTrigger,
   }
 }
