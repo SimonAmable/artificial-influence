@@ -97,7 +97,7 @@ export async function runSwapForMotionCopy(input: {
     formData.append("resolution", studioRequest.resolution)
   }
   if (
-    studioRequest.model === "openai/gpt-image-2" ||
+    studioRequest.model === "openai/gpt-image-2.5/flare" ||
     studioRequest.model === "google/nano-banana-2-lite" ||
     studioRequest.model === "bytedance/seedream-5-lite"
   ) {

@@ -2,9 +2,9 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { estimateStudioToolCredits } from "@/lib/image/studio-tools/estimate-credits"
 
-test("GPT Image 2 studio tools quote medium quality, not the flat model_cost", () => {
+test("GPT Image 2.5 Flare studio tools quote high quality, not the flat model_cost", () => {
   const quoted = estimateStudioToolCredits({
-    baseModelIdentifier: "openai/gpt-image-2",
+    baseModelIdentifier: "openai/gpt-image-2.5/flare",
     model_cost: 5,
     pricing_config: {
       strategy: "tiered_per_output",
@@ -15,15 +15,15 @@ test("GPT Image 2 studio tools quote medium quality, not the flat model_cost", (
     },
   })
 
-  assert.equal(quoted, 4)
+  assert.equal(quoted, 8)
 })
 
-test("GPT Image 2 studio tools still quote medium when pricing_config is missing", () => {
+test("GPT Image 2.5 Flare studio tools still quote high when pricing_config is missing", () => {
   const quoted = estimateStudioToolCredits({
-    baseModelIdentifier: "openai/gpt-image-2",
+    baseModelIdentifier: "openai/gpt-image-2.5/flare",
     model_cost: 5,
     pricing_config: null,
   })
 
-  assert.equal(quoted, 4)
+  assert.equal(quoted, 8)
 })

@@ -207,7 +207,7 @@ export function MessageParts({
               key={`${message.id}-${index}`}
               badgeLabel="Generated"
               messageId={`${message.id}-${index}`}
-              modelFallback="openai/gpt-image-2"
+              modelFallback="openai/gpt-image-2.5/flare"
               part={toolPart}
               title="Image Generation Tool"
               allMessages={transcriptMessages}

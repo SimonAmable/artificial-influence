@@ -20,6 +20,8 @@ export const MODEL_IDENTIFIERS = {
   GOOGLE_NANO_BANANA_2: 'google/nano-banana-2',
   OPENAI_GPT_IMAGE_1_5: 'openai/gpt-image-1.5',
   OPENAI_GPT_IMAGE_2: 'openai/gpt-image-2',
+  OPENAI_GPT_IMAGE_25_FLARE: 'openai/gpt-image-2.5/flare',
+  OPENAI_GPT_IMAGE_25_SUNBURST: 'openai/gpt-image-2.5/sunburst',
   BYTEDANCE_SEEDREAM_4_5: 'bytedance/seedream-4.5',
   BYTEDANCE_SEEDREAM_5_LITE: 'bytedance/seedream-5-lite',
   BYTEDANCE_SEEDREAM_5_PRO: 'bytedance/seedream-5-pro',
@@ -49,6 +51,9 @@ export const MODEL_IDENTIFIERS = {
   GOOGLE_GEMINI_OMNI_FLASH: 'google/gemini-omni-flash',
   GOOGLE_NANO_BANANA_2_LITE: 'google/nano-banana-2-lite',
   MINIMAX_H3: 'minimax/h3',
+  MINIMAX_H3_TEXT_TO_VIDEO: 'minimax/h3/text-to-video',
+  MINIMAX_H3_IMAGE_TO_VIDEO: 'minimax/h3/image-to-video',
+  MINIMAX_H3_REFERENCE_TO_VIDEO: 'minimax/h3/reference-to-video',
   PRUNAAI_P_VIDEO: 'prunaai/p-video',
   XAI_GROK_IMAGINE_VIDEO: 'xai/grok-imagine-video',
   XAI_GROK_IMAGINE_VIDEO_1_5: 'xai/grok-imagine-video-1.5',
@@ -58,7 +63,15 @@ export const MODEL_IDENTIFIERS = {
 } as const;
 
 /** Default model for image generation (used when no model is specified). */
-export const DEFAULT_IMAGE_MODEL_IDENTIFIER = MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_2;
+export const DEFAULT_IMAGE_MODEL_IDENTIFIER = MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_25_FLARE;
+
+export function isOpenAiGptImageFalIdentifier(identifier: string | null | undefined): boolean {
+  return (
+    identifier === MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_2 ||
+    identifier === MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_25_FLARE ||
+    identifier === MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_25_SUNBURST
+  );
+}
 /** Default model for motion copy generation. */
 export const DEFAULT_MOTION_COPY_MODEL_IDENTIFIER = MODEL_IDENTIFIERS.KWAIVGI_KLING_V3_MOTION;
 
@@ -83,9 +96,29 @@ export function isGeminiOmniFlashModelIdentifier(identifier: string | null | und
 export function isMinimaxH3ModelIdentifier(identifier: string | null | undefined): boolean {
   return (
     identifier === MODEL_IDENTIFIERS.MINIMAX_H3 ||
-    identifier === 'minimax/h3/text-to-video' ||
-    identifier === 'minimax/h3/image-to-video' ||
-    identifier === 'minimax/h3/reference-to-video'
+    identifier === MODEL_IDENTIFIERS.MINIMAX_H3_TEXT_TO_VIDEO ||
+    identifier === MODEL_IDENTIFIERS.MINIMAX_H3_IMAGE_TO_VIDEO ||
+    identifier === MODEL_IDENTIFIERS.MINIMAX_H3_REFERENCE_TO_VIDEO
+  );
+}
+
+export function isMinimaxH3TextToVideoIdentifier(identifier: string | null | undefined): boolean {
+  return identifier === MODEL_IDENTIFIERS.MINIMAX_H3_TEXT_TO_VIDEO;
+}
+
+export function isMinimaxH3ImageToVideoIdentifier(identifier: string | null | undefined): boolean {
+  return identifier === MODEL_IDENTIFIERS.MINIMAX_H3_IMAGE_TO_VIDEO;
+}
+
+export function isMinimaxH3ReferenceToVideoIdentifier(identifier: string | null | undefined): boolean {
+  return identifier === MODEL_IDENTIFIERS.MINIMAX_H3_REFERENCE_TO_VIDEO;
+}
+
+export function isMinimaxH3FalModelIdentifier(identifier: string | null | undefined): boolean {
+  return (
+    isMinimaxH3TextToVideoIdentifier(identifier) ||
+    isMinimaxH3ImageToVideoIdentifier(identifier) ||
+    isMinimaxH3ReferenceToVideoIdentifier(identifier)
   );
 }
 
@@ -770,7 +803,18 @@ const HAPPY_HORSE_VIDEO_PARAMS: ParameterDefinition[] = [
   },
 ];
 
-const MINIMAX_H3_VIDEO_PARAMS: ParameterDefinition[] = [
+const MINIMAX_H3_FAL_PRICING_CONFIG = {
+  strategy: 'per_second' as const,
+  defaultCreditsPerSecond: 8,
+  tiers: [
+    { match: { resolution: '480P' }, creditsPerSecond: 5 },
+    { match: { resolution: '768P' }, creditsPerSecond: 8 },
+    { match: { resolution: '2K' }, creditsPerSecond: 13 },
+    { match: { resolution: '4K' }, creditsPerSecond: 16 },
+  ],
+};
+
+const MINIMAX_H3_SHARED_FAL_PARAMS: ParameterDefinition[] = [
   {
     name: 'enable_prompt_expansion',
     type: 'boolean',
@@ -780,6 +824,30 @@ const MINIMAX_H3_VIDEO_PARAMS: ParameterDefinition[] = [
     default: true,
     ui_type: 'switch',
   },
+  {
+    name: 'duration',
+    type: 'number',
+    label: 'Duration',
+    description: 'Video duration in seconds',
+    required: false,
+    default: 5,
+    enum: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    ui_type: 'select',
+  },
+  {
+    name: 'resolution',
+    type: 'string',
+    label: 'Resolution',
+    description: '480P and 768P are native; 2K and 4K upscale a 768P base.',
+    required: false,
+    default: '768P',
+    enum: ['480P', '768P', '2K', '4K'],
+    ui_type: 'select',
+    affects_pricing: true,
+  },
+];
+
+const MINIMAX_H3_VIDEO_PARAMS: ParameterDefinition[] = [
   {
     name: 'image',
     type: 'string',
@@ -798,27 +866,7 @@ const MINIMAX_H3_VIDEO_PARAMS: ParameterDefinition[] = [
     default: null,
     ui_type: 'text',
   },
-  {
-    name: 'duration',
-    type: 'number',
-    label: 'Duration',
-    description: 'Video duration in seconds',
-    required: false,
-    default: 5,
-    enum: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-    ui_type: 'select',
-  },
-  {
-    name: 'resolution',
-    type: 'string',
-    label: 'Resolution',
-    description: '480P and 768P are native; 2K and 4K upscale a 768P base. Used for all MiniMax H3 modes.',
-    required: false,
-    default: '2K',
-    enum: ['480P', '768P', '2K', '4K'],
-    ui_type: 'select',
-    affects_pricing: true,
-  },
+  ...MINIMAX_H3_SHARED_FAL_PARAMS,
   {
     name: 'aspect_ratio',
     type: 'string',
@@ -827,6 +875,53 @@ const MINIMAX_H3_VIDEO_PARAMS: ParameterDefinition[] = [
     required: false,
     default: '16:9',
     enum: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', 'adaptive'],
+    ui_type: 'select',
+  },
+];
+
+const MINIMAX_H3_REPLICATE_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'first_frame_image',
+    type: 'string',
+    label: 'First Frame',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
+    name: 'last_frame_image',
+    type: 'string',
+    label: 'Last Frame',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
+    name: 'duration',
+    type: 'number',
+    label: 'Duration',
+    required: false,
+    default: 5,
+    enum: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    ui_type: 'select',
+  },
+  {
+    name: 'resolution',
+    type: 'string',
+    label: 'Resolution',
+    required: false,
+    default: '768P',
+    enum: ['768P', '2K'],
+    ui_type: 'select',
+    affects_pricing: true,
+  },
+  {
+    name: 'ratio',
+    type: 'string',
+    label: 'Aspect Ratio',
+    required: false,
+    default: '16:9',
+    enum: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
     ui_type: 'select',
   },
 ];
@@ -2093,12 +2188,13 @@ export const MINIMAX_H3_VIDEO_MODEL: Model = {
   identifier: MODEL_IDENTIFIERS.MINIMAX_H3,
   name: 'MiniMax H3',
   description:
-    'MiniMax H3 on fal: text-to-video, first/last frame, or reference-to-video with images, clips, and audio at up to 4K.',
+    'MiniMax H3 on fal: one selector for text-to-video, first/last frame, or reference-to-video with images, clips, and audio.',
   type: 'video',
   provider: 'fal',
   is_active: true,
-  model_cost: 65,
-  model_cost_per_second: 13,
+  model_cost: 40,
+  model_cost_per_second: 8,
+  pricing_config: MINIMAX_H3_FAL_PRICING_CONFIG,
   parameters: {
     parameters: MINIMAX_H3_VIDEO_PARAMS,
   },
@@ -2110,6 +2206,32 @@ export const MINIMAX_H3_VIDEO_MODEL: Model = {
   supports_first_frame: true,
   supports_last_frame: true,
   duration_options: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+  max_images: 9,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+export const MINIMAX_H3_REPLICATE_VIDEO_MODEL: Model = {
+  id: 'model-minimax-h3-replicate',
+  identifier: 'minimax/h3-replicate',
+  name: 'MiniMax H3 (Replicate)',
+  description: 'MiniMax H3 on Replicate. Kept inactive; generation uses fal MiniMax H3 instead.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: false,
+  model_cost: 40,
+  model_cost_per_second: 8,
+  parameters: {
+    parameters: MINIMAX_H3_REPLICATE_PARAMS,
+  },
+  aspect_ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+  default_aspect_ratio: '16:9',
+  supports_reference_image: true,
+  supports_reference_video: true,
+  supports_reference_audio: true,
+  supports_first_frame: true,
+  supports_last_frame: true,
+  duration_options: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
   max_images: 9,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
@@ -2278,6 +2400,65 @@ export const GPT_IMAGE_1_5_MODEL: Model = {
   updated_at: new Date().toISOString(),
 };
 
+const GPT_IMAGE_25_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'quality',
+    type: 'string',
+    label: 'Quality',
+    description: 'Generation quality. Higher settings increase detail, latency, and cost.',
+    required: false,
+    default: 'high',
+    enum: ['auto', 'low', 'medium', 'high', 'xhigh', 'max'],
+    ui_type: 'select',
+  },
+  {
+    name: 'output_format',
+    type: 'string',
+    label: 'Output Format',
+    description: 'Image file format',
+    required: false,
+    default: 'png',
+    enum: ['png', 'jpeg', 'webp'],
+    ui_type: 'select',
+  },
+];
+
+export const GPT_IMAGE_25_FLARE_MODEL: Model = {
+  id: 'model-gpt-image-2.5-flare',
+  identifier: MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_25_FLARE,
+  name: 'GPT Image 2.5 Flare',
+  description:
+    "OpenAI's default image model on Fal: faster than GPT Image 2, with text-to-image and precise edits including transparent backgrounds.",
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 8,
+  parameters: {
+    parameters: GPT_IMAGE_25_PARAMS,
+  },
+  supports_reference_image: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+export const GPT_IMAGE_25_SUNBURST_MODEL: Model = {
+  id: 'model-gpt-image-2.5-sunburst',
+  identifier: MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_25_SUNBURST,
+  name: 'GPT Image 2.5 Sunburst',
+  description:
+    "OpenAI's precision image model on Fal for premium detail and tighter edits, with longer generation times than Flare.",
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 8,
+  parameters: {
+    parameters: GPT_IMAGE_25_PARAMS,
+  },
+  supports_reference_image: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 export const FAL_WAN_27_IMAGE_MODEL: Model = {
   id: 'model-fal-wan-2.7-image',
   identifier: MODEL_IDENTIFIERS.FAL_WAN_27_IMAGE,
@@ -2439,6 +2620,8 @@ export const IMAGE_MODELS = [
   NANO_BANANA_PRO_MODEL,
   NANO_BANANA_2_LITE_MODEL,
   GPT_IMAGE_1_5_MODEL,
+  GPT_IMAGE_25_FLARE_MODEL,
+  GPT_IMAGE_25_SUNBURST_MODEL,
   FAL_WAN_27_IMAGE_MODEL,
   FAL_WAN_27_PRO_IMAGE_MODEL,
   SEEDREAM_4_5_MODEL,
@@ -2467,6 +2650,7 @@ export const VIDEO_MODELS = [
   HAPPY_HORSE_VIDEO_MODEL,
   GEMINI_OMNI_FLASH_VIDEO_MODEL,
   MINIMAX_H3_VIDEO_MODEL,
+  MINIMAX_H3_REPLICATE_VIDEO_MODEL,
   P_VIDEO_MODEL,
 ] as const;
 
@@ -2487,6 +2671,8 @@ const IMAGE_MODELS_FIXED = [
   NANO_BANANA_PRO_MODEL,
   NANO_BANANA_2_LITE_MODEL,
   GPT_IMAGE_1_5_MODEL,
+  GPT_IMAGE_25_FLARE_MODEL,
+  GPT_IMAGE_25_SUNBURST_MODEL,
   FAL_WAN_27_IMAGE_MODEL,
   FAL_WAN_27_PRO_IMAGE_MODEL,
   SEEDREAM_4_5_MODEL,
@@ -2515,6 +2701,7 @@ const VIDEO_MODELS_FIXED = [
   HAPPY_HORSE_VIDEO_MODEL,
   GEMINI_OMNI_FLASH_VIDEO_MODEL,
   MINIMAX_H3_VIDEO_MODEL,
+  MINIMAX_H3_REPLICATE_VIDEO_MODEL,
   P_VIDEO_MODEL,
 ] as const;
 

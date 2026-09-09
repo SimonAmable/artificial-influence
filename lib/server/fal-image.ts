@@ -3,6 +3,8 @@ import { getFalWebhookUrl } from "@/lib/server/fal-webhook-url"
 import { aspectRatioToDimensions } from "@/lib/utils/model-parameters"
 
 export const OPENAI_GPT_IMAGE_2_CANONICAL_ID = "openai/gpt-image-2" as const
+export const OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID = "openai/gpt-image-2.5/flare" as const
+export const OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID = "openai/gpt-image-2.5/sunburst" as const
 export const QWEN_IMAGE2_CANONICAL_ID = "fal-ai/qwen-image-2" as const
 export const WAN_27_IMAGE_CANONICAL_ID = "fal-ai/wan/v2.7" as const
 export const WAN_27_PRO_IMAGE_CANONICAL_ID = "fal-ai/wan/v2.7/pro" as const
@@ -13,6 +15,10 @@ export const NANO_BANANA_2_LITE_CANONICAL_ID = "google/nano-banana-2-lite" as co
 
 export const FAL_OPENAI_GPT_IMAGE_2_T2I = "openai/gpt-image-2" as const
 export const FAL_OPENAI_GPT_IMAGE_2_EDIT = "openai/gpt-image-2/edit" as const
+export const FAL_OPENAI_GPT_IMAGE_25_FLARE_T2I = "openai/gpt-image-2.5/flare/text-to-image" as const
+export const FAL_OPENAI_GPT_IMAGE_25_FLARE_EDIT = "openai/gpt-image-2.5/flare/edit" as const
+export const FAL_OPENAI_GPT_IMAGE_25_SUNBURST_T2I = "openai/gpt-image-2.5/sunburst/text-to-image" as const
+export const FAL_OPENAI_GPT_IMAGE_25_SUNBURST_EDIT = "openai/gpt-image-2.5/sunburst/edit" as const
 export const FAL_QWEN_T2I = "fal-ai/qwen-image-2/text-to-image" as const
 export const FAL_QWEN_EDIT = "fal-ai/qwen-image-2/edit" as const
 export const FAL_WAN_27_T2I = "fal-ai/wan/v2.7/text-to-image" as const
@@ -30,6 +36,8 @@ export const FAL_NANO_BANANA_2_LITE_EDIT = "google/nano-banana-2-lite/edit" as c
 
 export type SupportedFalImageModelIdentifier =
   | typeof OPENAI_GPT_IMAGE_2_CANONICAL_ID
+  | typeof OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID
+  | typeof OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID
   | typeof QWEN_IMAGE2_CANONICAL_ID
   | typeof WAN_27_IMAGE_CANONICAL_ID
   | typeof WAN_27_PRO_IMAGE_CANONICAL_ID
@@ -41,6 +49,10 @@ export type SupportedFalImageModelIdentifier =
 export type FalImageEndpoint =
   | typeof FAL_OPENAI_GPT_IMAGE_2_T2I
   | typeof FAL_OPENAI_GPT_IMAGE_2_EDIT
+  | typeof FAL_OPENAI_GPT_IMAGE_25_FLARE_T2I
+  | typeof FAL_OPENAI_GPT_IMAGE_25_FLARE_EDIT
+  | typeof FAL_OPENAI_GPT_IMAGE_25_SUNBURST_T2I
+  | typeof FAL_OPENAI_GPT_IMAGE_25_SUNBURST_EDIT
   | typeof FAL_QWEN_T2I
   | typeof FAL_QWEN_EDIT
   | typeof FAL_WAN_27_T2I
@@ -68,6 +80,16 @@ const FAL_IMAGE_MODEL_CONFIG: Record<
     textEndpointId: FAL_OPENAI_GPT_IMAGE_2_T2I,
     editEndpointId: FAL_OPENAI_GPT_IMAGE_2_EDIT,
     maxReferenceImages: 4,
+  },
+  [OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID]: {
+    textEndpointId: FAL_OPENAI_GPT_IMAGE_25_FLARE_T2I,
+    editEndpointId: FAL_OPENAI_GPT_IMAGE_25_FLARE_EDIT,
+    maxReferenceImages: 16,
+  },
+  [OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID]: {
+    textEndpointId: FAL_OPENAI_GPT_IMAGE_25_SUNBURST_T2I,
+    editEndpointId: FAL_OPENAI_GPT_IMAGE_25_SUNBURST_EDIT,
+    maxReferenceImages: 16,
   },
   [QWEN_IMAGE2_CANONICAL_ID]: {
     textEndpointId: FAL_QWEN_T2I,
@@ -186,6 +208,34 @@ function normalizeQuality(value: string | null | undefined): "low" | "medium" | 
   }
 
   return "low"
+}
+
+type GptImage25Quality = "auto" | "low" | "medium" | "high" | "xhigh" | "max"
+
+function isOpenAiGptImage25Model(
+  modelIdentifier: SupportedFalImageModelIdentifier,
+): modelIdentifier is
+  | typeof OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID
+  | typeof OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID {
+  return (
+    modelIdentifier === OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID ||
+    modelIdentifier === OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID
+  )
+}
+
+function normalizeGptImage25Quality(value: string | null | undefined): GptImage25Quality {
+  if (
+    value === "auto" ||
+    value === "low" ||
+    value === "medium" ||
+    value === "high" ||
+    value === "xhigh" ||
+    value === "max"
+  ) {
+    return value
+  }
+
+  return "high"
 }
 
 /**
@@ -320,11 +370,16 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
     })
   const shouldIncludeImageSize = imageSize !== "auto"
 
-  if (options.modelIdentifier === OPENAI_GPT_IMAGE_2_CANONICAL_ID) {
+  if (
+    options.modelIdentifier === OPENAI_GPT_IMAGE_2_CANONICAL_ID ||
+    isOpenAiGptImage25Model(options.modelIdentifier)
+  ) {
     const input: Record<string, unknown> = {
       prompt: options.prompt,
-      quality: normalizeQuality(options.quality),
-      num_images: Math.min(4, Math.max(1, options.numImages)),
+      quality: isOpenAiGptImage25Model(options.modelIdentifier)
+        ? normalizeGptImage25Quality(options.quality)
+        : normalizeQuality(options.quality),
+      num_images: Math.min(isOpenAiGptImage25Model(options.modelIdentifier) ? 10 : 4, Math.max(1, options.numImages)),
       output_format: normalizeOutputFormat(options.outputFormat),
       image_size: imageSize,
     }

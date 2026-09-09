@@ -457,6 +457,55 @@ export const GPT_IMAGE_1_5_META: ModelMetadata = {
   aspect_ratios: ['1:1',"2:3","3:2"],
 };
 
+const GPT_IMAGE_25_QUALITY: ModelMetadata['customParameters'] = [
+  {
+    name: 'quality',
+    label: 'Quality',
+    options: ['auto', 'low', 'medium', 'high', 'xhigh', 'max'],
+    default: 'high',
+    description: 'Higher settings increase detail, latency, and cost.',
+  },
+  {
+    name: 'output_format',
+    label: 'Output Format',
+    options: ['png', 'jpeg', 'webp'],
+    default: 'png',
+    description: 'Image file format',
+  },
+];
+
+export const GPT_IMAGE_25_FLARE_META: ModelMetadata = {
+  id: 'gpt-image-2.5-flare-meta',
+  identifier: 'openai/gpt-image-2.5/flare',
+  name: 'GPT Image 2.5 Flare',
+  description:
+    "OpenAI's default image model on Fal: faster than GPT Image 2, with text-to-image and precise edits including transparent backgrounds.",
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 8,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['match_input_image', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '2:1', '1:2', '19.5:9', '9:19.5', '20:9', '9:20', '21:9'],
+  customParameters: GPT_IMAGE_25_QUALITY,
+};
+
+export const GPT_IMAGE_25_SUNBURST_META: ModelMetadata = {
+  id: 'gpt-image-2.5-sunburst-meta',
+  identifier: 'openai/gpt-image-2.5/sunburst',
+  name: 'GPT Image 2.5 Sunburst',
+  description:
+    "OpenAI's precision image model on Fal for premium detail and tighter edits, with longer generation times than Flare.",
+  type: 'image',
+  provider: 'fal',
+  is_active: true,
+  model_cost: 8,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  aspect_ratios: ['match_input_image', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '2:1', '1:2', '19.5:9', '9:19.5', '20:9', '9:20', '21:9'],
+  customParameters: GPT_IMAGE_25_QUALITY,
+};
+
 export const GPT_IMAGE_2_META: ModelMetadata = {
   id: 'f44f56d5-4ad4-4a16-8a8a-0b2ab8e3b482',
   identifier: 'openai/gpt-image-2',
@@ -955,11 +1004,11 @@ export const MINIMAX_H3_META: ModelMetadata = {
   identifier: 'minimax/h3',
   name: 'MiniMax H3',
   description:
-    'MiniMax H3 on fal: text-to-video, first/last frame, or reference-to-video with images, clips, and audio at up to 4K.',
+    'MiniMax H3 on fal: text-to-video, first/last frame, or reference-to-video with images, clips, and audio.',
   type: 'video',
   provider: 'fal',
   is_active: true,
-  model_cost: 65,
+  model_cost: 40,
   supports_reference_image: true,
   supports_reference_video: true,
   supports_reference_audio: true,
@@ -971,7 +1020,7 @@ export const MINIMAX_H3_META: ModelMetadata = {
       name: 'resolution',
       label: 'Resolution',
       options: ['480P', '768P', '2K', '4K'],
-      default: '2K',
+      default: '768P',
       description: '480P and 768P are native; 2K and 4K upscale a 768P base',
     },
     {
@@ -1069,6 +1118,8 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
   QWEN_IMAGE_EDIT_PLUS_META,
   GROK_IMAGINE_META,
   GPT_IMAGE_1_5_META,
+  GPT_IMAGE_25_FLARE_META,
+  GPT_IMAGE_25_SUNBURST_META,
   GPT_IMAGE_2_META,
   WAN_27_IMAGE_META,
   WAN_27_PRO_IMAGE_META,
@@ -1150,7 +1201,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     P_VIDEO_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
-  fal: [WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, SEEDREAM_4_5_META, SEEDREAM_5_PRO_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META, MINIMAX_H3_META],
+  fal: [GPT_IMAGE_25_FLARE_META, GPT_IMAGE_25_SUNBURST_META, WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, SEEDREAM_4_5_META, SEEDREAM_5_PRO_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META, MINIMAX_H3_META],
   xai: [GROK_IMAGINE_META],
 };
 

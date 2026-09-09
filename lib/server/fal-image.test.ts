@@ -5,6 +5,9 @@ const {
   coerceWanImagePrompt,
   FAL_OPENAI_GPT_IMAGE_2_EDIT,
   FAL_OPENAI_GPT_IMAGE_2_T2I,
+  FAL_OPENAI_GPT_IMAGE_25_FLARE_EDIT,
+  FAL_OPENAI_GPT_IMAGE_25_FLARE_T2I,
+  FAL_OPENAI_GPT_IMAGE_25_SUNBURST_EDIT,
   FAL_SEEDREAM_4_5_EDIT,
   FAL_SEEDREAM_4_5_T2I,
   FAL_SEEDREAM_5_LITE_EDIT,
@@ -17,6 +20,8 @@ const {
   FAL_WAN_27_PRO_T2I,
   NANO_BANANA_2_LITE_CANONICAL_ID,
   OPENAI_GPT_IMAGE_2_CANONICAL_ID,
+  OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID,
+  OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID,
   SEEDREAM_4_5_CANONICAL_ID,
   SEEDREAM_5_LITE_CANONICAL_ID,
   SEEDREAM_5_PRO_CANONICAL_ID,
@@ -161,6 +166,44 @@ runTest("GPT Image 2 maps wide custom ratios to explicit dimensions", () => {
     width: 1344,
     height: 576,
   })
+})
+
+runTest("GPT Image 2.5 Flare routes text and edits to separate Fal endpoints", () => {
+  const text = buildFalImageRequest({
+    aspectRatio: "1:1",
+    modelIdentifier: OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID,
+    numImages: 1,
+    prompt: "A sunlit product still life",
+    referenceImageUrls: [],
+  })
+  assert.equal(text.endpointId, FAL_OPENAI_GPT_IMAGE_25_FLARE_T2I)
+  assert.equal(text.input.quality, "high")
+
+  const edit = buildFalImageRequest({
+    aspectRatio: "match_input_image",
+    modelIdentifier: OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID,
+    numImages: 1,
+    prompt: "Keep the face, change the jacket",
+    quality: "xhigh",
+    referenceImageUrls: ["https://example.com/ref-1.png"],
+  })
+  assert.equal(edit.endpointId, FAL_OPENAI_GPT_IMAGE_25_FLARE_EDIT)
+  assert.equal(edit.input.quality, "xhigh")
+  assert.equal(edit.input.image_size, "auto")
+})
+
+runTest("GPT Image 2.5 Sunburst uses its own Fal endpoints", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: "16:9",
+    modelIdentifier: OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID,
+    numImages: 1,
+    prompt: "A precise campaign still with tiny label text",
+    quality: "max",
+    referenceImageUrls: ["https://example.com/ref-1.png"],
+  })
+
+  assert.equal(result.endpointId, FAL_OPENAI_GPT_IMAGE_25_SUNBURST_EDIT)
+  assert.equal(result.input.quality, "max")
 })
 
 runTest("Seedream 4.5 routes prompt-only generations to Fal text-to-image with safety checker off", () => {

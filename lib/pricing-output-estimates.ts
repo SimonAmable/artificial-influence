@@ -48,6 +48,20 @@ export const PRICING_ESTIMATE_MODELS = [
     unit: 'image',
   },
   {
+    id: 'gpt-image-2.5-flare',
+    name: 'GPT Image 2.5 Flare',
+    creditsPerUnit: 1,
+    creditsPerUnitMax: 16,
+    unit: 'image',
+  },
+  {
+    id: 'gpt-image-2.5-sunburst',
+    name: 'GPT Image 2.5 Sunburst',
+    creditsPerUnit: 1,
+    creditsPerUnitMax: 16,
+    unit: 'image',
+  },
+  {
     id: 'seedream-5',
     name: 'Seedream 5.0',
     creditsPerUnit: 3,

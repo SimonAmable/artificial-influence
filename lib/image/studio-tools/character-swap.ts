@@ -3,7 +3,7 @@ import type { ImageStudioToolDefinition } from "./types"
 export const CHARACTER_SWAP_TOOL: ImageStudioToolDefinition = {
   id: "character_swap",
   uiModelIdentifier: "custom/character-swap",
-  baseModelIdentifier: "openai/gpt-image-2",
+  baseModelIdentifier: "openai/gpt-image-2.5/flare",
   name: "Character Swap",
   description: "Swap a character into a scene using two references.",
   historyToolTag: "character_swap",

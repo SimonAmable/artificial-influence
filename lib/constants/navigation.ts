@@ -320,9 +320,9 @@ const baseMegaNavGroups: MegaNavGroup[] = [
             iconSrc: "/ai_icons/gemini-color.svg",
           },
           {
-            path: "/image?model=openai/gpt-image-2",
-            label: "GPT Image 2",
-            description: "OpenAI image generation with strong prompt following",
+            path: "/image?model=openai/gpt-image-2.5/flare",
+            label: "GPT Image 2.5 Flare",
+            description: "OpenAI's default image model, faster than GPT Image 2",
             badge: "new",
             iconSrc: "/ai_icons/openai.svg",
           },

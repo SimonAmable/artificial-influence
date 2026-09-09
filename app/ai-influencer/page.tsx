@@ -163,6 +163,8 @@ const FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF = new Set([
   "fal-ai/wan/v2.7",
   "fal-ai/wan/v2.7/pro",
   "openai/gpt-image-2",
+  "openai/gpt-image-2.5/flare",
+  "openai/gpt-image-2.5/sunburst",
   "bytedance/seedream-4.5",
   "bytedance/seedream-5-lite",
   "bytedance/seedream-5-pro",
@@ -1197,7 +1199,7 @@ function AIInfluencerPageContent() {
         )
 
         const formData = new FormData()
-        formData.append("model", "openai/gpt-image-2")
+        formData.append("model", CHARACTER_EDIT_MODEL)
         formData.append("prompt", prompt)
         formData.append("enhancePrompt", "true")
         formData.append("tool", "ai_influencer")
@@ -1223,7 +1225,7 @@ function AIInfluencerPageContent() {
         const createdCharacter: ImageHistoryItem = {
           id: acceptedGenerationId ?? `generated-${Date.now()}`,
           url: generatedUrl,
-          model: "openai/gpt-image-2",
+          model: CHARACTER_EDIT_MODEL,
           displayName: name,
           trackedPills: Object.values(selectedTraits)
             .map((value) => value.trim())
@@ -1240,8 +1242,8 @@ function AIInfluencerPageContent() {
             title: name,
             url: generatedUrl,
             description: prompt,
-            tags: buildCharacterAssetTags(selectedTraits, "openai/gpt-image-2", false),
-            model: "openai/gpt-image-2",
+            tags: buildCharacterAssetTags(selectedTraits, CHARACTER_EDIT_MODEL, false),
+            model: CHARACTER_EDIT_MODEL,
             sourceGenerationId: acceptedGenerationId,
             sourceMode: "generated",
           })

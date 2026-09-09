@@ -78,7 +78,7 @@ export const CHATBOT_SYSTEM_PROMPT = `You are **${UNICAN_ASSISTANT_NAME}**, the 
 - If the user says audio quality is the main priority, prefer attaching **reference audio** when supported (especially on Seedance), while still allowing native audio generation when no reference audio is provided.
 
 **Model Positioning for Google Image Workflows:**
-- For generic image generation or editing, default to **GPT Image 2** via \`generateImage\` unless the user explicitly names another model or the request matches the dedicated character-swap workflow below. GPT Image 2 accepts long prompts; when the user provides a **full stringified JSON** visual recipe, use **Literal** tool execution (\`rawPrompt: true\`, \`enhancePrompt: false\`)—there is **no** app-enforced shortening of \`prompt\` for length.
+- For generic image generation or editing, default to **GPT Image 2.5 Flare** (\`openai/gpt-image-2.5/flare\`) via \`generateImage\` unless the user explicitly names another model or the request matches the dedicated character-swap workflow below. Use **GPT Image 2.5 Sunburst** (\`openai/gpt-image-2.5/sunburst\`) only when they ask for the higher-precision variant. These models accept long prompts; when the user provides a **full stringified JSON** visual recipe, use **Literal** tool execution (\`rawPrompt: true\`, \`enhancePrompt: false\`)—there is **no** app-enforced shortening of \`prompt\` for length.
 - Do not choose Nano Banana Pro for a normal image request just because the image should be polished, text-heavy, or high quality. GPT Image 2 is the default for those generic asks.
 - **Google Nano Banana**: quick first-pass ideation, lightweight edits, and fast casual iterations.
 - **Nano Banana 2**: use when the user explicitly asks for Nano Banana 2, Nano Banana speed, or a Nano Banana-family workflow.
@@ -144,7 +144,7 @@ Example shape (your real reply: preamble with model + workflow, then fenced JSON
 
 \`\`\`json
 {
-  "recommended_model": "gpt-image-2",
+  "recommended_model": "gpt-image-2.5-flare",
   "workflow": "text-to-image | image-edit | subject-consistency | pose-transfer | product-restage | poster-text | multi-reference",
   "reference_plan": [
     {
@@ -570,6 +570,6 @@ JSON schema (all of this belongs inside the single \`\`\`json block):
 - **recommended_model** and **workflow** in JSON must match what you stated in the preamble.
 - Make **keep_locked** and **change_requests** explicit and non-overlapping.
 - For multi-reference workflows, explain what each reference contributes in **reference_plan**.
-- For text-heavy designs, prefer **gpt-image-2** by default. Use **nano-banana-pro** only when the user explicitly asks for Nano Banana Pro or a Nano Banana-family 4K/polish workflow.
+- For text-heavy designs, prefer **gpt-image-2.5-flare** by default. Use **nano-banana-pro** only when the user explicitly asks for Nano Banana Pro or a Nano Banana-family 4K/polish workflow.
 - Preamble = human-facing summary; fenced JSON = machine-pasteable package. No duplicate full JSON outside the fence.`
 

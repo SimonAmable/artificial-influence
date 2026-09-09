@@ -26,22 +26,22 @@ test("isModerationGenerationFailure only matches moderation-like errors", () => 
   assert.equal(isModerationGenerationFailure(new Error("Insufficient credits")), false)
 })
 
-test("studio fallback chain starts with gpt image 2", () => {
+test("studio fallback chain starts with gpt image 2.5 flare", () => {
   assert.deepEqual(STUDIO_IMAGE_FALLBACK_CHAIN, [
-    "openai/gpt-image-2",
+    "openai/gpt-image-2.5/flare",
     "google/nano-banana-2-lite",
     "bytedance/seedream-5-lite",
   ])
 })
 
 test("isStudioImageFallbackModel matches the rescue ladder", () => {
-  assert.equal(isStudioImageFallbackModel("openai/gpt-image-2"), true)
+  assert.equal(isStudioImageFallbackModel("openai/gpt-image-2.5/flare"), true)
   assert.equal(isStudioImageFallbackModel("custom/character-swap"), false)
 })
 
 test("studio tool quality params use the locked generation tier per model", () => {
   assert.deepEqual(getStudioToolFalQualityParams("google/nano-banana-2-lite"), {})
-  assert.deepEqual(getStudioToolFalQualityParams("openai/gpt-image-2"), { quality: "medium" })
+  assert.deepEqual(getStudioToolFalQualityParams("openai/gpt-image-2.5/flare"), { quality: "high" })
   assert.deepEqual(getStudioToolFalQualityParams("bytedance/seedream-5-lite"), {
     resolutionPreset: "2K",
   })

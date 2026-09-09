@@ -419,13 +419,13 @@ export function createGenerateImageTool({
         .min(1)
         .max(120)
         .optional()
-        .describe("Image model identifier, preferably selected from listModels. Defaults to openai/gpt-image-2."),
+        .describe("Image model identifier, preferably selected from listModels. Defaults to openai/gpt-image-2.5/flare."),
       aspectRatio: z
         .string()
         .min(1)
         .max(32)
         .optional()
-        .describe("Preferred aspect ratio. It must match the selected model's supported aspect ratios from listModels. For `openai/gpt-image-2`, rely on the model's returned ratio list instead of guessing."),
+        .describe("Preferred aspect ratio. It must match the selected model's supported aspect ratios from listModels. For GPT Image models, rely on the model's returned ratio list instead of guessing."),
       resolution: z
         .string()
         .min(1)

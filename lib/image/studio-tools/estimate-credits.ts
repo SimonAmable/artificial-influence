@@ -20,12 +20,29 @@ const GPT_IMAGE_2_PRICING_FALLBACK: ModelPricingConfig = {
   ],
 }
 
+const GPT_IMAGE_25_PRICING_FALLBACK: ModelPricingConfig = {
+  strategy: "tiered_per_output",
+  defaultCredits: 8,
+  dimensions: [
+    {
+      parameter: "quality",
+      values: { auto: 8, low: 1, medium: 4, high: 8, xhigh: 12, max: 16 },
+    },
+  ],
+}
+
 function pricingConfigForStudioTool(
   baseModelIdentifier: string,
   pricingConfig: ModelPricingConfig | null | undefined,
 ): ModelPricingConfig | null {
   if (pricingConfig) return pricingConfig
   if (baseModelIdentifier === "openai/gpt-image-2") return GPT_IMAGE_2_PRICING_FALLBACK
+  if (
+    baseModelIdentifier === "openai/gpt-image-2.5/flare" ||
+    baseModelIdentifier === "openai/gpt-image-2.5/sunburst"
+  ) {
+    return GPT_IMAGE_25_PRICING_FALLBACK
+  }
   return null
 }
 

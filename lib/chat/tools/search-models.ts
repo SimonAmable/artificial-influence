@@ -164,7 +164,7 @@ export function buildActiveModelsSnapshotText(models: ListedModel[]): string {
 export function createListModelsTool({ supabase }: CreateModelsToolOptions) {
   return tool({
     description:
-      "List UniCan's active models. Use this when the user asks which models are available, which one supports a capability, or when you need a valid model identifier before generating an image, video, or audio asset. This tool accepts no search or filter parameters. Inspect the returned list and match by name or identifier yourself. For image models, the default image generation model is returned as `defaultImageModel` and is currently `openai/gpt-image-2`. The response includes model-specific `aspectRatios` and `usageGuide` when available, including optional workflow playbooks, so use those instead of guessing supported ratios, input semantics, and model-specific routing rules.",
+      "List UniCan's active models. Use this when the user asks which models are available, which one supports a capability, or when you need a valid model identifier before generating an image, video, or audio asset. This tool accepts no search or filter parameters. Inspect the returned list and match by name or identifier yourself. For image models, the default image generation model is returned as `defaultImageModel` and is currently `openai/gpt-image-2.5/flare`. The response includes model-specific `aspectRatios` and `usageGuide` when available, including optional workflow playbooks, so use those instead of guessing supported ratios, input semantics, and model-specific routing rules.",
     inputSchema: z.object({}),
     strict: true,
     execute: async () => buildListModelsResponse(await loadActiveModels(supabase)),
