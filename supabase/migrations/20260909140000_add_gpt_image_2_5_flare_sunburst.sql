@@ -149,7 +149,7 @@ INSERT INTO public.models (
     }
   }$json$::jsonb
 )
-ON CONFLICT (identifier) DO UPDATE SET
+ON CONFLICT (identifier, provider) DO UPDATE SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,
   type = EXCLUDED.type,
