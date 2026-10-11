@@ -29,7 +29,7 @@ export function applyMinimalReplicateVideoModeration(
   modelIdentifier: string,
   input: Record<string, unknown>,
 ): Record<string, unknown> {
-  if (modelIdentifier === "prunaai/p-video") {
+  if (modelIdentifier === "prunaai/p-video" || modelIdentifier === "prunaai/p-video-2") {
     input.disable_safety_filter = true
   }
 

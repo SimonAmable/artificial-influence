@@ -140,6 +140,14 @@ export function resolvePredictedDurationSeconds(input: VideoDurationInput): numb
         return roundDuration(explicitDuration, 1, 10)
       }
       return 5
+    case "prunaai/p-video-2":
+      if (sourceDuration != null && sourceDuration > 0) {
+        return roundDuration(sourceDuration, 1, 20)
+      }
+      if (explicitDuration != null && explicitDuration > 0) {
+        return roundDuration(explicitDuration, 1, 20)
+      }
+      return 5
     case "alibaba/happy-horse":
     case "alibaba/happy-horse/v1.1":
       if (explicitDuration != null && explicitDuration > 0) {

@@ -37,6 +37,7 @@ import {
   isHappyHorseModelIdentifier,
   isGeminiOmniFlashModelIdentifier,
   isMinimaxH3ModelIdentifier,
+  isPrunaVideoModelIdentifier,
   isSeedanceVideoModelIdentifier,
   MODEL_IDENTIFIERS,
   usesFalMultimodalVideoInputs,
@@ -124,9 +125,11 @@ const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
   "grok-imagine-video": "xai/grok-imagine-video",
   "grok-imagine-video-1.5": "xai/grok-imagine-video-1.5",
   "grok-imagine-video-15": "xai/grok-imagine-video-1.5",
-  "p-video": "prunaai/p-video",
-  "pvideo": "prunaai/p-video",
-  "pruna-p-video": "prunaai/p-video",
+  "p-video": "prunaai/p-video-2",
+  "pvideo": "prunaai/p-video-2",
+  "pruna-p-video": "prunaai/p-video-2",
+  "p-video-2": "prunaai/p-video-2",
+  "pvideo2": "prunaai/p-video-2",
   "soul-cinema": "kwaivgi/kling-v3-video",
   "kling-v3-video": "kwaivgi/kling-v3-video",
   "seedance-2": "bytedance/seedance-2.0",
@@ -832,7 +835,7 @@ function VideoPageContent() {
     const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
     const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
     const isSeedance2 = isSeedanceVideoModelIdentifier(selectedModel.identifier)
-    const isPrunaPVideo = selectedModel.identifier === 'prunaai/p-video'
+    const isPrunaPVideo = isPrunaVideoModelIdentifier(selectedModel.identifier)
     const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
     const isHappyHorse = isHappyHorseModelIdentifier(selectedModel.identifier)
     const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(selectedModel.identifier)

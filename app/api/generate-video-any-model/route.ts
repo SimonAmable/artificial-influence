@@ -718,6 +718,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'prunaai/p-video':
+      case 'prunaai/p-video-2':
         if (image) replicateInput.image = image;
         if (typeof otherParams.audio === 'string' && otherParams.audio.length > 0) {
           const audioConfig = getVideoReferenceAudioConfig(normalizedModel);
@@ -744,10 +745,11 @@ export async function POST(request: NextRequest) {
         }
         if (otherParams.aspect_ratio) replicateInput.aspect_ratio = otherParams.aspect_ratio;
         if (otherParams.resolution) replicateInput.resolution = otherParams.resolution;
-        replicateInput.fps = 24;
+        replicateInput.fps = otherParams.fps === 48 ? 48 : 24;
         if (typeof otherParams.draft === 'boolean') replicateInput.draft = otherParams.draft;
         replicateInput.prompt_upsampling = true;
-        if (typeof otherParams.save_audio === 'boolean') replicateInput.save_audio = otherParams.save_audio;
+        replicateInput.save_audio =
+          typeof otherParams.save_audio === 'boolean' ? otherParams.save_audio : true;
         break;
 
       case 'wan-video/wan-2.7': {

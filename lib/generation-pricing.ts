@@ -283,6 +283,11 @@ function legacyResolveCreditsPerSecond(
         return draft ? 1 : 4;
       }
       return draft ? 0.5 : 2;
+    case 'prunaai/p-video-2':
+      if (resolution === '1080p') {
+        return draft ? 2.4 : 4;
+      }
+      return draft ? 1.2 : 2;
     default:
       return base && base > 0 ? base : null;
   }

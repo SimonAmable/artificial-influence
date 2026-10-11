@@ -1041,7 +1041,7 @@ export const P_VIDEO_META: ModelMetadata = {
     'Pruna AI unified video model for text-to-video, image-to-video, and audio-conditioned generation with draft mode.',
   type: 'video',
   provider: 'replicate',
-  is_active: true,
+  is_active: false,
   model_cost: 10,
   supports_reference_image: true,
   supports_reference_video: false,
@@ -1062,6 +1062,46 @@ export const P_VIDEO_META: ModelMetadata = {
       options: ['false', 'true'],
       default: 'false',
       description: 'Faster lower-quality preview mode',
+    },
+  ],
+};
+
+export const P_VIDEO_2_META: ModelMetadata = {
+  id: 'p-video-2-meta',
+  identifier: 'prunaai/p-video-2',
+  name: 'P-Video 2',
+  description: 'Premium text, image, and audio video with native speech',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 10,
+  supports_reference_image: true,
+  supports_reference_video: false,
+  supports_reference_audio: true,
+  aspect_ratios: ['16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '1:1'],
+  supports_first_frame: true,
+  supports_last_frame: true,
+  customParameters: [
+    {
+      name: 'resolution',
+      label: 'Resolution',
+      options: ['720p', '1080p'],
+      default: '720p',
+      description: 'Output resolution',
+    },
+    {
+      name: 'fps',
+      label: 'FPS',
+      options: ['24', '48'],
+      default: '24',
+      description: 'Prefer 24 fps at 1080p, or 48 fps at 720p',
+    },
+    {
+      name: 'draft',
+      label: 'Draft Mode',
+      options: ['false', 'true'],
+      default: 'false',
+      description: 'Faster, lower-cost preview',
     },
   ],
 };
@@ -1144,6 +1184,7 @@ export const VIDEO_MODELS_METADATA: ModelMetadata[] = [
   GEMINI_OMNI_FLASH_META,
   MINIMAX_H3_META,
   P_VIDEO_META,
+  P_VIDEO_2_META,
 ];
 
 export const AUDIO_MODELS_METADATA: ModelMetadata[] = [
@@ -1199,6 +1240,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     SEEDANCE_2_0_MINI_META,
     SEEDANCE_2_5_META,
     P_VIDEO_META,
+    P_VIDEO_2_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
   fal: [GPT_IMAGE_25_FLARE_META, GPT_IMAGE_25_SUNBURST_META, WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, SEEDREAM_4_5_META, SEEDREAM_5_PRO_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META, MINIMAX_H3_META],

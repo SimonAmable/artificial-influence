@@ -55,6 +55,7 @@ export const MODEL_IDENTIFIERS = {
   MINIMAX_H3_IMAGE_TO_VIDEO: 'minimax/h3/image-to-video',
   MINIMAX_H3_REFERENCE_TO_VIDEO: 'minimax/h3/reference-to-video',
   PRUNAAI_P_VIDEO: 'prunaai/p-video',
+  PRUNAAI_P_VIDEO_2: 'prunaai/p-video-2',
   XAI_GROK_IMAGINE_VIDEO: 'xai/grok-imagine-video',
   XAI_GROK_IMAGINE_VIDEO_1_5: 'xai/grok-imagine-video-1.5',
 
@@ -124,6 +125,13 @@ export function isMinimaxH3FalModelIdentifier(identifier: string | null | undefi
 
 export function isSeedance25ModelIdentifier(identifier: string | null | undefined): boolean {
   return identifier === MODEL_IDENTIFIERS.BYTEDANCE_SEEDANCE_2_5;
+}
+
+export function isPrunaVideoModelIdentifier(identifier: string | null | undefined): boolean {
+  return (
+    identifier === MODEL_IDENTIFIERS.PRUNAAI_P_VIDEO ||
+    identifier === MODEL_IDENTIFIERS.PRUNAAI_P_VIDEO_2
+  );
 }
 
 export function isSeedanceVideoModelIdentifier(identifier: string | null | undefined): boolean {
@@ -2245,7 +2253,7 @@ export const P_VIDEO_MODEL: Model = {
     'Pruna AI unified video model for text-to-video, image-to-video, and audio-conditioned video generation.',
   type: 'video',
   provider: 'replicate',
-  is_active: true,
+  is_active: false,
   model_cost: 10,
   model_cost_per_second: 2,
   parameters: {
@@ -2254,6 +2262,61 @@ export const P_VIDEO_MODEL: Model = {
   supports_reference_image: true,
   supports_reference_audio: true,
   supports_first_frame: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+const P_VIDEO_2_PARAMS: ParameterDefinition[] = [
+  ...P_VIDEO_PARAMS.filter((param) => param.name !== 'disable_safety_filter').map((param) =>
+    param.name === 'duration'
+      ? {
+          ...param,
+          description: 'Video duration in seconds (1-20). Ignored when audio is provided.',
+          max: 20,
+        }
+      : param,
+  ),
+  {
+    name: 'save_audio',
+    type: 'boolean',
+    label: 'Save Audio',
+    description: 'Keep generated audio, including native speech and lip-sync',
+    required: false,
+    default: true,
+    ui_type: 'switch',
+  },
+];
+
+export const P_VIDEO_2_MODEL: Model = {
+  id: 'model-pruna-p-video-2',
+  identifier: MODEL_IDENTIFIERS.PRUNAAI_P_VIDEO_2,
+  name: 'P-Video 2',
+  description: 'Premium text, image, and audio video with native speech',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 10,
+  model_cost_per_second: 2,
+  pricing_config: {
+    strategy: 'per_second',
+    defaultCreditsPerSecond: 2,
+    tiers: [
+      { match: { resolution: '720p', draft: false }, creditsPerSecond: 2 },
+      { match: { resolution: '720p', draft: true }, creditsPerSecond: 1.2 },
+      { match: { resolution: '1080p', draft: false }, creditsPerSecond: 4 },
+      { match: { resolution: '1080p', draft: true }, creditsPerSecond: 2.4 },
+    ],
+  },
+  parameters: {
+    parameters: P_VIDEO_2_PARAMS,
+  },
+  aspect_ratios: ['16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '1:1'],
+  default_aspect_ratio: '16:9',
+  supports_reference_image: true,
+  supports_reference_audio: true,
+  supports_first_frame: true,
+  supports_last_frame: true,
+  duration_options: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -2652,6 +2715,7 @@ export const VIDEO_MODELS = [
   MINIMAX_H3_VIDEO_MODEL,
   MINIMAX_H3_REPLICATE_VIDEO_MODEL,
   P_VIDEO_MODEL,
+  P_VIDEO_2_MODEL,
 ] as const;
 
 export const AUDIO_MODELS = [GOOGLE_GEMINI_3_1_FLASH_TTS_MODEL] as const;
@@ -2703,6 +2767,7 @@ const VIDEO_MODELS_FIXED = [
   MINIMAX_H3_VIDEO_MODEL,
   MINIMAX_H3_REPLICATE_VIDEO_MODEL,
   P_VIDEO_MODEL,
+  P_VIDEO_2_MODEL,
 ] as const;
 
 const ALL_MODELS_FIXED = [

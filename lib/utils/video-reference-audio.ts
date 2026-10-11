@@ -50,6 +50,13 @@ const VIDEO_REFERENCE_AUDIO_CONFIGS: Record<string, VideoReferenceAudioConfig> =
     title: "Optional audio",
     validationMessage: "P-Video currently supports .wav or .mp3 audio inputs.",
   },
+  "prunaai/p-video-2": {
+    accept: "audio/wav,audio/x-wav,audio/flac,audio/mpeg,audio/mp3,.wav,.mp3,.flac",
+    allowedExtensions: ["wav", "mp3", "flac"],
+    description: ".wav / .mp3 / .flac. The clip follows this audio, so duration is ignored. Prompt is still required.",
+    title: "Optional audio",
+    validationMessage: "P-Video 2 supports .wav, .mp3, or .flac audio inputs.",
+  },
   "wan-video/wan-2.7": {
     accept: "audio/wav,audio/x-wav,audio/mpeg,audio/mp3,.wav,.mp3",
     allowedExtensions: ["wav", "mp3"],

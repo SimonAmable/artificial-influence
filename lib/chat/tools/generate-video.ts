@@ -30,7 +30,7 @@ import { resolveToolVideoReferences } from "@/lib/chat/resolve-tool-video-refere
 import { studioBoardFieldsForIndex } from "@/lib/studio/form-data"
 import type { StudioBoardFields } from "@/lib/studio/types"
 
-const DEFAULT_TEXT_TO_VIDEO_MODEL = "prunaai/p-video" as const
+const DEFAULT_TEXT_TO_VIDEO_MODEL = "prunaai/p-video-2" as const
 const DEFAULT_MOTION_COPY_MODEL = "kwaivgi/kling-v3-motion-control" as const
 const MAX_REFERENCE_IMAGES = 30
 const MAX_REFERENCE_VIDEOS = 10
@@ -279,7 +279,7 @@ export function createGenerateVideoTool({
         .min(1)
         .max(120)
         .optional()
-        .describe("Active video model identifier. Defaults to prunaai/p-video, or kwaivgi/kling-v3-motion-control (Kling 3.0 motion copy) when both image and video references are present."),
+        .describe("Active video model identifier. Defaults to prunaai/p-video-2, or kwaivgi/kling-v3-motion-control (Kling 3.0 motion copy) when both image and video references are present."),
       assetIds: z
         .array(z.string().uuid())
         .max(6)
@@ -745,6 +745,7 @@ export function createGenerateVideoTool({
           break
         }
         case "prunaai/p-video":
+        case "prunaai/p-video-2":
           if (primaryImage) replicateInput.image = primaryImage
           if (referenceAudioUrls[0]) replicateInput.audio = referenceAudioUrls[0]
           if (secondaryImage) replicateInput.last_frame_image = secondaryImage
@@ -754,6 +755,7 @@ export function createGenerateVideoTool({
           replicateInput.fps = 24
           if (draft !== undefined) replicateInput.draft = draft
           replicateInput.prompt_upsampling = true
+          replicateInput.save_audio = true
           break
         case "wan-video/wan-2.7": {
           const wan = resolveWan27Replicate(

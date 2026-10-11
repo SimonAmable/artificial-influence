@@ -40,6 +40,7 @@ import {
   isGeminiOmniFlashModelIdentifier,
   isMinimaxH3ModelIdentifier,
   isMotionCopyModelIdentifier,
+  isPrunaVideoModelIdentifier,
   isSeedanceVideoModelIdentifier,
   normalizeMotionCopyModelIdentifier,
   usesFalMultimodalVideoInputs,
@@ -790,7 +791,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     const isKlingV3 = modelIdentifier === "kwaivgi/kling-v3-video"
     const isKlingV3Omni = modelIdentifier === "kwaivgi/kling-v3-omni-video"
     const isSeedance2 = isSeedanceVideoModelIdentifier(modelIdentifier)
-    const isPrunaPVideo = modelIdentifier === "prunaai/p-video"
+    const isPrunaPVideo = isPrunaVideoModelIdentifier(modelIdentifier)
     const isWan27 = modelIdentifier === "wan-video/wan-2.7"
     const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(modelIdentifier)
     const isMinimaxH3 = isMinimaxH3ModelIdentifier(modelIdentifier)
@@ -1169,7 +1170,7 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   )
 
   const isSeedance2Node = isSeedanceVideoModelIdentifier(selectedModel?.identifier)
-  const isPrunaPVideoNode = selectedModel?.identifier === "prunaai/p-video"
+  const isPrunaPVideoNode = isPrunaVideoModelIdentifier(selectedModel?.identifier)
   const isWan27Node = selectedModel?.identifier === "wan-video/wan-2.7"
   const isGeminiOmniFlashNode = isGeminiOmniFlashModelIdentifier(selectedModel?.identifier)
   const isMinimaxH3Node = isMinimaxH3ModelIdentifier(selectedModel?.identifier)

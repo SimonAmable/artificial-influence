@@ -37,6 +37,7 @@ import type { AttachedRef, SlashCommandUiAction } from "@/lib/commands/types"
 import {
   isGeminiOmniFlashModelIdentifier,
   isMinimaxH3ModelIdentifier,
+  isPrunaVideoModelIdentifier,
   isSeedanceVideoModelIdentifier,
   getSeedanceMaxReferenceImages,
   usesFalMultimodalVideoInputs,
@@ -315,7 +316,7 @@ export function VideoInputBox({
   const isKlingV3 = selectedModel.identifier === 'kwaivgi/kling-v3-video'
   const isKlingV3Omni = selectedModel.identifier === 'kwaivgi/kling-v3-omni-video'
   const isSeedance2 = isSeedanceVideoModelIdentifier(selectedModel.identifier)
-  const isPrunaPVideo = selectedModel.identifier === 'prunaai/p-video'
+  const isPrunaPVideo = isPrunaVideoModelIdentifier(selectedModel.identifier)
   const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
   const isFalMultimodalVideo = usesFalMultimodalVideoInputs(selectedModel.identifier)
   const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(selectedModel.identifier)

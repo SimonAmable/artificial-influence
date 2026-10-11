@@ -64,13 +64,12 @@ export function buildVideoModelParameters(input: VideoParamsInput): ParameterDef
   const baseParams = input.parameters?.parameters ?? getModelParameters(input.identifier);
   const params = [...baseParams];
 
-  if (input.identifier === "prunaai/p-video") {
-    return params.filter(
-      (param) =>
-        param.name !== "fps" &&
-        param.name !== "seed" &&
-        param.name !== "prompt_upsampling",
-    );
+  if (input.identifier === "prunaai/p-video" || input.identifier === "prunaai/p-video-2") {
+    return params.filter((param) => {
+      if (param.name === "seed" || param.name === "prompt_upsampling") return false;
+      if (input.identifier === "prunaai/p-video" && param.name === "fps") return false;
+      return true;
+    });
   }
 
   // Override duration param to use discrete options from DB when available
