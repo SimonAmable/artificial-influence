@@ -8,6 +8,7 @@ export const OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID = "openai/gpt-image-2.5/s
 export const OPENAI_GPT_IMAGE_26_FLARE_CANONICAL_ID = "openai/gpt-image-2.6/flare" as const
 export const OPENAI_GPT_IMAGE_26_SUNBURST_CANONICAL_ID = "openai/gpt-image-2.6/sunburst" as const
 export const QWEN_IMAGE2_CANONICAL_ID = "fal-ai/qwen-image-2" as const
+export const QWEN_IMAGE_3_CANONICAL_ID = "alibaba/qwen-image-3" as const
 export const WAN_27_IMAGE_CANONICAL_ID = "fal-ai/wan/v2.7" as const
 export const WAN_27_PRO_IMAGE_CANONICAL_ID = "fal-ai/wan/v2.7/pro" as const
 export const SEEDREAM_4_5_CANONICAL_ID = "bytedance/seedream-4.5" as const
@@ -27,6 +28,8 @@ export const FAL_OPENAI_GPT_IMAGE_25_SUNBURST_T2I = "openai/gpt-image-2.5/sunbur
 export const FAL_OPENAI_GPT_IMAGE_25_SUNBURST_EDIT = "openai/gpt-image-2.5/sunburst/edit" as const
 export const FAL_QWEN_T2I = "fal-ai/qwen-image-2/text-to-image" as const
 export const FAL_QWEN_EDIT = "fal-ai/qwen-image-2/edit" as const
+export const FAL_QWEN_IMAGE_3_T2I = "alibaba/qwen-image-3/text-to-image" as const
+export const FAL_QWEN_IMAGE_3_EDIT = "alibaba/qwen-image-3/edit" as const
 export const FAL_WAN_27_T2I = "fal-ai/wan/v2.7/text-to-image" as const
 export const FAL_WAN_27_EDIT = "fal-ai/wan/v2.7/edit" as const
 export const FAL_WAN_27_PRO_T2I = "fal-ai/wan/v2.7/pro/text-to-image" as const
@@ -59,6 +62,7 @@ export type SupportedFalImageModelIdentifier =
   | typeof OPENAI_GPT_IMAGE_26_FLARE_CANONICAL_ID
   | typeof OPENAI_GPT_IMAGE_26_SUNBURST_CANONICAL_ID
   | typeof QWEN_IMAGE2_CANONICAL_ID
+  | typeof QWEN_IMAGE_3_CANONICAL_ID
   | typeof WAN_27_IMAGE_CANONICAL_ID
   | typeof WAN_27_PRO_IMAGE_CANONICAL_ID
   | typeof SEEDREAM_4_5_CANONICAL_ID
@@ -79,6 +83,8 @@ export type FalImageEndpoint =
   | typeof FAL_OPENAI_GPT_IMAGE_25_SUNBURST_EDIT
   | typeof FAL_QWEN_T2I
   | typeof FAL_QWEN_EDIT
+  | typeof FAL_QWEN_IMAGE_3_T2I
+  | typeof FAL_QWEN_IMAGE_3_EDIT
   | typeof FAL_WAN_27_T2I
   | typeof FAL_WAN_27_EDIT
   | typeof FAL_WAN_27_PRO_T2I
@@ -140,6 +146,11 @@ const FAL_IMAGE_MODEL_CONFIG: Record<
   [QWEN_IMAGE2_CANONICAL_ID]: {
     textEndpointId: FAL_QWEN_T2I,
     editEndpointId: FAL_QWEN_EDIT,
+    maxReferenceImages: 3,
+  },
+  [QWEN_IMAGE_3_CANONICAL_ID]: {
+    textEndpointId: FAL_QWEN_IMAGE_3_T2I,
+    editEndpointId: FAL_QWEN_IMAGE_3_EDIT,
     maxReferenceImages: 3,
   },
   [WAN_27_IMAGE_CANONICAL_ID]: {
@@ -470,7 +481,10 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
     return { endpointId, input, resolvedAspectRatio }
   }
 
-  if (options.modelIdentifier === QWEN_IMAGE2_CANONICAL_ID) {
+  if (
+    options.modelIdentifier === QWEN_IMAGE2_CANONICAL_ID ||
+    options.modelIdentifier === QWEN_IMAGE_3_CANONICAL_ID
+  ) {
     const input: Record<string, unknown> = {
       prompt: options.prompt,
       negative_prompt: options.negativePrompt ?? "",

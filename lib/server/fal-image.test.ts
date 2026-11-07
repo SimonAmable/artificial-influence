@@ -21,6 +21,8 @@ const {
   FAL_FLUX_3_EDIT,
   FAL_FLUX_3_T2I,
   FAL_SEEDREAM_5_FLASH_T2I,
+  FAL_QWEN_IMAGE_3_EDIT,
+  FAL_QWEN_IMAGE_3_T2I,
   FAL_OPENAI_GPT_IMAGE_26_FLARE_EDIT,
   FAL_OPENAI_GPT_IMAGE_26_FLARE_T2I,
   FAL_WAN_27_PRO_EDIT,
@@ -29,6 +31,7 @@ const {
   NANO_BANANA_2_1_CANONICAL_ID,
   FLUX_3_CANONICAL_ID,
   SEEDREAM_5_FLASH_CANONICAL_ID,
+  QWEN_IMAGE_3_CANONICAL_ID,
   OPENAI_GPT_IMAGE_26_FLARE_CANONICAL_ID,
   OPENAI_GPT_IMAGE_2_CANONICAL_ID,
   OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID,
@@ -436,4 +439,33 @@ runTest("Seedream 5 Flash maps size presets to auto sizes", () => {
   assert.equal(result.endpointId, FAL_SEEDREAM_5_FLASH_T2I)
   assert.equal(result.input.image_size, "auto_1.5K")
   assert.equal(result.input.enable_safety_checker, false)
+})
+
+runTest("Qwen Image 3 routes text to text-to-image and trims edits to three references", () => {
+  const text = buildFalImageRequest({
+    aspectRatio: "1:1",
+    modelIdentifier: QWEN_IMAGE_3_CANONICAL_ID,
+    numImages: 1,
+    prompt: "A poster that says MORNING BLEND",
+    referenceImageUrls: [],
+  })
+  assert.equal(text.endpointId, FAL_QWEN_IMAGE_3_T2I)
+  assert.equal(text.input.enable_safety_checker, false)
+  assert.equal(text.input.image_size, "square_hd")
+
+  const edit = buildFalImageRequest({
+    aspectRatio: "match_input_image",
+    modelIdentifier: QWEN_IMAGE_3_CANONICAL_ID,
+    numImages: 1,
+    prompt: "Change the cup color",
+    referenceImageUrls: [
+      "https://example.com/a.png",
+      "https://example.com/b.png",
+      "https://example.com/c.png",
+      "https://example.com/d.png",
+    ],
+  })
+  assert.equal(edit.endpointId, FAL_QWEN_IMAGE_3_EDIT)
+  assert.equal((edit.input.image_urls as string[]).length, 3)
+  assert.ok(!("image_size" in edit.input))
 })

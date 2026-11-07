@@ -192,11 +192,13 @@ const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
   "wan-pro": "fal-ai/wan/v2.7/pro",
   "wan-2.7-pro": "fal-ai/wan/v2.7/pro",
   "wan-2.7-pro-image": "fal-ai/wan/v2.7/pro",
+  "qwen-image-3": "alibaba/qwen-image-3",
   "qwen-edit": "qwen/qwen-image-edit-plus-lora",
   "qwen-image-edit-plus": "qwen/qwen-image-edit-plus-lora",
 }
 const FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF = new Set([
   "fal-ai/qwen-image-2",
+  "alibaba/qwen-image-3",
   "fal-ai/wan/v2.7",
   "fal-ai/wan/v2.7/pro",
   "openai/gpt-image-2",
@@ -345,7 +347,10 @@ function ImagePageContent() {
   // Set default model when models load.
   React.useEffect(() => {
     if (effectiveImageModels.length > 0 && !selectedModel) {
-      const defaultModel = effectiveImageModels.find((m) => m.identifier === DEFAULT_IMAGE_MODEL_IDENTIFIER) ?? effectiveImageModels[0]
+      const defaultModel =
+        effectiveImageModels.find((m) => m.identifier === DEFAULT_IMAGE_MODEL_IDENTIFIER) ??
+        effectiveImageModels.find((m) => m.identifier === "openai/gpt-image-2.5/flare") ??
+        effectiveImageModels[0]
       setSelectedModel(defaultModel.identifier)
       setSelectedAspectRatio(getDefaultAspectRatioForModel(defaultModel))
     }

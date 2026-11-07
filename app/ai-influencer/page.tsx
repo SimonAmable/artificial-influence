@@ -160,6 +160,7 @@ const CHARACTER_EDIT_MODEL = DEFAULT_IMAGE_MODEL_IDENTIFIER
 
 const FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF = new Set([
   "fal-ai/qwen-image-2",
+  "alibaba/qwen-image-3",
   "fal-ai/wan/v2.7",
   "fal-ai/wan/v2.7/pro",
   "openai/gpt-image-2",

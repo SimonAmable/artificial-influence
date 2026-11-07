@@ -252,6 +252,26 @@ export const FLUX_3_KLEIN_MODEL = imageModel(
   FLUX_3_MODEL.parameters.parameters,
 )
 
+export const QWEN_IMAGE_3_MODEL = imageModel(
+  "model-qwen-image-3",
+  "alibaba/qwen-image-3",
+  "Qwen Image 3",
+  "Alibaba Qwen Image 3 on Fal. Strong text rendering, with edits from up to 3 reference images.",
+  4,
+  ["match_input_image", "1:1", "16:9", "9:16", "4:3", "3:4"],
+  [
+    {
+      name: "output_format",
+      type: "string",
+      label: "Output Format",
+      required: false,
+      default: "png",
+      enum: ["png", "jpeg", "webp"],
+      ui_type: "select",
+    },
+  ],
+)
+
 export const SEEDREAM_5_FLASH_MODEL = imageModel(
   "model-seedream-5-flash",
   "bytedance/seedream-5-flash",
@@ -372,6 +392,7 @@ export const LATEST_IMAGE_MODELS = [
   FLUX_3_MODEL,
   FLUX_3_KLEIN_MODEL,
   SEEDREAM_5_FLASH_MODEL,
+  QWEN_IMAGE_3_MODEL,
 ] as const
 
 export const LATEST_VIDEO_MODELS = [
@@ -428,6 +449,7 @@ export const LATEST_IMAGE_MODELS_METADATA: LatestModelMetadata[] = [
   imageMeta(FLUX_3_MODEL, FLUX_RATIOS),
   imageMeta(FLUX_3_KLEIN_MODEL, FLUX_RATIOS),
   imageMeta(SEEDREAM_5_FLASH_MODEL, ["match_input_image", "1:1", "16:9", "9:16", "4:3", "3:4"]),
+  imageMeta(QWEN_IMAGE_3_MODEL, ["match_input_image", "1:1", "16:9", "9:16", "4:3", "3:4"]),
 ]
 
 export const LATEST_VIDEO_MODELS_METADATA: LatestModelMetadata[] = [
