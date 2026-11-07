@@ -376,6 +376,21 @@ runTest("Wan 3.0 routes prompt-only generations to text-to-video", () => {
   assert.equal(result.input.enable_safety_checker, false)
 })
 
+runTest("Wan 3.0 routes a reference video to reference-to-video", () => {
+  const result = buildFalVideoRequest({
+    duration: 5,
+    imageUrl: "https://example.com/start.png",
+    modelIdentifier: "alibaba/wan-3.0",
+    prompt: "The subject in Image 1 copies Video 1",
+    referenceImageUrls: [],
+    referenceVideoUrls: ["https://example.com/clip.mp4"],
+  })
+
+  assert.equal(result.endpointId, "alibaba/wan-3.0/reference-to-video")
+  assert.deepEqual(result.input.reference_video_urls, ["https://example.com/clip.mp4"])
+  assert.deepEqual(result.input.reference_image_urls, ["https://example.com/start.png"])
+})
+
 runTest("FLUX 3 Max sends duration as a string", () => {
   const result = buildFalVideoRequest({
     duration: 7,

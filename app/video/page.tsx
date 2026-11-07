@@ -39,6 +39,7 @@ import {
   isMinimaxH3ModelIdentifier,
   isPrunaVideoModelIdentifier,
   isSeedanceVideoModelIdentifier,
+  isWan30ModelIdentifier,
   MODEL_IDENTIFIERS,
   usesFalMultimodalVideoInputs,
 } from "@/lib/constants/models"
@@ -840,6 +841,7 @@ function VideoPageContent() {
     const isHappyHorse = isHappyHorseModelIdentifier(selectedModel.identifier)
     const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(selectedModel.identifier)
     const isMinimaxH3 = isMinimaxH3ModelIdentifier(selectedModel.identifier)
+    const isWan30 = isWan30ModelIdentifier(selectedModel.identifier)
     const isFalMultimodalVideo = usesFalMultimodalVideoInputs(selectedModel.identifier)
     const isLipsync =
       selectedModel.identifier.includes('lipsync') ||
@@ -961,7 +963,14 @@ function VideoPageContent() {
             !!chipSlots.lastFrameChipUrl)) ||
         (isHappyHorse &&
           !falMultimodalReferenceMode &&
-          (!!inputImage || !!chipSlots.startImageChipUrl))
+          (!!inputImage || !!chipSlots.startImageChipUrl)) ||
+        (isWan30 &&
+          (!!inputImage ||
+            !!lastFrameImage ||
+            !!inputVideo ||
+            !!chipSlots.startImageChipUrl ||
+            !!chipSlots.lastFrameChipUrl ||
+            !!chipSlots.referenceVideoChipUrl))
       if (!allowNoPrompt) {
         setError("Please enter a prompt")
         return
@@ -994,6 +1003,7 @@ function VideoPageContent() {
       isHappyHorse,
       isGeminiOmniFlash,
       isMinimaxH3,
+      isWan30,
       isFalMultimodalVideo,
       falMultimodalReferenceMode,
       isLipsync,
@@ -1036,6 +1046,7 @@ function VideoPageContent() {
       const isHappyHorse = capture.isHappyHorse
       const isGeminiOmniFlash = capture.isGeminiOmniFlash
       const isMinimaxH3 = capture.isMinimaxH3
+      const isWan30 = capture.isWan30
       const isFalMultimodalVideo = capture.isFalMultimodalVideo
       const falMultimodalReferenceMode = capture.falMultimodalReferenceMode
       const isLipsync = capture.isLipsync
@@ -1286,6 +1297,17 @@ function VideoPageContent() {
         requestBody.reference_videos = [inputVideo.url]
       }
       if (isMinimaxH3 && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
+        requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
+      }
+
+      if (isWan30 && inputVideo?.file) {
+        const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'video-gen-reference-videos')
+        requestBody.reference_videos = [videoUpload.url]
+      }
+      if (!inputVideo?.file && isWan30 && inputVideo?.url) {
+        requestBody.reference_videos = [inputVideo.url]
+      }
+      if (isWan30 && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
         requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
       }
 

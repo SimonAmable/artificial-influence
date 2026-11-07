@@ -322,7 +322,7 @@ export const WAN_30_MODEL = videoModel(
   "model-wan-3.0",
   "alibaba/wan-3.0",
   "Wan 3.0",
-  "Alibaba Wan 3.0 on Fal. Text or first-and-last frame video up to 30 seconds with audio.",
+  "Alibaba Wan 3.0 on Fal. Text, start and end frames, or up to 5 reference videos, up to 30 seconds with audio.",
   12,
   12,
   ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
@@ -330,12 +330,13 @@ export const WAN_30_MODEL = videoModel(
   { options: ["480p", "720p", "1080p"], default: "1080p" },
   true,
 )
+WAN_30_MODEL.supports_reference_video = true
 
 export const WAN_30_PRIME_MODEL = videoModel(
   "model-wan-3.0-prime",
   "alibaba/wan-3.0-prime",
   "Wan 3.0 Prime",
-  "Faster Wan 3.0 Prime on Fal for text and image-to-video up to 30 seconds.",
+  "Faster Wan 3.0 Prime on Fal for text, frames, or reference video, up to 30 seconds.",
   12,
   12,
   ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
@@ -343,6 +344,7 @@ export const WAN_30_PRIME_MODEL = videoModel(
   { options: ["480p", "720p", "1080p"], default: "1080p" },
   true,
 )
+WAN_30_PRIME_MODEL.supports_reference_video = true
 
 export const FLUX_3_MAX_MODEL = videoModel(
   "model-flux-3-max",
@@ -435,7 +437,7 @@ function videoMeta(model: Model, aspectRatios: string[]): LatestModelMetadata {
     is_active: true,
     model_cost: model.model_cost,
     supports_reference_image: model.supports_first_frame === true,
-    supports_reference_video: false,
+    supports_reference_video: model.supports_reference_video === true,
     supports_first_frame: model.supports_first_frame === true,
     supports_last_frame: model.supports_last_frame,
     aspect_ratios: aspectRatios,

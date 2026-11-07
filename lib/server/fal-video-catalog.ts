@@ -7,7 +7,10 @@ export interface CatalogFalVideoRequestOptions {
   imageUrl?: string | null
   modelIdentifier: string
   prompt?: string | null
+  referenceImageUrls?: string[]
+  referenceVideoUrls?: string[]
   resolution?: string | null
+  videoUrl?: string | null
 }
 
 export const KLING_V4_CANONICAL_ID = "kling/v4" as const
@@ -37,8 +40,10 @@ export type CatalogFalVideoEndpoint =
   | "kling/v4/flash/image-to-video"
   | "alibaba/wan-3.0/text-to-video"
   | "alibaba/wan-3.0/image-to-video"
+  | "alibaba/wan-3.0/reference-to-video"
   | "alibaba/wan-3.0-prime/text-to-video"
   | "alibaba/wan-3.0-prime/image-to-video"
+  | "alibaba/wan-3.0-prime/reference-to-video"
   | "blackforestlabs/flux-3-max/text-to-video"
   | "blackforestlabs/flux-3-max/image-to-video"
   | "minimax/h3-max/text-to-video"
@@ -50,6 +55,18 @@ export function isCatalogFalVideoModel(
   modelIdentifier: string,
 ): modelIdentifier is CatalogFalVideoModelId {
   return CATALOG_ID_SET.has(modelIdentifier)
+}
+
+function uniqueMediaUrls(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>()
+  const urls: string[] = []
+  for (const value of values) {
+    const url = pickString(value)
+    if (!url || seen.has(url)) continue
+    seen.add(url)
+    urls.push(url)
+  }
+  return urls
 }
 
 function pickString(value: unknown): string | undefined {
@@ -78,7 +95,7 @@ function pickAspect(value: CatalogFalVideoRequestOptions["aspectRatio"], allowed
 export function buildCatalogFalVideoRequest(options: CatalogFalVideoRequestOptions): {
   endpointId: CatalogFalVideoEndpoint
   input: Record<string, unknown>
-  mode: "text-to-video" | "image-to-video"
+  mode: "text-to-video" | "image-to-video" | "reference-to-video"
 } {
   const id = options.modelIdentifier
   const prompt = pickString(options.prompt)
@@ -136,6 +153,29 @@ export function buildCatalogFalVideoRequest(options: CatalogFalVideoRequestOptio
       audio: options.generateAudio !== false,
       enable_prompt_expansion: options.enablePromptExpansion !== false,
       enable_safety_checker: false,
+    }
+    const referenceVideos = uniqueMediaUrls([
+      ...(options.referenceVideoUrls ?? []),
+      options.videoUrl,
+    ]).slice(0, 5)
+    if (referenceVideos.length > 0) {
+      const referenceImages = uniqueMediaUrls([
+        startImage,
+        endImage,
+        ...(options.referenceImageUrls ?? []),
+      ]).slice(0, 10)
+      return {
+        endpointId: prime
+          ? "alibaba/wan-3.0-prime/reference-to-video"
+          : "alibaba/wan-3.0/reference-to-video",
+        mode: "reference-to-video",
+        input: {
+          ...shared,
+          ...(prompt ? { prompt } : {}),
+          reference_video_urls: referenceVideos,
+          ...(referenceImages.length > 0 ? { reference_image_urls: referenceImages } : {}),
+        },
+      }
     }
     if (startImage) {
       return {

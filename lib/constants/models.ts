@@ -111,6 +111,13 @@ export function isGeminiOmniFlashModelIdentifier(identifier: string | null | und
   return identifier === MODEL_IDENTIFIERS.GOOGLE_GEMINI_OMNI_FLASH;
 }
 
+export function isWan30ModelIdentifier(identifier: string | null | undefined): boolean {
+  return (
+    identifier === MODEL_IDENTIFIERS.WAN_30 ||
+    identifier === MODEL_IDENTIFIERS.WAN_30_PRIME
+  );
+}
+
 export function isMinimaxH3ModelIdentifier(identifier: string | null | undefined): boolean {
   return (
     identifier === MODEL_IDENTIFIERS.MINIMAX_H3 ||

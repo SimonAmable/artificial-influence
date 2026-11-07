@@ -42,6 +42,7 @@ import {
   isMotionCopyModelIdentifier,
   isPrunaVideoModelIdentifier,
   isSeedanceVideoModelIdentifier,
+  isWan30ModelIdentifier,
   normalizeMotionCopyModelIdentifier,
   usesFalMultimodalVideoInputs,
 } from "@/lib/constants/models"
@@ -1094,6 +1095,16 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
           requestBody.reference_videos = [videoUpload.url]
         }
         if (isMinimaxH3 && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
+          requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
+        }
+        if (isWan30ModelIdentifier(modelIdentifier) && videoUpload?.url) {
+          requestBody.reference_videos = [videoUpload.url]
+        }
+        if (
+          isWan30ModelIdentifier(modelIdentifier) &&
+          !requestBody.reference_videos &&
+          chipSlots.referenceVideoChipUrl
+        ) {
           requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
         }
         if ((isSeedance2 || isMinimaxH3) && audioUpload?.url) {

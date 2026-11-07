@@ -22,6 +22,7 @@ import { applyMinimalReplicateVideoModeration } from '@/lib/server/minimal-moder
 import {
   isHappyHorseModelIdentifier,
   isMotionCopyModelIdentifier,
+  isWan30ModelIdentifier,
   normalizeMotionCopyModelIdentifier,
   usesFalMultimodalVideoInputs,
 } from '@/lib/constants/models';
@@ -179,6 +180,7 @@ export async function POST(request: NextRequest) {
       typeof otherParams.end_image === 'string' ? otherParams.end_image : null,
     ].find((value): value is string => typeof value === 'string' && value.length > 0) ?? null;
     const isFalMultimodalVideo = usesFalMultimodalVideoInputs(catalogModelIdentifier);
+    const wanAcceptsReferenceVideo = isWan30ModelIdentifier(catalogModelIdentifier);
     const seedance25UsesFal = shouldRouteSeedance25ToFal({
       hasReferenceVideo: falReferenceVideos.length > 0,
       modelIdentifier: catalogModelIdentifier,
@@ -428,15 +430,15 @@ export async function POST(request: NextRequest) {
         modelIdentifier: catalogModelIdentifier,
         prompt: typeof prompt === 'string' ? prompt : null,
         referenceAudioUrls: useFalReferenceBundle ? falReferenceAudios : [],
-        referenceImageUrls: useFalReferenceBundle ? falMultimodalReferenceImages : [],
-        referenceVideoUrls: useFalReferenceBundle ? falReferenceVideos : [],
+        referenceImageUrls: useFalReferenceBundle || wanAcceptsReferenceVideo ? falMultimodalReferenceImages : [],
+        referenceVideoUrls: useFalReferenceBundle || wanAcceptsReferenceVideo ? falReferenceVideos : [],
         resolution:
           typeof otherParams.resolution === 'string' ? otherParams.resolution : null,
         seed:
           otherParams.seed !== null && otherParams.seed !== undefined
             ? (otherParams.seed as number | string)
             : null,
-        videoUrl: useFalReferenceBundle ? falReferenceVideo : null,
+        videoUrl: useFalReferenceBundle || wanAcceptsReferenceVideo ? falReferenceVideo : null,
         })
       } catch (error) {
         return NextResponse.json(
