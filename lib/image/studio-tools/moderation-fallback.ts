@@ -3,7 +3,7 @@ import { isContentModerationMessage } from "@/lib/generate-image-client"
 
 /** Moderation rescue ladder for proprietary studio tools. */
 export const STUDIO_IMAGE_FALLBACK_CHAIN = [
-  "openai/gpt-image-2.5/flare",
+  "openai/gpt-image-2.6/flare",
   "google/nano-banana-2-lite",
   "bytedance/seedream-5-lite",
 ] as const
@@ -41,7 +41,7 @@ export function getStudioToolFalQualityParams(
   switch (model) {
     case "google/nano-banana-2-lite":
       return {}
-    case "openai/gpt-image-2.5/flare":
+    case "openai/gpt-image-2.6/flare":
       return { quality: "high" as const }
     case "bytedance/seedream-5-lite":
       return { resolutionPreset: "2K" }

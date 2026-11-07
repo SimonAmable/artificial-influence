@@ -156,9 +156,36 @@ export function resolvePredictedDurationSeconds(input: VideoDurationInput): numb
       return 5
     case "google/gemini-omni-flash":
       if (explicitDuration != null && explicitDuration > 0) {
-        return roundDuration(explicitDuration, 3, 10)
+        return roundDuration(explicitDuration, 3, 15)
       }
       return 8
+    case "kling/v4":
+      if (explicitDuration != null && explicitDuration > 0) {
+        return roundDuration(explicitDuration, 3, 30)
+      }
+      return 5
+    case "kling/v4/flash":
+      if (explicitDuration != null && explicitDuration > 0) {
+        return roundDuration(explicitDuration, 3, 20)
+      }
+      return 5
+    case "alibaba/wan-3.0":
+    case "alibaba/wan-3.0-prime":
+      if (explicitDuration != null && explicitDuration > 0) {
+        return roundDuration(explicitDuration, 3, 30)
+      }
+      return 5
+    case "blackforestlabs/flux-3-max":
+      if (explicitDuration != null && explicitDuration > 0) {
+        return roundDuration(explicitDuration, 5, 20)
+      }
+      return 5
+    case "minimax/h3-max":
+    case "minimax/h3-max-turbo":
+      if (explicitDuration != null && explicitDuration > 0) {
+        return roundDuration(explicitDuration, 2, 15)
+      }
+      return 5
     case "minimax/h3":
       if (explicitDuration != null && explicitDuration > 0) {
         return roundDuration(explicitDuration, 5, 15)

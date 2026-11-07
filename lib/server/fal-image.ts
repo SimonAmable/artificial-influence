@@ -5,6 +5,8 @@ import { aspectRatioToDimensions } from "@/lib/utils/model-parameters"
 export const OPENAI_GPT_IMAGE_2_CANONICAL_ID = "openai/gpt-image-2" as const
 export const OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID = "openai/gpt-image-2.5/flare" as const
 export const OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID = "openai/gpt-image-2.5/sunburst" as const
+export const OPENAI_GPT_IMAGE_26_FLARE_CANONICAL_ID = "openai/gpt-image-2.6/flare" as const
+export const OPENAI_GPT_IMAGE_26_SUNBURST_CANONICAL_ID = "openai/gpt-image-2.6/sunburst" as const
 export const QWEN_IMAGE2_CANONICAL_ID = "fal-ai/qwen-image-2" as const
 export const WAN_27_IMAGE_CANONICAL_ID = "fal-ai/wan/v2.7" as const
 export const WAN_27_PRO_IMAGE_CANONICAL_ID = "fal-ai/wan/v2.7/pro" as const
@@ -12,6 +14,10 @@ export const SEEDREAM_4_5_CANONICAL_ID = "bytedance/seedream-4.5" as const
 export const SEEDREAM_5_LITE_CANONICAL_ID = "bytedance/seedream-5-lite" as const
 export const SEEDREAM_5_PRO_CANONICAL_ID = "bytedance/seedream-5-pro" as const
 export const NANO_BANANA_2_LITE_CANONICAL_ID = "google/nano-banana-2-lite" as const
+export const NANO_BANANA_2_1_CANONICAL_ID = "google/nano-banana-2.1" as const
+export const FLUX_3_CANONICAL_ID = "blackforestlabs/flux-3" as const
+export const FLUX_3_KLEIN_CANONICAL_ID = "blackforestlabs/flux-3/klein" as const
+export const SEEDREAM_5_FLASH_CANONICAL_ID = "bytedance/seedream-5-flash" as const
 
 export const FAL_OPENAI_GPT_IMAGE_2_T2I = "openai/gpt-image-2" as const
 export const FAL_OPENAI_GPT_IMAGE_2_EDIT = "openai/gpt-image-2/edit" as const
@@ -31,13 +37,27 @@ export const FAL_SEEDREAM_5_LITE_T2I = "fal-ai/bytedance/seedream/v5/lite/text-t
 export const FAL_SEEDREAM_5_LITE_EDIT = "fal-ai/bytedance/seedream/v5/lite/edit" as const
 export const FAL_SEEDREAM_5_PRO_T2I = "bytedance/seedream/v5/pro/text-to-image" as const
 export const FAL_SEEDREAM_5_PRO_EDIT = "bytedance/seedream/v5/pro/edit" as const
+export const FAL_OPENAI_GPT_IMAGE_26_FLARE_T2I = "openai/gpt-image-2.6/flare/text-to-image" as const
+export const FAL_OPENAI_GPT_IMAGE_26_FLARE_EDIT = "openai/gpt-image-2.6/flare/edit" as const
+export const FAL_OPENAI_GPT_IMAGE_26_SUNBURST_T2I = "openai/gpt-image-2.6/sunburst/text-to-image" as const
+export const FAL_OPENAI_GPT_IMAGE_26_SUNBURST_EDIT = "openai/gpt-image-2.6/sunburst/edit" as const
 export const FAL_NANO_BANANA_2_LITE_T2I = "google/nano-banana-2-lite" as const
 export const FAL_NANO_BANANA_2_LITE_EDIT = "google/nano-banana-2-lite/edit" as const
+export const FAL_NANO_BANANA_2_1_T2I = "google/nano-banana-2.1" as const
+export const FAL_NANO_BANANA_2_1_EDIT = "google/nano-banana-2.1/edit" as const
+export const FAL_FLUX_3_T2I = "blackforestlabs/flux-3/text-to-image" as const
+export const FAL_FLUX_3_EDIT = "blackforestlabs/flux-3/edit-image" as const
+export const FAL_FLUX_3_KLEIN_T2I = "blackforestlabs/flux-3/klein/text-to-image" as const
+export const FAL_FLUX_3_KLEIN_EDIT = "blackforestlabs/flux-3/klein/edit-image" as const
+export const FAL_SEEDREAM_5_FLASH_T2I = "bytedance/seedream/v5/flash/text-to-image" as const
+export const FAL_SEEDREAM_5_FLASH_EDIT = "bytedance/seedream/v5/flash/edit" as const
 
 export type SupportedFalImageModelIdentifier =
   | typeof OPENAI_GPT_IMAGE_2_CANONICAL_ID
   | typeof OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID
   | typeof OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID
+  | typeof OPENAI_GPT_IMAGE_26_FLARE_CANONICAL_ID
+  | typeof OPENAI_GPT_IMAGE_26_SUNBURST_CANONICAL_ID
   | typeof QWEN_IMAGE2_CANONICAL_ID
   | typeof WAN_27_IMAGE_CANONICAL_ID
   | typeof WAN_27_PRO_IMAGE_CANONICAL_ID
@@ -45,6 +65,10 @@ export type SupportedFalImageModelIdentifier =
   | typeof SEEDREAM_5_LITE_CANONICAL_ID
   | typeof SEEDREAM_5_PRO_CANONICAL_ID
   | typeof NANO_BANANA_2_LITE_CANONICAL_ID
+  | typeof NANO_BANANA_2_1_CANONICAL_ID
+  | typeof FLUX_3_CANONICAL_ID
+  | typeof FLUX_3_KLEIN_CANONICAL_ID
+  | typeof SEEDREAM_5_FLASH_CANONICAL_ID
 
 export type FalImageEndpoint =
   | typeof FAL_OPENAI_GPT_IMAGE_2_T2I
@@ -65,8 +89,20 @@ export type FalImageEndpoint =
   | typeof FAL_SEEDREAM_5_LITE_EDIT
   | typeof FAL_SEEDREAM_5_PRO_T2I
   | typeof FAL_SEEDREAM_5_PRO_EDIT
+  | typeof FAL_OPENAI_GPT_IMAGE_26_FLARE_T2I
+  | typeof FAL_OPENAI_GPT_IMAGE_26_FLARE_EDIT
+  | typeof FAL_OPENAI_GPT_IMAGE_26_SUNBURST_T2I
+  | typeof FAL_OPENAI_GPT_IMAGE_26_SUNBURST_EDIT
   | typeof FAL_NANO_BANANA_2_LITE_T2I
   | typeof FAL_NANO_BANANA_2_LITE_EDIT
+  | typeof FAL_NANO_BANANA_2_1_T2I
+  | typeof FAL_NANO_BANANA_2_1_EDIT
+  | typeof FAL_FLUX_3_T2I
+  | typeof FAL_FLUX_3_EDIT
+  | typeof FAL_FLUX_3_KLEIN_T2I
+  | typeof FAL_FLUX_3_KLEIN_EDIT
+  | typeof FAL_SEEDREAM_5_FLASH_T2I
+  | typeof FAL_SEEDREAM_5_FLASH_EDIT
 
 const FAL_IMAGE_MODEL_CONFIG: Record<
   SupportedFalImageModelIdentifier,
@@ -89,6 +125,16 @@ const FAL_IMAGE_MODEL_CONFIG: Record<
   [OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID]: {
     textEndpointId: FAL_OPENAI_GPT_IMAGE_25_SUNBURST_T2I,
     editEndpointId: FAL_OPENAI_GPT_IMAGE_25_SUNBURST_EDIT,
+    maxReferenceImages: 16,
+  },
+  [OPENAI_GPT_IMAGE_26_FLARE_CANONICAL_ID]: {
+    textEndpointId: FAL_OPENAI_GPT_IMAGE_26_FLARE_T2I,
+    editEndpointId: FAL_OPENAI_GPT_IMAGE_26_FLARE_EDIT,
+    maxReferenceImages: 16,
+  },
+  [OPENAI_GPT_IMAGE_26_SUNBURST_CANONICAL_ID]: {
+    textEndpointId: FAL_OPENAI_GPT_IMAGE_26_SUNBURST_T2I,
+    editEndpointId: FAL_OPENAI_GPT_IMAGE_26_SUNBURST_EDIT,
     maxReferenceImages: 16,
   },
   [QWEN_IMAGE2_CANONICAL_ID]: {
@@ -124,6 +170,26 @@ const FAL_IMAGE_MODEL_CONFIG: Record<
   [NANO_BANANA_2_LITE_CANONICAL_ID]: {
     textEndpointId: FAL_NANO_BANANA_2_LITE_T2I,
     editEndpointId: FAL_NANO_BANANA_2_LITE_EDIT,
+    maxReferenceImages: 10,
+  },
+  [NANO_BANANA_2_1_CANONICAL_ID]: {
+    textEndpointId: FAL_NANO_BANANA_2_1_T2I,
+    editEndpointId: FAL_NANO_BANANA_2_1_EDIT,
+    maxReferenceImages: 14,
+  },
+  [FLUX_3_CANONICAL_ID]: {
+    textEndpointId: FAL_FLUX_3_T2I,
+    editEndpointId: FAL_FLUX_3_EDIT,
+    maxReferenceImages: 10,
+  },
+  [FLUX_3_KLEIN_CANONICAL_ID]: {
+    textEndpointId: FAL_FLUX_3_KLEIN_T2I,
+    editEndpointId: FAL_FLUX_3_KLEIN_EDIT,
+    maxReferenceImages: 10,
+  },
+  [SEEDREAM_5_FLASH_CANONICAL_ID]: {
+    textEndpointId: FAL_SEEDREAM_5_FLASH_T2I,
+    editEndpointId: FAL_SEEDREAM_5_FLASH_EDIT,
     maxReferenceImages: 10,
   },
 }
@@ -216,10 +282,14 @@ function isOpenAiGptImage25Model(
   modelIdentifier: SupportedFalImageModelIdentifier,
 ): modelIdentifier is
   | typeof OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID
-  | typeof OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID {
+  | typeof OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID
+  | typeof OPENAI_GPT_IMAGE_26_FLARE_CANONICAL_ID
+  | typeof OPENAI_GPT_IMAGE_26_SUNBURST_CANONICAL_ID {
   return (
     modelIdentifier === OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID ||
-    modelIdentifier === OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID
+    modelIdentifier === OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID ||
+    modelIdentifier === OPENAI_GPT_IMAGE_26_FLARE_CANONICAL_ID ||
+    modelIdentifier === OPENAI_GPT_IMAGE_26_SUNBURST_CANONICAL_ID
   )
 }
 
@@ -263,6 +333,7 @@ export function coerceWanImagePrompt(prompt: string): string {
 type SeedreamImageSize =
   | FalImageSize
   | "auto_1K"
+  | "auto_1.5K"
   | "auto_2K"
   | "auto_3K"
   | "auto_4K"
@@ -274,11 +345,17 @@ function aspectRatioToSeedreamImageSize(
     resolutionPreset?: string | null
     supportsAuto1K?: boolean
     supportsAuto3K?: boolean
+    supportsFlashSizes?: boolean
   },
 ): SeedreamImageSize {
   const aspect = (aspectRatio || "1:1").trim()
 
   const preset = options?.resolutionPreset?.trim().toUpperCase()
+  if (options?.supportsFlashSizes) {
+    if (preset === "1K") return "auto_1K"
+    if (preset === "1.5K") return "auto_1.5K"
+    return "auto_2K"
+  }
   if (preset === "4K") return "auto_4K"
   if (preset === "3K" && options?.supportsAuto3K) return "auto_3K"
   if (preset === "2K") return "auto_2K"
@@ -310,11 +387,13 @@ function isSeedreamFalImageModel(
 ): modelIdentifier is
   | typeof SEEDREAM_4_5_CANONICAL_ID
   | typeof SEEDREAM_5_LITE_CANONICAL_ID
-  | typeof SEEDREAM_5_PRO_CANONICAL_ID {
+  | typeof SEEDREAM_5_PRO_CANONICAL_ID
+  | typeof SEEDREAM_5_FLASH_CANONICAL_ID {
   return (
     modelIdentifier === SEEDREAM_4_5_CANONICAL_ID ||
     modelIdentifier === SEEDREAM_5_LITE_CANONICAL_ID ||
-    modelIdentifier === SEEDREAM_5_PRO_CANONICAL_ID
+    modelIdentifier === SEEDREAM_5_PRO_CANONICAL_ID ||
+    modelIdentifier === SEEDREAM_5_FLASH_CANONICAL_ID
   )
 }
 
@@ -459,6 +538,7 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
       resolutionPreset: options.resolutionPreset,
       supportsAuto1K: options.modelIdentifier === SEEDREAM_5_PRO_CANONICAL_ID,
       supportsAuto3K: options.modelIdentifier === SEEDREAM_5_LITE_CANONICAL_ID,
+      supportsFlashSizes: options.modelIdentifier === SEEDREAM_5_FLASH_CANONICAL_ID,
     })
     const input: Record<string, unknown> = {
       prompt: options.prompt,
@@ -497,6 +577,78 @@ export function buildFalImageRequest(options: FalImageRequestOptions): {
       input.image_urls = referenceImageUrls
     }
 
+    return { endpointId, input, resolvedAspectRatio }
+  }
+
+  if (options.modelIdentifier === NANO_BANANA_2_1_CANONICAL_ID) {
+    const preset = (options.resolutionPreset || "1K").trim().toUpperCase()
+    const resolution = preset === "2K" || preset === "4K" ? preset : "1K"
+    const input: Record<string, unknown> = {
+      prompt: options.prompt,
+      aspect_ratio: normalizeNanoBananaLiteAspectRatio(resolvedAspectRatio, isEdit),
+      resolution,
+      num_images: Math.min(4, Math.max(1, options.numImages)),
+      output_format: normalizeOutputFormat(options.outputFormat),
+      safety_tolerance: "6",
+      limit_generations: true,
+      thinking_level: "medium",
+    }
+
+    if (options.seed != null && !Number.isNaN(Number(options.seed))) {
+      input.seed = Math.round(Number(options.seed))
+    }
+
+    if (isEdit) {
+      input.image_urls = referenceImageUrls
+    }
+
+    return { endpointId, input, resolvedAspectRatio }
+  }
+
+  if (
+    options.modelIdentifier === FLUX_3_CANONICAL_ID ||
+    options.modelIdentifier === FLUX_3_KLEIN_CANONICAL_ID
+  ) {
+    const preset = (options.resolutionPreset || "1K").trim().toLowerCase()
+    const resolution =
+      preset === "768" || preset === "768sq"
+        ? "768sq"
+        : preset === "1.5k"
+          ? "1.5k"
+          : preset === "2k"
+            ? "2k"
+            : preset === "4k"
+              ? "4k"
+              : "1k"
+    const aspect = (resolvedAspectRatio || "auto").trim()
+    const fluxAspects = new Set([
+      "auto",
+      "21:9",
+      "2:1",
+      "16:9",
+      "3:2",
+      "7:5",
+      "4:3",
+      "5:4",
+      "1:1",
+      "4:5",
+      "3:4",
+      "5:7",
+      "2:3",
+      "9:16",
+      "1:2",
+    ])
+    const input: Record<string, unknown> = {
+      prompt: options.prompt,
+      aspect_ratio: aspect === "match_input_image" || fluxAspects.has(aspect) ? (aspect === "match_input_image" ? "auto" : aspect) : "1:1",
+      resolution,
+      safety_tolerance: 4,
+      output_format: options.outputFormat === "png" ? "png" : "jpeg",
+      enable_prompt_expansion: options.enablePromptExpansion ?? false,
+    }
+    if (isEdit) {
+      input.image_urls = referenceImageUrls
+    }
     return { endpointId, input, resolvedAspectRatio }
   }
 

@@ -16,9 +16,20 @@ const {
   FAL_SEEDREAM_5_PRO_T2I,
   FAL_NANO_BANANA_2_LITE_EDIT,
   FAL_NANO_BANANA_2_LITE_T2I,
+  FAL_NANO_BANANA_2_1_EDIT,
+  FAL_NANO_BANANA_2_1_T2I,
+  FAL_FLUX_3_EDIT,
+  FAL_FLUX_3_T2I,
+  FAL_SEEDREAM_5_FLASH_T2I,
+  FAL_OPENAI_GPT_IMAGE_26_FLARE_EDIT,
+  FAL_OPENAI_GPT_IMAGE_26_FLARE_T2I,
   FAL_WAN_27_PRO_EDIT,
   FAL_WAN_27_PRO_T2I,
   NANO_BANANA_2_LITE_CANONICAL_ID,
+  NANO_BANANA_2_1_CANONICAL_ID,
+  FLUX_3_CANONICAL_ID,
+  SEEDREAM_5_FLASH_CANONICAL_ID,
+  OPENAI_GPT_IMAGE_26_FLARE_CANONICAL_ID,
   OPENAI_GPT_IMAGE_2_CANONICAL_ID,
   OPENAI_GPT_IMAGE_25_FLARE_CANONICAL_ID,
   OPENAI_GPT_IMAGE_25_SUNBURST_CANONICAL_ID,
@@ -351,4 +362,78 @@ runTest("Nano Banana 2 Lite routes referenced generations to edit with auto aspe
   assert.equal(result.input.aspect_ratio, "auto")
   assert.equal(result.input.safety_tolerance, "6")
   assert.deepEqual(result.input.image_urls, ["https://example.com/ref-1.png"])
+})
+
+runTest("GPT Image 2.6 Flare routes prompt-only generations to text-to-image", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: "1:1",
+    modelIdentifier: OPENAI_GPT_IMAGE_26_FLARE_CANONICAL_ID,
+    numImages: 1,
+    prompt: "A ceramic mug on a wooden table",
+    quality: "high",
+    referenceImageUrls: [],
+  })
+
+  assert.equal(result.endpointId, FAL_OPENAI_GPT_IMAGE_26_FLARE_T2I)
+  assert.equal(result.input.quality, "high")
+  assert.ok(!("image_urls" in result.input))
+})
+
+runTest("GPT Image 2.6 Flare routes referenced generations to edit", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: "1:1",
+    modelIdentifier: OPENAI_GPT_IMAGE_26_FLARE_CANONICAL_ID,
+    numImages: 1,
+    prompt: "Change the mug color to green",
+    referenceImageUrls: ["https://example.com/mug.png"],
+  })
+
+  assert.equal(result.endpointId, FAL_OPENAI_GPT_IMAGE_26_FLARE_EDIT)
+  assert.deepEqual(result.input.image_urls, ["https://example.com/mug.png"])
+})
+
+runTest("Nano Banana 2.1 routes prompt-only generations to text-to-image", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: "16:9",
+    modelIdentifier: NANO_BANANA_2_1_CANONICAL_ID,
+    numImages: 1,
+    prompt: "A glass greenhouse at sunrise",
+    referenceImageUrls: [],
+    resolutionPreset: "2K",
+  })
+
+  assert.equal(result.endpointId, FAL_NANO_BANANA_2_1_T2I)
+  assert.equal(result.input.resolution, "2K")
+  assert.equal(result.input.safety_tolerance, "6")
+})
+
+runTest("FLUX 3 routes referenced generations to edit-image", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: "1:1",
+    modelIdentifier: FLUX_3_CANONICAL_ID,
+    numImages: 1,
+    prompt: "Replace the chair with a stool",
+    referenceImageUrls: ["https://example.com/room.png"],
+    resolutionPreset: "2k",
+  })
+
+  assert.equal(result.endpointId, FAL_FLUX_3_EDIT)
+  assert.equal(result.input.resolution, "2k")
+  assert.equal(result.input.safety_tolerance, 4)
+  assert.deepEqual(result.input.image_urls, ["https://example.com/room.png"])
+})
+
+runTest("Seedream 5 Flash maps size presets to auto sizes", () => {
+  const result = buildFalImageRequest({
+    aspectRatio: "1:1",
+    modelIdentifier: SEEDREAM_5_FLASH_CANONICAL_ID,
+    numImages: 1,
+    prompt: "A red bicycle against a white wall",
+    referenceImageUrls: [],
+    resolutionPreset: "1.5K",
+  })
+
+  assert.equal(result.endpointId, FAL_SEEDREAM_5_FLASH_T2I)
+  assert.equal(result.input.image_size, "auto_1.5K")
+  assert.equal(result.input.enable_safety_checker, false)
 })

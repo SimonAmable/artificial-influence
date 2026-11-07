@@ -419,7 +419,7 @@ export function createGenerateImageTool({
         .min(1)
         .max(120)
         .optional()
-        .describe("Image model identifier, preferably selected from listModels. Defaults to openai/gpt-image-2.5/flare."),
+        .describe("Image model identifier, preferably selected from listModels. Defaults to openai/gpt-image-2.6/flare."),
       aspectRatio: z
         .string()
         .min(1)

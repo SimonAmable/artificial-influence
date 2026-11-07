@@ -177,6 +177,17 @@ runTest("Gemini Omni Flash routes video input to the edit endpoint", () => {
   })
 })
 
+runTest("MiniMax H3 defaults omitted resolution to 768P", () => {
+  const result = buildFalVideoRequest({
+    modelIdentifier: MINIMAX_H3_CANONICAL_ID,
+    prompt: "A white kitten chases a butterfly across a sunlit garden",
+    referenceImageUrls: [],
+  })
+
+  assert.equal(result.endpointId, FAL_MINIMAX_H3_T2V)
+  assert.equal(result.input.resolution, "768P")
+})
+
 runTest("MiniMax H3 routes prompt-only generations to text-to-video", () => {
   const result = buildFalVideoRequest({
     aspectRatio: "9:16",
@@ -316,5 +327,76 @@ runTest("Seedance 2.5 Fal routing rejects requests without a reference video", (
         referenceImageUrls: ["https://example.com/still.png"],
       }),
     /reference video/,
+  )
+})
+
+runTest("Gemini Omni Flash 1.2 accepts a 15 second duration and a resolution", () => {
+  const result = buildFalVideoRequest({
+    aspectRatio: "16:9",
+    duration: 15,
+    modelIdentifier: GEMINI_OMNI_FLASH_CANONICAL_ID,
+    prompt: "A train crossing a snowy bridge",
+    referenceImageUrls: [],
+    resolution: "1080p",
+  })
+
+  assert.equal(result.endpointId, FAL_GEMINI_OMNI_FLASH_T2V)
+  assert.equal(result.input.duration, 15)
+  assert.equal(result.input.resolution, "1080p")
+})
+
+runTest("Kling 4.0 routes a start frame to image-to-video", () => {
+  const result = buildFalVideoRequest({
+    aspectRatio: "16:9",
+    duration: 8,
+    imageUrl: "https://example.com/start.png",
+    modelIdentifier: "kling/v4",
+    prompt: "The camera pushes in",
+    referenceImageUrls: [],
+    resolution: "720p",
+  })
+
+  assert.equal(result.endpointId, "kling/v4/image-to-video")
+  assert.equal(result.input.start_image_url, "https://example.com/start.png")
+  assert.equal(result.input.resolution, "720p")
+  assert.equal(result.input.duration, 8)
+})
+
+runTest("Wan 3.0 routes prompt-only generations to text-to-video", () => {
+  const result = buildFalVideoRequest({
+    aspectRatio: "9:16",
+    duration: 5,
+    modelIdentifier: "alibaba/wan-3.0",
+    prompt: "Rain on a neon street",
+    referenceImageUrls: [],
+  })
+
+  assert.equal(result.endpointId, "alibaba/wan-3.0/text-to-video")
+  assert.equal(result.input.resolution, "1080p")
+  assert.equal(result.input.enable_safety_checker, false)
+})
+
+runTest("FLUX 3 Max sends duration as a string", () => {
+  const result = buildFalVideoRequest({
+    duration: 7,
+    modelIdentifier: "blackforestlabs/flux-3-max",
+    prompt: "A paper boat on a stream",
+    referenceImageUrls: [],
+  })
+
+  assert.equal(result.endpointId, "blackforestlabs/flux-3-max/text-to-video")
+  assert.equal(result.input.duration, "7")
+})
+
+runTest("MiniMax H3 Max rejects a start frame", () => {
+  assert.throws(
+    () =>
+      buildFalVideoRequest({
+        imageUrl: "https://example.com/start.png",
+        modelIdentifier: "minimax/h3-max",
+        prompt: "A fox looks at the camera",
+        referenceImageUrls: [],
+      }),
+    /text-to-video/,
   )
 })

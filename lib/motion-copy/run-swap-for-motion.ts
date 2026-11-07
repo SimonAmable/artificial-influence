@@ -13,7 +13,7 @@ import {
   appendCharacterSwapVisionHints,
   fetchCharacterSwapVisionHints,
 } from "@/lib/image/studio-tools"
-import { getStudioToolFalQualityParams } from "@/lib/image/studio-tools/moderation-fallback"
+import { getStudioToolFalQualityParams, isStudioImageFallbackModel } from "@/lib/image/studio-tools/moderation-fallback"
 import type { MotionCopyActiveSwapMode } from "@/lib/motion-copy/swap-mode"
 import type { ImageStudioToolDefinition } from "@/lib/image/studio-tools/types"
 
@@ -96,11 +96,7 @@ export async function runSwapForMotionCopy(input: {
   if (studioRequest.resolution) {
     formData.append("resolution", studioRequest.resolution)
   }
-  if (
-    studioRequest.model === "openai/gpt-image-2.5/flare" ||
-    studioRequest.model === "google/nano-banana-2-lite" ||
-    studioRequest.model === "bytedance/seedream-5-lite"
-  ) {
+  if (isStudioImageFallbackModel(studioRequest.model)) {
     for (const [key, value] of Object.entries(getStudioToolFalQualityParams(studioRequest.model))) {
       if (value == null || value === "") continue
       formData.append(key, String(value))

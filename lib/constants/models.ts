@@ -8,6 +8,7 @@ import type {
   Model,
   ParameterDefinition,
 } from '../types/models';
+import { LATEST_IMAGE_MODELS, LATEST_VIDEO_MODELS } from './latest-media-models';
 
 // ============================================================================
 // MODEL IDENTIFIERS
@@ -22,9 +23,15 @@ export const MODEL_IDENTIFIERS = {
   OPENAI_GPT_IMAGE_2: 'openai/gpt-image-2',
   OPENAI_GPT_IMAGE_25_FLARE: 'openai/gpt-image-2.5/flare',
   OPENAI_GPT_IMAGE_25_SUNBURST: 'openai/gpt-image-2.5/sunburst',
+  OPENAI_GPT_IMAGE_26_FLARE: 'openai/gpt-image-2.6/flare',
+  OPENAI_GPT_IMAGE_26_SUNBURST: 'openai/gpt-image-2.6/sunburst',
   BYTEDANCE_SEEDREAM_4_5: 'bytedance/seedream-4.5',
   BYTEDANCE_SEEDREAM_5_LITE: 'bytedance/seedream-5-lite',
   BYTEDANCE_SEEDREAM_5_PRO: 'bytedance/seedream-5-pro',
+  BYTEDANCE_SEEDREAM_5_FLASH: 'bytedance/seedream-5-flash',
+  FLUX_3: 'blackforestlabs/flux-3',
+  FLUX_3_KLEIN: 'blackforestlabs/flux-3/klein',
+  NANO_BANANA_2_1: 'google/nano-banana-2.1',
   PRUNAAI_Z_IMAGE_TURBO: 'prunaai/z-image-turbo',
   PRUNAAI_FLUX_KONTEXT_FAST: 'prunaai/flux-kontext-fast',
   XAI_GROK_IMAGINE: 'xai/grok-imagine-image',
@@ -58,19 +65,28 @@ export const MODEL_IDENTIFIERS = {
   PRUNAAI_P_VIDEO_2: 'prunaai/p-video-2',
   XAI_GROK_IMAGINE_VIDEO: 'xai/grok-imagine-video',
   XAI_GROK_IMAGINE_VIDEO_1_5: 'xai/grok-imagine-video-1.5',
+  KLING_V4: 'kling/v4',
+  KLING_V4_FLASH: 'kling/v4/flash',
+  WAN_30: 'alibaba/wan-3.0',
+  WAN_30_PRIME: 'alibaba/wan-3.0-prime',
+  FLUX_3_MAX: 'blackforestlabs/flux-3-max',
+  MINIMAX_H3_MAX: 'minimax/h3-max',
+  MINIMAX_H3_MAX_TURBO: 'minimax/h3-max-turbo',
 
   // Audio Models
   GOOGLE_GEMINI_3_1_FLASH_TTS: 'google/gemini-3.1-flash-tts',
 } as const;
 
 /** Default model for image generation (used when no model is specified). */
-export const DEFAULT_IMAGE_MODEL_IDENTIFIER = MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_25_FLARE;
+export const DEFAULT_IMAGE_MODEL_IDENTIFIER = MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_26_FLARE;
 
 export function isOpenAiGptImageFalIdentifier(identifier: string | null | undefined): boolean {
   return (
     identifier === MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_2 ||
     identifier === MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_25_FLARE ||
-    identifier === MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_25_SUNBURST
+    identifier === MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_25_SUNBURST ||
+    identifier === MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_26_FLARE ||
+    identifier === MODEL_IDENTIFIERS.OPENAI_GPT_IMAGE_26_SUNBURST
   );
 }
 /** Default model for motion copy generation. */
@@ -2079,14 +2095,14 @@ export const HAPPY_HORSE_VIDEO_MODEL: Model = {
 export const GEMINI_OMNI_FLASH_VIDEO_MODEL: Model = {
   id: 'model-gemini-omni-flash',
   identifier: MODEL_IDENTIFIERS.GOOGLE_GEMINI_OMNI_FLASH,
-  name: 'Gemini Omni Flash',
+  name: 'Gemini Omni Flash 1.2',
   description:
-    'Google Gemini Omni Flash on fal: create from text or images, or edit a video with synchronized audio.',
+    'Gemini Omni Flash 1.2 on fal: 3 to 15 second video with audio, from text, images, or an existing clip.',
   type: 'video',
   provider: 'fal',
   is_active: true,
-  model_cost: 10,
-  model_cost_per_second: 10,
+  model_cost: 6,
+  model_cost_per_second: 6,
   parameters: {
     parameters: [
       {
@@ -2116,8 +2132,18 @@ export const GEMINI_OMNI_FLASH_VIDEO_MODEL: Model = {
         required: false,
         default: 8,
         min: 3,
-        max: 10,
+        max: 15,
         ui_type: 'number',
+      },
+      {
+        name: 'resolution',
+        type: 'string',
+        label: 'Resolution',
+        description: 'Output resolution. Higher resolutions cost more.',
+        required: false,
+        default: '720p',
+        enum: ['360p', '720p', '1080p', '4k'],
+        ui_type: 'select',
       },
     ],
   },
@@ -2126,7 +2152,7 @@ export const GEMINI_OMNI_FLASH_VIDEO_MODEL: Model = {
   supports_reference_image: true,
   supports_reference_video: true,
   supports_first_frame: true,
-  duration_options: [3, 4, 5, 6, 7, 8, 9, 10],
+  duration_options: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -2679,6 +2705,7 @@ export const GOOGLE_GEMINI_3_1_FLASH_TTS_MODEL: Model = {
  * All available models organized by type
  */
 export const IMAGE_MODELS = [
+  ...LATEST_IMAGE_MODELS,
   GOOGLE_NANO_BANANA_MODEL,
   NANO_BANANA_PRO_MODEL,
   NANO_BANANA_2_LITE_MODEL,
@@ -2699,6 +2726,7 @@ export const IMAGE_MODELS = [
 ] as const;
 
 export const VIDEO_MODELS = [
+  ...LATEST_VIDEO_MODELS,
   KLING_V2_6_MODEL,
   KLING_V3_MOTION_MODEL,
   KLING_V2_6_PRO_MODEL,
@@ -2731,6 +2759,7 @@ export const ALL_MODELS = [
 
 // Fix identifiers in collections
 const IMAGE_MODELS_FIXED = [
+  ...LATEST_IMAGE_MODELS,
   GOOGLE_NANO_BANANA_MODEL,
   NANO_BANANA_PRO_MODEL,
   NANO_BANANA_2_LITE_MODEL,
@@ -2751,6 +2780,7 @@ const IMAGE_MODELS_FIXED = [
 ] as const;
 
 const VIDEO_MODELS_FIXED = [
+  ...LATEST_VIDEO_MODELS,
   KLING_V2_6_MODEL,
   KLING_V3_MOTION_MODEL,
   KLING_V2_6_PRO_MODEL,

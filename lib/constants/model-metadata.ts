@@ -5,6 +5,7 @@
  */
 
 import type { ModelType } from '../types/models';
+import { LATEST_IMAGE_MODELS_METADATA, LATEST_VIDEO_MODELS_METADATA } from './latest-media-models';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -970,9 +971,9 @@ export const HAPPY_HORSE_META: ModelMetadata = {
 export const GEMINI_OMNI_FLASH_META: ModelMetadata = {
   id: 'gemini-omni-flash-meta',
   identifier: 'google/gemini-omni-flash',
-  name: 'Gemini Omni Flash',
+  name: 'Gemini Omni Flash 1.2',
   description:
-    'Google Gemini Omni Flash on fal: create from text or images, or edit a video with synchronized audio.',
+    'Gemini Omni Flash 1.2 on fal: 3 to 15 second video with audio, from text, images, or an existing clip.',
   type: 'video',
   provider: 'fal',
   is_active: true,
@@ -992,7 +993,7 @@ export const GEMINI_OMNI_FLASH_META: ModelMetadata = {
     {
       name: 'duration',
       label: 'Duration',
-      options: ['3', '4', '5', '6', '7', '8', '9', '10'],
+      options: ['3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15'],
       default: '8',
       description: 'Video duration in seconds',
     },
@@ -1145,6 +1146,7 @@ export const GOOGLE_GEMINI_3_1_FLASH_TTS_META: ModelMetadata = {
  * All image models
  */
 export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
+  ...LATEST_IMAGE_MODELS_METADATA,
   GOOGLE_NANO_BANANA_META,
   NANO_BANANA_PRO_META,
   NANO_BANANA_2_META,
@@ -1171,6 +1173,7 @@ export const IMAGE_MODELS_METADATA: ModelMetadata[] = [
  * All video models
  */
 export const VIDEO_MODELS_METADATA: ModelMetadata[] = [
+  ...LATEST_VIDEO_MODELS_METADATA,
   KLING_V2_6_MOTION_META,
   KLING_V3_MOTION_META,
   FABRIC_1_0_META,
@@ -1243,7 +1246,7 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     P_VIDEO_2_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
-  fal: [GPT_IMAGE_25_FLARE_META, GPT_IMAGE_25_SUNBURST_META, WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, SEEDREAM_4_5_META, SEEDREAM_5_PRO_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META, MINIMAX_H3_META],
+  fal: [GPT_IMAGE_25_FLARE_META, GPT_IMAGE_25_SUNBURST_META, WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, SEEDREAM_4_5_META, SEEDREAM_5_PRO_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META, MINIMAX_H3_META, ...LATEST_IMAGE_MODELS_METADATA, ...LATEST_VIDEO_MODELS_METADATA],
   xai: [GROK_IMAGINE_META],
 };
 

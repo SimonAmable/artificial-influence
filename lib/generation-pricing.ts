@@ -259,8 +259,30 @@ function legacyResolveCreditsPerSecond(
     case 'alibaba/happy-horse':
     case 'alibaba/happy-horse/v1.1':
       return resolution === '720p' ? 6 : 12;
-    case 'google/gemini-omni-flash':
-      return 10;
+    case 'google/gemini-omni-flash': {
+      if (resolution === '360p') return 2;
+      if (resolution === '1080p') return 9;
+      if (resolution === '4k') return 17;
+      return 6;
+    }
+    case 'kling/v4':
+      return resolution === '720p' ? 13 : 19;
+    case 'kling/v4/flash':
+      return 8;
+    case 'alibaba/wan-3.0':
+    case 'alibaba/wan-3.0-prime':
+      if (resolution === '480p') return 4;
+      if (resolution === '720p') return 8;
+      return 12;
+    case 'blackforestlabs/flux-3-max':
+      if (resolution === '1080p') return 20;
+      if (resolution === '2k') return 28;
+      if (resolution === '4k') return 40;
+      return 14;
+    case 'minimax/h3-max':
+      return 7;
+    case 'minimax/h3-max-turbo':
+      return 4;
     case 'minimax/h3':
     case 'minimax/h3/text-to-video':
     case 'minimax/h3/image-to-video':

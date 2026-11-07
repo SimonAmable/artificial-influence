@@ -90,7 +90,7 @@ async function runImageGeneration(input: {
   const output = await execute(
     {
       prompt: input.prompt,
-      modelIdentifier: input.modelIdentifier ?? "openai/gpt-image-2.5/flare",
+      modelIdentifier: input.modelIdentifier ?? "openai/gpt-image-2.6/flare",
       aspectRatio: input.aspectRatio,
       variantCount: 1,
       referenceIds: referenceUrls,

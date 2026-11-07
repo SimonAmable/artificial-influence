@@ -1,5 +1,11 @@
 import { fal } from "@fal-ai/client"
 import {
+  buildCatalogFalVideoRequest,
+  isCatalogFalVideoModel,
+  type CatalogFalVideoEndpoint,
+  type CatalogFalVideoModelId,
+} from "@/lib/server/fal-video-catalog"
+import {
   buildFalKlingMotionControlElement,
   FAL_KLING_V3_PRO_MOTION_CONTROL,
   FAL_KLING_V3_STD_MOTION_CONTROL,
@@ -16,10 +22,10 @@ export const MINIMAX_H3_CANONICAL_ID = "minimax/h3" as const
 export const FAL_HAPPY_HORSE_T2V = "alibaba/happy-horse/v1.1/text-to-video" as const
 export const FAL_HAPPY_HORSE_I2V = "alibaba/happy-horse/v1.1/image-to-video" as const
 export const FAL_HAPPY_HORSE_REFERENCE = "alibaba/happy-horse/v1.1/reference-to-video" as const
-export const FAL_GEMINI_OMNI_FLASH_T2V = "google/gemini-omni-flash" as const
-export const FAL_GEMINI_OMNI_FLASH_I2V = "google/gemini-omni-flash/image-to-video" as const
-export const FAL_GEMINI_OMNI_FLASH_REFERENCE = "google/gemini-omni-flash/reference-to-video" as const
-export const FAL_GEMINI_OMNI_FLASH_EDIT = "google/gemini-omni-flash/edit" as const
+export const FAL_GEMINI_OMNI_FLASH_T2V = "google/gemini-omni-flash/v1.2/text-to-video" as const
+export const FAL_GEMINI_OMNI_FLASH_I2V = "google/gemini-omni-flash/v1.2/image-to-video" as const
+export const FAL_GEMINI_OMNI_FLASH_REFERENCE = "google/gemini-omni-flash/v1.2/reference-to-video" as const
+export const FAL_GEMINI_OMNI_FLASH_EDIT = "google/gemini-omni-flash/v1.2/edit" as const
 export const FAL_MINIMAX_H3_T2V = "minimax/h3/text-to-video" as const
 export const FAL_MINIMAX_H3_I2V = "minimax/h3/image-to-video" as const
 export const FAL_MINIMAX_H3_REFERENCE = "minimax/h3/reference-to-video" as const
@@ -36,6 +42,7 @@ export type SupportedFalVideoModelIdentifier =
   | typeof HAPPY_HORSE_CANONICAL_ID
   | typeof GEMINI_OMNI_FLASH_CANONICAL_ID
   | typeof MINIMAX_H3_CANONICAL_ID
+  | CatalogFalVideoModelId
 
 export type FalVideoEndpoint =
   | typeof FAL_HAPPY_HORSE_T2V
@@ -49,6 +56,7 @@ export type FalVideoEndpoint =
   | typeof FAL_MINIMAX_H3_I2V
   | typeof FAL_MINIMAX_H3_REFERENCE
   | typeof FAL_SEEDANCE_2_5_REFERENCE
+  | CatalogFalVideoEndpoint
 
 export type MinimaxH3Resolution = "480P" | "768P" | "2K" | "4K"
 
@@ -161,7 +169,17 @@ function normalizeDuration(value: FalVideoRequestOptions["duration"]): number {
 
 function normalizeGeminiOmniFlashDuration(value: FalVideoRequestOptions["duration"]): number {
   const numeric = normalizeDuration(value)
-  return Math.min(10, Math.max(3, numeric === 5 ? 8 : numeric))
+  return Math.min(15, Math.max(3, numeric === 5 ? 8 : numeric))
+}
+
+function normalizeGeminiOmniFlashResolution(
+  value: FalVideoRequestOptions["resolution"],
+): "360p" | "720p" | "1080p" | "4k" {
+  const raw = pickString(value)?.toLowerCase().replace(/\s+/g, "") ?? "720p"
+  if (raw === "360p" || raw === "360") return "360p"
+  if (raw === "1080p" || raw === "1080") return "1080p"
+  if (raw === "4k" || raw === "2160p" || raw === "2160") return "4k"
+  return "720p"
 }
 
 function normalizeMinimaxH3Duration(value: FalVideoRequestOptions["duration"]): number {
@@ -172,16 +190,11 @@ function normalizeMinimaxH3Duration(value: FalVideoRequestOptions["duration"]): 
 function normalizeMinimaxH3Resolution(
   value: FalVideoRequestOptions["resolution"],
 ): MinimaxH3Resolution {
-  const raw = pickString(value)?.toLowerCase().replace(/\s+/g, "") ?? "2k"
+  const raw = pickString(value)?.toLowerCase().replace(/\s+/g, "") ?? "768p"
   switch (raw) {
     case "480p":
     case "480":
       return "480P"
-    case "768p":
-    case "768":
-    case "720p":
-    case "720":
-      return "768P"
     case "4k":
     case "2160p":
     case "2160":
@@ -191,8 +204,12 @@ function normalizeMinimaxH3Resolution(
     case "1080":
     case "1440p":
       return "2K"
+    case "768p":
+    case "768":
+    case "720p":
+    case "720":
     default:
-      return "2K"
+      return "768P"
   }
 }
 
@@ -272,6 +289,9 @@ export function normalizeFalVideoModelIdentifier(
   }
   if (isMinimaxH3ModelIdentifier(modelIdentifier)) {
     return MINIMAX_H3_CANONICAL_ID
+  }
+  if (isCatalogFalVideoModel(modelIdentifier)) {
+    return modelIdentifier
   }
   return null
 }
@@ -369,11 +389,12 @@ function buildGeminiOmniFlashFalVideoRequest(
   const referenceImageUrls = options.referenceImageUrls
     .map((url) => pickString(url))
     .filter((url): url is string => Boolean(url))
-    .slice(0, 9)
+    .slice(0, 10)
 
   const baseInput: Record<string, unknown> = {
     aspect_ratio: normalizeGeminiOmniFlashAspectRatio(options.aspectRatio),
     duration: normalizeGeminiOmniFlashDuration(options.duration),
+    resolution: normalizeGeminiOmniFlashResolution(options.resolution),
   }
 
   if (videoUrl) {
@@ -437,12 +458,87 @@ function buildGeminiOmniFlashFalVideoRequest(
   }
 }
 
-function buildMinimaxH3FalVideoRequest(
+function requestedMinimaxH3Mode(
+  modelIdentifier: string,
+): "auto" | "text-to-video" | "image-to-video" | "reference-to-video" {
+  switch (modelIdentifier) {
+    case FAL_MINIMAX_H3_T2V:
+      return "text-to-video"
+    case FAL_MINIMAX_H3_I2V:
+      return "image-to-video"
+    case FAL_MINIMAX_H3_REFERENCE:
+      return "reference-to-video"
+    default:
+      return "auto"
+  }
+}
+
+function buildMinimaxH3TextToVideoRequest(
   options: FalVideoRequestOptions,
 ): {
   endpointId: FalVideoEndpoint
   input: Record<string, unknown>
-  mode: "text-to-video" | "image-to-video" | "reference-to-video"
+  mode: "text-to-video"
+} {
+  const prompt = pickString(options.prompt)
+  if (!prompt) {
+    throw new Error("MiniMax H3 text-to-video requires a prompt.")
+  }
+  return {
+    endpointId: FAL_MINIMAX_H3_T2V,
+    mode: "text-to-video",
+    input: {
+      duration: normalizeMinimaxH3Duration(options.duration),
+      resolution: normalizeMinimaxH3Resolution(options.resolution),
+      enable_prompt_expansion: pickBoolean(options.enablePromptExpansion, true),
+      enable_safety_checker: false,
+      prompt,
+      aspect_ratio: normalizeMinimaxH3AspectRatio(options.aspectRatio, false),
+    },
+  }
+}
+
+function buildMinimaxH3ImageToVideoRequest(
+  options: FalVideoRequestOptions,
+): {
+  endpointId: FalVideoEndpoint
+  input: Record<string, unknown>
+  mode: "image-to-video"
+} {
+  const prompt = pickString(options.prompt)
+  const startImageUrl = pickString(options.imageUrl)
+  const endImageUrl = pickString(options.endImageUrl)
+  const firstFrameUrl = startImageUrl ?? endImageUrl
+  if (!prompt) {
+    throw new Error("MiniMax H3 image-to-video requires a prompt.")
+  }
+  if (!firstFrameUrl) {
+    throw new Error("MiniMax H3 image-to-video requires a start frame.")
+  }
+  const input: Record<string, unknown> = {
+    duration: normalizeMinimaxH3Duration(options.duration),
+    resolution: normalizeMinimaxH3Resolution(options.resolution),
+    enable_prompt_expansion: pickBoolean(options.enablePromptExpansion, true),
+    enable_safety_checker: false,
+    prompt,
+    image_url: firstFrameUrl,
+  }
+  if (startImageUrl && endImageUrl && endImageUrl !== startImageUrl) {
+    input.end_image_url = endImageUrl
+  }
+  return {
+    endpointId: FAL_MINIMAX_H3_I2V,
+    mode: "image-to-video",
+    input,
+  }
+}
+
+function buildMinimaxH3ReferenceToVideoRequest(
+  options: FalVideoRequestOptions,
+): {
+  endpointId: FalVideoEndpoint
+  input: Record<string, unknown>
+  mode: "reference-to-video"
 } {
   const prompt = pickString(options.prompt)
   const startImageUrl = pickString(options.imageUrl)
@@ -475,88 +571,72 @@ function buildMinimaxH3FalVideoRequest(
     referenceImageUrls.pop()
   }
 
-  const hasReferenceInputs =
-    options.referenceImageUrls.some((url) => Boolean(pickString(url))) ||
-    referenceVideoUrls.length > 0 ||
-    referenceAudioUrls.length > 0
+  if (!prompt) {
+    throw new Error("MiniMax H3 reference-to-video requires a prompt.")
+  }
+  if (referenceAudioUrls.length > 0 && referenceImageUrls.length === 0 && referenceVideoUrls.length === 0) {
+    throw new Error("MiniMax H3 reference audio requires at least one reference image or video.")
+  }
+  if (referenceImageUrls.length === 0 && referenceVideoUrls.length === 0) {
+    throw new Error("MiniMax H3 reference-to-video requires at least one image or video reference.")
+  }
 
-  const baseInput: Record<string, unknown> = {
+  const input: Record<string, unknown> = {
     duration: normalizeMinimaxH3Duration(options.duration),
     resolution: normalizeMinimaxH3Resolution(options.resolution),
     enable_prompt_expansion: pickBoolean(options.enablePromptExpansion, true),
     enable_safety_checker: false,
+    prompt,
+    aspect_ratio: normalizeMinimaxH3AspectRatio(options.aspectRatio, true),
   }
-
-  if (hasReferenceInputs) {
-    if (!prompt) {
-      throw new Error("MiniMax H3 reference-to-video requires a prompt.")
-    }
-    if (referenceAudioUrls.length > 0 && referenceImageUrls.length === 0 && referenceVideoUrls.length === 0) {
-      throw new Error(
-        "MiniMax H3 reference audio requires at least one reference image or video.",
-      )
-    }
-    if (referenceImageUrls.length === 0 && referenceVideoUrls.length === 0) {
-      throw new Error("MiniMax H3 reference-to-video requires at least one image or video reference.")
-    }
-
-    const input: Record<string, unknown> = {
-      ...baseInput,
-      prompt,
-      aspect_ratio: normalizeMinimaxH3AspectRatio(options.aspectRatio, true),
-    }
-    if (referenceImageUrls.length > 0) {
-      input.reference_image_urls = referenceImageUrls
-    }
-    if (referenceVideoUrls.length > 0) {
-      input.reference_video_urls = referenceVideoUrls
-    }
-    if (referenceAudioUrls.length > 0) {
-      input.reference_audio_urls = referenceAudioUrls
-    }
-
-    return {
-      endpointId: FAL_MINIMAX_H3_REFERENCE,
-      mode: "reference-to-video",
-      input,
-    }
+  if (referenceImageUrls.length > 0) {
+    input.reference_image_urls = referenceImageUrls
   }
-
-  const firstFrameUrl = startImageUrl ?? endImageUrl
-  if (firstFrameUrl) {
-    if (!prompt) {
-      throw new Error("MiniMax H3 image-to-video requires a prompt.")
-    }
-
-    const input: Record<string, unknown> = {
-      ...baseInput,
-      prompt,
-      image_url: firstFrameUrl,
-    }
-    if (startImageUrl && endImageUrl && endImageUrl !== startImageUrl) {
-      input.end_image_url = endImageUrl
-    }
-
-    return {
-      endpointId: FAL_MINIMAX_H3_I2V,
-      mode: "image-to-video",
-      input,
-    }
+  if (referenceVideoUrls.length > 0) {
+    input.reference_video_urls = referenceVideoUrls
   }
-
-  if (!prompt) {
-    throw new Error("MiniMax H3 text-to-video requires a prompt.")
+  if (referenceAudioUrls.length > 0) {
+    input.reference_audio_urls = referenceAudioUrls
   }
 
   return {
-    endpointId: FAL_MINIMAX_H3_T2V,
-    mode: "text-to-video",
-    input: {
-      ...baseInput,
-      prompt,
-      aspect_ratio: normalizeMinimaxH3AspectRatio(options.aspectRatio, false),
-    },
+    endpointId: FAL_MINIMAX_H3_REFERENCE,
+    mode: "reference-to-video",
+    input,
   }
+}
+
+function buildMinimaxH3FalVideoRequest(
+  options: FalVideoRequestOptions,
+): {
+  endpointId: FalVideoEndpoint
+  input: Record<string, unknown>
+  mode: "text-to-video" | "image-to-video" | "reference-to-video"
+} {
+  const mode = requestedMinimaxH3Mode(options.modelIdentifier)
+  if (mode === "text-to-video") {
+    return buildMinimaxH3TextToVideoRequest(options)
+  }
+  if (mode === "image-to-video") {
+    return buildMinimaxH3ImageToVideoRequest(options)
+  }
+  if (mode === "reference-to-video") {
+    return buildMinimaxH3ReferenceToVideoRequest(options)
+  }
+
+  const hasReferenceInputs =
+    options.referenceImageUrls.some((url) => Boolean(pickString(url))) ||
+    Boolean(pickString(options.videoUrl)) ||
+    (options.referenceVideoUrls ?? []).some((url) => Boolean(pickString(url))) ||
+    (options.referenceAudioUrls ?? []).some((url) => Boolean(pickString(url)))
+
+  if (hasReferenceInputs) {
+    return buildMinimaxH3ReferenceToVideoRequest(options)
+  }
+  if (pickString(options.imageUrl) || pickString(options.endImageUrl)) {
+    return buildMinimaxH3ImageToVideoRequest(options)
+  }
+  return buildMinimaxH3TextToVideoRequest(options)
 }
 
 function convertSeedancePromptTagsForFal(prompt: string): string {
@@ -667,6 +747,10 @@ export function buildFalVideoRequest(options: FalVideoRequestOptions): {
   const normalizedModel = normalizeFalVideoModelIdentifier(options.modelIdentifier)
   if (!normalizedModel) {
     throw new Error(`Unsupported Fal video model: ${options.modelIdentifier}`)
+  }
+
+  if (isCatalogFalVideoModel(normalizedModel)) {
+    return buildCatalogFalVideoRequest({ ...options, modelIdentifier: normalizedModel })
   }
 
   switch (normalizedModel) {

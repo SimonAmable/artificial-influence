@@ -39,7 +39,9 @@ function pricingConfigForStudioTool(
   if (baseModelIdentifier === "openai/gpt-image-2") return GPT_IMAGE_2_PRICING_FALLBACK
   if (
     baseModelIdentifier === "openai/gpt-image-2.5/flare" ||
-    baseModelIdentifier === "openai/gpt-image-2.5/sunburst"
+    baseModelIdentifier === "openai/gpt-image-2.5/sunburst" ||
+    baseModelIdentifier === "openai/gpt-image-2.6/flare" ||
+    baseModelIdentifier === "openai/gpt-image-2.6/sunburst"
   ) {
     return GPT_IMAGE_25_PRICING_FALLBACK
   }
