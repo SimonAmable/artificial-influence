@@ -326,7 +326,7 @@ export const WAN_30_MODEL = videoModel(
   12,
   12,
   ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
-  { min: 3, max: 30, default: 5 },
+  { min: 2, max: 30, default: 5 },
   { options: ["480p", "720p", "1080p"], default: "1080p" },
   true,
 )
@@ -340,7 +340,7 @@ export const WAN_30_PRIME_MODEL = videoModel(
   12,
   12,
   ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
-  { min: 3, max: 30, default: 5 },
+  { min: 2, max: 30, default: 5 },
   { options: ["480p", "720p", "1080p"], default: "1080p" },
   true,
 )

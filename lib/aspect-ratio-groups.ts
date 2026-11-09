@@ -2,6 +2,7 @@ export type AspectRatioCategory = "auto" | "square" | "horizontal" | "vertical" 
 
 /** Common aspect ratios shown in the prompt UI (excludes niche phone/cinema sizes). */
 export const ESSENTIAL_ASPECT_RATIO_UI_ORDER = [
+  "adaptive",
   "match_input_image",
   "auto",
   "1:1",
@@ -24,7 +25,7 @@ const GROUP_ORDER: { category: AspectRatioCategory; label: string }[] = [
   { category: "other", label: "Other" },
 ]
 
-function isAutoAspectRatio(ratio: string): boolean {
+function isCollapsedAutoAspectRatio(ratio: string): boolean {
   return ratio === "auto" || ratio === "match_input_image"
 }
 
@@ -35,25 +36,31 @@ function essentialOrderIndex(ratio: string): number {
   return index === -1 ? Number.MAX_SAFE_INTEGER : index
 }
 
-/** Keep only common ratios the model supports, in a stable display order. */
+/** Model ratios in a stable display order. Common ratios come first; every other ratio the model supports is kept. */
 export function filterToEssentialAspectRatios(supportedRatios: string[]): string[] {
   const supported = new Set(supportedRatios)
   const filtered: string[] = []
-  let hasAutoOption = false
+  let hasCollapsedAuto = false
 
   for (const ratio of ESSENTIAL_ASPECT_RATIO_UI_ORDER) {
     if (!supported.has(ratio)) {
       continue
     }
 
-    if (isAutoAspectRatio(ratio)) {
-      if (hasAutoOption) {
+    if (isCollapsedAutoAspectRatio(ratio)) {
+      if (hasCollapsedAuto) {
         continue
       }
-      hasAutoOption = true
+      hasCollapsedAuto = true
     }
 
     filtered.push(ratio)
+  }
+
+  for (const ratio of supportedRatios) {
+    if (!filtered.includes(ratio)) {
+      filtered.push(ratio)
+    }
   }
 
   return filtered
@@ -79,7 +86,7 @@ export function resolveDisplayAspectRatio(
 }
 
 export function getAspectRatioCategory(ratio: string): AspectRatioCategory {
-  if (ratio === "auto" || ratio === "match_input_image") {
+  if (ratio === "auto" || ratio === "match_input_image" || ratio === "adaptive") {
     return "auto"
   }
 

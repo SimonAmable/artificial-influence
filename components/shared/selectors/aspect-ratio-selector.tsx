@@ -24,7 +24,7 @@ import {
 /** Filled frame preview for a ratio string (used in selects and toolbars). */
 export function AspectRatioIcon({ ratio }: { ratio: string }) {
   const getIconDimensions = () => {
-    if (ratio === "match_input_image" || ratio === "auto") {
+    if (ratio === "match_input_image" || ratio === "auto" || ratio === "adaptive") {
       return { width: 10, height: 10, dashed: true }
     }
 
@@ -69,6 +69,8 @@ export function formatAspectRatioLabel(ratio: string): string {
     case "match_input_image":
     case "auto":
       return "Auto"
+    case "adaptive":
+      return "Adaptive"
     default:
       return ratio
   }

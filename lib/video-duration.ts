@@ -172,7 +172,7 @@ export function resolvePredictedDurationSeconds(input: VideoDurationInput): numb
     case "alibaba/wan-3.0":
     case "alibaba/wan-3.0-prime":
       if (explicitDuration != null && explicitDuration > 0) {
-        return roundDuration(explicitDuration, 3, 30)
+        return roundDuration(explicitDuration, 2, 30)
       }
       return 5
     case "blackforestlabs/flux-3-max":
