@@ -372,7 +372,7 @@ runTest("Wan 3.0 routes prompt-only generations to text-to-video", () => {
   })
 
   assert.equal(result.endpointId, "alibaba/wan-3.0/text-to-video")
-  assert.equal(result.input.resolution, "1080p")
+  assert.equal(result.input.resolution, "720p")
   assert.equal(result.input.enable_safety_checker, false)
 })
 

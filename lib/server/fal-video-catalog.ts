@@ -139,7 +139,7 @@ export function buildCatalogFalVideoRequest(options: CatalogFalVideoRequestOptio
   if (id === WAN_30_CANONICAL_ID || id === WAN_30_PRIME_CANONICAL_ID) {
     const prime = id === WAN_30_PRIME_CANONICAL_ID
     const rawResolution = pickString(options.resolution)?.toLowerCase()
-    const resolution = rawResolution === "480p" || rawResolution === "720p" ? rawResolution : "1080p"
+    const resolution = rawResolution === "480p" || rawResolution === "1080p" ? rawResolution : "720p"
     const duration = clampDuration(options.duration, 2, 30, 5)
     const aspectRatio = pickAspect(
       options.aspectRatio,

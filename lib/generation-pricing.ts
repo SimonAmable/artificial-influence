@@ -272,8 +272,8 @@ function legacyResolveCreditsPerSecond(
     case 'alibaba/wan-3.0':
     case 'alibaba/wan-3.0-prime':
       if (resolution === '480p') return 4;
-      if (resolution === '720p') return 8;
-      return 12;
+      if (resolution === '1080p') return 12;
+      return 8;
     case 'blackforestlabs/flux-3-max':
       if (resolution === '1080p') return 20;
       if (resolution === '2k') return 28;

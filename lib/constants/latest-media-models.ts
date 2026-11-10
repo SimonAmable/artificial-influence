@@ -323,11 +323,11 @@ export const WAN_30_MODEL = videoModel(
   "alibaba/wan-3.0",
   "Wan 3.0",
   "Alibaba Wan 3.0 on Fal. Text, start and end frames, or up to 5 reference videos, up to 30 seconds with audio.",
-  12,
-  12,
+  8,
+  8,
   ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
   { min: 2, max: 30, default: 5 },
-  { options: ["480p", "720p", "1080p"], default: "1080p" },
+  { options: ["480p", "720p", "1080p"], default: "720p" },
   true,
 )
 WAN_30_MODEL.supports_reference_video = true
@@ -337,11 +337,11 @@ export const WAN_30_PRIME_MODEL = videoModel(
   "alibaba/wan-3.0-prime",
   "Wan 3.0 Prime",
   "Faster Wan 3.0 Prime on Fal for text, frames, or reference video, up to 30 seconds.",
-  12,
-  12,
+  8,
+  8,
   ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
   { min: 2, max: 30, default: 5 },
-  { options: ["480p", "720p", "1080p"], default: "1080p" },
+  { options: ["480p", "720p", "1080p"], default: "720p" },
   true,
 )
 WAN_30_PRIME_MODEL.supports_reference_video = true
