@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
-import { useModels } from "@/hooks/use-models"
+import { useEffectiveVideoModels } from "@/lib/video/genjutsu/use-effective-video-models"
+import { GENJUTSU_MAX_SOURCE_SECONDS, isGenjutsuModelIdentifier } from "@/lib/video/genjutsu/constants"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, ParameterDefinition, StringParameterDefinition } from "@/lib/types/models"
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
@@ -140,6 +141,8 @@ const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
   "seedance-2-mini": "bytedance/seedance-2.0-mini",
   "seedance-2.5": "bytedance/seedance-2.5",
   seedance: "bytedance/seedance-2.5",
+  genjutsu: "custom/genjutsu",
+  "unican-genjutsu": "custom/genjutsu",
   "wan-2.7": "wan-video/wan-2.7",
   "wan2.7": "wan-video/wan-2.7",
   "wan-27": "wan-video/wan-2.7",
@@ -170,7 +173,7 @@ function VideoPageContent() {
   
   const { layoutMode } = layoutModeContext
 
-  const { models: videoModels, isLoading: modelsLoading } = useModels("video")
+  const { models: videoModels, isLoading: modelsLoading } = useEffectiveVideoModels()
 
   // State management
   const [selectedModel, setSelectedModel] = React.useState<Model | null>(null)
@@ -842,6 +845,7 @@ function VideoPageContent() {
     const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(selectedModel.identifier)
     const isMinimaxH3 = isMinimaxH3ModelIdentifier(selectedModel.identifier)
     const isWan30 = isWan30ModelIdentifier(selectedModel.identifier)
+    const isGenjutsu = isGenjutsuModelIdentifier(selectedModel.identifier)
     const isFalMultimodalVideo = usesFalMultimodalVideoInputs(selectedModel.identifier)
     const isLipsync =
       selectedModel.identifier.includes('lipsync') ||
@@ -921,6 +925,28 @@ function VideoPageContent() {
           return
         }
       }
+    } else if (isGenjutsu) {
+      if (referenceImages.length === 0) {
+        setError("Add a character image")
+        return
+      }
+      if (!inputVideo?.url && !inputVideo?.file) {
+        setError("Add a video")
+        return
+      }
+      try {
+        const seconds = inputVideo.file
+          ? await getVideoDuration(inputVideo.file)
+          : await getVideoDurationSeconds(inputVideo.url!)
+        if (seconds > GENJUTSU_MAX_SOURCE_SECONDS) {
+          setError("Use a clip that is 15 seconds or shorter.")
+          return
+        }
+      } catch (err) {
+        console.error("Error validating Genjutsu video duration:", err)
+        setError("Could not read the video length.")
+        return
+      }
     } else if (isLipsync) {
       if (!inputImage?.file) {
         setError("Please upload an image or video")
@@ -970,7 +996,8 @@ function VideoPageContent() {
             !!inputVideo ||
             !!chipSlots.startImageChipUrl ||
             !!chipSlots.lastFrameChipUrl ||
-            !!chipSlots.referenceVideoChipUrl))
+            !!chipSlots.referenceVideoChipUrl)) ||
+        (isGenjutsu && referenceImages.length > 0 && !!inputVideo)
       if (!allowNoPrompt) {
         setError("Please enter a prompt")
         return
@@ -1004,6 +1031,7 @@ function VideoPageContent() {
       isGeminiOmniFlash,
       isMinimaxH3,
       isWan30,
+      isGenjutsu,
       isFalMultimodalVideo,
       falMultimodalReferenceMode,
       isLipsync,
@@ -1047,6 +1075,7 @@ function VideoPageContent() {
       const isGeminiOmniFlash = capture.isGeminiOmniFlash
       const isMinimaxH3 = capture.isMinimaxH3
       const isWan30 = capture.isWan30
+      const isGenjutsu = capture.isGenjutsu
       const isFalMultimodalVideo = capture.isFalMultimodalVideo
       const falMultimodalReferenceMode = capture.falMultimodalReferenceMode
       const isLipsync = capture.isLipsync
@@ -1080,6 +1109,8 @@ function VideoPageContent() {
       const sourceDurationSeconds =
         inputVideo?.file
           ? await getVideoDuration(inputVideo.file)
+          : isGenjutsu && inputVideo?.url
+            ? await getVideoDurationSeconds(inputVideo.url)
           : inputAudio?.file
             ? await getAudioDuration(inputAudio.file)
             : null
@@ -1153,7 +1184,7 @@ function VideoPageContent() {
       }
       
       // Handle other models with image uploads
-      else if (inputImage?.file && !(isFalMultimodalVideo && falMultimodalReferenceMode)) {
+      else if (inputImage?.file && !isGenjutsu && !(isFalMultimodalVideo && falMultimodalReferenceMode)) {
         const imageUpload = await uploadImageToSupabase(inputImage.file, user.id, 'video-gen-input-images')
         if (selectedModel.identifier === 'kwaivgi/kling-v2.6') {
           requestBody.start_image = imageUpload.url
@@ -1168,7 +1199,7 @@ function VideoPageContent() {
         }
       }
       // Handle pre-loaded images from URL (no file to upload)
-      else if (inputImage?.url && !(isFalMultimodalVideo && falMultimodalReferenceMode)) {
+      else if (inputImage?.url && !isGenjutsu && !(isFalMultimodalVideo && falMultimodalReferenceMode)) {
         const firstUrl =
           isWan27
             ? await resolveBlobOrDataImageUrlForReplicate(
@@ -1192,6 +1223,7 @@ function VideoPageContent() {
       }
 
       if (
+        !isGenjutsu &&
         !requestBody.start_image &&
         !requestBody.image &&
         !requestBody.first_frame_image &&
@@ -1300,14 +1332,14 @@ function VideoPageContent() {
         requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
       }
 
-      if (isWan30 && inputVideo?.file) {
+      if ((isWan30 || isGenjutsu) && inputVideo?.file) {
         const videoUpload = await uploadImageToSupabase(inputVideo.file, user.id, 'video-gen-reference-videos')
         requestBody.reference_videos = [videoUpload.url]
       }
-      if (!inputVideo?.file && isWan30 && inputVideo?.url) {
+      if (!inputVideo?.file && (isWan30 || isGenjutsu) && inputVideo?.url) {
         requestBody.reference_videos = [inputVideo.url]
       }
-      if (isWan30 && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
+      if ((isWan30 || isGenjutsu) && !requestBody.reference_videos && chipSlots.referenceVideoChipUrl) {
         requestBody.reference_videos = [chipSlots.referenceVideoChipUrl]
       }
 
@@ -1336,7 +1368,7 @@ function VideoPageContent() {
       }
 
       // Kling v3 Omni / Seedance 2.0: extra reference images
-      if ((isKlingV3Omni || isSeedance2 || isFalMultimodalVideo) && referenceImages.length > 0) {
+      if ((isGenjutsu || isKlingV3Omni || isSeedance2 || isFalMultimodalVideo) && referenceImages.length > 0) {
         const refUrls: string[] = []
         for (const ref of referenceImages) {
           if (ref.file) {
@@ -1368,7 +1400,16 @@ function VideoPageContent() {
         requestBody.video = chipSlots.referenceVideoChipUrl
       }
 
-      requestBody.tool = isLipsync ? 'lipsync' : 'video'
+      requestBody.tool = isGenjutsu ? 'genjutsu' : isLipsync ? 'lipsync' : 'video'
+      if (isGenjutsu) {
+        requestBody.aspect_ratio = 'adaptive'
+        requestBody.resolution = '720p'
+        requestBody.generate_audio = false
+        requestBody.enable_prompt_expansion = false
+        delete requestBody.image
+        delete requestBody.start_image
+        delete requestBody.first_frame_image
+      }
 
       console.log('Sending video generation request:', requestBody)
 

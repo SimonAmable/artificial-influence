@@ -42,6 +42,7 @@ import {
   getSeedanceMaxReferenceImages,
   usesFalMultimodalVideoInputs,
 } from "@/lib/constants/models"
+import { GENJUTSU_MAX_REFERENCE_IMAGES, isGenjutsuModelIdentifier } from "@/lib/video/genjutsu/constants"
 import { buildPromptWithRefs } from "@/lib/commands/build-prompt"
 import { brandRefsOnly, getImageAssetUrlsFromRefChips, getVideoAssetUrlsFromRefChips } from "@/lib/commands/ref-image-pipeline"
 import { allowedAssetTypesForVideoModel } from "@/lib/commands/allowed-asset-types"
@@ -284,7 +285,9 @@ export function VideoInputBox({
     selectedModel.identifier.includes('lipsync') ||
     selectedModel.identifier.includes('wav2lip') ||
     selectedModel.identifier === 'veed/fabric-1.0'
+  const isGenjutsu = isGenjutsuModelIdentifier(selectedModel.identifier)
   const isReferenceVideoSupported =
+    isGenjutsu ||
     selectedModel.supports_reference_video === true ||
     isGeminiOmniFlashModelIdentifier(selectedModel.identifier) ||
     selectedModel.identifier === 'xai/grok-imagine-video' ||
@@ -322,15 +325,17 @@ export function VideoInputBox({
   const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(selectedModel.identifier)
   const isMinimaxH3 = isMinimaxH3ModelIdentifier(selectedModel.identifier)
   const isKlingV3OrOmni = isKlingV3 || isKlingV3Omni
-  const usesRefImageGallery = isKlingV3Omni || isSeedance2 || isFalMultimodalVideo
+  const usesRefImageGallery = isGenjutsu || isKlingV3Omni || isSeedance2 || isFalMultimodalVideo
   const totalDuration = Number(parameters.duration) || 5
-  const maxReferenceImages = isSeedance2
-    ? getSeedanceMaxReferenceImages(selectedModel.identifier)
-    : isFalMultimodalVideo
-      ? 9
-      : inputVideo
-        ? 4
-        : 7
+  const maxReferenceImages = isGenjutsu
+    ? GENJUTSU_MAX_REFERENCE_IMAGES
+    : isSeedance2
+      ? getSeedanceMaxReferenceImages(selectedModel.identifier)
+      : isFalMultimodalVideo
+        ? 9
+        : inputVideo
+          ? 4
+          : 7
 
   // Determine if we need prompt
   const needsPrompt = !isMotionCopyModel && !isLipsyncModel
@@ -561,6 +566,9 @@ export function VideoInputBox({
   }
 
   const isReady = React.useMemo(() => {
+    if (isGenjutsu) {
+      return referenceImages.length > 0 && Boolean(inputVideo)
+    }
     if (isMotionCopyModel) {
       return !!(inputImage && inputVideo)
     }
@@ -609,6 +617,7 @@ export function VideoInputBox({
     }
     return mergedPromptForReady.length > 0 || hasRefChips
   }, [
+    isGenjutsu,
     isMotionCopyModel,
     isLipsyncModel,
     inputImage,
@@ -1037,7 +1046,9 @@ export function VideoInputBox({
     return "Reference Media"
   }, [canAcceptImageDrop, canDropReferenceVideo, draggedMediaKind, isMotionCopyModel, nextImageDropLabel])
 
-  const promptPlaceholderText = needsPrompt
+  const promptPlaceholderText = isGenjutsu
+    ? "Optional edit. Leave blank to copy the motion and keep their identity."
+    : needsPrompt
     ? (
       isPromptDragActive && canAcceptPromptDrop
         ? `Drop file to set ${promptDropLabel}...`
@@ -1069,7 +1080,7 @@ export function VideoInputBox({
   )
 
   const showMediaPlusMenu =
-    (modelSupportsImage || modelSupportsLastFrame || isReferenceVideoSupported) &&
+    (isGenjutsu || modelSupportsImage || modelSupportsLastFrame || isReferenceVideoSupported) &&
     !isMotionCopyModel &&
     !isLipsyncModel
 
@@ -1093,12 +1104,12 @@ export function VideoInputBox({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-52 p-1">
-                {isSeedance2 && modelSupportsImage ? (
+                {isSeedance2 && modelSupportsImage && !isGenjutsu ? (
                   <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     First & last frame
                   </DropdownMenuLabel>
                 ) : null}
-                {modelSupportsImage && (
+                {modelSupportsImage && !isGenjutsu && (
                   <VideoMediaMenuRow
                     variant={isSeedance2 ? "stacked" : "inline"}
                     onPickAsset={() => openAssetPicker("toolbar-input-image")}
@@ -1139,7 +1150,7 @@ export function VideoInputBox({
                     }
                   />
                 )}
-                {modelSupportsLastFrame && (
+                {modelSupportsLastFrame && !isGenjutsu && (
                   <VideoMediaMenuRow
                     variant={isSeedance2 ? "stacked" : "inline"}
                     onPickAsset={() => openAssetPicker("toolbar-last-frame")}
@@ -1186,7 +1197,7 @@ export function VideoInputBox({
                 ) : null}
                 {isReferenceVideoSupported && (
                   <VideoMediaMenuRow
-                    variant={isSeedance2 ? "stacked" : "inline"}
+                    variant={isGenjutsu || isSeedance2 ? "stacked" : "inline"}
                     onPickAsset={() => openAssetPicker("toolbar-reference-video")}
                     onUpload={() => videoRef.current?.click()}
                     uploadDisabled={
@@ -1200,12 +1211,14 @@ export function VideoInputBox({
                       seedanceReferenceVideoBlocked
                     }
                     label={
-                      isGeminiOmniFlash ? "Video to edit" : "Reference video"
+                      isGenjutsu ? "Video" : isGeminiOmniFlash ? "Video to edit" : "Reference video"
                     }
                     description={
-                      isSeedance2 ? (
+                      isGenjutsu || isSeedance2 ? (
                         <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
-                          {seedanceReferenceVideoBlocked
+                          {isGenjutsu
+                            ? "The motion to copy. 15 seconds or less."
+                            : seedanceReferenceVideoBlocked
                             ? "Remove the last frame before adding reference video."
                             : "Edit, extend, or borrow motion. Last frame is disabled in this mode."}
                         </span>
@@ -1227,11 +1240,19 @@ export function VideoInputBox({
                     uploadDisabled={!canAddReferenceImage}
                     assetPickDisabled={!canAddReferenceImage}
                     label={
-                      isSeedance2 || isFalMultimodalVideo ? "Reference images" : "Add reference image"
+                      isGenjutsu
+                        ? "Character"
+                        : isSeedance2 || isFalMultimodalVideo
+                          ? "Reference images"
+                          : "Add reference image"
                     }
                     leadingIcon={<FilePlus className="mr-2 size-4 shrink-0" />}
                     description={
-                      isSeedance2 ? (
+                      isGenjutsu ? (
+                        <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
+                          Face or reference sheet. Extra photos are the same person.
+                        </span>
+                      ) : isSeedance2 ? (
                         <span className="text-muted-foreground pl-6 text-[10px] leading-snug">
                           {seedanceFrameMode
                             ? "Remove first/last frame to add reference images."
@@ -1250,7 +1271,7 @@ export function VideoInputBox({
                     }
                   />
                 )}
-                {(isSeedance2 || isPrunaPVideo || isWan27 || isMinimaxH3) && (
+                {!isGenjutsu && (isSeedance2 || isPrunaPVideo || isWan27 || isMinimaxH3) && (
                   <VideoMediaMenuRow
                     variant="stacked"
                     onPickAsset={() => openAssetPicker("toolbar-reference-audio")}
@@ -1470,7 +1491,9 @@ export function VideoInputBox({
                 </button>
                 <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-medium border border-border">
                   {inputVideo?.url
-                    ? isMotionCopyModel
+                    ? isGenjutsu
+                      ? "Video"
+                      : isMotionCopyModel
                       ? "Background source"
                       : isGeminiOmniFlash
                         ? "Video to Edit"
@@ -1501,7 +1524,7 @@ export function VideoInputBox({
                       <X className="size-2.5" weight="bold" />
                     </button>
                     <div className="absolute bottom-0.5 left-0.5 bg-background/80 backdrop-blur-sm px-1 py-0.5 rounded text-[9px] font-medium border border-border">
-                      {isSeedance2 ? `[Image${index + 1}]` : `Ref ${index + 1}`}
+                      {isGenjutsu ? `Character ${index + 1}` : isSeedance2 ? `[Image${index + 1}]` : `Ref ${index + 1}`}
                     </div>
                   </div>
                 ) : null
@@ -1600,7 +1623,7 @@ export function VideoInputBox({
                   onPromptChange={onPromptChange}
                   negativePromptValue={negativePromptValue}
                   onNegativePromptChange={onNegativePromptChange}
-                  showNegativePrompt={modelSupportsNegativePrompt}
+                  showNegativePrompt={modelSupportsNegativePrompt && !isGenjutsu}
                   placeholder={promptPlaceholderText}
                   variant="page"
                   onPromptKeyDown={handleTextInputKeyDown}

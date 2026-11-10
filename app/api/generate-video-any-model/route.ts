@@ -28,6 +28,15 @@ import {
 } from '@/lib/constants/models';
 import { resolveVideoPricingQuote } from '@/lib/video-pricing';
 import {
+  GENJUTSU_BASE_MODEL,
+  GENJUTSU_UI_MODEL,
+  isGenjutsuModelIdentifier,
+} from '@/lib/video/genjutsu/constants';
+import { resolveGenjutsuDuration } from '@/lib/video/genjutsu/duration';
+import { buildGenjutsuPrompt } from '@/lib/video/genjutsu/prompt';
+import { buildGenjutsuFalRequest } from '@/lib/video/genjutsu/request';
+import { enhanceGenjutsuPrompt } from '@/lib/prompt-enhancement';
+import {
   getVideoReferenceAudioConfig,
   isSupportedVideoReferenceAudioUrl,
 } from '@/lib/utils/video-reference-audio';
@@ -145,8 +154,11 @@ export async function POST(request: NextRequest) {
 
     const normalizedModel =
       typeof model === 'string' ? normalizeMotionCopyModelIdentifier(model) ?? model : model;
-    const catalogModelIdentifier =
-      normalizeFalVideoModelIdentifier(normalizedModel) ?? normalizedModel;
+    const isGenjutsu = isGenjutsuModelIdentifier(normalizedModel);
+    const catalogModelIdentifier = isGenjutsu
+      ? GENJUTSU_BASE_MODEL
+      : normalizeFalVideoModelIdentifier(normalizedModel) ?? normalizedModel;
+    const storedModelIdentifier = isGenjutsu ? GENJUTSU_UI_MODEL : catalogModelIdentifier;
     const isMotionCopy = isMotionCopyModelIdentifier(normalizedModel);
     const motionCopyImage = image || body.imagePublicUrl;
     const motionCopyVideo = body.video || body.videoPublicUrl;
@@ -198,8 +210,41 @@ export async function POST(request: NextRequest) {
       isHappyHorse &&
       (typeof image === 'string' && image.length > 0 ||
         typeof first_frame_image === 'string' && first_frame_image.length > 0);
+    const genjutsuHasInputs = isGenjutsu && falMultimodalReferenceImages.length > 0 && Boolean(falReferenceVideo);
+    let genjutsuDuration: number | null = null;
+    if (isGenjutsu) {
+      if (!genjutsuHasInputs) {
+        return NextResponse.json(
+          { error: 'A character image and a source video are required for Genjutsu' },
+          { status: 400 },
+        );
+      }
+      try {
+        const rawDuration =
+          sourceDurationSeconds != null && Number.isFinite(sourceDurationSeconds)
+            ? sourceDurationSeconds
+            : typeof otherParams.duration === 'number'
+              ? otherParams.duration
+              : typeof otherParams.duration === 'string'
+                ? Number(otherParams.duration)
+                : Number.NaN;
+        genjutsuDuration = resolveGenjutsuDuration(rawDuration);
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : 'Invalid Genjutsu video' },
+          { status: 400 },
+        );
+      }
+      otherParams.duration = genjutsuDuration;
+      otherParams.aspect_ratio = 'adaptive';
+      otherParams.resolution = '720p';
+      otherParams.generate_audio = false;
+      otherParams.enable_prompt_expansion = false;
+    }
+
     const allowsPromptlessRequest =
       hasMotionCopyInputs ||
+      genjutsuHasInputs ||
       (isHappyHorse && hasHappyHorseStartImage && !hasFalMultimodalReferenceInputs);
 
     if (isMotionCopy && !hasMotionCopyInputs) {
@@ -352,7 +397,7 @@ export async function POST(request: NextRequest) {
             referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
           reference_videos_supabase_storage_path:
             referenceVideoStoragePaths.length > 0 ? referenceVideoStoragePaths : null,
-          model: catalogModelIdentifier,
+          model: storedModelIdentifier,
           type: 'video',
           is_public: true,
           tool: typeof body.tool === 'string' ? body.tool : null,
@@ -405,8 +450,21 @@ export async function POST(request: NextRequest) {
         body.videoPublicUrl,
       ]);
       let falRequest: ReturnType<typeof buildFalVideoRequest>
+      let generationPrompt = typeof prompt === 'string' ? prompt : null
       try {
-        falRequest = buildFalVideoRequest({
+        if (isGenjutsu) {
+          const edit = generationPrompt ?? ''
+          const draft = buildGenjutsuPrompt(falMultimodalReferenceImages.length, edit)
+          generationPrompt = edit.trim()
+            ? await enhanceGenjutsuPrompt(draft, edit)
+            : draft
+          falRequest = buildGenjutsuFalRequest({
+            durationSeconds: genjutsuDuration ?? 5,
+            prompt: generationPrompt,
+            referenceImageUrls: falMultimodalReferenceImages,
+            referenceVideoUrl: falReferenceVideo ?? '',
+          })
+        } else falRequest = buildFalVideoRequest({
         aspectRatio:
           typeof otherParams.aspect_ratio === 'string' ? otherParams.aspect_ratio : null,
         duration:
@@ -455,13 +513,13 @@ export async function POST(request: NextRequest) {
         .from('generations')
         .insert({
           user_id: user.id,
-          prompt: typeof prompt === 'string' ? prompt : null,
+          prompt: generationPrompt,
           supabase_storage_path: null,
           reference_images_supabase_storage_path:
             referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
           reference_videos_supabase_storage_path:
             referenceVideoStoragePaths.length > 0 ? referenceVideoStoragePaths : null,
-          model: catalogModelIdentifier,
+          model: storedModelIdentifier,
           type: 'video',
           is_public: true,
           tool: typeof body.tool === 'string' ? body.tool : null,

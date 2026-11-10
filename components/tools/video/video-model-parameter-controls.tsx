@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { buildVideoModelParameters } from "@/lib/utils/video-model-parameters"
 import type { Model, NumberParameterDefinition, ParameterDefinition } from "@/lib/types/models"
 import { isHappyHorseModelIdentifier, isPrunaVideoModelIdentifier, isSeedanceVideoModelIdentifier } from "@/lib/constants/models"
+import { isGenjutsuModelIdentifier } from "@/lib/video/genjutsu/constants"
 import { formatVideoPricingOptionLabel } from "@/lib/pricing-parameter-ui"
 import { ModelIcon } from "@/components/shared/icons/model-icon"
 import {
@@ -567,6 +568,7 @@ export function VideoModelParameterControls({
 
   const filteredParameters =
     selectedModel.parameters.parameters?.filter((param) => {
+      if (isGenjutsuModelIdentifier(selectedModel.identifier)) return false
       if (
         (selectedModel.identifier === "kwaivgi/kling-v3-video" ||
           selectedModel.identifier === "kwaivgi/kling-v3-omni-video") &&

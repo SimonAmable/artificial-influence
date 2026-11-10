@@ -169,6 +169,13 @@ export function resolvePredictedDurationSeconds(input: VideoDurationInput): numb
         return roundDuration(explicitDuration, 3, 20)
       }
       return 5
+    case "custom/genjutsu": {
+      const seconds = sourceDuration ?? explicitDuration
+      if (seconds != null && seconds > 0) {
+        return roundDuration(Math.min(seconds, 15), 2, 15)
+      }
+      return 5
+    }
     case "alibaba/wan-3.0":
     case "alibaba/wan-3.0-prime":
       if (explicitDuration != null && explicitDuration > 0) {

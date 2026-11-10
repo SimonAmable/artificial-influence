@@ -376,3 +376,35 @@ export async function enhanceScriptForTts({
     text: await enhanceScriptForInworldTts(script),
   }
 }
+
+const GENJUTSU_EDIT_SYSTEM = `You write the final prompt for a Wan 3.0 motion swap.
+
+Output contract:
+- Return ONLY the prompt that should be sent to the video model.
+- No title, markdown, or explanation.
+- Keep the citations Image 1 and Video 1. If the draft mentions Image 2 or later, keep those too.
+- The character images decide identity. The video decides motion.
+- Apply the user's edit as an override. If the edit changes clothing, stop saying clothing comes only from Video 1.
+- If the edit names who to replace, name that subject.
+- Keep the identity lock general. Do not add a list of makeup, tattoos, or freckles.`
+
+export async function enhanceGenjutsuPrompt(draft: string, edit: string): Promise<string> {
+  const trimmedEdit = edit.trim()
+  if (!trimmedEdit) return draft
+  if (!hasAIGatewayCredentials()) return draft
+
+  try {
+    const { text } = await generateText({
+      model: enhancementLanguageModel(),
+      system: GENJUTSU_EDIT_SYSTEM,
+      prompt: `Draft prompt:\n${draft}\n\nUser edit:\n${trimmedEdit}`,
+      temperature: 0.2,
+    })
+    const enhanced = cleanEnhancedPromptOutput(text)
+    if (!enhanced.includes("Image 1") || !enhanced.includes("Video 1")) return draft
+    return enhanced
+  } catch (error) {
+    console.error("[genjutsu] Prompt enhancement failed", error)
+    return draft
+  }
+}

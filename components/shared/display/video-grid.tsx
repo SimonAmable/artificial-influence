@@ -16,6 +16,7 @@ import {
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
+import { formatGenjutsuModelLabel } from "@/lib/video/genjutsu/constants"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -155,7 +156,7 @@ function VideoHistoryTile({
         />
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 to-transparent p-2 pr-14 pt-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-        <p className="truncate text-xs font-medium text-white">{item.model ?? ""}</p>
+        <p className="truncate text-xs font-medium text-white">{formatGenjutsuModelLabel(item.model) ?? ""}</p>
         <p className="text-xs text-white/70">
           {displayTime(item) ? new Date(displayTime(item)).toLocaleString() : ""}
         </p>
@@ -236,7 +237,7 @@ function GeneratingCell({ item }: { item: Extract<VideoGridItem, { type: "genera
       /> : null}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-zinc-800/30 via-transparent to-zinc-900/30" />
       <div className="absolute inset-x-2 bottom-2 z-10 text-left text-[10px] text-white/90 drop-shadow-md">
-        <p className="truncate font-semibold">{item.type === "failed" ? "Generation failed · Credit refunded" : item.model ?? "Generating..."}</p>
+        <p className="truncate font-semibold">{item.type === "failed" ? "Generation failed · Credit refunded" : formatGenjutsuModelLabel(item.model) ?? "Generating..."}</p>
         <p className="truncate text-white/60">{item.type === "failed" ? "Sorry for the issue. We refunded your credits so you can try again." : item.prompt ?? "Generating..."}</p>
       </div>
     </div>

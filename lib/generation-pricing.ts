@@ -226,7 +226,8 @@ function legacyResolveCreditsPerSecond(
   model: GenerationPricingModelInput,
   parameters: Record<string, unknown>,
 ): number | null {
-  const modelIdentifier = model.identifier;
+  const modelIdentifier =
+    model.identifier === "custom/genjutsu" ? "alibaba/wan-3.0" : model.identifier;
   const base = toFiniteNumber(model.model_cost_per_second);
   const generateAudioRaw = getParameterValue(parameters, 'generate_audio');
   const generateAudio = generateAudioRaw === undefined ? true : generateAudioRaw === true;
