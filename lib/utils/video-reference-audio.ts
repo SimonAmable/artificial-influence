@@ -34,6 +34,24 @@ const VIDEO_REFERENCE_AUDIO_CONFIGS: Record<string, VideoReferenceAudioConfig> =
     title: "Reference audio",
     validationMessage: "Use a supported audio file (.wav, .mp3, .m4a, or .aac).",
   },
+  "minimax/h3-highspeed": {
+    accept:
+      "audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac",
+    allowedExtensions: ["wav", "mp3", "m4a", "aac"],
+    description:
+      ".wav / .mp3 / .m4a / .aac (up to 3 clips). Needs an image or video reference.",
+    title: "Reference audio",
+    validationMessage: "Use a supported audio file (.wav, .mp3, .m4a, or .aac).",
+  },
+  "minimax/h3-lite": {
+    accept:
+      "audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac",
+    allowedExtensions: ["wav", "mp3", "m4a", "aac"],
+    description:
+      ".wav / .mp3 / .m4a / .aac (up to 3 clips). Needs an image or video reference.",
+    title: "Reference audio",
+    validationMessage: "Use a supported audio file (.wav, .mp3, .m4a, or .aac).",
+  },
   "minimax/h3": {
     accept:
       "audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/x-m4a,.wav,.mp3,.m4a,.aac",

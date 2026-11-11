@@ -198,6 +198,12 @@ export function resolvePredictedDurationSeconds(input: VideoDurationInput): numb
         return roundDuration(explicitDuration, 5, 15)
       }
       return 5
+    case "minimax/h3-highspeed":
+    case "minimax/h3-lite":
+      if (explicitDuration != null && explicitDuration > 0) {
+        return roundDuration(explicitDuration, 4, 15)
+      }
+      return 5
     default:
       if (explicitDuration != null && explicitDuration > 0) {
         return Math.max(1, Math.round(explicitDuration))

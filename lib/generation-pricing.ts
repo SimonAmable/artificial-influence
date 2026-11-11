@@ -280,6 +280,10 @@ function legacyResolveCreditsPerSecond(
       if (resolution === '2k') return 28;
       if (resolution === '4k') return 40;
       return 14;
+    case 'minimax/h3-highspeed':
+      return 5;
+    case 'minimax/h3-lite':
+      return resolution === '480p' ? 2 : 4;
     case 'minimax/h3-max':
       return 7;
     case 'minimax/h3-max-turbo':

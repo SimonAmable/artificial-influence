@@ -73,6 +73,8 @@ export const MODEL_IDENTIFIERS = {
   FLUX_3_MAX: 'blackforestlabs/flux-3-max',
   MINIMAX_H3_MAX: 'minimax/h3-max',
   MINIMAX_H3_MAX_TURBO: 'minimax/h3-max-turbo',
+  MINIMAX_H3_HIGHSPEED: 'minimax/h3-highspeed',
+  MINIMAX_H3_LITE: 'minimax/h3-lite',
 
   // Audio Models
   GOOGLE_GEMINI_3_1_FLASH_TTS: 'google/gemini-3.1-flash-tts',
@@ -115,6 +117,13 @@ export function isWan30ModelIdentifier(identifier: string | null | undefined): b
   return (
     identifier === MODEL_IDENTIFIERS.WAN_30 ||
     identifier === MODEL_IDENTIFIERS.WAN_30_PRIME
+  );
+}
+
+export function isMinimaxH3ReplicateVariant(identifier: string | null | undefined): boolean {
+  return (
+    identifier === MODEL_IDENTIFIERS.MINIMAX_H3_HIGHSPEED ||
+    identifier === MODEL_IDENTIFIERS.MINIMAX_H3_LITE
   );
 }
 
@@ -175,7 +184,8 @@ export function usesFalMultimodalVideoInputs(identifier: string | null | undefin
   return (
     isHappyHorseModelIdentifier(identifier) ||
     isGeminiOmniFlashModelIdentifier(identifier) ||
-    isMinimaxH3ModelIdentifier(identifier)
+    isMinimaxH3ModelIdentifier(identifier) ||
+    isMinimaxH3ReplicateVariant(identifier)
   );
 }
 
@@ -2253,6 +2263,124 @@ export const MINIMAX_H3_VIDEO_MODEL: Model = {
   updated_at: new Date().toISOString(),
 };
 
+const MINIMAX_H3_REPLICATE_VARIANT_FRAME_PARAMS: ParameterDefinition[] = [
+  {
+    name: 'first_frame_image',
+    type: 'string',
+    label: 'First Frame',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
+    name: 'last_frame_image',
+    type: 'string',
+    label: 'Last Frame',
+    required: false,
+    default: null,
+    ui_type: 'text',
+  },
+  {
+    name: 'duration',
+    type: 'number',
+    label: 'Duration',
+    description: '4 to 15 seconds.',
+    required: false,
+    default: 5,
+    enum: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    ui_type: 'select',
+  },
+  {
+    name: 'aspect_ratio',
+    type: 'string',
+    label: 'Aspect Ratio',
+    required: false,
+    default: '16:9',
+    enum: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+    ui_type: 'select',
+  },
+];
+
+const MINIMAX_H3_HIGHSPEED_PRICING_CONFIG = {
+  strategy: 'per_second' as const,
+  defaultCreditsPerSecond: 5,
+  tiers: [],
+};
+
+const MINIMAX_H3_LITE_PRICING_CONFIG = {
+  strategy: 'per_second' as const,
+  defaultCreditsPerSecond: 4,
+  tiers: [{ match: { resolution: '480P' }, creditsPerSecond: 2 }],
+};
+
+export const MINIMAX_H3_HIGHSPEED_VIDEO_MODEL: Model = {
+  id: 'model-minimax-h3-highspeed',
+  identifier: MODEL_IDENTIFIERS.MINIMAX_H3_HIGHSPEED,
+  name: 'MiniMax H3 Highspeed',
+  description:
+    'MiniMax H3 Highspeed on Replicate. 768P video from text, a start frame, or up to 9 images, 3 videos, and 3 audio clips.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 25,
+  model_cost_per_second: 5,
+  pricing_config: MINIMAX_H3_HIGHSPEED_PRICING_CONFIG,
+  parameters: {
+    parameters: MINIMAX_H3_REPLICATE_VARIANT_FRAME_PARAMS,
+  },
+  aspect_ratios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+  default_aspect_ratio: '16:9',
+  supports_reference_image: true,
+  supports_reference_video: true,
+  supports_reference_audio: true,
+  supports_first_frame: true,
+  supports_last_frame: true,
+  duration_options: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+  max_images: 9,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+export const MINIMAX_H3_LITE_VIDEO_MODEL: Model = {
+  id: 'model-minimax-h3-lite',
+  identifier: MODEL_IDENTIFIERS.MINIMAX_H3_LITE,
+  name: 'MiniMax H3 Lite',
+  description:
+    'MiniMax H3 Lite on Replicate. Draft video at 480P or 768P, with a start frame or image, video, and audio references.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 20,
+  model_cost_per_second: 4,
+  pricing_config: MINIMAX_H3_LITE_PRICING_CONFIG,
+  parameters: {
+    parameters: [
+      ...MINIMAX_H3_REPLICATE_VARIANT_FRAME_PARAMS,
+      {
+        name: 'resolution',
+        type: 'string',
+        label: 'Resolution',
+        required: false,
+        default: '768P',
+        enum: ['480P', '768P'],
+        ui_type: 'select',
+        affects_pricing: true,
+      },
+    ],
+  },
+  aspect_ratios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+  default_aspect_ratio: '16:9',
+  supports_reference_image: true,
+  supports_reference_video: true,
+  supports_reference_audio: true,
+  supports_first_frame: true,
+  supports_last_frame: true,
+  duration_options: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+  max_images: 9,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 export const MINIMAX_H3_REPLICATE_VIDEO_MODEL: Model = {
   id: 'model-minimax-h3-replicate',
   identifier: 'minimax/h3-replicate',
@@ -2749,6 +2877,8 @@ export const VIDEO_MODELS = [
   HAPPY_HORSE_VIDEO_MODEL,
   GEMINI_OMNI_FLASH_VIDEO_MODEL,
   MINIMAX_H3_VIDEO_MODEL,
+  MINIMAX_H3_HIGHSPEED_VIDEO_MODEL,
+  MINIMAX_H3_LITE_VIDEO_MODEL,
   MINIMAX_H3_REPLICATE_VIDEO_MODEL,
   P_VIDEO_MODEL,
   P_VIDEO_2_MODEL,
@@ -2803,6 +2933,8 @@ const VIDEO_MODELS_FIXED = [
   HAPPY_HORSE_VIDEO_MODEL,
   GEMINI_OMNI_FLASH_VIDEO_MODEL,
   MINIMAX_H3_VIDEO_MODEL,
+  MINIMAX_H3_HIGHSPEED_VIDEO_MODEL,
+  MINIMAX_H3_LITE_VIDEO_MODEL,
   MINIMAX_H3_REPLICATE_VIDEO_MODEL,
   P_VIDEO_MODEL,
   P_VIDEO_2_MODEL,

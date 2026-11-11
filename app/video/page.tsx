@@ -38,6 +38,7 @@ import {
   isHappyHorseModelIdentifier,
   isGeminiOmniFlashModelIdentifier,
   isMinimaxH3ModelIdentifier,
+  isMinimaxH3ReplicateVariant,
   isPrunaVideoModelIdentifier,
   isSeedanceVideoModelIdentifier,
   isWan30ModelIdentifier,
@@ -157,6 +158,12 @@ const VIDEO_MODEL_QUERY_ALIASES: Record<string, string> = {
   "minimax/h3/text-to-video": MODEL_IDENTIFIERS.MINIMAX_H3,
   "minimax/h3/image-to-video": MODEL_IDENTIFIERS.MINIMAX_H3,
   "minimax/h3/reference-to-video": MODEL_IDENTIFIERS.MINIMAX_H3,
+  "h3-highspeed": MODEL_IDENTIFIERS.MINIMAX_H3_HIGHSPEED,
+  "minimax-h3-highspeed": MODEL_IDENTIFIERS.MINIMAX_H3_HIGHSPEED,
+  "minimax/h3-highspeed": MODEL_IDENTIFIERS.MINIMAX_H3_HIGHSPEED,
+  "h3-lite": MODEL_IDENTIFIERS.MINIMAX_H3_LITE,
+  "minimax-h3-lite": MODEL_IDENTIFIERS.MINIMAX_H3_LITE,
+  "minimax/h3-lite": MODEL_IDENTIFIERS.MINIMAX_H3_LITE,
   "hailuo-03": MODEL_IDENTIFIERS.MINIMAX_H3,
   hailuo03: MODEL_IDENTIFIERS.MINIMAX_H3,
 }
@@ -843,7 +850,9 @@ function VideoPageContent() {
     const isWan27 = selectedModel.identifier === 'wan-video/wan-2.7'
     const isHappyHorse = isHappyHorseModelIdentifier(selectedModel.identifier)
     const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(selectedModel.identifier)
-    const isMinimaxH3 = isMinimaxH3ModelIdentifier(selectedModel.identifier)
+    const isMinimaxH3 =
+      isMinimaxH3ModelIdentifier(selectedModel.identifier) ||
+      isMinimaxH3ReplicateVariant(selectedModel.identifier)
     const isWan30 = isWan30ModelIdentifier(selectedModel.identifier)
     const isGenjutsu = isGenjutsuModelIdentifier(selectedModel.identifier)
     const isFalMultimodalVideo = usesFalMultimodalVideoInputs(selectedModel.identifier)

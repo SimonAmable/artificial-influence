@@ -18,6 +18,7 @@ import {
   shouldRouteMotionCopyToFal,
 } from '@/lib/motion-copy/face-lock';
 import { resolveWan27Replicate } from '@/lib/server/wan-2.7-replicate';
+import { buildMinimaxH3ReplicateInput } from '@/lib/server/minimax-h3-replicate';
 import { applyMinimalReplicateVideoModeration } from '@/lib/server/minimal-moderation';
 import {
   isHappyHorseModelIdentifier,
@@ -812,6 +813,17 @@ export async function POST(request: NextRequest) {
           typeof otherParams.save_audio === 'boolean' ? otherParams.save_audio : true;
         break;
 
+      case 'minimax/h3-highspeed':
+      case 'minimax/h3-lite':
+        replicateInput = buildMinimaxH3ReplicateInput(normalizedModel, {
+          prompt: effectivePrompt,
+          image,
+          first_frame_image,
+          last_frame,
+          otherParams: otherParams as Record<string, unknown>,
+        });
+        break;
+
       case 'wan-video/wan-2.7': {
         const audioRaw = typeof body.audio === 'string' ? body.audio : undefined;
         const resolved = resolveWan27Replicate(
@@ -853,12 +865,15 @@ export async function POST(request: NextRequest) {
       replicateInput.last_frame_image,
       replicateInput.end_image,
       replicateInput.reference_images,
+      replicateInput.reference_image_urls,
+      replicateInput.reference_audio_urls,
       replicateInput.audio,
     ]);
     const referenceVideoStoragePaths = collectStoragePaths([
       replicateInput.video,
       replicateInput.reference_video,
       replicateInput.reference_videos,
+      replicateInput.reference_video_urls,
     ]);
 
     const webhookBase = process.env.REPLICATE_WEBHOOK_BASE_URL?.replace(/\/$/, '');

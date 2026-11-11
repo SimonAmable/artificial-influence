@@ -39,6 +39,7 @@ import {
   isHappyHorseModelIdentifier,
   isGeminiOmniFlashModelIdentifier,
   isMinimaxH3ModelIdentifier,
+  isMinimaxH3ReplicateVariant,
   isMotionCopyModelIdentifier,
   isPrunaVideoModelIdentifier,
   isSeedanceVideoModelIdentifier,
@@ -795,7 +796,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
     const isPrunaPVideo = isPrunaVideoModelIdentifier(modelIdentifier)
     const isWan27 = modelIdentifier === "wan-video/wan-2.7"
     const isGeminiOmniFlash = isGeminiOmniFlashModelIdentifier(modelIdentifier)
-    const isMinimaxH3 = isMinimaxH3ModelIdentifier(modelIdentifier)
+    const isMinimaxH3 =
+      isMinimaxH3ModelIdentifier(modelIdentifier) ||
+      isMinimaxH3ReplicateVariant(modelIdentifier)
     const isFalMultimodalVideo = usesFalMultimodalVideoInputs(modelIdentifier)
 
     if (isMotionCopy && (!finalImageUrl || !finalVideoUrl)) {
@@ -1184,7 +1187,9 @@ export const VideoGenNodeComponent = React.memo(({ id, data, selected }: NodePro
   const isPrunaPVideoNode = isPrunaVideoModelIdentifier(selectedModel?.identifier)
   const isWan27Node = selectedModel?.identifier === "wan-video/wan-2.7"
   const isGeminiOmniFlashNode = isGeminiOmniFlashModelIdentifier(selectedModel?.identifier)
-  const isMinimaxH3Node = isMinimaxH3ModelIdentifier(selectedModel?.identifier)
+  const isMinimaxH3Node =
+    isMinimaxH3ModelIdentifier(selectedModel?.identifier) ||
+    isMinimaxH3ReplicateVariant(selectedModel?.identifier)
   const referenceAudioConfig = selectedModel
     ? getVideoReferenceAudioConfig(selectedModel.identifier)
     : null

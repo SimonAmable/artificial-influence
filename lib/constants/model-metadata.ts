@@ -1034,6 +1034,81 @@ export const MINIMAX_H3_META: ModelMetadata = {
   ],
 };
 
+export const MINIMAX_H3_HIGHSPEED_META: ModelMetadata = {
+  id: 'minimax-h3-highspeed-meta',
+  identifier: 'minimax/h3-highspeed',
+  name: 'MiniMax H3 Highspeed',
+  description:
+    'MiniMax H3 Highspeed on Replicate. 768P video from text, a start frame, or image, video, and audio references.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 25,
+  supports_reference_image: true,
+  supports_reference_video: true,
+  supports_reference_audio: true,
+  aspect_ratios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+  supports_first_frame: true,
+  supports_last_frame: true,
+  customParameters: [
+    {
+      name: 'aspect_ratio',
+      label: 'Aspect Ratio',
+      options: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+      default: '16:9',
+      description: 'Output ratio. Sent to Replicate as ratio.',
+    },
+    {
+      name: 'duration',
+      label: 'Duration',
+      options: ['4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15'],
+      default: '5',
+      description: 'Video duration in seconds',
+    },
+  ],
+};
+
+export const MINIMAX_H3_LITE_META: ModelMetadata = {
+  id: 'minimax-h3-lite-meta',
+  identifier: 'minimax/h3-lite',
+  name: 'MiniMax H3 Lite',
+  description:
+    'MiniMax H3 Lite on Replicate. Draft video at 480P or 768P, with frames or image, video, and audio references.',
+  type: 'video',
+  provider: 'replicate',
+  is_active: true,
+  model_cost: 20,
+  supports_reference_image: true,
+  supports_reference_video: true,
+  supports_reference_audio: true,
+  aspect_ratios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+  supports_first_frame: true,
+  supports_last_frame: true,
+  customParameters: [
+    {
+      name: 'resolution',
+      label: 'Resolution',
+      options: ['480P', '768P'],
+      default: '768P',
+      description: '480P is cheaper. 768P is the default.',
+    },
+    {
+      name: 'aspect_ratio',
+      label: 'Aspect Ratio',
+      options: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+      default: '16:9',
+      description: 'Output ratio. Sent to Replicate as ratio.',
+    },
+    {
+      name: 'duration',
+      label: 'Duration',
+      options: ['4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15'],
+      default: '5',
+      description: 'Video duration in seconds',
+    },
+  ],
+};
+
 export const P_VIDEO_META: ModelMetadata = {
   id: 'p-video-meta',
   identifier: 'prunaai/p-video',
@@ -1186,6 +1261,8 @@ export const VIDEO_MODELS_METADATA: ModelMetadata[] = [
   HAPPY_HORSE_META,
   GEMINI_OMNI_FLASH_META,
   MINIMAX_H3_META,
+  MINIMAX_H3_HIGHSPEED_META,
+  MINIMAX_H3_LITE_META,
   P_VIDEO_META,
   P_VIDEO_2_META,
 ];
@@ -1243,6 +1320,8 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     SEEDANCE_2_0_MINI_META,
     SEEDANCE_2_5_META,
     P_VIDEO_META,
+    MINIMAX_H3_HIGHSPEED_META,
+    MINIMAX_H3_LITE_META,
     P_VIDEO_2_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],

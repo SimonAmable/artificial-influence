@@ -1,5 +1,10 @@
 import type { Model } from "@/lib/types/models"
-import { isSeedanceVideoModelIdentifier, usesFalMultimodalVideoInputs } from "@/lib/constants/models"
+import {
+  isMinimaxH3ModelIdentifier,
+  isMinimaxH3ReplicateVariant,
+  isSeedanceVideoModelIdentifier,
+  usesFalMultimodalVideoInputs,
+} from "@/lib/constants/models"
 import type { AttachedRef } from "./types"
 
 function imageAssetRefs(refs: AttachedRef[]): AttachedRef[] {
@@ -24,6 +29,7 @@ export type VideoChipSlotOptions = {
  * Maps @ image/video library assets to model input slots (same URLs sent to the API as manual uploads).
  * - Kling Omni: first image @ = start frame when no manual start; remaining image @ = style reference_images; video @ = reference_video.
  * - Fal multimodal video (Happy Horse, Gemini Omni Flash): image @ chips are always reference images.
+ * - MiniMax H3 / Seedance: first @ image is the start frame unless a reference video is present; extra images become gallery refs only with a reference video.
  * - Other models: first image @ = input/start when supported; second image @ = last frame when supported; first video @ = reference video when supported.
  */
 export function getVideoChipSlotInfo(model: Model, attachedRefs: AttachedRef[], opts: VideoChipSlotOptions) {
@@ -32,8 +38,10 @@ export function getVideoChipSlotInfo(model: Model, attachedRefs: AttachedRef[], 
   const vids = videoAssetRefs(attachedRefs)
   const isOmni = id === "kwaivgi/kling-v3-omni-video"
   const isSeedance = isSeedanceVideoModelIdentifier(id)
-  const isFalMultimodalVideo = usesFalMultimodalVideoInputs(id)
-  const useOmniStyleChips = isOmni || (isSeedance && opts.hasReferenceVideo) || isFalMultimodalVideo
+  const isMinimaxH3 = isMinimaxH3ModelIdentifier(id) || isMinimaxH3ReplicateVariant(id)
+  const isFalMultimodalVideo = usesFalMultimodalVideoInputs(id) && !isMinimaxH3
+  const useOmniStyleChips =
+    isOmni || ((isSeedance || isMinimaxH3) && opts.hasReferenceVideo) || isFalMultimodalVideo
 
   const supportsInput =
     model.parameters?.parameters?.some((p) =>
