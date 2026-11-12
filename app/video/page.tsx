@@ -999,13 +999,6 @@ function VideoPageContent() {
         (isHappyHorse &&
           !falMultimodalReferenceMode &&
           (!!inputImage || !!chipSlots.startImageChipUrl)) ||
-        (isWan30 &&
-          (!!inputImage ||
-            !!lastFrameImage ||
-            !!inputVideo ||
-            !!chipSlots.startImageChipUrl ||
-            !!chipSlots.lastFrameChipUrl ||
-            !!chipSlots.referenceVideoChipUrl)) ||
         (isGenjutsu && referenceImages.length > 0 && !!inputVideo)
       if (!allowNoPrompt) {
         setError("Please enter a prompt")
