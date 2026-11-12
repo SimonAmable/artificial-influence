@@ -16,6 +16,11 @@ const QWEN_IMAGE_21_ASPECT_RATIOS = new Set([
   "3:1",
 ])
 
+export type QwenImage21WaveSpeedLora = {
+  path: string
+  scale: number
+}
+
 export type QwenImage21WaveSpeedRequestOptions = {
   prompt: string | null
   referenceImageUrls: string[]
@@ -23,6 +28,7 @@ export type QwenImage21WaveSpeedRequestOptions = {
   resolution: string | null
   outputFormat: string | null
   seed: number | string | null
+  loras?: QwenImage21WaveSpeedLora[] | null
 }
 
 function text(value: unknown): string | null {
@@ -62,6 +68,24 @@ function seed(value: unknown): number | null {
   return parsed
 }
 
+function loraScale(value: unknown): number {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN
+  if (!Number.isFinite(parsed)) return 1
+  return Math.min(4, Math.max(0, parsed))
+}
+
+function normalizeLoras(loras: QwenImage21WaveSpeedLora[] | null | undefined): QwenImage21WaveSpeedLora[] {
+  if (!loras?.length) return []
+  const out: QwenImage21WaveSpeedLora[] = []
+  for (const item of loras) {
+    const path = text(item.path)
+    if (!path) continue
+    out.push({ path, scale: loraScale(item.scale) })
+    if (out.length >= 3) break
+  }
+  return out
+}
+
 export function buildQwenImage21WaveSpeedRequest(options: QwenImage21WaveSpeedRequestOptions): {
   endpoint: string
   input: Record<string, unknown>
@@ -81,6 +105,8 @@ export function buildQwenImage21WaveSpeedRequest(options: QwenImage21WaveSpeedRe
   if (ratio) input.aspect_ratio = ratio
   const chosenSeed = seed(options.seed)
   if (chosenSeed != null) input.seed = chosenSeed
+  const loras = normalizeLoras(options.loras)
+  if (loras.length > 0) input.loras = loras
   if (images.length > 0) {
     input.images = images
     return {

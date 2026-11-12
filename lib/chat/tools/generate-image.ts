@@ -781,6 +781,7 @@ export function createGenerateImageTool({
           resolution: resolution ?? null,
           outputFormat: "png",
           seed: null,
+          loras: null,
         })
         const requestId = await submitWaveSpeedPrediction(waveSpeedRequest.endpoint, waveSpeedRequest.input)
         const { data: pendingGeneration, error: saveError } = await supabase

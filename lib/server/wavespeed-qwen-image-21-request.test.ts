@@ -31,4 +31,22 @@ assert.equal(edit.input.resolution, "1.5k")
 assert.equal(edit.input.seed, 4)
 assert.deepEqual(edit.input.images, ["https://example.com/a.png", "https://example.com/b.png"])
 
+const withLoras = buildQwenImage21WaveSpeedRequest({
+  prompt: "styled fox",
+  referenceImageUrls: [],
+  aspectRatio: "1:1",
+  resolution: "1k",
+  outputFormat: "png",
+  seed: null,
+  loras: [
+    { path: "https://example.com/a.safetensors", scale: 1.2 },
+    { path: "https://example.com/b.safetensors", scale: 0.5 },
+  ],
+})
+
+assert.deepEqual(withLoras.input.loras, [
+  { path: "https://example.com/a.safetensors", scale: 1.2 },
+  { path: "https://example.com/b.safetensors", scale: 0.5 },
+])
+
 console.log("qwen image 2.1 wavespeed request tests passed")

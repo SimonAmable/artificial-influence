@@ -29,6 +29,7 @@ import {
   submitFalImageQueue,
 } from '@/lib/server/fal-image';
 import { buildQwenImage21WaveSpeedRequest } from '@/lib/server/wavespeed-qwen-image-21-request';
+import { parseWaveSpeedLorasFormValue } from '@/lib/image/wavespeed-loras';
 import { submitWaveSpeedPrediction } from '@/lib/server/wavespeed-video';
 import { wavespeedStoredEndpoint } from '@/lib/server/wavespeed-wan30-request';
 import {
@@ -683,6 +684,7 @@ export async function POST(request: NextRequest) {
 
     if (modelProvider === 'wavespeed' && modelIdentifier === 'wavespeed-ai/qwen-image-2.1') {
       const rawFormat = (output_format || 'png').toLowerCase();
+      const waveSpeedLoras = parseWaveSpeedLorasFormValue(formData.get('wavespeed_loras'));
       const waveSpeedRequest = buildQwenImage21WaveSpeedRequest({
         prompt: finalPrompt,
         referenceImageUrls,
@@ -690,6 +692,7 @@ export async function POST(request: NextRequest) {
         resolution: resolution || size || null,
         outputFormat: rawFormat,
         seed: seed != null && !Number.isNaN(seed) ? seed : null,
+        loras: waveSpeedLoras,
       });
       const requestId = await submitWaveSpeedPrediction(waveSpeedRequest.endpoint, waveSpeedRequest.input);
       const { data: pendingGeneration, error: insertError } = await supabase

@@ -28,7 +28,10 @@ import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { useDefaultEnhancePrompt } from "@/hooks/use-default-enhance-prompt"
-import { DEFAULT_IMAGE_MODEL_IDENTIFIER } from "@/lib/constants/models"
+import { DEFAULT_IMAGE_MODEL_IDENTIFIER, MODEL_IDENTIFIERS } from "@/lib/constants/models"
+import { QwenLoraControl } from "@/components/tools/influencer/qwen-lora-control"
+import { useQwenImageLoras } from "@/hooks/use-qwen-image-loras"
+import { waveSpeedLoraSlotsToPayload } from "@/lib/image/wavespeed-loras"
 import { useRouter, useSearchParams } from "next/navigation"
 import { consumeImageGenerationIntent } from "@/lib/image/image-generation-intent"
 import { appendImageReferencesToFormData } from "@/lib/image/append-references-to-form-data"
@@ -271,6 +274,8 @@ function ImagePageContent() {
   const [selectedAspectRatio, setSelectedAspectRatio] = React.useState<string>("match_input_image")
   const [selectedNumImages, setSelectedNumImages] = React.useState<number>(1)
   const [selectedModelParameters, setSelectedModelParameters] = React.useState<ModelInputValues>({})
+  const { loras: qwenLoras, setLoras: setQwenLoras } = useQwenImageLoras()
+  const showQwenLoraControl = selectedModel === MODEL_IDENTIFIERS.QWEN_IMAGE_21
   const prevModelForAspectRef = React.useRef<string | null>(null)
   const selectedStudioTool = React.useMemo(
     () => getStudioToolByUiModel(selectedModel),
@@ -941,6 +946,10 @@ function ImagePageContent() {
         if (value == null || value === "") continue
         formData.append(key, String(value))
       }
+      const waveSpeedLoras = waveSpeedLoraSlotsToPayload(qwenLoras)
+      if (!studioToolPayload && capturedModel === MODEL_IDENTIFIERS.QWEN_IMAGE_21 && waveSpeedLoras.length > 0) {
+        formData.append("wavespeed_loras", JSON.stringify(waveSpeedLoras))
+      }
       if (
         (studioToolPayload?.model ?? capturedModel) &&
         FAL_IMAGE_MODELS_WITH_SAFETY_CHECKER_FORCED_OFF.has(studioToolPayload?.model ?? capturedModel)
@@ -1136,6 +1145,11 @@ function ImagePageContent() {
           modelParameters={selectedModelParameters}
           onModelParametersChange={setSelectedModelParameters}
           allowedAssetTypes={["image"]}
+          customControlsEnd={
+            showQwenLoraControl ? (
+              <QwenLoraControl loras={qwenLoras} onLorasChange={setQwenLoras} />
+            ) : undefined
+          }
         />
       )
     }
@@ -1172,6 +1186,9 @@ function ImagePageContent() {
     selectedModel,
     selectedModelParameters,
     selectedNumImages,
+    qwenLoras,
+    setQwenLoras,
+    showQwenLoraControl,
     selectedStudioTool,
     studioToolAdditionalInstructions,
     studioToolSceneImage,
