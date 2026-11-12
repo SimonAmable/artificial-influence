@@ -105,6 +105,19 @@ async function markFailed(generationId: string, predictionId: string, message: s
   await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
 }
 
+export async function fetchWaveSpeedPrediction(predictionId: string): Promise<{
+  status: string
+  outputs: unknown
+  error: string | null
+}> {
+  const task = await waveSpeedJson(`${WAVESPEED_API_BASE}/predictions/${predictionId}/result`)
+  return {
+    status: task.status ?? "",
+    outputs: task.outputs,
+    error: typeof task.error === "string" && task.error.trim() ? task.error.trim() : null,
+  }
+}
+
 export async function completeWaveSpeedPendingVideoAdmin(
   predictionId: string,
 ): Promise<{ status: "pending" | "completed" | "failed"; error?: string }> {

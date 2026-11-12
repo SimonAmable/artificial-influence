@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { completeFalPendingImageAdmin } from "@/lib/server/fal-image-completion"
 import { completeFalPendingVideoAdmin } from "@/lib/server/fal-video-completion"
+import { completeWaveSpeedPendingImageAdmin } from "@/lib/server/wavespeed-image-completion"
 import { completeWaveSpeedPendingVideoAdmin } from "@/lib/server/wavespeed-video"
 
 export const maxDuration = 300
@@ -55,12 +56,14 @@ export async function GET(request: Request) {
 
   for (const row of pendingRows ?? []) {
     const predictionId = row.replicate_prediction_id as string
-    const waveSpeed = row.type === "video" && String(row.fal_endpoint_id ?? "").startsWith("wavespeed:")
-    const result = waveSpeed
+    const waveSpeed = String(row.fal_endpoint_id ?? "").startsWith("wavespeed:")
+    const result = waveSpeed && row.type === "video"
       ? await completeWaveSpeedPendingVideoAdmin(predictionId)
-      : row.type === "video"
-        ? await completeFalPendingVideoAdmin(predictionId)
-        : await completeFalPendingImageAdmin(predictionId)
+      : waveSpeed
+        ? await completeWaveSpeedPendingImageAdmin(predictionId)
+        : row.type === "video"
+          ? await completeFalPendingVideoAdmin(predictionId)
+          : await completeFalPendingImageAdmin(predictionId)
 
     if (result.status === "completed") {
       completed += 1

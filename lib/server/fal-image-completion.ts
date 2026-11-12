@@ -81,6 +81,9 @@ export async function completeFalPendingImageAdmin(
   if (row.status !== "pending" || !row.fal_endpoint_id || !row.replicate_prediction_id) {
     return { status: row.status === "completed" ? "completed" : row.status === "failed" ? "failed" : "pending" }
   }
+  if (row.fal_endpoint_id.startsWith("wavespeed:")) {
+    return { status: "pending" }
+  }
 
   configureFal()
   const endpointId = row.fal_endpoint_id

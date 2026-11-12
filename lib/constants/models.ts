@@ -38,6 +38,7 @@ export const MODEL_IDENTIFIERS = {
   XAI_GROK_IMAGINE_IMAGE_2: 'xai/grok-imagine-image-2.0',
   XAI_GROK_IMAGINE_IMAGE_QUALITY: 'xai/grok-imagine-image-quality',
   QWEN_IMAGE_EDIT_PLUS_LORA: 'qwen/qwen-image-edit-plus-lora',
+  QWEN_IMAGE_21: 'wavespeed-ai/qwen-image-2.1',
   QWEN_IMAGE_3: 'alibaba/qwen-image-3',
   FAL_WAN_27_IMAGE: 'fal-ai/wan/v2.7',
   FAL_WAN_27_PRO_IMAGE: 'fal-ai/wan/v2.7/pro',

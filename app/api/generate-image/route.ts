@@ -28,6 +28,9 @@ import {
   isSupportedFalImageModel,
   submitFalImageQueue,
 } from '@/lib/server/fal-image';
+import { buildQwenImage21WaveSpeedRequest } from '@/lib/server/wavespeed-qwen-image-21-request';
+import { submitWaveSpeedPrediction } from '@/lib/server/wavespeed-video';
+import { wavespeedStoredEndpoint } from '@/lib/server/wavespeed-wan30-request';
 import {
   buildReplicateGptImage2Input,
   isReplicateGptImage2Model,
@@ -273,6 +276,14 @@ export async function POST(request: NextRequest) {
         console.error('[generate-image] FAL_KEY not set for Fal model');
         return NextResponse.json(
           { error: 'FAL_KEY environment variable is not set' },
+          { status: 500 },
+        );
+      }
+    } else if (modelProvider === 'wavespeed') {
+      if (!process.env.WAVESPEED_API_KEY) {
+        console.error('[generate-image] WAVESPEED_API_KEY not set');
+        return NextResponse.json(
+          { error: 'WAVESPEED_API_KEY environment variable is not set' },
           { status: 500 },
         );
       }
@@ -668,6 +679,65 @@ export async function POST(request: NextRequest) {
 
         throw studioError;
       }
+    }
+
+    if (modelProvider === 'wavespeed' && modelIdentifier === 'wavespeed-ai/qwen-image-2.1') {
+      const rawFormat = (output_format || 'png').toLowerCase();
+      const waveSpeedRequest = buildQwenImage21WaveSpeedRequest({
+        prompt: finalPrompt,
+        referenceImageUrls,
+        aspectRatio: aspectRatio || aspect_ratio || null,
+        resolution: resolution || size || null,
+        outputFormat: rawFormat,
+        seed: seed != null && !Number.isNaN(seed) ? seed : null,
+      });
+      const requestId = await submitWaveSpeedPrediction(waveSpeedRequest.endpoint, waveSpeedRequest.input);
+      const { data: pendingGeneration, error: insertError } = await supabase
+        .from('generations')
+        .insert({
+          user_id: user.id,
+          prompt: finalPrompt,
+          supabase_storage_path: null,
+          reference_images_supabase_storage_path:
+            referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+          aspect_ratio: waveSpeedRequest.resolvedAspectRatio,
+          model: modelIdentifier,
+          type: 'image',
+          is_public: true,
+          tool: tool || null,
+          status: 'pending',
+          replicate_prediction_id: requestId,
+          fal_request_id: requestId,
+          fal_endpoint_id: wavespeedStoredEndpoint(waveSpeedRequest.endpoint),
+          quoted_credits: requiredCredits,
+          pricing_snapshot: pricingSnapshot,
+          character_asset_id: characterAssetId,
+          ...studioBoardFieldsForIndex(studioBoardFields, 0),
+        })
+        .select('id')
+        .single();
+
+      if (insertError || !pendingGeneration) {
+        console.error('[generate-image] Failed to insert pending WaveSpeed generation:', insertError);
+        return NextResponse.json({ error: 'Failed to create pending generation' }, { status: 500 });
+      }
+
+      return NextResponse.json(
+        {
+          status: 'pending',
+          predictionId: requestId,
+          generationId: pendingGeneration.id,
+          message: 'Generation started. Poll GET /api/generate-image/status?predictionId=' + requestId,
+        },
+        { status: 202 },
+      );
+    }
+
+    if (modelProvider === 'wavespeed') {
+      return NextResponse.json(
+        { error: `Unsupported WaveSpeed image model: ${modelIdentifier}` },
+        { status: 400 },
+      );
     }
 
     if (modelProvider === 'fal' && isSupportedFalImageModel(modelIdentifier)) {

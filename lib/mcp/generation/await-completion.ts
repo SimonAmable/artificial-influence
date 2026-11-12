@@ -2,6 +2,7 @@ import "server-only"
 
 import { completeFalPendingImageAdmin } from "@/lib/server/fal-image-completion"
 import { completeFalPendingVideoAdmin } from "@/lib/server/fal-video-completion"
+import { completeWaveSpeedPendingImageAdmin } from "@/lib/server/wavespeed-image-completion"
 import { completeWaveSpeedPendingVideoAdmin } from "@/lib/server/wavespeed-video"
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled", "canceled", "error"])
@@ -38,6 +39,7 @@ export async function awaitGenerationSnapshot<T extends GenerationAwaitSnapshot>
         await completeWaveSpeedPendingVideoAdmin(snapshot.predictionId)
         await completeFalPendingVideoAdmin(snapshot.predictionId)
       } else if (snapshot.type === "image") {
+        await completeWaveSpeedPendingImageAdmin(snapshot.predictionId)
         await completeFalPendingImageAdmin(snapshot.predictionId)
       }
     }

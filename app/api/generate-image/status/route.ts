@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isContentModerationMessage } from '@/lib/generate-image-client';
+import { completeWaveSpeedPendingImageAdmin } from '@/lib/server/wavespeed-image-completion';
 
 function inferImageMimeType(storagePath: string) {
   const lower = storagePath.toLowerCase();
@@ -27,13 +28,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'predictionId or generationId is required' }, { status: 400 });
     }
 
-    const statusColumns = 'id, status, supabase_storage_path, error_message, created_at';
+    const statusColumns = 'id, status, supabase_storage_path, error_message, created_at, fal_endpoint_id, replicate_prediction_id';
     let generations: Array<{
       id: string
       status: string | null
       supabase_storage_path: string | null
       error_message: string | null
       created_at: string
+      fal_endpoint_id?: string | null
+      replicate_prediction_id?: string | null
     }> | null = null;
     let error: { message?: string } | null = null;
 
@@ -78,6 +81,35 @@ export async function GET(request: NextRequest) {
 
     if (!generations || generations.length === 0) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    const pendingWaveSpeed = generations.find(
+      (generation) =>
+        generation.status === 'pending' &&
+        generation.replicate_prediction_id &&
+        String(generation.fal_endpoint_id ?? '').startsWith('wavespeed:'),
+    );
+    if (pendingWaveSpeed?.replicate_prediction_id) {
+      await completeWaveSpeedPendingImageAdmin(pendingWaveSpeed.replicate_prediction_id);
+      if (generationId) {
+        const refreshed = await supabase
+          .from('generations')
+          .select(statusColumns)
+          .eq('id', generationId)
+          .eq('user_id', user.id)
+          .eq('type', 'image')
+          .maybeSingle();
+        if (refreshed.data) generations = [refreshed.data];
+      } else if (predictionId) {
+        const refreshed = await supabase
+          .from('generations')
+          .select(statusColumns)
+          .eq('replicate_prediction_id', predictionId)
+          .eq('user_id', user.id)
+          .eq('type', 'image')
+          .order('created_at', { ascending: true });
+        if (refreshed.data) generations = refreshed.data;
+      }
     }
 
     if (generationId) {

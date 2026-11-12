@@ -26,6 +26,9 @@ import {
   isSupportedFalImageModel,
   submitFalImageQueue,
 } from "@/lib/server/fal-image"
+import { buildQwenImage21WaveSpeedRequest } from "@/lib/server/wavespeed-qwen-image-21-request"
+import { submitWaveSpeedPrediction } from "@/lib/server/wavespeed-video"
+import { wavespeedStoredEndpoint } from "@/lib/server/wavespeed-wan30-request"
 import {
   buildReplicateGptImage2Input,
   isReplicateGptImage2Model,
@@ -761,6 +764,73 @@ export function createGenerateImageTool({
           variantCount: persisted.images.length,
           ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
         }
+      }
+
+      if (provider === "wavespeed" && modelIdentifier === "wavespeed-ai/qwen-image-2.1") {
+        const hasCredits = await checkUserHasCredits(userId, requiredCredits, supabase)
+        if (!hasCredits) {
+          throw new Error(`Insufficient credits. This generation requires ${requiredCredits} credits.`)
+        }
+        if (!process.env.WAVESPEED_API_KEY) {
+          throw new Error("WAVESPEED_API_KEY environment variable is not set.")
+        }
+        const waveSpeedRequest = buildQwenImage21WaveSpeedRequest({
+          prompt: finalPrompt,
+          referenceImageUrls,
+          aspectRatio: aspectRatio ?? null,
+          resolution: resolution ?? null,
+          outputFormat: "png",
+          seed: null,
+        })
+        const requestId = await submitWaveSpeedPrediction(waveSpeedRequest.endpoint, waveSpeedRequest.input)
+        const { data: pendingGeneration, error: saveError } = await supabase
+          .from("generations")
+          .insert({
+            user_id: userId,
+            prompt: finalPrompt,
+            supabase_storage_path: null,
+            reference_images_supabase_storage_path:
+              referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+            aspect_ratio: waveSpeedRequest.resolvedAspectRatio,
+            model: modelIdentifier,
+            type: "image",
+            is_public: true,
+            tool: "chat-generate-image",
+            status: "pending",
+            replicate_prediction_id: requestId,
+            fal_request_id: requestId,
+            fal_endpoint_id: wavespeedStoredEndpoint(waveSpeedRequest.endpoint),
+            quoted_credits: requiredCredits,
+            pricing_snapshot: pricingSnapshot,
+            character_asset_id: characterAssetId,
+            ...(threadId ? { chat_thread_id: threadId } : {}),
+            ...studioBoardFieldsForIndex(studioBoardFields, 0),
+          })
+          .select("id")
+          .single()
+
+        if (saveError || !pendingGeneration) {
+          console.error("[chat/generate-image] Failed to save WaveSpeed pending generation:", saveError)
+          throw new Error("Failed to create pending image generation.")
+        }
+
+        return {
+          aspectRatio: waveSpeedRequest.resolvedAspectRatio,
+          generationId: pendingGeneration.id,
+          model: modelIdentifier,
+          nextStepHint:
+            "Only call awaitGeneration when a later tool in this same turn needs the finished image (for example image -> video or image -> draft). Otherwise reply to the user and stop.",
+          predictionId: requestId,
+          status: "pending" as const,
+          usedReferenceCount: referenceImageUrls.length,
+          referenceImageUrls,
+          variantCount: effectiveVariantCount,
+          ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
+        }
+      }
+
+      if (provider === "wavespeed") {
+        throw new Error(`Unsupported WaveSpeed image model: ${modelIdentifier}`)
       }
 
       if (provider === "fal" && isSupportedFalImageModel(modelIdentifier)) {

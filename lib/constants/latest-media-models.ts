@@ -252,6 +252,40 @@ export const FLUX_3_KLEIN_MODEL = imageModel(
   FLUX_3_MODEL.parameters.parameters,
 )
 
+export const QWEN_IMAGE_21_MODEL: Model = {
+  ...imageModel(
+    "model-qwen-image-2-1",
+    "wavespeed-ai/qwen-image-2.1",
+    "Qwen Image 2.1",
+    "Qwen Image 2.1 on WaveSpeed. Text-to-image, or an edit from up to 10 reference images.",
+    4,
+    ["auto", "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21"],
+    [
+      {
+        name: "resolution",
+        type: "string",
+        label: "Resolution",
+        required: false,
+        default: "1k",
+        enum: ["1k", "1.5k", "2k"],
+        ui_type: "select",
+      },
+      {
+        name: "output_format",
+        type: "string",
+        label: "Output Format",
+        required: false,
+        default: "png",
+        enum: ["png", "jpeg", "webp"],
+        ui_type: "select",
+      },
+    ],
+  ),
+  provider: "wavespeed",
+  default_aspect_ratio: "auto",
+  max_images: 1,
+}
+
 export const QWEN_IMAGE_3_MODEL = imageModel(
   "model-qwen-image-3",
   "alibaba/qwen-image-3",
@@ -404,6 +438,7 @@ export const LATEST_IMAGE_MODELS = [
   FLUX_3_MODEL,
   FLUX_3_KLEIN_MODEL,
   SEEDREAM_5_FLASH_MODEL,
+  QWEN_IMAGE_21_MODEL,
   QWEN_IMAGE_3_MODEL,
 ] as const
 
@@ -427,7 +462,7 @@ function imageMeta(
     name: model.name,
     description: model.description ?? "",
     type: "image",
-    provider: "fal",
+    provider: model.provider ?? "fal",
     is_active: true,
     model_cost: model.model_cost,
     supports_reference_image: true,
@@ -461,6 +496,7 @@ export const LATEST_IMAGE_MODELS_METADATA: LatestModelMetadata[] = [
   imageMeta(FLUX_3_MODEL, FLUX_RATIOS),
   imageMeta(FLUX_3_KLEIN_MODEL, FLUX_RATIOS),
   imageMeta(SEEDREAM_5_FLASH_MODEL, ["match_input_image", "1:1", "16:9", "9:16", "4:3", "3:4"]),
+  imageMeta(QWEN_IMAGE_21_MODEL, ["auto", "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21"]),
   imageMeta(QWEN_IMAGE_3_MODEL, ["match_input_image", "1:1", "16:9", "9:16", "4:3", "3:4"]),
 ]
 

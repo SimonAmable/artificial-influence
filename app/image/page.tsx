@@ -192,6 +192,8 @@ const IMAGE_MODEL_QUERY_ALIASES: Record<string, string> = {
   "wan-pro": "fal-ai/wan/v2.7/pro",
   "wan-2.7-pro": "fal-ai/wan/v2.7/pro",
   "wan-2.7-pro-image": "fal-ai/wan/v2.7/pro",
+  "qwen-image-2.1": "wavespeed-ai/qwen-image-2.1",
+  "qwen-image-2-1": "wavespeed-ai/qwen-image-2.1",
   "qwen-image-3": "alibaba/qwen-image-3",
   "qwen-edit": "qwen/qwen-image-edit-plus-lora",
   "qwen-image-edit-plus": "qwen/qwen-image-edit-plus-lora",
