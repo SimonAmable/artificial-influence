@@ -23,6 +23,7 @@ import {
   submitWaveSpeedPrediction,
   wavespeedStoredEndpoint,
 } from '@/lib/server/wavespeed-video';
+import { buildH3HighspeedWaveSpeedRequest } from '@/lib/server/wavespeed-h3-highspeed-request';
 import { buildMinimaxH3ReplicateInput } from '@/lib/server/minimax-h3-replicate';
 import { applyMinimalReplicateVideoModeration } from '@/lib/server/minimal-moderation';
 import {
@@ -558,10 +559,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (modelProvider === 'wavespeed' && catalogModelIdentifier === 'alibaba/wan-3.0') {
-      let waveSpeedRequest: ReturnType<typeof buildWan30WaveSpeedRequest>
+    if (
+      modelProvider === 'wavespeed' &&
+      (catalogModelIdentifier === 'alibaba/wan-3.0' ||
+        catalogModelIdentifier === 'minimax/h3-highspeed')
+    ) {
+      let waveSpeedRequest: { endpoint: string; input: Record<string, unknown> }
       try {
-        waveSpeedRequest = buildWan30WaveSpeedRequest({
+        waveSpeedRequest = catalogModelIdentifier === 'minimax/h3-highspeed'
+          ? buildH3HighspeedWaveSpeedRequest({
+              aspectRatio:
+                typeof otherParams.aspect_ratio === 'string' ? otherParams.aspect_ratio : null,
+              duration:
+                typeof otherParams.duration === 'number' || typeof otherParams.duration === 'string'
+                  ? otherParams.duration
+                  : null,
+              endImageUrl: falEndImageUrl,
+              imageUrl:
+                typeof image === 'string'
+                  ? image
+                  : typeof first_frame_image === 'string'
+                    ? first_frame_image
+                    : null,
+              prompt: typeof prompt === 'string' ? prompt : null,
+              referenceAudioUrls: falReferenceAudios,
+              referenceImageUrls: falMultimodalReferenceImages,
+              referenceVideoUrls: falReferenceVideos,
+              videoUrl: falReferenceVideo,
+            })
+          : buildWan30WaveSpeedRequest({
           aspectRatio:
             typeof otherParams.aspect_ratio === 'string' ? otherParams.aspect_ratio : null,
           duration:

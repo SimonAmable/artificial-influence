@@ -2318,9 +2318,9 @@ export const MINIMAX_H3_HIGHSPEED_VIDEO_MODEL: Model = {
   identifier: MODEL_IDENTIFIERS.MINIMAX_H3_HIGHSPEED,
   name: 'MiniMax H3 Highspeed',
   description:
-    'MiniMax H3 Highspeed on Replicate. 768P video from text, a start frame, or up to 9 images, 3 videos, and 3 audio clips.',
+    'MiniMax H3 Highspeed on WaveSpeed. 768P video from text, a start frame, or up to 9 images, 3 videos, and 3 audio clips.',
   type: 'video',
-  provider: 'replicate',
+  provider: 'wavespeed',
   is_active: true,
   model_cost: 25,
   model_cost_per_second: 5,

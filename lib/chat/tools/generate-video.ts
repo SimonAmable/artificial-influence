@@ -9,6 +9,7 @@ import {
   submitWaveSpeedPrediction,
   wavespeedStoredEndpoint,
 } from "@/lib/server/wavespeed-video"
+import { buildH3HighspeedWaveSpeedRequest } from "@/lib/server/wavespeed-h3-highspeed-request"
 import { applyMinimalReplicateVideoModeration } from "@/lib/server/minimal-moderation"
 import { checkUserHasCredits } from "@/lib/credits"
 import { validateExternalReferenceUrl } from "@/lib/server/external-reference-url"
@@ -553,14 +554,31 @@ export function createGenerateVideoTool({
         .map((item) => item.storagePath)
         .filter((value): value is string => Boolean(value))
 
-      if (modelData.provider === "wavespeed" && resolvedModel === "alibaba/wan-3.0") {
+      if (
+        modelData.provider === "wavespeed" &&
+        (resolvedModel === "alibaba/wan-3.0" || resolvedModel === "minimax/h3-highspeed")
+      ) {
         const allImageUrls = uploadedImages
           .map((item) => item.url)
           .filter((url): url is string => typeof url === "string" && url.length > 0)
         const allVideoUrls = uploadedVideos
           .map((item) => item.url)
           .filter((url): url is string => typeof url === "string" && url.length > 0)
-        const waveSpeedRequest = buildWan30WaveSpeedRequest({
+        const waveSpeedInput = {
+          aspectRatio: aspectRatio ?? null,
+          duration: duration ?? null,
+          endImageUrl: allImageUrls.length === 2 && allVideoUrls.length === 0 ? allImageUrls[1] : null,
+          imageUrl: allImageUrls[0] ?? null,
+          prompt: normalizedPrompt,
+          referenceAudioUrls,
+          referenceImageUrls: allImageUrls.slice(allImageUrls.length === 2 && allVideoUrls.length === 0 ? 2 : 1),
+          referenceVideoUrls: allVideoUrls,
+          videoUrl: null,
+        }
+        const waveSpeedRequest = resolvedModel === "minimax/h3-highspeed"
+          ? buildH3HighspeedWaveSpeedRequest(waveSpeedInput)
+          : buildWan30WaveSpeedRequest({
+          ...waveSpeedInput,
           aspectRatio: aspectRatio ?? null,
           duration: duration ?? null,
           enablePromptExpansion: null,
@@ -573,7 +591,6 @@ export function createGenerateVideoTool({
           referenceVideoUrls: allVideoUrls,
           resolution: resolution ?? null,
           seed: null,
-          videoUrl: null,
         })
         const requestId = await submitWaveSpeedPrediction(waveSpeedRequest.endpoint, waveSpeedRequest.input)
         const { data: pendingGeneration, error: saveError } = await supabase

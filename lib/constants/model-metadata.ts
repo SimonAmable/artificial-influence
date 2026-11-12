@@ -1039,9 +1039,9 @@ export const MINIMAX_H3_HIGHSPEED_META: ModelMetadata = {
   identifier: 'minimax/h3-highspeed',
   name: 'MiniMax H3 Highspeed',
   description:
-    'MiniMax H3 Highspeed on Replicate. 768P video from text, a start frame, or image, video, and audio references.',
+    'MiniMax H3 Highspeed on WaveSpeed. 768P video from text, a start frame, or image, video, and audio references.',
   type: 'video',
-  provider: 'replicate',
+  provider: 'wavespeed',
   is_active: true,
   model_cost: 25,
   supports_reference_image: true,
@@ -1320,13 +1320,13 @@ export const MODELS_BY_PROVIDER: Record<string, ModelMetadata[]> = {
     SEEDANCE_2_0_MINI_META,
     SEEDANCE_2_5_META,
     P_VIDEO_META,
-    MINIMAX_H3_HIGHSPEED_META,
     MINIMAX_H3_LITE_META,
     P_VIDEO_2_META,
     GOOGLE_GEMINI_3_1_FLASH_TTS_META,
   ],
   fal: [GPT_IMAGE_25_FLARE_META, GPT_IMAGE_25_SUNBURST_META, WAN_27_IMAGE_META, WAN_27_PRO_IMAGE_META, NANO_BANANA_2_LITE_META, SEEDREAM_4_5_META, SEEDREAM_5_PRO_META, HAPPY_HORSE_META, GEMINI_OMNI_FLASH_META, MINIMAX_H3_META, ...LATEST_IMAGE_MODELS_METADATA, ...LATEST_VIDEO_MODELS_METADATA],
   xai: [GROK_IMAGINE_META],
+  wavespeed: [MINIMAX_H3_HIGHSPEED_META],
 };
 
 // ============================================================================
