@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { completeWaveSpeedPendingVideoAdmin } from "@/lib/server/wavespeed-video"
 
 function inferVideoMimeType(storagePath: string) {
   const lower = storagePath.toLowerCase()
@@ -26,12 +27,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "predictionId or generationId is required" }, { status: 400 })
     }
 
-    const statusColumns = "id, status, supabase_storage_path, error_message"
+    const statusColumns = "id, status, supabase_storage_path, error_message, fal_endpoint_id, replicate_prediction_id"
     let generation: {
       id: string
       status: string | null
       supabase_storage_path: string | null
       error_message: string | null
+      fal_endpoint_id?: string | null
+      replicate_prediction_id?: string | null
     } | null = null
     let error: { message?: string } | null = null
 
@@ -76,6 +79,22 @@ export async function GET(request: NextRequest) {
 
     if (!generation) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
+    if (
+      generation.status === "pending" &&
+      generation.fal_endpoint_id?.startsWith("wavespeed:") &&
+      generation.replicate_prediction_id
+    ) {
+      await completeWaveSpeedPendingVideoAdmin(generation.replicate_prediction_id)
+      const refreshed = await supabase
+        .from("generations")
+        .select(statusColumns)
+        .eq("id", generation.id)
+        .eq("user_id", user.id)
+        .eq("type", "video")
+        .maybeSingle()
+      if (refreshed.data) generation = refreshed.data
     }
 
     if (generation.status === "pending") {

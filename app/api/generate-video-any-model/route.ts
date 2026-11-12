@@ -18,6 +18,11 @@ import {
   shouldRouteMotionCopyToFal,
 } from '@/lib/motion-copy/face-lock';
 import { resolveWan27Replicate } from '@/lib/server/wan-2.7-replicate';
+import {
+  buildWan30WaveSpeedRequest,
+  submitWaveSpeedPrediction,
+  wavespeedStoredEndpoint,
+} from '@/lib/server/wavespeed-video';
 import { buildMinimaxH3ReplicateInput } from '@/lib/server/minimax-h3-replicate';
 import { applyMinimalReplicateVideoModeration } from '@/lib/server/minimal-moderation';
 import {
@@ -551,6 +556,115 @@ export async function POST(request: NextRequest) {
         },
         { status: 202 },
       );
+    }
+
+    if (modelProvider === 'wavespeed' && catalogModelIdentifier === 'alibaba/wan-3.0') {
+      let waveSpeedRequest: ReturnType<typeof buildWan30WaveSpeedRequest>
+      try {
+        waveSpeedRequest = buildWan30WaveSpeedRequest({
+          aspectRatio:
+            typeof otherParams.aspect_ratio === 'string' ? otherParams.aspect_ratio : null,
+          duration:
+            typeof otherParams.duration === 'number' || typeof otherParams.duration === 'string'
+              ? otherParams.duration
+              : null,
+          enablePromptExpansion:
+            typeof otherParams.enable_prompt_expansion === 'boolean'
+              ? otherParams.enable_prompt_expansion
+              : null,
+          endImageUrl: falEndImageUrl,
+          generateAudio:
+            typeof otherParams.generate_audio === 'boolean' ? otherParams.generate_audio : null,
+          imageUrl:
+            typeof image === 'string'
+              ? image
+              : typeof first_frame_image === 'string'
+                ? first_frame_image
+                : null,
+          prompt: typeof prompt === 'string' ? prompt : null,
+          referenceAudioUrls: falReferenceAudios,
+          referenceImageUrls: falMultimodalReferenceImages,
+          referenceVideoUrls: falReferenceVideos,
+          resolution:
+            typeof otherParams.resolution === 'string' ? otherParams.resolution : null,
+          seed:
+            otherParams.seed !== null && otherParams.seed !== undefined
+              ? (otherParams.seed as number | string)
+              : null,
+          videoUrl: falReferenceVideo,
+        })
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : 'Invalid WaveSpeed video request' },
+          { status: 400 },
+        )
+      }
+
+      let requestId: string
+      try {
+        requestId = await submitWaveSpeedPrediction(waveSpeedRequest.endpoint, waveSpeedRequest.input)
+      } catch (error) {
+        console.error('[generate-video-test] WaveSpeed submit failed:', error)
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : 'WaveSpeed submit failed' },
+          { status: 502 },
+        )
+      }
+
+      const referenceImageStoragePaths = collectStoragePaths([
+        image,
+        first_frame_image,
+        last_frame,
+        body.last_frame_image,
+        body.reference_images,
+      ])
+      const referenceVideoStoragePaths = collectStoragePaths([
+        body.reference_video,
+        body.reference_videos,
+        body.video,
+        body.videoPublicUrl,
+      ])
+      const { data: pendingGeneration, error: insertError } = await supabase
+        .from('generations')
+        .insert({
+          user_id: user.id,
+          prompt: typeof prompt === 'string' ? prompt : null,
+          supabase_storage_path: null,
+          reference_images_supabase_storage_path:
+            referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+          reference_videos_supabase_storage_path:
+            referenceVideoStoragePaths.length > 0 ? referenceVideoStoragePaths : null,
+          model: storedModelIdentifier,
+          type: 'video',
+          is_public: true,
+          tool: typeof body.tool === 'string' ? body.tool : null,
+          status: 'pending',
+          replicate_prediction_id: requestId,
+          fal_request_id: requestId,
+          fal_endpoint_id: wavespeedStoredEndpoint(waveSpeedRequest.endpoint),
+          quoted_credits: quotedCredits,
+          predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
+          character_asset_id: characterAssetId,
+          ...studioBoardFieldsForIndex(studioBoardFields, 0),
+        })
+        .select('id')
+        .single()
+
+      if (insertError || !pendingGeneration) {
+        console.error('[generate-video-test] Failed to insert pending WaveSpeed generation:', insertError)
+        throw new Error('Failed to create pending generation')
+      }
+
+      return NextResponse.json(
+        {
+          status: 'pending',
+          predictionId: requestId,
+          generationId: pendingGeneration.id,
+          creditsQuoted: quotedCredits,
+          message: `Video generation started. Poll GET /api/generate-video/status?predictionId=${requestId}`,
+        },
+        { status: 202 },
+      )
     }
 
     if (modelProvider === 'fal') {

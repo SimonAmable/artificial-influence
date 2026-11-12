@@ -322,15 +322,25 @@ export const WAN_30_MODEL = videoModel(
   "model-wan-3.0",
   "alibaba/wan-3.0",
   "Wan 3.0",
-  "Alibaba Wan 3.0 on Fal. Text, start and end frames, or up to 5 reference videos, up to 30 seconds with audio.",
+  "Alibaba Wan 3.0 on WaveSpeed. Text, start and end frames, or reference images, videos, and audio, up to 30 seconds.",
   8,
   8,
-  ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
+  ["16:9", "9:16", "1:1", "4:3", "3:4"],
   { min: 2, max: 30, default: 5 },
   { options: ["480p", "720p", "1080p"], default: "720p" },
   true,
 )
+WAN_30_MODEL.provider = "wavespeed"
 WAN_30_MODEL.supports_reference_video = true
+WAN_30_MODEL.pricing_config = {
+  strategy: "per_second",
+  defaultCreditsPerSecond: 8,
+  tiers: [
+    { match: { resolution: "480p" }, creditsPerSecond: 4 },
+    { match: { resolution: "720p" }, creditsPerSecond: 8 },
+    { match: { resolution: "1080p" }, creditsPerSecond: 16 },
+  ],
+}
 
 export const WAN_30_PRIME_MODEL = videoModel(
   "model-wan-3.0-prime",
@@ -433,7 +443,7 @@ function videoMeta(model: Model, aspectRatios: string[]): LatestModelMetadata {
     name: model.name,
     description: model.description ?? "",
     type: "video",
-    provider: "fal",
+    provider: model.provider ?? "fal",
     is_active: true,
     model_cost: model.model_cost,
     supports_reference_image: model.supports_first_frame === true,
@@ -457,7 +467,7 @@ export const LATEST_IMAGE_MODELS_METADATA: LatestModelMetadata[] = [
 export const LATEST_VIDEO_MODELS_METADATA: LatestModelMetadata[] = [
   videoMeta(KLING_V4_MODEL, ["16:9", "9:16", "1:1", "21:9"]),
   videoMeta(KLING_V4_FLASH_MODEL, ["16:9", "9:16", "1:1", "21:9"]),
-  videoMeta(WAN_30_MODEL, ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"]),
+  videoMeta(WAN_30_MODEL, ["16:9", "9:16", "1:1", "4:3", "3:4"]),
   videoMeta(WAN_30_PRIME_MODEL, ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"]),
   videoMeta(FLUX_3_MAX_MODEL, ["auto", "21:9", "2:1", "16:9", "4:3", "1:1", "3:4", "9:16"]),
   videoMeta(MINIMAX_H3_MAX_MODEL, ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"]),

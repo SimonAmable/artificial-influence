@@ -4,6 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { inferStoragePathFromUrl } from "@/lib/assets/library"
 import { resolveWan27Replicate } from "@/lib/server/wan-2.7-replicate"
+import {
+  buildWan30WaveSpeedRequest,
+  submitWaveSpeedPrediction,
+  wavespeedStoredEndpoint,
+} from "@/lib/server/wavespeed-video"
 import { applyMinimalReplicateVideoModeration } from "@/lib/server/minimal-moderation"
 import { checkUserHasCredits } from "@/lib/credits"
 import { validateExternalReferenceUrl } from "@/lib/server/external-reference-url"
@@ -510,7 +515,7 @@ export function createGenerateVideoTool({
 
       const { data: modelData, error: modelError } = await supabase
         .from("models")
-        .select("model_cost, model_cost_per_second, pricing_config")
+        .select("model_cost, model_cost_per_second, pricing_config, provider")
         .eq("identifier", resolvedModel)
         .eq("type", "video")
         .eq("is_active", true)
@@ -547,6 +552,77 @@ export function createGenerateVideoTool({
       const referenceVideoStoragePaths = uploadedVideos
         .map((item) => item.storagePath)
         .filter((value): value is string => Boolean(value))
+
+      if (modelData.provider === "wavespeed" && resolvedModel === "alibaba/wan-3.0") {
+        const allImageUrls = uploadedImages
+          .map((item) => item.url)
+          .filter((url): url is string => typeof url === "string" && url.length > 0)
+        const allVideoUrls = uploadedVideos
+          .map((item) => item.url)
+          .filter((url): url is string => typeof url === "string" && url.length > 0)
+        const waveSpeedRequest = buildWan30WaveSpeedRequest({
+          aspectRatio: aspectRatio ?? null,
+          duration: duration ?? null,
+          enablePromptExpansion: null,
+          endImageUrl: allImageUrls.length === 2 && allVideoUrls.length === 0 ? allImageUrls[1] : null,
+          generateAudio: typeof generateAudio === "boolean" ? generateAudio : null,
+          imageUrl: allImageUrls[0] ?? null,
+          prompt: normalizedPrompt,
+          referenceAudioUrls,
+          referenceImageUrls: allImageUrls.slice(allImageUrls.length === 2 && allVideoUrls.length === 0 ? 2 : 1),
+          referenceVideoUrls: allVideoUrls,
+          resolution: resolution ?? null,
+          seed: null,
+          videoUrl: null,
+        })
+        const requestId = await submitWaveSpeedPrediction(waveSpeedRequest.endpoint, waveSpeedRequest.input)
+        const { data: pendingGeneration, error: saveError } = await supabase
+          .from("generations")
+          .insert({
+            user_id: userId,
+            prompt: normalizedPrompt || null,
+            supabase_storage_path: null,
+            reference_images_supabase_storage_path:
+              referenceImageStoragePaths.length > 0 ? referenceImageStoragePaths : null,
+            reference_videos_supabase_storage_path:
+              referenceVideoStoragePaths.length > 0 ? referenceVideoStoragePaths : null,
+            model: resolvedModel,
+            type: "video",
+            is_public: true,
+            tool: "chat-generate-video",
+            status: "pending",
+            replicate_prediction_id: requestId,
+            fal_request_id: requestId,
+            fal_endpoint_id: wavespeedStoredEndpoint(waveSpeedRequest.endpoint),
+            quoted_credits: requiredCredits,
+            predicted_duration_seconds: pricingQuote.predictedDurationSeconds,
+            character_asset_id: characterAssetId,
+            ...(threadId ? { chat_thread_id: threadId } : {}),
+            ...studioBoardFieldsForIndex(studioBoardFields, 0),
+          })
+          .select("id")
+          .single()
+
+        if (saveError || !pendingGeneration) {
+          console.error("[chat/generate-video] Failed to save WaveSpeed generation row:", saveError)
+          throw new Error("Failed to create pending video generation.")
+        }
+
+        return {
+          generationId: pendingGeneration.id,
+          message: `Started a video generation with ${resolvedModel}. If no later tool or automatic follow-up in this workflow needs the finished video, stop here and let the UI update asynchronously.`,
+          model: resolvedModel,
+          nextStepHint:
+            "Only call awaitGeneration for short same-turn dependency chains, or scheduleGenerationFollowUp for long video chains that truly require a later automatic step. Otherwise reply to the user and stop.",
+          predictionId: requestId,
+          creditsQuoted: requiredCredits,
+          status: "pending" as const,
+          usedImageReferenceCount: uploadedImages.length,
+          usedVideoReferenceCount: uploadedVideos.length,
+          usedAudioReferenceCount: uploadedAudios.length,
+          ...(referenceWarnings.length > 0 ? { warnings: referenceWarnings } : {}),
+        }
+      }
 
       if (isFalVideo || seedance25UsesFal) {
         const allImageUrls = uploadedImages

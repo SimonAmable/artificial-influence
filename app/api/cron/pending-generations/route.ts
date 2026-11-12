@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { completeFalPendingImageAdmin } from "@/lib/server/fal-image-completion"
 import { completeFalPendingVideoAdmin } from "@/lib/server/fal-video-completion"
+import { completeWaveSpeedPendingVideoAdmin } from "@/lib/server/wavespeed-video"
 
 export const maxDuration = 300
 
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
   const cutoff = new Date(Date.now() - MIN_AGE_MS).toISOString()
   const { data: pendingRows, error } = await supabase
     .from("generations")
-    .select("replicate_prediction_id, type")
+    .select("replicate_prediction_id, type, fal_endpoint_id")
     .eq("status", "pending")
     .not("fal_endpoint_id", "is", null)
     .not("replicate_prediction_id", "is", null)
@@ -54,8 +55,10 @@ export async function GET(request: Request) {
 
   for (const row of pendingRows ?? []) {
     const predictionId = row.replicate_prediction_id as string
-    const result =
-      row.type === "video"
+    const waveSpeed = row.type === "video" && String(row.fal_endpoint_id ?? "").startsWith("wavespeed:")
+    const result = waveSpeed
+      ? await completeWaveSpeedPendingVideoAdmin(predictionId)
+      : row.type === "video"
         ? await completeFalPendingVideoAdmin(predictionId)
         : await completeFalPendingImageAdmin(predictionId)
 

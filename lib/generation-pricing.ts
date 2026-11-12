@@ -271,6 +271,9 @@ function legacyResolveCreditsPerSecond(
     case 'kling/v4/flash':
       return 8;
     case 'alibaba/wan-3.0':
+      if (resolution === '480p') return 4;
+      if (resolution === '1080p') return 16;
+      return 8;
     case 'alibaba/wan-3.0-prime':
       if (resolution === '480p') return 4;
       if (resolution === '1080p') return 12;

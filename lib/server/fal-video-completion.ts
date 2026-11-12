@@ -65,6 +65,9 @@ export async function completeFalPendingVideoAdmin(
   }
 
   const row = generation as PendingFalVideoRow & { created_at?: string | null }
+  if (row.fal_endpoint_id?.startsWith("wavespeed:")) {
+    return { status: row.status === "completed" ? "completed" : row.status === "failed" ? "failed" : "pending" }
+  }
   if (row.status !== "pending" || !row.fal_endpoint_id || !row.replicate_prediction_id) {
     return { status: row.status === "completed" ? "completed" : row.status === "failed" ? "failed" : "pending" }
   }
