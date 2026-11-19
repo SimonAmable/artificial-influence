@@ -5,17 +5,14 @@ import { toast } from "sonner"
 
 import { AssetSelectionModal, type AssetSelectionPick } from "@/components/shared/modals/asset-selection-modal"
 import type { ImageUpload } from "@/components/shared/upload/photo-upload"
-import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
-import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
-import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { useAIChatDockInsetRight } from "@/components/ai-chat"
 import { ensureStoredReferenceImage } from "@/lib/image/ensure-stored-reference-image"
 import { isStoredReferenceImageUrl } from "@/lib/image/is-stored-reference-image-url"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
 import { consumeViralClonerHandoff } from "@/lib/viral-cloner/handoff"
 import { GENJUTSU_MAX_SECONDS, GENJUTSU_MIN_SECONDS } from "@/lib/viral-cloner/constants"
 import { quoteViralCloneSelection } from "@/lib/viral-cloner/pricing"
 import type { ViralClonerTrimSelection } from "@/lib/viral-cloner/types"
-import { cn } from "@/lib/utils"
 
 import { ViralClonerInputBox } from "./viral-cloner-input-box"
 import { ViralClonerTargetGrid, type ViralClonerTargetItem } from "./viral-cloner-target-grid"
@@ -39,7 +36,6 @@ type JobItem = {
 }
 
 export function ViralClonerTool() {
-  const layoutMode = useLayoutMode()
   const chatDockInsetRight = useAIChatDockInsetRight()
   const fixedPromptPanelStyle = React.useMemo(
     () => ({ right: chatDockInsetRight }),
@@ -136,9 +132,8 @@ export function ViralClonerTool() {
           includeImportFee: true,
         }),
       )
-    } catch (error) {
+    } catch {
       setQuote(null)
-      if (error instanceof Error) toast.error(error.message)
     }
   }, [selected, media, trims])
 
@@ -377,15 +372,8 @@ export function ViralClonerTool() {
     </div>
   )
 
-  const isRowLayout = layoutMode === "row"
-
   return (
-    <div
-      className={cn(
-        "h-[calc(100dvh-52px)] min-h-0 overflow-hidden bg-background flex flex-col",
-        isRowLayout ? "px-0" : "px-4 pb-0 sm:px-6 md:px-12",
-      )}
-    >
+    <div className="flex h-[calc(100dvh-52px)] min-h-0 flex-col overflow-hidden bg-background px-3 sm:px-6">
       <ul className="sr-only" aria-live="polite">
         {quote?.lines.map((line) => (
           <li key={line.index}>
@@ -394,19 +382,14 @@ export function ViralClonerTool() {
         ))}
       </ul>
 
-      <div className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col", !isRowLayout && "max-w-7xl")}>
-        <GeneratorLayout layoutMode={layoutMode} className="h-full min-h-0 flex-1">
-          <div className="flex h-full min-h-0 flex-1 flex-col overflow-auto overscroll-contain [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {showcase}
-          </div>
-        </GeneratorLayout>
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col">
+        <div className="flex h-full min-h-0 flex-1 flex-col overflow-auto overscroll-contain pt-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          {showcase}
+        </div>
       </div>
 
       <div
-        className={cn(
-          "pointer-events-none fixed bottom-0 left-0 z-50 p-4 sm:p-6",
-          !isRowLayout && "lg:left-[50%] lg:right-0 lg:max-w-none",
-        )}
+        className="pointer-events-none fixed bottom-0 left-0 z-50 p-4 sm:p-6"
         style={fixedPromptPanelStyle}
       >
         <div className="pointer-events-none mx-auto flex max-w-7xl justify-center">

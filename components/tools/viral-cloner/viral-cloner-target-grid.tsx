@@ -42,7 +42,7 @@ export function ViralClonerTargetGrid({
     return (
       <div
         className={cn(
-          "flex min-h-[40vh] flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/20 px-6 text-center",
+          "flex min-h-[calc(100dvh-220px)] flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/20 px-6 text-center",
           className,
         )}
       >

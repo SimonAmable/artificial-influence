@@ -37,6 +37,11 @@ export function resolveSocialImportAdapter(rawUrl: string): {
       "That URL isn't from a supported platform. Paste a public post link or a direct media file URL.",
     )
   }
+  const directFile = /\.(gif|mp4|webm|mov|jpe?g|png|webp)$/i.test(url.pathname)
+  if (directFile) {
+    const direct = matches.find((adapter) => adapter.platform === "direct")
+    if (direct) return { adapter: direct, url }
+  }
   if (matches.length > 1) {
     const nonDirect = matches.find((m) => m.platform !== "direct")
     if (nonDirect) {

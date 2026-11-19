@@ -32,16 +32,21 @@ export async function POST(request: Request) {
       sourceUrl,
     })
 
-    const quotePreview = quoteViralCloneSelection({
-      items: manifest.media.map((item) => ({
-        index: item.index,
-        kind: item.kind,
-        durationSeconds: item.durationSeconds,
-      })),
-      selectedIndexes: manifest.media.map((item) => item.index),
-      trims: {},
-      includeImportFee: true,
-    })
+    let quotePreview: ReturnType<typeof quoteViralCloneSelection> | null = null
+    try {
+      quotePreview = quoteViralCloneSelection({
+        items: manifest.media.map((item) => ({
+          index: item.index,
+          kind: item.kind,
+          durationSeconds: item.durationSeconds,
+        })),
+        selectedIndexes: manifest.media.map((item) => item.index),
+        trims: {},
+        includeImportFee: true,
+      })
+    } catch {
+      quotePreview = null
+    }
 
     return NextResponse.json({
       importId,

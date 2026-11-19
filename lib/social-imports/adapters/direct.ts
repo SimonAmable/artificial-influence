@@ -40,13 +40,16 @@ export const directSocialImportAdapter: SocialImportAdapter = {
       }
     }
 
-    const head = await fetchHttpsWithRedirectGuard(canonicalUrl, { method: "HEAD" })
-    if (!head.ok && head.status !== 405) {
+    let probe = await fetchHttpsWithRedirectGuard(canonicalUrl, { method: "HEAD" })
+    if (!probe.ok && probe.status !== 405) {
+      probe = await fetchHttpsWithRedirectGuard(canonicalUrl, { method: "GET", headers: { Range: "bytes=0-0" } })
+    }
+    if (!probe.ok && probe.status !== 206 && probe.status !== 405) {
       throw new Error("Could not access that media URL.")
     }
-    assertContentLengthAllowed(head.headers.get("content-length"))
+    assertContentLengthAllowed(probe.headers.get("content-length"))
 
-    const kind = directMediaKind(parsed, head.headers.get("content-type"))
+    const kind = directMediaKind(parsed, probe.headers.get("content-type"))
 
     const media: SocialMediaItem[] = [
       {
