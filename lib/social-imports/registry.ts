@@ -1,13 +1,13 @@
 import { directSocialImportAdapter } from "./adapters/direct"
 import {
-  facebookAdapter,
-  pinterestAdapter,
-  redditAdapter,
-  redgifsAdapter,
-  threadsAdapter,
-  xAdapter,
-  youtubeShortsAdapter,
-} from "./adapters/host-only"
+  facebookSocialImportAdapter,
+  pinterestSocialImportAdapter,
+  redditSocialImportAdapter,
+  redgifsSocialImportAdapter,
+  threadsSocialImportAdapter,
+  xSocialImportAdapter,
+  youtubeShortsSocialImportAdapter,
+} from "./adapters/apify-platform-adapters"
 import { instagramSocialImportAdapter } from "./adapters/instagram"
 import { tiktokSocialImportAdapter } from "./adapters/tiktok"
 import { assertHttpsPublicUrl } from "./security"
@@ -16,13 +16,13 @@ import type { SocialImportAdapter, SocialPlatform } from "./types"
 const ADAPTERS: SocialImportAdapter[] = [
   tiktokSocialImportAdapter,
   instagramSocialImportAdapter,
-  threadsAdapter,
-  youtubeShortsAdapter,
-  xAdapter,
-  redditAdapter,
-  facebookAdapter,
-  pinterestAdapter,
-  redgifsAdapter,
+  threadsSocialImportAdapter,
+  youtubeShortsSocialImportAdapter,
+  xSocialImportAdapter,
+  redditSocialImportAdapter,
+  facebookSocialImportAdapter,
+  pinterestSocialImportAdapter,
+  redgifsSocialImportAdapter,
   directSocialImportAdapter,
 ]
 
