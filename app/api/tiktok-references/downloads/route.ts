@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const { data: rows, error } = await supabase
       .from(SOCIAL_REFERENCE_DOWNLOAD_JOB_TABLE)
       .select(
-        "id, status, source_tiktok_url, source_platform, output_public_url, output_public_urls, output_media_kind, normalization_profile, tiktok_snapshot, error_message, created_at, completed_at",
+        "id, status, source_url, source_platform, output_public_url, output_public_urls, output_media_kind, normalization_profile, source_snapshot, error_message, created_at, completed_at",
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -44,13 +44,15 @@ export async function GET(request: NextRequest) {
         rows?.map((job) => ({
           id: job.id,
           status: job.status,
-          sourceTiktokUrl: job.source_tiktok_url,
+          sourceTiktokUrl: job.source_url,
+          sourceUrl: job.source_url,
           sourcePlatform: job.source_platform === "instagram" ? "instagram" : "tiktok",
           outputPublicUrl: job.output_public_url,
           outputPublicUrls: Array.isArray(job.output_public_urls) ? job.output_public_urls : [],
           outputMediaKind: job.output_media_kind,
           normalizationProfile: job.normalization_profile,
-          tiktokSnapshot: job.tiktok_snapshot,
+          tiktokSnapshot: job.source_snapshot,
+          sourceSnapshot: job.source_snapshot,
           errorMessage: job.error_message,
           createdAt: job.created_at,
           completedAt: job.completed_at,

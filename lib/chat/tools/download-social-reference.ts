@@ -6,7 +6,7 @@ import {
   processSocialReferenceDownloadJob,
   SOCIAL_REFERENCE_DOWNLOAD_JOB_TABLE,
 } from "@/lib/free-tools/social-reference-jobs"
-import { detectSocialPlatform } from "@/lib/server/apify/instagram-scraper"
+import { detectLegacyDownloadPlatform } from "@/lib/social-imports/registry"
 
 interface CreateDownloadSocialReferenceToolOptions {
   supabase: SupabaseClient
@@ -31,7 +31,7 @@ export function createDownloadSocialReferenceTool({
       const trimmed = url.trim()
       let sourcePlatform: "tiktok" | "instagram"
       try {
-        sourcePlatform = detectSocialPlatform(trimmed)
+        sourcePlatform = detectLegacyDownloadPlatform(trimmed)
       } catch (validationError) {
         const message =
           validationError instanceof Error ? validationError.message : "Invalid URL."
@@ -43,7 +43,8 @@ export function createDownloadSocialReferenceTool({
         .insert({
           user_id: userId,
           status: "queued",
-          source_tiktok_url: trimmed,
+          source_url: trimmed,
+          import_purpose: "reference_download",
           source_platform: sourcePlatform,
         })
         .select("id")

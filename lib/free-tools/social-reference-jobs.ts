@@ -22,10 +22,12 @@ import {
   uploadTikTokReferenceVideoRawToStorage,
 } from "@/lib/tiktok/normalize-video"
 
-export const SOCIAL_REFERENCE_DOWNLOAD_JOB_TABLE = "social_reference_download_jobs" as const
+import { SOCIAL_MEDIA_IMPORTS_TABLE } from "@/lib/social-imports/types"
 
-/** @deprecated Use SOCIAL_REFERENCE_DOWNLOAD_JOB_TABLE — kept for external imports until full rename. */
-export const TIKTOK_REFERENCE_DOWNLOAD_JOB_TABLE = SOCIAL_REFERENCE_DOWNLOAD_JOB_TABLE
+export const SOCIAL_REFERENCE_DOWNLOAD_JOB_TABLE = SOCIAL_MEDIA_IMPORTS_TABLE
+
+/** @deprecated Use SOCIAL_MEDIA_IMPORTS_TABLE */
+export const TIKTOK_REFERENCE_DOWNLOAD_JOB_TABLE = SOCIAL_MEDIA_IMPORTS_TABLE
 
 export const TIKTOK_REFERENCE_SEARCH_JOB_TABLE = "tiktok_reference_search_jobs" as const
 export type TikTokReferenceOutputMediaKind = "video" | "slideshow"
@@ -134,9 +136,9 @@ async function finalizeDownloadFailure(jobId: string, message: string) {
   })
 }
 
-async function executeTiktokDownload(jobId: string, job: { user_id: string; source_tiktok_url: string }) {
+async function executeTiktokDownload(jobId: string, job: { user_id: string; source_url: string }) {
   const supabase = getRequiredServiceRoleClient()
-  const sourceUrl = String(job.source_tiktok_url)
+  const sourceUrl = String(job.source_url)
   assertLooksLikeTikTokVideoUrl(sourceUrl)
 
   const { runId, items } = await runTikTokScraperActor(buildTikTokUrlDownloadActorInput(sourceUrl), 300)
@@ -235,7 +237,7 @@ async function executeTiktokDownload(jobId: string, job: { user_id: string; sour
 
   await finalizeDownloadSuccess(jobId, {
     apify_run_id: runId,
-    tiktok_snapshot: snapshot,
+    source_snapshot: snapshot,
     output_public_url: outputPublicUrl,
     output_storage_path: outputStoragePath,
     output_public_urls: outputPublicUrls,
@@ -245,9 +247,9 @@ async function executeTiktokDownload(jobId: string, job: { user_id: string; sour
   })
 }
 
-async function executeInstagramDownload(jobId: string, job: { user_id: string; source_tiktok_url: string }) {
+async function executeInstagramDownload(jobId: string, job: { user_id: string; source_url: string }) {
   const supabase = getRequiredServiceRoleClient()
-  const sourceUrl = String(job.source_tiktok_url)
+  const sourceUrl = String(job.source_url)
 
   const { runId, items } = await runInstagramScraperActor(buildInstagramPostActorInput(sourceUrl), 300)
 
@@ -358,7 +360,7 @@ async function executeInstagramDownload(jobId: string, job: { user_id: string; s
 
   await finalizeDownloadSuccess(jobId, {
     apify_run_id: runId,
-    tiktok_snapshot: snapshot,
+    source_snapshot: snapshot,
     output_public_url: outputPublicUrl,
     output_storage_path: outputStoragePath,
     output_public_urls: outputPublicUrls,
@@ -372,7 +374,7 @@ export async function processSocialReferenceDownloadJob(jobId: string) {
   const supabase = getRequiredServiceRoleClient()
   const { data: job, error } = await supabase
     .from(SOCIAL_REFERENCE_DOWNLOAD_JOB_TABLE)
-    .select("id, user_id, status, source_tiktok_url, source_platform")
+    .select("id, user_id, status, source_url, source_platform")
     .eq("id", jobId)
     .maybeSingle()
 
@@ -401,7 +403,7 @@ export async function processSocialReferenceDownloadJob(jobId: string) {
       id: string
       user_id: string
       status: string | null
-      source_tiktok_url: string
+      source_url: string
       source_platform?: string | null
     }
 
@@ -410,12 +412,12 @@ export async function processSocialReferenceDownloadJob(jobId: string) {
     if (platform === "instagram") {
       await executeInstagramDownload(jobId, {
         user_id: String(typedJob.user_id),
-        source_tiktok_url: String(typedJob.source_tiktok_url),
+        source_url: String(typedJob.source_url),
       })
     } else {
       await executeTiktokDownload(jobId, {
         user_id: String(typedJob.user_id),
-        source_tiktok_url: String(typedJob.source_tiktok_url),
+        source_url: String(typedJob.source_url),
       })
     }
   } catch (processingError) {

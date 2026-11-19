@@ -5,7 +5,7 @@ import {
   processSocialReferenceDownloadJob,
   SOCIAL_REFERENCE_DOWNLOAD_JOB_TABLE,
 } from "@/lib/free-tools/social-reference-jobs"
-import { detectSocialPlatform } from "@/lib/server/apify/instagram-scraper"
+import { detectLegacyDownloadPlatform } from "@/lib/social-imports/registry"
 import { createClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     let sourcePlatform: "tiktok" | "instagram"
 
     try {
-      sourcePlatform = detectSocialPlatform(url)
+      sourcePlatform = detectLegacyDownloadPlatform(url)
     } catch (validationError) {
       return NextResponse.json(
         { error: validationError instanceof Error ? validationError.message : "Invalid URL." },
@@ -49,7 +49,8 @@ export async function POST(request: Request) {
       .insert({
         user_id: user.id,
         status: "queued",
-        source_tiktok_url: url,
+        source_url: url,
+        import_purpose: "reference_download",
         source_platform: sourcePlatform,
       })
       .select("id")

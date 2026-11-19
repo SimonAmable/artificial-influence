@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils"
 import { useDefaultEnhancePrompt } from "@/hooks/use-default-enhance-prompt"
 import { DEFAULT_IMAGE_MODEL_IDENTIFIER, MODEL_IDENTIFIERS } from "@/lib/constants/models"
 import { QwenLoraControl } from "@/components/tools/influencer/qwen-lora-control"
+import { ViralClonerHandoffButton } from "@/components/tools/viral-cloner/viral-cloner-handoff-button"
 import { useQwenImageLoras } from "@/hooks/use-qwen-image-loras"
 import { waveSpeedLoraSlotsToPayload } from "@/lib/image/wavespeed-loras"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -986,7 +987,7 @@ function ImagePageContent() {
         return
       }
 
-      appendImageReferencesToFormData(formData, resolvedImagesToUpload)
+      await appendImageReferencesToFormData(formData, resolvedImagesToUpload)
       
       // Add number of images when > 1
       if (!studioToolPayload && selectedNumImages > 1) {
@@ -1146,9 +1147,14 @@ function ImagePageContent() {
           onModelParametersChange={setSelectedModelParameters}
           allowedAssetTypes={["image"]}
           customControlsEnd={
-            showQwenLoraControl ? (
-              <QwenLoraControl loras={qwenLoras} onLorasChange={setQwenLoras} />
-            ) : undefined
+            <>
+              <ViralClonerHandoffButton
+                characterPreviewUrl={referenceImage?.url ?? referenceImages[0]?.url}
+              />
+              {showQwenLoraControl ? (
+                <QwenLoraControl loras={qwenLoras} onLorasChange={setQwenLoras} />
+              ) : null}
+            </>
           }
         />
       )

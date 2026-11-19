@@ -26,7 +26,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const { data: job, error } = await supabase
       .from(SOCIAL_REFERENCE_DOWNLOAD_JOB_TABLE)
       .select(
-        "id, status, source_tiktok_url, source_platform, output_public_url, output_storage_path, output_public_urls, output_storage_paths, output_media_kind, normalization_profile, tiktok_snapshot, apify_run_id, error_message, created_at, started_at, completed_at",
+        "id, status, source_url, source_platform, output_public_url, output_storage_path, output_public_urls, output_storage_paths, output_media_kind, normalization_profile, source_snapshot, apify_run_id, error_message, created_at, started_at, completed_at",
       )
       .eq("id", id)
       .eq("user_id", user.id)
@@ -44,7 +44,8 @@ export async function GET(_request: Request, context: RouteContext) {
       job: {
         id: job.id,
         status: job.status,
-        sourceTiktokUrl: job.source_tiktok_url,
+        sourceTiktokUrl: job.source_url,
+        sourceUrl: job.source_url,
         sourcePlatform: job.source_platform === "instagram" ? "instagram" : "tiktok",
         outputPublicUrl: job.output_public_url,
         outputStoragePath: job.output_storage_path,
@@ -52,7 +53,8 @@ export async function GET(_request: Request, context: RouteContext) {
         outputStoragePaths: Array.isArray(job.output_storage_paths) ? job.output_storage_paths : [],
         outputMediaKind: job.output_media_kind,
         normalizationProfile: job.normalization_profile,
-        tiktokSnapshot: job.tiktok_snapshot,
+        tiktokSnapshot: job.source_snapshot,
+        sourceSnapshot: job.source_snapshot,
         apifyRunId: job.apify_run_id,
         errorMessage: job.error_message,
         createdAt: job.created_at,

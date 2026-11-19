@@ -203,6 +203,8 @@ interface VideoInputBoxProps {
   motionSwapMode?: MotionCopySwapMode
   onMotionSwapModeChange?: (mode: MotionCopySwapMode) => void
   estimatedSwapCredits?: number | null
+  /** Extra controls rendered in the media toolbar row (e.g. Viral Cloner handoff). */
+  toolbarAccessory?: React.ReactNode
 }
 
 export function VideoInputBox({
@@ -244,6 +246,7 @@ export function VideoInputBox({
   motionSwapMode = "off",
   onMotionSwapModeChange,
   estimatedSwapCredits = null,
+  toolbarAccessory = null,
 }: VideoInputBoxProps) {
   const [attachedRefsLocal, setAttachedRefsLocal] = React.useState<AttachedRef[]>([])
   const attachedRefs = attachedRefsProp ?? attachedRefsLocal
@@ -1444,6 +1447,8 @@ export function VideoInputBox({
             </AnimatedControlItem>
           </>
         ) : null}
+
+        {toolbarAccessory ? <AnimatedControlItem>{toolbarAccessory}</AnimatedControlItem> : null}
 
       </div>
     </LayoutGroup>

@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js"
-import { checkUserHasCredits, deductUserCredits } from "@/lib/credits"
+import { checkUserHasCredits } from "@/lib/credits"
+import { settleFailedGenerationCredits, settleSuccessfulGenerationCredits } from "@/lib/server/settle-generation-credits"
+import { reconcileViralCloneItemFromGeneration } from "@/lib/viral-cloner/reconcile"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
 import { getAutoStripImageMetadata } from "@/lib/server/auto-strip-image-metadata"
 import { notifyGenerationCompleteTelegram } from "@/lib/server/notify-generation-complete"
@@ -32,6 +34,7 @@ type PendingWaveSpeedImageRow = {
   status: string
   quoted_credits?: number | null
   character_asset_id?: string | null
+  credit_reservation_key?: string | null
 }
 
 function extensionForMime(mimeType: string): string {
@@ -71,7 +74,7 @@ export async function completeWaveSpeedPendingImageAdmin(
   const { data: generation, error } = await supabaseAdmin
     .from("generations")
     .select(
-      "id, user_id, model, prompt, aspect_ratio, tool, reference_images_supabase_storage_path, character_asset_id, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type, quoted_credits",
+      "id, user_id, model, prompt, aspect_ratio, tool, reference_images_supabase_storage_path, character_asset_id, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type, quoted_credits, credit_reservation_key",
     )
     .eq("replicate_prediction_id", predictionId)
     .eq("type", "image")
@@ -98,7 +101,17 @@ export async function completeWaveSpeedPendingImageAdmin(
   if (PENDING_STATUS.has(status)) return { status: "pending" }
   if (TERMINAL_FAILURE.has(status)) {
     const message = task.error ?? `WaveSpeed status: ${status}`
+    await settleFailedGenerationCredits({
+      supabase: supabaseAdmin,
+      creditReservationKey: row.credit_reservation_key,
+    })
     await markFailed(row.id, predictionId, message)
+    await reconcileViralCloneItemFromGeneration({
+      supabase: supabaseAdmin,
+      generationId: row.id,
+      status: "failed",
+      errorMessage: message,
+    })
     return { status: "failed", error: message }
   }
   if (status !== "completed") return { status: "pending" }
@@ -123,10 +136,12 @@ export async function completeWaveSpeedPendingImageAdmin(
     1,
     Number(row.quoted_credits ?? costPerOutput * urls.length) || costPerOutput * urls.length,
   )
-  const hasCredits = await checkUserHasCredits(row.user_id, requiredCredits, supabaseAdmin)
-  if (!hasCredits) {
-    await markFailed(row.id, predictionId, "Insufficient credits when processing WaveSpeed result")
-    return { status: "failed", error: "Insufficient credits" }
+  if (!row.credit_reservation_key) {
+    const hasCredits = await checkUserHasCredits(row.user_id, requiredCredits, supabaseAdmin)
+    if (!hasCredits) {
+      await markFailed(row.id, predictionId, "Insufficient credits when processing WaveSpeed result")
+      return { status: "failed", error: "Insufficient credits" }
+    }
   }
 
   const persistedOutputs: { storagePath: string }[] = []
@@ -200,7 +215,21 @@ export async function completeWaveSpeedPendingImageAdmin(
   }
 
   await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
-  await deductUserCredits(row.user_id, requiredCredits, supabaseAdmin)
+  await settleSuccessfulGenerationCredits({
+    supabase: supabaseAdmin,
+    userId: row.user_id,
+    quotedCredits: requiredCredits,
+    creditReservationKey: row.credit_reservation_key,
+  })
+  const { data: publicUrlData } = supabaseAdmin.storage
+    .from("public-bucket")
+    .getPublicUrl(persistedOutputs[0]?.storagePath ?? "")
+  await reconcileViralCloneItemFromGeneration({
+    supabase: supabaseAdmin,
+    generationId: row.id,
+    status: "completed",
+    outputUrl: publicUrlData?.publicUrl ?? null,
+  })
   void notifyGenerationCompleteTelegram(supabaseAdmin, {
     userId: row.user_id,
     generationId: row.id,

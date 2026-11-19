@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fal } from "@fal-ai/client"
 import { createClient } from "@supabase/supabase-js"
-import { deductUserCreditsUpTo } from "@/lib/credits"
+import { settleFailedGenerationCredits, settleSuccessfulGenerationCredits } from "@/lib/server/settle-generation-credits"
+import { reconcileViralCloneItemFromGeneration } from "@/lib/viral-cloner/reconcile"
 import { syncGenerationResultToPersistedChat } from "@/lib/chat/media-persistence"
 import { notifyGenerationCompleteTelegram } from "@/lib/server/notify-generation-complete"
 import { configureFal } from "./fal-image"
@@ -28,6 +29,7 @@ type PendingFalVideoRow = {
   model: string
   prompt: string | null
   quoted_credits?: number | null
+  credit_reservation_key?: string | null
   tool?: string | null
   reference_images_supabase_storage_path?: string[] | null
   reference_videos_supabase_storage_path?: string[] | null
@@ -54,7 +56,7 @@ export async function completeFalPendingVideoAdmin(
   const { data: generation, error } = await supabaseAdmin
     .from("generations")
     .select(
-      "id, user_id, model, prompt, quoted_credits, tool, reference_images_supabase_storage_path, reference_videos_supabase_storage_path, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type, created_at",
+      "id, user_id, model, prompt, quoted_credits, credit_reservation_key, tool, reference_images_supabase_storage_path, reference_videos_supabase_storage_path, chat_message_id, chat_thread_id, chat_tool_call_id, status, replicate_prediction_id, fal_endpoint_id, type, created_at",
     )
     .eq("replicate_prediction_id", predictionId)
     .eq("type", "video")
@@ -207,7 +209,20 @@ export async function completeFalPendingVideoAdmin(
     .eq("id", row.id)
 
   await syncGenerationResultToPersistedChat({ predictionId, supabase: supabaseAdmin })
-  await deductUserCreditsUpTo(row.user_id, requiredCredits, supabaseAdmin)
+  await settleSuccessfulGenerationCredits({
+    supabase: supabaseAdmin,
+    userId: row.user_id,
+    quotedCredits: requiredCredits,
+    creditReservationKey: row.credit_reservation_key,
+  })
+
+  const { data: publicUrlData } = supabaseAdmin.storage.from("public-bucket").getPublicUrl(storagePath)
+  await reconcileViralCloneItemFromGeneration({
+    supabase: supabaseAdmin,
+    generationId: row.id,
+    status: "completed",
+    outputUrl: publicUrlData?.publicUrl ?? null,
+  })
 
   void notifyGenerationCompleteTelegram(supabaseAdmin, {
     userId: row.user_id,

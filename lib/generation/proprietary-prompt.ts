@@ -2,6 +2,7 @@
 const HIDDEN_DETAIL_TOOLS = new Set([
   "ai_influencer",
   "carousel_shots",
+  "viral_cloner",
   "photodump",
   "character_swap",
   "face_swap",
@@ -17,6 +18,7 @@ const PROMPT_VISIBLE_TOOLS = new Set(["shot_recreate"])
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   ai_influencer: "AI Influencer",
   carousel_shots: "Carousel Shots",
+  viral_cloner: "Viral Cloner",
   photodump: "Photodump",
   character_swap: "Character Swap",
   face_swap: "Face Swap",

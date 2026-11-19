@@ -5,6 +5,7 @@ import { Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
 import { VideoInputBox } from "@/components/tools/video/video-input-box"
+import { ViralClonerHandoffButton } from "@/components/tools/viral-cloner/viral-cloner-handoff-button"
 import { VideoShowcaseCard } from "@/components/tools/video/video-showcase-card"
 import { VideoGrid } from "@/components/shared/display/video-grid"
 import { useGenerationTasks } from "@/components/generation-companion/generation-tasks-provider"
@@ -1710,6 +1711,16 @@ function VideoPageContent() {
                     onReferenceImagesChange={setReferenceImages}
                     attachedRefs={attachedCommandRefs}
                     onAttachedRefsChange={setAttachedCommandRefs}
+                    toolbarAccessory={
+                      <ViralClonerHandoffButton
+                        characterPreviewUrl={
+                          inputImage?.url ??
+                          referenceImages[0]?.url ??
+                          faceLockCustomImage?.url ??
+                          null
+                        }
+                      />
+                    }
                   />
                 </div>
               </div>
@@ -1813,6 +1824,16 @@ function VideoPageContent() {
                     onReferenceImagesChange={setReferenceImages}
                     attachedRefs={attachedCommandRefs}
                     onAttachedRefsChange={setAttachedCommandRefs}
+                    toolbarAccessory={
+                      <ViralClonerHandoffButton
+                        characterPreviewUrl={
+                          inputImage?.url ??
+                          referenceImages[0]?.url ??
+                          faceLockCustomImage?.url ??
+                          null
+                        }
+                      />
+                    }
                   />
                 </div>
               </div>
