@@ -19,6 +19,7 @@ type CreateViralCloneBody = {
   importId?: string
   characterAssetId?: string | null
   characterUploadId?: string | null
+  characterStoragePath?: string | null
   selectedItemIndexes?: number[]
   trims?: Record<string, ViralClonerTrimSelection>
   acceptedRightToUse?: boolean
@@ -58,6 +59,17 @@ export async function POST(request: Request) {
       typeof body.characterAssetId === "string" && body.characterAssetId.trim()
         ? body.characterAssetId.trim()
         : null
+    const characterStoragePath =
+      typeof body.characterStoragePath === "string" && body.characterStoragePath.trim()
+        ? body.characterStoragePath.trim()
+        : null
+
+    if (!characterAssetId && !characterStoragePath) {
+      return NextResponse.json(
+        { error: "Choose a reference character from the library or upload a face image." },
+        { status: 400 },
+      )
+    }
 
     const { manifest } = await getOwnedImportManifest({
       supabase,
@@ -138,7 +150,7 @@ export async function POST(request: Request) {
       user_id: user.id,
       social_import_id: importId,
       character_asset_id: characterAssetId,
-      character_storage_path: null,
+      character_storage_path: characterStoragePath,
       idempotency_key: idempotencyKey,
       status: "importing",
       source_url: manifest.canonicalUrl,

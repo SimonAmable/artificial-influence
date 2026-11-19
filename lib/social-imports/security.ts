@@ -67,6 +67,7 @@ export function isAllowedDirectMediaHostname(hostname: string): boolean {
     "i.redd.it",
     "v.redd.it",
     "redgifs.com",
+    "i.redgifs.com",
     "media.redgifs.com",
     "gfycat.com",
     "imgur.com",

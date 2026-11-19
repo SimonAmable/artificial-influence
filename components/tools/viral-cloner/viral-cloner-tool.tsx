@@ -1,21 +1,24 @@
 "use client"
 
 import * as React from "react"
-import { LinkSimple, UploadSimple } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
 import { AssetSelectionModal, type AssetSelectionPick } from "@/components/shared/modals/asset-selection-modal"
-import { PhotoUpload, type ImageUpload } from "@/components/shared/upload/photo-upload"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import type { ImageUpload } from "@/components/shared/upload/photo-upload"
+import { GeneratorLayout } from "@/components/shared/layout/generator-layout"
+import { useLayoutMode } from "@/components/shared/layout/layout-mode-context"
+import { uploadFileToSupabase } from "@/lib/canvas/upload-helpers"
+import { useAIChatDockInsetRight } from "@/components/ai-chat"
+import { ensureStoredReferenceImage } from "@/lib/image/ensure-stored-reference-image"
+import { isStoredReferenceImageUrl } from "@/lib/image/is-stored-reference-image-url"
 import { consumeViralClonerHandoff } from "@/lib/viral-cloner/handoff"
 import { GENJUTSU_MAX_SECONDS, GENJUTSU_MIN_SECONDS } from "@/lib/viral-cloner/constants"
 import { quoteViralCloneSelection } from "@/lib/viral-cloner/pricing"
 import type { ViralClonerTrimSelection } from "@/lib/viral-cloner/types"
 import { cn } from "@/lib/utils"
+
+import { ViralClonerInputBox } from "./viral-cloner-input-box"
+import { ViralClonerTargetGrid, type ViralClonerTargetItem } from "./viral-cloner-target-grid"
 
 type InspectMedia = {
   index: number
@@ -36,6 +39,13 @@ type JobItem = {
 }
 
 export function ViralClonerTool() {
+  const layoutMode = useLayoutMode()
+  const chatDockInsetRight = useAIChatDockInsetRight()
+  const fixedPromptPanelStyle = React.useMemo(
+    () => ({ right: chatDockInsetRight }),
+    [chatDockInsetRight],
+  )
+
   const [characterAssetId, setCharacterAssetId] = React.useState<string | null>(null)
   const [referenceImage, setReferenceImage] = React.useState<ImageUpload | null>(null)
   const [assetModalOpen, setAssetModalOpen] = React.useState(false)
@@ -50,6 +60,7 @@ export function ViralClonerTool() {
   const [submitting, setSubmitting] = React.useState(false)
   const [jobId, setJobId] = React.useState<string | null>(null)
   const [jobStatus, setJobStatus] = React.useState<string | null>(null)
+  const [jobError, setJobError] = React.useState<string | null>(null)
   const [jobItems, setJobItems] = React.useState<JobItem[]>([])
 
   React.useEffect(() => {
@@ -60,17 +71,7 @@ export function ViralClonerTool() {
 
   const inspectDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  React.useEffect(() => {
-    const trimmed = sourceUrl.trim()
-    if (!trimmed) return
-    if (inspectDebounceRef.current) clearTimeout(inspectDebounceRef.current)
-    inspectDebounceRef.current = setTimeout(() => void runInspect(trimmed), 600)
-    return () => {
-      if (inspectDebounceRef.current) clearTimeout(inspectDebounceRef.current)
-    }
-  }, [sourceUrl])
-
-  async function runInspect(url: string) {
+  const runInspect = React.useCallback(async (url: string) => {
     setInspecting(true)
     try {
       const response = await fetch("/api/viral-cloner/inspect", {
@@ -89,6 +90,10 @@ export function ViralClonerTool() {
       setMedia(items)
       setSelected(new Set(items.map((item) => item.index)))
       setTrims({})
+      setJobId(null)
+      setJobItems([])
+      setJobStatus(null)
+      setJobError(null)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Inspection failed.")
       setImportId(null)
@@ -96,7 +101,17 @@ export function ViralClonerTool() {
     } finally {
       setInspecting(false)
     }
-  }
+  }, [])
+
+  React.useEffect(() => {
+    const trimmed = sourceUrl.trim()
+    if (!trimmed) return
+    if (inspectDebounceRef.current) clearTimeout(inspectDebounceRef.current)
+    inspectDebounceRef.current = setTimeout(() => void runInspect(trimmed), 600)
+    return () => {
+      if (inspectDebounceRef.current) clearTimeout(inspectDebounceRef.current)
+    }
+  }, [sourceUrl, runInspect])
 
   React.useEffect(() => {
     if (media.length === 0) {
@@ -134,10 +149,11 @@ export function ViralClonerTool() {
       const response = await fetch(`/api/viral-cloner/${jobId}`)
       if (!response.ok || cancelled) return
       const payload = (await response.json()) as {
-        job?: { status?: string }
+        job?: { status?: string; error_message?: string | null }
         items?: JobItem[]
       }
       setJobStatus(payload.job?.status ?? null)
+      setJobError(payload.job?.error_message ?? null)
       setJobItems(payload.items ?? [])
     }
     void poll()
@@ -149,6 +165,7 @@ export function ViralClonerTool() {
   }, [jobId])
 
   function toggleSelected(index: number) {
+    if (jobId) return
     setSelected((current) => {
       const next = new Set(current)
       if (next.has(index)) next.delete(index)
@@ -175,13 +192,55 @@ export function ViralClonerTool() {
     })
   }
 
-  const hasCharacter = Boolean(characterAssetId || referenceImage?.url)
+  const hasCharacter = Boolean(characterAssetId || referenceImage?.url || referenceImage?.file)
   const selectedCount = selected.size
   const ctaCredits = quote?.totalCredits ?? 0
-  const ctaLabel =
-    selectedCount > 0 && ctaCredits > 0
-      ? `Clone ${selectedCount} item${selectedCount === 1 ? "" : "s"} · ${ctaCredits} credits`
-      : "Clone"
+  const isReady =
+    Boolean(importId) && hasCharacter && selectedCount > 0 && acceptedRights && !inspecting && !jobId
+
+  const gridItems = React.useMemo((): ViralClonerTargetItem[] => {
+    return media.map((item) => {
+      const jobItem = jobItems.find((row) => row.item_index === item.index)
+      return {
+        index: item.index,
+        kind: item.kind,
+        previewUrl: item.previewUrl,
+        remoteUrl: item.remoteUrl,
+        durationSeconds: item.durationSeconds,
+        selected: selected.has(item.index),
+        jobStatus: jobItem?.status ?? null,
+        outputUrl: jobItem?.output_url ?? null,
+        errorMessage: jobItem?.error_message ?? jobError,
+      }
+    })
+  }, [jobError, jobId, jobItems, media, selected])
+
+  async function resolveCharacterForSubmit(): Promise<{
+    characterAssetId: string | null
+    characterStoragePath: string | null
+  }> {
+    if (characterAssetId) {
+      return { characterAssetId, characterStoragePath: null }
+    }
+    if (!referenceImage) {
+      throw new Error("Choose a reference character.")
+    }
+    if (referenceImage.file) {
+      const uploaded = await uploadFileToSupabase(referenceImage.file, "reference-images")
+      if (!uploaded?.storagePath) {
+        throw new Error("Could not upload character image.")
+      }
+      return { characterAssetId: null, characterStoragePath: uploaded.storagePath }
+    }
+    const stored = await ensureStoredReferenceImage(referenceImage)
+    if (!stored?.url) {
+      throw new Error("Choose a reference character.")
+    }
+    if (isStoredReferenceImageUrl(stored.url)) {
+      return { characterAssetId: null, characterStoragePath: stored.url }
+    }
+    throw new Error("Upload your character image or pick one from the library.")
+  }
 
   async function onSubmit() {
     if (!importId || !hasCharacter || selectedCount === 0 || !acceptedRights) {
@@ -197,12 +256,14 @@ export function ViralClonerTool() {
     }
     setSubmitting(true)
     try {
+      const character = await resolveCharacterForSubmit()
       const response = await fetch("/api/viral-cloner", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           importId,
-          characterAssetId,
+          characterAssetId: character.characterAssetId,
+          characterStoragePath: character.characterStoragePath,
           selectedItemIndexes: Array.from(selected),
           trims,
           acceptedRightToUse: true,
@@ -240,189 +301,118 @@ export function ViralClonerTool() {
     setAssetModalOpen(false)
   }
 
-  return (
-    <div className="flex h-full min-h-0 flex-col gap-4 lg:flex-row">
-      <Card className="flex min-h-0 flex-1 flex-col border-border/60 shadow-none">
-        <CardContent className="flex flex-col gap-4 p-4">
-          <div className="space-y-2">
-            <Label>Reference character</Label>
-            <div className="flex flex-wrap items-center gap-2">
-              <PhotoUpload
-                value={referenceImage}
-                onChange={(next) => {
-                  setReferenceImage(next)
-                  if (next?.file) setCharacterAssetId(null)
-                }}
-                className="h-28 w-28"
-              />
-              <Button type="button" variant="outline" size="sm" onClick={() => setAssetModalOpen(true)}>
-                <UploadSimple className="mr-2 size-4" />
-                Library
-              </Button>
-            </div>
-          </div>
+  const inputBox = (
+    <ViralClonerInputBox
+      referenceImage={referenceImage}
+      onReferenceImageChange={(next) => {
+        setReferenceImage(next)
+        if (next?.file) setCharacterAssetId(null)
+      }}
+      onOpenLibrary={() => setAssetModalOpen(true)}
+      sourceUrl={sourceUrl}
+      onSourceUrlChange={setSourceUrl}
+      inspecting={inspecting}
+      acceptedRights={acceptedRights}
+      onAcceptedRightsChange={setAcceptedRights}
+      selectedCount={selectedCount}
+      creditTotal={ctaCredits}
+      isReady={isReady}
+      isSubmitting={submitting}
+      onGenerate={() => void onSubmit()}
+    />
+  )
 
-          <div className="space-y-2">
-            <Label htmlFor="viral-source-url">Post URL</Label>
-            <Input
-              id="viral-source-url"
-              value={sourceUrl}
-              onChange={(event) => setSourceUrl(event.target.value)}
-              placeholder="https://www.tiktok.com/..."
-              className="font-mono text-sm"
-            />
-            {inspecting ? <p className="text-xs text-muted-foreground">Inspecting…</p> : null}
-          </div>
-
-          {media.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {media.map((item) => (
-                <div
-                  key={item.index}
-                  className={cn(
-                    "rounded-lg border p-2",
-                    selected.has(item.index) ? "border-primary bg-primary/5" : "border-border",
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleSelected(item.index)}
-                    className="w-full text-left"
-                  >
-                    <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>
-                        #{item.index + 1} · {item.kind}
-                        {item.durationSeconds != null ? ` · ${item.durationSeconds}s` : ""}
-                      </span>
-                      <Checkbox checked={selected.has(item.index)} aria-hidden />
-                    </div>
-                    {item.previewUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={item.previewUrl}
-                        alt=""
-                        className="aspect-video w-full rounded-md object-cover"
-                      />
-                    ) : (
-                      <div className="flex aspect-video items-center justify-center rounded-md bg-muted text-xs">
-                        Video preview
-                      </div>
-                    )}
-                  </button>
-                  {selected.has(item.index) && needsTrim(item) ? (
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                      <label className="space-y-1">
-                        <span className="text-muted-foreground">Start (s)</span>
-                        <Input
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={trims[item.index]?.startSeconds ?? 0}
-                          onChange={(e) =>
-                            updateTrim(item.index, { startSeconds: Number(e.target.value) })
-                          }
-                        />
-                      </label>
-                      <label className="space-y-1">
-                        <span className="text-muted-foreground">End (s)</span>
-                        <Input
-                          type="number"
-                          min={GENJUTSU_MIN_SECONDS}
-                          max={item.durationSeconds ?? GENJUTSU_MAX_SECONDS}
-                          step={0.1}
-                          value={
-                            trims[item.index]?.endSeconds ??
-                            Math.min(item.durationSeconds ?? GENJUTSU_MAX_SECONDS, GENJUTSU_MAX_SECONDS)
-                          }
-                          onChange={(e) =>
-                            updateTrim(item.index, { endSeconds: Number(e.target.value) })
-                          }
-                        />
-                      </label>
-                    </div>
-                  ) : null}
+  const showcase = (
+    <div className="flex min-h-0 flex-col gap-3 pb-44 lg:pb-32">
+      {jobId ? (
+        <p className="text-xs text-muted-foreground px-1">
+          Job {jobId.slice(0, 8)}… · {jobStatus ?? "starting"}
+        </p>
+      ) : null}
+      <ViralClonerTargetGrid
+        items={gridItems}
+        characterFaceUrl={referenceImage?.url ?? null}
+        onToggleSelect={toggleSelected}
+        onRetry={jobId ? retryItem : undefined}
+      />
+      {media.some((item) => selected.has(item.index) && needsTrim(item)) ? (
+        <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-xs">
+          <p className="mb-2 font-medium text-foreground">Trim long videos (max {GENJUTSU_MAX_SECONDS}s)</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {media
+              .filter((item) => selected.has(item.index) && needsTrim(item))
+              .map((item) => (
+                <div key={item.index} className="grid grid-cols-2 gap-2">
+                  <label className="space-y-1">
+                    <span className="text-muted-foreground">Item {item.index + 1} start (s)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-2"
+                      value={trims[item.index]?.startSeconds ?? 0}
+                      onChange={(e) => updateTrim(item.index, { startSeconds: Number(e.target.value) })}
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-muted-foreground">End (s)</span>
+                    <input
+                      type="number"
+                      min={GENJUTSU_MIN_SECONDS}
+                      max={item.durationSeconds ?? GENJUTSU_MAX_SECONDS}
+                      step={0.1}
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-2"
+                      value={
+                        trims[item.index]?.endSeconds ??
+                        Math.min(item.durationSeconds ?? GENJUTSU_MAX_SECONDS, GENJUTSU_MAX_SECONDS)
+                      }
+                      onChange={(e) => updateTrim(item.index, { endSeconds: Number(e.target.value) })}
+                    />
+                  </label>
                 </div>
               ))}
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap items-center gap-3 border-t pt-3">
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Checkbox checked={acceptedRights} onCheckedChange={(v) => setAcceptedRights(v === true)} />
-              I have the right to use this source media for cloning.
-            </label>
-            <Button
-              type="button"
-              disabled={submitting || !importId || !hasCharacter || selectedCount === 0 || !acceptedRights}
-              onClick={() => void onSubmit()}
-            >
-              {submitting ? "Starting…" : ctaLabel}
-            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      ) : null}
+    </div>
+  )
 
-      <Card className="w-full border-border/60 shadow-none lg:w-[360px]">
-        <CardContent className="space-y-3 p-4">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <LinkSimple className="size-4" />
-            Outputs
+  const isRowLayout = layoutMode === "row"
+
+  return (
+    <div
+      className={cn(
+        "h-[calc(100dvh-52px)] min-h-0 overflow-hidden bg-background flex flex-col",
+        isRowLayout ? "px-0" : "px-4 pb-0 sm:px-6 md:px-12",
+      )}
+    >
+      <ul className="sr-only" aria-live="polite">
+        {quote?.lines.map((line) => (
+          <li key={line.index}>
+            Item {line.index + 1}: {line.credits} credits
+          </li>
+        ))}
+      </ul>
+
+      <div className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col", !isRowLayout && "max-w-7xl")}>
+        <GeneratorLayout layoutMode={layoutMode} className="h-full min-h-0 flex-1">
+          <div className="flex h-full min-h-0 flex-1 flex-col overflow-auto overscroll-contain [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {showcase}
           </div>
-          {jobId ? (
-            <p className="text-sm text-muted-foreground">
-              Job {jobId.slice(0, 8)}… · {jobStatus ?? "starting"}
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground">Confirm cloning to track each output here.</p>
-          )}
-          {jobItems.length > 0 ? (
-            <ul className="space-y-2 text-xs">
-              {jobItems.map((item) => (
-                <li key={item.id} className="rounded border border-border p-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>
-                      Item {item.item_index + 1} · {item.status}
-                    </span>
-                    {item.status === "failed" ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void retryItem(item.item_index)}
-                      >
-                        Retry
-                      </Button>
-                    ) : null}
-                  </div>
-                  {item.output_url ? (
-                    <a
-                      href={item.output_url}
-                      className="mt-1 block truncate text-primary underline"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      View output
-                    </a>
-                  ) : null}
-                  {item.error_message ? (
-                    <p className="mt-1 text-destructive">{item.error_message}</p>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {quote ? (
-            <ul className="space-y-1 text-xs text-muted-foreground">
-              {quote.lines.map((line) => (
-                <li key={line.index}>
-                  Item {line.index + 1}: {line.credits} credits
-                </li>
-              ))}
-              <li className="font-medium text-foreground">Total: {quote.totalCredits} credits (includes 1 import)</li>
-            </ul>
-          ) : null}
-        </CardContent>
-      </Card>
+        </GeneratorLayout>
+      </div>
+
+      <div
+        className={cn(
+          "pointer-events-none fixed bottom-0 left-0 z-50 p-4 sm:p-6",
+          !isRowLayout && "lg:left-[50%] lg:right-0 lg:max-w-none",
+        )}
+        style={fixedPromptPanelStyle}
+      >
+        <div className="pointer-events-none mx-auto flex max-w-7xl justify-center">
+          <div className="pointer-events-auto w-full max-w-sm sm:max-w-lg lg:max-w-4xl">{inputBox}</div>
+        </div>
+      </div>
 
       <AssetSelectionModal
         open={assetModalOpen}

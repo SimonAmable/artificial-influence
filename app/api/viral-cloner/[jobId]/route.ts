@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
+import { waitUntil } from "@vercel/functions"
 
 import { createClient } from "@/lib/supabase/server"
+import { processViralCloneJob } from "@/lib/viral-cloner/worker"
 
 type RouteContext = {
   params: Promise<{ jobId: string }>
@@ -55,6 +57,19 @@ export async function GET(_request: Request, context: RouteContext) {
     }
 
     const itemCredits = (items ?? []).reduce((sum, row) => sum + Number(row.quoted_credits ?? 0), 0)
+
+    const needsWorkerNudge =
+      job.status === "importing" ||
+      job.status === "submitting" ||
+      (items ?? []).some(
+        (row) =>
+          row.status === "pending" ||
+          row.status === "importing" ||
+          row.status === "queued",
+      )
+    if (needsWorkerNudge) {
+      waitUntil(processViralCloneJob(jobId))
+    }
 
     return NextResponse.json({
       job,

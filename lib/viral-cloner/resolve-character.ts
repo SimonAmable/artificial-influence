@@ -30,13 +30,21 @@ export async function resolveViralClonerCharacterReference(input: {
   }
 
   if (input.characterStoragePath) {
-    const { data } = input.supabase.storage.from("public-bucket").getPublicUrl(input.characterStoragePath)
+  const storagePath = input.characterStoragePath.trim()
+  if (/^https:\/\//i.test(storagePath)) {
+    return {
+      referenceImageUrl: storagePath,
+      referenceStoragePath: null,
+      characterAssetId: null,
+    }
+  }
+    const { data } = input.supabase.storage.from("public-bucket").getPublicUrl(storagePath)
     if (!data?.publicUrl) {
       throw new Error("Character image is missing.")
     }
     return {
       referenceImageUrl: data.publicUrl,
-      referenceStoragePath: input.characterStoragePath,
+      referenceStoragePath: storagePath,
       characterAssetId: null,
     }
   }

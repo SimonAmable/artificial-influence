@@ -283,7 +283,7 @@ export const pinterestSocialImportAdapter: SocialImportAdapter = {
 export const redgifsSocialImportAdapter: SocialImportAdapter = {
   platform: "redgifs",
   matches(url) {
-    return hostMatches(url, [/^redgifs\.com$/i])
+    return hostMatches(url, [/^redgifs\.com$/i, /^i\.redgifs\.com$/i])
   },
   async inspect(url) {
     return inspectWithApify(

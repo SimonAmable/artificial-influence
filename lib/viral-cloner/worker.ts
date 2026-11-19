@@ -79,13 +79,6 @@ export async function processViralCloneJob(jobId: string): Promise<void> {
       !(typeof item.source_storage_path === "string" && item.source_storage_path.length > 0),
   )
 
-  const character = await resolveViralClonerCharacterReference({
-    supabase,
-    userId: job.user_id,
-    characterAssetId: job.character_asset_id,
-    characterStoragePath: job.character_storage_path,
-  })
-
   const mediaByIndex = new Map<number, SocialMediaItem>()
   for (const entry of manifest.media) {
     mediaByIndex.set(entry.index, entry)
@@ -110,7 +103,16 @@ export async function processViralCloneJob(jobId: string): Promise<void> {
     }
   }
 
+  let character: Awaited<ReturnType<typeof resolveViralClonerCharacterReference>>
+
   try {
+    character = await resolveViralClonerCharacterReference({
+      supabase,
+      userId: job.user_id,
+      characterAssetId: job.character_asset_id,
+      characterStoragePath: job.character_storage_path,
+    })
+
     if (needsFreshImport) {
       await markImportDownloading(supabase, job.social_import_id)
     }
